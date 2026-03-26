@@ -1,3 +1,10 @@
 fn main() {
-    println!("Hello, world! {}", topcoat::add(5, 6));
+    topcoat::view! {
+        html {
+            head {
+                title { "pip" }
+            }
+        }
+    };
+    println!("Hello, world!");
 }

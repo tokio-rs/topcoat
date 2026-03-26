@@ -2,6 +2,8 @@
 resolver = "2"
 members = [
     "crates/topcoat",
+    "crates/topcoat-macro",
+    "crates/topcoat-view",
 
     "examples/hello-world",
 ]
@@ -12,3 +14,5 @@ unsafe_code = "deny"
 [workspace.dependencies]
 # Topcoat crates
 topcoat = { path = "crates/topcoat" }
+topcoat-macro = { path = "crates/topcoat-macro" }
+topcoat-view = { path = "crates/topcoat-view" }
