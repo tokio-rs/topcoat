@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/topcoat",
+
+    "examples/hello-world",
+]
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.dependencies]
+# Topcoat crates
+topcoat = { path = "crates/topcoat" }
