@@ -1,6 +1,4 @@
 fn main() {
-    let name = "carl";
-
     let content = topcoat::view! {
         <html>
             <head>
@@ -11,8 +9,10 @@ fn main() {
                     if name.len() < 5 {
                         <div>
                             "hello " (name)
+                            <input />
                         </div>
                     } else {
+                        <br>
                         "im " (name)
                     }
                 }
