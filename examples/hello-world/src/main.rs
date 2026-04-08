@@ -7,6 +7,7 @@ fn main() {
             <body>
                 for name in ["carl", "julien"] {
                     if name.len() < 5 {
+                        let name = name.to_uppercase();
                         <div>
                             "hello " (name)
                             <input />
