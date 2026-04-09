@@ -35,6 +35,7 @@ impl ToTokens for ComponentItem {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let item = &self.item;
         let ident = &item.sig.ident;
+        let generics = &item.sig.generics;
         // let props_struct_ident = Ident::new(
         //     &(self.item.sig.ident.to_string().to_upper_camel_case() + "Props"),
         //     self.item.sig.ident.span(),
@@ -61,11 +62,11 @@ impl ToTokens for ComponentItem {
 
         quote! {
             #[allow(non_camel_case_types)]
-            struct #ident {
+            struct #ident #generics {
                 #(#fields),*
             }
 
-            impl ::topcoat::component::Component for #ident {
+            impl #generics ::topcoat::component::Component for #ident #generics {
                 async fn render(self) -> ::topcoat::view::View {
                     #item
                     #ident(#(#args),*).await

@@ -1,9 +1,9 @@
 use topcoat::{component, view, view::View};
 
 #[component]
-async fn button(child: View) -> View {
+async fn button<'a>(id: &'a str, child: View) -> View {
     view! {
-        <button class="button">(child)</button>
+        <button id=(id) class="button">(child)</button>
     }
 }
 
@@ -15,7 +15,7 @@ async fn main() {
                 <title>"hello world"</title>
             </head>
             <body id="test">
-                [button]
+                [button id="5"]
                     "click me"
                 [/button]
             </body>
