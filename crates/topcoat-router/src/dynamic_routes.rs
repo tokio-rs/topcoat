@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use http::Method;
+use matchit::Params;
 
-use crate::{Pattern, pattern::Segment, route::RouteId};
+use crate::{Path, Pattern, pattern::Segment, route::RouteId};
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct DynamicRoutes {
@@ -22,7 +23,11 @@ impl DynamicRoutes {
             .unwrap();
     }
 
-    pub fn get<'path>(&self, method: &Method, path: &'path str) -> Option<DynamicMatch<'_, 'path>> {
+    pub fn get<'path>(
+        &self,
+        method: &Method,
+        path: &'path Path<'_>,
+    ) -> Option<DynamicMatch<'_, 'path>> {
         self.routers
             .get(method)?
             .at(path)
@@ -61,8 +66,8 @@ fn convert_pattern(pattern: &Pattern) -> String {
 }
 
 pub(crate) struct DynamicMatch<'k, 'v> {
-    route_id: RouteId,
-    params: matchit::Params<'k, 'v>,
+    pub(crate) route_id: RouteId,
+    pub(crate) params: Params<'k, 'v>,
 }
 
 impl<'k, 'v> DynamicMatch<'k, 'v> {

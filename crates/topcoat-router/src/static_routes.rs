@@ -19,8 +19,10 @@ impl StaticRoutes {
             .insert(StaticRouteKey::new(method, path), route_id);
     }
 
-    pub fn get(&self, method: Method, path: Path) -> Option<RouteId> {
-        self.routes.get(&StaticRouteKey::new(method, path)).copied()
+    pub fn get(&self, method: &Method, path: &Path<'_>) -> Option<RouteId> {
+        self.routes
+            .get(&StaticRouteKey::new(method.clone(), path.clone()))
+            .copied()
     }
 }
 
