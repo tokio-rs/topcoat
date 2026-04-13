@@ -14,7 +14,10 @@ path = "src/bin/cargo_topcoat.rs"
 
 [dependencies]
 clap = { version = "4.6.0", features = ["derive"] }
-tokio = { version = "1.51.0", features = ["rt-multi-thread", "macros"] }
+notify = "8.1.0"
+indicatif = "0.18"
+serde_json = "1"
+tokio = { version = "1.51.0", features = ["rt-multi-thread", "macros", "process", "signal", "io-util", "time", "sync"] }
 
 [lints]
 workspace = true

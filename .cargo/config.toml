@@ -1,2 +1,2 @@
 [alias]
-topcoat = "run --bin topcoat --"
+topcoat = "run -p topcoat-cli --bin topcoat --"
