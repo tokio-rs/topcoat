@@ -39,11 +39,13 @@ impl DevCommand {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => {
                     eprintln!();
-                    eprintln!("  {}", style("shutting down...").dim());
+                    let spinner = make_spinner("shutting down...");
                     eprintln!();
                     if let Some(c) = &mut child {
                         kill_child(c).await;
                     }
+                    spinner.finish_and_clear();
+                    eprintln!();
                     break;
                 }
                 Some(_event) = rx.recv() => {
