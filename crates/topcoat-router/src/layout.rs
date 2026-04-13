@@ -2,18 +2,20 @@ use std::pin::Pin;
 
 use topcoat_view::runtime::View;
 
+pub type Slot = Pin<Box<dyn Future<Output = View> + Send>>;
+
 #[derive(Clone)]
 pub struct Layout {
     file: &'static str,
     path: &'static str,
-    render: fn() -> Pin<Box<dyn Future<Output = View> + Send>>,
+    render: fn(slot: Slot) -> Pin<Box<dyn Future<Output = View> + Send>>,
 }
 
 impl Layout {
     pub const fn new(
         file: &'static str,
         path: &'static str,
-        render: fn() -> Pin<Box<dyn Future<Output = View> + Send>>,
+        render: fn(slot: Slot) -> Pin<Box<dyn Future<Output = View> + Send>>,
     ) -> Self {
         Self { file, path, render }
     }
@@ -26,7 +28,7 @@ impl Layout {
         self.path
     }
 
-    pub fn render(&self) -> Pin<Box<dyn Future<Output = View> + Send>> {
-        (self.render)()
+    pub fn render(&self, slot: Slot) -> Pin<Box<dyn Future<Output = View> + Send>> {
+        (self.render)(slot)
     }
 }

@@ -42,9 +42,10 @@ impl ToTokens for Layout {
             #[allow(non_upper_case_globals)]
             const #ident: ::topcoat::router::layout::Layout = ::topcoat::router::layout::Layout::new(
                 file!(),
-                || {
+                "",
+                |page| {
                     #item
-                    Box::pin(#ident())
+                    Box::pin(#ident(page))
                 }
             );
         }

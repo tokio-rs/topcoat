@@ -3,11 +3,12 @@ pub mod page;
 
 use axum::routing::get;
 
-use crate::page::Page;
+use crate::{layout::Layout, page::Page};
 
 #[derive(Default)]
 pub struct Router {
     pages: Vec<Page>,
+    layouts: Vec<Layout>,
 }
 
 impl Router {
@@ -19,6 +20,11 @@ impl Router {
         self.pages.push(page);
         self
     }
+
+    pub fn layout(mut self, layout: Layout) -> Self {
+        self.layouts.push(layout);
+        self
+    }
 }
 
 impl From<Router> for axum::Router {
@@ -26,7 +32,17 @@ impl From<Router> for axum::Router {
         let mut result = axum::Router::new();
 
         for page in value.pages {
-            result = result.route(page.path(), get(async move || page.render().await));
+            let layouts = value.layouts.clone();
+            result = result.route(
+                page.path(),
+                get(async move || {
+                    let mut result = page.render();
+                    for layout in layouts {
+                        result = layout.render(result);
+                    }
+                    result.await
+                }),
+            );
         }
 
         result
