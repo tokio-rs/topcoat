@@ -11,6 +11,7 @@ async fn main() {
         "/",
         get(async || {
             view! {
+                <!DOCTYPE html>
                 <html>
                     <head>
                         <title>"hello world"</title>

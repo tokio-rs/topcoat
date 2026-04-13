@@ -1,5 +1,6 @@
 mod attribute;
 mod component;
+mod document_type;
 mod element;
 mod node;
 mod node_block;
@@ -13,6 +14,7 @@ mod view;
 
 pub use attribute::*;
 pub use component::*;
+pub use document_type::*;
 pub use element::*;
 pub use node::*;
 pub use node_block::*;

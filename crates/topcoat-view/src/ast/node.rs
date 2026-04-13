@@ -6,14 +6,15 @@ use syn::{
 
 use crate::{
     ast::{
-        Component, Element, NodeBlock, NodeBreak, NodeContinue, NodeExpr, NodeForLoop, NodeIf,
-        NodeLet, NodeMatch, ParseOption,
+        Component, DocumentType, Element, NodeBlock, NodeBreak, NodeContinue, NodeExpr,
+        NodeForLoop, NodeIf, NodeLet, NodeMatch, ParseOption,
     },
     output::ViewWriter,
 };
 
 pub enum Node {
     Text(LitStr),
+    DocumentType(DocumentType),
     Element(Element),
     Component(Component),
     Expr(NodeExpr),
@@ -30,6 +31,7 @@ impl Node {
     pub(crate) fn write(&self, writer: &mut ViewWriter) {
         match self {
             Self::Text(inner) => writer.push_escaped(&inner.value()),
+            Self::DocumentType(inner) => inner.write(writer),
             Self::Element(inner) => inner.write(writer),
             Self::Component(inner) => inner.write(writer),
             Self::Expr(inner) => inner.write(writer),
@@ -48,6 +50,8 @@ impl Parse for Node {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let result = if input.peek(LitStr) {
             Self::Text(input.parse()?)
+        } else if DocumentType::peek(input) {
+            Self::DocumentType(input.parse()?)
         } else if Element::peek(input) {
             Self::Element(input.parse()?)
         } else if Component::peek(input) {
