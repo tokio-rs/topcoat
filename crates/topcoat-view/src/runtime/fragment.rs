@@ -1,7 +1,15 @@
 use crate::runtime::{Formatter, view::View};
 
+/// A piece of content that can be rendered into HTML.
+///
+/// Every `Fragment` provides two rendering paths:
+///
+/// - [`fmt`](Self::fmt) — the default, which escapes HTML-significant characters.
+/// - [`fmt_unescaped`](Self::fmt_unescaped) — writes content verbatim, for trusted markup.
 pub trait Fragment {
+    /// Renders this fragment into the formatter, escaping by default.
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result;
+    /// Renders this fragment into the formatter without escaping.
     fn fmt_unescaped(&self, f: &mut Formatter<'_>) -> std::fmt::Result;
 }
 
@@ -44,12 +52,27 @@ impl Fragment for View {
     }
 }
 
+/// A wrapper that marks a fragment as already escaped / trusted.
+///
+/// When rendered, `Escaped<T>` bypasses escaping — both [`fmt`](Fragment::fmt)
+/// and [`fmt_unescaped`](Fragment::fmt_unescaped) write the inner content
+/// verbatim. This is useful for content that is known to be safe HTML, such as
+/// the output of a previous render pass.
+///
+/// Constructed via [`new_unchecked`](Self::new_unchecked) to make the trust
+/// decision explicit at the call site.
 pub struct Escaped<T>(T);
 
 impl<T> Escaped<T>
 where
     T: Fragment,
 {
+    /// Wraps `inner` as already-escaped content.
+    ///
+    /// # Safety (logical)
+    ///
+    /// The caller must ensure `inner` does not contain untrusted HTML.
+    /// Misuse can lead to XSS vulnerabilities.
     #[inline]
     pub fn new_unchecked(inner: T) -> Self {
         Self(inner)
