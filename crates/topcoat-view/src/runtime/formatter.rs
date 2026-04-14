@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 /// An HTML-aware writer that escapes text content by default.
 ///
-/// `Formatter` wraps any [`std::fmt::Write`] destination and provides paired
+/// `Formatter` wraps a [`String`] buffer and provides paired
 /// escaped/unescaped methods for writing strings and characters. The escaped
 /// variants handle the five characters that are meaningful in HTML:
 ///
@@ -20,33 +20,33 @@ use std::fmt::Write;
 /// [`write_char_unescaped`](Self::write_char_unescaped)) for trusted markup
 /// like tags and attributes.
 pub struct Formatter<'a> {
-    write: &'a mut dyn Write,
+    buf: &'a mut String,
 }
 
 impl<'a> Formatter<'a> {
     /// Creates a new `Formatter` that writes into the given destination.
     #[inline]
-    pub fn new(write: &'a mut dyn Write) -> Self {
-        Self { write }
+    pub fn new(buf: &'a mut String) -> Self {
+        Self { buf }
     }
 
     /// Writes a single character, escaping it if it is HTML-significant.
     #[inline]
-    pub fn write_char(&mut self, c: char) -> std::fmt::Result {
+    pub fn write_char(&mut self, c: char) {
         match c {
-            '&' => self.write.write_str("&amp;"),
-            '<' => self.write.write_str("&lt;"),
-            '>' => self.write.write_str("&gt;"),
-            '"' => self.write.write_str("&quot;"),
-            '\'' => self.write.write_str("&#x27;"),
+            '&' => self.buf.push_str("&amp;"),
+            '<' => self.buf.push_str("&lt;"),
+            '>' => self.buf.push_str("&gt;"),
+            '"' => self.buf.push_str("&quot;"),
+            '\'' => self.buf.push_str("&#x27;"),
             _ => self.write_char_unescaped(c),
-        }
+        };
     }
 
     /// Writes a single character without escaping. Use for trusted content only.
     #[inline]
-    pub fn write_char_unescaped(&mut self, c: char) -> std::fmt::Result {
-        self.write.write_char(c)
+    pub fn write_char_unescaped(&mut self, c: char) {
+        self.buf.push(c);
     }
 
     /// Writes a string, escaping any HTML-significant characters.
@@ -56,7 +56,7 @@ impl<'a> Formatter<'a> {
     /// the overhead of writing one character at a time for strings that are
     /// mostly (or entirely) safe.
     #[inline]
-    pub fn write_str(&mut self, s: &str) -> std::fmt::Result {
+    pub fn write_str(&mut self, s: &str) {
         let bytes = s.as_bytes();
         let mut last = 0;
 
@@ -71,23 +71,21 @@ impl<'a> Formatter<'a> {
             };
 
             if last < i {
-                self.write.write_str(&s[last..i])?;
+                self.buf.push_str(&s[last..i]);
             }
-            self.write.write_str(escape)?;
+            self.buf.push_str(escape);
             last = i + 1;
         }
 
         if last < s.len() {
-            self.write.write_str(&s[last..])?;
+            self.buf.push_str(&s[last..]);
         }
-
-        Ok(())
     }
 
     /// Writes a string without escaping. Use for trusted markup like tags and attributes.
     #[inline]
-    pub fn write_str_unescaped(&mut self, s: &str) -> std::fmt::Result {
-        self.write.write_str(s)
+    pub fn write_str_unescaped(&mut self, s: &str) {
+        self.buf.write_str(s);
     }
 }
 
@@ -98,7 +96,7 @@ mod tests {
     fn escape(s: &str) -> String {
         let mut buf = String::new();
         let mut f = Formatter::new(&mut buf);
-        f.write_str(s).unwrap();
+        f.write_str(s);
         buf
     }
 

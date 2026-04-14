@@ -8,9 +8,9 @@ use crate::runtime::{Formatter, view::View};
 /// - [`fmt_unescaped`](Self::fmt_unescaped) — writes content verbatim, for trusted markup.
 pub trait Fragment {
     /// Renders this fragment into the formatter, escaping by default.
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result;
+    fn fmt(&self, f: &mut Formatter<'_>);
     /// Renders this fragment into the formatter without escaping.
-    fn fmt_unescaped(&self, f: &mut Formatter<'_>) -> std::fmt::Result;
+    fn fmt_unescaped(&self, f: &mut Formatter<'_>);
 }
 
 impl<T> Fragment for T
@@ -18,36 +18,36 @@ where
     T: AsRef<str>,
 {
     #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) {
         f.write_str(self.as_ref())
     }
 
     #[inline]
-    fn fmt_unescaped(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt_unescaped(&self, f: &mut Formatter<'_>) {
         f.write_str_unescaped(self.as_ref())
     }
 }
 
 impl Fragment for &View {
     #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) {
         f.write_str(&self.buf)
     }
 
     #[inline]
-    fn fmt_unescaped(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt_unescaped(&self, f: &mut Formatter<'_>) {
         f.write_str_unescaped(&self.buf)
     }
 }
 
 impl Fragment for View {
     #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) {
         <&View as Fragment>::fmt(&self, f)
     }
 
     #[inline]
-    fn fmt_unescaped(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt_unescaped(&self, f: &mut Formatter<'_>) {
         <&View as Fragment>::fmt_unescaped(&self, f)
     }
 }
@@ -84,12 +84,12 @@ where
     T: Fragment,
 {
     #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) {
         self.fmt_unescaped(f)
     }
 
     #[inline]
-    fn fmt_unescaped(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt_unescaped(&self, f: &mut Formatter<'_>) {
         self.0.fmt_unescaped(f)
     }
 }
