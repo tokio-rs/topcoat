@@ -5,6 +5,7 @@ members = [
     "crates/topcoat",
     "crates/topcoat-axum",
     "crates/topcoat-cli",
+    "crates/topcoat-core",
     "crates/topcoat-macro",
     "crates/topcoat-router",
     "crates/topcoat-view",
@@ -18,6 +19,7 @@ unsafe_code = "deny"
 [workspace.dependencies]
 # Topcoat crates
 topcoat = { path = "crates/topcoat" }
+topcoat-core = { path = "crates/topcoat-core" }
 topcoat-macro = { path = "crates/topcoat-macro" }
 topcoat-router = { path = "crates/topcoat-router" }
 topcoat-view = { path = "crates/topcoat-view" }
