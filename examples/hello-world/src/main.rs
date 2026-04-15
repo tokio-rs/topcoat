@@ -31,17 +31,17 @@ async fn layout(slot: Slot) -> View {
     }
 }
 
-#[page("/")]
+#[page]
 async fn home_page() -> View {
     view! { "home" }
 }
 
-#[page("/about")]
+#[page]
 async fn about_page() -> View {
     view! { "about" }
 }
 
-#[page("/contact")]
+#[page]
 async fn contact_page() -> View {
     view! { "contact" }
 }

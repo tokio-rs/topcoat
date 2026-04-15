@@ -18,16 +18,25 @@ impl Router {
 
     #[doc(hidden)]
     pub fn file_root(mut self, file_root: impl Into<Cow<'static, str>>) -> Self {
+        if !self.pages.is_empty() || !self.layouts.is_empty() {
+            panic!("`file_root` must be called before registering any pages or layouts");
+        }
         self.file_root = Some(file_root.into());
         self
     }
 
     pub fn page(mut self, page: Page) -> Self {
+        if page.path().is_none() && self.file_root.is_none() {
+            panic!("page is missing a path, which is only allowed in file router")
+        }
         self.pages.push(page);
         self
     }
 
     pub fn layout(mut self, layout: Layout) -> Self {
+        if layout.path().is_none() && self.file_root.is_none() {
+            panic!("layout is missing a path, which is only allowed in file router")
+        }
         self.layouts.push(layout);
         self
     }
