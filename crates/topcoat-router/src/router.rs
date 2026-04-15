@@ -6,9 +6,9 @@ use crate::{layout::Layout, page::Page};
 
 #[derive(Default)]
 pub struct Router {
-    file_root: Option<Cow<'static, str>>,
-    pages: Vec<Page>,
-    layouts: Vec<Layout>,
+    pub(crate) file_root: Option<Cow<'static, str>>,
+    pub(crate) pages: Vec<Page>,
+    pub(crate) layouts: Vec<Layout>,
 }
 
 impl Router {
@@ -57,10 +57,16 @@ impl From<Router> for axum::Router {
     fn from(value: Router) -> Self {
         let mut result = axum::Router::new();
 
-        for page in value.pages {
+        for page in &value.pages {
+            let page = page.clone();
             let layouts = value.layouts.clone();
+            let path = page
+                .path()
+                .map(Cow::Borrowed)
+                .unwrap_or_else(|| Cow::Owned(value.path_from_file(page.file())));
+
             result = result.route(
-                page.path().unwrap(),
+                &path,
                 get(async move || {
                     let mut result = page.render();
                     for layout in layouts {
