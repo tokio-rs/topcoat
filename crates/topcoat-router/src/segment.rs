@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Segment<'a> {
     Static(&'a str),
     Group(&'a str),
@@ -63,6 +64,14 @@ impl<'a> Segment<'a> {
         matches!(self, Self::Param(..))
     }
 
+    /// Returns `true` if the segment is [`CatchAll`].
+    ///
+    /// [`CatchAll`]: Segment::CatchAll
+    #[must_use]
+    pub fn is_catch_all(&self) -> bool {
+        matches!(self, Self::CatchAll(..))
+    }
+
     pub fn as_static(&self) -> Option<&&'a str> {
         if let Self::Static(v) = self {
             Some(v)
@@ -81,6 +90,14 @@ impl<'a> Segment<'a> {
 
     pub fn as_param(&self) -> Option<&&'a str> {
         if let Self::Param(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_catch_all(&self) -> Option<&&'a str> {
+        if let Self::CatchAll(v) = self {
             Some(v)
         } else {
             None

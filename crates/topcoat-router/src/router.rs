@@ -66,7 +66,7 @@ impl From<Router> for axum::Router {
                 .unwrap_or_else(|| Cow::Owned(value.path_from_file(page.file())));
 
             result = result.route(
-                &path,
+                &path.to_axum_path(),
                 get(async move || {
                     let mut result = page.render();
                     for layout in layouts {
