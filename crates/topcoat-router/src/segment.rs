@@ -30,9 +30,6 @@ impl<'a> Segment<'a> {
             assert_valid_ident(inner, "group", s);
             Segment::Group(inner)
         } else {
-            if s.is_empty() {
-                panic!("invalid segment: segment must not be empty");
-            }
             if s.contains('{') || s.contains('}') || s.contains('(') || s.contains(')') {
                 panic!("invalid segment: unexpected brackets in `{s}`");
             }

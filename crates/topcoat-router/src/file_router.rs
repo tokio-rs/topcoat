@@ -16,7 +16,7 @@ impl Router {
     /// # Examples
     ///
     /// - `./src/app/home.rs` → `/home`
-    /// - `./src/app/settings/mod.rs` → `/settings`
+    /// - `./src/app/dashboard/_group/settings/mod.rs` → `/dashboard/settings`
     pub(crate) fn path_from_file(&self, file: &str) -> PathBuf {
         let file_root = self
             .file_root
@@ -33,9 +33,9 @@ impl Router {
             .skip(1)
             .map(|s| {
                 if s.starts_with("_") {
-                    Segment::Static(s)
-                } else {
                     Segment::Group(s)
+                } else {
+                    Segment::Static(s)
                 }
             })
             .collect()

@@ -1,5 +1,5 @@
+mod _group;
 mod about;
-mod contact;
 
 use topcoat::{
     router::{Slot, layout, page},
