@@ -19,49 +19,55 @@ impl Router {
 
     #[doc(hidden)]
     pub fn file_root(mut self, file_root: impl Into<Cow<'static, str>>) -> Self {
-        if !self.pages.is_empty() || !self.layouts.is_empty() {
-            panic!("`file_root` must be called before registering any pages or layouts");
-        }
+        assert!(
+            self.segments.is_empty() && self.pages.is_empty() && self.layouts.is_empty(),
+            "`file_root` must be called before registering any resource"
+        );
         self.file_root = Some(file_root.into());
         self
     }
 
+    #[doc(hidden)]
+    pub fn segment(mut self, segment: Segment) -> Self {
+        assert!(
+            self.file_root.is_some(),
+            "segments may only be used as part of a file router"
+        );
+        self.segments.push(segment);
+        self
+    }
+
     pub fn page(mut self, page: Page) -> Self {
-        if page.path().is_none() && self.file_root.is_none() {
-            panic!("page is missing a path, which is only allowed in file router")
-        }
+        assert!(
+            page.path().is_some() || self.file_root.is_some(),
+            "page is missing a path, which is only allowed in file router"
+        );
         self.pages.push(page);
         self
     }
 
     pub fn layout(mut self, layout: Layout) -> Self {
-        if layout.path().is_none() && self.file_root.is_none() {
-            panic!("layout is missing a path, which is only allowed in file router")
-        }
+        assert!(
+            layout.path().is_some() || self.file_root.is_some(),
+            "layout is missing a path, which is only allowed in file router"
+        );
         self.layouts.push(layout);
-        self
-    }
-
-    pub fn segment(mut self, segment: Segment) -> Self {
-        if self.file_root.is_none() {
-            panic!("segments may only be used in a file router")
-        }
-        self.segments.push(segment);
         self
     }
 
     #[cfg(feature = "discover")]
     pub fn discover(mut self) -> Self {
+        if self.file_root.is_some() {
+            for segment in inventory::iter::<Segment>().cloned() {
+                self = self.segment(segment);
+            }
+        }
+
         for page in inventory::iter::<Page>().cloned() {
             self = self.page(page);
         }
         for layout in inventory::iter::<Layout>().cloned() {
             self = self.layout(layout);
-        }
-        if self.file_root.is_some() {
-            for segment in inventory::iter::<Segment>().cloned() {
-                self = self.segment(segment);
-            }
         }
         self
     }
