@@ -204,11 +204,11 @@ impl Display for PathBuf {
 ///
 /// Topcoat paths use four segment types:
 ///
-/// | Syntax      | Variant    | Example     | Description                                            |
-/// |-------------|------------|-------------|--------------------------------------------------------|
-/// | `foo`       | `Static`   | `users`     | Literal URL segment                                    |
+/// | Syntax      | Variant    | Example     | Description                                             |
+/// |-------------|------------|-------------|---------------------------------------------------------|
+/// | `foo`       | `Static`   | `users`     | Literal URL segment                                     |
 /// | `{name}`    | `Param`    | `{id}`      | Dynamic parameter, extracted at request time            |
-/// | `{*name}`   | `CatchAll` | `{*path}`   | Wildcard tail, matches the rest of the URL             |
+/// | `{*name}`   | `CatchAll` | `{*path}`   | Wildcard tail, matches the rest of the URL              |
 /// | `(name)`    | `Group`    | `(auth)`    | Logical grouping for layout matching, stripped from URL |
 ///
 /// Segment names (for `Param`, `CatchAll`, and `Group`) must be valid
