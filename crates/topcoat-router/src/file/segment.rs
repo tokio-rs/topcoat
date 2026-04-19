@@ -52,7 +52,7 @@ impl Segments {
 
     pub fn register(&mut self, path: &'static str, segment: Segment) {
         if let Some(existing) = self.segments.insert(path, segment) {
-            panic!("duplicate segment description in `{}`", existing.file())
+            panic!("duplicate segment specifier in `{}`", existing.file())
         }
     }
 
@@ -62,5 +62,41 @@ impl Segments {
 
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_segment() -> Segment {
+        Segment::new("test.rs", Some(SegmentKind::Static), None)
+    }
+
+    #[test]
+    fn register_and_get() {
+        let mut segments = Segments::new();
+        segments.register("foo", test_segment());
+
+        assert!(!segments.is_empty());
+        let seg = segments.get("foo").unwrap();
+        assert_eq!(seg.file(), "test.rs");
+        assert_eq!(seg.kind(), Some(&SegmentKind::Static));
+        assert_eq!(seg.rename(), None);
+    }
+
+    #[test]
+    fn get_missing_returns_none() {
+        let segments = Segments::new();
+        assert!(segments.is_empty());
+        assert!(segments.get("nope").is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate segment specifier")]
+    fn register_duplicate_panics() {
+        let mut segments = Segments::new();
+        segments.register("foo", test_segment());
+        segments.register("foo", test_segment());
     }
 }
