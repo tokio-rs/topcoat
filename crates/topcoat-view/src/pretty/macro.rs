@@ -7,7 +7,7 @@ use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer};
 
 /// A wrapper type that parses and pretty-prints content with any of the three delimiter types.
 ///
-/// This enum is used by the Kosame formatter (`cargo kosame fmt`) to scan macro invocations
+/// This enum is used by the Topcoat formatter (`cargo topcoat fmt`) to scan macro invocations
 /// in Rust source files and reformat their contents while preserving the original delimiter
 /// choice. Different delimiter types receive different formatting treatment:
 ///
@@ -19,16 +19,16 @@ use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer};
 ///
 /// The formatter uses this type with [`pretty_print_macro_str`] to reformat macro contents:
 ///
-/// ```ignore
+/// ```rust,ignore
 /// // Parse and reformat a macro invocation based on its delimiter
-/// let result = pretty_print_macro_str::<Macro<kosame_dsl::schema::Table>>(
-///     "{ create table users ( id int ) }",
+/// let result = pretty_print_macro_str::<Macro<topcoat_view::ast::View>>(
+///     "{ <html><body>"format"</body></html> }",
 ///     initial_space,
 ///     initial_indent,
 /// )?;
 /// ```
 ///
-/// When the formatter encounters a macro like `pg_table! { ... }` or `table!( ... )`,
+/// When the formatter encounters a macro like `view! { ... }` or `view!( ... )`,
 /// it extracts the delimiter span and uses this type to parse and reformat the contents
 /// according to the delimiter type used.
 ///

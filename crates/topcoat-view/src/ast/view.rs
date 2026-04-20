@@ -31,3 +31,8 @@ impl ToTokens for View {
         writer.to_tokens(tokens);
     }
 }
+
+#[cfg(feature = "pretty")]
+impl crate::pretty::PrettyPrint for View {
+    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {}
+}
