@@ -204,6 +204,12 @@ impl<'a> Printer<'a> {
         }
     }
 
+    pub fn skip_trivia(&mut self) {
+        while self.ready_trivia().is_some() {
+            self.trivia = &self.trivia[1..];
+        }
+    }
+
     fn ready_trivia(&mut self) -> Option<&'a Trivia<'a>> {
         if let Some(trivia) = self.trivia.first()
             && trivia.span.start() <= self.cursor

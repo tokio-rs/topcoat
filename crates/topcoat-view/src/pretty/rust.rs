@@ -46,6 +46,8 @@ impl PrettyPrint for syn::Expr {
         let stripped = stripped.strip_suffix(";").unwrap();
         let output = stripped.to_owned();
         output.pretty_print(printer);
+        printer.move_cursor(self.span().end());
+        printer.skip_trivia();
     }
 }
 
@@ -87,6 +89,8 @@ impl PrettyPrint for syn::Pat {
         let stripped = stripped.strip_suffix(");").unwrap();
         let output = stripped.to_owned();
         output.pretty_print(printer);
+        printer.move_cursor(self.span().end());
+        printer.skip_trivia();
     }
 }
 
