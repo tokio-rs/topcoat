@@ -85,6 +85,10 @@ impl<'a> Printer<'a> {
         self.scan_indent += indent;
     }
 
+    pub fn current_indent(&self) -> isize {
+        self.scan_indent
+    }
+
     pub fn scan_begin(&mut self, mode: BreakMode) {
         self.tokens
             .push_back(Token::Begin(BeginToken::new(mode, 0)));

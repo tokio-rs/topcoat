@@ -57,12 +57,6 @@ impl<'ast> Visit<'ast> for Visitor {
         self.indent -= 1;
     }
 
-    fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
-        self.indent += 1;
-        syn::visit::visit_item_fn(self, node);
-        self.indent -= 1;
-    }
-
     fn visit_block(&mut self, node: &'ast syn::Block) {
         self.indent += 1;
         syn::visit::visit_block(self, node);

@@ -22,16 +22,30 @@ impl PrettyPrint for syn::Expr {
             .spawn()
             .expect("failed to run rustfmt on nested rust expression");
         let mut stdin = command.stdin.as_ref().expect("command must has stdin");
+        println!("{}", printer.current_indent());
+        for _ in 0..printer.current_indent() {
+            stdin.write_all("const _: () = {".as_bytes()).unwrap();
+        }
         stdin.write_all("const _: () = ".as_bytes()).unwrap();
         stdin.write_all(source_text.as_bytes()).unwrap();
         stdin.write_all(";".as_bytes()).unwrap();
+        for _ in 0..printer.current_indent() {
+            stdin.write_all("};".as_bytes()).unwrap();
+        }
         let output = command
             .wait_with_output()
             .expect("failed to run rustfmt on nested rust expression");
         let output = String::from_utf8(output.stdout).expect("rustfmt output must be utf8");
         let output = pretty_print_rust_str(&output).unwrap();
-        let stripped = output.strip_prefix("const _: () = ").unwrap();
-        let stripped = stripped.strip_suffix(";\n").unwrap();
+        let mut stripped = output.trim();
+        for _ in 0..printer.current_indent() {
+            stripped = stripped.strip_prefix("const _: () = {").unwrap();
+            stripped = stripped.strip_suffix("};").unwrap();
+            stripped = stripped.trim();
+        }
+        let stripped = stripped.strip_prefix("const _: () = ").unwrap();
+        let stripped = stripped.strip_suffix(";").unwrap();
+        let output = stripped.to_owned();
         output.pretty_print(printer);
     }
 }
