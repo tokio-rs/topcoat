@@ -11,7 +11,11 @@ impl std::fmt::Display for Error {
             Self::Syntax { errors } => {
                 write!(f, "syntax errors while formatting view macro:")?;
                 for error in errors {
-                    write!(f, "\n{error}")?;
+                    let span = error.span();
+                    let start = span.start();
+                    let line = start.line;
+                    let column = start.column;
+                    write!(f, "\nat line {line} column {column}: {error}")?;
                 }
             }
         }
