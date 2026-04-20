@@ -34,5 +34,15 @@ impl ToTokens for View {
 
 #[cfg(feature = "pretty")]
 impl crate::pretty::PrettyPrint for View {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {}
+    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+        for (index, node) in self.nodes.iter().enumerate() {
+            node.pretty_print(printer);
+            if index < self.nodes.len() - 1 {
+                printer.scan_same_line_trivia();
+                printer.scan_break();
+                " ".pretty_print(printer);
+                printer.scan_trivia(true, true);
+            }
+        }
+    }
 }

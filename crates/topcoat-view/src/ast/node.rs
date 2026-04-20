@@ -89,3 +89,13 @@ impl Parse for Node {
         }
     }
 }
+
+#[cfg(feature = "pretty")]
+impl crate::pretty::PrettyPrint for Node {
+    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+        match self {
+            Self::Text(inner) => inner.pretty_print(printer),
+            _ => todo!("missing node formatting implementation"),
+        }
+    }
+}
