@@ -4,6 +4,7 @@ use topcoat_view::runtime::View;
 
 use crate::{Layout, Path, Slot};
 
+#[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct FileLayout {
     file: &'static str,

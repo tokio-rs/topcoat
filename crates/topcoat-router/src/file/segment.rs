@@ -1,13 +1,38 @@
 use std::{borrow::Cow, collections::HashMap};
 
+/// The kind of a file-router path segment, set via the `segment!` macro.
+///
+/// When using the file router, each module maps to a URL segment. By default,
+/// regular modules are `Static` and `_`-prefixed modules are `Group`. Use
+/// `segment!(kind = ...)` in a module to override the default.
+///
+/// | Kind       | URL format   | Use case                                       |
+/// |------------|--------------|------------------------------------------------|
+/// | `Static`   | `/name`      | Default for regular modules                    |
+/// | `Group`    | *(hidden)*   | Default for `_`-prefixed modules; layout-only  |
+/// | `Param`    | `/{name}`    | Dynamic path parameter                         |
+/// | `CatchAll` | `/{*name}`   | Matches all remaining path segments            |
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// // In a file-router module (e.g. src/app/users/id/mod.rs):
+/// topcoat::router::segment!(kind = Param);
+/// // This module now maps to /users/{id}
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SegmentKind {
+    /// A literal URL segment (e.g. `/users`). Default for regular modules.
     Static,
+    /// A layout-only grouping that doesn't appear in the URL. Default for `_`-prefixed modules.
     Group,
+    /// A dynamic path parameter (e.g. `/{id}`).
     Param,
+    /// A wildcard tail that matches all remaining path segments (e.g. `/{*path}`).
     CatchAll,
 }
 
+#[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct Segment {
     file: &'static str,
@@ -40,6 +65,7 @@ impl Segment {
 #[cfg(feature = "discover")]
 inventory::collect!(Segment);
 
+#[doc(hidden)]
 #[derive(Debug, Default, Clone)]
 pub struct Segments {
     segments: HashMap<&'static str, Segment>,

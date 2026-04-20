@@ -4,6 +4,23 @@ use heck::ToKebabCase;
 
 use crate::{FileLayout, FilePage, PathBuf, PathSegment, Router, Segment, SegmentKind, Segments};
 
+/// The file-based router, created by the `file_router!` macro.
+///
+/// Translates Rust module file paths into route paths and builds a [`Router`].
+/// The module tree rooted at `file_root` becomes the route tree: each directory
+/// and file maps to a path segment, with `_`-prefixed modules becoming groups
+/// and static names kebab-cased.
+///
+/// Segment overrides (kind, rename) registered via `segment!` are applied during
+/// the file-to-path translation. Overrides must be registered before any pages
+/// or layouts — this is enforced with a panic.
+///
+/// The translation pipeline for a given file:
+/// 1. Strip the `file_root` prefix and module suffix (`mod.rs`, `.rs`)
+/// 2. Walk each directory component, checking for a [`Segment`] override
+/// 3. Apply default kind (`_` prefix → `Group`, otherwise `Static`)
+/// 4. Kebab-case static segment names, leave others as-is
+/// 5. Collect into a [`PathBuf`]
 #[doc(hidden)]
 pub struct FileRouter {
     inner: Router,
@@ -12,6 +29,11 @@ pub struct FileRouter {
 }
 
 impl FileRouter {
+    /// Creates a new `FileRouter` rooted at the given file path.
+    ///
+    /// The `file_root` is the `file!()` of the module calling `file_router!`.
+    /// Module suffixes (`mod.rs`, `.rs`) are stripped so that sibling modules
+    /// resolve relative to the directory.
     pub fn new(file_root: &'static str) -> Self {
         Self {
             file_root: Self::strip_module_suffix(file_root),
@@ -20,12 +42,17 @@ impl FileRouter {
         }
     }
 
+    /// Strips `.rs` and `/mod` (or `\mod`) suffixes to get the directory path.
     fn strip_module_suffix(file: &'static str) -> &'static str {
         let path = file.strip_suffix(".rs").unwrap_or(file);
         let path = path.strip_suffix("/mod").unwrap_or(path);
         path.strip_suffix("\\mod").unwrap_or(path)
     }
 
+    /// Returns the file path relative to the root, with module suffixes stripped.
+    ///
+    /// This is the key used to look up [`Segment`] overrides and to derive
+    /// route path segments.
     fn canonical_module_path(&self, file: &'static str) -> &'static str {
         let path = file
             .strip_prefix(self.file_root)
@@ -33,6 +60,12 @@ impl FileRouter {
         Self::strip_module_suffix(path)
     }
 
+    /// Registers a [`Segment`] override for a module path.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any pages or layouts have already been registered, since
+    /// segment overrides affect path computation and must come first.
     pub fn segment(mut self, segment: Segment) -> Self {
         assert!(
             self.inner.is_empty(),
@@ -43,6 +76,11 @@ impl FileRouter {
         self
     }
 
+    /// Converts a source file path to a route [`PathBuf`].
+    ///
+    /// Walks each directory component of the canonical module path, applying
+    /// segment overrides and defaults (kebab-case for static, `_` prefix for
+    /// groups) to build the final route path.
     fn file_to_path(&self, file: &'static str) -> PathBuf {
         let module_path = self.canonical_module_path(file);
         let mut path_buf = PathBuf::new();
@@ -85,6 +123,7 @@ impl FileRouter {
         path_buf
     }
 
+    /// Registers a [`FilePage`], computing its route path from the source file.
     pub fn page(mut self, page: FilePage) -> Self {
         let file = page.file();
         let page = page.into_page(Cow::Owned(self.file_to_path(file)));
@@ -92,6 +131,7 @@ impl FileRouter {
         self
     }
 
+    /// Registers a [`FileLayout`], computing its route path from the source file.
     pub fn layout(mut self, layout: FileLayout) -> Self {
         let file = layout.file();
         let layout = layout.into_layout(Cow::Owned(self.file_to_path(file)));
@@ -99,6 +139,11 @@ impl FileRouter {
         self
     }
 
+    /// Discovers and registers all segments, pages, and layouts collected at link time.
+    ///
+    /// Segments are registered first (they must precede pages/layouts), then
+    /// pages and layouts, and finally the inner router's own `discover()` is
+    /// called to pick up any non-file-router pages and layouts.
     pub fn discover(mut self) -> Self {
         for segment in inventory::iter::<Segment>().cloned() {
             self = self.segment(segment);

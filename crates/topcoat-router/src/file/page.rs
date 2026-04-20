@@ -4,6 +4,7 @@ use topcoat_view::runtime::View;
 
 use crate::{Page, Path};
 
+#[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct FilePage {
     file: &'static str,
