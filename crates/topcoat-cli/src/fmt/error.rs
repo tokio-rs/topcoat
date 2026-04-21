@@ -1,5 +1,7 @@
 #[derive(Debug)]
 pub enum Error {
+    Glob(glob::GlobError),
+    Pattern(glob::PatternError),
     Io(std::io::Error),
     Syntax { errors: Vec<syn::Error> },
 }
@@ -7,6 +9,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Glob(inner) => write!(f, "{inner}")?,
+            Self::Pattern(inner) => write!(f, "{inner}")?,
             Self::Io(inner) => write!(f, "{inner}")?,
             Self::Syntax { errors } => {
                 write!(f, "syntax errors while formatting view macro:")?;
@@ -24,6 +28,18 @@ impl std::fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+impl From<glob::GlobError> for Error {
+    fn from(value: glob::GlobError) -> Self {
+        Self::Glob(value)
+    }
+}
+
+impl From<glob::PatternError> for Error {
+    fn from(value: glob::PatternError) -> Self {
+        Self::Pattern(value)
+    }
+}
 
 impl From<std::io::Error> for Error {
     fn from(value: std::io::Error) -> Self {

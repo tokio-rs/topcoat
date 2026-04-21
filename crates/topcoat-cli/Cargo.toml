@@ -18,6 +18,7 @@ topcoat-view = { workspace = true, features = ["pretty"] }
 clap = { workspace = true, features = ["derive"] }
 console.workspace = true
 futures-util.workspace = true
+glob.workspace = true
 indicatif.workspace = true
 notify.workspace = true
 proc-macro2 = { workspace = true, features = ["span-locations"] }

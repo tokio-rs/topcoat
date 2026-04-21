@@ -22,26 +22,26 @@ pub struct FmtCommand {
 impl FmtCommand {
     pub async fn run(&self) {
         let result: Result<(), Error> = async {
-            let count = 0;
+            let mut count = 0;
 
-            // for pattern in &self.files {
-            //     for entry in glob::glob(pattern)? {
-            //         let entry = entry?;
-            //         if entry.is_dir() {
-            //             let entry = entry
-            //                 .to_str()
-            //                 .expect("directory does not have a UTF-8 compatible name");
-            //             for entry in glob::glob(&format!("{entry}/**/*.rs"))? {
-            //                 let entry = entry?;
-            //                 format_file(&entry)?;
-            //                 count += 1;
-            //             }
-            //         } else {
-            //             format_file(&entry)?;
-            //             count += 1;
-            //         }
-            //     }
-            // }
+            for pattern in &self.files {
+                for entry in glob::glob(pattern)? {
+                    let entry = entry?;
+                    if entry.is_dir() {
+                        let entry = entry
+                            .to_str()
+                            .expect("directory does not have a UTF-8 compatible name");
+                        for entry in glob::glob(&format!("{entry}/**/*.rs"))? {
+                            let entry = entry?;
+                            format_file(&entry)?;
+                            count += 1;
+                        }
+                    } else {
+                        format_file(&entry)?;
+                        count += 1;
+                    }
+                }
+            }
 
             if self.stdin {
                 let mut buf = String::new();
@@ -49,7 +49,10 @@ impl FmtCommand {
                 buf = pretty_print_rust_str(&buf)?;
                 print!("{buf}");
             } else {
-                eprintln!("{}", style("successfully formatted {} files").green())
+                eprintln!(
+                    "{}",
+                    style(format!("successfully formatted {count} files")).green()
+                )
             }
             Ok(())
         }
