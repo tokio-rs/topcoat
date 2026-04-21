@@ -1,6 +1,6 @@
 mod error;
 
-use std::{io::Read, path::PathBuf};
+use std::{collections::BTreeSet, io::Read, path::PathBuf};
 
 use clap::Args;
 
@@ -22,24 +22,31 @@ pub struct FmtCommand {
 impl FmtCommand {
     pub async fn run(&self) {
         let result: Result<(), Error> = async {
-            let mut count = 0;
+            let mut files = BTreeSet::new();
 
             for pattern in &self.files {
                 for entry in glob::glob(pattern)? {
                     let entry = entry?;
                     if entry.is_dir() {
-                        let entry = entry
+                        let dir = entry
                             .to_str()
                             .expect("directory does not have a UTF-8 compatible name");
-                        for entry in glob::glob(&format!("{entry}/**/*.rs"))? {
-                            let entry = entry?;
-                            format_file(&entry)?;
-                            count += 1;
+                        for entry in glob::glob(&format!("{dir}/**/*.rs"))? {
+                            files.insert(entry?);
                         }
                     } else {
-                        format_file(&entry)?;
-                        count += 1;
+                        files.insert(entry);
                     }
+                }
+            }
+
+            let mut count = 0;
+            for file in &files {
+                if let Err(error) = format_file(file) {
+                    eprintln!("{}", style(format!("{}: {error}", file.display())).red());
+                    std::process::exit(1);
+                } else {
+                    count += 1;
                 }
             }
 

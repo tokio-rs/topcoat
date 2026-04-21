@@ -19,7 +19,7 @@ impl std::fmt::Display for Error {
                     let start = span.start();
                     let line = start.line;
                     let column = start.column;
-                    write!(f, "\nat line {line} column {column}: {error}")?;
+                    write!(f, "\n  at line {line} column {column}: {error}")?;
                 }
             }
         }
