@@ -143,6 +143,7 @@ impl crate::pretty::PrettyPrint for Component {
                 opening_tag.pretty_print(printer);
                 printer.scan_indent(1);
                 printer.scan_break();
+                printer.scan_trivia(false, true);
                 for (index, node) in children.iter().enumerate() {
                     node.pretty_print(printer);
                     if index < children.len() - 1 {
@@ -152,6 +153,8 @@ impl crate::pretty::PrettyPrint for Component {
                         printer.scan_trivia(true, true);
                     }
                 }
+                printer.scan_same_line_trivia();
+                printer.scan_trivia(true, false);
                 printer.scan_indent(-1);
                 printer.scan_break();
                 closing_tag.pretty_print(printer);

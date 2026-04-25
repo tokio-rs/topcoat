@@ -15,5 +15,8 @@ proc-macro2.workspace = true
 quote.workspace = true
 syn = { workspace = true, features = ["full", "extra-traits"] }
 
+[dev-dependencies]
+proc-macro2 = { workspace = true, features = ["span-locations"] }
+
 [lints]
 workspace = true

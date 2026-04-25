@@ -1,0 +1,3 @@
+{
+    <div class=(get_class()) id="main" style=(compute_styles())></div>
+}

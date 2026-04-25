@@ -1,0 +1,1 @@
+{  for  item  in  items  {  <li>(item)</li>  }  }

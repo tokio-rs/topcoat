@@ -1,0 +1,50 @@
+{
+// page wrapper
+<!DOCTYPE html>
+<html>
+// head section
+<head>
+<meta charset="utf-8">
+// page title
+<title>"my app"</title>
+</head>
+// body starts here
+<body>
+// navigation
+<nav class="main-nav">
+<a href="/">"home"</a> // home link
+<a href="/about">"about"</a> /* about link */
+<a href="/contact">"contact"</a>
+</nav>
+<hr> // separator
+// main content area
+<main>
+<section>
+// article header
+<h1>"welcome"</h1>
+/* introductory paragraph */
+<p>"hello world"</p>
+
+// list of items
+<ul>
+// first item
+<li>"one"</li>
+// second item
+<li>"two"</li>
+/* third item */
+<li>"three"</li>
+</ul>
+</section>
+// sidebar
+<aside>
+/* ad block */
+<div class="ad">"advertisement"</div>
+</aside>
+</main>
+// footer
+<footer>
+<p>"copyright"</p> // legal
+</footer>
+</body>
+</html>
+}

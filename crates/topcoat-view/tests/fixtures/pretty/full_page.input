@@ -1,0 +1,17 @@
+{
+<!DOCTYPE html>
+<html>
+<head>
+<title>"hello world"</title>
+</head>
+<body>
+<nav>
+<a href="/">"home"</a>
+<span>" | "</span>
+<a href="/about">"about"</a>
+</nav>
+<hr>
+"content"
+</body>
+</html>
+}

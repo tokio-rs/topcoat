@@ -26,6 +26,7 @@ impl Parse for ComponentOpeningTag {
 #[cfg(feature = "pretty")]
 impl crate::pretty::PrettyPrint for ComponentOpeningTag {
     fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+        printer.scan_begin(crate::pretty::BreakMode::Consistent);
         "[".pretty_print(printer);
         self.path.pretty_print(printer);
         if !self.attributes.is_empty() {
@@ -36,6 +37,7 @@ impl crate::pretty::PrettyPrint for ComponentOpeningTag {
             printer.scan_break();
         }
         "]".pretty_print(printer);
+        printer.scan_end();
     }
 }
 

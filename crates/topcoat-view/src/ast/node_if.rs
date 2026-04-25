@@ -29,7 +29,7 @@ impl Parse for NodeIf {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             if_token: input.parse()?,
-            cond: input.parse()?,
+            cond: input.call(syn::Expr::parse_without_eager_brace)?,
             then_branch: input.parse()?,
             else_branch: input.call(NodeElse::parse_option)?,
         })
