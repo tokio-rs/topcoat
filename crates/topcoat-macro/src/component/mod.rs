@@ -37,42 +37,55 @@ impl ToTokens for ComponentItem {
         let vis = &item.vis;
         let ident = &item.sig.ident;
 
-        let mut generics = item.sig.generics.clone();
-        generics
-            .params
-            .insert(0, syn::parse_quote!('__implicit));
+        let generics = item.sig.generics.clone();
+        // generics.params.insert(0, syn::parse_quote!('__implicit));
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-        let fields = self.item.sig.inputs.iter().map(|input| match input {
-            FnArg::Receiver(_) => panic!("component macro must not be used on methods"),
-            FnArg::Typed(pat_type) => {
-                let ty = &pat_type.ty;
-                match &*pat_type.pat {
-                    Pat::Ident(ident) => quote! { #ident: #ty },
-                    _ => panic!("function args must have an identifier"),
+        let mut has_cx = false;
+        let mut fields = Vec::new();
+        let mut args = Vec::new();
+
+        for input in self.item.sig.inputs.iter() {
+            match input {
+                FnArg::Receiver(_) => panic!("component macro must not be used on methods"),
+                FnArg::Typed(pat_type) => {
+                    let ty = &pat_type.ty;
+                    match &*pat_type.pat {
+                        Pat::Ident(pi) if pi.ident == "cx" => {
+                            has_cx = true;
+                            args.push(quote! { cx });
+                        }
+                        Pat::Ident(pi) => {
+                            fields.push(quote! { #pi: #ty });
+                            args.push(quote! { self.#pi });
+                        }
+                        _ => panic!("function args must have an identifier"),
+                    }
                 }
             }
-        });
+        }
 
-        let args = self.item.sig.inputs.iter().map(|input| match input {
-            FnArg::Receiver(_) => panic!("component macro must not be used on methods"),
-            FnArg::Typed(pat_type) => match &*pat_type.pat {
-                Pat::Ident(ident) => quote! { self.#ident },
-                _ => panic!("function args must have an identifier"),
-            },
-        });
+        let body = if has_cx {
+            quote! {
+                #item
+                ::topcoat::router::with_context(async |cx| #ident(#(#args),*).await).await
+            }
+        } else {
+            quote! {
+                #item
+                #ident(#(#args),*).await
+            }
+        };
 
         quote! {
             #[allow(non_camel_case_types)]
             #vis struct #ident #impl_generics #where_clause {
-                #vis __cx: &'__implicit ::topcoat::router::Cx,
                 #(#vis #fields),*
             }
 
             impl #impl_generics ::topcoat::component::Component for #ident #ty_generics #where_clause {
                 async fn render(self) -> ::topcoat::view::View {
-                    #item
-                    #ident(#(#args),*).await
+                    #body
                 }
             }
         }

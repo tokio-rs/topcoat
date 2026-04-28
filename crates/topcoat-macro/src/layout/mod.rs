@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    ItemFn, LitStr,
+    FnArg, Ident, ItemFn, LitStr, Pat,
     parse::{Parse, ParseStream},
 };
 
@@ -19,12 +19,52 @@ impl Parse for LayoutAttr {
 
 pub struct LayoutItem {
     item: ItemFn,
+    args: Vec<Ident>,
+    has_cx: bool,
 }
 
 impl Parse for LayoutItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        let item: ItemFn = input.parse()?;
+        let mut args = Vec::new();
+        let mut has_cx = false;
+        let mut has_slot = false;
+        for arg in &item.sig.inputs {
+            match arg {
+                FnArg::Receiver(r) => {
+                    return Err(syn::Error::new_spanned(
+                        r,
+                        "layout functions cannot take a `self` receiver",
+                    ));
+                }
+                FnArg::Typed(pat_type) => match &*pat_type.pat {
+                    Pat::Ident(pi) if pi.ident == "slot" => {
+                        has_slot = true;
+                        args.push(pi.ident.clone());
+                    }
+                    Pat::Ident(pi) if pi.ident == "cx" => {
+                        has_cx = true;
+                        args.push(pi.ident.clone());
+                    }
+                    _ => {
+                        return Err(syn::Error::new_spanned(
+                            pat_type,
+                            "layout functions only accept a `slot: Slot` and an optional `cx: &Cx` parameter",
+                        ));
+                    }
+                },
+            }
+        }
+        if !has_slot {
+            return Err(syn::Error::new_spanned(
+                &item.sig,
+                "layout functions must take a `slot: Slot` parameter",
+            ));
+        }
         Ok(Self {
-            item: input.parse()?,
+            item,
+            args,
+            has_cx,
         })
     }
 }
@@ -42,11 +82,21 @@ impl ToTokens for Layout {
         let attr = &self.0;
         let item = &self.1.item;
         let ident = &item.sig.ident;
+        let args = &self.1.args;
 
-        let render = quote! {
-            |slot| {
-                #item
-                Box::pin(#ident(slot))
+        let render = if self.1.has_cx {
+            quote! {
+                |slot| Box::pin(async move {
+                    #item
+                    ::topcoat::router::with_context(async |cx| #ident(#(#args),*).await).await
+                })
+            }
+        } else {
+            quote! {
+                |slot| {
+                    #item
+                    Box::pin(#ident(#(#args),*))
+                }
             }
         };
 

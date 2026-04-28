@@ -2,7 +2,7 @@ mod _group;
 mod about;
 
 use topcoat::{
-    router::{Slot, layout, page},
+    router::{Cx, Slot, layout, page, uri},
     view::{View, view},
 };
 
@@ -11,7 +11,7 @@ pub fn router() -> topcoat::router::Router {
 }
 
 #[layout]
-async fn layout(slot: Slot) -> View {
+async fn layout(cx: &Cx, slot: Slot) -> View {
     view! {
         <!DOCTYPE html>
         <html>
@@ -30,13 +30,17 @@ async fn layout(slot: Slot) -> View {
                 <hr>
 
                 "current page: "
-                (slot.await)
+                (uri(cx).to_string())
+
+                <div>
+                    (slot.await)
+                </div>
             </body>
         </html>
     }
 }
 
 #[page]
-async fn home_page() -> View {
+async fn home_page(cx: &Cx) -> View {
     view! { "home" }
 }

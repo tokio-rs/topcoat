@@ -69,7 +69,7 @@ impl ToTokens for Page {
             quote! {
                 || Box::pin(async {
                     #item
-                    ::topcoat::router::with_context(|cx| #ident(cx)).await
+                    ::topcoat::router::with_context(async |cx| #ident(cx).await).await
                 })
             }
         } else {
