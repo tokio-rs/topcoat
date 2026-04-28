@@ -1,4 +1,5 @@
-use axum::routing::get;
+use axum::{body::Body, routing::get};
+use http::Request;
 
 use crate::{Layout, Layouts, Page, Pages};
 
@@ -101,12 +102,13 @@ impl From<Router> for axum::Router {
 
             result = result.route(
                 &page.path().to_axum_path(),
-                get(async move || {
-                    let mut result = page.render();
+                get(async move |request: Request<Body>| {
+                    let mut render = page.render();
                     for layout in layouts.iter().rev() {
-                        result = layout.render(result);
+                        render = layout.render(render);
                     }
-                    result.await
+
+                    render.await
                 }),
             );
         }

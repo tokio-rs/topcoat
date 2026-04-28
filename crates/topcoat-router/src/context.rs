@@ -1,49 +1,19 @@
-use axum::body::Body;
-use http::Request;
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
-use tower::{Layer, Service};
+use axum::{body::Body, extract::Request};
+use tokio::task_local;
 
-pub struct Cx<'a> {}
-
-#[derive(Clone)]
-struct CxLayer;
-
-#[derive(Clone)]
-struct CxMiddleware<S> {
-    inner: S,
+#[derive(Debug, Clone, Copy)]
+pub struct Cx<'a> {
+    request: &'a Request<Body>,
 }
 
-impl<S> Layer<S> for CxLayer {
-    type Service = CxMiddleware<S>;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        CxMiddleware { inner }
-    }
+task_local! {
+    static CX: Cx<'static>;
 }
 
-impl<S> Service<Request<Body>> for CxMiddleware<S>
-where
-    S: Service<Request<Body>, Response = axum::response::Response> + Clone + Send + 'static,
-    S::Future: Send + 'static,
-    S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, request: Request<Body>) -> Self::Future {
-        let future = self.inner.call(request);
-        Box::pin(async move {
-            let response: Self::Response = future.await?;
-            Ok(response)
-        })
-    }
+pub(crate) async fn with_context<F: Future>(request: &Request<Body>, f: F) -> F::Output {
+    // SAFETY: `CX` requires a `'static` type, but the value is only accessible
+    // for the duration of `scope`, which awaits `f` to completion before
+    // returning. The borrow therefore cannot outlive `request`.
+    let cx: Cx<'static> = unsafe { std::mem::transmute(Cx { request }) };
+    CX.scope(cx, f).await
 }
