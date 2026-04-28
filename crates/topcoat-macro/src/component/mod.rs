@@ -68,7 +68,7 @@ impl ToTokens for ComponentItem {
         let body = if has_cx {
             quote! {
                 #item
-                ::topcoat::router::with_context(async |cx| #ident(#(#args),*).await).await
+                ::topcoat::context::with_context(async |cx| #ident(#(#args),*).await).await
             }
         } else {
             quote! {

@@ -1,7 +1,8 @@
 use axum::{body::Body, extract::RawPathParams, routing::get};
 use http::Request;
+use topcoat_core::context::scope_context;
 
-use crate::{Layout, Layouts, Page, Pages, scope_context};
+use crate::{Layout, Layouts, Page, Pages};
 
 /// The core routing primitive that collects [`Page`]s and [`Layout`]s,
 /// matches layouts to pages by path prefix, and converts into an

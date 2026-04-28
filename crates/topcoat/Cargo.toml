@@ -13,6 +13,7 @@ discover = [
 ]
 
 [dependencies]
+topcoat-core.workspace = true
 topcoat-macro.workspace = true
 topcoat-router.workspace = true
 topcoat-view = { workspace = true, features = ["axum"] }

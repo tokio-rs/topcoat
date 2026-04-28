@@ -2,7 +2,8 @@ mod _group;
 mod about;
 
 use topcoat::{
-    router::{Cx, Slot, layout, page, uri},
+    context::{Cx, uri},
+    router::{Slot, layout, page},
     view::{View, view},
 };
 

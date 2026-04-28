@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+axum.workspace = true
+http.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true

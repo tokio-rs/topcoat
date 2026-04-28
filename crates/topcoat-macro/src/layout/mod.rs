@@ -61,11 +61,7 @@ impl Parse for LayoutItem {
                 "layout functions must take a `slot: Slot` parameter",
             ));
         }
-        Ok(Self {
-            item,
-            args,
-            has_cx,
-        })
+        Ok(Self { item, args, has_cx })
     }
 }
 
@@ -88,7 +84,7 @@ impl ToTokens for Layout {
             quote! {
                 |slot| Box::pin(async move {
                     #item
-                    ::topcoat::router::with_context(async |cx| #ident(#(#args),*).await).await
+                    ::topcoat::context::with_context(async |cx| #ident(#(#args),*).await).await
                 })
             }
         } else {

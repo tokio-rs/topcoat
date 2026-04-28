@@ -3,6 +3,8 @@ extern crate self as topcoat;
 pub mod dev;
 mod serve;
 
+pub use topcoat_core::*;
+
 pub mod component {
     pub use topcoat_macro::component;
 

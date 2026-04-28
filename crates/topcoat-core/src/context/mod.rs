@@ -1,3 +1,7 @@
+mod parts;
+
+pub use parts::*;
+
 use std::sync::Arc;
 
 use axum::extract::RawPathParams;
@@ -22,11 +26,7 @@ task_local! {
     static CX: Arc<Cx>;
 }
 
-pub(crate) async fn scope_context<F: Future>(
-    parts: Parts,
-    params: RawPathParams,
-    f: F,
-) -> F::Output {
+pub async fn scope_context<F: Future>(parts: Parts, params: RawPathParams, f: F) -> F::Output {
     CX.scope(Arc::new(Cx { parts, params }), f).await
 }
 
@@ -38,48 +38,4 @@ where
 {
     let cx = CX.with(Arc::clone);
     f(&cx).await
-}
-
-#[inline]
-#[must_use]
-pub fn parts(cx: &Cx) -> &Parts {
-    &cx.parts
-}
-
-#[inline]
-#[must_use]
-pub fn method(cx: &Cx) -> &http::Method {
-    &parts(cx).method
-}
-
-#[inline]
-#[must_use]
-pub fn uri(cx: &Cx) -> &http::Uri {
-    &parts(cx).uri
-}
-
-#[inline]
-#[must_use]
-pub fn version(cx: &Cx) -> &http::Version {
-    &parts(cx).version
-}
-
-#[inline]
-#[must_use]
-pub fn headers(cx: &Cx) -> &http::HeaderMap {
-    &parts(cx).headers
-}
-
-#[inline]
-#[must_use]
-pub fn extensions(cx: &Cx) -> &http::Extensions {
-    &parts(cx).extensions
-}
-
-/// This is an internal function, use direct path hooks instead.
-#[inline]
-#[must_use]
-#[doc(hidden)]
-pub fn raw_path_params(cx: &Cx) -> &RawPathParams {
-    &cx.params
 }
