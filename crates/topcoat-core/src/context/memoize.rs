@@ -6,7 +6,7 @@ use std::{
 };
 
 pub(super) struct DynRequestCache {
-    entries: Mutex<HashMap<Box<dyn DynKey>, Arc<dyn Any>>>,
+    entries: Mutex<HashMap<Box<dyn DynKey>, Arc<dyn Any + Send + Sync>>>,
 }
 
 impl DynRequestCache {
@@ -16,23 +16,33 @@ impl DynRequestCache {
         }
     }
 
-    fn get<T: 'static>(&self, key: &dyn DynKey) -> Option<&T> {
-        let index = {
+    fn get<T: Send + Sync + 'static>(&self, key: &dyn DynKey) -> Option<Arc<T>> {
+        let value = {
             let guard = self.entries.lock().unwrap();
-            *guard.get(key)?.clone()
+            guard.get(key)?.clone()
         };
+        Some(value.downcast::<T>().unwrap())
     }
 
-    fn insert<T>(&mut self, key: &dyn DynKey, value: T) {}
+    fn insert<T: Send + Sync + 'static>(&mut self, key: Box<dyn DynKey>, value: T) {
+        let mut guard = self.entries.lock().unwrap();
+        guard.insert(key, Arc::new(value));
+    }
 }
 
-trait DynKey: Any {
+impl std::fmt::Debug for DynRequestCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DynRequestCache").finish()
+    }
+}
+
+trait DynKey: Any + Send + Sync {
     fn dyn_eq(&self, other: &dyn DynKey) -> bool;
     fn dyn_hash(&self, state: &mut dyn Hasher);
     fn as_any(&self) -> &dyn Any;
 }
 
-impl<T: Any + Eq + Hash> DynKey for T {
+impl<T: Any + Eq + Hash + Send + Sync> DynKey for T {
     fn dyn_eq(&self, other: &dyn DynKey) -> bool {
         other.as_any().downcast_ref::<T>() == Some(self)
     }
