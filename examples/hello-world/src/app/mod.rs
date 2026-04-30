@@ -18,12 +18,19 @@ async fn kek(cx: &Cx, x: i32, y: i32) -> i32 {
     x + y
 }
 
+#[memoize]
+async fn pip(cx: &Cx, x: i32, y: i32) -> i32 {
+    println!("adding {x} + {y} in pip");
+    x + y
+}
+
 #[layout]
 async fn layout(cx: &Cx, slot: Slot) -> View {
     let result = kek(cx, 5, 6).await;
-    let result = kek(cx, 7, 6).await;
-    let result = kek(cx, 5, 7).await;
     let result = kek(cx, 5, 6).await;
+    let result = pip(cx, 5, 6).await;
+    let result = pip(cx, 5, 6).await;
+    let result = pip(cx, 5, 6).await;
 
     view! {
         <!DOCTYPE html>

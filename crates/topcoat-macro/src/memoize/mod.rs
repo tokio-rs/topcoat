@@ -102,8 +102,8 @@ impl ToTokens for Memoize {
             quote! {
                 ::topcoat::context::memoize_raw_async(
                     cx,
-                    (#(#key_idents,)*),
-                    async |(#(#key_idents,)*)| {
+                    (::std::marker::PhantomData::<__MemoizeTag>, #(#key_idents,)*),
+                    async |(_, #(#key_idents,)*)| {
                         #(#destructures)*
                         #(#body_stmts)*
                     },
@@ -113,8 +113,8 @@ impl ToTokens for Memoize {
             quote! {
                 ::topcoat::context::memoize_raw(
                     cx,
-                    (#(#key_idents,)*),
-                    |(#(#key_idents,)*)| {
+                    (::std::marker::PhantomData::<__MemoizeTag>, #(#key_idents,)*),
+                    |(_, #(#key_idents,)*)| {
                         #(#destructures)*
                         #(#body_stmts)*
                     },
@@ -128,6 +128,7 @@ impl ToTokens for Memoize {
                 -> ::topcoat::context::Memoized<'__cx, #return_type>
             #where_clause
             {
+                struct __MemoizeTag;
                 #call
             }
         }
