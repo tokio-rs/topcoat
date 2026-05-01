@@ -113,10 +113,12 @@ impl ToTokens for Memoize {
 
         let call = if asyncness.is_some() {
             quote! {
+                struct __Tag;
                 ::topcoat::context::memoize_raw_async(
                     cx,
-                    (::std::marker::PhantomData::<__MemoizeTag>, #(#key_idents,)*),
-                    async |(_, #(#closure_pats,)*)| {
+                    ::std::any::TypeId::of::<__Tag>(),
+                    (#(#key_idents,)*),
+                    async |(#(#closure_pats,)*)| {
                         #(#destructures)*
                         #(#body_stmts)*
                     },
@@ -124,10 +126,12 @@ impl ToTokens for Memoize {
             }
         } else {
             quote! {
+                struct __Tag;
                 ::topcoat::context::memoize_raw(
                     cx,
-                    (::std::marker::PhantomData::<__MemoizeTag>, #(#key_idents,)*),
-                    |(_, #(#closure_pats,)*)| {
+                    ::std::any::TypeId::of::<__Tag>(),
+                    (#(#key_idents,)*),
+                    |(#(#closure_pats,)*)| {
                         #(#destructures)*
                         #(#body_stmts)*
                     },
@@ -141,7 +145,6 @@ impl ToTokens for Memoize {
                 -> ::topcoat::context::Memoized<'__cx, #return_type>
             #where_clause
             {
-                struct __MemoizeTag;
                 #call
             }
         }

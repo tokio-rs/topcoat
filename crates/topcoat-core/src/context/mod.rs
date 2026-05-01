@@ -13,8 +13,6 @@ use axum::extract::RawPathParams;
 use http::request::Parts;
 use tokio::task_local;
 
-use crate::context::memoize::DynCache;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CxId(u64);
 
@@ -32,7 +30,7 @@ pub struct Cx {
     parts: Parts,
     params: RawPathParams,
 
-    cache: DynCache,
+    cache: MemoizeCache,
 }
 
 impl Cx {
@@ -59,7 +57,7 @@ pub async fn scope_context<F: Future>(parts: Parts, params: RawPathParams, f: F)
             id: CxId::new(),
             parts,
             params,
-            cache: DynCache::new(),
+            cache: MemoizeCache::new(),
         }),
         f,
     )

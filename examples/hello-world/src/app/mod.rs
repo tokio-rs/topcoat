@@ -42,27 +42,16 @@ async fn layout(cx: &Cx, slot: Slot) -> View {
     }
 }
 
-// #[memoize]
-// async fn add(cx: &Cx, x: &str, y: &str) -> String {
-//     println!("adding {x} + {y}");
-//     x.to_owned() + y
-// }
+#[memoize]
+async fn add(cx: &Cx, x: &str, y: i32) -> String {
+    println!("adding {x} + {y}");
+    x.to_owned() + y.to_string().as_str()
+}
 
 #[page]
 async fn home_page(cx: &Cx) -> View {
-    let result1 = add(cx, 5, 6).await;
-    let kek = "".clone();
+    let result1 = add(cx, "5", 6).await;
+    let result1 = add(cx, "5", 6).await;
 
     view! { "home" }
-}
-
-async fn smep<'__cx>(cx: &'__cx ::topcoat::context::Cx, x: &str, y: i32) -> () {
-    static CACHE: ::std::sync::Mutex<
-        ::std::collections::HashMap<
-            ::topcoat::context::CxId,
-            ::std::sync::Arc<
-                ::std::sync::Mutex<::std::collections::HashMap<(String, i32), String>>,
-            >,
-        >,
-    > = ::std::default::Default::default();
 }

@@ -1,59 +1,15 @@
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
-    hash::{Hash, Hasher},
+    hash::Hash,
     marker::PhantomData,
     ops::Deref,
-    sync::{Arc, LazyLock, Mutex, MutexGuard},
+    sync::{Arc, Mutex},
 };
 
-use bumpalo::Bump;
 use tokio::sync::OnceCell;
 
-use crate::context::{Cx, CxId};
-
-struct MemoizeCache<K, V> {
-    entries: Mutex<HashMap<CxId, Arc<Mutex<HashMap<K, V>>>>>,
-}
-
-impl<K, V> MemoizeCache<K, V> {
-    fn for_cx(&self, cx: &Cx) -> Arc<Mutex<HashMap<K, V>>> {
-        let mut guard = self.entries.lock().unwrap();
-        if let Some(cache) = guard.get(&cx.id()) {
-            cache.clone()
-        } else {
-            let cache = Arc::new(Mutex::new(HashMap::<K, V>::new()));
-            guard.insert(cx.id(), cache.clone());
-            drop(guard);
-            cache
-        }
-    }
-}
-
-pub fn memoize_raw<'a, K, V, F>(cx: &'a Cx, key: K, f: F) -> Memoized<'a, V>
-where
-    K: DynKey + Clone,
-    V: Send + Sync + 'static,
-    F: FnOnce(K) -> V,
-{
-    Memoized {
-        inner: cx.cache.memoize(key, f),
-        lifetime: Default::default(),
-    }
-}
-
-pub async fn memoize_raw_async<'a, K, V, F, Fut>(cx: &'a Cx, key: K, f: F) -> Memoized<'a, V>
-where
-    K: DynKey + Clone,
-    V: Send + Sync + 'static,
-    F: FnOnce(K) -> Fut,
-    Fut: Future<Output = V>,
-{
-    Memoized {
-        inner: cx.cache.memoize_async(key, f).await,
-        lifetime: Default::default(),
-    }
-}
+use crate::context::Cx;
 
 pub struct Memoized<'a, T> {
     inner: Arc<T>,
@@ -65,6 +21,15 @@ pub struct Memoized<'a, T> {
     lifetime: PhantomData<&'a ()>,
 }
 
+impl<'a, T> Memoized<'a, T> {
+    fn new(inner: Arc<T>) -> Self {
+        Self {
+            inner,
+            lifetime: PhantomData,
+        }
+    }
+}
+
 impl<'a, T> Deref for Memoized<'a, T> {
     type Target = T;
 
@@ -73,99 +38,81 @@ impl<'a, T> Deref for Memoized<'a, T> {
     }
 }
 
-pub(super) struct DynCache {
-    entries: Mutex<HashMap<Box<dyn DynKey>, Arc<dyn Any + Send + Sync>>>,
+pub(super) struct MemoizeCache {
+    entries: Mutex<HashMap<TypeId, Box<dyn Any + Send + Sync>>>,
 }
 
-impl DynCache {
+impl MemoizeCache {
     pub(super) fn new() -> Self {
         Self {
             entries: Mutex::new(HashMap::new()),
         }
     }
-
-    fn memoize<K, V, F>(&self, key: K, f: F) -> Arc<V>
-    where
-        K: DynKey + Clone,
-        V: Send + Sync + 'static,
-        F: FnOnce(K) -> V,
-    {
-        let mut guard = self.entries.lock().unwrap();
-        if let Some(value) = guard.get(&key as &dyn DynKey) {
-            value
-                .clone()
-                .downcast::<V>()
-                .expect("wrong value type used for cache lookup")
-        } else {
-            let value = Arc::new(f(key.clone()));
-            guard.insert(Box::new(key), value.clone());
-            value
-        }
-    }
-
-    async fn memoize_async<K, V, F, Fut>(&self, key: K, f: F) -> Arc<V>
-    where
-        K: DynKey + Clone,
-        V: Send + Sync + 'static,
-        F: FnOnce(K) -> Fut,
-        Fut: Future<Output = V>,
-    {
-        let cell: Arc<OnceCell<Arc<V>>> = {
-            let mut guard = self.entries.lock().unwrap();
-            if let Some(value) = guard.get(&key as &dyn DynKey) {
-                value
-                    .clone()
-                    .downcast::<OnceCell<Arc<V>>>()
-                    .expect("wrong value type used for cache lookup")
-            } else {
-                let cell = Arc::new(OnceCell::<Arc<V>>::new());
-                guard.insert(Box::new(key.clone()), cell.clone());
-                cell
-            }
-        };
-        cell.get_or_init(|| async { Arc::new(f(key).await) })
-            .await
-            .clone()
-    }
 }
 
-impl std::fmt::Debug for DynCache {
+impl std::fmt::Debug for MemoizeCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DynRequestCache").finish()
+        f.debug_struct("MemoizeCache").finish()
     }
 }
 
-pub trait DynKey: Any + Send + Sync {
-    fn dyn_eq(&self, other: &dyn DynKey) -> bool;
-    fn dyn_hash(&self, state: &mut dyn Hasher);
-    fn as_any(&self) -> &dyn Any;
-}
+pub fn memoize_raw<'a, K, V, F>(cx: &Cx, type_id: TypeId, key: K, f: F) -> Memoized<'a, V>
+where
+    K: ToOwned + Eq + Hash,
+    <K as ToOwned>::Owned: Eq + Hash + Send + Sync + 'static,
+    V: Send + Sync + 'static,
+    F: FnOnce(K) -> V,
+{
+    let mut guard = cx.cache.entries.lock().unwrap();
+    let cache = guard
+        .entry(type_id)
+        .or_insert_with(|| Box::new(HashMap::<<K as ToOwned>::Owned, Arc<V>>::new()));
+    let cache = cache
+        .downcast_mut::<HashMap<<K as ToOwned>::Owned, Arc<V>>>()
+        .unwrap();
 
-impl<T: Any + Eq + Hash + Send + Sync> DynKey for T {
-    fn dyn_eq(&self, other: &dyn DynKey) -> bool {
-        other.as_any().downcast_ref::<T>() == Some(self)
-    }
-
-    fn dyn_hash(&self, mut state: &mut dyn Hasher) {
-        TypeId::of::<T>().hash(&mut state);
-        self.hash(&mut state);
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl PartialEq for dyn DynKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.dyn_eq(other)
+    if let Some(value) = cache.get(&key) {
+        Memoized::new(value.clone())
+    } else {
+        let key_owned = key.to_owned();
+        let value = Arc::new(f(key));
+        cache.insert(key_owned, value.clone());
+        Memoized::new(value)
     }
 }
 
-impl Eq for dyn DynKey {}
+pub async fn memoize_raw_async<'a, K, V, F, Fut>(
+    cx: &Cx,
+    type_id: TypeId,
+    key: K,
+    f: F,
+) -> Memoized<'a, V>
+where
+    K: ToOwned + Eq + Hash,
+    <K as ToOwned>::Owned: Eq + Hash + Send + Sync + 'static,
+    V: Send + Sync + 'static,
+    F: FnOnce(K) -> Fut,
+    Fut: Future<Output = V>,
+{
+    let cell = {
+        let mut guard = cx.cache.entries.lock().unwrap();
+        let cache = guard.entry(type_id).or_insert_with(|| {
+            Box::new(HashMap::<<K as ToOwned>::Owned, Arc<OnceCell<Arc<V>>>>::new())
+        });
+        let cache = cache
+            .downcast_mut::<HashMap<<K as ToOwned>::Owned, Arc<OnceCell<Arc<V>>>>>()
+            .unwrap();
 
-impl Hash for dyn DynKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.dyn_hash(state);
-    }
+        if let Some(cell) = cache.get(&key) {
+            cell.clone()
+        } else {
+            let cell = Arc::new(OnceCell::new());
+            let key_owned = key.to_owned();
+            cache.insert(key_owned, cell.clone());
+            cell
+        }
+    };
+
+    let value = cell.get_or_init(|| async { Arc::new(f(key).await) }).await;
+    Memoized::new(value.clone())
 }
