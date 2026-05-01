@@ -50,16 +50,16 @@ impl MemoizeCache {
         }
     }
 
-    pub fn memoize<'a, K, V, F>(&'a self, type_id: TypeId, key: K, f: F) -> Memoized<'a, V>
+    pub fn memoize<'a, K, V, F>(&'a self, key: K, f: F) -> Memoized<'a, V>
     where
         K: ToOwned + Eq + Hash,
         <K as ToOwned>::Owned: Eq + Hash + Send + Sync + 'static,
         V: Send + Sync + 'static,
-        F: FnOnce(K) -> V,
+        F: (FnOnce(K) -> V) + 'static,
     {
         let mut guard = self.entries.lock().unwrap();
         let cache = guard
-            .entry(type_id)
+            .entry(TypeId::of::<F>())
             .or_insert_with(|| Box::new(HashMap::<<K as ToOwned>::Owned, Arc<V>>::new()));
         let cache = cache
             .downcast_mut::<HashMap<<K as ToOwned>::Owned, Arc<V>>>()
@@ -75,22 +75,17 @@ impl MemoizeCache {
         }
     }
 
-    pub async fn memoize_async<'a, K, V, F, Fut>(
-        &'a self,
-        type_id: TypeId,
-        key: K,
-        f: F,
-    ) -> Memoized<'a, V>
+    pub async fn memoize_async<'a, K, V, F, Fut>(&'a self, key: K, f: F) -> Memoized<'a, V>
     where
         K: ToOwned + Eq + Hash,
         <K as ToOwned>::Owned: Eq + Hash + Send + Sync + 'static,
         V: Send + Sync + 'static,
-        F: FnOnce(K) -> Fut,
+        F: (FnOnce(K) -> Fut) + 'static,
         Fut: Future<Output = V>,
     {
         let cell = {
             let mut guard = self.entries.lock().unwrap();
-            let cache = guard.entry(type_id).or_insert_with(|| {
+            let cache = guard.entry(TypeId::of::<F>()).or_insert_with(|| {
                 Box::new(HashMap::<<K as ToOwned>::Owned, Arc<OnceCell<Arc<V>>>>::new())
             });
             let cache = cache
