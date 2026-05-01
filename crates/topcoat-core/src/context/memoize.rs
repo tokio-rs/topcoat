@@ -5,12 +5,13 @@ use std::{
     hash::Hash,
     marker::PhantomData,
     ops::Deref,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 use hashbrown::{Equivalent, HashMap};
 use tokio::sync::OnceCell;
 
+#[derive(Debug, Clone)]
 pub struct Memoized<'a, T> {
     inner: Arc<T>,
     // We artificially limit the lifetime of a memoized value to be the lifetime of the request
@@ -58,26 +59,36 @@ impl MemoizeCache {
         V: Send + Sync + 'static,
         F: (FnOnce(K) -> V) + 'static,
     {
-        let mut guard = self.entries.lock().unwrap();
-        let cache = guard.entry(TypeId::of::<F>()).or_insert_with(|| {
-            Box::new(HashMap::<
-                <MemoizeKey<Q> as ToOwnedKey>::Owned,
-                Arc<V>,
-                RandomState,
-            >::with_hasher(RandomState::new()))
-        });
-        let cache = cache
-            .downcast_mut::<HashMap<<MemoizeKey<Q> as ToOwnedKey>::Owned, Arc<V>, RandomState>>()
-            .unwrap();
+        let cell = {
+            let mut guard = self.entries.lock().unwrap();
+            let cache = guard.entry(TypeId::of::<F>()).or_insert_with(|| {
+                Box::new(HashMap::<
+                    <MemoizeKey<Q> as ToOwnedKey>::Owned,
+                    Arc<OnceLock<Arc<V>>>,
+                    RandomState,
+                >::with_hasher(RandomState::new()))
+            });
+            let cache =
+                cache
+                    .downcast_mut::<HashMap<
+                        <MemoizeKey<Q> as ToOwnedKey>::Owned,
+                        Arc<OnceLock<Arc<V>>>,
+                        RandomState,
+                    >>()
+                    .unwrap();
 
-        if let Some(value) = cache.get(&MemoizeKey(borrowed_key)) {
-            Memoized::new(value.clone())
-        } else {
-            let key_owned = MemoizeKey(borrowed_key).to_owned_key();
-            let value = Arc::new(f(key));
-            cache.insert(key_owned, value.clone());
-            Memoized::new(value)
-        }
+            if let Some(cell) = cache.get(&MemoizeKey(borrowed_key)) {
+                cell.clone()
+            } else {
+                let cell = Arc::new(OnceLock::new());
+                let key_owned = MemoizeKey(borrowed_key).to_owned_key();
+                cache.insert(key_owned, cell.clone());
+                cell
+            }
+        };
+
+        let value = cell.get_or_init(|| Arc::new(f(key)));
+        Memoized::new(value.clone())
     }
 
     pub async fn memoize_async<'a, Q, K, V, F, Fut>(
@@ -132,7 +143,7 @@ impl std::fmt::Debug for MemoizeCache {
         f.debug_struct("MemoizeCache").finish()
     }
 }
-//
+
 #[derive(Hash)]
 pub struct MemoizeKey<T>(T);
 
