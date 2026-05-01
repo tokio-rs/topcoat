@@ -1,5 +1,6 @@
 use std::{
     any::{Any, TypeId},
+    borrow::Borrow,
     collections::HashMap,
     hash::Hash,
     marker::PhantomData,
@@ -8,8 +9,6 @@ use std::{
 };
 
 use tokio::sync::OnceCell;
-
-use crate::context::Cx;
 
 pub struct Memoized<'a, T> {
     inner: Arc<T>,
@@ -52,23 +51,23 @@ impl MemoizeCache {
 
     pub fn memoize<'a, K, V, F>(&'a self, key: K, f: F) -> Memoized<'a, V>
     where
-        K: ToOwned + Eq + Hash,
-        <K as ToOwned>::Owned: Eq + Hash + Send + Sync + 'static,
+        K: MemoizeKey,
+        <K as MemoizeKey>::Owned: Borrow<K>,
         V: Send + Sync + 'static,
         F: (FnOnce(K) -> V) + 'static,
     {
         let mut guard = self.entries.lock().unwrap();
         let cache = guard
             .entry(TypeId::of::<F>())
-            .or_insert_with(|| Box::new(HashMap::<<K as ToOwned>::Owned, Arc<V>>::new()));
+            .or_insert_with(|| Box::new(HashMap::<<K as MemoizeKey>::Owned, Arc<V>>::new()));
         let cache = cache
-            .downcast_mut::<HashMap<<K as ToOwned>::Owned, Arc<V>>>()
+            .downcast_mut::<HashMap<<K as MemoizeKey>::Owned, Arc<V>>>()
             .unwrap();
 
         if let Some(value) = cache.get(&key) {
             Memoized::new(value.clone())
         } else {
-            let key_owned = key.to_owned();
+            let key_owned = key.to_owned_key();
             let value = Arc::new(f(key));
             cache.insert(key_owned, value.clone());
             Memoized::new(value)
@@ -77,8 +76,8 @@ impl MemoizeCache {
 
     pub async fn memoize_async<'a, K, V, F, Fut>(&'a self, key: K, f: F) -> Memoized<'a, V>
     where
-        K: ToOwned + Eq + Hash,
-        <K as ToOwned>::Owned: Eq + Hash + Send + Sync + 'static,
+        K: MemoizeKey,
+        <K as MemoizeKey>::Owned: Borrow<K>,
         V: Send + Sync + 'static,
         F: (FnOnce(K) -> Fut) + 'static,
         Fut: Future<Output = V>,
@@ -86,17 +85,17 @@ impl MemoizeCache {
         let cell = {
             let mut guard = self.entries.lock().unwrap();
             let cache = guard.entry(TypeId::of::<F>()).or_insert_with(|| {
-                Box::new(HashMap::<<K as ToOwned>::Owned, Arc<OnceCell<Arc<V>>>>::new())
+                Box::new(HashMap::<<K as MemoizeKey>::Owned, Arc<OnceCell<Arc<V>>>>::new())
             });
             let cache = cache
-                .downcast_mut::<HashMap<<K as ToOwned>::Owned, Arc<OnceCell<Arc<V>>>>>()
+                .downcast_mut::<HashMap<<K as MemoizeKey>::Owned, Arc<OnceCell<Arc<V>>>>>()
                 .unwrap();
 
             if let Some(cell) = cache.get(&key) {
                 cell.clone()
             } else {
                 let cell = Arc::new(OnceCell::new());
-                let key_owned = key.to_owned();
+                let key_owned = key.to_owned_key();
                 cache.insert(key_owned, cell.clone());
                 cell
             }
@@ -111,4 +110,44 @@ impl std::fmt::Debug for MemoizeCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MemoizeCache").finish()
     }
+}
+
+pub trait MemoizeKey: Eq + Hash {
+    type Owned: Eq + Hash + Send + Sync + 'static;
+
+    fn to_owned_key(&self) -> Self::Owned;
+}
+
+macro_rules! impl_memoize_key_tuple {
+    ($(($ty:ident, $accessor:tt)),*) => {
+        impl<$($ty),*> crate::context::MemoizeKey for ($($ty,)*)
+        where
+            $(
+                $ty: ToOwned + Eq + std::hash::Hash,
+                <$ty as ToOwned>::Owned: Eq + std::hash::Hash + Send + Sync + 'static,
+            )*
+        {
+            type Owned = ($($ty::Owned,)*);
+
+            fn to_owned_key(&self) -> Self::Owned {
+                ($(self.$accessor.to_owned(),)*)
+            }
+        }
+    };
+}
+
+#[rustfmt::skip]
+mod impls {
+    impl_memoize_key_tuple!((T1, 0));
+    impl_memoize_key_tuple!((T1, 0), (T2, 1));
+    impl_memoize_key_tuple!((T1, 0), (T2, 1), (T3, 2));
+    impl_memoize_key_tuple!((T1, 0), (T2, 1), (T3, 2), (T4, 3));
+    impl_memoize_key_tuple!((T1, 0), (T2, 1), (T3, 2), (T4, 3), (T5, 4));
+    impl_memoize_key_tuple!((T1, 0), (T2, 1), (T3, 2), (T4, 3), (T5, 4), (T6, 5));
+    impl_memoize_key_tuple!((T1, 0), (T2, 1), (T3, 2), (T4, 3), (T5, 4), (T6, 5), (T7, 6));
+    impl_memoize_key_tuple!((T1, 0), (T2, 1), (T3, 2), (T4, 3), (T5, 4), (T6, 5), (T7, 6), (T8, 7));
+    impl_memoize_key_tuple!((T1, 0), (T2, 1), (T3, 2), (T4, 3), (T5, 4), (T6, 5), (T7, 6), (T8, 7), (T9, 8));
+    impl_memoize_key_tuple!((T1, 0), (T2, 1), (T3, 2), (T4, 3), (T5, 4), (T6, 5), (T7, 6), (T8, 7), (T9, 8), (T10, 9));
+    impl_memoize_key_tuple!((T0, 0), (T2, 1), (T3, 2), (T4, 3), (T5, 4), (T6, 5), (T7, 6), (T8, 7), (T9, 8), (T10, 9), (T11, 10));
+    impl_memoize_key_tuple!((T1, 0), (T2, 1), (T3, 2), (T4, 3), (T5, 4), (T6, 5), (T7, 6), (T8, 7), (T9, 8), (T10, 9), (T11, 10), (T12, 11));
 }

@@ -43,23 +43,28 @@ async fn layout(cx: &Cx, slot: Slot) -> View {
 }
 
 #[memoize]
-async fn add(cx: &Cx, x: i32, y: i32) -> i32 {
+fn add(cx: &Cx, x: &str, y: i32) -> String {
     println!("adding {x} + {y}");
-    x + y
-}
-
-#[memoize]
-async fn add2(cx: &Cx, x: i32, y: i32) -> i32 {
-    println!("adding2 {x} + {y}");
-    x + y
+    x.to_owned() + &y.to_string()
 }
 
 #[page]
 async fn home_page(cx: &Cx) -> View {
-    let result1 = add(cx, 5, 6).await;
-    let result1 = add(cx, 5, 6).await;
-    let result1 = add2(cx, 5, 6).await;
-    let result1 = add2(cx, 5, 6).await;
+    let result1 = add(cx, "5", 6);
+    let result1 = add(cx, "5", 6);
 
     view! { "home" }
+}
+
+fn add2<'__cx>(
+    cx: &'__cx ::topcoat::context::Cx,
+    x: &str,
+    y: i32,
+) -> ::topcoat::context::Memoized<'__cx, String> {
+    cx.cache().memoize((x, y), |(x, y)| {
+        {
+            ::std::io::_print(format_args!("adding {0} + {1}\n", x, y));
+        };
+        x.to_owned() + &y.to_string()
+    })
 }
