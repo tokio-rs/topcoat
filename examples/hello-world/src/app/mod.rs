@@ -43,24 +43,24 @@ async fn layout(cx: &Cx, slot: Slot) -> View {
 }
 
 #[memoize]
-fn add(cx: &Cx, x: i32, y: i32) -> i32 {
+async fn add(cx: &Cx, x: i32, y: i32) -> i32 {
     println!("adding {x} + {y}");
     x + y
 }
 
 #[memoize]
-fn add_str(cx: &Cx, x: &str, y: i32) -> String {
+async fn add_str(cx: &Cx, x: &str, y: i32) -> String {
     println!("adding str {x} + {y}");
     x.to_owned() + &y.to_string()
 }
 
 #[page]
 async fn home_page(cx: &Cx) -> View {
-    let result1 = add(cx, 5, 6);
-    let result1 = add(cx, 5, 6);
-    let result1 = add_str(cx, "test", 6);
-    let result1 = add_str(cx, "test", 6);
-    let result1 = add_str(cx, "test2", 6);
+    let result1 = add(cx, 5, 6).await;
+    let result1 = add(cx, 5, 6).await;
+    let result1 = add_str(cx, "test", 6).await;
+    let result1 = add_str(cx, "test", 6).await;
+    let result1 = add_str(cx, "test2", 6).await;
 
     view! { "home" }
 }
