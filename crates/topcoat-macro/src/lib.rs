@@ -84,8 +84,8 @@ pub fn segment(tokens: TokenStream) -> TokenStream {
 /// }
 ///
 /// async fn handler(cx: &Cx) {
-///     let sum = add(cx, 2, 3);              // computes
-///     let sum = add(cx, 2, 3);              // cached
+///     let sum = add(cx, 2, 3); // computes
+///     let sum = add(cx, 2, 3); // cached
 ///     let user = fetch_user(cx, "alice").await; // computes
 ///     let user = fetch_user(cx, "alice").await; // cached
 /// }
