@@ -51,63 +51,65 @@ impl MemoizeCache {
         }
     }
 
-    pub fn memoize<'a, Q, K, V, F>(&'a self, borrowed_key: Q, key: K, f: F) -> Memoized<'a, V>
+    pub fn memoize<'a, K, P, V, F>(&'a self, key: K, params: P, f: F) -> Memoized<'a, V>
     where
-        Q: Copy,
-        MemoizeKey<Q>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<Q> as ToOwnedKey>::Owned>,
-        <MemoizeKey<Q> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
+        K: Copy,
+        MemoizeKey<K>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<K> as ToOwnedKey>::Owned>,
+        <MemoizeKey<K> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
         V: Send + Sync + 'static,
-        F: (FnOnce(K) -> V) + 'static,
+        F: (FnOnce(P) -> V) + 'static,
     {
-        let cell = self.cell_for::<F, _, OnceLock<Arc<V>>>(borrowed_key);
-        let value = cell.get_or_init(|| Arc::new(f(key)));
+        let cell = self.cell_for::<F, _, OnceLock<Arc<V>>>(key);
+        let value = cell.get_or_init(|| Arc::new(f(params)));
         Memoized::new(value.clone())
     }
 
-    pub async fn memoize_async<'a, Q, K, V, F, Fut>(
+    pub async fn memoize_async<'a, K, P, V, F, Fut>(
         &'a self,
-        borrowed_key: Q,
         key: K,
+        params: P,
         f: F,
     ) -> Memoized<'a, V>
     where
-        Q: Copy,
-        MemoizeKey<Q>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<Q> as ToOwnedKey>::Owned>,
-        <MemoizeKey<Q> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
+        K: Copy,
+        MemoizeKey<K>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<K> as ToOwnedKey>::Owned>,
+        <MemoizeKey<K> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
         V: Send + Sync + 'static,
-        F: (FnOnce(K) -> Fut) + 'static,
+        F: (FnOnce(P) -> Fut) + 'static,
         Fut: Future<Output = V>,
     {
-        let cell = self.cell_for::<F, _, OnceCell<Arc<V>>>(borrowed_key);
-        let value = cell.get_or_init(|| async { Arc::new(f(key).await) }).await;
+        let cell = self.cell_for::<F, _, OnceCell<Arc<V>>>(key);
+        let value = cell
+            .get_or_init(|| async { Arc::new(f(params).await) })
+            .await;
         Memoized::new(value.clone())
     }
 
-    fn cell_for<Marker, Q, Cell>(&self, borrowed_key: Q) -> Arc<Cell>
+    fn cell_for<Marker, K, Cell>(&self, key: K) -> Arc<Cell>
     where
         Marker: 'static,
-        Q: Copy,
-        MemoizeKey<Q>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<Q> as ToOwnedKey>::Owned>,
-        <MemoizeKey<Q> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
+        K: Copy,
+        MemoizeKey<K>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<K> as ToOwnedKey>::Owned>,
+        <MemoizeKey<K> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
         Cell: Default + Send + Sync + 'static,
     {
         let mut guard = self.entries.lock().unwrap();
         let cache = guard.entry(TypeId::of::<Marker>()).or_insert_with(|| {
             Box::new(HashMap::<
-                <MemoizeKey<Q> as ToOwnedKey>::Owned,
+                <MemoizeKey<K> as ToOwnedKey>::Owned,
                 Arc<Cell>,
                 RandomState,
             >::with_hasher(RandomState::new()))
         });
         let cache = cache
-            .downcast_mut::<HashMap<<MemoizeKey<Q> as ToOwnedKey>::Owned, Arc<Cell>, RandomState>>()
+            .downcast_mut::<HashMap<<MemoizeKey<K> as ToOwnedKey>::Owned, Arc<Cell>, RandomState>>()
             .unwrap();
 
-        if let Some(cell) = cache.get(&MemoizeKey(borrowed_key)) {
+        if let Some(cell) = cache.get(&MemoizeKey(key)) {
             cell.clone()
         } else {
             let cell = Arc::new(Cell::default());
-            let key_owned = MemoizeKey(borrowed_key).to_owned_key();
+            let key_owned = MemoizeKey(key).to_owned_key();
             cache.insert(key_owned, cell.clone());
             cell
         }
@@ -120,6 +122,7 @@ impl std::fmt::Debug for MemoizeCache {
     }
 }
 
+#[doc(hidden)]
 #[derive(Hash)]
 pub struct MemoizeKey<T>(T);
 
