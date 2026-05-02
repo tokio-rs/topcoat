@@ -330,13 +330,11 @@ mod tests {
 
     #[test]
     fn rename_segment() {
-        let r = router("my_crate::app").segment(seg(
-            "my_crate::app::blog_post",
-            None,
-            Some("posts"),
-        ));
+        let r =
+            router("my_crate::app").segment(seg("my_crate::app::blog_post", None, Some("posts")));
         assert_eq!(
-            r.module_path_to_path("my_crate::app::blog_post").to_string(),
+            r.module_path_to_path("my_crate::app::blog_post")
+                .to_string(),
             "/posts"
         );
     }
@@ -362,7 +360,8 @@ mod tests {
             None,
         ));
         assert_eq!(
-            r.module_path_to_path("my_crate::app::users::id").to_string(),
+            r.module_path_to_path("my_crate::app::users::id")
+                .to_string(),
             "/users/{id}"
         );
         assert_eq!(
@@ -380,7 +379,8 @@ mod tests {
             None,
         ));
         assert_eq!(
-            r.module_path_to_path("my_crate::app::docs::path").to_string(),
+            r.module_path_to_path("my_crate::app::docs::path")
+                .to_string(),
             "/docs/{*path}"
         );
     }
@@ -414,12 +414,8 @@ mod tests {
     fn segment_after_page_panics() {
         let r = router("my_crate::app");
         // Register a page first, then try to add a segment.
-        let page =
-            ModulePage::new("my_crate::app::about", || Box::pin(async { View::new("") }));
-        r.page(page).segment(seg(
-            "my_crate::app::users",
-            Some(SegmentKind::Param),
-            None,
-        ));
+        let page = ModulePage::new("my_crate::app::about", || Box::pin(async { View::new("") }));
+        r.page(page)
+            .segment(seg("my_crate::app::users", Some(SegmentKind::Param), None));
     }
 }

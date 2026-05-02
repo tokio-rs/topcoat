@@ -121,9 +121,7 @@ impl Segment {
 impl ToTokens for Segment {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         if let Self::Param { name, ty, fn_name } = self {
-            let ty_tokens = ty
-                .as_ref()
-                .map(|ParamType { path, .. }| quote! { : #path });
+            let ty_tokens = ty.as_ref().map(|ParamType { path, .. }| quote! { : #path });
             let fn_name_tokens = fn_name
                 .as_ref()
                 .map(|ParamFnName { name, .. }| quote! { as #name });
