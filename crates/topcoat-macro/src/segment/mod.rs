@@ -60,7 +60,13 @@ impl ToTokens for Segment {
 
             if let Some(kind) = kind
                 && kind == "Param"
-            {}
+            {
+                let name = Ident::new(self.module(), Span::call_site());
+                quote! {
+                    ::topcoat::router::path_param!(#name);
+                }
+                .to_tokens(tokens);
+            }
 
             quote! {
                 ::topcoat::inventory::submit! {
