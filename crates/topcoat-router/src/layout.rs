@@ -84,7 +84,7 @@ mod tests {
     use super::*;
 
     fn dummy_render(slot: Slot) -> Pin<Box<dyn Future<Output = View> + Send>> {
-        Box::pin(async move { slot.await })
+        Box::pin(slot)
     }
 
     fn layout(path: &'static str) -> Layout {
