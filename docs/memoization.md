@@ -43,14 +43,14 @@ Every argument except `cx` is part of the cache key. Two calls hit the same cach
 
 ```rust
 #[memoize]
-async fn add(cx: &Cx, x: i32, y: i32) -> i32 {
+fn add(cx: &Cx, x: i32, y: i32) -> i32 {
     println!("computing");
     x + y
 }
 
-add(cx, 1, 2).await; // prints "computing", returns 3
-add(cx, 1, 2).await; // returns 3 from cache
-add(cx, 1, 3).await; // prints "computing", returns 4 (different args)
+add(cx, 1, 2); // prints "computing", returns 3
+add(cx, 1, 2); // returns 3 from cache
+add(cx, 1, 3); // prints "computing", returns 4 (different args)
 ```
 
 Each `#[memoize]` function has its own independent cache slot, so two functions with the same argument types don't collide.
