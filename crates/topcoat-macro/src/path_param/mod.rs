@@ -9,8 +9,8 @@ use topcoat_view::ast::ParseOption;
 pub struct PathParam {
     vis: Visibility,
     name: Ident,
-    fn_name: Option<PathParamFnName>,
     ty: Option<PathParamType>,
+    fn_name: Option<PathParamFnName>,
 }
 
 impl Parse for PathParam {
@@ -18,8 +18,8 @@ impl Parse for PathParam {
         Ok(Self {
             vis: input.parse()?,
             name: input.parse()?,
-            fn_name: input.call(PathParamFnName::parse_option)?,
             ty: input.call(PathParamType::parse_option)?,
+            fn_name: input.call(PathParamFnName::parse_option)?,
         })
     }
 }

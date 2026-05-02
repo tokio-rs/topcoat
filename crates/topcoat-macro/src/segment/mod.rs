@@ -15,7 +15,17 @@ pub struct Segment {
     file: String,
 }
 
-impl Segment {}
+impl Segment {
+    fn module(&self) -> &str {
+        let file_or_folder = self
+            .file
+            .split(&['/', '\\'])
+            .rev()
+            .find(|v| *v != "mod.rs")
+            .expect("failed to extract module name from rust source file path");
+        file_or_folder.strip_suffix(".rs").unwrap_or(file_or_folder)
+    }
+}
 
 impl Parse for Segment {
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -43,19 +53,20 @@ impl Parse for Segment {
 impl ToTokens for Segment {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         if cfg!(feature = "discover") {
-            let kind = QuoteOption::new(
-                self.attrs
-                    .iter()
-                    .find_map(SegmentAttr::kind)
-                    .map(|kind| quote! { ::topcoat::router::SegmentKind::#kind }),
-            );
+            let kind = self.attrs.iter().find_map(SegmentAttr::kind);
+            let kind_enum =
+                QuoteOption::new(kind.map(|kind| quote! { ::topcoat::router::SegmentKind::#kind }));
             let rename = QuoteOption::new(self.attrs.iter().find_map(SegmentAttr::rename));
+
+            if let Some(kind) = kind
+                && kind == "Param"
+            {}
 
             quote! {
                 ::topcoat::inventory::submit! {
                     ::topcoat::router::Segment::new(
                         file!(),
-                        #kind,
+                        #kind_enum,
                         #rename,
                     )
                 }
