@@ -1,5 +1,4 @@
 mod _group;
-mod about;
 mod posts;
 
 use topcoat::{
@@ -57,4 +56,16 @@ async fn layout(cx: &Cx, slot: Slot) -> View {
 async fn home_page(cx: &Cx) -> View {
     let user = current_user(cx).await;
     view! { "welcome, " ((*user).clone()) }
+}
+
+mod about {
+    use topcoat::{
+        router::page,
+        view::{View, view},
+    };
+
+    #[page]
+    async fn about_page() -> View {
+        view! { "about" }
+    }
 }
