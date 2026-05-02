@@ -4,7 +4,7 @@ use topcoat::{
     view::{View, view},
 };
 
-segment!(kind = Param);
+segment!(kind = Param, parse = uuid::Uuid);
 
 #[page]
 async fn post_page(cx: &Cx) -> View {
