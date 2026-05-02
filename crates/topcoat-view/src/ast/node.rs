@@ -145,10 +145,7 @@ mod tests {
         assert!(matches!(parse(r#"if a { "x" }"#), Node::If(_)));
         assert!(matches!(parse(r#"let a = 1;"#), Node::Let(_)));
         assert!(matches!(parse(r#"for x in xs { (x) }"#), Node::ForLoop(_)));
-        assert!(matches!(
-            parse(r#"match v { _ => "x", }"#),
-            Node::Match(_)
-        ));
+        assert!(matches!(parse(r#"match v { _ => "x", }"#), Node::Match(_)));
         assert!(matches!(parse(r#"{ "x" }"#), Node::Block(_)));
     }
 
