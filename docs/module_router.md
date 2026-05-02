@@ -163,10 +163,10 @@ If the URL param name and the accessor name should differ, append `as <fn_name>`
 
 ```rust
 // src/app/posts/id/mod.rs
-topcoat::router::segment!(id: uuid::Uuid as post_id);
+topcoat::router::segment!(id: uuid::Uuid as param);
 ```
 
-This still routes as `/posts/{id}` but the accessor is `post_id(cx) -> uuid::Uuid`.
+This still routes as `/posts/{id}` but the accessor is `param(cx) -> uuid::Uuid`.
 
 ## Catch-all segments
 
@@ -189,113 +189,3 @@ This maps the `app::docs::path` module to `/docs/{*path}`.
 | `segment!(post_id: uuid::Uuid)` | `Param` | `/{post_id}` | `post_id(cx) -> uuid::Uuid` |
 | `segment!(post_id as my_post_id)` | `Param` | `/{post_id}` | `my_post_id(cx) -> &str` |
 | `segment!(..rest)` | `CatchAll` | `/{*rest}` | — |
-
-## Example: blog with user profiles
-
-```
-src/app/
-  mod.rs                    # layout at /, page at /
-  _auth/
-    mod.rs                  # auth-required layout (no URL segment)
-    dashboard.rs            # /dashboard
-  users/
-    mod.rs                  # page at /users
-    id/
-      mod.rs                # page at /users/{id}  (segment!(id))
-      posts.rs              # page at /users/{id}/posts
-  posts/
-    mod.rs                  # page at /posts
-    slug.rs                 # page at /posts/{slug}  (segment!(slug))
-```
-
-```rust
-// src/app/mod.rs
-mod _auth;
-mod posts;
-mod users;
-
-use topcoat::{
-    router::{Slot, layout, page},
-    view::{View, view},
-};
-
-pub fn router() -> topcoat::router::Router {
-    topcoat::router::module_router!()
-}
-
-#[layout]
-async fn root_layout(slot: Slot) -> View {
-    view! {
-        <!DOCTYPE html>
-        <html>
-            <body>
-                <nav>
-                    <a href="/">"Home"</a>
-                    <a href="/posts">"Blog"</a>
-                    <a href="/dashboard">"Dashboard"</a>
-                </nav>
-                (slot.await)
-            </body>
-        </html>
-    }
-}
-
-#[page]
-async fn home() -> View {
-    view! { <h1>"Welcome"</h1> }
-}
-```
-
-```rust
-// src/app/_auth/mod.rs — wraps dashboard in auth check, no URL segment
-use topcoat::{
-    router::{Slot, layout},
-    view::{View, view},
-};
-
-#[layout]
-async fn auth_layout(slot: Slot) -> View {
-    // In a real app, check auth here
-    view! {
-        <div class="authenticated">
-            (slot.await)
-        </div>
-    }
-}
-```
-
-```rust
-// src/app/users/id/mod.rs — /users/{id}
-use topcoat::{context::Cx, router::{page, segment}, view::{View, view}};
-
-segment!(id);
-
-#[page]
-async fn user_profile(cx: &Cx) -> View {
-    view! { <h1>"User: " (id(cx)) </h1> }
-}
-```
-
-```rust
-// src/app/posts/slug.rs — /posts/{slug}
-use topcoat::{context::Cx, router::{page, segment}, view::{View, view}};
-
-segment!(slug);
-
-#[page]
-async fn post(cx: &Cx) -> View {
-    view! { <h1>"Post: " (slug(cx)) </h1> }
-}
-```
-
-The resulting routes:
-
-| Route | Module |
-|---|---|
-| `/` | `app` |
-| `/dashboard` | `app::_auth::dashboard` |
-| `/users` | `app::users` |
-| `/users/{id}` | `app::users::id` |
-| `/users/{id}/posts` | `app::users::id::posts` |
-| `/posts` | `app::posts` |
-| `/posts/{slug}` | `app::posts::slug` |
