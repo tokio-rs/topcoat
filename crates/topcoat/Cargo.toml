@@ -21,6 +21,7 @@ topcoat-view = { workspace = true, features = ["axum"] }
 axum.workspace = true
 futures-util.workspace = true
 inventory = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
 serde_urlencoded.workspace = true
 tokio.workspace = true
 tokio-tungstenite.workspace = true

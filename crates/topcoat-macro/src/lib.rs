@@ -60,10 +60,12 @@ pub fn path_param(tokens: TokenStream) -> TokenStream {
     quote! { #path_param }.into()
 }
 
-#[proc_macro_derive(QueryParams)]
-pub fn query_params(tokens: TokenStream) -> TokenStream {
-    let query_params = syn::parse_macro_input!(tokens as query_params::QueryParams);
-    quote! { #query_params }.into()
+#[proc_macro_attribute]
+pub fn query_params(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr = syn::parse_macro_input!(attr as query_params::QueryParamsAttr);
+    let item = syn::parse_macro_input!(item as query_params::QueryParamsItem);
+    let combined = query_params::QueryParams::new(attr, item);
+    quote! { #combined }.into()
 }
 
 /// Caches the result of a function for the duration of a request, keyed by its arguments.

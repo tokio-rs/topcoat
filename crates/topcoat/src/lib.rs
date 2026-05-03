@@ -18,7 +18,7 @@ pub mod component {
 }
 
 pub mod router {
-    pub use topcoat_macro::{QueryParams, layout, page, path_param, route, segment};
+    pub use topcoat_macro::{layout, page, path_param, query_params, route, segment};
 
     pub use topcoat_router::*;
 }
@@ -35,5 +35,6 @@ pub use serve::serve;
 pub mod internal {
     #[cfg(feature = "discover")]
     pub use inventory;
+    pub use serde;
     pub use serde_urlencoded;
 }

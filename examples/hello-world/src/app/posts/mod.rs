@@ -1,13 +1,12 @@
-use serde::Deserialize;
 use topcoat::{
     context::Cx,
-    router::{QueryParams, page},
+    router::{page, query_params},
     view::{View, view},
 };
 
 mod id;
 
-#[derive(Deserialize, QueryParams)]
+#[query_params]
 struct PageQuery {
     page: Option<u32>,
 }

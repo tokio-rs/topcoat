@@ -5,30 +5,48 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-pub struct QueryParams {
-    derive_input: DeriveInput,
+pub struct QueryParamsAttr;
+
+impl Parse for QueryParamsAttr {
+    fn parse(_input: ParseStream) -> syn::Result<Self> {
+        Ok(Self)
+    }
 }
 
-impl Parse for QueryParams {
+pub struct QueryParamsItem {
+    item: DeriveInput,
+}
+
+impl Parse for QueryParamsItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            derive_input: input.parse()?,
+            item: input.parse()?,
         })
+    }
+}
+
+pub struct QueryParams(QueryParamsAttr, QueryParamsItem);
+
+impl QueryParams {
+    pub fn new(attr: QueryParamsAttr, item: QueryParamsItem) -> Self {
+        Self(attr, item)
     }
 }
 
 impl ToTokens for QueryParams {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let input = &self.derive_input;
-        let ident = &input.ident;
+        let item = &self.1.item;
+        let ident = &item.ident;
 
         quote! {
-            impl ::topcoat::router::QueryParams for #ident {
-                type Error = ::topcoat::internal::serde_urlencoded::de::Error;
+            #[derive(::topcoat::internal::serde::Deserialize)]
+            #[serde(crate = "::topcoat::internal::serde")]
+            #item
 
-                fn of(cx: &::topcoat::context::Cx) -> topcoat::context::Memoized<'_, ::core::result::Result<Self, Self::Error>> {
+            impl #ident {
+                fn of(cx: &::topcoat::context::Cx) -> ::topcoat::context::Memoized<'_, ::core::result::Result<Self, ::topcoat::internal::serde_urlencoded::de::Error>> {
                     #[::topcoat::context::memoize]
-                    fn parse(cx: &::topcoat::context::Cx) -> Result<#ident,::topcoat::internal::serde_urlencoded::de::Error>  {
+                    fn parse(cx: &::topcoat::context::Cx) -> ::core::result::Result<#ident, ::topcoat::internal::serde_urlencoded::de::Error> {
                         ::topcoat::internal::serde_urlencoded::from_str(
                             ::topcoat::context::uri(cx).path_and_query().map(|pq| pq.query().unwrap_or("")).unwrap_or("")
                         )
