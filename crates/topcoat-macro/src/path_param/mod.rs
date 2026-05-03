@@ -59,11 +59,34 @@ impl ToTokens for PathParam {
         let ident = &item.ident;
         let inner_ty = &self.1.inner_ty;
         let name_string = ident.to_string().to_snake_case();
+        let (impl_generics, ty_generics, where_clause) = item.generics.split_for_impl();
 
-        quote! {
-            #item
+        fn is_str_ref(ty: &Type) -> bool {
+            let Type::Reference(reference) = ty else {
+                return false;
+            };
+            if reference.mutability.is_some() {
+                return false;
+            }
+            let Type::Path(path) = &*reference.elem else {
+                return false;
+            };
+            path.qself.is_none() && path.path.is_ident("str")
+        }
 
-            impl #ident {
+        let of_fn = if is_str_ref(inner_ty) {
+            quote! {
+                fn of(cx: &::topcoat::context::Cx) -> &str {
+                    for (key, value) in ::topcoat::router::raw_path_params(cx) {
+                        if key == #name_string {
+                            return value;
+                        }
+                    }
+                    panic!("path parameter \"{}\" was not found in request path", #name_string);
+                }
+            }
+        } else {
+            quote! {
                 fn of(cx: &::topcoat::context::Cx) -> ::topcoat::context::Memoized<'_, ::core::result::Result<#inner_ty, <#inner_ty as ::core::str::FromStr>::Err>> {
                     #[::topcoat::context::memoize]
                     fn parse(cx: &::topcoat::context::Cx) -> ::core::result::Result<#inner_ty, <#inner_ty as ::core::str::FromStr>::Err> {
@@ -76,6 +99,14 @@ impl ToTokens for PathParam {
                     }
                     parse(cx)
                 }
+            }
+        };
+
+        quote! {
+            #item
+
+            impl #impl_generics #ident #ty_generics #where_clause {
+                #of_fn
             }
         }
         .to_tokens(tokens);
