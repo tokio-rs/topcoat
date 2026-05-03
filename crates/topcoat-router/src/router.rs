@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{body::Body, extract::RawPathParams, routing::get};
+use axum::{body::Body, extract::RawPathParams, response::IntoResponse, routing::get};
 use http::Request;
 use topcoat_core::context::{MaybeAborted, scope_context};
 
@@ -114,8 +114,14 @@ impl From<Router> for axum::Router {
                     let (mut parts, _body) = request.into_parts();
                     parts.extensions.insert(Arc::new(params));
                     match scope_context(parts, render).await {
-                        MaybeAborted::Completed(value) => value,
-                        MaybeAborted::Aborted(value) => panic!("lol we aborted"),
+                        MaybeAborted::Completed(value) => value.into_response(),
+                        MaybeAborted::Aborted(value) => {
+                            if let Ok(redirect) = value.downcast::<axum::response::Redirect>() {
+                                return redirect.into_response();
+                            }
+
+                            panic!("request was aborted with an unrecognized type");
+                        }
                     }
                 }),
             );

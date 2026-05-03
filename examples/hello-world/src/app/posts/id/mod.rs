@@ -1,6 +1,6 @@
 use topcoat::{
-    context::{Cx, abort},
-    router::{page, path_param},
+    context::Cx,
+    router::{RedirectExt, page, path_param},
     view::{View, view},
 };
 
@@ -9,7 +9,9 @@ struct PostId(uuid::Uuid);
 
 #[page]
 async fn post_page(cx: &Cx) -> View {
-    let post_id = PostId::of(cx).as_ref().unwrap();
-    abort(cx, Box::new(5)).await;
+    let post_id = PostId::of(cx)
+        .as_ref()
+        .unwrap_or_redirect(cx, "/what")
+        .await;
     view! { "showing post with id: " (post_id.to_string()) }
 }
