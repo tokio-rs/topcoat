@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap, pin::Pin};
 
 use crate::{Path, Result};
 
-/// A future that resolves to the inner page (or nested layout) [`View`].
+/// A future that resolves to the inner page (or nested layout) [`Result`].
 ///
 /// Every layout render function receives a `Slot` and `.await`s it to embed
 /// the child content at the desired location.

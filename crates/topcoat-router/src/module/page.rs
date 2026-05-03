@@ -12,7 +12,7 @@ use crate::{Page, Path, Result};
 pub struct ModulePage {
     /// Module path where `#[page]` was declared, used to derive the URL path.
     module_path: &'static str,
-    /// The page's async render function, returning a [`View`].
+    /// The page's async render function, returning a [`Result`].
     pub(super) render: fn() -> Pin<Box<dyn Future<Output = Result> + Send>>,
 }
 

@@ -12,7 +12,7 @@ use crate::{Layout, Path, Result, Slot};
 pub struct ModuleLayout {
     /// Module path where `#[layout]` was declared, used to derive the URL path.
     module_path: &'static str,
-    /// The layout's async render function, receiving a [`Slot`] and returning a [`View`].
+    /// The layout's async render function, receiving a [`Slot`] and returning a [`Result`].
     render: fn(slot: Slot) -> Pin<Box<dyn Future<Output = Result> + Send>>,
 }
 

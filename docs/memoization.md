@@ -95,8 +95,8 @@ It is *not* a substitute for a long-lived cache (Redis, an LRU, etc.). Cross-req
 ```rust
 use topcoat::{
     context::{Cx, memoize},
-    router::{Slot, layout, page},
-    view::{View, view},
+    router::{Result, Slot, layout, page},
+    view::view,
 };
 
 #[memoize]
@@ -105,7 +105,7 @@ async fn current_user(cx: &Cx) -> Option<User> {
 }
 
 #[layout]
-async fn root(cx: &Cx, slot: Slot) -> View {
+async fn root(cx: &Cx, slot: Slot) -> Result {
     let user = current_user(cx).await; // computes once
     view! {
         <header>
@@ -114,12 +114,12 @@ async fn root(cx: &Cx, slot: Slot) -> View {
                 None => view! { <a href="/login">"Sign in"</a> },
             })
         </header>
-        (slot.await)
+        (slot.await?)
     }
 }
 
 #[page]
-async fn dashboard(cx: &Cx) -> View {
+async fn dashboard(cx: &Cx) -> Result {
     let user = current_user(cx).await; // cache hit, no extra DB query
     view! { <h1>"Welcome, " (user.as_ref().unwrap().name.clone())</h1> }
 }

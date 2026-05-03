@@ -29,7 +29,7 @@ impl Page {
         &self.path
     }
 
-    /// Renders the page, returning a [`View`].
+    /// Renders the page, returning a [`Result`].
     pub fn render(&self) -> Pin<Box<dyn Future<Output = Result> + Send>> {
         (self.render)()
     }
