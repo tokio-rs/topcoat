@@ -9,5 +9,6 @@ struct PostId(uuid::Uuid);
 
 #[page]
 async fn post_page(cx: &Cx) -> View {
-    view! { "showing post with id: " (PostId::of(cx).as_ref().unwrap().to_string()) }
+    let post_id = PostId::of(cx).as_ref().unwrap();
+    view! { "showing post with id: " (post_id.to_string()) }
 }
