@@ -13,19 +13,22 @@ pub trait Fragment {
     fn fmt_unescaped(&self, f: &mut Formatter<'_>);
 }
 
-impl Fragment for str {
+impl<T> Fragment for &T
+where
+    T: Fragment + ?Sized,
+{
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) {
-        f.write_str(self)
+        (*self).fmt(f)
     }
 
     #[inline]
     fn fmt_unescaped(&self, f: &mut Formatter<'_>) {
-        f.write_str_unescaped(self)
+        (*self).fmt_unescaped(f)
     }
 }
 
-impl Fragment for &str {
+impl Fragment for str {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) {
         f.write_str(self)

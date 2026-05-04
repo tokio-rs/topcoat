@@ -2,7 +2,7 @@ mod _group;
 mod posts;
 
 use topcoat::{
-    context::{Cx, memoize, uri},
+    context::{Cx, app_state, memoize, uri},
     router::{Result, Slot, layout, page},
     view::view,
 };
@@ -46,6 +46,8 @@ async fn layout(cx: &Cx, slot: Slot) -> Result {
 
                 "current page: "
                 (uri(cx).to_string())
+                ", app state: "
+                (app_state::<i32>(cx))
 
                 <div>(slot.await?)</div>
             </body>

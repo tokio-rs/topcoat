@@ -1,8 +1,10 @@
 mod abort;
+mod app_state;
 mod memoize;
 mod parts;
 
 pub use abort::*;
+pub use app_state::*;
 pub use memoize::*;
 pub use parts::*;
 
@@ -27,6 +29,7 @@ impl CxId {
 #[derive(Debug)]
 pub struct Cx {
     id: CxId,
+    state: Arc<AppState>,
     parts: Parts,
     cache: MemoizeCache,
     abort: AbortStore,
@@ -55,9 +58,14 @@ task_local! {
     static CX: Arc<Cx>;
 }
 
-pub async fn scope_context<F: Future>(parts: Parts, f: F) -> MaybeAborted<F::Output> {
+pub async fn scope_context<F: Future>(
+    state: Arc<AppState>,
+    parts: Parts,
+    f: F,
+) -> MaybeAborted<F::Output> {
     let cx = Arc::new(Cx {
         id: CxId::new(),
+        state,
         parts,
         cache: MemoizeCache::new(),
         abort: AbortStore::new(),

@@ -1,8 +1,13 @@
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
-use axum::{body::Body, extract::RawPathParams, response::IntoResponse, routing::get};
+use axum::{
+    body::Body,
+    extract::{RawPathParams, State},
+    response::IntoResponse,
+    routing::get,
+};
 use http::Request;
-use topcoat_core::context::{MaybeAborted, scope_context};
+use topcoat_core::context::{AppState, MaybeAborted, scope_context};
 
 use crate::{Layout, Layouts, Page, Pages};
 
@@ -40,6 +45,7 @@ use crate::{Layout, Layouts, Page, Pages};
 pub struct Router {
     pages: Pages,
     layouts: Layouts,
+    state: AppState,
 }
 
 impl Router {
@@ -48,6 +54,7 @@ impl Router {
         Self {
             pages: Pages::new(),
             layouts: Layouts::new(),
+            state: AppState::new(),
         }
     }
 
@@ -78,6 +85,14 @@ impl Router {
         self
     }
 
+    pub fn app_state<T>(mut self, value: T) -> Self
+    where
+        T: Any + Send + Sync,
+    {
+        self.state.register(value);
+        self
+    }
+
     /// Discovers and registers all `#[page]` and `#[layout]` items
     /// collected at link time across the crate and its dependencies.
     #[cfg(feature = "discover")]
@@ -97,7 +112,7 @@ impl Router {
 /// path are nested from innermost (most specific) to outermost.
 impl From<Router> for axum::Router {
     fn from(value: Router) -> Self {
-        let mut result = axum::Router::new();
+        let mut result = axum::Router::<Arc<AppState>>::new();
 
         for page in value.pages {
             let mut layouts: Vec<_> = value.layouts.for_path(page.path()).cloned().collect();
@@ -105,28 +120,32 @@ impl From<Router> for axum::Router {
 
             result = result.route(
                 &page.path().to_axum_path(),
-                get(async move |params: RawPathParams, request: Request<Body>| {
-                    let mut render = page.render();
-                    for layout in layouts.iter().rev() {
-                        render = layout.render(render);
-                    }
-
-                    let (mut parts, _body) = request.into_parts();
-                    parts.extensions.insert(Arc::new(params));
-                    match scope_context(parts, render).await {
-                        MaybeAborted::Completed(value) => value.into_response(),
-                        MaybeAborted::Aborted(value) => {
-                            if let Ok(redirect) = value.downcast::<axum::response::Redirect>() {
-                                return redirect.into_response();
-                            }
-
-                            panic!("request was aborted with an unrecognized type");
+                get(
+                    async move |State(state): State<Arc<AppState>>,
+                                params: RawPathParams,
+                                request: Request<Body>| {
+                        let mut render = page.render();
+                        for layout in layouts.iter().rev() {
+                            render = layout.render(render);
                         }
-                    }
-                }),
+
+                        let (mut parts, _body) = request.into_parts();
+                        parts.extensions.insert(Arc::new(params));
+                        match scope_context(state, parts, render).await {
+                            MaybeAborted::Completed(value) => value.into_response(),
+                            MaybeAborted::Aborted(value) => {
+                                if let Ok(redirect) = value.downcast::<axum::response::Redirect>() {
+                                    return redirect.into_response();
+                                }
+
+                                panic!("request was aborted with an unrecognized type");
+                            }
+                        }
+                    },
+                ),
             );
         }
 
-        result
+        result.with_state(Arc::new(value.state))
     }
 }

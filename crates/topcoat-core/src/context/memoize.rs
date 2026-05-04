@@ -176,10 +176,13 @@ mod impls {
 
 #[cfg(test)]
 mod tests {
-    use crate::context::AbortStore;
+    use crate::context::{AbortStore, AppState};
 
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     /// Returns a fresh counter with `'static` lifetime so closures that capture it can be
     /// `Copy + 'static` (the bounds `MemoizeCache::memoize` imposes on its function).
@@ -190,6 +193,7 @@ mod tests {
     fn cx() -> Cx {
         Cx {
             id: super::super::CxId(0),
+            state: Arc::new(AppState::new()),
             parts: http::Request::new(()).into_parts().0,
             cache: MemoizeCache::new(),
             abort: AbortStore::new(),
