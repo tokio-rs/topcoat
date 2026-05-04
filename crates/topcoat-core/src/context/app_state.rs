@@ -37,7 +37,13 @@ pub fn app_state<T>(cx: &Cx) -> &T
 where
     T: Any + Send + Sync,
 {
-    cx.state.get::<T>()
+    match cx.state.get::<T>() {
+        Some(value) => value,
+        None => panic!(
+            "attempted to access app state of type `{:?}`, but this type was not registered for this context",
+            TypeId::of::<T>()
+        ),
+    }
 }
 
 /// A type-keyed container of values shared across every request.
@@ -74,20 +80,14 @@ impl AppState {
         }
     }
 
-    fn get<T>(&self) -> &T
+    fn get<T>(&self) -> Option<&T>
     where
         T: Any + Send + Sync,
     {
-        match self.entries.get(&TypeId::of::<T>()).as_ref() {
-            Some(&value) => value
+        self.entries.get(&TypeId::of::<T>()).as_ref().map(|value| {
+            value
                 .downcast_ref()
-                .expect("value must downcast to the type it was registered as"),
-            None => {
-                panic!(
-                    "attempted to access app state of type `{:?}`, but this type was not registered",
-                    TypeId::of::<T>()
-                );
-            }
-        }
+                .expect("value must downcast to the type it was registered as")
+        })
     }
 }
