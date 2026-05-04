@@ -105,6 +105,26 @@ impl Router {
     /// # Panics
     ///
     /// Panics if a state value has already been registered for the same type.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use topcoat::context::{Cx, app_state};
+    /// use topcoat::router::Router;
+    ///
+    /// struct Database { /* ... */ }
+    ///
+    /// pub fn router() -> Router {
+    ///     Router::new()
+    ///         .app_state(Database::connect())
+    ///         .page(user_profile)
+    /// }
+    ///
+    /// async fn fetch_user(cx: &Cx, id: u64) -> User {
+    ///     let db: &Database = app_state(cx);
+    ///     db.fetch_user(5).await;
+    /// }
+    /// ```
     pub fn app_state<T>(mut self, value: T) -> Self
     where
         T: Any + Send + Sync,
