@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use topcoat_pretty::{Registry, pretty_print_str};
+use topcoat_view::ast::View;
 
 fn diff(expected: &str, actual: &str) -> String {
     let mut output = String::new();
@@ -31,7 +32,7 @@ fn diff(expected: &str, actual: &str) -> String {
 }
 
 fn registry() -> Registry {
-    Registry::one::<syn::Ident>("test")
+    Registry::one::<View>("view")
 }
 
 fn assert_format(input: &str, expected: &str) {
