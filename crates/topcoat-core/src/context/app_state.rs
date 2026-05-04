@@ -97,3 +97,76 @@ impl AppState {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::context::{AbortStore, MemoizeCache};
+
+    #[derive(Debug, PartialEq)]
+    struct Database(&'static str);
+
+    #[derive(Debug, PartialEq)]
+    struct Config(u32);
+
+    fn cx_with(state: AppState) -> Cx {
+        Cx {
+            id: super::super::CxId(0),
+            state: Arc::new(state),
+            parts: http::Request::new(()).into_parts().0,
+            cache: MemoizeCache::new(),
+            abort: AbortStore::new(),
+        }
+    }
+
+    #[test]
+    fn register_and_get_returns_value() {
+        let mut state = AppState::new();
+        state.register(Database("primary"));
+
+        assert_eq!(state.get::<Database>(), Some(&Database("primary")));
+    }
+
+    #[test]
+    fn get_returns_none_for_unregistered_type() {
+        let state = AppState::new();
+        assert_eq!(state.get::<Database>(), None);
+    }
+
+    #[test]
+    fn multiple_types_coexist() {
+        let mut state = AppState::new();
+        state.register(Database("primary"));
+        state.register(Config(42));
+
+        assert_eq!(state.get::<Database>(), Some(&Database("primary")));
+        assert_eq!(state.get::<Config>(), Some(&Config(42)));
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate state entry")]
+    fn register_panics_on_duplicate_type() {
+        let mut state = AppState::new();
+        state.register(Database("primary"));
+        state.register(Database("replica"));
+    }
+
+    #[test]
+    fn app_state_returns_registered_value() {
+        let mut state = AppState::new();
+        state.register(Database("primary"));
+        let cx = cx_with(state);
+
+        let db: &Database = app_state(&cx);
+        assert_eq!(db, &Database("primary"));
+    }
+
+    #[test]
+    #[should_panic(expected = "attempted to access app state")]
+    fn app_state_panics_for_unregistered_type() {
+        let cx = cx_with(AppState::new());
+        let _: &Database = app_state(&cx);
+    }
+}
