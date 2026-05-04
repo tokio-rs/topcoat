@@ -79,7 +79,9 @@ impl AppState {
         T: Any + Send + Sync,
     {
         match self.entries.get(&TypeId::of::<T>()).as_ref() {
-            Some(&value) => value.downcast_ref().unwrap(),
+            Some(&value) => value
+                .downcast_ref()
+                .expect("value must downcast to the type it was registered as"),
             None => {
                 panic!(
                     "attempted to access app state of type `{:?}`, but this type was not registered",
