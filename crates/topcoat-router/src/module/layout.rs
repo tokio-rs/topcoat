@@ -1,8 +1,6 @@
 use std::{borrow::Cow, pin::Pin};
 
-use topcoat_view::runtime::View;
-
-use crate::{Layout, Path, Slot};
+use crate::{Layout, Path, Result, Slot};
 
 /// A layout discovered by the module router, produced by the `#[layout]` macro.
 ///
@@ -14,15 +12,15 @@ use crate::{Layout, Path, Slot};
 pub struct ModuleLayout {
     /// Module path where `#[layout]` was declared, used to derive the URL path.
     module_path: &'static str,
-    /// The layout's async render function, receiving a [`Slot`] and returning a [`View`].
-    render: fn(slot: Slot) -> Pin<Box<dyn Future<Output = View> + Send>>,
+    /// The layout's async render function, receiving a [`Slot`] and returning a [`Result`].
+    render: fn(slot: Slot) -> Pin<Box<dyn Future<Output = Result> + Send>>,
 }
 
 impl ModuleLayout {
     /// Creates a new module layout. Called by the expanded `#[layout]` macro.
     pub const fn new(
         module_path: &'static str,
-        render: fn(slot: Slot) -> Pin<Box<dyn Future<Output = View> + Send>>,
+        render: fn(slot: Slot) -> Pin<Box<dyn Future<Output = Result> + Send>>,
     ) -> Self {
         Self {
             module_path,

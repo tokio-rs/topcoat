@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bumpalo.workspace = true
+boxcar.workspace = true
 hashbrown.workspace = true
 http.workspace = true
-tokio = { workspace = true, features = ["sync"] }
+pin-project.workspace = true
+tokio = { workspace = true, features = ["rt", "sync"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }

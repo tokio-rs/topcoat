@@ -101,8 +101,8 @@ impl Parse for Node {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for Node {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for Node {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         match self {
             Self::Text(inner) => inner.pretty_print(printer),
             Self::DocumentType(inner) => inner.pretty_print(printer),

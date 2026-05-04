@@ -1,8 +1,6 @@
 use std::{borrow::Cow, pin::Pin};
 
-use topcoat_view::runtime::View;
-
-use crate::{Page, Path};
+use crate::{Page, Path, Result};
 
 /// A page discovered by the module router, produced by the `#[page]` macro.
 ///
@@ -14,15 +12,15 @@ use crate::{Page, Path};
 pub struct ModulePage {
     /// Module path where `#[page]` was declared, used to derive the URL path.
     module_path: &'static str,
-    /// The page's async render function, returning a [`View`].
-    pub(super) render: fn() -> Pin<Box<dyn Future<Output = View> + Send>>,
+    /// The page's async render function, returning a [`Result`].
+    pub(super) render: fn() -> Pin<Box<dyn Future<Output = Result> + Send>>,
 }
 
 impl ModulePage {
     /// Creates a new module page. Called by the expanded `#[page]` macro.
     pub const fn new(
         module_path: &'static str,
-        render: fn() -> Pin<Box<dyn Future<Output = View> + Send>>,
+        render: fn() -> Pin<Box<dyn Future<Output = Result> + Send>>,
     ) -> Self {
         Self {
             module_path,

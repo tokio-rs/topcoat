@@ -156,6 +156,7 @@ impl ModuleRouter {
     /// Segments are registered first (they must precede pages/layouts), then
     /// pages and layouts, and finally the inner router's own `discover()` is
     /// called to pick up any non-module-router pages and layouts.
+    #[cfg(feature = "discover")]
     pub fn discover(mut self) -> Self {
         for segment in inventory::iter::<Segment>().cloned() {
             self = self.segment(segment);
@@ -414,7 +415,9 @@ mod tests {
     fn segment_after_page_panics() {
         let r = router("my_crate::app");
         // Register a page first, then try to add a segment.
-        let page = ModulePage::new("my_crate::app::about", || Box::pin(async { View::new("") }));
+        let page = ModulePage::new("my_crate::app::about", || {
+            Box::pin(async { Ok(View::new("")) })
+        });
         r.page(page)
             .segment(seg("my_crate::app::users", Some(SegmentKind::Param), None));
     }

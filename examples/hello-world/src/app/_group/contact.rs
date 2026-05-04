@@ -1,9 +1,9 @@
 use topcoat::{
-    router::page,
-    view::{View, view},
+    router::{Result, page},
+    view::view,
 };
 
 #[page]
-async fn contact_page() -> View {
+async fn contact_page() -> Result {
     view! { "contact" }
 }

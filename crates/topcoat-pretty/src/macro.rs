@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer};
+use crate::{BreakMode, Delim, PrettyPrint, Printer};
 
 /// A wrapper type that parses and pretty-prints content with any of the three delimiter types.
 ///
@@ -32,7 +32,7 @@ use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer};
 /// it extracts the delimiter span and uses this type to parse and reformat the contents
 /// according to the delimiter type used.
 ///
-/// [`pretty_print_macro_str`]: crate::pretty::pretty_print_macro_str
+/// [`pretty_print_macro_str`]: topcoat_pretty::pretty_print_macro_str
 pub enum Macro<T> {
     Parenthesized {
         paren: syn::token::Paren,
@@ -103,45 +103,49 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::registry::Registry;
+
+    fn registry() -> Registry {
+        Registry::one::<syn::Ident>("test")
+    }
 
     #[test]
     fn test_parenthesized_short() {
-        let source = "(foo)";
-        let result = crate::pretty::pretty_print_str::<Macro<syn::Ident>>(source, 0, 0);
+        let source = "test!(foo);";
+        let result = crate::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "(foo)");
+        assert_eq!(result.unwrap(), "test!(foo);");
     }
 
     #[test]
     fn test_parenthesized_long() {
-        let source = "(this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed)";
-        let result = crate::pretty::pretty_print_str::<Macro<syn::Ident>>(source, 0, 0);
+        let source = "test!(this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed);";
+        let result = crate::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            r"(
+            r"test!(
     this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed
-)"
+);"
         );
     }
 
     #[test]
     fn test_braced_short() {
-        let source = "{ foo }";
-        let result = crate::pretty::pretty_print_str::<Macro<syn::Ident>>(source, 0, 0);
+        let source = "test! { foo }";
+        let result = crate::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "{ foo }");
+        assert_eq!(result.unwrap(), "test! { foo }");
     }
 
     #[test]
     fn test_braced_long() {
-        let source = "{ this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed }";
-        let result = crate::pretty::pretty_print_str::<Macro<syn::Ident>>(source, 0, 0);
+        let source = "test! { this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed }";
+        let result = crate::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            r"{
+            r"test! {
     this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed
 }"
         );
@@ -149,22 +153,22 @@ mod tests {
 
     #[test]
     fn test_bracketed_short() {
-        let source = "[foo]";
-        let result = crate::pretty::pretty_print_str::<Macro<syn::Ident>>(source, 0, 0);
+        let source = "test![foo];";
+        let result = crate::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "[foo]");
+        assert_eq!(result.unwrap(), "test![foo];");
     }
 
     #[test]
     fn test_bracketed_long() {
-        let source = "[this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed]";
-        let result = crate::pretty::pretty_print_str::<Macro<syn::Ident>>(source, 0, 0);
+        let source = "test![this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed];";
+        let result = crate::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            r"[
+            r"test![
     this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed
-]"
+];"
         );
     }
 }

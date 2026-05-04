@@ -17,7 +17,7 @@ async fn get_user(cx: &Cx, id: i64) -> User {
 }
 ```
 
-That's it. Calling `get_user(cx, 42).await` from anywhere in the request — a page, a layout, a component — runs the body the first time and returns the cached `User` for every subsequent call with `id == 42`.
+That's it. Calling `get_user(cx, 42).await` from anywhere in the request — a page, a layout, a component — runs the body the first time and returns the cached `User` for every subsequent call with `id == 42`. The function's return type `T` is rewritten to `&T` that has the same lifetime as `&cx`.
 
 ## Sync and async
 
@@ -69,26 +69,6 @@ lookup(cx, "alice").await; // computes; stores "alice".to_owned() as the key
 lookup(cx, "alice").await; // cache hit, no allocation
 ```
 
-## The `Memoized<T>` return type
-
-`#[memoize]` rewrites the function to return [`Memoized<'_, T>`] instead of `T`. This is a smart-pointer handle that:
-
-- dereferences to `&T`, so you can use it anywhere a reference works,
-- is tied to the lifetime of the request context, so it can't outlive the cache it came from.
-
-```rust
-#[memoize]
-async fn site_title(cx: &Cx) -> String {
-    settings::load_title(cx).await
-}
-
-let title = site_title(cx).await;     // Memoized<'_, String>
-println!("{}", *title);               // deref to &String
-let owned: String = (*title).clone(); // clone if you need ownership
-```
-
-If you need to send the value across a `'static` boundary (e.g. into a spawned task), `clone()` the inner value out — don't try to move the `Memoized` itself.
-
 ## Requirements
 
 The macro enforces these at compile time:
@@ -115,8 +95,8 @@ It is *not* a substitute for a long-lived cache (Redis, an LRU, etc.). Cross-req
 ```rust
 use topcoat::{
     context::{Cx, memoize},
-    router::{Slot, layout, page},
-    view::{View, view},
+    router::{Result, Slot, layout, page},
+    view::view,
 };
 
 #[memoize]
@@ -125,7 +105,7 @@ async fn current_user(cx: &Cx) -> Option<User> {
 }
 
 #[layout]
-async fn root(cx: &Cx, slot: Slot) -> View {
+async fn root(cx: &Cx, slot: Slot) -> Result {
     let user = current_user(cx).await; // computes once
     view! {
         <header>
@@ -134,12 +114,12 @@ async fn root(cx: &Cx, slot: Slot) -> View {
                 None => view! { <a href="/login">"Sign in"</a> },
             })
         </header>
-        (slot.await)
+        (slot.await?)
     }
 }
 
 #[page]
-async fn dashboard(cx: &Cx) -> View {
+async fn dashboard(cx: &Cx) -> Result {
     let user = current_user(cx).await; // cache hit, no extra DB query
     view! { <h1>"Welcome, " (user.as_ref().unwrap().name.clone())</h1> }
 }

@@ -1,5 +1,6 @@
 use futures_util::SinkExt;
 use tokio_tungstenite::tungstenite::Message;
+use topcoat_router::Result;
 
 use crate::{
     component::component,
@@ -30,7 +31,7 @@ pub async fn notify_ready() {
     unused_variables,
     reason = "child is required by the component macro contract but unused here"
 )]
-pub async fn script(child: View) -> View {
+pub async fn script(child: View) -> Result {
     let url = std::env::var("TOPCOAT_DEV_URL").unwrap_or_default();
 
     view! {

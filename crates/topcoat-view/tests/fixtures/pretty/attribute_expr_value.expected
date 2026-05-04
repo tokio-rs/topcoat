@@ -1,1 +1,1 @@
-{ <span class=(get_class())></span> }
+view! { <span class=(get_class())></span> }

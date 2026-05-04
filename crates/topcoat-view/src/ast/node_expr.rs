@@ -38,8 +38,8 @@ impl ParseOption for NodeExpr {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for NodeExpr {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for NodeExpr {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         "(".pretty_print(printer);
         self.expr.pretty_print(printer);
         ")".pretty_print(printer);

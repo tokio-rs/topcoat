@@ -1,8 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, pin::Pin};
 
-use topcoat_view::runtime::View;
-
-use crate::Path;
+use crate::{Path, Result};
 
 /// A route handler that renders a [`View`] for a specific URL path.
 ///
@@ -14,14 +12,14 @@ pub struct Page {
     /// The URL path this page handles.
     path: Cow<'static, Path>,
     /// The async render function that produces the page [`View`].
-    render: fn() -> Pin<Box<dyn Future<Output = View> + Send>>,
+    render: fn() -> Pin<Box<dyn Future<Output = Result> + Send>>,
 }
 
 impl Page {
     /// Creates a new page with an explicit path and render function.
     pub const fn new(
         path: Cow<'static, Path>,
-        render: fn() -> Pin<Box<dyn Future<Output = View> + Send>>,
+        render: fn() -> Pin<Box<dyn Future<Output = Result> + Send>>,
     ) -> Self {
         Self { path, render }
     }
@@ -31,8 +29,8 @@ impl Page {
         &self.path
     }
 
-    /// Renders the page, returning a [`View`].
-    pub fn render(&self) -> Pin<Box<dyn Future<Output = View> + Send>> {
+    /// Renders the page, returning a [`Result`].
+    pub fn render(&self) -> Pin<Box<dyn Future<Output = Result> + Send>> {
         (self.render)()
     }
 }
@@ -77,10 +75,12 @@ impl IntoIterator for Pages {
 
 #[cfg(test)]
 mod tests {
+    use topcoat_view::runtime::View;
+
     use super::*;
 
-    fn dummy_render() -> Pin<Box<dyn Future<Output = View> + Send>> {
-        Box::pin(async { View::new("") })
+    fn dummy_render() -> Pin<Box<dyn Future<Output = Result> + Send>> {
+        Box::pin(async { Ok(View::new("")) })
     }
 
     fn page(path: &'static str) -> Page {

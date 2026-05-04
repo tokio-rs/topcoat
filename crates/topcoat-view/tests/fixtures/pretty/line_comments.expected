@@ -1,4 +1,4 @@
-{
+view! {
     // a comment
     <div>"hello"</div>
 }

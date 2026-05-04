@@ -25,9 +25,9 @@ impl Parse for OpeningTag {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for OpeningTag {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
-        printer.scan_begin(crate::pretty::BreakMode::Consistent);
+impl topcoat_pretty::PrettyPrint for OpeningTag {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_pretty::BreakMode::Consistent);
         self.lt.pretty_print(printer);
         self.name.pretty_print(printer);
         if !self.attributes.is_empty() {
@@ -68,8 +68,8 @@ impl ParseOption for ClosingTag {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for ClosingTag {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for ClosingTag {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         self.lt.pretty_print(printer);
         self.slash.pretty_print(printer);
         self.name.pretty_print(printer);

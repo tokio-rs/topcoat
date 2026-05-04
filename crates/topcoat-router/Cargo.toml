@@ -8,13 +8,15 @@ discover = ["dep:inventory"]
 
 [dependencies]
 topcoat-core.workspace = true
-topcoat-view.workspace = true
+topcoat-view = { workspace = true, features = ["axum"] }
 
 axum.workspace = true
 heck.workspace = true
 http.workspace = true
 inventory = { workspace = true, optional = true }
 ref-cast.workspace = true
+serde.workspace = true
+serde_urlencoded.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tower.workspace = true

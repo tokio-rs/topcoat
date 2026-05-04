@@ -1,1 +1,1 @@
-{ [Layout]<p>"content"</p>[/Layout] }
+view! { [Layout]<p>"content"</p>[/Layout] }

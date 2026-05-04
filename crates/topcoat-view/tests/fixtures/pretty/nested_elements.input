@@ -1,1 +1,1 @@
-{     <div>     <span>     <p>"hello"</p>     </span>     </div>     }
+view! {    <div>     <span>     <p>"hello"</p>     </span>     </div>     }

@@ -1,1 +1,1 @@
-{  for  item  in  items  {  <li>(item)</li>  }  }
+view! { for  item  in  items  { <li>(item)</li>  }  }

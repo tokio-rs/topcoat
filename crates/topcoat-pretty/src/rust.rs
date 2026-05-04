@@ -1,11 +1,17 @@
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
-use crate::pretty::pretty_print_rust_str;
+use crate::pretty_print_str;
 
 use super::{PrettyPrint, Printer, TextMode};
 
-fn format_rust_snippet(source: &str, prefix: &str, suffix: &str, indent: isize) -> String {
+fn format_rust_snippet(
+    printer: &mut Printer<'_>,
+    source: &str,
+    prefix: &str,
+    suffix: &str,
+    indent: isize,
+) -> String {
     let mut input = String::new();
     for _ in 0..indent {
         input.push_str("const _: () = {");
@@ -19,7 +25,7 @@ fn format_rust_snippet(source: &str, prefix: &str, suffix: &str, indent: isize) 
 
     let file = syn::parse_file(&input).expect("failed to parse rust snippet for formatting");
     let formatted = prettyplease::unparse(&file);
-    let formatted = pretty_print_rust_str(&formatted).unwrap();
+    let formatted = pretty_print_str(printer.registry(), &formatted).unwrap();
 
     let mut stripped = formatted.trim();
     for _ in 0..indent {
@@ -39,6 +45,7 @@ impl PrettyPrint for syn::Expr {
             .source_text()
             .expect("cannot pretty print rust expr without source text");
         let output = format_rust_snippet(
+            printer,
             &source_text,
             "const _: () = ",
             ";",
@@ -55,6 +62,7 @@ impl PrettyPrint for syn::Pat {
             .source_text()
             .expect("cannot pretty print rust expr without source text");
         let output = format_rust_snippet(
+            printer,
             &source_text,
             "const _: () = matches!(x, ",
             ");",

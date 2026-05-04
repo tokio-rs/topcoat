@@ -59,7 +59,7 @@ impl Component {
             let value = &item.value;
             quote! { #name: #value }
         });
-        let mut child_writer = ViewWriter::new();
+        let mut child_writer = ViewWriter::new_nested();
         for child in self.children() {
             child.write(&mut child_writer);
         }
@@ -68,7 +68,7 @@ impl Component {
             <#name as ::topcoat::component::Component>::render(#name {
                 child: #child_writer,
                 #(#fields),*
-            }).await
+            }).await?
         });
     }
 }
@@ -136,9 +136,9 @@ impl ParseOption for Component {
     }
 }
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for Component {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
-        printer.scan_begin(crate::pretty::BreakMode::Consistent);
+impl topcoat_pretty::PrettyPrint for Component {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_pretty::BreakMode::Consistent);
         match self {
             Self::Normal {
                 opening_tag,

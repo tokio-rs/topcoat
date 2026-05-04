@@ -147,9 +147,9 @@ impl ParseOption for Element {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for Element {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
-        printer.scan_begin(crate::pretty::BreakMode::Consistent);
+impl topcoat_pretty::PrettyPrint for Element {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_pretty::BreakMode::Consistent);
         match self {
             Self::Normal {
                 opening_tag,

@@ -45,8 +45,8 @@ impl ParseOption for NodeForLoop {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for NodeForLoop {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for NodeForLoop {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         self.for_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.pat.pretty_print(printer);
@@ -89,8 +89,8 @@ impl ParseOption for NodeContinue {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for NodeContinue {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for NodeContinue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         self.semi_token.pretty_print(printer);
         todo!();
     }
@@ -126,8 +126,8 @@ impl ParseOption for NodeBreak {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for NodeBreak {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for NodeBreak {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         self.semi_token.pretty_print(printer);
         todo!();
     }

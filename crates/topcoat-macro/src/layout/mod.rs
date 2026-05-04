@@ -108,7 +108,7 @@ impl ToTokens for Layout {
         }.to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { ::topcoat::inventory::submit! { #ident } }.to_tokens(tokens);
+            quote! { ::topcoat::internal::inventory::submit! { #ident } }.to_tokens(tokens);
         }
     }
 }

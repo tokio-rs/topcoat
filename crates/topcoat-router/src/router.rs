@@ -1,8 +1,13 @@
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
-use axum::{body::Body, extract::RawPathParams, routing::get};
+use axum::{
+    body::Body,
+    extract::{RawPathParams, State},
+    response::IntoResponse,
+    routing::get,
+};
 use http::Request;
-use topcoat_core::context::scope_context;
+use topcoat_core::context::{AppState, MaybeAborted, scope_context};
 
 use crate::{Layout, Layouts, Page, Pages};
 
@@ -26,6 +31,7 @@ use crate::{Layout, Layouts, Page, Pages};
 ///         .layout(root_layout)
 ///         .page(home)
 ///         .page(about)
+///         .app_state(Database::connect())
 /// }
 /// ```
 ///
@@ -33,13 +39,16 @@ use crate::{Layout, Layouts, Page, Pages};
 ///
 /// ```rust,ignore
 /// pub fn router() -> Router {
-///     Router::new().discover()
+///     Router::new()
+///         .discover()
+///         .app_state(Database::connect())
 /// }
 /// ```
 #[derive(Default)]
 pub struct Router {
     pages: Pages,
     layouts: Layouts,
+    state: AppState,
 }
 
 impl Router {
@@ -48,6 +57,7 @@ impl Router {
         Self {
             pages: Pages::new(),
             layouts: Layouts::new(),
+            state: AppState::new(),
         }
     }
 
@@ -90,6 +100,41 @@ impl Router {
         }
         self
     }
+
+    /// Registers a unique value that is accessible to every request sent to
+    /// this router by its type `T`. The top-level [`app_state`](topcoat_core::context::app_state)
+    /// function can be used to retrieve a reference to this value via a request context.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a state value has already been registered for the same type.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use topcoat::context::{Cx, app_state};
+    /// use topcoat::router::Router;
+    ///
+    /// struct Database { /* ... */ }
+    ///
+    /// pub fn router() -> Router {
+    ///     Router::new()
+    ///         .page(user_profile)
+    ///         .app_state(Database::connect())
+    /// }
+    ///
+    /// async fn fetch_user(cx: &Cx, id: u64) -> User {
+    ///     let db: &Database = app_state(cx);
+    ///     db.fetch_user(id).await;
+    /// }
+    /// ```
+    pub fn app_state<T>(mut self, value: T) -> Self
+    where
+        T: Any + Send + Sync,
+    {
+        self.state.register(value);
+        self
+    }
 }
 
 /// Converts into an [`axum::Router`] by wiring each page to its matching
@@ -97,7 +142,7 @@ impl Router {
 /// path are nested from innermost (most specific) to outermost.
 impl From<Router> for axum::Router {
     fn from(value: Router) -> Self {
-        let mut result = axum::Router::new();
+        let mut result = axum::Router::<Arc<AppState>>::new();
 
         for page in value.pages {
             let mut layouts: Vec<_> = value.layouts.for_path(page.path()).cloned().collect();
@@ -105,19 +150,32 @@ impl From<Router> for axum::Router {
 
             result = result.route(
                 &page.path().to_axum_path(),
-                get(async move |params: RawPathParams, request: Request<Body>| {
-                    let mut render = page.render();
-                    for layout in layouts.iter().rev() {
-                        render = layout.render(render);
-                    }
+                get(
+                    async move |State(state): State<Arc<AppState>>,
+                                params: RawPathParams,
+                                request: Request<Body>| {
+                        let mut render = page.render();
+                        for layout in layouts.iter().rev() {
+                            render = layout.render(render);
+                        }
 
-                    let (mut parts, _body) = request.into_parts();
-                    parts.extensions.insert(Arc::new(params));
-                    scope_context(parts, render).await
-                }),
+                        let (mut parts, _body) = request.into_parts();
+                        parts.extensions.insert(Arc::new(params));
+                        match scope_context(state, parts, render).await {
+                            MaybeAborted::Completed(value) => value.into_response(),
+                            MaybeAborted::Aborted(value) => {
+                                if let Ok(redirect) = value.downcast::<axum::response::Redirect>() {
+                                    return redirect.into_response();
+                                }
+
+                                panic!("request was aborted with an unrecognized type");
+                            }
+                        }
+                    },
+                ),
             );
         }
 
-        result
+        result.with_state(Arc::new(value.state))
     }
 }

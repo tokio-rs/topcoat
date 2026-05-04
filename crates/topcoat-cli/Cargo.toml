@@ -13,6 +13,7 @@ name = "cargo-topcoat"
 path = "src/bin/cargo_topcoat.rs"
 
 [dependencies]
+topcoat-pretty.workspace = true
 topcoat-view = { workspace = true, features = ["pretty"] }
 
 clap = { workspace = true, features = ["derive"] }

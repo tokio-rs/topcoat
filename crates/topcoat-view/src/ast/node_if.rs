@@ -44,8 +44,8 @@ impl ParseOption for NodeIf {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for NodeIf {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for NodeIf {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         self.if_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.cond.pretty_print(printer);
@@ -101,8 +101,8 @@ impl ParseOption for NodeElse {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for NodeElse {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for NodeElse {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         match self {
             Self::ElseIf {
                 else_token,

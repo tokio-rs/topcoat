@@ -53,9 +53,9 @@ impl ParseOption for NodeMatch {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for NodeMatch {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
-        use crate::pretty::{BreakMode, Delim};
+impl topcoat_pretty::PrettyPrint for NodeMatch {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use topcoat_pretty::{BreakMode, Delim};
 
         self.match_token.pretty_print(printer);
 
@@ -122,8 +122,8 @@ impl Parse for NodeMatchArm {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for NodeMatchArm {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for NodeMatchArm {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         self.pat.pretty_print(printer);
         " ".pretty_print(printer);
         self.fat_arrow_token.pretty_print(printer);

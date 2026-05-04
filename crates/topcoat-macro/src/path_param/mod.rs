@@ -1,109 +1,124 @@
+use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Ident, Path, Token, Visibility,
+    Data, DeriveInput, Fields, Type,
     parse::{Parse, ParseStream},
 };
-use topcoat_view::ast::ParseOption;
 
-pub struct PathParam {
-    vis: Visibility,
-    name: Ident,
-    ty: Option<PathParamType>,
-    fn_name: Option<PathParamFnName>,
+pub struct PathParamAttr;
+
+impl Parse for PathParamAttr {
+    fn parse(_input: ParseStream) -> syn::Result<Self> {
+        Ok(Self)
+    }
 }
 
-impl Parse for PathParam {
+pub struct PathParamItem {
+    item: DeriveInput,
+    inner_ty: Type,
+}
+
+impl Parse for PathParamItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
-            vis: input.parse()?,
-            name: input.parse()?,
-            ty: input.call(PathParamType::parse_option)?,
-            fn_name: input.call(PathParamFnName::parse_option)?,
-        })
+        let item: DeriveInput = input.parse()?;
+        let Data::Struct(data_struct) = &item.data else {
+            return Err(syn::Error::new_spanned(
+                &item.ident,
+                "path_param can only be applied to a tuple struct with one unnamed field",
+            ));
+        };
+        let Fields::Unnamed(unnamed) = &data_struct.fields else {
+            return Err(syn::Error::new_spanned(
+                &data_struct.fields,
+                "path_param can only be applied to a tuple struct with one unnamed field",
+            ));
+        };
+        if unnamed.unnamed.len() != 1 {
+            return Err(syn::Error::new_spanned(
+                &unnamed.unnamed,
+                "path_param structs must have exactly one unnamed field",
+            ));
+        }
+        let inner_ty = unnamed.unnamed.first().unwrap().ty.clone();
+        Ok(Self { item, inner_ty })
     }
 }
 
-struct PathParamFnName {
-    _as_token: Token![as],
-    name: Ident,
-}
+pub struct PathParam(PathParamAttr, PathParamItem);
 
-impl Parse for PathParamFnName {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
-            _as_token: input.parse()?,
-            name: input.parse()?,
-        })
-    }
-}
-
-impl ParseOption for PathParamFnName {
-    fn peek(input: ParseStream) -> bool {
-        input.peek(Token![as])
-    }
-}
-
-struct PathParamType {
-    _colon_token: Token![:],
-    path: Path,
-}
-
-impl Parse for PathParamType {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
-            _colon_token: input.parse()?,
-            path: input.parse()?,
-        })
-    }
-}
-
-impl ParseOption for PathParamType {
-    fn peek(input: ParseStream) -> bool {
-        input.peek(Token![:])
+impl PathParam {
+    pub fn new(attr: PathParamAttr, item: PathParamItem) -> Self {
+        Self(attr, item)
     }
 }
 
 impl ToTokens for PathParam {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let vis = &self.vis;
-        let name_string = self.name.to_string();
-        let fn_name = self
-            .fn_name
-            .as_ref()
-            .map(|fn_name| &fn_name.name)
-            .unwrap_or(&self.name);
+        let item = &self.1.item;
+        let ident = &item.ident;
+        let inner_ty = &self.1.inner_ty;
+        let name_string = ident.to_string().to_snake_case();
+        let (impl_generics, ty_generics, where_clause) = item.generics.split_for_impl();
 
-        let panic = quote! {
-            panic!("path parameter \"{}\" was not found in request path", #name_string);
-        };
+        fn is_str_ref(ty: &Type) -> bool {
+            let Type::Reference(reference) = ty else {
+                return false;
+            };
+            if reference.mutability.is_some() {
+                return false;
+            }
+            let Type::Path(path) = &*reference.elem else {
+                return false;
+            };
+            path.qself.is_none() && path.path.is_ident("str")
+        }
 
-        if let Some(ty) = &self.ty {
-            let ty = &ty.path;
+        let of_fn = if is_str_ref(inner_ty) {
             quote! {
-                #[::topcoat::context::memoize]
-                #vis fn #fn_name(cx: &::topcoat::context::Cx) -> #ty {
+                fn of(cx: &::topcoat::context::Cx) -> &ident {
                     for (key, value) in ::topcoat::router::raw_path_params(cx) {
                         if key == #name_string {
-                            return str::parse::<#ty>(value).unwrap();
+                            return #ident(value);
                         }
                     }
-                    #panic
+                    panic!("path parameter \"{}\" was not found in request path", #name_string);
                 }
             }
-            .to_tokens(tokens);
         } else {
             quote! {
-                #vis fn #fn_name(cx: &::topcoat::context::Cx) -> &str {
-                    for (key, value) in ::topcoat::router::raw_path_params(cx) {
-                        if key == #name_string {
-                            return value;
+                fn of(cx: &::topcoat::context::Cx) -> &::core::result::Result<#ident, <#inner_ty as ::core::str::FromStr>::Err> {
+                    #[::topcoat::context::memoize]
+                    fn parse(cx: &::topcoat::context::Cx) -> ::core::result::Result<#ident, <#inner_ty as ::core::str::FromStr>::Err> {
+                        for (key, value) in ::topcoat::router::raw_path_params(cx) {
+                            if key == #name_string {
+                                return ::core::str::FromStr::from_str(value).map(#ident);
+                            }
                         }
+                        panic!("path parameter \"{}\" was not found in request path", #name_string);
                     }
-                    #panic
+                    parse(cx)
                 }
             }
-            .to_tokens(tokens);
+        };
+
+        quote! {
+            #item
+
+            impl #impl_generics #ident #ty_generics #where_clause {
+                #of_fn
+            }
+
+            impl ::core::ops::Deref for #ident {
+                type Target = #inner_ty;
+
+                fn deref(&self) -> &Self::Target {
+                    &self.0
+                }
+            }
+
+            ::topcoat::router::segment!(kind = Param, rename = #name_string);
         }
+        .to_tokens(tokens);
     }
 }

@@ -46,8 +46,8 @@ impl ParseOption for Attribute {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for Attribute {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for Attribute {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         self.name.pretty_print(printer);
         self.eq.pretty_print(printer);
         self.value.pretty_print(printer);
@@ -97,12 +97,12 @@ impl ToTokens for AttributeValue {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for AttributeValue {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for AttributeValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         match self {
             Self::LitStr(inner) => inner.pretty_print(printer),
             Self::Expr { paren, expr } => {
-                use crate::pretty::{BreakMode, Delim};
+                use topcoat_pretty::{BreakMode, Delim};
                 paren.pretty_print(printer, Some(BreakMode::Inconsistent), |printer| {
                     expr.pretty_print(printer);
                 });
@@ -141,8 +141,8 @@ impl Parse for Attributes {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for Attributes {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for Attributes {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         if self.items.is_empty() {
             return;
         }

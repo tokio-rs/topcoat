@@ -1,1 +1,1 @@
-{   <p>"hello world"</p>   }
+view! {  <p>"hello world"</p>   }

@@ -34,14 +34,14 @@ A `#[page]` defines a route handler. A `#[layout]` wraps all pages in the same m
 ```rust
 // src/app/mod.rs — layout at "/" wraps all pages
 #[layout]
-async fn root_layout(slot: Slot) -> View {
+async fn root_layout(slot: Slot) -> Result {
     view! {
-        <html><body>(slot.await)</body></html>
+        <html><body>(slot.await?)</body></html>
     }
 }
 
 #[page]
-async fn home() -> View {
+async fn home() -> Result {
     view! { <h1>"Home"</h1> }
 }
 ```
@@ -49,9 +49,19 @@ async fn home() -> View {
 ```rust
 // src/app/about.rs — page at "/about"
 #[page]
-async fn about() -> View {
+async fn about() -> Result {
     view! { <h1>"About"</h1> }
 }
+```
+
+## Renaming a static segment
+
+`segment!(rename = "name")` overrides the URL with the given literal (used as-is, no kebab-casing).
+
+```rust
+// src/app/blog_post.rs
+topcoat::router::segment!(rename = "articles");
+// Route: /articles instead of /blog-post
 ```
 
 ## Groups
@@ -72,12 +82,20 @@ app/
 
 Both `pricing` and `getting_started` are top-level routes, but they can have different layouts via their respective group `mod.rs` files.
 
-You can also turn a regular module into a group with `segment!(_)`:
+You can also turn a regular module into a group with `segment!(kind = Group)`:
 
 ```rust
 // src/app/marketing/mod.rs
-topcoat::router::segment!(_);
+topcoat::router::segment!(kind = Group);
 // `marketing` now contributes no URL segment.
+```
+
+Or turn a group module into a regular static path segment:
+
+```rust
+// src/app/_group/mod.rs
+topcoat::router::segment!(kind = Static);
+// Module now reachable as `/group`.
 ```
 
 The `_`-prefix can also act as a naming convention for route-specific utilities. For example, a `_components` module for shared UI fragments:
@@ -92,100 +110,3 @@ app/
   about.rs            # /about — can use app::_components::header
   contact.rs          # /contact
 ```
-
-## Renaming a static segment
-
-`segment!("name")` overrides the URL with the given literal (used as-is, no kebab-casing) and forces the kind to `Static`.
-
-```rust
-// src/app/blog_post.rs
-topcoat::router::segment!("articles");
-// Route: /articles instead of /blog-post
-```
-
-This also works to flip a `_`-prefixed group into a regular static segment:
-
-```rust
-// src/app/_internal/mod.rs
-topcoat::router::segment!("internal");
-// Route: /internal instead of being a hidden group
-```
-
-## Dynamic segments (params)
-
-`segment!(name)` marks the module as a dynamic parameter and generates an accessor function with the same name.
-
-```rust
-// src/app/users/id/mod.rs
-topcoat::router::segment!(id);
-```
-
-This maps the `app::users::id` module to `/users/{id}` and generates an accessor:
-
-```rust
-fn id(cx: &Cx) -> &str { /* … */ }
-```
-
-You can read the captured value from any handler in this module or its submodules:
-
-```rust
-#[page]
-async fn user_profile(cx: &Cx) -> View {
-    view! { <h1>"User: " (id(cx)) </h1> }
-}
-```
-
-Any submodule inherits the param segment:
-
-| Module | Route |
-|---|---|
-| `app::users::id` | `/users/{id}` |
-| `app::users::id::settings` | `/users/{id}/settings` |
-
-### Typed params
-
-Append `: Type` to parse the captured string into a custom type. The type must implement `FromStr`.
-
-```rust
-// src/app/posts/id/mod.rs
-topcoat::router::segment!(id: uuid::Uuid);
-```
-
-The accessor now returns the parsed value:
-
-```rust
-fn id(cx: &Cx) -> uuid::Uuid { /* … */ }
-```
-
-### Renaming the accessor
-
-If the URL param name and the accessor name should differ, append `as <fn_name>`:
-
-```rust
-// src/app/posts/id/mod.rs
-topcoat::router::segment!(id: uuid::Uuid as param);
-```
-
-This still routes as `/posts/{id}` but the accessor is `param(cx) -> uuid::Uuid`.
-
-## Catch-all segments
-
-`segment!(..name)` matches all remaining path segments:
-
-```rust
-// src/app/docs/path/mod.rs
-topcoat::router::segment!(..path);
-```
-
-This maps the `app::docs::path` module to `/docs/{*path}`.
-
-## Segment forms at a glance
-
-| Form | Kind | URL | Generated accessor |
-|---|---|---|---|
-| `segment!("blog-posts")` | `Static` | `/blog-posts` | — |
-| `segment!(_)` | `Group` | *(hidden)* | — |
-| `segment!(post_id)` | `Param` | `/{post_id}` | `post_id(cx) -> &str` |
-| `segment!(post_id: uuid::Uuid)` | `Param` | `/{post_id}` | `post_id(cx) -> uuid::Uuid` |
-| `segment!(post_id as my_post_id)` | `Param` | `/{post_id}` | `my_post_id(cx) -> &str` |
-| `segment!(..rest)` | `CatchAll` | `/{*rest}` | — |

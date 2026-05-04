@@ -2,8 +2,9 @@ use std::borrow::Cow;
 
 use proc_macro2::LineColumn;
 
-use crate::pretty::{
+use crate::{
     BeginToken, BreakMode, BreakToken, TextMode, TextToken, Token, TokenBuffer, Trivia, TriviaKind,
+    registry::Registry,
 };
 
 /// The target line width. Groups whose collapsed length exceeds this break.
@@ -24,6 +25,7 @@ struct PrintFrame {
 /// boundaries) via the `scan_*` methods, and the printer decides which breaks
 /// to render based on the available width.
 pub struct Printer<'a> {
+    registry: &'a Registry,
     trivia: &'a [Trivia<'a>],
     tokens: TokenBuffer<'a>,
     output: String,
@@ -37,8 +39,14 @@ pub struct Printer<'a> {
 
 impl<'a> Printer<'a> {
     #[must_use]
-    pub fn new(trivia: &'a [Trivia<'a>], initial_space: isize, initial_indent: isize) -> Self {
+    pub fn new(
+        registry: &'a Registry,
+        trivia: &'a [Trivia<'a>],
+        initial_space: isize,
+        initial_indent: isize,
+    ) -> Self {
         Self {
+            registry,
             trivia,
             output: String::new(),
             space: initial_space.max(MIN_SPACE),
@@ -49,6 +57,10 @@ impl<'a> Printer<'a> {
             pending_break: false,
             cursor: LineColumn { line: 1, column: 0 },
         }
+    }
+
+    pub fn registry(&self) -> &'a Registry {
+        self.registry
     }
 
     #[must_use]

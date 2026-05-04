@@ -6,18 +6,18 @@ You can register pages and layouts in two ways: **manually** (explicit paths, fu
 
 ## Pages
 
-A page is an async function that returns a `View`, annotated with `#[page]` and an explicit path:
+A page is an async function annotated with `#[page]` and an explicit path:
 
 ```rust
-use topcoat::{router::page, view::{View, view}};
+use topcoat::{router::{Result, page}, view::view};
 
 #[page("/")]
-async fn home() -> View {
+async fn home() -> Result {
     view! { <h1>"Home"</h1> }
 }
 
 #[page("/about")]
-async fn about() -> View {
+async fn about() -> Result {
     view! { <h1>"About"</h1> }
 }
 ```
@@ -26,28 +26,28 @@ The path string uses Axum's routing syntax — static segments, `{param}` for dy
 
 ```rust
 #[page("/users/{id}")]
-async fn user_profile() -> View {
+async fn user_profile() -> Result {
     view! { <h1>"User profile"</h1> }
 }
 
 #[page("/docs/{*path}")]
-async fn docs_page() -> View {
+async fn docs_page() -> Result {
     view! { <h1>"Documentation"</h1> }
 }
 ```
 
 ## Layouts
 
-A layout wraps pages. It receives a `Slot` — a future that resolves to the inner page's `View`. Annotate it with `#[layout]` and an explicit path:
+A layout wraps pages. It receives a `Slot` — a future that resolves to the inner page's rendered output. Annotate it with `#[layout]` and an explicit path:
 
 ```rust
 use topcoat::{
-    router::{Slot, layout},
-    view::{View, view},
+    router::{Result, Slot, layout},
+    view::view,
 };
 
 #[layout("/")]
-async fn root_layout(slot: Slot) -> View {
+async fn root_layout(slot: Slot) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -56,7 +56,7 @@ async fn root_layout(slot: Slot) -> View {
                     <a href="/">"Home"</a>
                     <a href="/about">"About"</a>
                 </nav>
-                (slot.await)
+                (slot.await?)
             </body>
         </html>
     }
@@ -71,22 +71,22 @@ When multiple layouts match a page, they nest from innermost (most specific path
 
 ```rust
 #[layout("/")]
-async fn root_layout(slot: Slot) -> View {
-    view! { <html><body>(slot.await)</body></html> }
+async fn root_layout(slot: Slot) -> Result {
+    view! { <html><body>(slot.await?)</body></html> }
 }
 
 #[layout("/settings")]
-async fn settings_layout(slot: Slot) -> View {
+async fn settings_layout(slot: Slot) -> Result {
     view! {
         <div class="settings-shell">
             <nav>"Settings nav"</nav>
-            (slot.await)
+            (slot.await?)
         </div>
     }
 }
 
 #[page("/settings/profile")]
-async fn profile() -> View {
+async fn profile() -> Result {
     view! { <h1>"Profile"</h1> }
 }
 ```
@@ -147,12 +147,12 @@ let axum_router: axum::Router = router.into();
 
 ```rust
 use topcoat::{
-    router::{Router, Slot, layout, page},
-    view::{View, view},
+    router::{Result, Router, Slot, layout, page},
+    view::view,
 };
 
 #[layout("/")]
-async fn root_layout(slot: Slot) -> View {
+async fn root_layout(slot: Slot) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -161,24 +161,24 @@ async fn root_layout(slot: Slot) -> View {
                     <a href="/">"Home"</a>
                     <a href="/users">"Users"</a>
                 </nav>
-                (slot.await)
+                (slot.await?)
             </body>
         </html>
     }
 }
 
 #[page("/")]
-async fn home() -> View {
+async fn home() -> Result {
     view! { <h1>"Welcome"</h1> }
 }
 
 #[page("/users")]
-async fn users_list() -> View {
+async fn users_list() -> Result {
     view! { <h1>"All users"</h1> }
 }
 
 #[page("/users/{id}")]
-async fn user_profile() -> View {
+async fn user_profile() -> Result {
     view! { <h1>"User profile"</h1> }
 }
 

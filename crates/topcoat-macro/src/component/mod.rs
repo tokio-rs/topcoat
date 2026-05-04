@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    FnArg, ItemFn, Pat,
+    FnArg, ItemFn, Pat, ReturnType,
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
@@ -27,6 +27,12 @@ impl Parse for ComponentItem {
                 "components must be async",
             ));
         }
+        if let ReturnType::Default = &item.sig.output {
+            return Err(syn::Error::new(
+                item.sig.fn_token.span(),
+                "components must have a return type",
+            ));
+        }
         Ok(Self { item })
     }
 }
@@ -36,6 +42,9 @@ impl ToTokens for ComponentItem {
         let item = &self.item;
         let vis = &item.vis;
         let ident = &item.sig.ident;
+        let ReturnType::Type(_, return_ty) = &item.sig.output else {
+            panic!("components must have a return type");
+        };
 
         let generics = item.sig.generics.clone();
         // generics.params.insert(0, syn::parse_quote!('__implicit));
@@ -84,7 +93,9 @@ impl ToTokens for ComponentItem {
             }
 
             impl #impl_generics ::topcoat::component::Component for #ident #ty_generics #where_clause {
-                async fn render(self) -> ::topcoat::view::View {
+                type Error = <#return_ty as ::topcoat::internal::ResultExt>::E;
+
+                async fn render(self) -> #return_ty {
                     #body
                 }
             }

@@ -14,7 +14,7 @@ Built on top of [Axum](https://github.com/tokio-rs/axum).
 - **`view!` macro** — write HTML that looks like HTML, with Rust control flow (`if`, `match`, `for`, `let`)
 - **No surprising HTML** — void elements stay void, no self-closing components, no camelCase attributes
 - **Layouts** — wrap pages in shared layouts via a `Slot` composition model
-- **Components** — reusable async functions that return `View`
+- **Components** — reusable async functions that render to a `View`
 - **Dev server** — `topcoat dev` watches for changes and hot-reloads the browser
 - **Axum compatible** — you can drop down to raw Axum when needed
 
@@ -56,8 +56,8 @@ mod _group;
 mod about;
 
 use topcoat::{
-    router::{Slot, layout, page},
-    view::{View, view},
+    router::{Result, Slot, layout, page},
+    view::view,
 };
 
 pub fn router() -> topcoat::router::Router {
@@ -65,7 +65,7 @@ pub fn router() -> topcoat::router::Router {
 }
 
 #[layout]
-async fn layout(slot: Slot) -> View {
+async fn layout(slot: Slot) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -80,24 +80,24 @@ async fn layout(slot: Slot) -> View {
                     <a href="/about">"about"</a>
                 </nav>
                 <hr>
-                (slot.await)
+                (slot.await?)
             </body>
         </html>
     }
 }
 
 #[page]
-async fn home_page() -> View {
+async fn home_page() -> Result {
     view! { "home" }
 }
 ```
 
 **`src/app/about.rs`**
 ```rust
-use topcoat::{router::page, view::{View, view}};
+use topcoat::{router::{Result, page}, view::view};
 
 #[page]
-async fn about_page() -> View {
+async fn about_page() -> Result {
     view! { "about" }
 }
 ```
@@ -123,24 +123,24 @@ If you prefer not to use the module router, you can register pages and layouts e
 
 ```rust
 use topcoat::{
-    router::{Router, Slot, layout, page},
-    view::{View, view},
+    router::{Result, Router, Slot, layout, page},
+    view::view,
 };
 
 #[layout("/")]
-async fn root_layout(slot: Slot) -> View {
+async fn root_layout(slot: Slot) -> Result {
     view! {
-        <html><body>(slot.await)</body></html>
+        <html><body>(slot.await?)</body></html>
     }
 }
 
 #[page("/")]
-async fn home_page() -> View {
+async fn home_page() -> Result {
     view! { "home" }
 }
 
 #[page("/about")]
-async fn about_page() -> View {
+async fn about_page() -> Result {
     view! { "about" }
 }
 
@@ -190,10 +190,10 @@ view! {
 Components are async functions annotated with `#[component]`. They receive typed parameters including child `View`s.
 
 ```rust
-use topcoat::{component, view, view::View};
+use topcoat::{component, router::Result, view::{View, view}};
 
 #[component]
-async fn button<'a>(id: &'a str, child: View) -> View {
+async fn button<'a>(id: &'a str, child: View) -> Result {
     view! {
         <button id=(id) class="button">(child)</button>
     }
@@ -212,15 +212,15 @@ view! {
 
 ## Layouts
 
-A `#[layout]` wraps all pages found in the same module (and submodules). It receives a `Slot` — a future that resolves to the page's `View`.
+A `#[layout]` wraps all pages found in the same module (and submodules). It receives a `Slot` — a future that resolves to the page's rendered output.
 
 ```rust
 #[layout]
-async fn layout(slot: Slot) -> View {
+async fn layout(slot: Slot) -> Result {
     view! {
         <html>
             <body>
-                (slot.await)
+                (slot.await?)
             </body>
         </html>
     }

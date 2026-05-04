@@ -147,8 +147,7 @@ impl ToTokens for Memoize {
 
         quote! {
             #(#attrs)*
-            #vis #asyncness fn #ident #generics (#(#new_inputs,)*)
-                -> ::topcoat::context::Memoized<'__cx, #return_type>
+            #vis #asyncness fn #ident #generics (#(#new_inputs,)*) -> &'__cx #return_type
             #where_clause
             {
                 #call

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::pretty::RingBuffer;
+use crate::RingBuffer;
 
 /// Controls whether a piece of text is emitted depending on the surrounding
 /// group's break decision.

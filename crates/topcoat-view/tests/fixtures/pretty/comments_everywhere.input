@@ -1,4 +1,4 @@
-{
+view! {
 // page wrapper
 <!DOCTYPE html>
 <html>

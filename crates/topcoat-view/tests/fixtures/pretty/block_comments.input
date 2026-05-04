@@ -1,1 +1,1 @@
-{ /* block */ <div>"hello"</div> }
+view! {/* block */ <div>"hello"</div> }

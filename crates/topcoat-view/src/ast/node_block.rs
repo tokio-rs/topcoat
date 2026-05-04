@@ -47,9 +47,9 @@ impl ParseOption for NodeBlock {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for NodeBlock {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
-        use crate::pretty::Delim;
+impl topcoat_pretty::PrettyPrint for NodeBlock {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use topcoat_pretty::Delim;
 
         printer.move_cursor(self.brace.span().open().start());
         "{".pretty_print(printer);

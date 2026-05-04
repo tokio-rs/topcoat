@@ -1,11 +1,11 @@
 use topcoat::{
-    router::{Slot, layout},
-    view::{View, view},
+    router::{Result, Slot, layout},
+    view::view,
 };
 
 mod contact;
 
 #[layout]
-async fn group_layout(slot: Slot) -> View {
-    view! { (slot.await) <div>"(in group layout)"</div> }
+async fn group_layout(slot: Slot) -> Result {
+    view! { (slot.await?) <div>"(in group layout)"</div> }
 }

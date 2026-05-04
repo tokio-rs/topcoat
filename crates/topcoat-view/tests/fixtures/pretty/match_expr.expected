@@ -1,4 +1,4 @@
-{
+view! {
     match status {
         Status::Active => "active",
         Status::Inactive => "inactive",

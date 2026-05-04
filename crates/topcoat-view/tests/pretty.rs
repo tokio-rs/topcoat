@@ -1,8 +1,7 @@
 use std::path::Path;
 
-use topcoat_view::pretty::{Macro, pretty_print_str};
-
-type View = Macro<topcoat_view::ast::View>;
+use topcoat_pretty::{Registry, pretty_print_str};
+use topcoat_view::ast::View;
 
 fn diff(expected: &str, actual: &str) -> String {
     let mut output = String::new();
@@ -32,9 +31,16 @@ fn diff(expected: &str, actual: &str) -> String {
     output
 }
 
+fn registry() -> Registry {
+    Registry::one::<View>("view")
+}
+
 fn assert_format(input: &str, expected: &str) {
-    let result = pretty_print_str::<View>(input, 0, 0).unwrap_or_else(|err| {
-        panic!("failed to parse input:\n{input}\nerror: {err}");
+    let result = pretty_print_str(&registry(), input).unwrap_or_else(|errors| {
+        panic!(
+            "failed to parse input:\n{input}\nerror: {}",
+            errors.first().unwrap()
+        );
     });
     if result != expected {
         panic!(

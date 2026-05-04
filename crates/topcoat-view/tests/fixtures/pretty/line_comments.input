@@ -1,2 +1,2 @@
-{ // a comment
+view! {// a comment
 <div>"hello"</div> }

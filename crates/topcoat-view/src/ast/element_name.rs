@@ -110,13 +110,13 @@ impl Parse for ElementName {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for ElementName {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for ElementName {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         match self {
             Self::Ident(inner) => inner.pretty_print(printer),
             Self::LitStr(inner) => inner.pretty_print(printer),
             Self::Expr { paren, expr } => {
-                use crate::pretty::{BreakMode, Delim};
+                use topcoat_pretty::{BreakMode, Delim};
 
                 paren.pretty_print(printer, Some(BreakMode::Inconsistent), |printer| {
                     expr.pretty_print(printer);

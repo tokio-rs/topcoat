@@ -25,9 +25,9 @@ impl Parse for ComponentOpeningTag {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for ComponentOpeningTag {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
-        printer.scan_begin(crate::pretty::BreakMode::Consistent);
+impl topcoat_pretty::PrettyPrint for ComponentOpeningTag {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_pretty::BreakMode::Consistent);
         "[".pretty_print(printer);
         self.path.pretty_print(printer);
         if !self.attributes.is_empty() {
@@ -63,8 +63,8 @@ impl Parse for ComponentSelfClosingTag {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for ComponentSelfClosingTag {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for ComponentSelfClosingTag {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         "[".pretty_print(printer);
         self.path.pretty_print(printer);
         if !self.attributes.is_empty() {
@@ -110,8 +110,8 @@ impl ParseOption for ComponentClosingTag {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for ComponentClosingTag {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl topcoat_pretty::PrettyPrint for ComponentClosingTag {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         "[/".pretty_print(printer);
         self.path.pretty_print(printer);
         "]".pretty_print(printer);

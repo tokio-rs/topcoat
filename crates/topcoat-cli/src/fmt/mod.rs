@@ -1,11 +1,11 @@
 mod error;
 
 use std::{collections::BTreeSet, io::Read, path::PathBuf, time::Instant};
+use topcoat_pretty::{Registry, pretty_print_str};
 
 use clap::Args;
 
 use console::style;
-use topcoat_view::pretty::pretty_print_rust_str;
 
 use crate::fmt::error::Error;
 
@@ -21,6 +21,9 @@ pub struct FmtCommand {
 
 impl FmtCommand {
     pub async fn run(&self) {
+        let mut registry = Registry::new();
+        registry.register_macro::<topcoat_view::ast::View>("view");
+
         let start = Instant::now();
         let result: Result<(), Error> = async {
             let mut files = BTreeSet::new();
@@ -43,7 +46,7 @@ impl FmtCommand {
 
             let mut count = 0;
             for file in &files {
-                if let Err(error) = format_file(file) {
+                if let Err(error) = format_file(file, &registry) {
                     eprintln!("{}", style(format!("{}: {error}", file.display())).red());
                     std::process::exit(1);
                 } else {
@@ -54,7 +57,7 @@ impl FmtCommand {
             if self.stdin {
                 let mut buf = String::new();
                 std::io::stdin().read_to_string(&mut buf)?;
-                buf = pretty_print_rust_str(&buf)?;
+                buf = pretty_print_str(&registry, &buf)?;
                 print!("{buf}");
             } else {
                 eprintln!(
@@ -79,9 +82,9 @@ impl FmtCommand {
     }
 }
 
-fn format_file(path: &PathBuf) -> Result<(), error::Error> {
+fn format_file(path: &PathBuf, registry: &Registry) -> Result<(), error::Error> {
     let input = std::fs::read_to_string(path)?;
-    let output = pretty_print_rust_str(&input)?;
+    let output = pretty_print_str(registry, &input)?;
     std::fs::write(path, output)?;
     Ok(())
 }
