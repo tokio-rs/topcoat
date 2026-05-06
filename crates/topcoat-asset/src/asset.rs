@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use memchr::memmem;
 use serde::{Deserialize, Serialize};
@@ -81,17 +81,69 @@ impl Asset {
         &self.crate_name
     }
 
-    /// Resolve the asset path relative to the source file it was declared in.
+    /// Resolve the asset path to an absolute filesystem path.
     ///
-    /// `file!()` is relative to the crate's manifest dir for first-party
-    /// sources but absolute for dependencies built from the cargo cache;
-    /// `Path::join` collapses both cases since an absolute right-hand side
-    /// replaces the base.
+    /// Paths starting with `./` or `../` are anchored to the directory of
+    /// the source file the macro was invoked in; anything else is anchored
+    /// to the crate's manifest dir.
     pub fn resolved_path(&self) -> PathBuf {
-        let source = Path::new(&self.manifest_dir).join(&self.source_file);
-        let parent = source.parent().unwrap_or(Path::new(""));
-        parent.join(&self.path)
+        let path = Path::new(&self.path);
+        if path.is_absolute() {
+            return normalize(path);
+        }
+
+        let anchor = match path.components().next() {
+            Some(Component::CurDir | Component::ParentDir) => {
+                let source = anchor_source_file(&self.manifest_dir, &self.source_file);
+                source
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| PathBuf::from(&self.manifest_dir))
+            }
+            _ => PathBuf::from(&self.manifest_dir),
+        };
+
+        normalize(&anchor.join(path))
     }
+}
+
+/// Locate the source file on disk by walking up from `manifest_dir`. Cargo
+/// makes `file!()` relative to its invocation directory, which can be the
+/// crate or the workspace root; trying parents in order finds whichever
+/// anchor produces an existing file. Absolute paths (e.g. dependencies
+/// built from the cargo cache) short-circuit.
+fn anchor_source_file(manifest_dir: &str, source_file: &str) -> PathBuf {
+    let source = Path::new(source_file);
+    if source.is_absolute() {
+        return source.to_path_buf();
+    }
+    let mut cur = Path::new(manifest_dir);
+    loop {
+        let candidate = cur.join(source);
+        if candidate.exists() {
+            return candidate;
+        }
+        match cur.parent() {
+            Some(parent) => cur = parent,
+            None => return Path::new(manifest_dir).join(source),
+        }
+    }
+}
+
+fn normalize(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for comp in path.components() {
+        match comp {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !out.pop() {
+                    out.push(comp);
+                }
+            }
+            other => out.push(other),
+        }
+    }
+    out
 }
 
 #[macro_export]
