@@ -10,14 +10,17 @@ default = [
 	"discover",
 ]
 
-view = [
-	"dep:topcoat-view",
-	"topcoat-macro/view",
+asset = [
+	"dep:topcoat-asset",
 ]
 router = [
 	"view",
 	"dep:topcoat-router",
 	"topcoat-macro/router",
+]
+view = [
+	"dep:topcoat-view",
+	"topcoat-macro/view",
 ]
 
 discover = [
@@ -27,6 +30,7 @@ discover = [
 ]
 
 [dependencies]
+topcoat-asset = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-macro.workspace = true
 topcoat-router = { workspace = true, optional = true }
