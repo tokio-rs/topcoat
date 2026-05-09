@@ -53,6 +53,12 @@ impl Cx {
     }
 }
 
+impl Default for Cx {
+    fn default() -> Self {
+        Cx::new(Arc::new(State::default()), State::default())
+    }
+}
+
 // `Cx` lives for the entire `scope_context` future, so conceptually we'd just
 // store it directly and hand out `&Cx` borrows tied to that scope. We can't:
 // `LocalKey::with` only lends `&T` for the duration of its closure (it borrows

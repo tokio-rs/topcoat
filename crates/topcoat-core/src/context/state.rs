@@ -187,7 +187,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "attempted to access app state")]
     fn app_state_panics_for_unregistered_type() {
-        let cx = Cx::new(Arc::new(State::new()), State::new());
+        let cx = Cx::default();
         let _: &Database = app_state(&cx);
     }
 
@@ -204,7 +204,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "attempted to access request state")]
     fn request_state_panics_for_unregistered_type() {
-        let cx = Cx::new(Arc::new(State::new()), State::new());
+        let cx = Cx::default();
         let _: &Database = request_state(&cx);
     }
 }

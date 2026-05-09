@@ -216,13 +216,8 @@ mod impls {
 
 #[cfg(test)]
 mod tests {
-    use crate::context::State;
-
     use super::*;
-    use std::sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     /// Returns a fresh counter with `'static` lifetime so closures that capture it can be
     /// `Copy + 'static` (the bounds `MemoizeCache::memoize` imposes on its function).
@@ -230,14 +225,10 @@ mod tests {
         Box::leak(Box::new(AtomicUsize::new(0)))
     }
 
-    fn cx() -> Cx {
-        Cx::new(Arc::new(State::new()), State::new())
-    }
-
     #[test]
     fn sync_same_key_runs_body_once() {
         let cache = MemoizeCache::new();
-        let cx = cx();
+        let cx = Cx::default();
         let n = counter();
         let f = move |_: &Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -255,7 +246,7 @@ mod tests {
     #[test]
     fn sync_different_keys_run_body_per_key() {
         let cache = MemoizeCache::new();
-        let cx = cx();
+        let cx = Cx::default();
         let n = counter();
         let f = move |_: &Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -272,7 +263,7 @@ mod tests {
     #[test]
     fn sync_different_functions_dont_collide() {
         let cache = MemoizeCache::new();
-        let cx = cx();
+        let cx = Cx::default();
         let n1 = counter();
         let n2 = counter();
         let f1 = move |_: &Cx, (x,): (i32,)| {
@@ -296,7 +287,7 @@ mod tests {
     #[test]
     fn sync_borrowed_str_key_dedupes_by_value() {
         let cache = MemoizeCache::new();
-        let cx = cx();
+        let cx = Cx::default();
         let n = counter();
         let f = move |_: &Cx, (s,): (&str,)| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -317,7 +308,7 @@ mod tests {
     #[test]
     fn sync_zero_arity_key() {
         let cache = MemoizeCache::new();
-        let cx = cx();
+        let cx = Cx::default();
         let n = counter();
         let f = move |_: &Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -335,7 +326,7 @@ mod tests {
     #[tokio::test]
     async fn async_same_key_runs_body_once() {
         let cache = MemoizeCache::new();
-        let cx = cx();
+        let cx = Cx::default();
         let n = counter();
         let f = async move |_: &Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -353,7 +344,7 @@ mod tests {
     #[tokio::test]
     async fn async_different_keys_run_body_per_key() {
         let cache = MemoizeCache::new();
-        let cx = cx();
+        let cx = Cx::default();
         let n = counter();
         let f = async move |_: &Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
