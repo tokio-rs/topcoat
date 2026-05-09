@@ -188,7 +188,7 @@ mod tests {
     }
 
     fn cx() -> Cx {
-        Cx::for_test(State::new())
+        Cx::for_test(State::new(), State::new())
     }
 
     #[test]

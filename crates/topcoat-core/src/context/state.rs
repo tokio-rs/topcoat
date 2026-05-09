@@ -188,7 +188,7 @@ mod tests {
     fn app_state_returns_registered_value() {
         let mut state = State::new();
         state.register(Database("primary"));
-        let cx = Cx::for_test(state);
+        let cx = Cx::for_test(state, State::new());
 
         let db: &Database = app_state(&cx);
         assert_eq!(db, &Database("primary"));
@@ -197,7 +197,24 @@ mod tests {
     #[test]
     #[should_panic(expected = "attempted to access app state")]
     fn app_state_panics_for_unregistered_type() {
-        let cx = Cx::for_test(State::new());
+        let cx = Cx::for_test(State::new(), State::new());
         let _: &Database = app_state(&cx);
+    }
+
+    #[test]
+    fn request_state_returns_registered_value() {
+        let mut state = State::new();
+        state.register(Database("primary"));
+        let cx = Cx::for_test(State::new(), state);
+
+        let db: &Database = request_state(&cx);
+        assert_eq!(db, &Database("primary"));
+    }
+
+    #[test]
+    #[should_panic(expected = "attempted to access request state")]
+    fn request_state_panics_for_unregistered_type() {
+        let cx = Cx::for_test(State::new(), State::new());
+        let _: &Database = request_state(&cx);
     }
 }

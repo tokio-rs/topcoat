@@ -48,7 +48,7 @@ impl ToTokens for QueryParams {
                     #[::topcoat::context::memoize]
                     fn parse(cx: &::topcoat::context::Cx) -> ::core::result::Result<#ident, ::topcoat::internal::serde_urlencoded::de::Error> {
                         ::topcoat::internal::serde_urlencoded::from_str(
-                            ::topcoat::context::uri(cx).path_and_query().map(|pq| pq.query().unwrap_or("")).unwrap_or("")
+                            ::topcoat::router::uri(cx).path_and_query().map(|pq| pq.query().unwrap_or("")).unwrap_or("")
                         )
                     }
                     parse(cx)

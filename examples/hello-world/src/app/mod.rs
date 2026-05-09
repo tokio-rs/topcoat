@@ -2,8 +2,8 @@ mod _group;
 mod posts;
 
 use topcoat::{
-    context::{Cx, app_state, memoize, uri},
-    router::{Result, Slot, layout, page},
+    context::{Cx, app_state, memoize},
+    router::{Result, Slot, layout, page, uri},
     view::view,
 };
 

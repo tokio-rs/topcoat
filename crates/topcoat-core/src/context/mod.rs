@@ -1,11 +1,9 @@
 mod abort;
 mod memoize;
-mod parts;
 mod state;
 
 pub use abort::*;
 pub use memoize::*;
-pub use parts::*;
 pub use state::*;
 
 use std::sync::{
@@ -13,7 +11,6 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use http::request::Parts;
 use tokio::task_local;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -31,7 +28,6 @@ pub struct Cx {
     id: CxId,
     app_state: Arc<State>,
     request_state: State,
-    parts: Parts,
     cache: MemoizeCache,
     abort: AbortStore,
 }
@@ -49,12 +45,11 @@ impl Cx {
     /// Builds a `Cx` suitable for unit tests, with the given `app_state` and
     /// every other field set to a default value.
     #[cfg(test)]
-    pub(crate) fn for_test(app_state: State) -> Self {
+    pub(crate) fn for_test(app_state: State, request_state: State) -> Self {
         Self {
             id: CxId(0),
             app_state: Arc::new(app_state),
-            request_state: State::new(),
-            parts: http::Request::new(()).into_parts().0,
+            request_state,
             cache: MemoizeCache::new(),
             abort: AbortStore::new(),
         }
@@ -75,14 +70,13 @@ task_local! {
 
 pub async fn scope_context<F: Future>(
     app_state: Arc<State>,
-    parts: Parts,
+    request_state: State,
     f: F,
 ) -> MaybeAborted<F::Output> {
     let cx = Arc::new(Cx {
         id: CxId::new(),
         app_state,
-        request_state: State::new(),
-        parts,
+        request_state,
         cache: MemoizeCache::new(),
         abort: AbortStore::new(),
     });

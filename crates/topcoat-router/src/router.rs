@@ -161,7 +161,7 @@ impl From<Router> for axum::Router {
             result = result.route(
                 &page.path().to_axum_path(),
                 get(
-                    async move |extract::State(state): extract::State<Arc<State>>,
+                    async move |extract::State(app_state): extract::State<Arc<State>>,
                                 params: RawPathParams,
                                 request: Request<Body>| {
                         let mut render = page.render();
@@ -169,9 +169,13 @@ impl From<Router> for axum::Router {
                             render = layout.render(render);
                         }
 
-                        let (mut parts, _body) = request.into_parts();
-                        parts.extensions.insert(Arc::new(params));
-                        match scope_context(state, parts, render).await {
+                        let (parts, _body) = request.into_parts();
+
+                        let mut request_state = State::new();
+                        request_state.register(parts);
+                        request_state.register(params);
+
+                        match scope_context(app_state, request_state, render).await {
                             MaybeAborted::Completed(value) => value.into_response(),
                             MaybeAborted::Aborted(value) => {
                                 if let Ok(redirect) = value.downcast::<axum::response::Redirect>() {

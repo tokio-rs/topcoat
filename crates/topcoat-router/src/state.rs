@@ -1,11 +1,11 @@
+use axum::extract::RawPathParams;
 use http::request::Parts;
-
-use super::Cx;
+use topcoat_core::context::{Cx, request_state};
 
 #[inline]
 #[must_use]
 pub fn parts(cx: &Cx) -> &Parts {
-    &cx.parts
+    request_state(cx)
 }
 
 #[inline]
@@ -36,4 +36,12 @@ pub fn headers(cx: &Cx) -> &http::HeaderMap {
 #[must_use]
 pub fn extensions(cx: &Cx) -> &http::Extensions {
     &parts(cx).extensions
+}
+
+/// This is an internal function, use direct path hooks instead.
+#[inline]
+#[must_use]
+#[doc(hidden)]
+pub fn raw_path_params(cx: &Cx) -> &RawPathParams {
+    request_state::<RawPathParams>(cx)
 }
