@@ -4,6 +4,7 @@ mod posts;
 use topcoat::{
     context::{Cx, memoize},
     router::{Result, Slot, layout, page},
+    tailwind,
     view::view,
 };
 
@@ -30,6 +31,7 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
         <html>
             <head>
                 <title>"hello world"</title>
+                <link rel="stylesheet" href=tailwind::stylesheet!()>
                 [topcoat::dev::script /]
             </head>
             <body>
@@ -69,6 +71,6 @@ mod about {
 
     #[page]
     async fn about_page() -> Result {
-        view! { "about" <img src=asset!("./ferris.png")> }
+        view! { <div class="font-bold">"about"</div> <img src=asset!("./ferris.png")> }
     }
 }

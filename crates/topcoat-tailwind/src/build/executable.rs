@@ -1,0 +1,80 @@
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
+
+use crate::build::{BuildError, Result};
+
+const REPO: &str = "tailwindlabs/tailwindcss";
+
+/// Returns the GitHub release asset name for the host platform.
+fn asset_name() -> Result<&'static str> {
+    let os = std::env::consts::OS;
+    let arch = std::env::consts::ARCH;
+    Ok(match (os, arch) {
+        ("macos", "x86_64") => "tailwindcss-macos-x64",
+        ("macos", "aarch64") => "tailwindcss-macos-arm64",
+        ("linux", "x86_64") => "tailwindcss-linux-x64",
+        ("linux", "aarch64") => "tailwindcss-linux-arm64",
+        ("linux", "arm") => "tailwindcss-linux-armv7",
+        ("windows", "x86_64") => "tailwindcss-windows-x64.exe",
+        ("windows", "aarch64") => "tailwindcss-windows-arm64.exe",
+        _ => return Err(BuildError::UnsupportedPlatform { os, arch }),
+    })
+}
+
+/// Download the Tailwind CLI for `version` to `dest`.
+///
+/// If `dest` already exists it's left untouched. On Unix the file is made
+/// executable.
+pub fn download(version: &str, dest: impl AsRef<Path>) -> Result<PathBuf> {
+    let dest = dest.as_ref().to_path_buf();
+    if dest.exists() {
+        return Ok(dest);
+    }
+
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|source| BuildError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+
+    let url = format!(
+        "https://github.com/{REPO}/releases/download/v{version}/{name}",
+        name = asset_name()?,
+    );
+
+    let mut body = ureq::get(&url)
+        .call()
+        .map_err(|e| BuildError::Http(Box::new(e)))?
+        .into_body();
+    let mut reader = body.as_reader();
+
+    let mut file = fs::File::create(&dest).map_err(|source| BuildError::Io {
+        path: dest.clone(),
+        source,
+    })?;
+    io::copy(&mut reader, &mut file).map_err(|source| BuildError::Io {
+        path: dest.clone(),
+        source,
+    })?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&dest)
+            .map_err(|source| BuildError::Io {
+                path: dest.clone(),
+                source,
+            })?
+            .permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&dest, perms).map_err(|source| BuildError::Io {
+            path: dest.clone(),
+            source,
+        })?;
+    }
+
+    Ok(dest)
+}

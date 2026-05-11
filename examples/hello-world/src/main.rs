@@ -7,7 +7,7 @@ mod components;
 
 #[tokio::main]
 async fn main() {
-    let id = asset!("./kek/ferris.png");
+    let id = asset!("./app/ferris.png");
     println!("asset id: {id:?}");
 
     let router = app::router()

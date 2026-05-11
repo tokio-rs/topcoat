@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-build = []
+default = ["build"]
+build = ["dep:thiserror", "dep:ureq"]
 
 [dependencies]
+thiserror = { workspace = true, optional = true }
+ureq = { workspace = true, optional = true }
 
 [lints]
 workspace = true

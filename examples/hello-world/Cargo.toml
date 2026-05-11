@@ -10,5 +10,8 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 topcoat = { workspace = true, features = ["tailwind"] }
 uuid = "1.23.1"
 
+[build-dependencies]
+topcoat = { workspace = true, features = ["tailwind"] }
+
 [lints]
 workspace = true

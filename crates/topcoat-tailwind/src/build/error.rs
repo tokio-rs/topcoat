@@ -1,0 +1,24 @@
+use std::{io, path::PathBuf, process::ExitStatus};
+
+pub type Result<T = ()> = std::result::Result<T, BuildError>;
+
+#[derive(Debug, thiserror::Error)]
+pub enum BuildError {
+    #[error("unsupported platform: {os}-{arch}")]
+    UnsupportedPlatform {
+        os: &'static str,
+        arch: &'static str,
+    },
+    #[error("http error: {0}")]
+    Http(#[from] Box<ureq::Error>),
+    #[error("io error at {}: {source}", path.display())]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+    #[error("`OUT_DIR` is not set; `Config::render` must be called from a build script")]
+    NoOutDir,
+    #[error("tailwindcss exited with {status}")]
+    Cli { status: ExitStatus },
+}
