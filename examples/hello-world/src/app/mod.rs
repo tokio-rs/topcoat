@@ -1,4 +1,5 @@
 mod _group;
+mod api;
 mod posts;
 
 use topcoat::{

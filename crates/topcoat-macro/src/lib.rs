@@ -37,14 +37,6 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[cfg(feature = "router")]
 #[proc_macro_attribute]
-pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let _attr = syn::parse_macro_input!(attr as route::RouteAttr);
-    let item = syn::parse_macro_input!(item as route::RouteItem);
-    quote! { #item }.into()
-}
-
-#[cfg(feature = "router")]
-#[proc_macro_attribute]
 pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as page::PageAttr);
     let item = syn::parse_macro_input!(item as page::PageItem);
@@ -58,6 +50,15 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as layout::LayoutAttr);
     let item = syn::parse_macro_input!(item as layout::LayoutItem);
     let combined = layout::Layout::new(attr, item);
+    quote! { #combined }.into()
+}
+
+#[cfg(feature = "router")]
+#[proc_macro_attribute]
+pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr = syn::parse_macro_input!(attr as route::RouteAttr);
+    let item = syn::parse_macro_input!(item as route::RouteItem);
+    let combined = route::Route::new(attr, item);
     quote! { #combined }.into()
 }
 
