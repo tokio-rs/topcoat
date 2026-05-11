@@ -11,14 +11,13 @@ default = [
 	"discover",
 ]
 
-asset = [
-	"dep:topcoat-asset",
-]
+asset = ["dep:topcoat-asset"]
 router = [
 	"view",
 	"dep:topcoat-router",
 	"topcoat-macro/router",
 ]
+tailwind = ["dep:topcoat-tailwind"]
 view = [
 	"dep:topcoat-view",
 	"topcoat-asset/view",
@@ -36,6 +35,7 @@ topcoat-asset = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-macro.workspace = true
 topcoat-router = { workspace = true, optional = true }
+topcoat-tailwind = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true, features = ["axum"] }
 
 axum.workspace = true

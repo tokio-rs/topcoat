@@ -1,0 +1,12 @@
+[package]
+name = "topcoat-tailwind"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+build = []
+
+[dependencies]
+
+[lints]
+workspace = true

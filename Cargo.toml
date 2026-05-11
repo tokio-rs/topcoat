@@ -8,6 +8,7 @@ members = [
     "crates/topcoat-macro",
     "crates/topcoat-pretty",
     "crates/topcoat-router",
+    "crates/topcoat-tailwind",
     "crates/topcoat-view",
 
     "examples/hello-world",
@@ -24,6 +25,7 @@ topcoat-core = { path = "crates/topcoat-core" }
 topcoat-macro = { path = "crates/topcoat-macro" }
 topcoat-pretty = { path = "crates/topcoat-pretty" }
 topcoat-router = { path = "crates/topcoat-router" }
+topcoat-tailwind = { path = "crates/topcoat-tailwind" }
 topcoat-view = { path = "crates/topcoat-view" }
 
 anymap3 = "1.0"

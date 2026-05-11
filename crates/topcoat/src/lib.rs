@@ -34,6 +34,11 @@ pub mod view {
 #[cfg(feature = "router")]
 pub use serve::serve;
 
+#[cfg(feature = "tailwind")]
+pub mod tailwind {
+    pub use topcoat_tailwind::*;
+}
+
 #[doc(hidden)]
 pub mod internal {
     #[cfg(feature = "discover")]
