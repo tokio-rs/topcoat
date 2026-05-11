@@ -1,10 +1,12 @@
 mod layout;
 mod page;
+mod route;
 mod router;
 mod segment;
 
 pub use layout::*;
 pub use page::*;
+pub use route::*;
 pub use router::*;
 pub use segment::*;
 

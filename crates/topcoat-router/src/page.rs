@@ -10,7 +10,7 @@ pub type PageRenderFn =
 
 /// A route handler that renders a [`View`] for a specific URL path.
 ///
-/// Created either manually via `#[page("/path")]` or by the file router
+/// Created either manually via `#[page("/path")]` or by the module router
 /// (which derives the path from the module tree). Registered into a
 /// [`Router`](crate::Router) alongside [`Layout`](crate::Layout)s.
 #[derive(Debug, Clone)]

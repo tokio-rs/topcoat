@@ -10,14 +10,15 @@ use http::Request;
 use topcoat_asset::{AssetBundle, AssetFragmentResolver, ServeAssetBundle};
 use topcoat_core::context::{Cx, MaybeAborted, State, WatchAbort};
 
-use crate::{Layout, Layouts, Page, Pages};
+use crate::{Layout, Layouts, Page, Pages, Route, Routes};
 
-/// The core routing primitive that collects [`Page`]s and [`Layout`]s,
-/// matches layouts to pages by path prefix, and converts into an
+/// The core routing primitive that collects [`Page`]s, [`Layout`]s, and
+/// [`Route`]s, matches layouts to pages by path prefix, and converts into an
 /// [`axum::Router`] for serving.
 ///
-/// Pages and layouts can be registered manually via [`page()`](Self::page)
-/// and [`layout()`](Self::layout), or auto-discovered with
+/// Pages, layouts, and routes can be registered manually via
+/// [`page()`](Self::page), [`layout()`](Self::layout), and
+/// [`route()`](Self::route), or auto-discovered with
 /// [`discover()`](Self::discover) (requires the `discover` feature).
 ///
 /// # Examples
@@ -32,6 +33,7 @@ use crate::{Layout, Layouts, Page, Pages};
 ///         .layout(root_layout)
 ///         .page(home)
 ///         .page(about)
+///         .route(api_health)
 ///         .app_state(Database::connect())
 /// }
 /// ```
@@ -49,6 +51,7 @@ use crate::{Layout, Layouts, Page, Pages};
 pub struct Router {
     pages: Pages,
     layouts: Layouts,
+    routes: Routes,
     assets: AssetBundle,
     state: State,
 }
@@ -62,6 +65,7 @@ impl Router {
         Self {
             pages: Pages::new(),
             layouts: Layouts::new(),
+            routes: Routes::new(),
             assets: AssetBundle::empty(),
             state,
         }
@@ -69,7 +73,7 @@ impl Router {
 
     /// Returns `true` if no pages or layouts have been registered.
     pub fn is_empty(&self) -> bool {
-        self.pages.is_empty() && self.layouts.is_empty()
+        self.pages.is_empty() && self.layouts.is_empty() && self.routes.is_empty()
     }
 
     /// Registers a [`Page`]. Order doesn't matter — layout matching
@@ -91,6 +95,19 @@ impl Router {
     /// Panics if a layout has already been registered for the same path.
     pub fn layout(mut self, layout: Layout) -> Self {
         self.layouts.register(layout);
+        self
+    }
+
+    /// Registers a [`Route`], an HTTP API handler bound to a specific path.
+    ///
+    /// Unlike pages, routes don't render a [`View`](topcoat_view::runtime::View)
+    /// and aren't wrapped by layouts — they return a raw response.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a route has already been registered for the same path.
+    pub fn route(mut self, route: Route) -> Self {
+        self.routes.register(route);
         self
     }
 

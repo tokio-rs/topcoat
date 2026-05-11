@@ -3,7 +3,8 @@ use std::borrow::Cow;
 use heck::ToKebabCase;
 
 use crate::{
-    ModuleLayout, ModulePage, PathBuf, PathSegment, Router, Segment, SegmentKind, Segments,
+    ModuleLayout, ModulePage, ModuleRoute, PathBuf, PathSegment, Router, Segment, SegmentKind,
+    Segments,
 };
 
 /// The module-based router, created by the `module_router!` macro.
@@ -151,6 +152,18 @@ impl ModuleRouter {
         self
     }
 
+    /// Registers a [`ModuleRoute`], computing its route path from the module path.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a route has already been registered for the same path.
+    pub fn route(mut self, route: ModuleRoute) -> Self {
+        let module_path = route.module_path();
+        let route = route.into_route(Cow::Owned(self.module_path_to_path(module_path)));
+        self.inner = self.inner.route(route);
+        self
+    }
+
     /// Discovers and registers all segments, pages, and layouts collected at link time.
     ///
     /// Segments are registered first (they must precede pages/layouts), then
@@ -166,6 +179,9 @@ impl ModuleRouter {
         }
         for layout in inventory::iter::<ModuleLayout>().cloned() {
             self = self.layout(layout);
+        }
+        for route in inventory::iter::<ModuleRoute>().cloned() {
+            self = self.route(route);
         }
         self.inner = self.inner.discover();
         self
