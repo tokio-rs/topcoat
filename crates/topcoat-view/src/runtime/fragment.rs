@@ -85,17 +85,28 @@ impl Fragment for View {
     }
 }
 
+struct UnescapedDisplayAdapter<'a, 'b>(&'a mut Formatter<'b>);
+
+impl core::fmt::Write for UnescapedDisplayAdapter<'_, '_> {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.0.write_str_unescaped(s);
+        Ok(())
+    }
+}
+
 macro_rules! impl_with_display {
     ($ty:ty) => {
         impl Fragment for $ty {
             #[inline]
             fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
-                f.write_str(&self.to_string())
+                use core::fmt::Write;
+                let _ = write!(UnescapedDisplayAdapter(f), "{self}");
             }
 
             #[inline]
             fn fmt_unescaped(&self, _cx: &Cx, f: &mut Formatter<'_>) {
-                f.write_str_unescaped(&self.to_string())
+                use core::fmt::Write;
+                let _ = write!(UnescapedDisplayAdapter(f), "{self}");
             }
         }
     };
