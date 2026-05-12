@@ -5,14 +5,18 @@ use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 use notify::{RecursiveMode, Watcher, recommended_watcher};
 use std::error::Error;
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::process::Stdio;
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc;
-use tokio::time::{Duration, Instant};
+use tokio::time::Duration;
 
 #[derive(Args)]
 pub struct DevCommand {}
+
+type BuildFut = Pin<Box<dyn Future<Output = Option<Child>> + Send>>;
 
 impl DevCommand {
     pub async fn run(self) {
@@ -30,7 +34,8 @@ impl DevCommand {
         eprintln!("  {}", style("watching for file changes...").dim());
         eprintln!();
 
-        let mut child = build_and_run(true, &dev_url).await;
+        let mut current_build: Option<BuildFut> = Some(spawn_build(true, &dev_url));
+        let mut child: Option<Child> = None;
 
         let (tx, mut rx) = mpsc::channel::<notify::Result<notify::Event>>(16);
         let mut watcher = recommended_watcher(move |event| {
@@ -49,7 +54,6 @@ impl DevCommand {
         }
 
         let debounce = Duration::from_millis(200);
-        let mut last_rebuild = Instant::now();
 
         loop {
             tokio::select! {
@@ -57,6 +61,7 @@ impl DevCommand {
                     eprintln!();
                     let spinner = make_spinner("shutting down...");
                     eprintln!();
+                    drop(current_build.take());
                     if let Some(c) = &mut child {
                         kill_child(c).await;
                     }
@@ -64,24 +69,36 @@ impl DevCommand {
                     eprintln!();
                     break;
                 }
+                result = wait_for_build(&mut current_build) => {
+                    current_build = None;
+                    child = result;
+                }
                 Some(_event) = rx.recv() => {
                     while rx.try_recv().is_ok() {}
-
-                    if last_rebuild.elapsed() < debounce {
-                        continue;
-                    }
-
                     tokio::time::sleep(debounce).await;
                     while rx.try_recv().is_ok() {}
 
-                    last_rebuild = Instant::now();
+                    drop(current_build.take());
                     if let Some(c) = &mut child {
                         kill_child(c).await;
                     }
-                    child = build_and_run(false, &dev_url).await;
+                    child = None;
+                    current_build = Some(spawn_build(false, &dev_url));
                 }
             }
         }
+    }
+}
+
+fn spawn_build(initial: bool, dev_url: &str) -> BuildFut {
+    let dev_url = dev_url.to_string();
+    Box::pin(async move { build_and_run(initial, &dev_url).await })
+}
+
+async fn wait_for_build(slot: &mut Option<BuildFut>) -> Option<Child> {
+    match slot {
+        Some(fut) => fut.as_mut().await,
+        None => std::future::pending().await,
     }
 }
 
@@ -141,6 +158,7 @@ async fn build_and_run(initial: bool, dev_url: &str) -> Option<Child> {
         .args(["build", "--message-format=json-diagnostic-rendered-ansi"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .kill_on_drop(true)
         .spawn()
         .expect("failed to spawn cargo build")
         .wait_with_output()

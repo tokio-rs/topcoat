@@ -3,11 +3,14 @@ use std::{borrow::Cow, collections::HashMap, pin::Pin};
 use http::Method;
 use topcoat_core::context::Cx;
 
-use crate::{Body, Path, Result};
+use crate::{Body, Path, Response, Result};
 
 /// The async handler function backing a [`Route`].
 pub type RouteHandlerFn =
-    for<'cx> fn(cx: &'cx Cx, body: Body) -> Pin<Box<dyn Future<Output = Result> + Send + 'cx>>;
+    for<'cx> fn(
+        cx: &'cx Cx,
+        body: Body,
+    ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>>;
 
 /// A route handler that handles an HTTP API call.
 ///
@@ -20,16 +23,16 @@ pub struct Route {
     /// The URL path this route handles.
     path: Cow<'static, Path>,
     /// The async render function that produces the page [`View`].
-    render: RouteHandlerFn,
+    handle: RouteHandlerFn,
 }
 
 impl Route {
     /// Creates a new route with an explicit method, path, and handler function.
-    pub const fn new(method: Method, path: Cow<'static, Path>, render: RouteHandlerFn) -> Self {
+    pub const fn new(method: Method, path: Cow<'static, Path>, handle: RouteHandlerFn) -> Self {
         Self {
             method,
             path,
-            render,
+            handle,
         }
     }
 
@@ -44,12 +47,12 @@ impl Route {
     }
 
     /// Invokes the route's handler, returning a [`Result`].
-    pub fn render<'cx>(
+    pub fn handle<'cx>(
         &self,
         cx: &'cx Cx,
         body: Body,
-    ) -> Pin<Box<dyn Future<Output = Result> + Send + 'cx>> {
-        (self.render)(cx, body)
+    ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>> {
+        (self.handle)(cx, body)
     }
 }
 
@@ -93,12 +96,16 @@ impl IntoIterator for Routes {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_view::runtime::View;
+    use http::StatusCode;
 
     use super::*;
+    use crate::IntoResponse;
 
-    fn dummy_render(_cx: &Cx) -> Pin<Box<dyn Future<Output = Result> + Send>> {
-        Box::pin(async { Ok(View::new("")) })
+    fn dummy_render(
+        _cx: &Cx,
+        _body: Body,
+    ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send>> {
+        Box::pin(async { Ok((StatusCode::OK).into_response()) })
     }
 
     fn route(path: &'static str) -> Route {

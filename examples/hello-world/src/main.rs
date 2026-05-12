@@ -1,15 +1,12 @@
 use std::path::PathBuf;
 
-use topcoat::asset::{AssetBundle, asset};
+use topcoat::asset::AssetBundle;
 
 mod app;
 mod components;
 
 #[tokio::main]
 async fn main() {
-    let id = asset!("./app/ferris.png");
-    println!("asset id: {id:?}");
-
     let router = app::router()
         .assets(AssetBundle::load(PathBuf::from("../../target/assets")).unwrap())
         .app_state(5);

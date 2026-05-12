@@ -77,7 +77,7 @@ impl ToTokens for Route {
         let method = self.0.method.as_ref().unwrap_or(&default_method);
 
         let render = quote! {
-            |cx| {
+            |cx, body| {
                 #item
                 Box::pin(#ident(cx, #(#args),*))
             }
@@ -87,7 +87,7 @@ impl ToTokens for Route {
             Some(path) => quote! {
                 #[allow(non_upper_case_globals)]
                 const #ident: ::topcoat::router::Route = ::topcoat::router::Route::new(
-                    ::topcoat::router::ModuleRoute::#method,
+                    ::topcoat::router::Method::#method,
                     #path,
                     #render,
                 );
@@ -95,7 +95,7 @@ impl ToTokens for Route {
             None => quote! {
                 #[allow(non_upper_case_globals)]
                 const #ident: ::topcoat::router::ModuleRoute = ::topcoat::router::ModuleRoute::new(
-                    ::topcoat::router::ModuleRoute::#method,
+                    ::topcoat::router::Method::#method,
                     module_path!(),
                     #render,
                 );

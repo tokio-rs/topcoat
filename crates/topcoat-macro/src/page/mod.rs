@@ -72,7 +72,7 @@ impl ToTokens for Page {
         let args = &self.1.args;
 
         let render = quote! {
-            |cx| {
+            |cx, body| {
                 #item
                 Box::pin(#ident(cx, #(#args),*))
             }

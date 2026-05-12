@@ -215,11 +215,36 @@ impl From<Router> for axum::Router {
 
                         match result {
                             MaybeAborted::Completed(value) => value.into_response(),
-                            MaybeAborted::Aborted(value) => {
-                                if let Ok(redirect) = value.downcast::<axum::response::Redirect>() {
-                                    return redirect.into_response();
-                                }
+                            MaybeAborted::Aborted(_value) => {
+                                panic!("request was aborted with an unrecognized type");
+                            }
+                        }
+                    },
+                ),
+            );
+        }
 
+        for route in value.routes {
+            result = result.route(
+                &route.path().to_axum_path(),
+                get(
+                    async move |extract::State(app_state): extract::State<Arc<State>>,
+                                params: RawPathParams,
+                                request: Request<axum::body::Body>| {
+                        let (parts, body) = request.into_parts();
+                        let body = Body::from(body);
+
+                        let mut request_state = State::new();
+                        request_state.register(parts);
+                        request_state.register(params);
+
+                        let cx = Cx::new(app_state, request_state);
+
+                        let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
+
+                        match result {
+                            MaybeAborted::Completed(value) => value.into_response(),
+                            MaybeAborted::Aborted(_value) => {
                                 panic!("request was aborted with an unrecognized type");
                             }
                         }
