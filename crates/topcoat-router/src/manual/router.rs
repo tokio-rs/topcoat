@@ -5,7 +5,7 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use http::Request;
+use http::{Request, StatusCode};
 use topcoat_asset::{AssetBundle, AssetFragmentResolver, ServeAssetBundle};
 use topcoat_core::context::{Cx, MaybeAborted, State, WatchAbort};
 
@@ -252,6 +252,14 @@ impl From<Router> for axum::Router {
                 ),
             );
         }
+
+        result = result.fallback(
+            async move |extract::State(app_state): extract::State<Arc<State>>,
+                        params: RawPathParams,
+                        request: Request<axum::body::Body>| {
+                (StatusCode::OK, "not found lol")
+            },
+        );
 
         result.with_state(Arc::new(state))
     }
