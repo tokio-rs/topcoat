@@ -1,7 +1,7 @@
-use std::{any::Any, sync::Arc};
+use std::{any::Any, convert::Infallible, sync::Arc};
 
 use axum::{
-    extract::{self, RawPathParams},
+    extract::{self, FromRequest, FromRequestParts, RawPathParams},
     response::IntoResponse,
     routing::get,
 };
@@ -191,76 +191,71 @@ impl From<Router> for axum::Router {
 
             result = result.route(
                 &page.path().to_axum_path(),
-                get(
-                    async move |extract::State(app_state): extract::State<Arc<State>>,
-                                params: RawPathParams,
-                                request: Request<axum::body::Body>| {
-                        let (parts, body) = request.into_parts();
-                        let body = Body::from(body);
-
-                        let mut request_state = State::new();
-                        request_state.register(parts);
-                        request_state.register(params);
-
-                        let cx = Cx::new(app_state, request_state);
-
-                        let result = WatchAbort::new(&cx, async {
-                            let mut render = page.render(&cx, body);
-                            for layout in layouts.iter().rev() {
-                                render = layout.render(&cx, render);
-                            }
-                            render.await
-                        })
-                        .await;
-
-                        match result {
-                            MaybeAborted::Completed(value) => value.into_response(),
-                            MaybeAborted::Aborted(_value) => {
-                                panic!("request was aborted with an unrecognized type");
-                            }
+                get(async move |CxAndBody { cx, body }: CxAndBody| {
+                    let result = WatchAbort::new(&cx, async {
+                        let mut render = page.render(&cx, body);
+                        for layout in layouts.iter().rev() {
+                            render = layout.render(&cx, render);
                         }
-                    },
-                ),
+                        render.await
+                    })
+                    .await;
+
+                    match result {
+                        MaybeAborted::Completed(value) => value.into_response(),
+                        MaybeAborted::Aborted(_value) => {
+                            panic!("request was aborted with an unrecognized type");
+                        }
+                    }
+                }),
             );
         }
 
         for route in value.routes {
             result = result.route(
                 &route.path().to_axum_path(),
-                get(
-                    async move |extract::State(app_state): extract::State<Arc<State>>,
-                                params: RawPathParams,
-                                request: Request<axum::body::Body>| {
-                        let (parts, body) = request.into_parts();
-                        let body = Body::from(body);
+                get(async move |CxAndBody { cx, body }: CxAndBody| {
+                    let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
 
-                        let mut request_state = State::new();
-                        request_state.register(parts);
-                        request_state.register(params);
-
-                        let cx = Cx::new(app_state, request_state);
-
-                        let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
-
-                        match result {
-                            MaybeAborted::Completed(value) => value.into_response(),
-                            MaybeAborted::Aborted(_value) => {
-                                panic!("request was aborted with an unrecognized type");
-                            }
+                    match result {
+                        MaybeAborted::Completed(value) => value.into_response(),
+                        MaybeAborted::Aborted(_value) => {
+                            panic!("request was aborted with an unrecognized type");
                         }
-                    },
-                ),
+                    }
+                }),
             );
         }
 
-        result = result.fallback(
-            async move |extract::State(app_state): extract::State<Arc<State>>,
-                        params: RawPathParams,
-                        request: Request<axum::body::Body>| {
-                (StatusCode::OK, "not found lol")
-            },
-        );
+        result = result.fallback(async move |CxAndBody { cx, body }: CxAndBody| {
+            (StatusCode::OK, "not found lol")
+        });
 
         result.with_state(Arc::new(state))
+    }
+}
+
+struct CxAndBody {
+    cx: Cx,
+    body: Body,
+}
+
+impl FromRequest<Arc<State>> for CxAndBody {
+    type Rejection = Infallible;
+
+    async fn from_request(
+        req: extract::Request,
+        state: &Arc<State>,
+    ) -> Result<Self, Self::Rejection> {
+        let app_state = state.clone();
+        let (mut parts, body) = req.into_parts();
+        let body = Body::from(body);
+
+        let mut request_state = State::new();
+        request_state.register(RawPathParams::from_request_parts(&mut parts, state).await);
+        request_state.register(parts);
+
+        let cx = Cx::new(app_state, request_state);
+        Ok(Self { cx, body })
     }
 }
