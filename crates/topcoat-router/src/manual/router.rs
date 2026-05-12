@@ -3,7 +3,7 @@ use std::{any::Any, convert::Infallible, sync::Arc};
 use axum::{
     extract::{self, FromRequest, FromRequestParts, RawPathParams},
     response::IntoResponse,
-    routing::get,
+    routing::{MethodFilter, get, on},
 };
 use http::{Request, StatusCode};
 use topcoat_asset::{AssetBundle, AssetFragmentResolver, ServeAssetBundle};
@@ -214,16 +214,20 @@ impl From<Router> for axum::Router {
         for route in value.routes {
             result = result.route(
                 &route.path().to_axum_path(),
-                get(async move |CxAndBody { cx, body }: CxAndBody| {
-                    let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
+                on(
+                    MethodFilter::try_from(route.method().clone())
+                        .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),
+                    async move |CxAndBody { cx, body }: CxAndBody| {
+                        let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
 
-                    match result {
-                        MaybeAborted::Completed(value) => value.into_response(),
-                        MaybeAborted::Aborted(_value) => {
-                            panic!("request was aborted with an unrecognized type");
+                        match result {
+                            MaybeAborted::Completed(value) => value.into_response(),
+                            MaybeAborted::Aborted(_value) => {
+                                panic!("request was aborted with an unrecognized type");
+                            }
                         }
-                    }
-                }),
+                    },
+                ),
             );
         }
 
