@@ -13,8 +13,11 @@ async fn button(id: &str, child: View) -> Result {
 pub async fn app_and_request_state(cx: &Cx) -> Result {
     view! {
         "current page: "
+
         (uri(cx).to_string())
+
         ", app state: "
+
         (app_state::<i32>(cx))
     }
 }

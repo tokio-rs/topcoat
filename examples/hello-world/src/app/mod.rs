@@ -60,7 +60,10 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
 #[page]
 async fn home_page(cx: &Cx) -> Result {
     let user = current_user(cx).await;
-    view! { "welcome, " ((*user).clone()) }
+    view! {
+        "welcome, "
+        ((*user).clone())
+    }
 }
 
 mod about {
@@ -72,6 +75,9 @@ mod about {
 
     #[page]
     async fn about_page() -> Result {
-        view! { <div class="font-bold">"about"</div> <img src=asset!("./ferris.png")> }
+        view! {
+            <div class="font-bold">"about"</div>
+            <img src=asset!("./ferris.png")>
+        }
     }
 }
