@@ -61,14 +61,14 @@ pub enum ViewPart {
     Node(Box<[ViewPart]>),
 }
 
-pub trait DynViewPart: fmt::Debug {
+pub trait DynViewPart: fmt::Debug + Send {
     fn dyn_fmt(&self, cx: &Cx, f: &mut Formatter<'_>);
     fn clone_box(&self) -> Box<dyn DynViewPart>;
 }
 
 impl<T> DynViewPart for T
 where
-    T: 'static + Fragment + fmt::Debug + Clone,
+    T: 'static + Fragment + fmt::Debug + Clone + Send,
 {
     #[inline]
     fn dyn_fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {

@@ -82,16 +82,10 @@ impl IntoIterator for Pages {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_view::runtime::View;
-
     use super::*;
 
-    fn dummy_render(_cx: &Cx, _body: Body) -> Pin<Box<dyn Future<Output = Result> + Send>> {
-        Box::pin(async { Ok(View::new("")) })
-    }
-
     fn page(path: &'static str) -> Page {
-        Page::new(Cow::Borrowed(Path::new(path)), dummy_render)
+        Page::new(Cow::Borrowed(Path::new(path)), |_, _| unimplemented!())
     }
 
     // ── Page ──

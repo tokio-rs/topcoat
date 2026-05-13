@@ -198,8 +198,6 @@ impl From<ModuleRouter> for Router {
 mod tests {
     use std::borrow::Cow;
 
-    use topcoat_view::runtime::View;
-
     use super::*;
 
     fn router(root: &'static str) -> ModuleRouter {
@@ -431,8 +429,8 @@ mod tests {
     fn segment_after_page_panics() {
         let r = router("my_crate::app");
         // Register a page first, then try to add a segment.
-        let page = ModulePage::new("my_crate::app::about", |_cx| {
-            Box::pin(async { Ok(View::new("")) })
+        let page = ModulePage::new("my_crate::app::about", |_, _| {
+            unimplemented!();
         });
         r.page(page)
             .segment(seg("my_crate::app::users", Some(SegmentKind::Param), None));

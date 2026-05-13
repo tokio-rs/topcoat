@@ -23,8 +23,4 @@ impl Fragment for Asset {
     fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
         app_state::<AssetFragmentResolver>(cx).resolve(cx, *self, f)
     }
-
-    fn fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        app_state::<AssetFragmentResolver>(cx).resolve(cx, *self, f)
-    }
 }
