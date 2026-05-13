@@ -136,7 +136,7 @@ impl ViewWriter {
                 .any(|chunk| !matches!(chunk, Chunk::Expr(..)));
 
             if needs_vec {
-                let reserve = self
+                let capacity = self
                     .chunks
                     .iter()
                     .filter(|chunk| matches!(chunk, Chunk::Expr(..)))
@@ -194,7 +194,7 @@ impl ViewWriter {
                 let statements = recursive(&self.chunks);
 
                 quote! {{
-                    let __v = Vec::reserve(#reserve);
+                    let __v = Vec::with_capacity(#capacity);
                     #statements
                     ::topcoat::view::View::new(__v.into_boxed_slice())
                 }}
