@@ -4,12 +4,9 @@ use syn::{
     spanned::Spanned,
 };
 
-use crate::{
-    ast::{
-        Component, DocumentType, Element, NodeBlock, NodeBreak, NodeContinue, NodeExpr,
-        NodeForLoop, NodeIf, NodeLet, NodeMatch, ParseOption,
-    },
-    output::ViewWriter,
+use crate::ast::{
+    Component, DocumentType, Element, NodeBlock, NodeBreak, NodeContinue, NodeExpr, NodeForLoop,
+    NodeIf, NodeLet, NodeMatch, ParseOption, ViewWriter,
 };
 
 /// A single child within a [`View`](super::View) — the union of every construct

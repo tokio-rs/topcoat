@@ -3,10 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::{
-    ast::{NodeBlock, parse_option::ParseOption},
-    output::ViewWriter,
-};
+use crate::ast::{NodeBlock, ViewWriter, parse_option::ParseOption};
 
 /// An `if cond { ... } else { ... }` chain in view-body position.
 pub struct NodeIf {

@@ -4,10 +4,7 @@ use syn::{
     token::Brace,
 };
 
-use crate::{
-    ast::{Node, parse_option::ParseOption},
-    output::ViewWriter,
-};
+use crate::ast::{Node, ViewWriter, parse_option::ParseOption};
 
 /// A brace-delimited group of nodes: `{ ...nodes... }`. Used as the body of
 /// `if`, `for` and `match` arms.

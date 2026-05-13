@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::{ast::ParseOption, output::ViewWriter};
+use crate::ast::{ParseOption, ViewWriter};
 
 mod kw {
     use syn::custom_keyword;

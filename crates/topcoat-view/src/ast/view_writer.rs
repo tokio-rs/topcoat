@@ -145,7 +145,7 @@ impl ViewWriter {
             } else {
                 if self.chunks.is_empty() {
                     // Optimized path: The view has no content.
-                    quote! { ::topcoat::view::View::new(::topcoat::view::ViewPart::Empty) }
+                    quote! { ::topcoat::view::View::empty() }
                 } else if self.chunks.len() == 1 {
                     // Optimized path: The view can be constructed from a single expression.
                     let Chunk::Expr(entry) = self.chunks.first().unwrap() else {

@@ -32,6 +32,11 @@ impl View {
         }
     }
 
+    #[inline]
+    pub fn empty() -> Self {
+        Self::new(ViewPart::Empty)
+    }
+
     pub fn render(&self, cx: &Cx) -> String {
         let mut buf = String::with_capacity(self.size_hint());
         let mut f = Formatter::new(&mut buf);

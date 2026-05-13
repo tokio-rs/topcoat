@@ -1,15 +1,10 @@
-use std::ops::Deref;
-
 use syn::{
     Expr, Pat, Token,
     parse::{Parse, ParseStream},
     token::Brace,
 };
 
-use crate::{
-    ast::{node::Node, parse_option::ParseOption},
-    output::ViewWriter,
-};
+use crate::ast::{ViewWriter, node::Node, parse_option::ParseOption};
 
 /// A `match expr { ... }` expression in view-body position.
 pub struct NodeMatch {

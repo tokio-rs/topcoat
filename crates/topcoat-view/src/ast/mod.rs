@@ -14,6 +14,7 @@ mod node_let;
 mod node_match;
 mod parse_option;
 mod view;
+mod view_writer;
 
 pub use attribute::*;
 pub use component::*;
@@ -31,3 +32,4 @@ pub use node_let::*;
 pub use node_match::*;
 pub use parse_option::*;
 pub use view::*;
+pub(crate) use view_writer::*;

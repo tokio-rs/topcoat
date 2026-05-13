@@ -6,12 +6,9 @@ use syn::{
     token::Bracket,
 };
 
-use crate::{
-    ast::{
-        Attributes, ComponentClosingTag, ComponentOpeningTag, ComponentSelfClosingTag, Node,
-        ParseOption,
-    },
-    output::ViewWriter,
+use crate::ast::{
+    Attributes, ComponentClosingTag, ComponentOpeningTag, ComponentSelfClosingTag, Node,
+    ParseOption, ViewWriter,
 };
 
 /// A user-defined component invocation, written as `[path attr=value]...[/path]`
