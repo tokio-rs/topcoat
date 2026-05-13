@@ -15,7 +15,7 @@ use quote::{ToTokens, quote};
 /// `capacity` accumulates the lower bound of bytes the rendered view will need
 /// so the runtime can pre-allocate the output buffer.
 pub(crate) struct ViewWriter {
-    pub(self) tokens: TokenStream,
+    pub(self) exprs: Vec<TokenStream>,
     static_segment: String,
     capacity: usize,
     nested: bool,
@@ -24,7 +24,7 @@ pub(crate) struct ViewWriter {
 impl ViewWriter {
     pub fn new() -> Self {
         Self {
-            tokens: TokenStream::new(),
+            exprs: Vec::new(),
             static_segment: String::new(),
             capacity: 0,
             nested: false,
@@ -33,7 +33,7 @@ impl ViewWriter {
 
     pub fn new_nested() -> Self {
         Self {
-            tokens: TokenStream::new(),
+            exprs: Vec::new(),
             static_segment: String::new(),
             capacity: 0,
             nested: true,
@@ -43,8 +43,8 @@ impl ViewWriter {
     fn flush(&mut self) {
         if !self.static_segment.is_empty() {
             let static_segment = &self.static_segment;
-            quote! { ::topcoat::view::Fragment::fmt_unescaped(#static_segment, __cx, &mut __f); }
-                .to_tokens(&mut self.tokens);
+            self.exprs
+                .push(quote! { ::topcoat::view::ViewPart::StaticStr(#static_segment) });
             self.capacity += self.static_segment.len();
             self.static_segment.clear();
         }
@@ -58,51 +58,42 @@ impl ViewWriter {
         crate::runtime::Formatter::new(&mut self.static_segment).write_str(s);
     }
 
-    pub fn write_expr_unescaped(&mut self, expr: TokenStream) {
-        self.flush();
-        quote! { ::topcoat::view::Fragment::fmt_unescaped(&#expr, __cx, &mut __f); }
-            .to_tokens(&mut self.tokens);
-    }
-
     pub fn write_expr(&mut self, expr: TokenStream) {
         self.flush();
-        quote! { ::topcoat::view::Fragment::fmt(&#expr, __cx, &mut __f); }
-            .to_tokens(&mut self.tokens);
-    }
-
-    pub fn write_raw(&mut self, tokens: TokenStream) {
-        tokens.to_tokens(&mut self.tokens);
+        self.exprs.push(expr)
     }
 }
 
 impl ToTokens for ViewWriter {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let format_block = {
+        let format_expr = {
             let static_segment = &self.static_segment;
 
-            // Optimized path: The view has no dynamic content. We can construct it as a &'static str.
-            if self.tokens.is_empty() {
+            if self.exprs.is_empty() {
+                // Optimized path: The view has no dynamic content. We can construct it as a &'static str.
                 quote! { ::topcoat::view::View::new(#static_segment) }
+            } else if self.exprs.len() == 1 && static_segment.is_empty() {
+                // Optimized path: The view can be constructed from a single expression.
+                let entry = self.exprs.first().unwrap();
+                quote! { ::topcoat::view::View::new(#entry) }
             } else {
-                let buffer = &self.tokens;
-                let capacity = self.capacity + static_segment.len();
+                let entries = &self.exprs;
                 let final_segment = (!static_segment.is_empty()).then(|| {
-                    quote! { ::topcoat::view::Fragment::fmt_unescaped(#static_segment, __cx, &mut __f); }
+                    quote! { ::topcoat::view::ViewPart::StaticStr(#static_segment) }
                 });
                 quote! {{
-                    let mut __buf = ::std::string::String::with_capacity(#capacity);
-                    let mut __f = ::topcoat::view::Formatter::new(&mut __buf);
-                    #buffer
-                    #final_segment
-                    ::topcoat::view::View::new(__buf)
+                    ::topcoat::view::View::new(Box::new([
+                        #(::topcoat::view::IntoViewPart::into_view_part(#entries),)*
+                        #final_segment
+                    ]))
                 }}
             }
         };
 
         if self.nested {
-            format_block.to_tokens(tokens);
+            format_expr.to_tokens(tokens);
         } else {
-            quote! { async { Ok(#format_block) }.await }.to_tokens(tokens);
+            quote! { async { Ok(#format_expr) }.await }.to_tokens(tokens);
         }
     }
 }

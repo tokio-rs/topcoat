@@ -40,7 +40,7 @@ impl View {
     }
 
     #[inline]
-    pub fn size_hint(&self) -> usize {
+    fn size_hint(&self) -> usize {
         self.part.size_hint()
     }
 }
@@ -166,6 +166,13 @@ impl Fragment for ViewPart {
 
 pub trait IntoViewPart {
     fn into_view_part(self) -> ViewPart;
+}
+
+impl IntoViewPart for View {
+    #[inline]
+    fn into_view_part(self) -> ViewPart {
+        self.part
+    }
 }
 
 impl IntoViewPart for ViewPart {
