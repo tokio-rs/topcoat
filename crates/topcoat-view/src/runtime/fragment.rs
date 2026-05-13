@@ -6,6 +6,11 @@ use crate::runtime::Formatter;
 
 pub trait Fragment {
     fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>);
+
+    #[inline]
+    fn size_hint(&self) -> usize {
+        0
+    }
 }
 
 impl<T> Fragment for &T
@@ -16,6 +21,11 @@ where
     fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
         (*self).fmt(cx, f)
     }
+
+    #[inline]
+    fn size_hint(&self) -> usize {
+        (*self).size_hint()
+    }
 }
 
 impl Fragment for str {
@@ -23,12 +33,22 @@ impl Fragment for str {
     fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
         f.write_str(self)
     }
+
+    #[inline]
+    fn size_hint(&self) -> usize {
+        self.len()
+    }
 }
 
 impl Fragment for String {
     #[inline]
     fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
         f.write_str(self)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> usize {
+        self.len()
     }
 }
 
@@ -40,6 +60,14 @@ where
     fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
         if let Some(fragment) = self {
             fragment.fmt(cx, f);
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> usize {
+        match self {
+            Some(inner) => inner.size_hint(),
+            None => 0,
         }
     }
 }
@@ -65,6 +93,11 @@ macro_rules! impl_with_display {
             fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
                 use core::fmt::Write;
                 let _ = write!(UnescapedDisplayAdapter(f), "{self}");
+            }
+
+            #[inline]
+            fn size_hint(&self) -> usize {
+                1
             }
         }
     };
@@ -96,6 +129,11 @@ macro_rules! impl_smart_pointer {
             #[inline]
             fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
                 self.deref().fmt(cx, f);
+            }
+
+            #[inline]
+            fn size_hint(&self) -> usize {
+                self.deref().size_hint()
             }
         }
     };
