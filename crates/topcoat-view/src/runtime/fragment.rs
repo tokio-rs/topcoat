@@ -4,17 +4,8 @@ use topcoat_core::context::Cx;
 
 use crate::runtime::Formatter;
 
-/// A piece of content that can be rendered into HTML.
-///
-/// Every `Fragment` provides two rendering paths:
-///
-/// - [`fmt`](Self::fmt) — the default, which escapes HTML-significant characters.
-/// - [`fmt_unescaped`](Self::fmt_unescaped) — writes content verbatim, for trusted markup.
 pub trait Fragment {
-    /// Renders this fragment into the formatter, escaping by default.
     fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>);
-    /// Renders this fragment into the formatter without escaping.
-    fn fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>);
 }
 
 impl<T> Fragment for &T
@@ -25,11 +16,6 @@ where
     fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
         (*self).fmt(cx, f)
     }
-
-    #[inline]
-    fn fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        (*self).fmt_unescaped(cx, f)
-    }
 }
 
 impl Fragment for str {
@@ -37,22 +23,12 @@ impl Fragment for str {
     fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
         f.write_str(self)
     }
-
-    #[inline]
-    fn fmt_unescaped(&self, _cx: &Cx, f: &mut Formatter<'_>) {
-        f.write_str_unescaped(self)
-    }
 }
 
 impl Fragment for String {
     #[inline]
     fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
         f.write_str(self)
-    }
-
-    #[inline]
-    fn fmt_unescaped(&self, _cx: &Cx, f: &mut Formatter<'_>) {
-        f.write_str_unescaped(self)
     }
 }
 
@@ -66,13 +42,6 @@ where
             fragment.fmt(cx, f);
         }
     }
-
-    #[inline]
-    fn fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        if let Some(fragment) = self {
-            fragment.fmt_unescaped(cx, f);
-        }
-    }
 }
 
 struct UnescapedDisplayAdapter<'a, 'b>(&'a mut Formatter<'b>);
@@ -82,6 +51,11 @@ impl core::fmt::Write for UnescapedDisplayAdapter<'_, '_> {
         self.0.write_str_unescaped(s);
         Ok(())
     }
+
+    fn write_char(&mut self, c: char) -> std::fmt::Result {
+        self.0.write_char_unescaped(c);
+        Ok(())
+    }
 }
 
 macro_rules! impl_with_display {
@@ -89,12 +63,6 @@ macro_rules! impl_with_display {
         impl Fragment for $ty {
             #[inline]
             fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
-                use core::fmt::Write;
-                let _ = write!(UnescapedDisplayAdapter(f), "{self}");
-            }
-
-            #[inline]
-            fn fmt_unescaped(&self, _cx: &Cx, f: &mut Formatter<'_>) {
                 use core::fmt::Write;
                 let _ = write!(UnescapedDisplayAdapter(f), "{self}");
             }
@@ -129,10 +97,6 @@ macro_rules! impl_smart_pointer {
             fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
                 self.deref().fmt(cx, f);
             }
-            #[inline]
-            fn fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>) {
-                self.deref().fmt_unescaped(cx, f);
-            }
         }
     };
 }
@@ -141,21 +105,9 @@ impl_smart_pointer!(Box);
 impl_smart_pointer!(Rc);
 impl_smart_pointer!(Arc);
 
-/// A wrapper that marks a fragment as already escaped / trusted.
-///
-/// When rendered, `Escaped<T>` bypasses escaping — both [`fmt`](Fragment::fmt)
-/// and [`fmt_unescaped`](Fragment::fmt_unescaped) write the inner content
-/// verbatim. This is useful for content that is known to be safe HTML, such as
-/// the output of a previous render pass.
-///
-/// Constructed via [`new_unchecked`](Self::new_unchecked) to make the trust
-/// decision explicit at the call site.
 pub struct Escaped<T>(T);
 
-impl<T> Escaped<T>
-where
-    T: Fragment,
-{
+impl<T> Escaped<T> {
     /// Wraps `inner` as already-escaped content.
     ///
     /// # Safety (logical)
@@ -168,17 +120,16 @@ where
     }
 }
 
-impl<T> Fragment for Escaped<T>
-where
-    T: Fragment,
-{
+impl Fragment for Escaped<&str> {
     #[inline]
-    fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        self.fmt_unescaped(cx, f)
+    fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
+        f.write_str_unescaped(self.0);
     }
+}
 
+impl Fragment for Escaped<String> {
     #[inline]
-    fn fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        self.0.fmt_unescaped(cx, f)
+    fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
+        f.write_str_unescaped(&self.0);
     }
 }

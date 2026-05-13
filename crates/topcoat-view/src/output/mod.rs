@@ -82,7 +82,7 @@ impl ToTokens for ViewWriter {
 
             // Optimized path: The view has no dynamic content. We can construct it as a &'static str.
             if self.tokens.is_empty() {
-                quote! { ::topcoat::view::View::new(#static_segment) }
+                quote! { ::topcoat::view::View::new(::topcoat::view::ViewPart::StaticStr(#static_segment)) }
             } else {
                 let buffer = &self.tokens;
                 let capacity = self.capacity + static_segment.len();

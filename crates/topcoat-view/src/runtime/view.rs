@@ -36,10 +36,6 @@ impl Fragment for View {
     fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
         self.part.fmt(cx, f);
     }
-
-    fn fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        self.part.fmt_unescaped(cx, f);
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -53,7 +49,6 @@ pub enum ViewPart {
 
 pub trait DynViewPart: fmt::Debug {
     fn dyn_fmt(&self, cx: &Cx, f: &mut Formatter<'_>);
-    fn dyn_fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>);
     fn clone_box(&self) -> Box<dyn DynViewPart>;
     fn dyn_eq(&self, other: &dyn DynViewPart) -> bool;
     fn as_any(&self) -> &dyn Any;
@@ -66,11 +61,6 @@ where
     #[inline]
     fn dyn_fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
         Fragment::fmt(self, cx, f);
-    }
-
-    #[inline]
-    fn dyn_fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        Fragment::fmt_unescaped(self, cx, f);
     }
 
     #[inline]
@@ -113,20 +103,6 @@ impl Fragment for ViewPart {
             Self::Node(parts) => {
                 for part in parts.iter() {
                     part.fmt(cx, f);
-                }
-            }
-        }
-    }
-
-    fn fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        match self {
-            Self::StaticStr(s) => s.fmt_unescaped(cx, f),
-            Self::String(s) => s.fmt_unescaped(cx, f),
-            Self::Primitive(p) => p.fmt_unescaped(cx, f),
-            Self::Dyn(d) => d.dyn_fmt_unescaped(cx, f),
-            Self::Node(parts) => {
-                for part in parts.iter() {
-                    part.fmt_unescaped(cx, f);
                 }
             }
         }
@@ -174,27 +150,6 @@ impl Fragment for Primitive {
             Self::F64(v) => v.fmt(cx, f),
         }
     }
-
-    fn fmt_unescaped(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        match self {
-            Self::Bool(v) => v.fmt_unescaped(cx, f),
-            Self::Char(v) => v.fmt_unescaped(cx, f),
-            Self::I8(v) => v.fmt_unescaped(cx, f),
-            Self::I16(v) => v.fmt_unescaped(cx, f),
-            Self::I32(v) => v.fmt_unescaped(cx, f),
-            Self::I64(v) => v.fmt_unescaped(cx, f),
-            Self::I128(v) => v.fmt_unescaped(cx, f),
-            Self::Isize(v) => v.fmt_unescaped(cx, f),
-            Self::U8(v) => v.fmt_unescaped(cx, f),
-            Self::U16(v) => v.fmt_unescaped(cx, f),
-            Self::U32(v) => v.fmt_unescaped(cx, f),
-            Self::U64(v) => v.fmt_unescaped(cx, f),
-            Self::U128(v) => v.fmt_unescaped(cx, f),
-            Self::Usize(v) => v.fmt_unescaped(cx, f),
-            Self::F32(v) => v.fmt_unescaped(cx, f),
-            Self::F64(v) => v.fmt_unescaped(cx, f),
-        }
-    }
 }
 
 pub trait IntoViewPart {
@@ -212,13 +167,6 @@ impl IntoViewPart for String {
     #[inline]
     fn into_view_part(self) -> ViewPart {
         ViewPart::String(self)
-    }
-}
-
-impl IntoViewPart for Primitive {
-    #[inline]
-    fn into_view_part(self) -> ViewPart {
-        ViewPart::Primitive(self)
     }
 }
 
