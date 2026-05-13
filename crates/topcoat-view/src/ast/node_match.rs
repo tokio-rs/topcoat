@@ -8,7 +8,7 @@ use syn::{
 
 use crate::{
     ast::{node::Node, parse_option::ParseOption},
-    output::{ViewWriter, ViewWriterMatch},
+    output::ViewWriter,
 };
 
 /// A `match expr { ... }` expression in view-body position.
@@ -21,10 +21,7 @@ pub struct NodeMatch {
 
 impl NodeMatch {
     pub(crate) fn write(&self, writer: &mut ViewWriter) {
-        let mut writer = writer.begin_match(&self.expr);
-        for arm in &self.arms {
-            arm.write(&mut writer);
-        }
+        todo!();
     }
 }
 
@@ -86,12 +83,8 @@ pub struct NodeMatchArm {
 }
 
 impl NodeMatchArm {
-    pub(crate) fn write<'a>(&'a self, writer: &mut ViewWriterMatch<'a>) {
-        let mut writer = writer.begin_arm(
-            &self.pat,
-            self.guard.as_ref().map(|(_, guard)| guard.deref()),
-        );
-        self.body.write(&mut writer);
+    pub(crate) fn write(&self, writer: &mut ViewWriter) {
+        todo!();
     }
 }
 

@@ -63,12 +63,13 @@ impl Component {
         for child in self.children() {
             child.write(&mut child_writer);
         }
+        let child = child_writer.to_token_stream();
 
         writer.write_expr(quote! {
             <#name as ::topcoat::view::Component>::render(
                 #name { #(#fields),* },
                 __cx,
-                #child_writer,
+                #child,
             ).await?
         });
     }

@@ -69,12 +69,11 @@ impl Element {
                     Ident::new(&format!("__element_name_{}", increment), Span::call_site())
                 });
 
-                writer.write_raw(quote! {});
-
                 writer.write_str_unescaped("<");
                 match (name_ident.as_ref(), name_expr) {
                     (Some(ident), Some(expr)) => {
-                        writer.write_raw(quote! { let #ident = &#expr;  });
+                        todo!();
+                        // writer.write_raw(quote! { let #ident = &#expr;  });
                         writer.write_expr(quote! { #ident });
                     }
                     _ => opening_tag.name.write(writer),

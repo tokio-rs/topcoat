@@ -5,7 +5,7 @@ use syn::{
 
 use crate::{
     ast::{NodeBlock, parse_option::ParseOption},
-    output::{ViewWriter, ViewWriterIf},
+    output::ViewWriter,
 };
 
 /// An `if cond { ... } else { ... }` chain in view-body position.
@@ -18,11 +18,12 @@ pub struct NodeIf {
 
 impl NodeIf {
     pub(crate) fn write(&self, writer: &mut ViewWriter) {
-        let mut writer = writer.begin_if(&self.cond);
-        self.then_branch.write(&mut writer);
-        if let Some(else_branch) = self.else_branch.as_ref() {
-            else_branch.write(writer);
-        }
+        let mut writer = writer.if_else(&self.cond, |then_writer, else_writer| {
+            self.then_branch.write(then_writer);
+            if let Some(else_branch) = self.else_branch.as_ref() {
+                else_branch.write(else_writer);
+            }
+        });
     }
 }
 
@@ -68,11 +69,10 @@ pub enum NodeElse {
 }
 
 impl NodeElse {
-    fn write(&self, writer: ViewWriterIf<'_>) {
-        let mut writer = writer.begin_else();
+    fn write(&self, writer: &mut ViewWriter) {
         match self {
-            Self::ElseIf { node_if, .. } => node_if.write(&mut writer),
-            Self::Else { then_branch, .. } => then_branch.write(&mut writer),
+            Self::ElseIf { node_if, .. } => node_if.write(writer),
+            Self::Else { then_branch, .. } => then_branch.write(writer),
         }
     }
 }

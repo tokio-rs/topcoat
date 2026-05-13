@@ -1,12 +1,20 @@
-mod view_writer_for_loop;
-mod view_writer_if;
-mod view_writer_match;
-
-pub(crate) use view_writer_if::*;
-pub(crate) use view_writer_match::*;
-
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
+use syn::{Expr, Pat};
+
+enum Chunk {
+    Expr(TokenStream),
+    For {
+        pat: Pat,
+        expr: Expr,
+        body: Box<ViewWriter>,
+    },
+    If {
+        expr: Expr,
+        then_branch: Box<ViewWriter>,
+        else_branch: Box<ViewWriter>,
+    },
+}
 
 /// Builds the `TokenStream` that a `view!` invocation expands to.
 ///
@@ -15,37 +23,34 @@ use quote::{ToTokens, quote};
 /// `capacity` accumulates the lower bound of bytes the rendered view will need
 /// so the runtime can pre-allocate the output buffer.
 pub(crate) struct ViewWriter {
-    pub(self) exprs: Vec<TokenStream>,
+    pub(self) chunks: Vec<Chunk>,
     static_segment: String,
-    capacity: usize,
     nested: bool,
 }
 
 impl ViewWriter {
     pub fn new() -> Self {
         Self {
-            exprs: Vec::new(),
+            chunks: Vec::new(),
             static_segment: String::new(),
-            capacity: 0,
             nested: false,
         }
     }
 
     pub fn new_nested() -> Self {
         Self {
-            exprs: Vec::new(),
+            chunks: Vec::new(),
             static_segment: String::new(),
-            capacity: 0,
             nested: true,
         }
     }
 
-    fn flush(&mut self) {
+    pub fn flush(&mut self) {
         if !self.static_segment.is_empty() {
             let static_segment = &self.static_segment;
-            self.exprs
-                .push(quote! { ::topcoat::view::ViewPart::StaticStr(#static_segment) });
-            self.capacity += self.static_segment.len();
+            self.chunks.push(Chunk::Expr(
+                quote! { ::topcoat::view::ViewPart::StaticStr(#static_segment) },
+            ));
             self.static_segment.clear();
         }
     }
@@ -60,40 +65,111 @@ impl ViewWriter {
 
     pub fn write_expr(&mut self, expr: TokenStream) {
         self.flush();
-        self.exprs.push(expr)
+        self.chunks.push(Chunk::Expr(expr))
     }
-}
 
-impl ToTokens for ViewWriter {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
+    pub fn for_loop(&mut self, pat: &Pat, expr: &Expr, f: impl FnOnce(&mut ViewWriter)) {
+        self.flush();
+        let mut body = ViewWriter::new();
+        f(&mut body);
+        body.flush();
+        self.chunks.push(Chunk::For {
+            pat: pat.clone(),
+            expr: expr.clone(),
+            body: Box::new(body),
+        });
+    }
+
+    pub fn if_else(&mut self, expr: &Expr, f: impl FnOnce(&mut ViewWriter, &mut ViewWriter)) {
+        self.flush();
+        let mut then_branch = ViewWriter::new();
+        let mut else_branch = ViewWriter::new();
+        f(&mut then_branch, &mut else_branch);
+        then_branch.flush();
+        else_branch.flush();
+        self.chunks.push(Chunk::If {
+            expr: expr.clone(),
+            then_branch: Box::new(then_branch),
+            else_branch: Box::new(else_branch),
+        });
+    }
+
+    pub fn to_token_stream(mut self) -> TokenStream {
+        self.flush();
+
         let format_expr = {
-            let static_segment = &self.static_segment;
+            let needs_vec = self
+                .chunks
+                .iter()
+                .any(|chunk| !matches!(chunk, Chunk::Expr(..)));
 
-            if self.exprs.is_empty() {
-                // Optimized path: The view has no dynamic content. We can construct it as a &'static str.
-                quote! { ::topcoat::view::View::new(#static_segment) }
-            } else if self.exprs.len() == 1 && static_segment.is_empty() {
-                // Optimized path: The view can be constructed from a single expression.
-                let entry = self.exprs.first().unwrap();
-                quote! { ::topcoat::view::View::new(#entry) }
-            } else {
-                let entries = &self.exprs;
-                let final_segment = (!static_segment.is_empty()).then(|| {
-                    quote! { ::topcoat::view::ViewPart::StaticStr(#static_segment) }
-                });
+            if needs_vec {
+                fn recursive(chunks: &[Chunk]) -> TokenStream {
+                    let mut output = TokenStream::new();
+                    for chunk in chunks {
+                        match chunk {
+                            Chunk::Expr(expr) => {
+                                quote! { __v.push(::topcoat::view::IntoViewPart::into_view_part(#expr)); }
+                            }
+                            Chunk::If { expr, then_branch: then, else_branch: r#else } => {
+                                let then_branch = recursive(&then.chunks);
+                                let else_branch = recursive(&r#else.chunks);
+                                let else_branch = (!r#else.chunks.is_empty()).then(|| quote! { else { #else_branch } });
+                                quote! {
+                                    if #expr {
+                                        #then_branch
+                                    }
+                                    #else_branch
+                                }
+                            }
+                            Chunk::For { pat, expr, body } => {
+                                let body = recursive(&body.chunks);
+                                quote! {
+                                    for #pat in #expr {
+                                        #body
+                                    }
+                                }
+                            }
+                        }.to_tokens(&mut output);
+                    }
+                    output
+                }
+
+                let statements = recursive(&self.chunks);
+
                 quote! {{
-                    ::topcoat::view::View::new(Box::new([
-                        #(::topcoat::view::IntoViewPart::into_view_part(#entries),)*
-                        #final_segment
-                    ]))
+                    let __v = Vec::new();
+                    #statements
+                    ::topcoat::view::View::new(__v.into_boxed_slice())
                 }}
+            } else {
+                if self.chunks.is_empty() {
+                    // Optimized path: The view has no content.
+                    quote! { ::topcoat::view::View::new(::topcoat::view::ViewPart::Empty) }
+                } else if self.chunks.len() == 1 {
+                    // Optimized path: The view can be constructed from a single expression.
+                    let Chunk::Expr(entry) = self.chunks.first().unwrap() else {
+                        panic!("expected expression")
+                    };
+                    quote! { ::topcoat::view::View::new(#entry) }
+                } else {
+                    let entries = self.chunks.iter().map(|chunk| match chunk {
+                        Chunk::Expr(chunk) => chunk,
+                        _ => panic!("expected expression"),
+                    });
+                    quote! {{
+                        ::topcoat::view::View::new(Box::new([
+                            #(::topcoat::view::IntoViewPart::into_view_part(#entries),)*
+                        ]))
+                    }}
+                }
             }
         };
 
         if self.nested {
-            format_expr.to_tokens(tokens);
+            format_expr
         } else {
-            quote! { async { Ok(#format_expr) }.await }.to_tokens(tokens);
+            quote! { async { Ok(#format_expr) }.await }
         }
     }
 }

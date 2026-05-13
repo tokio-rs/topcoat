@@ -30,7 +30,7 @@ impl ToTokens for View {
         for node in &self.nodes {
             node.write(&mut writer);
         }
-        writer.to_tokens(tokens);
+        writer.to_token_stream().to_tokens(tokens);
     }
 }
 

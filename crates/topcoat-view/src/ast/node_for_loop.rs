@@ -21,8 +21,9 @@ pub struct NodeForLoop {
 
 impl NodeForLoop {
     pub(crate) fn write(&self, writer: &mut ViewWriter) {
-        let mut writer = writer.begin_for_loop(&self.pat, &self.expr);
-        self.body.write(&mut writer);
+        writer.for_loop(&self.pat, &self.expr, |writer| {
+            self.body.write(writer);
+        });
     }
 }
 
@@ -66,10 +67,8 @@ pub struct NodeContinue {
 }
 
 impl NodeContinue {
-    pub(crate) fn write(&self, writer: &mut ViewWriter) {
-        let expr_continue = &self.expr_continue;
-        let semi_token = &self.semi_token;
-        writer.write_raw(quote! { #expr_continue #semi_token });
+    pub(crate) fn write(&self, _writer: &mut ViewWriter) {
+        todo!();
     }
 }
 
@@ -103,10 +102,8 @@ pub struct NodeBreak {
 }
 
 impl NodeBreak {
-    pub(crate) fn write(&self, writer: &mut ViewWriter) {
-        let expr_break = &self.expr_break;
-        let semi_token = &self.semi_token;
-        writer.write_raw(quote! { #expr_break #semi_token });
+    pub(crate) fn write(&self, _writer: &mut ViewWriter) {
+        todo!();
     }
 }
 
