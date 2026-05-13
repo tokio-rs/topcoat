@@ -3,7 +3,10 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::ast::{NodeBlock, ViewWriter, parse_option::ParseOption};
+use crate::ast::{
+    ParseOption,
+    view::{NodeBlock, ViewWriter},
+};
 
 /// A `for pat in expr { ... }` loop in view-body position. The body is
 /// rendered once per iteration.

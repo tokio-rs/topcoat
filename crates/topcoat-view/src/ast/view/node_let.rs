@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::ast::{ViewWriter, parse_option::ParseOption};
+use crate::ast::{ParseOption, view::ViewWriter};
 
 /// A `let pat = expr;` binding in view-body position. The binding is in scope
 /// for all sibling nodes that follow it.

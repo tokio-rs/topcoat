@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::parse::{Parse, ParseStream};
 
-use crate::ast::{ViewWriter, node::Node};
+use crate::ast::view::{Node, ViewWriter};
 
 /// The parsed body of a `view!` invocation. Lowers to a
 /// [`runtime::View`](crate::runtime::View).

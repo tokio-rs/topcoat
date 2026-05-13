@@ -7,8 +7,11 @@ use syn::{
 };
 
 use crate::ast::{
-    Attributes, ComponentClosingTag, ComponentOpeningTag, ComponentSelfClosingTag, Node,
-    ParseOption, ViewWriter,
+    ParseOption,
+    view::{
+        Attributes, ComponentClosingTag, ComponentOpeningTag, ComponentSelfClosingTag, Node,
+        ViewWriter,
+    },
 };
 
 /// A user-defined component invocation, written as `[path attr=value]...[/path]`

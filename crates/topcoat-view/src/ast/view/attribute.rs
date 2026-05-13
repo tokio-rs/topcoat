@@ -10,7 +10,7 @@ use syn::{
     token::{Brace, Bracket, Paren},
 };
 
-use crate::ast::{ParseOption, ViewWriter};
+use crate::ast::{ParseOption, view::ViewWriter};
 
 /// A single `name=value` attribute on an [`Element`](super::Element) or
 /// [`Component`](super::Component).

@@ -21,7 +21,7 @@ use crate::{BreakMode, Delim, PrettyPrint, Printer};
 ///
 /// ```rust,ignore
 /// // Parse and reformat a macro invocation based on its delimiter
-/// let result = pretty_print_macro_str::<Macro<topcoat_view::ast::View>>(
+/// let result = pretty_print_macro_str::<Macro<topcoat_view::ast::view::View>>(
 ///     "{ <html><body>"format"</body></html> }",
 ///     initial_space,
 ///     initial_indent,

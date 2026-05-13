@@ -11,7 +11,7 @@ use syn::{
     token::Paren,
 };
 
-use crate::ast::ViewWriter;
+use crate::ast::view::ViewWriter;
 
 /// The name appearing in an [`Element`](super::Element)'s tag. May be a plain
 /// identifier (`div`), a string literal (`"my-tag"`), or a parenthesized Rust

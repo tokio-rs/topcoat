@@ -7,7 +7,10 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::ast::{Attributes, ClosingTag, ElementName, Node, OpeningTag, ParseOption, ViewWriter};
+use crate::ast::{
+    ParseOption,
+    view::{Attributes, ClosingTag, ElementName, Node, OpeningTag, ViewWriter},
+};
 
 /// An HTML element. `Void` covers the HTML void elements (`<br>`, `<img>`, …)
 /// which take no closing tag and no children.

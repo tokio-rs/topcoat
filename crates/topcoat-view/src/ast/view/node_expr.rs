@@ -4,7 +4,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::ast::{ViewWriter, parse_option::ParseOption};
+use crate::ast::{ParseOption, view::ViewWriter};
 
 /// A parenthesized Rust expression embedded as a child node, e.g. `(name)` or
 /// `(slot.await)`. The value is rendered through

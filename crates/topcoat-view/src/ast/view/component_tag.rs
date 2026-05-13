@@ -4,7 +4,7 @@ use syn::{
     token::Bracket,
 };
 
-use crate::ast::{Attributes, ParseOption};
+use crate::ast::{ParseOption, view::Attributes};
 
 /// A component's opening tag: `[path attr=value ...]`.
 pub struct ComponentOpeningTag {

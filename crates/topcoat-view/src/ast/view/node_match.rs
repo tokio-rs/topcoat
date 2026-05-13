@@ -5,7 +5,8 @@ use syn::{
 };
 
 use crate::ast::{
-    ViewWriter, node::Node, parse_option::ParseOption, view_writer::MatchArmsBuilder,
+    ParseOption,
+    view::{MatchArmsBuilder, Node, ViewWriter},
 };
 
 /// A `match expr { ... }` expression in view-body position.
