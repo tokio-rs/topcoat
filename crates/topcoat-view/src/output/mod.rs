@@ -49,7 +49,7 @@ impl ViewWriter {
         if !self.static_segment.is_empty() {
             let static_segment = &self.static_segment;
             self.chunks.push(Chunk::Expr(
-                quote! { ::topcoat::view::Escaped::new_unchecked(#static_segment) },
+                quote! { ::topcoat::view::Unescaped::new_unchecked(#static_segment) },
             ));
             self.static_segment.clear();
         }

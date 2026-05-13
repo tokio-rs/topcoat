@@ -2,7 +2,7 @@ use core::fmt;
 
 use topcoat_core::context::Cx;
 
-use crate::runtime::{Escaped, Formatter, Fragment};
+use crate::runtime::{Formatter, Fragment, Unescaped};
 
 /// A piece of HTML content.
 ///
@@ -71,7 +71,7 @@ pub enum ViewPart {
     F32(f32),
     F64(f64),
     String(String),
-    EscapedString(Escaped<String>),
+    UnescapedString(Unescaped<String>),
     BoxDyn(Box<dyn DynViewPart>),
     Node(Box<[ViewPart]>),
 }
@@ -98,7 +98,7 @@ impl ViewPart {
             Self::F32(_) => 1,
             Self::F64(_) => 1,
             Self::String(s) => s.len(),
-            Self::EscapedString(s) => s.len(),
+            Self::UnescapedString(s) => s.len(),
             Self::BoxDyn(_) => 0,
             Self::Node(parts) => parts.iter().map(|part| part.size_hint()).sum(),
         }
@@ -153,7 +153,7 @@ impl Fragment for ViewPart {
             Self::F32(v) => v.fmt(cx, f),
             Self::F64(v) => v.fmt(cx, f),
             Self::String(s) => s.fmt(cx, f),
-            Self::EscapedString(s) => s.fmt(cx, f),
+            Self::UnescapedString(s) => s.fmt(cx, f),
             Self::BoxDyn(d) => d.dyn_fmt(cx, f),
             Self::Node(parts) => {
                 for part in parts.iter() {
