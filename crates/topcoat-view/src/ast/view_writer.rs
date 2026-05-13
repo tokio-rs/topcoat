@@ -4,6 +4,10 @@ use syn::{Expr, Pat};
 
 enum Chunk {
     Expr(TokenStream),
+    Let {
+        pat: Pat,
+        expr: Box<Expr>,
+    },
     For {
         pat: Pat,
         expr: Box<Expr>,
@@ -78,6 +82,14 @@ impl ViewWriter {
         self.chunks.push(Chunk::Expr(expr))
     }
 
+    pub fn let_binding(&mut self, pat: &Pat, expr: &Expr) {
+        self.flush();
+        self.chunks.push(Chunk::Let {
+            pat: pat.clone(),
+            expr: Box::new(expr.clone()),
+        });
+    }
+
     pub fn for_loop(&mut self, pat: &Pat, expr: &Expr, f: impl FnOnce(&mut ViewWriter)) {
         self.flush();
         let mut body = ViewWriter::new();
@@ -130,6 +142,9 @@ impl ViewWriter {
                         match chunk {
                             Chunk::Expr(expr) => {
                                 quote! { __v.push(::topcoat::view::IntoViewPart::into_view_part(#expr)); }
+                            }
+                            Chunk::Let { pat, expr } => {
+                                quote! { let #pat = #expr; }
                             }
                             Chunk::If { expr, then_branch: then, else_branch: r#else } => {
                                 let then_branch = recursive(&then.chunks);

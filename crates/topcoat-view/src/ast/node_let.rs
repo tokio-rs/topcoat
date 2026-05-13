@@ -14,8 +14,7 @@ pub struct NodeLet {
 
 impl NodeLet {
     pub(crate) fn write(&self, writer: &mut ViewWriter) {
-        let expr_let = &self.expr_let;
-        todo!();
+        writer.let_binding(&self.expr_let.pat, &self.expr_let.expr);
     }
 }
 
