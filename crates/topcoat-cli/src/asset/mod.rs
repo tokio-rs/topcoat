@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Stdio;
 
 use clap::{Args, Subcommand};
@@ -17,6 +17,8 @@ enum AssetSubcommand {
     List(ListArgs),
     /// Bundle all assets embedded in the binary into a directory
     Bundle(BundleArgs),
+    /// Delete the asset bundle directory and the asset build cache
+    Clean(CleanArgs),
 }
 
 #[derive(Args)]
@@ -42,11 +44,19 @@ struct BundleArgs {
     out: Option<PathBuf>,
 }
 
+#[derive(Args)]
+struct CleanArgs {
+    /// Asset bundle directory to remove (defaults to <cargo-target>/assets)
+    #[arg(short, long)]
+    out: Option<PathBuf>,
+}
+
 impl AssetCommand {
     pub async fn run(self) {
         match self.command {
             AssetSubcommand::List(args) => list(args).await,
             AssetSubcommand::Bundle(args) => bundle(args).await,
+            AssetSubcommand::Clean(args) => clean(args).await,
         }
     }
 }
@@ -95,7 +105,7 @@ async fn bundle(args: BundleArgs) {
         }
     };
 
-    let target_dir = match target_dir(&executable) {
+    let target_dir = match cargo_target_dir().await {
         Some(path) => path,
         None => {
             eprintln!(
@@ -121,9 +131,53 @@ async fn bundle(args: BundleArgs) {
     println!("bundled assets into {}", out_dir.display());
 }
 
-fn target_dir(executable: &str) -> Option<PathBuf> {
-    let exe = PathBuf::from(executable);
-    exe.parent()?.parent().map(Path::to_path_buf)
+async fn clean(args: CleanArgs) {
+    let target_dir = match cargo_target_dir().await {
+        Some(path) => path,
+        None => {
+            eprintln!(
+                "{}",
+                style("could not derive cargo target directory; pass --out").red()
+            );
+            std::process::exit(1);
+        }
+    };
+
+    let out_dir = args.out.unwrap_or_else(|| target_dir.join("assets"));
+    let cache_dir = target_dir.join("topcoat/cache/assets");
+
+    for dir in [&out_dir, &cache_dir] {
+        match std::fs::remove_dir_all(dir) {
+            Ok(()) => println!("removed {}", dir.display()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                eprintln!(
+                    "{}",
+                    style(format!("failed to remove {}: {error}", dir.display())).red()
+                );
+                std::process::exit(1);
+            }
+        }
+    }
+}
+
+async fn cargo_target_dir() -> Option<PathBuf> {
+    let output = Command::new("cargo")
+        .args(["metadata", "--no-deps", "--format-version=1"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .ok()?
+        .wait_with_output()
+        .await
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let msg: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    msg.get("target_directory")?.as_str().map(PathBuf::from)
 }
 
 async fn build_executable(bin: Option<&str>, package: Option<&str>) -> Option<String> {
