@@ -65,6 +65,17 @@ impl From<InternalServerError> for Error {
     }
 }
 
+impl<T> From<T> for InternalServerError
+where
+    T: std::error::Error + Send + Sync + 'static,
+{
+    fn from(value: T) -> Self {
+        InternalServerError {
+            _inner: Box::new(value),
+        }
+    }
+}
+
 impl IntoResponse for InternalServerError {
     fn into_response(self) -> axum::response::Response {
         (StatusCode::INTERNAL_SERVER_ERROR, "internal sever error").into_response()

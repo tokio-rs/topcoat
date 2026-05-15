@@ -1,5 +1,6 @@
 use std::path::{Component, Path, PathBuf};
 
+use http::Uri;
 use memchr::memmem;
 use serde::{Deserialize, Serialize};
 
@@ -85,7 +86,7 @@ impl RawAsset {
 
     /// Classify the asset as a filesystem path or an http(s) URL.
     pub fn source(&self) -> Source {
-        if let Ok(uri) = self.path.parse()
+        if let Ok(uri) = self.path.parse::<Uri>()
             && matches!(uri.scheme_str(), Some("http" | "https"))
         {
             return Source::Url(uri);

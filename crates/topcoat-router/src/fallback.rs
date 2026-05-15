@@ -150,7 +150,7 @@ impl NotFoundError {
 
 impl axum::response::IntoResponse for NotFoundError {
     fn into_response(self) -> axum::response::Response {
-        StatusCode::NOT_FOUND.into_response()
+        (StatusCode::NOT_FOUND, "not found").into_response()
     }
 }
 
@@ -171,7 +171,7 @@ impl UnauthorizedError {
 
 impl axum::response::IntoResponse for UnauthorizedError {
     fn into_response(self) -> axum::response::Response {
-        StatusCode::UNAUTHORIZED.into_response()
+        (StatusCode::UNAUTHORIZED, "unauthorized").into_response()
     }
 }
 
@@ -192,7 +192,7 @@ impl ForbiddenError {
 
 impl axum::response::IntoResponse for ForbiddenError {
     fn into_response(self) -> axum::response::Response {
-        StatusCode::FORBIDDEN.into_response()
+        (StatusCode::FORBIDDEN, "forbidden").into_response()
     }
 }
 

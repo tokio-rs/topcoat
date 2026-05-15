@@ -168,11 +168,11 @@ impl Router {
 /// path are nested from innermost (most specific) to outermost.
 impl From<Router> for axum::Router {
     fn from(value: Router) -> Self {
-        let mut result = axum::Router::<Arc<State>>::new();
+        let mut axum_router = axum::Router::<Arc<State>>::new();
         let mut state = value.state;
 
         let assets = value.assets;
-        result = result.nest_service("/_topcoat/assets", ServeAssetBundle::new(&assets));
+        axum_router = axum_router.nest_service("/_topcoat/assets", ServeAssetBundle::new(&assets));
         let asset_resolver =
             AssetFragmentResolver::new(Box::new(move |_cx, asset, f| match assets.get(asset) {
                 Some(asset) => {
@@ -188,7 +188,7 @@ impl From<Router> for axum::Router {
             let mut layouts: Vec<_> = value.layouts.for_path(page.path()).cloned().collect();
             layouts.sort_by_key(|layout| layout.path().len());
 
-            result = result.route(
+            axum_router = axum_router.route(
                 &page.path().to_axum_path(),
                 get(async move |CxBody { cx, body }: CxBody| {
                     let result = WatchAbort::new(&cx, async {
@@ -212,7 +212,7 @@ impl From<Router> for axum::Router {
         }
 
         for route in value.routes {
-            result = result.route(
+            axum_router = axum_router.route(
                 &route.path().to_axum_path(),
                 on(
                     MethodFilter::try_from(route.method().clone())
@@ -231,10 +231,10 @@ impl From<Router> for axum::Router {
             );
         }
 
-        result = result.fallback(async move |CxBody { cx: _, body: _ }: CxBody| {
+        axum_router = axum_router.fallback(async move |CxBody { cx: _, body: _ }: CxBody| {
             (StatusCode::NOT_FOUND, "not found")
         });
 
-        result.with_state(Arc::new(state))
+        axum_router.with_state(Arc::new(state))
     }
 }
