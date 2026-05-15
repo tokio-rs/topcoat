@@ -10,6 +10,8 @@ pub struct BuildConfig {
     version: String,
     input: Option<PathBuf>,
     output: Option<PathBuf>,
+    optimize: bool,
+    minify: bool,
 }
 
 impl Default for BuildConfig {
@@ -18,6 +20,8 @@ impl Default for BuildConfig {
             version: DEFAULT_VERSION.to_owned(),
             input: None,
             output: None,
+            optimize: false,
+            minify: true,
         }
     }
 }
@@ -47,6 +51,18 @@ impl BuildConfig {
         self
     }
 
+    /// Pass `--optimize` to the Tailwind CLI. Defaults to `false`.
+    pub fn optimize(mut self, optimize: bool) -> Self {
+        self.optimize = optimize;
+        self
+    }
+
+    /// Pass `--minify` to the Tailwind CLI. Defaults to `true`.
+    pub fn minify(mut self, minify: bool) -> Self {
+        self.minify = minify;
+        self
+    }
+
     /// Download the CLI if needed and run it. Returns the path to the
     /// generated CSS file.
     pub fn render(self) -> Result<PathBuf> {
@@ -73,17 +89,18 @@ impl BuildConfig {
 
         println!("cargo:rerun-if-changed={}", input.display());
 
-        let status = Command::new(&cli)
-            .arg("-i")
-            .arg(&input)
-            .arg("-o")
-            .arg(&output)
-            .arg("--minify")
-            .status()
-            .map_err(|source| BuildError::Io {
-                path: cli.clone(),
-                source,
-            })?;
+        let mut command = Command::new(&cli);
+        command.arg("-i").arg(&input).arg("-o").arg(&output);
+        if self.optimize {
+            command.arg("--optimize");
+        }
+        if self.minify {
+            command.arg("--minify");
+        }
+        let status = command.status().map_err(|source| BuildError::Io {
+            path: cli.clone(),
+            source,
+        })?;
 
         if !status.success() {
             return Err(BuildError::Cli { status });
