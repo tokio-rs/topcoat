@@ -2,7 +2,7 @@ use core::fmt;
 
 use topcoat_core::context::Cx;
 
-use crate::runtime::{Formatter, Fragment, Unescaped};
+use crate::runtime::{Attribute, Formatter, Fragment, Unescaped};
 
 /// A piece of HTML content.
 ///
@@ -100,6 +100,7 @@ pub enum ViewPart {
     String(String),
     UnescapedStaticStr(Unescaped<&'static str>),
     UnescapedString(Unescaped<String>),
+    Attribute(Box<Attribute>),
     BoxDyn(Box<dyn DynViewPart>),
     Node(Box<[ViewPart]>),
 }
@@ -156,29 +157,30 @@ impl Fragment for ViewPart {
     fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
         match self {
             Self::Empty => {}
-            Self::Bool(v) => v.fmt(cx, f),
-            Self::Char(v) => v.fmt(cx, f),
-            Self::I8(v) => v.fmt(cx, f),
-            Self::I16(v) => v.fmt(cx, f),
-            Self::I32(v) => v.fmt(cx, f),
-            Self::I64(v) => v.fmt(cx, f),
-            Self::I128(v) => v.fmt(cx, f),
-            Self::Isize(v) => v.fmt(cx, f),
-            Self::U8(v) => v.fmt(cx, f),
-            Self::U16(v) => v.fmt(cx, f),
-            Self::U32(v) => v.fmt(cx, f),
-            Self::U64(v) => v.fmt(cx, f),
-            Self::U128(v) => v.fmt(cx, f),
-            Self::Usize(v) => v.fmt(cx, f),
-            Self::F32(v) => v.fmt(cx, f),
-            Self::F64(v) => v.fmt(cx, f),
-            Self::String(s) => s.fmt(cx, f),
-            Self::StaticStr(s) => s.fmt(cx, f),
-            Self::UnescapedString(s) => s.fmt(cx, f),
-            Self::UnescapedStaticStr(s) => s.fmt(cx, f),
-            Self::BoxDyn(d) => d.dyn_fmt(cx, f),
-            Self::Node(parts) => {
-                for part in parts.iter() {
+            Self::Bool(inner) => inner.fmt(cx, f),
+            Self::Char(inner) => inner.fmt(cx, f),
+            Self::I8(inner) => inner.fmt(cx, f),
+            Self::I16(inner) => inner.fmt(cx, f),
+            Self::I32(inner) => inner.fmt(cx, f),
+            Self::I64(inner) => inner.fmt(cx, f),
+            Self::I128(inner) => inner.fmt(cx, f),
+            Self::Isize(inner) => inner.fmt(cx, f),
+            Self::U8(inner) => inner.fmt(cx, f),
+            Self::U16(inner) => inner.fmt(cx, f),
+            Self::U32(inner) => inner.fmt(cx, f),
+            Self::U64(inner) => inner.fmt(cx, f),
+            Self::U128(inner) => inner.fmt(cx, f),
+            Self::Usize(inner) => inner.fmt(cx, f),
+            Self::F32(inner) => inner.fmt(cx, f),
+            Self::F64(inner) => inner.fmt(cx, f),
+            Self::String(inner) => inner.fmt(cx, f),
+            Self::StaticStr(inner) => inner.fmt(cx, f),
+            Self::UnescapedString(inner) => inner.fmt(cx, f),
+            Self::UnescapedStaticStr(inner) => inner.fmt(cx, f),
+            Self::Attribute(inner) => inner.fmt(cx, f),
+            Self::BoxDyn(inner) => inner.dyn_fmt(cx, f),
+            Self::Node(inner) => {
+                for part in inner.iter() {
                     part.fmt(cx, f);
                 }
             }
@@ -188,28 +190,29 @@ impl Fragment for ViewPart {
     fn size_hint(&self) -> usize {
         match self {
             Self::Empty => 0,
-            Self::Bool(v) => v.size_hint(),
-            Self::Char(v) => v.size_hint(),
-            Self::I8(v) => v.size_hint(),
-            Self::I16(v) => v.size_hint(),
-            Self::I32(v) => v.size_hint(),
-            Self::I64(v) => v.size_hint(),
-            Self::I128(v) => v.size_hint(),
-            Self::Isize(v) => v.size_hint(),
-            Self::U8(v) => v.size_hint(),
-            Self::U16(v) => v.size_hint(),
-            Self::U32(v) => v.size_hint(),
-            Self::U64(v) => v.size_hint(),
-            Self::U128(v) => v.size_hint(),
-            Self::Usize(v) => v.size_hint(),
-            Self::F32(v) => v.size_hint(),
-            Self::F64(v) => v.size_hint(),
-            Self::StaticStr(s) => s.size_hint(),
-            Self::String(s) => s.size_hint(),
-            Self::UnescapedString(s) => s.len(),
-            Self::UnescapedStaticStr(s) => s.len(),
-            Self::BoxDyn(d) => d.dyn_size_hint(),
-            Self::Node(parts) => parts.iter().map(|part| part.size_hint()).sum(),
+            Self::Bool(inner) => inner.size_hint(),
+            Self::Char(inner) => inner.size_hint(),
+            Self::I8(inner) => inner.size_hint(),
+            Self::I16(inner) => inner.size_hint(),
+            Self::I32(inner) => inner.size_hint(),
+            Self::I64(inner) => inner.size_hint(),
+            Self::I128(inner) => inner.size_hint(),
+            Self::Isize(inner) => inner.size_hint(),
+            Self::U8(inner) => inner.size_hint(),
+            Self::U16(inner) => inner.size_hint(),
+            Self::U32(inner) => inner.size_hint(),
+            Self::U64(inner) => inner.size_hint(),
+            Self::U128(inner) => inner.size_hint(),
+            Self::Usize(inner) => inner.size_hint(),
+            Self::F32(inner) => inner.size_hint(),
+            Self::F64(inner) => inner.size_hint(),
+            Self::StaticStr(inner) => inner.size_hint(),
+            Self::String(inner) => inner.size_hint(),
+            Self::UnescapedString(inner) => inner.len(),
+            Self::UnescapedStaticStr(inner) => inner.len(),
+            Self::Attribute(inner) => inner.size_hint(),
+            Self::BoxDyn(inner) => inner.dyn_size_hint(),
+            Self::Node(inner) => inner.iter().map(|part| part.size_hint()).sum(),
         }
     }
 }
