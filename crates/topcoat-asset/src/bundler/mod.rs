@@ -97,7 +97,7 @@ impl Bundler {
                 .and_then(|s| s.to_str())
                 .unwrap_or("asset");
             let file = match name_path.extension().and_then(|e| e.to_str()) {
-                Some(ext) => format!("{stem}.{short_hash}.{ext}"),
+                Some(ext) => format!("{stem}-{short_hash}.{ext}"),
                 None => format!("{stem}.{short_hash}"),
             };
 

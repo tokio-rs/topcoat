@@ -93,7 +93,7 @@ pub async fn build(opts: &BuildOpts) -> Result<PathBuf, BuildError> {
 
     let output = cmd
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::null())
         .kill_on_drop(true)
         .spawn()
         .map_err(BuildError::Spawn)?

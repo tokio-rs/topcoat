@@ -4,11 +4,10 @@ use axum::{
     response::{Html, IntoResponse},
     routing::{MethodFilter, get, on},
 };
-use http::StatusCode;
 use topcoat_asset::{AssetBundle, AssetFragmentResolver, ServeAssetBundle};
 use topcoat_core::context::{MaybeAborted, State, WatchAbort};
 
-use crate::{CxBody, Layout, Layouts, Page, Pages, Route, Routes};
+use crate::{CxBody, Layout, Layouts, Page, Pages, Route, Routes, not_found};
 
 /// The core routing primitive that collects [`Page`]s, [`Layout`]s, and
 /// [`Route`]s, matches layouts to pages by path prefix, and converts into an
@@ -231,9 +230,8 @@ impl From<Router> for axum::Router {
             );
         }
 
-        axum_router = axum_router.fallback(async move |CxBody { cx: _, body: _ }: CxBody| {
-            (StatusCode::NOT_FOUND, "not found")
-        });
+        axum_router = axum_router
+            .fallback(async move |CxBody { cx: _, body: _ }: CxBody| not_found().into_response());
 
         axum_router.with_state(Arc::new(state))
     }

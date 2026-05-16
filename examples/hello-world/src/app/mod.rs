@@ -4,7 +4,7 @@ mod posts;
 
 use topcoat::{
     context::{Cx, memoize},
-    router::{Error, Result, Slot, layout, page},
+    router::{Result, Slot, layout, page},
     tailwind,
     view::view,
 };
