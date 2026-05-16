@@ -1,8 +1,8 @@
-use std::ops::Deref;
+use std::{iter::once, ops::Deref};
 
 use topcoat_core::context::Cx;
 
-use crate::runtime::{Formatter, Fragment, IntoViewPart, ViewPart};
+use crate::runtime::{Formatter, Fragment, IntoViewParts, ViewPart};
 
 /// A wrapper that marks its contents as already-safe HTML.
 ///
@@ -54,14 +54,14 @@ impl<T> Deref for Unescaped<T> {
     }
 }
 
-impl IntoViewPart for Unescaped<&'static str> {
-    fn into_view_part(self) -> ViewPart {
-        ViewPart::UnescapedStaticStr(self)
+impl IntoViewParts for Unescaped<&'static str> {
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        once(ViewPart::UnescapedStaticStr(self))
     }
 }
 
-impl IntoViewPart for Unescaped<String> {
-    fn into_view_part(self) -> ViewPart {
-        ViewPart::UnescapedString(self)
+impl IntoViewParts for Unescaped<String> {
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        once(ViewPart::UnescapedString(self))
     }
 }

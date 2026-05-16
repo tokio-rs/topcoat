@@ -1,4 +1,5 @@
 use core::fmt;
+use std::iter::once;
 
 use topcoat_core::context::Cx;
 
@@ -29,18 +30,30 @@ pub struct View {
 }
 
 impl View {
-    /// Builds a `View` from any value that can be converted into a [`ViewPart`].
+    /// Builds a `View` from any value that can be converted into [`ViewPart`]s.
     #[inline]
-    pub fn new(part: impl IntoViewPart) -> Self {
+    pub fn new(parts: impl IntoViewParts) -> Self {
+        let mut iter = parts.into_view_part();
+        let Some(first) = iter.next() else {
+            return Self {
+                part: ViewPart::Empty,
+            };
+        };
+        let Some(second) = iter.next() else {
+            return Self { part: first };
+        };
+        let parts: Box<[ViewPart]> = [first, second].into_iter().chain(iter).collect();
         Self {
-            part: part.into_view_part(),
+            part: ViewPart::Node(parts),
         }
     }
 
     /// Returns a `View` that renders to an empty string.
     #[inline]
     pub fn empty() -> Self {
-        Self::new(ViewPart::Empty)
+        Self {
+            part: ViewPart::Empty,
+        }
     }
 
     /// Renders the view into an HTML string.
@@ -200,119 +213,108 @@ impl Fragment for ViewPart {
     }
 }
 
-/// Conversion into a [`ViewPart`].
-///
-/// The `view!` macro calls `into_view_part` on every expression interpolated
-/// into the view tree, so implementing this trait is what makes a type
-/// embeddable inside `view!` markup. Built-in impls cover primitives,
-/// strings, [`Option`], and pre-built [`View`]/[`ViewPart`] values; user
-/// types can opt in by adding their own impl.
-pub trait IntoViewPart {
-    /// Consumes `self` and produces the corresponding [`ViewPart`].
-    fn into_view_part(self) -> ViewPart;
+pub trait IntoViewParts {
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart>;
 }
 
-impl IntoViewPart for View {
+impl IntoViewParts for View {
     #[inline]
-    fn into_view_part(self) -> ViewPart {
-        self.part
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        once(self.part)
     }
 }
 
-impl IntoViewPart for ViewPart {
+impl IntoViewParts for ViewPart {
     #[inline]
-    fn into_view_part(self) -> ViewPart {
-        self
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        once(self)
     }
 }
 
-impl<T> IntoViewPart for &T
+impl<T> IntoViewParts for &T
 where
-    T: IntoViewPart + Copy,
+    T: IntoViewParts + Copy,
 {
-    fn into_view_part(self) -> ViewPart {
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
         (*self).into_view_part()
     }
 }
 
-impl IntoViewPart for &str {
+impl IntoViewParts for &str {
     #[inline]
-    fn into_view_part(self) -> ViewPart {
-        ViewPart::String(self.to_owned())
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        once(ViewPart::String(self.to_owned()))
     }
 }
 
-impl IntoViewPart for String {
+impl IntoViewParts for String {
     #[inline]
-    fn into_view_part(self) -> ViewPart {
-        ViewPart::String(self)
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        once(ViewPart::String(self))
     }
 }
 
-impl IntoViewPart for Box<dyn DynViewPart> {
+impl IntoViewParts for Box<dyn DynViewPart> {
     #[inline]
-    fn into_view_part(self) -> ViewPart {
-        ViewPart::BoxDyn(self)
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        once(ViewPart::BoxDyn(self))
     }
 }
 
-impl<const N: usize> IntoViewPart for [ViewPart; N] {
+impl<const N: usize> IntoViewParts for [ViewPart; N] {
     #[inline]
-    fn into_view_part(self) -> ViewPart {
-        ViewPart::Node(Box::new(self))
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        self.into_iter()
     }
 }
 
-impl IntoViewPart for Box<[ViewPart]> {
+impl IntoViewParts for Box<[ViewPart]> {
     #[inline]
-    fn into_view_part(self) -> ViewPart {
-        ViewPart::Node(self)
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        self.into_iter()
     }
 }
 
-impl<const N: usize> IntoViewPart for Box<[ViewPart; N]> {
+impl<const N: usize> IntoViewParts for Box<[ViewPart; N]> {
     #[inline]
-    fn into_view_part(self) -> ViewPart {
-        ViewPart::Node(self)
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        (*self).into_iter()
     }
 }
 
-macro_rules! impl_into_view_part_primitive {
+macro_rules! impl_into_view_parts_primitive {
     ($variant:ident, $ty:ty) => {
-        impl IntoViewPart for $ty {
+        impl IntoViewParts for $ty {
             #[inline]
-            fn into_view_part(self) -> ViewPart {
-                ViewPart::$variant(self)
+            fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+                once(ViewPart::$variant(self))
             }
         }
     };
 }
 
-impl_into_view_part_primitive!(Bool, bool);
-impl_into_view_part_primitive!(Char, char);
-impl_into_view_part_primitive!(I8, i8);
-impl_into_view_part_primitive!(I16, i16);
-impl_into_view_part_primitive!(I32, i32);
-impl_into_view_part_primitive!(I64, i64);
-impl_into_view_part_primitive!(I128, i128);
-impl_into_view_part_primitive!(Isize, isize);
-impl_into_view_part_primitive!(U8, u8);
-impl_into_view_part_primitive!(U16, u16);
-impl_into_view_part_primitive!(U32, u32);
-impl_into_view_part_primitive!(U64, u64);
-impl_into_view_part_primitive!(U128, u128);
-impl_into_view_part_primitive!(Usize, usize);
-impl_into_view_part_primitive!(F32, f32);
-impl_into_view_part_primitive!(F64, f64);
+impl_into_view_parts_primitive!(Bool, bool);
+impl_into_view_parts_primitive!(Char, char);
+impl_into_view_parts_primitive!(I8, i8);
+impl_into_view_parts_primitive!(I16, i16);
+impl_into_view_parts_primitive!(I32, i32);
+impl_into_view_parts_primitive!(I64, i64);
+impl_into_view_parts_primitive!(I128, i128);
+impl_into_view_parts_primitive!(Isize, isize);
+impl_into_view_parts_primitive!(U8, u8);
+impl_into_view_parts_primitive!(U16, u16);
+impl_into_view_parts_primitive!(U32, u32);
+impl_into_view_parts_primitive!(U64, u64);
+impl_into_view_parts_primitive!(U128, u128);
+impl_into_view_parts_primitive!(Usize, usize);
+impl_into_view_parts_primitive!(F32, f32);
+impl_into_view_parts_primitive!(F64, f64);
 
-impl<T> IntoViewPart for Option<T>
+impl<T> IntoViewParts for Option<T>
 where
-    T: IntoViewPart,
+    T: IntoViewParts,
 {
-    fn into_view_part(self) -> ViewPart {
-        match self {
-            Some(value) => value.into_view_part(),
-            None => ViewPart::Empty,
-        }
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        self.into_iter().flat_map(IntoViewParts::into_view_part)
     }
 }

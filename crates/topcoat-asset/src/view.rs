@@ -1,5 +1,7 @@
+use std::iter::once;
+
 use topcoat_core::context::{Cx, app_state};
-use topcoat_view::runtime::{Formatter, Fragment, IntoViewPart, ViewPart};
+use topcoat_view::runtime::{Formatter, Fragment, IntoViewParts, ViewPart};
 
 use crate::Asset;
 
@@ -25,8 +27,8 @@ impl Fragment for Asset {
     }
 }
 
-impl IntoViewPart for Asset {
-    fn into_view_part(self) -> ViewPart {
-        ViewPart::BoxDyn(Box::new(self))
+impl IntoViewParts for Asset {
+    fn into_view_part(self) -> impl Iterator<Item = ViewPart> {
+        once(ViewPart::BoxDyn(Box::new(self)))
     }
 }
