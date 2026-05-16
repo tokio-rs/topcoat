@@ -1,6 +1,7 @@
 use std::fmt::{self, Display, Write};
 
-use proc_macro2::{LineColumn, Span};
+use proc_macro2::{LineColumn, Span, TokenStream};
+use quote::ToTokens;
 use syn::{
     Ident, Token,
     ext::IdentExt,
@@ -128,6 +129,20 @@ impl Parse for HtmlIdent {
 impl ParseOption for HtmlIdent {
     fn peek(input: ParseStream) -> bool {
         input.peek(Ident::peek_any)
+    }
+}
+
+impl ToTokens for HtmlIdent {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.first.to_tokens(tokens);
+        for segment in &self.rest {
+            match &segment.separator {
+                HtmlIdentSeparator::Dash(t) => t.to_tokens(tokens),
+                HtmlIdentSeparator::Colon(t) => t.to_tokens(tokens),
+                HtmlIdentSeparator::Dot(t) => t.to_tokens(tokens),
+            }
+            segment.ident.to_tokens(tokens);
+        }
     }
 }
 

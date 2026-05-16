@@ -44,7 +44,7 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
                     <a href="/contact">"contact"</a>
                     <span-kek:pip
                         for kek in ["kek", "pip", "lel"] {
-                            lel=(kek)
+                            (kek)=(kek)
                         }
                     >
                         " | signed in as "

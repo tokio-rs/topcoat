@@ -2,26 +2,26 @@ use syn::{
     Ident, Token,
     ext::IdentExt,
     parse::{Parse, ParseStream},
+    token::Paren,
 };
 
 use crate::ast::{
     ParseOption,
-    view::{AttributeValue, ViewWriter, WriteView},
+    view::{AttributeKey, AttributeValue, ViewWriter, WriteView},
 };
 
 /// A single `name=value` attribute on an [`Element`](super::Element) or
 /// [`Component`](super::Component).
 pub struct Attribute {
-    pub key: Ident,
+    pub key: AttributeKey,
     pub eq: Token![=],
     pub value: AttributeValue,
 }
 
 impl WriteView for Attribute {
     fn write(&self, writer: &mut ViewWriter) {
-        let name = self.key.to_string();
         writer.write_str_unescaped(" ");
-        writer.write_str_unescaped(&name);
+        self.key.write(writer);
         writer.write_str_unescaped("=\"");
         self.value.write(writer);
         writer.write_str_unescaped("\"");
@@ -31,7 +31,7 @@ impl WriteView for Attribute {
 impl Parse for Attribute {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            key: Ident::parse_any(input)?,
+            key: input.parse()?,
             eq: input.parse()?,
             value: input.parse()?,
         })
@@ -40,7 +40,7 @@ impl Parse for Attribute {
 
 impl ParseOption for Attribute {
     fn peek(input: ParseStream) -> bool {
-        input.peek(Ident::peek_any) && input.peek2(Token![=])
+        (input.peek(Ident::peek_any) || input.peek(Paren)) && input.peek2(Token![=])
     }
 }
 

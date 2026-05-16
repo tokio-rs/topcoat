@@ -1,4 +1,5 @@
 mod attribute;
+mod attribute_key;
 mod attribute_node;
 mod attribute_value;
 mod attributes;
@@ -19,6 +20,7 @@ mod template_match;
 mod view_writer;
 
 pub use attribute::*;
+pub use attribute_key::*;
 pub use attribute_node::*;
 pub use attribute_value::*;
 pub use attributes::*;
