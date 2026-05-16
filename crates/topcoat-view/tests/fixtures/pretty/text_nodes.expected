@@ -1,1 +1,5 @@
-view! { "hello" " " "world" }
+view! {
+    "hello"
+    " "
+    "world"
+}

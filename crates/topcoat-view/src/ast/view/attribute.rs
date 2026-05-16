@@ -12,14 +12,14 @@ use crate::ast::{
 /// A single `name=value` attribute on an [`Element`](super::Element) or
 /// [`Component`](super::Component).
 pub struct Attribute {
-    pub name: Ident,
+    pub key: Ident,
     pub eq: Token![=],
     pub value: AttributeValue,
 }
 
 impl WriteView for Attribute {
     fn write(&self, writer: &mut ViewWriter) {
-        let name = self.name.to_string();
+        let name = self.key.to_string();
         writer.write_str_unescaped(" ");
         writer.write_str_unescaped(&name);
         writer.write_str_unescaped("=\"");
@@ -31,8 +31,7 @@ impl WriteView for Attribute {
 impl Parse for Attribute {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            // Accept Rust keywords as attribute names.
-            name: Ident::parse_any(input)?,
+            key: Ident::parse_any(input)?,
             eq: input.parse()?,
             value: input.parse()?,
         })
@@ -48,7 +47,7 @@ impl ParseOption for Attribute {
 #[cfg(feature = "pretty")]
 impl topcoat_pretty::PrettyPrint for Attribute {
     fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
-        self.name.pretty_print(printer);
+        self.key.pretty_print(printer);
         self.eq.pretty_print(printer);
         self.value.pretty_print(printer);
     }

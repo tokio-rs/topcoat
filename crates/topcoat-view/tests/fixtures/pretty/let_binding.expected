@@ -1,1 +1,4 @@
-view! { let x = compute_value(); <p>(x)</p> }
+view! {
+    let x = compute_value();
+    <p>(x)</p>
+}

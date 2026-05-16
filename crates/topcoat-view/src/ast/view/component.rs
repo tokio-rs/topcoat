@@ -56,14 +56,18 @@ impl Component {
 impl WriteView for Component {
     fn write(&self, writer: &mut ViewWriter) {
         let name = self.path();
-        let fields = self.attributes().items.iter().filter_map(|item| match item {
-            AttributeNode::Attribute(attr) => {
-                let name = &attr.name;
-                let value = &attr.value;
-                Some(quote! { #name: #value })
-            }
-            _ => None,
-        });
+        let fields = self
+            .attributes()
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                AttributeNode::Attribute(attr) => {
+                    let name = &attr.key;
+                    let value = &attr.value;
+                    Some(quote! { #name: #value })
+                }
+                _ => None,
+            });
         let mut child_writer = ViewWriter::new_nested();
         for child in self.children() {
             child.write(&mut child_writer);
@@ -224,7 +228,7 @@ mod tests {
         let AttributeNode::Attribute(attr) = &attrs.items[0] else {
             panic!("expected Attribute variant");
         };
-        assert_eq!(attr.name.to_string(), "label");
+        assert_eq!(attr.key.to_string(), "label");
     }
 
     #[test]
