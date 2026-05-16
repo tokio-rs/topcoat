@@ -34,7 +34,6 @@ impl topcoat_pretty::PrettyPrint for OpeningTag {
         self.lt.pretty_print(printer);
         self.name.pretty_print(printer);
         if !self.attributes.is_empty() {
-            printer.scan_break();
             printer.scan_indent(1);
             self.attributes.pretty_print(printer);
             printer.scan_indent(-1);
