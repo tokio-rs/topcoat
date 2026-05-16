@@ -78,7 +78,7 @@ mod about {
         view! {
             <div class="font-bold">"about"</div>
             <img src=asset!(
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Rust_programming_language_black_logo.svg/960px-Rust_programming_language_black_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail", rename: "kek"
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Rust_programming_language_black_logo.svg/960px-Rust_programming_language_black_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail", rename: "kek", extension: "svg", hash: "5"
             )>
 
         }

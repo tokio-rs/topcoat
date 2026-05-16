@@ -53,9 +53,9 @@ const fn cow_as_str<'a>(c: &'a Option<Cow<'static, str>>) -> Option<&'a str> {
 
 #[macro_export]
 macro_rules! asset_options {
-    ($($field:ident: $expr:expr),*) => {
+    ($($field:ident $(: $expr:expr)?),*) => {
         $crate::AssetOptions {
-            $($field: ::core::option::Option::Some(::std::borrow::Cow::Borrowed($expr)),)*
+            $($field: ::core::option::Option::Some(::std::borrow::Cow::Borrowed($($expr)?)),)*
             ..$crate::AssetOptions::NONE
         }
     };

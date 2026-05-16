@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 
 use http::Uri;
 
@@ -22,6 +22,15 @@ impl Source {
                 .find(|s| !s.is_empty())
                 .unwrap_or("asset")
                 .to_string(),
+        }
+    }
+}
+
+impl fmt::Display for Source {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Path(p) => p.display().fmt(f),
+            Self::Url(uri) => uri.fmt(f),
         }
     }
 }

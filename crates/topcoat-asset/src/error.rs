@@ -6,7 +6,7 @@ pub type Result = core::result::Result<(), AssetError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AssetError {
-    #[error("io error for asset at {}: {source}", asset.resolved_path().display())]
+    #[error("io error for asset at {}: {source}", asset.source())]
     AssetIo {
         asset: RawAsset,
         #[source]
@@ -17,5 +17,14 @@ pub enum AssetError {
         path: PathBuf,
         #[source]
         source: io::Error,
+    },
+    #[error(
+        "hash mismatch for asset at {}: expected {expected}, got {actual}",
+        asset.source()
+    )]
+    HashMismatch {
+        asset: RawAsset,
+        expected: String,
+        actual: String,
     },
 }

@@ -88,17 +88,35 @@ impl Bundler {
                 .iter()
                 .map(|b| format!("{:02x}", b))
                 .collect::<String>();
+
+            if let Some(expected) = asset.options().hash()
+                && expected != hash
+            {
+                return Err(AssetError::HashMismatch {
+                    asset: asset.clone(),
+                    expected: expected.to_owned(),
+                    actual: hash,
+                }
+                .into());
+            }
+
             let short_hash = &hash[..8];
 
             let name = source.display_name();
             let name_path = Path::new(&name);
-            let stem = name_path
+            let derived_stem = name_path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("asset");
-            let file = match name_path.extension().and_then(|e| e.to_str()) {
-                Some(ext) => format!("{stem}-{short_hash}.{ext}"),
-                None => format!("{stem}.{short_hash}"),
+            let derived_ext = name_path.extension().and_then(|e| e.to_str());
+            let options = asset.options();
+            let stem = options.rename().unwrap_or(derived_stem);
+            let ext = options.extension().or(derived_ext);
+            let file = match (stem.is_empty(), ext) {
+                (true, Some(ext)) if !ext.is_empty() => format!("{short_hash}.{ext}"),
+                (true, _) => short_hash.to_string(),
+                (false, Some(ext)) if !ext.is_empty() => format!("{stem}-{short_hash}.{ext}"),
+                (false, _) => format!("{stem}.{short_hash}"),
             };
 
             let id = asset.id();
