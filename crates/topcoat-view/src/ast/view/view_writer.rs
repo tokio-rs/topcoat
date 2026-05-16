@@ -124,9 +124,7 @@ impl ViewWriter {
                 fn build_chain(chunks: &[Chunk]) -> TokenStream {
                     fn chunk_to_iter(chunk: &Chunk) -> TokenStream {
                         match chunk {
-                            Chunk::Expr(expr) => quote! {
-                                ::topcoat::view::IntoViewParts::into_view_parts(#expr)
-                            },
+                            Chunk::Expr(expr) => quote! { IntoViewParts::into_view_parts(#expr) },
                             Chunk::For { pat, expr, body } => {
                                 let body_iter = build_chain(&body.chunks);
                                 quote! {
@@ -149,9 +147,10 @@ impl ViewWriter {
                 }
 
                 let chain = build_chain(&self.chunks);
-                quote! {
+                quote! {{
+                    use ::topcoat::view::IntoViewParts;
                     ::core::iter::Iterator::collect::<::topcoat::view::View>(#chain)
-                }
+                }}
             } else {
                 // `let`/`if`/`match` need imperative control flow; build a `Vec`.
                 fn build_vec(chunks: &[Chunk]) -> TokenStream {
@@ -159,7 +158,7 @@ impl ViewWriter {
                     for chunk in chunks {
                         match chunk {
                             Chunk::Expr(expr) => {
-                                quote! { __v.extend(::topcoat::view::IntoViewParts::into_view_parts(#expr)); }
+                                quote! { __v.extend(IntoViewParts::into_view_parts(#expr)); }
                             }
                             Chunk::Let { pat, expr } => {
                                 quote! { let #pat = #expr; }

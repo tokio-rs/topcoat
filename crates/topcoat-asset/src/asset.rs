@@ -173,7 +173,7 @@ fn normalize(path: &Path) -> PathBuf {
 
 #[macro_export]
 macro_rules! asset {
-    ($path:expr) => {{
+    ($path:expr $(, $($ao:tt)*)?) => {{
         const PATH: &str = $path;
         const CRATE_NAME: &str = env!("CARGO_CRATE_NAME");
         const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
@@ -187,7 +187,7 @@ macro_rules! asset {
             CRATE_NAME,
             MANIFEST_DIR,
             SOURCE_FILE,
-            &$crate::AssetOptions::NONE,
+            &$crate::asset_options!($($($ao)*)?),
         );
 
         ID
