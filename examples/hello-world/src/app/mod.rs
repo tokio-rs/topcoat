@@ -2,9 +2,13 @@ mod _group;
 mod api;
 mod posts;
 
+use std::time::Duration;
+
+use axum::response::Html;
 use topcoat::{
+    asset::asset,
     context::{Cx, memoize},
-    router::{Result, Slot, layout, page},
+    router::{IntoResponse, Response, Result, Slot, layout, page, query_params, route},
     tailwind,
     view::view,
 };
@@ -33,6 +37,7 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
             <head>
                 <title>"hello world"</title>
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
+                <script type="module" src=(asset!("https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"))></script>
                 [topcoat::dev::script /]
             </head>
             <body>
@@ -63,15 +68,6 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
     }
 }
 
-#[page]
-async fn home_page(cx: &Cx) -> Result {
-    let user = current_user(cx).await;
-    view! {
-        "welcome, "
-        ((*user).clone())
-    }
-}
-
 mod about {
     use topcoat::{
         asset::asset,
@@ -91,5 +87,47 @@ mod about {
             >
             <img src=(asset!("./ferris.png"))>
         }
+    }
+}
+
+#[query_params]
+struct DatastarQueryParams {
+    datastar: String,
+}
+
+#[derive(serde::Deserialize)]
+struct Signals {
+    input: String,
+}
+
+#[route(GET "/content")]
+async fn content(cx: &Cx) -> Result<Response> {
+    let kek = DatastarQueryParams::of(cx)
+        .as_ref()
+        .ok()
+        .and_then(|s| serde_json::from_str(&s.datastar).ok())
+        .unwrap_or(Signals {
+            input: "".to_owned(),
+        });
+
+    tokio::time::sleep(Duration::from_secs_f32(0.5)).await;
+    println!("rendering!");
+
+    let result: Result = view! {
+        <div id="content">
+            "lol"
+            (kek.input)
+        </div>
+    };
+    Ok(Html(result?.render(cx)).into_response())
+}
+
+#[page]
+async fn home_page(cx: &Cx) -> Result {
+    view! {
+        <input class="border border-[black]" data-bind="test">
+        <div data-effect="[true, $test] && @get('/content', { payload: { input: $test }})">
+            <div id="content">"loading..."</div>
+        </div>
     }
 }
