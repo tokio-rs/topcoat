@@ -15,7 +15,7 @@ use crate::ast::{
 /// of every construct that can appear at attribute-list position.
 pub enum AttributeNode {
     Attribute(Attribute),
-    If(TemplateIf<AttributeNode>),
+    If(Box<TemplateIf<AttributeNode>>),
     Let(TemplateLet),
     ForLoop(TemplateForLoop<AttributeNode>),
     Continue(TemplateContinue),
