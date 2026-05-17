@@ -54,7 +54,7 @@ Optional named arguments control the bundled output:
 
 - `rename: "name"` — replace the file stem (everything before the final `.`)
 - `extension: "ext"` — override the output extension (without the leading dot)
-- `checksum: "<sha256-hex>"` — assert the SHA-256 of the file's contents; the bundler fails with `ChecksumMismatch` otherwise. Recommended for remote assets.
+- `checksum: "<sha256-hex>"` — assert the SHA-256 of the raw, unbundled source file; the bundler fails with `ChecksumMismatch` otherwise. Recommended for remote assets.
 
 Output filenames always include a short content hash, so bundles stay cache-friendly: e.g. `logo-1a2b3c4d.png`.
 

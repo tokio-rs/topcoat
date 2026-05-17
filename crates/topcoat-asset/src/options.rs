@@ -13,8 +13,19 @@ use crate::{
 /// each field does.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssetOptions {
+    /// Replace the file stem (everything before the final `.`) in the
+    /// bundled output. The extension and content-hash suffix are kept.
+    /// An empty string drops the stem entirely, leaving just the hash
+    /// (and extension, if any) as the filename.
     pub rename: Option<Cow<'static, str>>,
+    /// Override the output extension (without the leading dot). Useful
+    /// when the source has no extension or the wrong one. An empty
+    /// string drops the extension entirely.
     pub extension: Option<Cow<'static, str>>,
+    /// Expected SHA-256 of the raw, unbundled source file, as a lowercase
+    /// hex string. The bundler fails with
+    /// [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's
+    /// actual hash differs. Recommended for remote assets.
     pub checksum: Option<Cow<'static, str>>,
 }
 
@@ -26,14 +37,17 @@ impl AssetOptions {
         checksum: None,
     };
 
+    /// Returns the configured [`rename`](Self::rename) value, if any.
     pub fn rename(&self) -> Option<&str> {
         self.rename.as_deref()
     }
 
+    /// Returns the configured [`extension`](Self::extension) value, if any.
     pub fn extension(&self) -> Option<&str> {
         self.extension.as_deref()
     }
 
+    /// Returns the configured [`checksum`](Self::checksum) value, if any.
     pub fn checksum(&self) -> Option<&str> {
         self.checksum.as_deref()
     }

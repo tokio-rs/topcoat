@@ -227,9 +227,10 @@ fn normalize(path: &Path) -> PathBuf {
 ///   final `.`) with `"name"`.
 /// - `extension: "ext"` — override the output extension (without the
 ///   leading dot). Useful when the source has no extension or a wrong one.
-/// - `checksum: "<sha256-hex>"` — assert the bundled file's SHA-256. The
-///   bundler returns [`AssetError::ChecksumMismatch`](crate::AssetError)
-///   if the file's actual hash differs. Recommended for remote assets.
+/// - `checksum: "<sha256-hex>"` — assert the SHA-256 of the raw,
+///   unbundled source file. The bundler returns
+///   [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's
+///   actual hash differs. Recommended for remote assets.
 ///
 /// Output filenames always include a short content hash so bundles stay
 /// cache-friendly: e.g. `logo-1a2b3c4d.png`, or `1a2b3c4d.png` if the
