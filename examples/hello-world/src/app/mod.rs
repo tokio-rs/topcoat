@@ -2,9 +2,6 @@ mod _group;
 mod api;
 mod posts;
 
-use std::time::Duration;
-
-use axum::response::Html;
 use topcoat::{
     asset::asset,
     context::{Cx, memoize},
@@ -91,6 +88,44 @@ mod about {
     }
 }
 
+#[component]
+async fn geiler_component_mit_combobox() -> Result {
+    view! {
+        <div>
+            combobox(
+                variant: Variant::Dark,
+                content: suspend!(|content| {
+                    let items = search_items(content).await;
+                    for item in items {
+                        combobox_item(
+                            variant: ???,
+                            item.to_string(),
+                        )
+                    }
+                }),
+            );
+        </div>
+    }
+}
+
+#[component]
+async fn combobox(cx: &Cx, variant: Variant, content: Suspend<String>) -> Result {
+    view! {
+        signal kek = "";
+
+        <div
+            match variant {
+                Variant::Dark => class="bg-black",
+                Variant::Light => class="bg-white",
+            }
+        >
+            <input bind=(kek)>
+
+            track content(kek);
+        </div>
+    }
+}
+
 struct InvoiceLine {
     article: String,
     quantity: i32,
@@ -113,6 +148,10 @@ async fn invoice(cx: &Cx) -> Result {
         // ];
 
         <div class="flex flex-col">
+            track |test| {
+
+            }
+
             // suspend |lines| {
             //     view! {
             //         for line in lines {

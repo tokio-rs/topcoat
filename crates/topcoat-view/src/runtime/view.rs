@@ -57,6 +57,10 @@ impl View {
         self.fmt(cx, &mut f);
         buf
     }
+
+    pub fn into_inner(self) -> ViewPart {
+        self.part
+    }
 }
 
 impl Fragment for View {

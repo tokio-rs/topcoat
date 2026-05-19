@@ -103,6 +103,11 @@ impl ViewWriter {
         });
     }
 
+    pub fn statement(&mut self, statement: TokenStream) {
+        self.flush();
+        self.chunks.push(Chunk::Statement(statement));
+    }
+
     pub fn into_token_stream(mut self) -> TokenStream {
         self.flush();
 
@@ -111,7 +116,10 @@ impl ViewWriter {
                 chunks.iter().any(|chunk| match chunk {
                     Chunk::Expr(_) => false,
                     Chunk::For { body, .. } => needs_vec(&body.chunks),
-                    Chunk::Let { .. } | Chunk::If { .. } | Chunk::Match { .. } => true,
+                    Chunk::Let { .. }
+                    | Chunk::If { .. }
+                    | Chunk::Match { .. }
+                    | Chunk::Statement(..) => true,
                 })
             }
 
@@ -207,6 +215,7 @@ impl ViewWriter {
                                     }
                                 }
                             }
+                            Chunk::Statement(tokens) => tokens.clone(),
                         }
                         .to_tokens(&mut output);
                     }
@@ -257,6 +266,7 @@ enum Chunk {
         expr: Box<Expr>,
         arms: Vec<MatchArm>,
     },
+    Statement(TokenStream),
 }
 
 struct MatchArm {

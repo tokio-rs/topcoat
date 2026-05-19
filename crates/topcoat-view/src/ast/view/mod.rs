@@ -18,6 +18,7 @@ mod template_for_loop;
 mod template_if;
 mod template_let;
 mod template_match;
+mod tracked_block;
 mod view_writer;
 
 pub use attribute::*;
@@ -40,6 +41,7 @@ pub use template_for_loop::*;
 pub use template_if::*;
 pub use template_let::*;
 pub use template_match::*;
+pub use tracked_block::*;
 pub(crate) use view_writer::*;
 
 use proc_macro2::TokenStream;

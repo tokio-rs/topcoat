@@ -28,6 +28,7 @@ discover = [
 	"dep:inventory",
 	"topcoat-macro/discover",
 	"topcoat-router/discover",
+	"topcoat-view/discover",
 ]
 
 [dependencies]
