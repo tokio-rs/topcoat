@@ -1,6 +1,6 @@
-use std::iter::empty;
+use std::{iter::empty, ops::Deref};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use topcoat_core::context::Cx;
 use uuid::Uuid;
 
@@ -65,48 +65,60 @@ where
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(bound(deserialize = "&'a T: Deserialize<'de>"))]
-pub struct ReadSignal<'a, T: ?Sized> {
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReadSignal<T> {
     id: SignalId,
-    #[serde(borrow)]
-    value: &'a T,
+    value: T,
 }
 
-impl<'a, T> ReadSignal<'a, T> {
-    pub fn new(signal: &'a Signal<T>) -> Self {
+impl<T> ReadSignal<T> {
+    pub fn new(signal: &Signal<T>) -> Self
+    where
+        T: Clone,
+    {
         Self {
             id: signal.id,
-            value: &signal.value,
+            value: signal.value.clone(),
         }
+    }
+
+    pub fn id(&self) -> SignalId {
+        self.id
     }
 }
 
-pub trait Signals<'de>: Sized {
-    fn ids(&self) -> impl Iterator<Item = SignalId>;
-    fn decode(encoded_signals: &'de EncodedSignals) -> Self;
+impl<T> Deref for ReadSignal<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
 }
 
-impl<'de> Signals<'de> for () {
+pub trait Signals: Sized {
+    fn ids(&self) -> impl Iterator<Item = SignalId>;
+    fn decode(encoded_signals: EncodedSignals) -> Self;
+}
+
+impl Signals for () {
     fn ids(&self) -> impl Iterator<Item = SignalId> {
         empty()
     }
 
-    fn decode(_encoded_signals: &'de EncodedSignals) -> Self {}
+    fn decode(_encoded_signals: EncodedSignals) -> Self {}
 }
 
 macro_rules! impl_signals_for_tuple {
     ($($n:tt $t:ident),+) => {
-        impl<'de, $($t),+> Signals<'de> for ($(ReadSignal<'de, $t>,)+)
+        impl<$($t),+> Signals for ($(ReadSignal<$t>,)+)
         where
-            $($t: ?Sized + 'de,)+
-            $(&'de $t: Deserialize<'de>,)+
+            $($t: DeserializeOwned,)+
         {
             fn ids(&self) -> impl Iterator<Item = SignalId> {
                 [$(self.$n.id),+].into_iter()
             }
 
-            fn decode(encoded_signals: &'de EncodedSignals) -> Self {
+            fn decode(encoded_signals: EncodedSignals) -> Self {
                 serde_json::from_str(&encoded_signals.0).unwrap()
             }
         }
@@ -160,9 +172,9 @@ pub struct ReactiveScope {
 
 impl ReactiveScope {
     #[inline]
-    pub async fn new<'de, S, E>(cx: &Cx, signals: &S, island: Island<S, E>) -> Result<Self, E>
+    pub async fn new<S, E>(cx: &Cx, signals: S, island: Island<S, E>) -> Result<Self, E>
     where
-        S: Signals<'de>,
+        S: Signals,
     {
         Ok(Self {
             id: ReactiveScopeId::new(),

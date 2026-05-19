@@ -95,11 +95,11 @@ mod about {
 }
 
 #[island]
-async fn combobox_content(input: ReadSignal<'_, String>) -> Result {
+async fn combobox_content(input: ReadSignal<String>) -> Result {
     view! {
         <div>
             "content:"
-            (input)
+            ((*input).clone())
         </div>
     }
 }

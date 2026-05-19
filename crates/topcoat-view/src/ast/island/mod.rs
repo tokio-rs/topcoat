@@ -60,7 +60,7 @@ impl ToTokens for Island {
                 |cx, signals| {
                     #item
 
-                    Box::pin(#ident(#(#call_args.clone()),*))
+                    Box::pin(#ident(#(#call_args),*))
                 },
             );
         }
