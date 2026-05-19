@@ -7,9 +7,9 @@ use syn::{
 use crate::ast::{
     ParseOption,
     view::{
-        Component, DocumentType, Element, SignalDeclaration, TemplateBlock, TemplateBreak,
-        TemplateContinue, TemplateExpr, TemplateForLoop, TemplateIf, TemplateLet, TemplateMatch,
-        TrackedBlock, ViewWriter, WriteView,
+        Component, DocumentType, Element, ReactiveScope, SignalDeclaration, TemplateBlock,
+        TemplateBreak, TemplateContinue, TemplateExpr, TemplateForLoop, TemplateIf, TemplateLet,
+        TemplateMatch, ViewWriter, WriteView,
     },
 };
 
@@ -29,7 +29,7 @@ pub enum Node {
     Match(TemplateMatch<Node>),
     Block(TemplateBlock<Node>),
     SignalDecaration(SignalDeclaration),
-    TrackedBlock(TrackedBlock),
+    ReactiveScope(ReactiveScope),
 }
 
 impl Node {
@@ -58,7 +58,7 @@ impl WriteView for Node {
             Self::Match(inner) => inner.write(writer),
             Self::Block(inner) => inner.write(writer),
             Self::SignalDecaration(inner) => inner.write(writer),
-            Self::TrackedBlock(inner) => inner.write(writer),
+            Self::ReactiveScope(inner) => inner.write(writer),
         }
     }
 }
@@ -91,8 +91,8 @@ impl Parse for Node {
             Self::Block(input.parse()?)
         } else if SignalDeclaration::peek(input) {
             Self::SignalDecaration(input.parse()?)
-        } else if TrackedBlock::peek(input) {
-            Self::TrackedBlock(input.parse()?)
+        } else if ReactiveScope::peek(input) {
+            Self::ReactiveScope(input.parse()?)
         } else {
             return Err(syn::Error::new(input.span(), "expected view node"));
         };
@@ -128,7 +128,7 @@ impl topcoat_pretty::PrettyPrint for Node {
             Self::Match(inner) => inner.pretty_print(printer),
             Self::Block(inner) => inner.pretty_print(printer),
             Self::SignalDecaration(inner) => inner.pretty_print(printer),
-            Self::TrackedBlock(inner) => inner.pretty_print(printer),
+            Self::ReactiveScope(inner) => inner.pretty_print(printer),
         }
     }
 }

@@ -7,7 +7,7 @@ use topcoat::{
     context::{Cx, memoize},
     router::{IntoResponse, Response, Result, Slot, layout, page, query_params, route},
     tailwind,
-    view::view,
+    view::{Signal, component, island, view},
 };
 
 use crate::components::app_and_request_state;
@@ -65,6 +65,12 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
         </html>
     }
 }
+#[page]
+async fn home_page() -> Result {
+    view! {
+        [combobox /]
+    }
+}
 
 mod about {
     use topcoat::{
@@ -88,82 +94,25 @@ mod about {
     }
 }
 
-#[component]
-async fn geiler_component_mit_combobox() -> Result {
+#[island]
+async fn combobox_content(input: Signal<String>) -> Result {
     view! {
         <div>
-            combobox(
-                variant: Variant::Dark,
-                content: suspend!(|content| {
-                    let items = search_items(content).await;
-                    for item in items {
-                        combobox_item(
-                            variant: ???,
-                            item.to_string(),
-                        )
-                    }
-                }),
-            );
+            "content:"
+            (input)
         </div>
     }
 }
 
 #[component]
-async fn combobox(cx: &Cx, variant: Variant, content: Suspend<String>) -> Result {
+async fn combobox(cx: &Cx) -> Result {
     view! {
-        signal kek = "";
+        signal kek = "initial content".to_owned();
 
-        <div
-            match variant {
-                Variant::Dark => class="bg-black",
-                Variant::Light => class="bg-white",
-            }
-        >
-            <input bind=(kek)>
+        <div>
+            <input>
 
-            track content(kek);
-        </div>
-    }
-}
-
-struct InvoiceLine {
-    article: String,
-    quantity: i32,
-}
-
-#[page]
-async fn invoice(cx: &Cx) -> Result {
-    view! {
-        signal test = 5;
-
-        // signal lines = [
-        //     InvoiceLine {
-        //         article: "kek".to_owned(),
-        //         quantity: 3,
-        //     },
-        //     InvoiceLine {
-        //         article: "pip".to_owned(),
-        //         quantity: 2,
-        //     },
-        // ];
-
-        <div class="flex flex-col">
-            track |test| {
-
-            }
-
-            // suspend |lines| {
-            //     view! {
-            //         for line in lines {
-            //             <div class="flex mb-2">
-            //                 <input value=(line.article) class="border mr-2">
-            //                 <input value=(line.quantity) type="number" class="border">
-            //                 <button onclick="line.removed = true">delete</button>
-            //             </div>
-            //         }
-            //     }
-            // }
-            <button onclick="console.log('kek')">"+ New line"</button>
+            track combobox_content(kek)
         </div>
     }
 }

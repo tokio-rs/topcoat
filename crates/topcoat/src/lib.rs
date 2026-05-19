@@ -26,7 +26,7 @@ pub mod router {
 
 #[cfg(feature = "view")]
 pub mod view {
-    pub use topcoat_macro::{component, view};
+    pub use topcoat_macro::{component, island, view};
 
     pub use topcoat_view::runtime::*;
 }

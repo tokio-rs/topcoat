@@ -2,8 +2,6 @@ mod memoize;
 mod quote_option;
 
 #[cfg(feature = "router")]
-mod island;
-#[cfg(feature = "router")]
 mod layout;
 #[cfg(feature = "router")]
 mod page;
@@ -35,10 +33,10 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
-#[cfg(feature = "router")]
+#[cfg(feature = "view")]
 #[proc_macro_attribute]
 pub fn island(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match island::Island::parse(attr.into(), item.into()) {
+    match topcoat_view::ast::island::Island::parse(attr.into(), item.into()) {
         Ok(value) => quote! { #value }.into(),
         Err(error) => error.to_compile_error().into(),
     }
