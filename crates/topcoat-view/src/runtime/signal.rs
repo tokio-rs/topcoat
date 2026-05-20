@@ -40,6 +40,12 @@ impl<T> Signal<T> {
     }
 }
 
+impl<T> IntoViewParts for Signal<T> {
+    fn into_view_parts(self) -> impl Iterator<Item = ViewPart> {
+        self.id.0.to_string().into_view_parts()
+    }
+}
+
 pub struct SignalDeclaration<'a, T>(&'a Signal<T>);
 
 impl<'a, T> SignalDeclaration<'a, T> {
@@ -167,6 +173,7 @@ impl Default for ReactiveScopeId {
 pub struct ReactiveScope {
     id: ReactiveScopeId,
     track: Vec<SignalId>,
+    path: String,
     placeholder: View,
 }
 
@@ -179,6 +186,7 @@ impl ReactiveScope {
         Ok(Self {
             id: ReactiveScopeId::new(),
             track: signals.ids().collect(),
+            path: "/_topcoat/islands/".to_owned() + island.id().as_str(),
             placeholder: island.render(cx, signals).await?,
         })
     }
@@ -194,6 +202,10 @@ impl IntoViewParts for ReactiveScope {
             ViewPart::UnescapedStaticStr(Unescaped::new_unchecked(" ")),
             ViewPart::UnescapedString(Unescaped::new_unchecked(
                 serde_json::to_string(&self.track).unwrap(),
+            )),
+            ViewPart::UnescapedStaticStr(Unescaped::new_unchecked(" ")),
+            ViewPart::UnescapedString(Unescaped::new_unchecked(
+                serde_json::to_string(&self.path).unwrap(),
             )),
             ViewPart::UnescapedStaticStr(Unescaped::new_unchecked(" -->")),
             self.placeholder.into_inner(),

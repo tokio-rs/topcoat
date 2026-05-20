@@ -2,6 +2,8 @@ mod _group;
 mod api;
 mod posts;
 
+use std::time::Duration;
+
 use topcoat::{
     asset::asset,
     context::{Cx, memoize},
@@ -94,12 +96,58 @@ mod about {
     }
 }
 
+async fn search_results(cx: &Cx, input: &str) -> Vec<&'static str> {
+    tokio::time::sleep(Duration::from_secs_f32(0.5)).await;
+    let all = [
+        "apple",
+        "apricot",
+        "banana",
+        "blackberry",
+        "blueberry",
+        "cherry",
+        "coconut",
+        "cranberry",
+        "date",
+        "dragonfruit",
+        "elderberry",
+        "fig",
+        "grape",
+        "grapefruit",
+        "guava",
+        "honeydew",
+        "kiwi",
+        "lemon",
+        "lime",
+        "lychee",
+        "mango",
+        "nectarine",
+        "orange",
+        "papaya",
+        "passionfruit",
+        "peach",
+        "pear",
+        "persimmon",
+        "pineapple",
+        "plum",
+        "pomegranate",
+        "raspberry",
+        "strawberry",
+        "tangerine",
+        "watermelon",
+    ];
+    let needle = input.to_lowercase();
+    all.into_iter().filter(|s| s.contains(&needle)).collect()
+}
+
 #[island]
-async fn combobox_content(input: ReadSignal<String>) -> Result {
+async fn combobox_content(cx: &Cx, input: ReadSignal<String>) -> Result {
+    let results = search_results(cx, &*input).await;
     view! {
         <div>
-            "content:"
-            ((*input).clone())
+            <b>"resuls:"</b>
+            for item in results {
+                <div>(item)</div>
+            }
         </div>
     }
 }
@@ -110,8 +158,7 @@ async fn combobox(cx: &Cx) -> Result {
         signal kek = "initial content".to_owned();
 
         <div>
-            <input>
-
+            <input data-topcoat-bind=(kek.clone())>
             track combobox_content(kek)
         </div>
     }

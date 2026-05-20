@@ -1,9 +1,12 @@
 use std::{any::Any, sync::Arc};
 
 use axum::{
+    extract::Query,
     response::{Html, IntoResponse},
     routing::{MethodFilter, get, on},
 };
+use http::Uri;
+use serde::Deserialize;
 use topcoat_asset::{AssetBundle, AssetFragmentResolver, ServeAssetBundle};
 use topcoat_core::context::{MaybeAborted, State, WatchAbort};
 use topcoat_view::runtime::{DynIsland, EncodedSignals, Islands};
@@ -254,29 +257,33 @@ impl From<Router> for axum::Router {
 
         let mut island_router = axum::Router::new();
         for island in value.islands {
+            #[derive(Deserialize)]
+            struct SignalsQuery {
+                signals: String,
+            }
+
             island_router = island_router.route(
                 &("/".to_owned() + island.id().as_str()),
-                get(async |CxBody { cx, body: _ }: CxBody| {
-                    let signal_param = raw_path_params(&cx)
-                        .iter()
-                        .find_map(|(key, value)| (key == "signals").then_some(value))
-                        .unwrap();
-                    // todo: handle errors properly
+                get(
+                    async |Query(query): Query<SignalsQuery>, CxBody { cx, body: _ }: CxBody| {
+                        let signal_param = query.signals;
+                        // todo: handle errors properly
 
-                    let result = island
-                        .dyn_render(&cx, EncodedSignals::new(signal_param))
-                        .await;
-                    match result {
-                        Ok(view) => Html(view.render(&cx)).into_response(),
-                        Err(error) => {
-                            if let Ok(error) = error.downcast::<Error>() {
-                                error.into_response()
-                            } else {
-                                panic!("island has unknown error type");
+                        let result = island
+                            .dyn_render(&cx, EncodedSignals::new(signal_param))
+                            .await;
+                        match result {
+                            Ok(view) => Html(view.render(&cx)).into_response(),
+                            Err(error) => {
+                                if let Ok(error) = error.downcast::<Error>() {
+                                    error.into_response()
+                                } else {
+                                    panic!("island has unknown error type");
+                                }
                             }
                         }
-                    }
-                }),
+                    },
+                ),
             );
         }
         axum_router = axum_router.nest("/_topcoat/islands", island_router);

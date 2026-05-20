@@ -1,7 +1,6 @@
 use std::{
     any::Any,
     collections::HashSet,
-    fmt::Display,
     hash::{Hash, Hasher},
     pin::Pin,
 };
