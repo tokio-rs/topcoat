@@ -9,7 +9,7 @@ use topcoat::{
     context::{Cx, memoize},
     router::{IntoResponse, Response, Result, Slot, layout, page, query_params, route},
     tailwind,
-    view::{ReadSignal, Signal, component, island, view},
+    view::{Island, ReadSignal, Signal, component, island, view},
 };
 
 use crate::components::app_and_request_state;
@@ -70,7 +70,7 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
 #[page]
 async fn home_page() -> Result {
     view! {
-        [combobox /]
+        [combobox content=(combobox_content) /]
     }
 }
 
@@ -153,13 +153,16 @@ async fn combobox_content(cx: &Cx, input: ReadSignal<String>) -> Result {
 }
 
 #[component]
-async fn combobox(cx: &Cx) -> Result {
+async fn combobox(
+    cx: &Cx,
+    content: Island<(ReadSignal<String>,), topcoat::router::Error>,
+) -> Result {
     view! {
         signal kek = "initial content".to_owned();
 
         <div>
             <input data-topcoat-bind=(kek.clone())>
-            track combobox_content(kek)
+            track content(kek)
         </div>
     }
 }
