@@ -38,6 +38,10 @@ impl<T> Signal<T> {
             value,
         }
     }
+
+    pub(crate) fn read(&self) -> &T {
+        &self.value
+    }
 }
 
 impl<T> IntoViewParts for Signal<T> {
@@ -59,7 +63,7 @@ impl<T> IntoViewParts for SignalDeclaration<'_, T>
 where
     T: Serialize,
 {
-    fn into_view_parts(self) -> impl Iterator<Item = super::ViewPart> {
+    fn into_view_parts(self) -> impl Iterator<Item = ViewPart> {
         [
             ViewPart::UnescapedStaticStr(Unescaped::new_unchecked("<!-- signal: ")),
             ViewPart::UnescapedString(Unescaped::new_unchecked(

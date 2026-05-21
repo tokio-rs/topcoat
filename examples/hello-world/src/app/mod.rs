@@ -7,9 +7,9 @@ use std::time::Duration;
 use topcoat::{
     asset::asset,
     context::{Cx, memoize},
-    router::{IntoResponse, Response, Result, Slot, layout, page, query_params, route},
+    router::{Result, Slot, layout, page},
     tailwind,
-    view::{Island, ReadSignal, Signal, component, island, view},
+    view::{Island, ReadSignal, component, island, view},
 };
 
 use crate::components::app_and_request_state;
