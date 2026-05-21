@@ -43,14 +43,12 @@ impl<T> Signal<T> {
         }
     }
 
+    pub(crate) fn id(&self) -> SignalId {
+        self.id
+    }
+
     pub(crate) fn read(&self) -> &T {
         &self.value
-    }
-}
-
-impl<T> IntoViewParts for Signal<T> {
-    fn into_view_parts(self) -> impl Iterator<Item = ViewPart> {
-        self.id.0.to_string().into_view_parts()
     }
 }
 

@@ -1,3 +1,5 @@
+use serde::{Serialize, Serializer, ser::SerializeStruct};
+
 use crate::{Expr, Interpreter, IntoExpr};
 
 pub struct ExprLit<T>(T);
@@ -7,6 +9,15 @@ impl<T> Expr for ExprLit<T> {
 
     fn evaluate(self, _interpreter: &mut Interpreter) -> Self::Output {
         self.0
+    }
+}
+
+impl<T: Serialize> Serialize for ExprLit<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = serializer.serialize_struct("ExprLit", 2)?;
+        s.serialize_field("type", "Lit")?;
+        s.serialize_field("value", &self.0)?;
+        s.end()
     }
 }
 

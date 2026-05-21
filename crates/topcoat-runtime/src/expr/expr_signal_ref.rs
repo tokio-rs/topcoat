@@ -1,3 +1,5 @@
+use serde::{Serialize, Serializer, ser::SerializeStruct};
+
 use crate::{Expr, Interpreter, IntoExpr, Signal};
 
 pub struct ExprSignalRef<'a, T> {
@@ -12,6 +14,15 @@ where
 
     fn evaluate(self, _interpreter: &mut Interpreter) -> Self::Output {
         self.signal.read().clone()
+    }
+}
+
+impl<T> Serialize for ExprSignalRef<'_, T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = serializer.serialize_struct("ExprSignalRef", 2)?;
+        s.serialize_field("type", "SignalRef")?;
+        s.serialize_field("id", &self.signal.id())?;
+        s.end()
     }
 }
 

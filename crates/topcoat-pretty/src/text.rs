@@ -79,6 +79,7 @@ impl_token!(else);
 impl_token!(for);
 impl_token!(in);
 impl_token!(match);
+impl_token!(@);
 
 macro_rules! impl_has_token {
     ($($for:tt)*) => {
