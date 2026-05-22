@@ -107,8 +107,8 @@ impl BuildConfig {
         let cwd = match self.cwd {
             Some(path) => path,
             None => {
-                let manifest_dir = env::var_os("CARGO_MANIFEST_DIR")
-                    .ok_or(BuildError::NoManifestDir)?;
+                let manifest_dir =
+                    env::var_os("CARGO_MANIFEST_DIR").ok_or(BuildError::NoManifestDir)?;
                 PathBuf::from(manifest_dir).join("src")
             }
         };

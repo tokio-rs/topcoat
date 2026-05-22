@@ -7,7 +7,7 @@ edition = "2024"
 discover = ["dep:inventory"]
 
 [dependencies]
-topcoat-asset.workspace = true
+topcoat-asset = { workspace = true, features = ["view"] }
 topcoat-core.workspace = true
 topcoat-runtime.workspace = true
 topcoat-view = { workspace = true, features = ["axum"] }

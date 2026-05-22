@@ -6,8 +6,8 @@ use syn::{
 use crate::ast::{
     ParseOption,
     view::{
-        Attribute, TemplateBreak, TemplateContinue, TemplateForLoop, TemplateIf, TemplateLet,
-        TemplateMatch, ViewWriter, WriteView,
+        Attribute, AttributeNodes, TemplateBreak, TemplateContinue, TemplateForLoop, TemplateIf,
+        TemplateLet, TemplateMatch, ViewWriter, WriteView,
     },
 };
 
@@ -15,9 +15,9 @@ use crate::ast::{
 /// of every construct that can appear at attribute-list position.
 pub enum AttributeNode {
     Attribute(Attribute),
-    If(Box<TemplateIf<AttributeNode>>),
+    If(Box<TemplateIf<AttributeNodes>>),
     Let(TemplateLet),
-    ForLoop(TemplateForLoop<AttributeNode>),
+    ForLoop(TemplateForLoop<AttributeNodes>),
     Continue(TemplateContinue),
     Break(TemplateBreak),
     Match(TemplateMatch<AttributeNode>),
@@ -39,11 +39,11 @@ impl WriteView for AttributeNode {
 
 impl Parse for AttributeNode {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let result = if TemplateIf::<AttributeNode>::peek(input) {
+        let result = if TemplateIf::<AttributeNodes>::peek(input) {
             Self::If(input.parse()?)
         } else if TemplateLet::peek(input) {
             Self::Let(input.parse()?)
-        } else if TemplateForLoop::<AttributeNode>::peek(input) {
+        } else if TemplateForLoop::<AttributeNodes>::peek(input) {
             Self::ForLoop(input.parse()?)
         } else if TemplateContinue::peek(input) {
             Self::Continue(input.parse()?)
@@ -74,9 +74,9 @@ impl Parse for AttributeNode {
 impl ParseOption for AttributeNode {
     fn peek(input: ParseStream) -> bool {
         Attribute::peek(input)
-            || TemplateIf::<AttributeNode>::peek(input)
+            || TemplateIf::<AttributeNodes>::peek(input)
             || TemplateLet::peek(input)
-            || TemplateForLoop::<AttributeNode>::peek(input)
+            || TemplateForLoop::<AttributeNodes>::peek(input)
             || TemplateContinue::peek(input)
             || TemplateBreak::peek(input)
             || TemplateMatch::<AttributeNode>::peek(input)

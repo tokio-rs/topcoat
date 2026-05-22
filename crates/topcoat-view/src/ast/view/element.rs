@@ -9,7 +9,7 @@ use syn::{
 
 use crate::ast::{
     ParseOption,
-    view::{Attributes, ClosingTag, ElementName, Node, OpeningTag, ViewWriter, WriteView},
+    view::{Attributes, ClosingTag, ElementName, Node, Nodes, OpeningTag, ViewWriter, WriteView},
 };
 
 /// An HTML element. `Void` covers the HTML void elements (`<br>`, `<img>`, …)
@@ -19,7 +19,7 @@ use crate::ast::{
 pub enum Element {
     Normal {
         opening_tag: OpeningTag,
-        children: Vec<Node>,
+        children: Nodes,
         closing_tag: ClosingTag,
     },
     Void {
@@ -111,10 +111,7 @@ impl Parse for Element {
             return Ok(Self::Void { tag: opening_tag });
         }
 
-        let mut children = Vec::new();
-        while !input.is_empty() && !ClosingTag::peek(input) {
-            children.push(input.parse()?);
-        }
+        let children: Nodes = input.parse()?;
 
         if input.is_empty() {
             return Err(syn::Error::new(
@@ -160,18 +157,7 @@ impl topcoat_pretty::PrettyPrint for Element {
                 printer.scan_indent(1);
                 printer.scan_break();
                 printer.scan_trivia(false, true);
-                for (index, node) in children.iter().enumerate() {
-                    node.pretty_print(printer);
-                    if index < children.len() - 1 {
-                        printer.scan_same_line_trivia();
-                        printer.scan_break();
-                        " ".pretty_print(printer);
-                        printer.scan_trivia(true, true);
-                    }
-                }
-                if children.len() > 1 {
-                    printer.scan_force_break();
-                }
+                children.pretty_print(printer);
                 printer.scan_same_line_trivia();
                 printer.scan_trivia(true, false);
                 printer.scan_indent(-1);

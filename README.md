@@ -71,7 +71,7 @@ async fn layout(slot: Slot<'_>) -> Result {
         <html>
             <head>
                 <title>"hello world"</title>
-                [topcoat::dev::script /]
+                topcoat::dev::script()
             </head>
             <body>
                 <nav>
@@ -158,7 +158,7 @@ The `view!` macro is a templating system that aims to be close to real HTML with
 
 - Elements use their real HTML names
 - Void elements (`<hr>`, `<br>`, `<input>`, etc.) do not need a closing tag
-- Components use a special `[component_name /]` syntax
+- Components use a function-call syntax with named parameters `component_name(name: value, <div>"foo"</div>)`
 - Rust expressions are wrapped in `()`
 - String literals must be quoted
 
@@ -200,13 +200,11 @@ async fn button<'a>(id: &'a str, child: View) -> Result {
 }
 ```
 
-Components are invoked with bracket syntax inside `view!`:
+Components are invoked with function-call syntax inside `view!`. Named arguments use `name: value` and any other positional arguments are appended to the component's child `View`:
 
 ```rust
 view! {
-    [button id="submit"]
-        "Click me"
-    [/button]
+    button(id: "submit", "Click me")
 }
 ```
 
@@ -235,7 +233,7 @@ topcoat dev
 cargo topcoat dev
 ```
 
-Topcoat watches your source files, rebuilds on changes, and sends a reload signal to the browser. The `[topcoat::dev::script /]` component in your layout handles the client side — it's a no-op in production.
+Topcoat watches your source files, rebuilds on changes, and sends a reload signal to the browser. The `topcoat::dev::script()` component in your layout handles the client side — it's a no-op in production.
 
 ## Architecture
 

@@ -1,75 +1,45 @@
 use quote::quote;
 use syn::{
-    Path, Token, bracketed,
+    Expr, Ident, Path, Token, parenthesized,
     parse::{Parse, ParseStream},
-    spanned::Spanned,
-    token::Bracket,
+    token::Paren,
 };
 
 use crate::ast::{
     ParseOption,
-    view::{
-        AttributeNode, Attributes, ComponentClosingTag, ComponentOpeningTag,
-        ComponentSelfClosingTag, Node, ViewWriter, WriteView,
-    },
+    view::{Nodes, ViewWriter, WriteView},
 };
 
-/// A user-defined component invocation, written as `[path attr=value]...[/path]`
-/// or `[path attr=value /]` for the self-closing form.
-pub enum Component {
-    Normal {
-        opening_tag: ComponentOpeningTag,
-        children: Vec<Node>,
-        closing_tag: ComponentClosingTag,
-    },
-    SelfClosing {
-        tag: ComponentSelfClosingTag,
-    },
+/// A user-defined component invocation, written as
+/// `path(name: value, ..., child_node child_node ...)`.
+///
+/// Named arguments come first, separated by `,`. Any child nodes appear after
+/// the last named argument (separated from it by `,`) and run together without
+/// separators.
+pub struct Component {
+    pub path: Path,
+    pub paren_token: Paren,
+    pub named_args: Vec<NamedArg>,
+    pub children: Nodes,
 }
 
-impl Component {
-    /// The component's path expression (e.g. `topcoat::dev::script`).
-    pub fn path(&self) -> &Path {
-        match self {
-            Self::Normal { opening_tag, .. } => &opening_tag.path,
-            Self::SelfClosing { tag } => &tag.path,
-        }
-    }
-
-    /// The attributes set on the component's opening tag.
-    pub fn attributes(&self) -> &Attributes {
-        match self {
-            Self::Normal { opening_tag, .. } => &opening_tag.attributes,
-            Self::SelfClosing { tag } => &tag.attributes,
-        }
-    }
-
-    /// The component's children. Always empty for self-closing components.
-    pub fn children(&self) -> &[Node] {
-        match self {
-            Self::Normal { children, .. } => children,
-            Self::SelfClosing { .. } => &[],
-        }
-    }
+/// A `name: value` entry in a component's argument list.
+pub struct NamedArg {
+    pub ident: Ident,
+    pub colon: Token![:],
+    pub value: Expr,
 }
 
 impl WriteView for Component {
     fn write(&self, writer: &mut ViewWriter) {
-        let name = self.path();
-        let fields = self
-            .attributes()
-            .items
-            .iter()
-            .filter_map(|item| match item {
-                AttributeNode::Attribute(attr) => {
-                    let name = &attr.key;
-                    let value = &attr.value;
-                    Some(quote! { #name: #value })
-                }
-                _ => None,
-            });
+        let name = &self.path;
+        let fields = self.named_args.iter().map(|arg| {
+            let ident = &arg.ident;
+            let value = &arg.value;
+            quote! { #ident: #value }
+        });
         let mut child_writer = ViewWriter::new_nested();
-        for child in self.children() {
+        for child in &self.children {
             child.write(&mut child_writer);
         }
         let child = child_writer.into_token_stream();
@@ -87,96 +57,83 @@ impl WriteView for Component {
 impl Parse for Component {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let content;
-        let bracket_token = bracketed!(content in input);
-        let path: Path = content.parse()?;
-        let attributes: Attributes = content.parse()?;
+        Ok(Self {
+            path: input.parse()?,
+            paren_token: parenthesized!(content in input),
+            named_args: {
+                /// Peek whether the stream is positioned at a `name :` named-argument start
+                /// (a single colon — `::` would start a path, e.g. `foo::bar()`).
+                fn peek_named_arg(input: ParseStream) -> bool {
+                    input.peek(Ident) && input.peek2(Token![:]) && !input.peek2(Token![::])
+                }
 
-        if content.peek(Token![/]) {
-            return Ok(Self::SelfClosing {
-                tag: ComponentSelfClosingTag {
-                    bracket_token,
-                    path,
-                    attributes,
-                    slash: content.parse()?,
-                },
-            });
-        }
+                let mut named_args = Vec::new();
+                while !content.is_empty() && peek_named_arg(&content) {
+                    let ident: Ident = content.parse()?;
+                    let colon: Token![:] = content.parse()?;
+                    let value: Expr = content.parse()?;
+                    named_args.push(NamedArg {
+                        ident,
+                        colon,
+                        value,
+                    });
+                    if content.peek(Token![,]) {
+                        let _: Token![,] = content.parse()?;
+                    } else {
+                        break;
+                    }
+                }
 
-        let opening_tag = ComponentOpeningTag {
-            bracket_token,
-            path,
-            attributes,
-        };
-
-        let mut children = Vec::new();
-        while !input.is_empty() && !ComponentClosingTag::peek(input) {
-            children.push(input.parse()?);
-        }
-
-        if input.is_empty() {
-            return Err(syn::Error::new(
-                input.span(),
-                format!(
-                    "missing closing tag for opening tag `{}`",
-                    &opening_tag.path.segments.last().unwrap().ident
-                ),
-            ));
-        }
-        let closing_tag: ComponentClosingTag = input.parse()?;
-        if closing_tag.path != opening_tag.path {
-            return Err(syn::Error::new(
-                closing_tag.path.span(),
-                format!(
-                    "closing tag `{}` does not match opening tag `{}`",
-                    &closing_tag.path.segments.last().unwrap().ident,
-                    &opening_tag.path.segments.last().unwrap().ident
-                ),
-            ));
-        }
-        Ok(Self::Normal {
-            opening_tag,
-            children,
-            closing_tag,
+                named_args
+            },
+            children: content.parse()?,
         })
     }
 }
 
 impl ParseOption for Component {
     fn peek(input: ParseStream) -> bool {
-        input.peek(Bracket)
+        let fork = input.fork();
+        fork.parse::<Path>().is_ok() && fork.peek(Paren)
     }
 }
+
 #[cfg(feature = "pretty")]
 impl topcoat_pretty::PrettyPrint for Component {
     fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         printer.scan_begin(topcoat_pretty::BreakMode::Consistent);
-        match self {
-            Self::Normal {
-                opening_tag,
-                children,
-                closing_tag,
-            } => {
-                opening_tag.pretty_print(printer);
-                printer.scan_indent(1);
-                printer.scan_break();
-                printer.scan_trivia(false, true);
-                for (index, node) in children.iter().enumerate() {
-                    node.pretty_print(printer);
-                    if index < children.len() - 1 {
-                        printer.scan_same_line_trivia();
-                        printer.scan_break();
-                        " ".pretty_print(printer);
-                        printer.scan_trivia(true, true);
-                    }
+        self.path.pretty_print(printer);
+        "(".pretty_print(printer);
+        let total = self.named_args.len() + self.children.len();
+        if total > 0 {
+            printer.scan_indent(1);
+            printer.scan_break();
+            printer.scan_trivia(false, true);
+
+            for (index, arg) in self.named_args.iter().enumerate() {
+                arg.ident.pretty_print(printer);
+                ": ".pretty_print(printer);
+                arg.value.pretty_print(printer);
+                let last_named = index == self.named_args.len() - 1;
+                if !last_named || !self.children.is_empty() {
+                    ",".pretty_print(printer);
+                    printer.scan_same_line_trivia();
+                    printer.scan_break();
+                    " ".pretty_print(printer);
+                    printer.scan_trivia(true, true);
                 }
-                printer.scan_same_line_trivia();
-                printer.scan_trivia(true, false);
-                printer.scan_indent(-1);
-                printer.scan_break();
-                closing_tag.pretty_print(printer);
             }
-            Self::SelfClosing { tag } => tag.pretty_print(printer),
+            self.children.pretty_print(printer);
+
+            if total > 1 {
+                printer.scan_force_break();
+            }
+            printer.scan_same_line_trivia();
+            printer.scan_trivia(true, false);
+            printer.scan_indent(-1);
+            printer.scan_break();
         }
+        ")".pretty_print(printer);
         printer.scan_end();
     }
 }
@@ -198,7 +155,7 @@ mod tests {
 
     fn path_segments(component: &Component) -> Vec<String> {
         component
-            .path()
+            .path
             .segments
             .iter()
             .map(|s| s.ident.to_string())
@@ -206,38 +163,57 @@ mod tests {
     }
 
     #[test]
-    fn parses_self_closing_form() {
-        let component = parse("[my::widget /]");
-        assert!(matches!(component, Component::SelfClosing { .. }));
+    fn parses_empty_arg_list() {
+        let component = parse("my::widget()");
         assert_eq!(path_segments(&component), vec!["my", "widget"]);
-        assert!(component.children().is_empty());
+        assert!(component.named_args.is_empty());
+        assert!(component.children.is_empty());
     }
 
     #[test]
-    fn parses_normal_form_with_children() {
-        let component = parse(r#"[card]"hi"[/card]"#);
-        assert!(matches!(component, Component::Normal { .. }));
-        assert_eq!(component.children().len(), 1);
+    fn parses_children_only() {
+        let component = parse(r#"card("hi")"#);
+        assert!(component.named_args.is_empty());
+        assert_eq!(component.children.len(), 1);
     }
 
     #[test]
-    fn collects_attributes_on_opening_tag() {
-        let component = parse(r#"[button label="ok" /]"#);
-        let attrs = component.attributes();
-        assert_eq!(attrs.items.len(), 1);
-        let AttributeNode::Attribute(attr) = &attrs.items[0] else {
-            panic!("expected Attribute variant");
-        };
-        assert_eq!(attr.key.to_string(), "label");
+    fn parses_multiple_children_without_separators() {
+        let component = parse(r#"card(<div>"foo"</div><div>"bar"</div>)"#);
+        assert_eq!(component.children.len(), 2);
     }
 
     #[test]
-    fn missing_closing_tag_is_rejected() {
-        assert!(parse_err("[foo]").contains("missing closing tag"));
+    fn parses_named_args_only() {
+        let component = parse(r#"button(label: "ok")"#);
+        assert_eq!(component.named_args.len(), 1);
+        assert_eq!(component.named_args[0].ident.to_string(), "label");
+        assert!(component.children.is_empty());
     }
 
     #[test]
-    fn mismatched_closing_path_is_rejected() {
-        assert!(parse_err("[foo][/bar]").contains("does not match"));
+    fn parses_named_args_then_children() {
+        let component = parse(r#"button(prop1: 5, prop2: 6, <div>"foo"</div><div>"bar"</div>)"#);
+        assert_eq!(component.named_args.len(), 2);
+        assert_eq!(component.children.len(), 2);
+    }
+
+    #[test]
+    fn allows_trailing_comma_when_no_children() {
+        let component = parse(r#"button(label: "ok",)"#);
+        assert_eq!(component.named_args.len(), 1);
+        assert!(component.children.is_empty());
+    }
+
+    #[test]
+    fn parses_path_qualified_child_component() {
+        let component = parse(r#"button(prop1: 5, foo::checkbox())"#);
+        assert_eq!(component.named_args.len(), 1);
+        assert_eq!(component.children.len(), 1);
+    }
+
+    #[test]
+    fn named_arg_after_child_is_rejected() {
+        assert!(parse_err(r#"button(<div></div> prop1: 5)"#).contains("expected view node"),);
     }
 }

@@ -1,1 +1,5 @@
-view! { [Layout]  <p>"content"</p>  [/Layout]  }
+view! { foo(    label: "abc", 
+           value :  5, <p>"content"</p><div>
+    "div content"</div>
+
+"plain string"<a href="/bar"> </a>)  }

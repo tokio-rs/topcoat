@@ -105,7 +105,8 @@ fixture_test!(match_expr);
 
 // ── Components ──────────────────────────────────────────────────────────────
 
-fixture_test!(component_self_closing);
+fixture_test!(component_empty);
+fixture_test!(component_with_child);
 fixture_test!(component_with_children);
 
 // ── Let bindings ────────────────────────────────────────────────────────────

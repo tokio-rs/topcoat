@@ -10,18 +10,16 @@ use crate::ast::{
 };
 
 /// A brace-delimited group of template nodes: `{ ...nodes... }`. Used as the
-/// body of `if`, `for` and `match` arms, generic over the kind of node it
-/// contains.
+/// body of `if`, `for` and `match` arms, generic over the collection it
+/// contains (`Nodes` or `AttributeNodes`).
 pub struct TemplateBlock<T> {
     pub brace: Brace,
-    pub children: Vec<T>,
+    pub children: T,
 }
 
 impl<T: WriteView> WriteView for TemplateBlock<T> {
     fn write(&self, writer: &mut ViewWriter) {
-        for child in &self.children {
-            child.write(writer);
-        }
+        self.children.write(writer);
     }
 }
 
@@ -30,13 +28,7 @@ impl<T: Parse> Parse for TemplateBlock<T> {
         let content;
         Ok(Self {
             brace: braced!(content in input),
-            children: {
-                let mut children = Vec::new();
-                while !content.is_empty() {
-                    children.push(content.parse()?)
-                }
-                children
-            },
+            children: content.parse()?,
         })
     }
 }
@@ -60,16 +52,7 @@ impl<T: topcoat_pretty::PrettyPrint> topcoat_pretty::PrettyPrint for TemplateBlo
         printer.scan_break();
 
         printer.scan_trivia(false, true);
-
-        for (index, node) in self.children.iter().enumerate() {
-            node.pretty_print(printer);
-            if index < self.children.len() - 1 {
-                printer.scan_same_line_trivia();
-                printer.scan_force_break();
-                " ".pretty_print(printer);
-                printer.scan_trivia(true, true);
-            }
-        }
+        self.children.pretty_print(printer);
 
         printer.move_cursor(self.brace.span().close().start());
         printer.scan_trivia(true, false);
