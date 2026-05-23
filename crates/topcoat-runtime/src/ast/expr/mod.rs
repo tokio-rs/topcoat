@@ -4,7 +4,6 @@ mod expr_deref;
 mod expr_field;
 mod expr_ident;
 mod expr_method_call;
-mod expr_param;
 
 pub use expr_assign_deref::*;
 pub use expr_closure::*;
@@ -12,7 +11,6 @@ pub use expr_deref::*;
 pub use expr_field::*;
 pub use expr_ident::*;
 pub use expr_method_call::*;
-pub use expr_param::*;
 
 use proc_macro2::TokenStream;
 use quote::ToTokens;
@@ -21,9 +19,9 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-/// A closure parameter binding tracked while lowering. The type is whatever
-/// the user wrote on the closure (e.g. `|e: Event|`); `None` means the user
-/// left the parameter un-annotated.
+/// A closure parameter binding. The type is whatever the user wrote on the
+/// closure (e.g. `|e: Event|`); `None` means the user left the parameter
+/// un-annotated.
 #[derive(Clone)]
 pub struct BoundParam {
     pub name: Ident,
@@ -35,7 +33,6 @@ pub struct BoundParam {
 /// whitelist is rejected at compile time.
 pub enum Expr {
     Ident(ExprIdent),
-    Param(ExprParam),
     Deref(ExprDeref),
     Field(ExprField),
     MethodCall(ExprMethodCall),
@@ -44,7 +41,7 @@ pub enum Expr {
 }
 
 impl Expr {
-    fn from_syn(expr: syn::Expr, bound: &[BoundParam]) -> syn::Result<Self> {
+    fn from_syn(expr: syn::Expr) -> syn::Result<Self> {
         match expr {
             syn::Expr::Path(path) => {
                 let Some(ident) = path.path.get_ident() else {
@@ -53,11 +50,7 @@ impl Expr {
                         "expected a bare identifier",
                     ));
                 };
-                if bound.iter().any(|b| &b.name == ident) {
-                    Ok(Self::Param(ExprParam::new(ident.clone())))
-                } else {
-                    Ok(Self::Ident(ExprIdent::new(ident.clone())))
-                }
+                Ok(Self::Ident(ExprIdent::new(ident.clone())))
             }
             syn::Expr::Unary(unary) => {
                 let UnOp::Deref(_) = unary.op else {
@@ -66,11 +59,11 @@ impl Expr {
                         "unsupported unary operator",
                     ));
                 };
-                let inner = Self::from_syn(*unary.expr, bound)?;
+                let inner = Self::from_syn(*unary.expr)?;
                 Ok(Self::Deref(ExprDeref::new(inner)))
             }
             syn::Expr::Field(field) => {
-                let receiver = Self::from_syn(*field.base, bound)?;
+                let receiver = Self::from_syn(*field.base)?;
                 let Member::Named(name) = field.member else {
                     return Err(syn::Error::new(
                         proc_macro2::Span::call_site(),
@@ -92,10 +85,10 @@ impl Expr {
                         "method arguments are not supported",
                     ));
                 }
-                let receiver = Self::from_syn(*mc.receiver, bound)?;
+                let receiver = Self::from_syn(*mc.receiver)?;
                 Ok(Self::MethodCall(ExprMethodCall::new(receiver, mc.method)))
             }
-            syn::Expr::Paren(paren) => Self::from_syn(*paren.expr, bound),
+            syn::Expr::Paren(paren) => Self::from_syn(*paren.expr),
             syn::Expr::Assign(assign) => {
                 let syn::Expr::Unary(unary) = *assign.left else {
                     return Err(syn::Error::new_spanned(
@@ -109,8 +102,8 @@ impl Expr {
                         "only `*place = value` assignments are supported",
                     ));
                 };
-                let place = Self::from_syn(*unary.expr, bound)?;
-                let value = Self::from_syn(*assign.right, bound)?;
+                let place = Self::from_syn(*unary.expr)?;
+                let value = Self::from_syn(*assign.right)?;
                 Ok(Self::AssignDeref(ExprAssignDeref::new(place, value)))
             }
             syn::Expr::Closure(closure) => {
@@ -140,9 +133,7 @@ impl Expr {
                         )),
                     })
                     .collect::<syn::Result<_>>()?;
-                let mut inner_bound = bound.to_vec();
-                inner_bound.extend(params.clone());
-                let body = Self::from_syn(*closure.body, &inner_bound)?;
+                let body = Self::from_syn(*closure.body)?;
                 Ok(Self::Closure(ExprClosure::new(params, body)))
             }
             other => Err(syn::Error::new_spanned(other, "unsupported expression")),
@@ -152,7 +143,7 @@ impl Expr {
 
 impl Parse for Expr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Self::from_syn(input.parse()?, &[])
+        Self::from_syn(input.parse()?)
     }
 }
 
@@ -160,7 +151,6 @@ impl ToTokens for Expr {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::Ident(node) => node.to_tokens(tokens),
-            Self::Param(node) => node.to_tokens(tokens),
             Self::Deref(node) => node.to_tokens(tokens),
             Self::Field(node) => node.to_tokens(tokens),
             Self::MethodCall(node) => node.to_tokens(tokens),
@@ -220,15 +210,6 @@ mod tests {
     #[test]
     fn parses_closure() {
         assert!(matches!(parse("|e| *kek = e.target.value"), Expr::Closure(_)));
-    }
-
-    #[test]
-    fn closure_parameter_resolves_to_param_node() {
-        let Expr::Closure(_) = parse("|e| e") else {
-            panic!("expected closure")
-        };
-        // The body of `|e| e` lowered with `e` bound should produce ExprParam,
-        // verified indirectly via the lowering not erroring out.
     }
 
     #[test]

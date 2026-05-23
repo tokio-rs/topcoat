@@ -34,6 +34,14 @@ pub trait IntoExpr {
     fn into_expr(self) -> Self::Expr;
 }
 
+impl<T: Expr> IntoExpr for T {
+    type Expr = T;
+
+    fn into_expr(self) -> Self::Expr {
+        self
+    }
+}
+
 /// Bridge between a Rust method name and its JS form. Implementers list the
 /// methods they support; everything else panics at JS codegen time —
 /// `ExprMethodCall::to_js` adds this trait as a bound so unsupported receiver
