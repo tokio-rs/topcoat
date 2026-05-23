@@ -33,3 +33,24 @@ pub trait IntoExpr {
 
     fn into_expr(self) -> Self::Expr;
 }
+
+/// Bridge between a Rust method name and its JS form. Implementers list the
+/// methods they support; everything else panics at JS codegen time —
+/// `ExprMethodCall::to_js` adds this trait as a bound so unsupported receiver
+/// types fail to compile rather than silently producing broken JS.
+///
+/// The receiver expression has already been emitted (wrapped in parens) when
+/// `js_call` is invoked; impls append the JS suffix for the method (e.g.
+/// `.toLowerCase()`, `.length`, or nothing at all for a no-op like `.clone()`
+/// on a value-typed primitive).
+pub trait JsCallable {
+    fn js_call(method: &str, out: &mut String);
+}
+
+/// Method calls on `&T` dispatch to `T`'s impl — keeps the surface narrow so
+/// per-type impls only need to consider the owned form.
+impl<T: JsCallable> JsCallable for &T {
+    fn js_call(method: &str, out: &mut String) {
+        T::js_call(method, out);
+    }
+}

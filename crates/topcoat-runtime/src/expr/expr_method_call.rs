@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{Expr, Interpreter};
+use crate::{Expr, Interpreter, JsCallable};
 
 /// A `receiver.method()` call. Only zero-argument methods are supported. The
 /// accessor closure passed to `new` carries the real implementation so the
@@ -33,6 +33,7 @@ where
 impl<R, F, T> Expr for ExprMethodCall<R, F, T>
 where
     R: Expr,
+    R::Output: JsCallable,
     F: FnOnce(R::Output) -> T,
 {
     type Output = T;
@@ -45,8 +46,7 @@ where
     fn to_js(&self, out: &mut String) {
         out.push('(');
         self.receiver.to_js(out);
-        out.push_str(").");
-        out.push_str(self.method);
-        out.push_str("()");
+        out.push(')');
+        R::Output::js_call(self.method, out);
     }
 }

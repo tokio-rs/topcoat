@@ -46,9 +46,11 @@ impl<T> Signal<T> {
     pub(crate) fn id(&self) -> SignalId {
         self.id
     }
+}
 
-    pub(crate) fn read(&self) -> &T {
-        &self.value
+impl Signal<std::string::String> {
+    pub(crate) fn read(&self) -> &crate::string::String {
+        &self.value.into()
     }
 }
 
