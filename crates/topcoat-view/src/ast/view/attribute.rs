@@ -8,7 +8,7 @@ use syn::{
 
 use crate::ast::{
     ParseOption,
-    view::{AttributeKey, AttributeValue, ViewWriter, WriteView},
+    view::{AttributeKey, AttributeValue, TemplateExpr, ViewWriter, WriteView},
 };
 
 /// A plain `name=value` attribute on an [`Element`](super::Element) or
@@ -68,18 +68,25 @@ impl topcoat_pretty::PrettyPrint for Attribute {
     }
 }
 
-/// A `:name=value` attribute — a one-way binding from a reactive expression to
+/// A `:name=(expr)` attribute — a one-way binding from a reactive expression to
 /// a DOM attribute or property.
 pub struct BindAttribute {
     pub colon: Token![:],
     pub key: AttributeKey,
     pub eq: Token![=],
-    pub value: AttributeValue,
+    pub value: TemplateExpr,
 }
 
 impl WriteView for BindAttribute {
-    fn write(&self, _writer: &mut ViewWriter) {
-        todo!()
+    fn write(&self, writer: &mut ViewWriter) {
+        let key = &self.key;
+        let expr = &self.value.expr;
+        writer.write_expr(quote! {
+            ::topcoat::view::BindAttribute::new(
+                #key,
+                ::topcoat::runtime::expr! { #expr },
+            )
+        });
     }
 }
 
@@ -110,12 +117,12 @@ impl topcoat_pretty::PrettyPrint for BindAttribute {
     }
 }
 
-/// An `@name=value` attribute — a DOM event handler.
+/// An `@name=(expr)` attribute — a DOM event handler.
 pub struct EventAttribute {
     pub at: Token![@],
     pub key: AttributeKey,
     pub eq: Token![=],
-    pub value: AttributeValue,
+    pub value: TemplateExpr,
 }
 
 impl WriteView for EventAttribute {

@@ -129,11 +129,11 @@ mod tests {
     fn dispatches_each_variant() {
         assert!(matches!(parse(r#"foo="bar""#), AttributeNode::Attribute(_)));
         assert!(matches!(
-            parse(r#":foo="bar""#),
+            parse(r#":foo=(bar)"#),
             AttributeNode::BindAttribute(_),
         ));
         assert!(matches!(
-            parse(r#"@foo="bar""#),
+            parse(r#"@foo=(bar)"#),
             AttributeNode::EventAttribute(_),
         ));
         assert!(matches!(
