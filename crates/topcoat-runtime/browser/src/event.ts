@@ -12,17 +12,13 @@ export function setupEventHandler(el: Element, attr: Attr, scope: Scope): void {
 	const { interpreter } = scope.runtime;
 	scope.run(() => {
 		el.addEventListener(name, (...params) => {
-			console.log("running:", expr);
-			console.log(
-				"result:",
-				eval_expr(
-					{
-						type: "Call",
-						receiver: expr,
-						params: params.map((param) => ({ type: "Lit", value: param })),
-					},
-					interpreter,
-				),
+			eval_expr(
+				{
+					type: "Call",
+					receiver: expr,
+					params: params.map((param) => ({ type: "Lit", value: param })),
+				},
+				interpreter,
 			);
 		});
 	});

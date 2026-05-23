@@ -162,9 +162,9 @@ async fn combobox(
         signal kek = String::from("initial content");
 
         <div>
-            <input :value=((*kek).clone()) @change=(|e: ::topcoat::runtime::Event| *kek = e.target.value)>
+            <input :value=(*kek) @change=(|e: ::topcoat::runtime::Event| *kek = e.target.value)>
             <div>
-                <input :value=((*kek).clone())>
+                <input :value=(*kek)>
             </div>
             // track content(kek)
         </div>
