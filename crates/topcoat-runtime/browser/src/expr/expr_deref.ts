@@ -1,4 +1,4 @@
-import { type Expr, interpret } from "./index";
+import { type Expr, eval_expr } from "./index";
 import type { Interpreter } from "./interpreter";
 
 export type ExprDeref = {
@@ -6,10 +6,10 @@ export type ExprDeref = {
 	inner: Expr;
 };
 
-export function interpret_expr_deref(
+export function eval_expr_deref(
 	expr: ExprDeref,
 	interpreter: Interpreter,
 ): unknown {
-	const target = interpret(expr.inner, interpreter);
+	const target = eval_expr(expr.inner, interpreter);
 	return (target as () => unknown)();
 }

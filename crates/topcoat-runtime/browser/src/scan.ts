@@ -1,5 +1,6 @@
 import { BIND_PREFIX, setupBinding } from "./binding";
 import { type CommentMarker, parseComment } from "./comment";
+import { setupEventHandler } from "./event";
 import type { Expr } from "./expr";
 import { ReactiveScope, type Scope } from "./scope";
 
@@ -46,17 +47,10 @@ export function scan(
 }
 
 function processElement(el: Element, scope: Scope): void {
-	const bindings: { name: string; expr: Expr }[] = [];
-	const toRemove: string[] = [];
 	for (const attr of Array.from(el.attributes)) {
-		if (!attr.name.startsWith(BIND_PREFIX)) continue;
-		toRemove.push(attr.name);
-		const name = attr.name.slice(BIND_PREFIX.length);
-		const expr = JSON.parse(attr.value) as Expr;
-		bindings.push({ name, expr });
+		setupBinding(el, attr, scope);
+		setupEventHandler(el, attr, scope);
 	}
-	for (const name of toRemove) el.removeAttribute(name);
-	for (const { name, expr } of bindings) setupBinding(el, name, expr, scope);
 }
 
 function processMarker(

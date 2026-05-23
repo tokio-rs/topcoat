@@ -7,7 +7,7 @@ export type ExprSignalRef = {
 	id: SignalId;
 };
 
-export function interpret_expr_signal_ref(
+export function eval_expr_signal_ref(
 	expr: ExprSignalRef,
 	interpreter: Interpreter,
 ): WriteSignal<unknown> {

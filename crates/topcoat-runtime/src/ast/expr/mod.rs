@@ -3,6 +3,7 @@ mod expr_closure;
 mod expr_deref;
 mod expr_field;
 mod expr_ident;
+mod expr_method_call;
 mod expr_param;
 
 pub use expr_assign_deref::*;
@@ -10,6 +11,7 @@ pub use expr_closure::*;
 pub use expr_deref::*;
 pub use expr_field::*;
 pub use expr_ident::*;
+pub use expr_method_call::*;
 pub use expr_param::*;
 
 use proc_macro2::TokenStream;
@@ -36,6 +38,7 @@ pub enum Expr {
     Param(ExprParam),
     Deref(ExprDeref),
     Field(ExprField),
+    MethodCall(ExprMethodCall),
     AssignDeref(ExprAssignDeref),
     Closure(ExprClosure),
 }
@@ -76,6 +79,23 @@ impl Expr {
                 };
                 Ok(Self::Field(ExprField::new(receiver, name)))
             }
+            syn::Expr::MethodCall(mc) => {
+                if mc.turbofish.is_some() {
+                    return Err(syn::Error::new_spanned(
+                        &mc.turbofish,
+                        "turbofish on method calls is not supported",
+                    ));
+                }
+                if !mc.args.is_empty() {
+                    return Err(syn::Error::new_spanned(
+                        &mc.args,
+                        "method arguments are not supported",
+                    ));
+                }
+                let receiver = Self::from_syn(*mc.receiver, bound)?;
+                Ok(Self::MethodCall(ExprMethodCall::new(receiver, mc.method)))
+            }
+            syn::Expr::Paren(paren) => Self::from_syn(*paren.expr, bound),
             syn::Expr::Assign(assign) => {
                 let syn::Expr::Unary(unary) = *assign.left else {
                     return Err(syn::Error::new_spanned(
@@ -145,6 +165,7 @@ impl ToTokens for Expr {
             Self::Param(node) => node.to_tokens(tokens),
             Self::Deref(node) => node.to_tokens(tokens),
             Self::Field(node) => node.to_tokens(tokens),
+            Self::MethodCall(node) => node.to_tokens(tokens),
             Self::AssignDeref(node) => node.to_tokens(tokens),
             Self::Closure(node) => node.to_tokens(tokens),
         }

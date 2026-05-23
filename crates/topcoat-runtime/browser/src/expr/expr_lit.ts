@@ -5,7 +5,7 @@ export type ExprLit<T> = {
 	value: T;
 };
 
-export function interpret_expr_lit<T>(
+export function eval_expr_lit<T>(
 	expr: ExprLit<T>,
 	_interpreter: Interpreter,
 ): T {
