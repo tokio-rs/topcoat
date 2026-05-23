@@ -1,19 +1,19 @@
 import { type Expr, eval_expr } from "./index";
 import type { Interpreter } from "./interpreter";
 
-export type ExprMethodCall = {
-	type: "MethodCall";
+export type ExprField = {
+	type: "Field";
 	receiver: Expr;
-	method: string;
+	name: string;
 };
 
-export function eval_expr_method_call(
-	expr: ExprMethodCall,
+export function eval_expr_field(
+	expr: ExprField,
 	interpreter: Interpreter,
 ): unknown {
 	const receiver = eval_expr(expr.receiver, interpreter) as Record<
 		string,
-		(...params: unknown[]) => unknown
+		unknown
 	>;
-	return receiver[expr.method].bind(receiver)();
+	return receiver[expr.name];
 }

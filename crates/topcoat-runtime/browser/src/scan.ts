@@ -1,7 +1,6 @@
-import { BIND_PREFIX, setupBinding } from "./binding";
+import { setupBinding } from "./binding";
 import { type CommentMarker, parseComment } from "./comment";
 import { setupEventHandler } from "./event";
-import type { Expr } from "./expr";
 import { ReactiveScope, type Scope } from "./scope";
 
 /**
