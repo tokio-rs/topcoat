@@ -142,10 +142,10 @@ async fn search_results(cx: &Cx, input: &str) -> Vec<&'static str> {
 
 #[island]
 async fn combobox_content(cx: &Cx, input: ReadSignal<String>) -> Result {
-    let results = search_results(cx, &*input).await;
+    let results = search_results(cx, &input).await;
     view! {
         <div>
-            <b>"resuls:"</b>
+            <b>"results:"</b>
             for item in results {
                 <div>(item)</div>
             }
@@ -154,19 +154,12 @@ async fn combobox_content(cx: &Cx, input: ReadSignal<String>) -> Result {
 }
 
 #[component]
-async fn combobox(
-    cx: &Cx,
-    content: Island<(ReadSignal<String>,), topcoat::router::Error>,
-) -> Result {
+async fn combobox(content: Island<(ReadSignal<String>,), topcoat::router::Error>) -> Result {
     view! {
         signal kek = "initial content".to_owned();
-
         <div>
             <input :value=(*kek) @input=(|e: ::topcoat::runtime::Event| *kek = e.target.value)>
-            <div>
-                <input :value=(*kek)>
-            </div>
-            // track content(kek)
+            track content(kek)
         </div>
     }
 }

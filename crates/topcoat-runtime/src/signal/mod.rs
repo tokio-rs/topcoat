@@ -55,7 +55,7 @@ where
     T: Value,
 {
     pub(crate) fn read(&self) -> &T::Surrogate {
-        &self.value.ref_cast()
+        self.value.ref_cast()
     }
 }
 

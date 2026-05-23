@@ -1,24 +1,28 @@
+use std::marker::PhantomData;
+
 use crate::{Expr, Interpreter};
 
-/// A handler closure `|p1, p2, ...| body`. The body is required to have unit
-/// output — handler bodies are statements, not value expressions. Server-side
-/// `eval` is unreachable.
-pub struct ExprClosure<Body> {
+pub struct ExprClosure<Params, Body> {
     params: &'static [&'static str],
     body: Body,
+    _phantom: PhantomData<fn(Params) -> ()>,
 }
 
-impl<Body> ExprClosure<Body> {
+impl<Params, Body> ExprClosure<Params, Body> {
     pub fn new(params: &'static [&'static str], body: Body) -> Self {
-        Self { params, body }
+        Self {
+            params,
+            body,
+            _phantom: PhantomData,
+        }
     }
 }
 
-impl<Body> Expr for ExprClosure<Body>
+impl<Params, Body> Expr for ExprClosure<Params, Body>
 where
-    Body: Expr<Output = ()>,
+    Body: Expr,
 {
-    type Output = ();
+    type Output = Body::Output;
 
     fn eval(self, _interpreter: &mut Interpreter) -> Self::Output {
         unreachable!("ExprClosure::eval called server-side; handlers do not run during SSR")
