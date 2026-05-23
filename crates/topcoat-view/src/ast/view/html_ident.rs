@@ -47,6 +47,59 @@ impl HtmlIdent {
             None => first,
         }
     }
+
+    /// Parses an [`HtmlIdent`] that only allows `-` as a separator. Used for
+    /// HTML element names, where `:` and `.` would tear apart adjacent
+    /// attribute syntax like `:value` or `class.active`.
+    pub fn parse_dash_only(input: ParseStream) -> syn::Result<Self> {
+        Self::parse_inner(input, false)
+    }
+
+    fn parse_inner(input: ParseStream, allow_colon_dot: bool) -> syn::Result<Self> {
+        let first = Ident::parse_any(input)?;
+        let mut rest = Vec::new();
+        let mut prev_end = first.span().end();
+
+        loop {
+            // Bail out on multi-character punctuation that starts with one of
+            // our separators (`::`, `..`) so we don't tear apart a path or
+            // range expression that happens to follow the identifier.
+            if input.peek(Token![::]) || input.peek(Token![..]) {
+                break;
+            }
+
+            let separator = if input.peek(Token![-]) {
+                HtmlIdentSeparator::Dash(input.parse()?)
+            } else if allow_colon_dot && input.peek(Token![:]) {
+                HtmlIdentSeparator::Colon(input.parse()?)
+            } else if allow_colon_dot && input.peek(Token![.]) {
+                HtmlIdentSeparator::Dot(input.parse()?)
+            } else {
+                break;
+            };
+
+            let separator_span = separator.span();
+            if !is_adjacent(prev_end, separator_span.start()) {
+                return Err(syn::Error::new(
+                    separator_span,
+                    "whitespace is not allowed inside an HTML identifier",
+                ));
+            }
+
+            let ident = Ident::parse_any(input)?;
+            if !is_adjacent(separator_span.end(), ident.span().start()) {
+                return Err(syn::Error::new(
+                    ident.span(),
+                    "whitespace is not allowed inside an HTML identifier",
+                ));
+            }
+
+            prev_end = ident.span().end();
+            rest.push(HtmlIdentSegment { separator, ident });
+        }
+
+        Ok(Self { first, rest })
+    }
 }
 
 impl HtmlIdentSeparator {
@@ -80,49 +133,7 @@ impl Display for HtmlIdent {
 
 impl Parse for HtmlIdent {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let first = Ident::parse_any(input)?;
-        let mut rest = Vec::new();
-        let mut prev_end = first.span().end();
-
-        loop {
-            // Bail out on multi-character punctuation that starts with one of
-            // our separators (`::`, `..`) so we don't tear apart a path or
-            // range expression that happens to follow the identifier.
-            if input.peek(Token![::]) || input.peek(Token![..]) {
-                break;
-            }
-
-            let separator = if input.peek(Token![-]) {
-                HtmlIdentSeparator::Dash(input.parse()?)
-            } else if input.peek(Token![:]) {
-                HtmlIdentSeparator::Colon(input.parse()?)
-            } else if input.peek(Token![.]) {
-                HtmlIdentSeparator::Dot(input.parse()?)
-            } else {
-                break;
-            };
-
-            let separator_span = separator.span();
-            if !is_adjacent(prev_end, separator_span.start()) {
-                return Err(syn::Error::new(
-                    separator_span,
-                    "whitespace is not allowed inside an HTML identifier",
-                ));
-            }
-
-            let ident = Ident::parse_any(input)?;
-            if !is_adjacent(separator_span.end(), ident.span().start()) {
-                return Err(syn::Error::new(
-                    ident.span(),
-                    "whitespace is not allowed inside an HTML identifier",
-                ));
-            }
-
-            prev_end = ident.span().end();
-            rest.push(HtmlIdentSegment { separator, ident });
-        }
-
-        Ok(Self { first, rest })
+        Self::parse_inner(input, true)
     }
 }
 

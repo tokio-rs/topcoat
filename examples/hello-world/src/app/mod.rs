@@ -162,7 +162,7 @@ async fn combobox(
         signal kek = "initial content".to_owned();
 
         <div>
-            <input data-topcoat-bind-value=(kek.clone())>
+            <input :value=(*kek)>
             track content(kek)
         </div>
     }
