@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use crate::{Expr, Interpreter, IntoExpr, Value};
 
 pub struct ExprLit<T>(T);
@@ -10,15 +8,11 @@ impl<T> ExprLit<T> {
     }
 }
 
-impl<T> Expr for ExprLit<T>
-where
-    T: Serialize + Value,
-    T::Surrogate: Copy,
-{
-    type Output = T::Surrogate;
+impl<'a> Expr for ExprLit<&'a str> {
+    type Output = &'a <str as Value>::Surrogate;
 
     fn eval(self, _interpreter: &mut Interpreter) -> Self::Output {
-        *self.0.ref_cast()
+        self.0.ref_cast()
     }
 
     fn to_js(&self, out: &mut String) {

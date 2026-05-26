@@ -39,10 +39,14 @@ where
     }
 }
 
-impl<T> ExprDerefAssignTarget for &Signal<T> {
-    type Value = T;
+impl<T> ExprDerefAssignTarget for &Signal<T>
+where
+    T: Value,
+    T::Surrogate: Sized,
+{
+    type Value = T::Surrogate;
 
-    fn expr_deref_assign(self, _value: T) {
+    fn expr_deref_assign(self, _value: Self::Value) {
         unreachable!(
             "ExprDerefAssignTarget::expr_deref_assign called server-side; handler bodies do not run during SSR"
         )

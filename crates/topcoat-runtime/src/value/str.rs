@@ -22,7 +22,7 @@ impl str {
     }
 }
 
-impl JsCallable for str {
+impl JsCallable for &str {
     fn js_call(method: &StdStr, _out: &mut String) {
         match method {
             // str and String are the same thing in JS, to_owned is not necessary.
