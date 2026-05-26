@@ -17,8 +17,13 @@ impl str {
     pub(crate) fn ref_cast(s: &StdStr) -> &Self;
 
     #[allow(clippy::should_implement_trait)]
-    pub fn to_owned(&self) -> crate::string::String {
-        crate::string::String::new(self.inner.to_owned())
+    pub fn to_owned(&self) -> crate::String {
+        crate::String::new(self.inner.to_owned())
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn to_string(&self) -> crate::String {
+        self.to_owned()
     }
 }
 
@@ -27,6 +32,7 @@ impl JsCallable for &str {
         match method {
             // str and String are the same thing in JS, to_owned is not necessary.
             "to_owned" => {}
+            // str and String are the same thing in JS, to_string is not necessary.
             "to_string" => {}
             _ => unreachable!(),
         }

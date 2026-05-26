@@ -35,5 +35,5 @@ impl JsCallable for Event {
 }
 
 pub struct EventTarget {
-    pub value: String,
+    pub value: crate::String,
 }
