@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::runtime::{Expr, Interpreter, JsCallable};
+use crate::runtime::Expr;
 
 /// A `receiver.method()` call. Only zero-argument methods are supported. The
 /// accessor closure passed to `new` carries the real implementation so the
@@ -27,26 +27,5 @@ where
             accessor,
             _phantom: PhantomData,
         }
-    }
-}
-
-impl<R, F, T> Expr for ExprMethodCall<R, F, T>
-where
-    R: Expr,
-    R::Output: JsCallable,
-    F: FnOnce(R::Output) -> T,
-{
-    type Output = T;
-
-    fn eval(self, interpreter: &mut Interpreter) -> Self::Output {
-        let receiver = self.receiver.eval(interpreter);
-        (self.accessor)(receiver)
-    }
-
-    fn to_js(&self, out: &mut String) {
-        out.push('(');
-        self.receiver.to_js(out);
-        out.push(')');
-        R::Output::js_call(self.method, out);
     }
 }

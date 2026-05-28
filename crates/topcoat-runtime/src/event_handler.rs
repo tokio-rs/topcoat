@@ -1,6 +1,7 @@
+use topcoat_interop::runtime::{Expr, ExprClosure, FmtJs, Formatter};
 use topcoat_view::runtime::{IntoViewParts, Unescaped, ViewPart};
 
-use crate::{Event, Expr, ExprClosure};
+use crate::Event;
 
 /// An event handler attribute. Emits a JavaScript closure expression into a
 /// `data-topcoat-on:<event>` attribute on the element. The browser scanner
@@ -24,7 +25,8 @@ where
 {
     fn into_view_parts(self) -> impl Iterator<Item = ViewPart> {
         let mut js = String::new();
-        self.value.to_js(&mut js);
+        let mut formatter = Formatter::new(&mut js);
+        self.value.fmt_js(&mut formatter);
 
         Unescaped::new_unchecked(" data-topcoat-on:")
             .into_view_parts()

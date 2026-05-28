@@ -1,13 +1,13 @@
 use std::marker::PhantomData;
 
-use crate::runtime::{Expr, ExprParam, Interpreter};
+use crate::runtime::{Eval, Expr, ExprParam, FmtJs, Formatter, Interpreter};
 
 /// Per-arity storage for a closure's parameters. Each `ExprParam<T>` is just a
 /// `&'static str` plus a zero-sized phantom, so the tuple is `Copy` and lives
 /// inline in [`ExprClosure`] — no allocation.
 pub trait ClosureParams {
     type Storage: Copy;
-    fn write_param_list(storage: &Self::Storage, out: &mut String);
+    fn write_param_list(storage: &Self::Storage, f: &mut Formatter<'_>);
 }
 
 macro_rules! impl_closure_params {
@@ -17,12 +17,12 @@ macro_rules! impl_closure_params {
                 type Storage = ($(ExprParam<$name>,)*);
 
                 #[allow(unused_variables, unused_assignments)]
-                fn write_param_list(storage: &Self::Storage, out: &mut String) {
+                fn write_param_list(storage: &Self::Storage, f: &mut Formatter<'_>) {
                     #[allow(unused_mut)]
                     let mut first = true;
                     $(
-                        if !first { out.push_str(", "); }
-                        out.push_str(storage.$idx.name());
+                        if !first { f.write_str(", "); }
+                        f.write_str(storage.$idx.name());
                         first = false;
                     )*
                 }
@@ -93,22 +93,28 @@ impl_new! {
     (0: T1, 1: T2, 2: T3, 3: T4, 4: T5, 5: T6, 6: T7, 7: T8),
 }
 
-impl<Params, Body> Expr for ExprClosure<Params, Body>
+impl<Params, Body> Eval for ExprClosure<Params, Body>
 where
     Params: ClosureParams,
-    Body: Expr,
+    Body: Eval,
 {
     type Output = Body::Output;
 
     fn eval(self, _interpreter: &mut Interpreter) -> Self::Output {
         unreachable!("ExprClosure::eval called server-side; handlers do not run during SSR")
     }
+}
 
-    fn to_js(&self, out: &mut String) {
-        out.push_str("((");
-        Params::write_param_list(&self.storage, out);
-        out.push_str(") => { ");
-        self.body.to_js(out);
-        out.push_str("; })");
+impl<Params, Body> FmtJs for ExprClosure<Params, Body>
+where
+    Params: ClosureParams,
+    Body: FmtJs,
+{
+    fn fmt_js(&self, f: &mut Formatter<'_>) {
+        f.write_str("((");
+        Params::write_param_list(&self.storage, f);
+        f.write_str(") => { ");
+        self.body.fmt_js(f);
+        f.write_str("; })");
     }
 }

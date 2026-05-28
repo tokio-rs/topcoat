@@ -12,32 +12,33 @@ pub mod asset {
 }
 
 pub mod context {
-    pub use topcoat_macro::memoize;
-
     pub use topcoat_core::context::*;
+    pub use topcoat_macro::memoize;
 }
 
 #[cfg(feature = "router")]
 pub mod router {
     pub use topcoat_macro::{layout, page, path_param, query_params, route, segment};
-
     pub use topcoat_router::*;
 }
 
 #[cfg(feature = "view")]
 pub mod view {
     pub use topcoat_macro::{component, island, view};
-
     pub use topcoat_view::runtime::*;
 }
 
 #[cfg(feature = "router")]
 pub use serve::serve;
 
+#[cfg(feature = "interop")]
+pub mod interop {
+    pub use topcoat_interop::runtime::*;
+    pub use topcoat_macro::expr;
+}
+
 #[cfg(feature = "runtime")]
 pub mod runtime {
-    pub use topcoat_macro::expr;
-
     pub use topcoat_runtime::*;
 }
 

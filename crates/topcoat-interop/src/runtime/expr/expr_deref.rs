@@ -1,4 +1,4 @@
-use crate::runtime::{Expr, Interpreter};
+use crate::runtime::{Eval, FmtJs, Formatter, Interpreter};
 
 pub trait ExprDerefTarget {
     type Target;
@@ -14,9 +14,9 @@ impl<E> ExprDeref<E> {
     }
 }
 
-impl<E> Expr for ExprDeref<E>
+impl<E> Eval for ExprDeref<E>
 where
-    E: Expr,
+    E: Eval,
     E::Output: ExprDerefTarget,
 {
     type Output = <E::Output as ExprDerefTarget>::Target;
@@ -24,11 +24,16 @@ where
     fn eval(self, interpreter: &mut Interpreter) -> Self::Output {
         self.0.eval(interpreter).expr_deref()
     }
+}
 
-    fn to_js(&self, out: &mut String) {
+impl<E> FmtJs for ExprDeref<E>
+where
+    E: FmtJs,
+{
+    fn fmt_js(&self, f: &mut Formatter<'_>) {
         // In JS, maverick signal handles are callable; reading is `handle()`.
-        out.push('(');
-        self.0.to_js(out);
-        out.push_str(")()");
+        f.write_char('(');
+        self.0.fmt_js(f);
+        f.write_str(")()");
     }
 }

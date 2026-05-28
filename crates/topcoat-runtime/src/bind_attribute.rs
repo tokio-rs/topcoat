@@ -1,6 +1,5 @@
+use topcoat_interop::runtime::{Expr, Formatter, Interpreter};
 use topcoat_view::runtime::{IntoViewParts, Unescaped, ViewPart};
-
-use crate::{Expr, Interpreter};
 
 #[derive(Debug, Clone)]
 pub struct BindAttribute<K, V> {
@@ -23,7 +22,8 @@ where
 {
     fn into_view_parts(self) -> impl Iterator<Item = ViewPart> {
         let mut js = String::new();
-        self.value.to_js(&mut js);
+        let mut formatter = Formatter::new(&mut js);
+        self.value.fmt_js(&mut formatter);
 
         let mut interpreter = Interpreter::new();
         let value = self.value.eval(&mut interpreter).into();
