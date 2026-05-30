@@ -32,10 +32,13 @@ impl ToTokens for Component {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut item = self.item.item().clone();
         let mut generics = item.sig.generics.clone();
-        item.sig.generics.params.insert(0, parse_quote! { '__cx });
         item.sig
             .inputs
-            .insert(0, parse_quote! { __cx: &'__cx ::topcoat::context::Cx });
+            .insert(0, parse_quote! { __cx: &::topcoat::context::Cx });
+        item.sig
+            .inputs
+            .insert(1, parse_quote! { __f: &mut ::topcoat::view::Formatter<'_> });
+
         let vis = &item.vis;
         let ident = &item.sig.ident;
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
@@ -43,7 +46,7 @@ impl ToTokens for Component {
         };
 
         let mut fields = Vec::new();
-        let mut args = Vec::new();
+        let mut destructure = Vec::new();
         let mut visitor = ImplicitLifetimeVisitor { used: false };
 
         for input in self.item.item().sig.inputs.iter() {
@@ -54,14 +57,12 @@ impl ToTokens for Component {
                 unreachable!("validated in Parse");
             };
             if pi.ident == "cx" {
-                args.push(quote! { cx });
-            } else if pi.ident == "child" {
-                args.push(quote! { child });
+                destructure.push(quote! { let #pi = __cx; });
             } else {
                 let mut ty = (*pat_type.ty).clone();
                 visitor.visit_type_mut(&mut ty);
                 fields.push(quote! { #pi: #ty });
-                args.push(quote! { self.#pi });
+                destructure.push(quote! { let #pi = self.#pi; });
             }
         }
 
@@ -70,10 +71,7 @@ impl ToTokens for Component {
         }
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-        let body = quote! {
-            #item
-            #ident(cx, #(#args),*).await
-        };
+        let block = item.block;
 
         quote! {
             #[allow(non_camel_case_types)]
@@ -84,9 +82,9 @@ impl ToTokens for Component {
             impl #impl_generics ::topcoat::view::Component for #ident #ty_generics #where_clause {
                 type Error = <#return_ty as ::topcoat::internal::ResultExt>::E;
 
-                async fn render(self, cx: &::topcoat::context::Cx, child: ::topcoat::view::View) -> #return_ty {
-                    let __cx = cx;
-                    #body
+                async fn render(self) -> #return_ty {
+                    let cx = self.__cx;
+                    #block
                 }
             }
         }

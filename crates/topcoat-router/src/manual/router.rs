@@ -263,6 +263,7 @@ impl From<Router> for axum::Router {
                 &("/".to_owned() + island.id().as_str()),
                 get(
                     async |Query(query): Query<SignalsQuery>, CxBody { cx, body: _ }: CxBody| {
+                        let cx = &cx;
                         let signal_param = query.signals;
                         // todo: handle errors properly
 
@@ -270,7 +271,7 @@ impl From<Router> for axum::Router {
                             .dyn_render(&cx, EncodedSignals::new(signal_param))
                             .await;
                         match result {
-                            Ok(view) => Html(view.render(&cx)).into_response(),
+                            Ok(view) => render!(&cx,).into_response(),
                             Err(error) => {
                                 if let Ok(error) = error.downcast::<Error>() {
                                     error.into_response()

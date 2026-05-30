@@ -1,7 +1,5 @@
-use std::iter::once;
-
 use topcoat_core::context::{Cx, app_state};
-use topcoat_view::runtime::{Formatter, Fragment, IntoViewParts, ViewPart};
+use topcoat_view::runtime::{Formatter, Fragment};
 
 use crate::Asset;
 
@@ -33,11 +31,5 @@ impl AssetFragmentResolver {
 impl Fragment for Asset {
     fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
         app_state::<AssetFragmentResolver>(cx).resolve(cx, *self, f)
-    }
-}
-
-impl IntoViewParts for Asset {
-    fn into_view_parts(self) -> impl Iterator<Item = ViewPart> {
-        once(ViewPart::BoxDyn(Box::new(self)))
     }
 }

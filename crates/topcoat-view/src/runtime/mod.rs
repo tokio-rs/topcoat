@@ -1,4 +1,5 @@
 mod attribute;
+mod child;
 mod component;
 mod formatter;
 mod fragment;
@@ -6,6 +7,7 @@ mod unescaped;
 mod view;
 
 pub use attribute::*;
+pub use child::*;
 pub use component::*;
 pub use formatter::*;
 pub use fragment::*;

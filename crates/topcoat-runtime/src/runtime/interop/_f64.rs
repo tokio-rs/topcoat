@@ -1,6 +1,5 @@
 use ref_cast::{RefCastCustom, ref_cast_custom};
 use std::fmt::Write;
-use topcoat_view::runtime::IntoViewParts;
 
 use crate::runtime::Interop;
 
@@ -27,12 +26,6 @@ impl Interop for core::primitive::f64 {
 
     fn to_surrogate_ref(&self) -> &Self::Surrogate {
         f64::from_ref(self)
-    }
-}
-
-impl IntoViewParts for f64 {
-    fn into_view_parts(self) -> impl Iterator<Item = topcoat_view::runtime::ViewPart> {
-        self.0.into_view_parts()
     }
 }
 

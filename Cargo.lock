@@ -1970,6 +1970,7 @@ dependencies = [
 name = "topcoat-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "anymap3",
  "boxcar",
  "hashbrown 0.17.0",

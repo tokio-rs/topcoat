@@ -16,6 +16,10 @@ pub mod context {
     pub use topcoat_macro::memoize;
 }
 
+pub mod error {
+    pub use topcoat_core::error::*;
+}
+
 #[cfg(feature = "router")]
 pub mod router {
     pub use topcoat_macro::{layout, page, path_param, query_params, route, segment};

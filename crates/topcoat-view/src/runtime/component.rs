@@ -1,10 +1,5 @@
-use topcoat_core::context::Cx;
-
-use crate::runtime::View;
+use topcoat_core::error::Result;
 
 pub trait Component {
-    type Error;
-
-    fn render(self, cx: &Cx, child: View)
-    -> impl Future<Output = Result<View, Self::Error>> + Send;
+    fn render(self) -> impl Future<Output = Result> + Send;
 }

@@ -30,6 +30,7 @@ topcoat-runtime = { path = "crates/topcoat-runtime" }
 topcoat-tailwind = { path = "crates/topcoat-tailwind" }
 topcoat-view = { path = "crates/topcoat-view" }
 
+anyhow = "1.0"
 anymap3 = "1.0"
 axum = "0.8.8"
 boxcar = "0.2"
