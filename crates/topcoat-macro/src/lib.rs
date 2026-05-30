@@ -17,6 +17,16 @@ mod segment;
 use proc_macro::TokenStream;
 use quote::quote;
 
+#[cfg(feature = "runtime")]
+#[proc_macro]
+pub fn expr(tokens: TokenStream) -> TokenStream {
+    let parsed = syn::parse_macro_input!(tokens as topcoat_runtime::ast::expr::Expr);
+    match parsed.expr_to_tokens() {
+        Ok(ts) => ts.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
 #[cfg(feature = "view")]
 #[proc_macro]
 pub fn view(tokens: TokenStream) -> TokenStream {
@@ -28,6 +38,15 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     match topcoat_view::ast::component::Component::parse(attr.into(), item.into()) {
+        Ok(value) => quote! { #value }.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
+
+#[cfg(feature = "view")]
+#[proc_macro_attribute]
+pub fn island(attr: TokenStream, item: TokenStream) -> TokenStream {
+    match topcoat_view::ast::island::Island::parse(attr.into(), item.into()) {
         Ok(value) => quote! { #value }.into(),
         Err(error) => error.to_compile_error().into(),
     }

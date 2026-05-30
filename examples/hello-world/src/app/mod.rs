@@ -2,12 +2,15 @@ mod _group;
 mod api;
 mod posts;
 
+use std::{cell::RefCell, time::Duration};
+
 use topcoat::{
     asset::asset,
     context::{Cx, memoize},
-    router::{Result, Slot, layout},
+    router::{Result, Slot, layout, page},
+    runtime::{Island, ReadSignal},
     tailwind,
-    view::view,
+    view::{component, island, view},
 };
 
 use crate::components::app_and_request_state;
@@ -35,6 +38,7 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
                 <title>"hello world"</title>
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
                 <script type="module" src=(asset!("https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"))></script>
+                <script type="module" src=(topcoat::runtime::SCRIPT)></script>
                 topcoat::dev::script()
             </head>
             <body>
@@ -44,7 +48,7 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
                     <a href="/about">"about"</a>
                     <span class=("test")>" | "</span>
                     <a href="/contact">"contact"</a>
-                    <span-kek:pip
+                    <span-kek
                         for kek in ["kek", "pip", "lel"] {
                             if kek != "pip" {
                                 (kek)=(kek)
@@ -53,7 +57,7 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
                     >
                         " | signed in as "
                         ((*user).clone())
-                    </span-kek:pip>
+                    </span-kek>
                 </nav>
                 <hr>
 
@@ -62,6 +66,13 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result {
                 <div>(slot.await?)</div>
             </body>
         </html>
+    }
+}
+
+#[page]
+async fn home_page() -> Result {
+    view! {
+        combobox(content: combobox_content)
     }
 }
 
@@ -84,5 +95,80 @@ mod about {
             >
             <img src=(asset!("./ferris.png"))>
         }
+    }
+}
+
+async fn search_results(_cx: &Cx, input: &str) -> Vec<&'static str> {
+    tokio::time::sleep(Duration::from_secs_f32(0.5)).await;
+    let all = [
+        "apple",
+        "apricot",
+        "banana",
+        "blackberry",
+        "blueberry",
+        "cherry",
+        "coconut",
+        "cranberry",
+        "date",
+        "dragonfruit",
+        "elderberry",
+        "fig",
+        "grape",
+        "grapefruit",
+        "guava",
+        "honeydew",
+        "kiwi",
+        "lemon",
+        "lime",
+        "lychee",
+        "mango",
+        "nectarine",
+        "orange",
+        "papaya",
+        "passionfruit",
+        "peach",
+        "pear",
+        "persimmon",
+        "pineapple",
+        "plum",
+        "pomegranate",
+        "raspberry",
+        "strawberry",
+        "tangerine",
+        "watermelon",
+    ];
+    let needle = input.to_lowercase();
+    all.into_iter().filter(|s| s.contains(&needle)).collect()
+}
+
+#[island]
+async fn combobox_content(cx: &Cx, input: ReadSignal<String>) -> Result {
+    let results = search_results(cx, &input).await;
+    view! {
+        <div>
+            <b>"results:"</b>
+            for item in results {
+                <div>(item)</div>
+            }
+        </div>
+    }
+}
+
+#[component]
+async fn combobox(content: Island<(ReadSignal<String>,), topcoat::router::Error>) -> Result {
+    let smep = "kek".to_owned();
+    view! {
+        signal kek = 5.0;
+        <div>
+            <input
+                :value=(*kek.read())
+                @input=(move |e| kek.set(*kek.read() + 1.0) )
+            >
+            // <input
+            //     :value=(signal.read())
+            //     // @change=(|e| kek.with(|v| v.pip.update() = 5; ))
+            // >
+            // track content(kek)
+        </div>
     }
 }

@@ -6,18 +6,27 @@ edition = "2024"
 [features]
 default = [
 	"asset",
-	"view",
 	"router",
+	"runtime",
+	"view",
 	"discover",
 ]
 
-asset = ["dep:topcoat-asset"]
+asset = [
+	"dep:topcoat-asset",
+]
 router = [
-	"view",
 	"dep:topcoat-router",
 	"topcoat-macro/router",
+	"view",
 ]
-tailwind = ["dep:topcoat-tailwind"]
+runtime = [
+	"dep:topcoat-runtime",
+	"topcoat-macro/runtime",
+]
+tailwind = [
+	"dep:topcoat-tailwind",
+]
 view = [
 	"dep:topcoat-view",
 	"topcoat-asset/view",
@@ -28,6 +37,8 @@ discover = [
 	"dep:inventory",
 	"topcoat-macro/discover",
 	"topcoat-router/discover",
+	"topcoat-runtime/discover",
+	"topcoat-view/discover",
 ]
 
 [dependencies]
@@ -35,6 +46,7 @@ topcoat-asset = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-macro.workspace = true
 topcoat-router = { workspace = true, optional = true }
+topcoat-runtime = { workspace = true, optional = true }
 topcoat-tailwind = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true, features = ["axum"] }
 

@@ -1,0 +1,15 @@
+{
+	"name": "@topcoat-rs/runtime",
+	"version": "0.0.1",
+	"scripts": {
+		"build": "tsup"
+	},
+	"dependencies": {
+		"@maverick-js/signals": "^6.0.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.15",
+		"tsup": "^8.5.1",
+		"typescript": "^6.0.3"
+	}
+}

@@ -6,7 +6,7 @@ use topcoat::{
 
 #[component]
 async fn button(id: &str, child: View) -> Result {
-    view! { <button id=(id) class="button">(child)</button> }
+    view! { <button id=(id.to_owned()) class="button">(child)</button> }
 }
 
 #[component]

@@ -1,9 +1,9 @@
 use core::fmt;
-use std::iter::once;
+use std::{borrow::Cow, iter::once};
 
 use topcoat_core::context::Cx;
 
-use crate::runtime::{Attribute, Formatter, Fragment, Unescaped};
+use crate::runtime::{Formatter, Fragment, Unescaped};
 
 /// A piece of HTML content.
 ///
@@ -56,6 +56,10 @@ impl View {
         let mut f = Formatter::new(&mut buf);
         self.fmt(cx, &mut f);
         buf
+    }
+
+    pub fn into_inner(self) -> ViewPart {
+        self.part
     }
 }
 
@@ -120,7 +124,6 @@ pub enum ViewPart {
     String(String),
     UnescapedStaticStr(Unescaped<&'static str>),
     UnescapedString(Unescaped<String>),
-    Attribute(Box<Attribute>),
     BoxDyn(Box<dyn DynViewPart>),
     Node(Box<[ViewPart]>),
 }
@@ -180,7 +183,6 @@ impl Fragment for ViewPart {
             Self::StaticStr(inner) => inner.fmt(cx, f),
             Self::UnescapedString(inner) => inner.fmt(cx, f),
             Self::UnescapedStaticStr(inner) => inner.fmt(cx, f),
-            Self::Attribute(inner) => inner.fmt(cx, f),
             Self::BoxDyn(inner) => Fragment::fmt(inner, cx, f),
             Self::Node(inner) => {
                 for part in inner.iter() {
@@ -213,7 +215,6 @@ impl Fragment for ViewPart {
             Self::String(inner) => inner.size_hint(),
             Self::UnescapedString(inner) => inner.len(),
             Self::UnescapedStaticStr(inner) => inner.len(),
-            Self::Attribute(inner) => inner.size_hint(),
             Self::BoxDyn(inner) => Fragment::size_hint(inner),
             Self::Node(inner) => inner.iter().map(|part| part.size_hint()).sum(),
         }
@@ -247,10 +248,10 @@ where
     }
 }
 
-impl IntoViewParts for &str {
+impl IntoViewParts for &'static str {
     #[inline]
     fn into_view_parts(self) -> impl Iterator<Item = ViewPart> {
-        once(ViewPart::String(self.to_owned()))
+        once(ViewPart::StaticStr(self))
     }
 }
 

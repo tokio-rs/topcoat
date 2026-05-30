@@ -8,6 +8,7 @@ members = [
     "crates/topcoat-macro",
     "crates/topcoat-pretty",
     "crates/topcoat-router",
+    "crates/topcoat-runtime",
     "crates/topcoat-tailwind",
     "crates/topcoat-view",
 
@@ -25,6 +26,7 @@ topcoat-core = { path = "crates/topcoat-core" }
 topcoat-macro = { path = "crates/topcoat-macro" }
 topcoat-pretty = { path = "crates/topcoat-pretty" }
 topcoat-router = { path = "crates/topcoat-router" }
+topcoat-runtime = { path = "crates/topcoat-runtime" }
 topcoat-tailwind = { path = "crates/topcoat-tailwind" }
 topcoat-view = { path = "crates/topcoat-view" }
 
@@ -63,3 +65,4 @@ tower = "0.5"
 tower-http = "0.6"
 tower-service = "0.3"
 ureq = "3.3"
+uuid = "1.23"

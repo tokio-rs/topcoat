@@ -1,13 +1,16 @@
 use std::{any::Any, sync::Arc};
 
 use axum::{
+    extract::Query,
     response::{Html, IntoResponse},
     routing::{MethodFilter, get, on},
 };
+use serde::Deserialize;
 use topcoat_asset::{AssetBundle, AssetFragmentResolver, ServeAssetBundle};
 use topcoat_core::context::{MaybeAborted, State, WatchAbort};
+use topcoat_runtime::runtime::{DynIsland, EncodedSignals, Islands};
 
-use crate::{CxBody, Layout, Layouts, Page, Pages, Route, Routes, not_found};
+use crate::{CxBody, Error, Layout, Layouts, Page, Pages, Route, Routes, not_found};
 
 /// The core routing primitive that collects [`Page`]s, [`Layout`]s, and
 /// [`Route`]s, matches layouts to pages by path prefix, and converts into an
@@ -49,6 +52,9 @@ pub struct Router {
     pages: Pages,
     layouts: Layouts,
     routes: Routes,
+
+    islands: Islands,
+
     assets: AssetBundle,
     state: State,
 }
@@ -63,6 +69,7 @@ impl Router {
             pages: Pages::new(),
             layouts: Layouts::new(),
             routes: Routes::new(),
+            islands: Islands::new(),
             assets: AssetBundle::empty(),
             state,
         }
@@ -108,10 +115,17 @@ impl Router {
         self
     }
 
+    pub fn island(mut self, island: &'static dyn DynIsland) -> Self {
+        self.islands.register(island);
+        self
+    }
+
     /// Discovers and registers all `#[page]`, `#[layout]` and `#[route]` items
     /// collected at link time across the crate and its dependencies.
     #[cfg(feature = "discover")]
     pub fn discover(mut self) -> Self {
+        use topcoat_runtime::runtime::DynIsland;
+
         for page in inventory::iter::<Page>().cloned() {
             self = self.page(page);
         }
@@ -121,6 +135,11 @@ impl Router {
         for route in inventory::iter::<Route>().cloned() {
             self = self.route(route);
         }
+
+        for island in inventory::iter::<&'static dyn DynIsland>().cloned() {
+            self = self.island(island);
+        }
+
         self
     }
 
@@ -232,6 +251,39 @@ impl From<Router> for axum::Router {
                 ),
             );
         }
+
+        let mut island_router = axum::Router::new();
+        for island in value.islands {
+            #[derive(Deserialize)]
+            struct SignalsQuery {
+                signals: String,
+            }
+
+            island_router = island_router.route(
+                &("/".to_owned() + island.id().as_str()),
+                get(
+                    async |Query(query): Query<SignalsQuery>, CxBody { cx, body: _ }: CxBody| {
+                        let signal_param = query.signals;
+                        // todo: handle errors properly
+
+                        let result = island
+                            .dyn_render(&cx, EncodedSignals::new(signal_param))
+                            .await;
+                        match result {
+                            Ok(view) => Html(view.render(&cx)).into_response(),
+                            Err(error) => {
+                                if let Ok(error) = error.downcast::<Error>() {
+                                    error.into_response()
+                                } else {
+                                    panic!("island has unknown error type");
+                                }
+                            }
+                        }
+                    },
+                ),
+            );
+        }
+        axum_router = axum_router.nest("/_topcoat/islands", island_router);
 
         axum_router = axum_router
             .fallback(async move |CxBody { cx: _, body: _ }: CxBody| not_found().into_response());

@@ -6,8 +6,8 @@ use syn::{
 use crate::ast::{
     ParseOption,
     view::{
-        Attribute, AttributeNodes, TemplateBreak, TemplateContinue, TemplateForLoop, TemplateIf,
-        TemplateLet, TemplateMatch, ViewWriter, WriteView,
+        Attribute, AttributeNodes, BindAttribute, EventHandler, TemplateBreak, TemplateContinue,
+        TemplateForLoop, TemplateIf, TemplateLet, TemplateMatch, ViewWriter, WriteView,
     },
 };
 
@@ -15,6 +15,8 @@ use crate::ast::{
 /// of every construct that can appear at attribute-list position.
 pub enum AttributeNode {
     Attribute(Attribute),
+    BindAttribute(BindAttribute),
+    EventHandler(EventHandler),
     If(Box<TemplateIf<AttributeNodes>>),
     Let(TemplateLet),
     ForLoop(TemplateForLoop<AttributeNodes>),
@@ -27,6 +29,8 @@ impl WriteView for AttributeNode {
     fn write(&self, writer: &mut ViewWriter) {
         match self {
             Self::Attribute(inner) => inner.write(writer),
+            Self::BindAttribute(inner) => inner.write(writer),
+            Self::EventHandler(inner) => inner.write(writer),
             Self::If(inner) => inner.write(writer),
             Self::Let(inner) => inner.write(writer),
             Self::ForLoop(inner) => inner.write(writer),
@@ -51,6 +55,10 @@ impl Parse for AttributeNode {
             Self::Break(input.parse()?)
         } else if TemplateMatch::<AttributeNode>::peek(input) {
             Self::Match(input.parse()?)
+        } else if BindAttribute::peek(input) {
+            Self::BindAttribute(input.parse()?)
+        } else if EventHandler::peek(input) {
+            Self::EventHandler(input.parse()?)
         } else if Attribute::peek(input) {
             Self::Attribute(input.parse()?)
         } else {
@@ -74,6 +82,8 @@ impl Parse for AttributeNode {
 impl ParseOption for AttributeNode {
     fn peek(input: ParseStream) -> bool {
         Attribute::peek(input)
+            || BindAttribute::peek(input)
+            || EventHandler::peek(input)
             || TemplateIf::<AttributeNodes>::peek(input)
             || TemplateLet::peek(input)
             || TemplateForLoop::<AttributeNodes>::peek(input)
@@ -88,6 +98,8 @@ impl topcoat_pretty::PrettyPrint for AttributeNode {
     fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         match self {
             Self::Attribute(inner) => inner.pretty_print(printer),
+            Self::BindAttribute(inner) => inner.pretty_print(printer),
+            Self::EventHandler(inner) => inner.pretty_print(printer),
             Self::If(inner) => inner.pretty_print(printer),
             Self::Let(inner) => inner.pretty_print(printer),
             Self::ForLoop(inner) => inner.pretty_print(printer),
@@ -117,6 +129,14 @@ mod tests {
     fn dispatches_each_variant() {
         assert!(matches!(parse(r#"foo="bar""#), AttributeNode::Attribute(_)));
         assert!(matches!(
+            parse(r#":foo=(bar)"#),
+            AttributeNode::BindAttribute(_),
+        ));
+        assert!(matches!(
+            parse(r#"@foo=(bar)"#),
+            AttributeNode::EventHandler(_),
+        ));
+        assert!(matches!(
             parse(r#"if cond { foo="bar" }"#),
             AttributeNode::If(_),
         ));
@@ -143,6 +163,6 @@ mod tests {
 
     #[test]
     fn unrecognized_token_is_rejected() {
-        assert!(parse_err("@").contains("expected attribute node"));
+        assert!(parse_err("#").contains("expected attribute node"));
     }
 }

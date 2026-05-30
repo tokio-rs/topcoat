@@ -9,6 +9,7 @@ discover = ["dep:inventory"]
 [dependencies]
 topcoat-asset = { workspace = true, features = ["view"] }
 topcoat-core.workspace = true
+topcoat-runtime.workspace = true
 topcoat-view = { workspace = true, features = ["axum"] }
 
 axum.workspace = true

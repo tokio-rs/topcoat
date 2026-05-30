@@ -34,3 +34,9 @@ impl FromRequest<Arc<State>> for CxBody {
 pub trait FromBody: Sized {
     fn from_body(cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> + Send;
 }
+
+impl FromBody for Body {
+    async fn from_body(_cx: &Cx, body: Body) -> Result<Self> {
+        Ok(body)
+    }
+}
