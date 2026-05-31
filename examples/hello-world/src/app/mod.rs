@@ -162,7 +162,7 @@ async fn combobox(content: Island<(ReadSignal<String>,), topcoat::router::Error>
         <div>
             <input
                 :value=(*kek.read())
-                @input=(move |e| kek.set(*kek.read() + 1.0) )
+                @input=(move |e| kek.set((*kek.read()).ref_cast() + 1.0) )
             >
             // <input
             //     :value=(signal.read())

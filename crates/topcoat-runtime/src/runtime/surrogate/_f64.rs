@@ -1,8 +1,8 @@
-use ref_cast::{RefCastCustom, ref_cast_custom};
+use ref_cast::RefCast;
 
 use crate::runtime::{Surrogated, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
 
-#[derive(RefCastCustom, Clone, Copy)]
+#[derive(RefCast, Clone, Copy)]
 #[repr(transparent)]
 #[allow(non_camel_case_types)]
 pub struct f64(core::primitive::f64);
@@ -12,11 +12,6 @@ impl f64 {
     pub(crate) const fn new(v: core::primitive::f64) -> Self {
         Self(v)
     }
-
-    #[ref_cast_custom]
-    pub(crate) const fn ref_cast(v: &core::primitive::f64) -> &Self;
-    #[ref_cast_custom]
-    pub(crate) const fn ref_cast_mut(v: &mut core::primitive::f64) -> &mut Self;
 }
 
 impl_surrogate!(core::primitive::f64, f64);

@@ -1,8 +1,8 @@
-use ref_cast::{RefCastCustom, ref_cast_custom};
+use ref_cast::RefCast;
 
 use crate::runtime::{Signal, Surrogated, impl_surrogate, impl_surrogate_ref};
 
-#[derive(RefCastCustom, Clone, Copy)]
+#[derive(RefCast, Clone, Copy)]
 #[repr(transparent)]
 pub struct WriteSignal<'a, T>(Signal<'a, T>);
 
@@ -11,9 +11,6 @@ impl<'a, T> WriteSignal<'a, T> {
     pub(crate) const fn new(v: Signal<'a, T>) -> Self {
         Self(v)
     }
-
-    #[ref_cast_custom]
-    pub(crate) const fn ref_cast<'b>(v: &'b Signal<'a, T>) -> &'b Self;
 }
 
 impl<'a, T> WriteSignal<'a, T>
