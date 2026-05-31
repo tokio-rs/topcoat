@@ -32,10 +32,10 @@ pub struct View {
 impl View {
     /// Builds a `View` from any value that can be converted into [`ViewPart`]s.
     #[inline]
-    pub fn new(part: ViewPart) -> Self {
+    pub fn new(parts: ViewParts) -> Self {
         Self {
-            size_hint: part.size_hint(),
-            part,
+            part: parts.into(),
+            size_hint: 0,
         }
     }
 
@@ -71,40 +71,6 @@ impl Fragment for View {
     #[inline]
     fn size_hint(&self) -> usize {
         self.size_hint
-    }
-}
-
-impl FromIterator<ViewPart> for View {
-    /// Avoids allocating when the iterator yields zero or one element.
-    fn from_iter<I: IntoIterator<Item = ViewPart>>(iter: I) -> Self {
-        let mut iter = iter.into_iter();
-        let Some(first) = iter.next() else {
-            return Self::empty();
-        };
-        let first_size_hint = first.size_hint();
-        let Some(second) = iter.next() else {
-            return Self {
-                part: first,
-                size_hint: first_size_hint,
-            };
-        };
-
-        let (additional, _) = iter.size_hint();
-        let mut parts = Vec::with_capacity(additional + 2);
-        let mut size_hint = first_size_hint + second.size_hint();
-
-        parts.push(first);
-        parts.push(second);
-
-        for part in iter {
-            size_hint += part.size_hint();
-            parts.push(part);
-        }
-
-        Self {
-            part: ViewPart::Node(parts.into_boxed_slice()),
-            size_hint,
-        }
     }
 }
 
@@ -308,5 +274,45 @@ impl_from_for_view_part! {
 impl From<View> for ViewPart {
     fn from(value: View) -> Self {
         value.part
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ViewParts {
+    first: Option<ViewPart>,
+    items: Vec<ViewPart>,
+}
+
+impl ViewParts {
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[inline]
+    pub fn push(&mut self, part: impl Into<ViewPart>) -> &mut Self {
+        let part = part.into();
+        if let Some(first) = self.first.take() {
+            self.items.push(first);
+            self.items.push(part);
+        } else if self.items.is_empty() {
+            self.first = Some(part)
+        } else {
+            self.items.push(part);
+        }
+        self
+    }
+}
+
+impl From<ViewParts> for ViewPart {
+    #[inline]
+    fn from(value: ViewParts) -> Self {
+        if let Some(first) = value.first {
+            first
+        } else if value.items.is_empty() {
+            ViewPart::empty()
+        } else {
+            value.items.into_boxed_slice().into()
+        }
     }
 }
