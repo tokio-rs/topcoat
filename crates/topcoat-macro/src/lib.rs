@@ -45,8 +45,8 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[cfg(feature = "view")]
 #[proc_macro_attribute]
-pub fn island(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match topcoat_view::ast::island::Island::parse(attr.into(), item.into()) {
+pub fn shard(attr: TokenStream, item: TokenStream) -> TokenStream {
+    match topcoat_view::ast::shard::Shard::parse(attr.into(), item.into()) {
         Ok(value) => quote! { #value }.into(),
         Err(error) => error.to_compile_error().into(),
     }

@@ -1,8 +1,8 @@
-mod island;
 mod reactive_scope;
+mod shard;
 
-pub use island::*;
 pub use reactive_scope::*;
+pub use shard::*;
 
 use std::{iter::empty, ops::Deref};
 

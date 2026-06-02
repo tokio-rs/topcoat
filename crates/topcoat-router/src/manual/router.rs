@@ -8,7 +8,7 @@ use axum::{
 use serde::Deserialize;
 use topcoat_asset::{AssetBundle, AssetFragmentResolver, ServeAssetBundle};
 use topcoat_core::context::{MaybeAborted, State, WatchAbort};
-use topcoat_runtime::runtime::{DynIsland, EncodedSignals, Islands};
+use topcoat_runtime::runtime::{DynShard, EncodedSignals, Shards};
 
 use crate::{CxBody, Error, Layout, Layouts, Page, Pages, Route, Routes, not_found};
 
@@ -53,7 +53,7 @@ pub struct Router {
     layouts: Layouts,
     routes: Routes,
 
-    islands: Islands,
+    shards: Shards,
 
     assets: AssetBundle,
     state: State,
@@ -69,7 +69,7 @@ impl Router {
             pages: Pages::new(),
             layouts: Layouts::new(),
             routes: Routes::new(),
-            islands: Islands::new(),
+            shards: Shards::new(),
             assets: AssetBundle::empty(),
             state,
         }
@@ -115,16 +115,17 @@ impl Router {
         self
     }
 
-    pub fn island(mut self, island: &'static dyn DynIsland) -> Self {
-        self.islands.register(island);
+    pub fn shard(mut self, shard: &'static dyn DynShard) -> Self {
+        self.shards.register(shard);
         self
     }
 
-    /// Discovers and registers all `#[page]`, `#[layout]` and `#[route]` items
+    /// Discovers and registers all `#[page]`, `#[layout]`, `#[route]`, and
+    /// `#[shard]` items
     /// collected at link time across the crate and its dependencies.
     #[cfg(feature = "discover")]
     pub fn discover(mut self) -> Self {
-        use topcoat_runtime::runtime::DynIsland;
+        use topcoat_runtime::runtime::DynShard;
 
         for page in inventory::iter::<Page>().cloned() {
             self = self.page(page);
@@ -136,8 +137,8 @@ impl Router {
             self = self.route(route);
         }
 
-        for island in inventory::iter::<&'static dyn DynIsland>().cloned() {
-            self = self.island(island);
+        for shard in inventory::iter::<&'static dyn DynShard>().cloned() {
+            self = self.shard(shard);
         }
 
         self
@@ -252,21 +253,21 @@ impl From<Router> for axum::Router {
             );
         }
 
-        let mut island_router = axum::Router::new();
-        for island in value.islands {
+        let mut shard_router = axum::Router::new();
+        for shard in value.shards {
             #[derive(Deserialize)]
             struct SignalsQuery {
                 signals: String,
             }
 
-            island_router = island_router.route(
-                &("/".to_owned() + island.id().as_str()),
+            shard_router = shard_router.route(
+                &("/".to_owned() + shard.id().as_str()),
                 get(
                     async |Query(query): Query<SignalsQuery>, CxBody { cx, body: _ }: CxBody| {
                         let signal_param = query.signals;
                         // todo: handle errors properly
 
-                        let result = island
+                        let result = shard
                             .dyn_render(&cx, EncodedSignals::new(signal_param))
                             .await;
                         match result {
@@ -275,7 +276,7 @@ impl From<Router> for axum::Router {
                                 if let Ok(error) = error.downcast::<Error>() {
                                     error.into_response()
                                 } else {
-                                    panic!("island has unknown error type");
+                                    panic!("shard has unknown error type");
                                 }
                             }
                         }
@@ -283,7 +284,7 @@ impl From<Router> for axum::Router {
                 ),
             );
         }
-        axum_router = axum_router.nest("/_topcoat/islands", island_router);
+        axum_router = axum_router.nest("/_topcoat/shards", shard_router);
 
         axum_router = axum_router
             .fallback(async move |CxBody { cx: _, body: _ }: CxBody| not_found().into_response());

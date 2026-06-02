@@ -3,7 +3,7 @@ use topcoat_core::context::Cx;
 use topcoat_view::runtime::{NodeViewParts, Unescaped, View, ViewParts};
 use uuid::Uuid;
 
-use crate::runtime::{Island, SignalId, Signals};
+use crate::runtime::{Shard, SignalId, Signals};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
@@ -32,15 +32,15 @@ pub struct ReactiveScope {
 
 impl ReactiveScope {
     #[inline]
-    pub async fn new<S, E>(cx: &Cx, signals: S, island: Island<S, E>) -> Result<Self, E>
+    pub async fn new<S, E>(cx: &Cx, signals: S, shard: Shard<S, E>) -> Result<Self, E>
     where
         S: Signals,
     {
         Ok(Self {
             id: ReactiveScopeId::new(),
             track: signals.ids().collect(),
-            path: "/_topcoat/islands/".to_owned() + island.id().as_str(),
-            placeholder: island.render(cx, signals).await?,
+            path: "/_topcoat/shards/".to_owned() + shard.id().as_str(),
+            placeholder: shard.render(cx, signals).await?,
         })
     }
 }

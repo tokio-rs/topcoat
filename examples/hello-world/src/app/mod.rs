@@ -8,9 +8,9 @@ use topcoat::{
     asset::asset,
     context::{Cx, memoize},
     router::{Result, Slot, layout, page},
-    runtime::{Island, ReadSignal},
+    runtime::{ReadSignal, Shard},
     tailwind,
-    view::{component, island, view},
+    view::{component, shard, view},
 };
 
 use crate::components::app_and_request_state;
@@ -141,7 +141,7 @@ async fn search_results(_cx: &Cx, input: &str) -> Vec<&'static str> {
     all.into_iter().filter(|s| s.contains(&needle)).collect()
 }
 
-#[island]
+#[shard]
 async fn combobox_content(cx: &Cx, input: ReadSignal<String>) -> Result {
     let results = search_results(cx, &input).await;
     view! {
@@ -155,7 +155,7 @@ async fn combobox_content(cx: &Cx, input: ReadSignal<String>) -> Result {
 }
 
 #[component]
-async fn combobox(content: Island<(ReadSignal<String>,), topcoat::router::Error>) -> Result {
+async fn combobox(content: Shard<(ReadSignal<String>,), topcoat::router::Error>) -> Result {
     view! {
         signal input = "".to_owned();
         <div>

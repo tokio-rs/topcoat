@@ -5,7 +5,7 @@ This guide captures the conventions used across `topcoat-view::ast` and
 this style so they remain readable and composable with the existing ones.
 
 It is descriptive, not prescriptive: when in doubt, mimic the existing modules
-(`component`, `island`, `view`, `memoize`, …).
+(`component`, `shard`, `view`, `memoize`, …).
 
 ---
 
@@ -49,7 +49,7 @@ pub use attribute_key::*;
 pub(crate) use view_writer::*;   // helpers stay crate-private
 ```
 
-The top-level type (`View`, `Component`, `Island`, …) is defined directly in
+The top-level type (`View`, `Component`, `Shard`, …) is defined directly in
 `mod.rs`. It owns the `Parse` and `ToTokens` impls that delegate into the
 writer/builder.
 
@@ -364,7 +364,7 @@ Use this pattern whenever:
   (e.g. expression context vs. statement context).
 
 Don't reach for it when a single `quote! { ... }` would do. The component and
-island macros are simple enough to skip the writer.
+shard macros are simple enough to skip the writer.
 
 ### 4.2 `ToTokens` shape
 
@@ -388,7 +388,7 @@ impl ToTokens for Component {
 
 Avoid returning a `TokenStream` and assigning it — emit straight into the
 caller's `tokens`. Multiple `quote! { ... }.to_tokens(tokens);` calls in
-sequence are fine (see `island/mod.rs` for the `cfg!(feature = "discover")`
+sequence are fine (see `shard/mod.rs` for the `cfg!(feature = "discover")`
 trailing block).
 
 ### 4.3 Fully-qualified absolute paths

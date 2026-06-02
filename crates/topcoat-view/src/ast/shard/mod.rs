@@ -9,15 +9,15 @@ use quote::{ToTokens, quote};
 use syn::{FnArg, Pat, ReturnType, Type};
 use uuid::Uuid;
 
-use crate::ast::island::{IslandAttr, IslandItem};
+use crate::ast::shard::{ShardAttr, ShardItem};
 
-pub struct Island {
-    _attr: IslandAttr,
-    item: IslandItem,
+pub struct Shard {
+    _attr: ShardAttr,
+    item: ShardItem,
 }
 
-impl Island {
-    pub fn new(attr: IslandAttr, item: IslandItem) -> Self {
+impl Shard {
+    pub fn new(attr: ShardAttr, item: ShardItem) -> Self {
         Self { _attr: attr, item }
     }
 
@@ -26,7 +26,7 @@ impl Island {
     }
 }
 
-impl ToTokens for Island {
+impl ToTokens for Shard {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let item = self.item.item();
         let ident = &item.sig.ident;
@@ -56,11 +56,11 @@ impl ToTokens for Island {
 
         quote! {
             #[allow(non_upper_case_globals)]
-            const #ident: ::topcoat::runtime::Island<
+            const #ident: ::topcoat::runtime::Shard<
                 (#(#signal_types,)*),
                 <#return_ty as ::topcoat::internal::ResultExt>::E,
-            > = ::topcoat::runtime::Island::new(
-                ::topcoat::runtime::IslandId::new(#id),
+            > = ::topcoat::runtime::Shard::new(
+                ::topcoat::runtime::ShardId::new(#id),
                 |cx, signals| {
                     #item
 
@@ -73,7 +73,7 @@ impl ToTokens for Island {
         if cfg!(feature = "discover") {
             quote! {
                 ::topcoat::internal::inventory::submit! {
-                    &#ident as &'static dyn ::topcoat::runtime::DynIsland
+                    &#ident as &'static dyn ::topcoat::runtime::DynShard
                 }
             }
             .to_tokens(tokens);
