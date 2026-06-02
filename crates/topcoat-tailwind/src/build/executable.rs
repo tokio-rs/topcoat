@@ -51,30 +51,45 @@ pub fn download(version: &str, dest: impl AsRef<Path>) -> Result<PathBuf> {
         .into_body();
     let mut reader = body.as_reader();
 
-    let mut file = fs::File::create(&dest).map_err(|source| BuildError::Io {
-        path: dest.clone(),
+    let temp = temp_path(&dest);
+    let mut file = fs::File::create(&temp).map_err(|source| BuildError::Io {
+        path: temp.clone(),
         source,
     })?;
     io::copy(&mut reader, &mut file).map_err(|source| BuildError::Io {
-        path: dest.clone(),
+        path: temp.clone(),
         source,
     })?;
+    drop(file);
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&dest)
+        let mut perms = fs::metadata(&temp)
             .map_err(|source| BuildError::Io {
-                path: dest.clone(),
+                path: temp.clone(),
                 source,
             })?
             .permissions();
         perms.set_mode(0o755);
-        fs::set_permissions(&dest, perms).map_err(|source| BuildError::Io {
-            path: dest.clone(),
+        fs::set_permissions(&temp, perms).map_err(|source| BuildError::Io {
+            path: temp.clone(),
             source,
         })?;
     }
 
+    fs::rename(&temp, &dest).map_err(|source| BuildError::Io {
+        path: dest.clone(),
+        source,
+    })?;
+
     Ok(dest)
+}
+
+fn temp_path(dest: &Path) -> PathBuf {
+    let file_name = dest
+        .file_name()
+        .and_then(|file_name| file_name.to_str())
+        .unwrap_or("tailwindcss");
+    dest.with_file_name(format!("{file_name}.tmp"))
 }
