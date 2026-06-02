@@ -86,17 +86,28 @@ impl Path {
     ///
     /// let root = Path::new("/");
     /// assert_eq!(root.to_axum_path(), "/");
+    ///
+    /// // A path made up entirely of group segments collapses to the root URL,
+    /// // e.g. a page in a `(marketing)` group that should serve `/`.
+    /// let group_root = Path::new("/(marketing)");
+    /// assert_eq!(group_root.to_axum_path(), "/");
     /// ```
     pub fn to_axum_path(&self) -> Cow<'static, str> {
         if self.inner.is_empty() {
             return Cow::Borrowed("/");
         }
-        Cow::Owned(
-            self.segments()
-                .filter(|s| !s.is_group())
-                .collect::<PathBuf>()
-                .inner,
-        )
+        let stripped = self
+            .segments()
+            .filter(|s| !s.is_group())
+            .collect::<PathBuf>()
+            .inner;
+        // Stripping groups can leave nothing behind (e.g. `/(marketing)` or
+        // `/(a)/(b)`). Such a path addresses the root URL, so normalize the empty
+        // result back to "/" — Axum rejects route paths that don't start with "/".
+        if stripped.is_empty() {
+            return Cow::Borrowed("/");
+        }
+        Cow::Owned(stripped)
     }
 
     /// Returns `true` if this path starts with the given prefix path.
@@ -429,6 +440,14 @@ mod tests {
     fn path_to_axum_empty() {
         let path = Path::new("");
         assert_eq!(path.to_axum_path(), "/");
+    }
+
+    #[test]
+    fn path_to_axum_group_only_is_root() {
+        // A page inside a route group that should serve `/`.
+        assert_eq!(Path::new("/(marketing)").to_axum_path(), "/");
+        // Nested groups collapse the same way.
+        assert_eq!(Path::new("/(a)/(b)").to_axum_path(), "/");
     }
 
     #[test]
