@@ -34,15 +34,15 @@ impl std::fmt::Display for SignalId {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
-pub struct Signal<'a, T> {
+#[derive(Debug, Serialize)]
+pub struct Signal<T> {
     id: SignalId,
-    value: &'a T,
+    value: T,
 }
 
-impl<'a, T> Signal<'a, T> {
+impl<T> Signal<T> {
     #[inline]
-    pub fn new(value: &'a T) -> Self {
+    pub fn new(value: T) -> Self {
         Self {
             id: SignalId::new(),
             value,
@@ -53,16 +53,16 @@ impl<'a, T> Signal<'a, T> {
         self.id
     }
 
-    pub(crate) fn read(&self) -> &'a T {
-        self.value
+    pub(crate) fn read(&self) -> &T {
+        &self.value
     }
 }
 
-pub struct SignalDeclaration<'a, T>(Signal<'a, T>);
+pub struct SignalDeclaration<'a, T>(&'a Signal<T>);
 
 impl<'a, T> SignalDeclaration<'a, T> {
     #[inline]
-    pub fn new(signal: Signal<'a, T>) -> Self {
+    pub fn new(signal: &'a Signal<T>) -> Self {
         Self(signal)
     }
 }

@@ -4,7 +4,7 @@ use ref_cast::RefCast;
 
 use crate::runtime::{ToJs, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
 
-#[derive(Debug, RefCast)]
+#[derive(Debug, Clone, RefCast)]
 #[repr(transparent)]
 #[allow(non_camel_case_types)]
 pub struct String(std::string::String);

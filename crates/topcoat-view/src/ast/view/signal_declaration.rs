@@ -31,7 +31,7 @@ impl WriteView for SignalDeclaration {
         writer.let_binding(&parse_quote! { #ident }, expr);
         writer.let_binding(
             &parse_quote! { #ident },
-            &parse_quote! { ::topcoat::runtime::Signal::new(&#ident) },
+            &parse_quote! { &::topcoat::runtime::Signal::new(#ident) },
         );
         writer.write_expr(
             ExprKind::Node,

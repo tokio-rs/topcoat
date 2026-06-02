@@ -6,18 +6,18 @@ use crate::runtime::{
     Signal, Surrogated, ToJs, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref,
 };
 
-#[derive(RefCast, Clone, Copy)]
+#[derive(RefCast)]
 #[repr(transparent)]
-pub struct WriteSignal<'a, T>(Signal<'a, T>);
+pub struct WriteSignal<T>(Signal<T>);
 
-impl<'a, T> WriteSignal<'a, T> {
+impl<T> WriteSignal<T> {
     #[inline]
-    pub(crate) const fn new(v: Signal<'a, T>) -> Self {
+    pub(crate) const fn new(v: Signal<T>) -> Self {
         Self(v)
     }
 }
 
-impl<'a, T> WriteSignal<'a, T>
+impl<T> WriteSignal<T>
 where
     T: Surrogated,
     for<'b> &'b T: Surrogated,
@@ -31,11 +31,11 @@ where
     }
 }
 
-impl_surrogate!({'a, T} Signal<'a, T>, WriteSignal<'a, T>);
-impl_surrogate_ref!({'a, T} Signal<'a, T>, WriteSignal<'a, T>);
-impl_surrogate_mut!({'a, T} Signal<'a, T>, WriteSignal<'a, T>);
+impl_surrogate!({T} Signal<T>, WriteSignal<T>);
+impl_surrogate_ref!({T} Signal<T>, WriteSignal<T>);
+impl_surrogate_mut!({T} Signal<T>, WriteSignal<T>);
 
-impl<'a, T> ToJs for WriteSignal<'a, T> {
+impl<T> ToJs for &WriteSignal<T> {
     fn to_js(&self, out: &mut String) {
         let id = self.0.id();
         let _ = write!(out, "cx.signal(\"{id}\")");
