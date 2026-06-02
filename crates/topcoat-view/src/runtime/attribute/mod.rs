@@ -6,7 +6,7 @@ pub use attributes::*;
 pub use key::*;
 pub use value::*;
 
-use crate::runtime::{Unescaped, ViewParts};
+use crate::runtime::{Unescaped, ViewPart, ViewParts};
 
 /// A single HTML attribute.
 ///
@@ -48,6 +48,13 @@ where
             self.value.into_view_parts(parts);
             parts.push(Unescaped::new_unchecked("\""));
         }
+    }
+}
+
+impl AttributeViewParts for ViewPart {
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        parts.push(self);
     }
 }
 

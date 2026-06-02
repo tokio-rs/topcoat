@@ -1,4 +1,4 @@
-use crate::runtime::{Unescaped, ViewParts};
+use crate::runtime::{Unescaped, ViewPart, ViewParts};
 
 /// Converts a value used as an element name into view parts.
 ///
@@ -19,7 +19,22 @@ macro_rules! impl_primitive {
     };
 }
 
-impl_primitive!(&'static str);
+impl_primitive!(ViewPart);
 impl_primitive!(String);
-impl_primitive!(Unescaped<&'static str>);
 impl_primitive!(Unescaped<String>);
+
+impl ElementNameViewParts for &str {
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        let part: ViewPart = self.to_owned().into();
+        parts.push(part);
+    }
+}
+
+impl ElementNameViewParts for Unescaped<&str> {
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        let part: ViewPart = Unescaped::new_unchecked(String::from(*self)).into();
+        parts.push(part);
+    }
+}

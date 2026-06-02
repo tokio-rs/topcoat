@@ -43,10 +43,34 @@ impl_primitive!(u128);
 impl_primitive!(usize);
 impl_primitive!(f32);
 impl_primitive!(f64);
-impl_primitive!(&'static str);
 impl_primitive!(String);
-impl_primitive!(Unescaped<&'static str>);
 impl_primitive!(Unescaped<String>);
+
+impl AttributeValueViewParts for &str {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        let part: ViewPart = self.to_owned().into();
+        parts.push(part);
+    }
+}
+
+impl AttributeValueViewParts for Unescaped<&str> {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        let part: ViewPart = Unescaped::new_unchecked(String::from(*self)).into();
+        parts.push(part);
+    }
+}
 
 impl AttributeValueViewParts for bool {
     #[inline]

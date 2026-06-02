@@ -1,4 +1,4 @@
-use crate::runtime::{Unescaped, View, ViewParts};
+use crate::runtime::{Unescaped, View, ViewPart, ViewParts};
 
 /// Converts a value used in node position into view parts.
 ///
@@ -27,6 +27,7 @@ macro_rules! impl_primitive {
     };
 }
 
+impl_primitive!(ViewPart);
 impl_primitive!(bool);
 impl_primitive!(char);
 impl_primitive!(i8);
@@ -43,10 +44,24 @@ impl_primitive!(u128);
 impl_primitive!(usize);
 impl_primitive!(f32);
 impl_primitive!(f64);
-impl_primitive!(&'static str);
 impl_primitive!(String);
-impl_primitive!(Unescaped<&'static str>);
 impl_primitive!(Unescaped<String>);
+
+impl NodeViewParts for &str {
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        let part: ViewPart = self.to_owned().into();
+        parts.push(part);
+    }
+}
+
+impl NodeViewParts for Unescaped<&str> {
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        let part: ViewPart = Unescaped::new_unchecked(String::from(*self)).into();
+        parts.push(part);
+    }
+}
 
 impl<T> NodeViewParts for Option<T>
 where
