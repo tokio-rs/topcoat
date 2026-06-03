@@ -212,6 +212,27 @@ view! {
 }
 ```
 
+## Components
+
+Components are called inside `view!` with function-call syntax. Named arguments use `name: value`, and child nodes can be passed after the named arguments:
+
+```rust
+view! {
+    panel(
+        title: "Profile",
+        <p>"Account details"</p>
+        badge(
+            label: "Active",
+            tone: "success",
+        )
+    )
+}
+```
+
+All component parameters are named parameters, except `child`, which can be passed unnamed in the last position. Conceptually, those trailing child nodes are the same thing as a `child` parameter whose value is a `view! { ... }` containing those nodes.
+
+See [The `component` macro](component.md) for defining components and passing child content.
+
 ## Conditional Attributes
 
 Expression attributes can remove themselves from the rendered markup.
