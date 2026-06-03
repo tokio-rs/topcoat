@@ -269,6 +269,8 @@ view! {
 }
 ```
 
+For reusable runtime attribute collections, use [the `attributes!` macro](attributes.md). It accepts the same attribute syntax and creates a `topcoat::view::Attributes` value that can be passed around and inserted into an element as an attribute fragment.
+
 ## Custom Values In Markup
 
 The macro accepts dynamic Rust values by routing them through small runtime traits. Implement the trait for the position where your type should be accepted:
