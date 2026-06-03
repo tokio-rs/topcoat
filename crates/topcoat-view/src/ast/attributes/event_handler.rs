@@ -87,8 +87,8 @@ impl WriteAttribute for EventHandler {
             1,
             quote! {
                 {
-                    let __key = ::std::convert::Into::<::std::string::String>::into(#key);
-                    let (_, __js) = #value.into_evaluated_and_js();
+                    let __key = ::std::string::String::from(#key);
+                    let (_, __js) = ::topcoat::runtime::Expr::from(#value).into_evaluated_and_js();
                     __attrs.insert(::std::format!("data-topcoat-on:{}", __key), __js);
                 }
             },
