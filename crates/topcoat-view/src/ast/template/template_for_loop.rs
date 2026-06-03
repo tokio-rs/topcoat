@@ -6,6 +6,7 @@ use syn::{
 
 use crate::ast::{
     ParseOption,
+    attributes::{AttributeWriter, WriteAttribute},
     template::TemplateBlock,
     view::{ViewWriter, WriteView},
 };
@@ -22,6 +23,14 @@ pub struct TemplateForLoop<T> {
 
 impl<T: WriteView> WriteView for TemplateForLoop<T> {
     fn write(&self, writer: &mut ViewWriter) {
+        writer.for_loop(&self.pat, &self.expr, |writer| {
+            self.body.write(writer);
+        });
+    }
+}
+
+impl<T: WriteAttribute> WriteAttribute for TemplateForLoop<T> {
+    fn write(&self, writer: &mut AttributeWriter) {
         writer.for_loop(&self.pat, &self.expr, |writer| {
             self.body.write(writer);
         });
@@ -74,6 +83,13 @@ impl WriteView for TemplateContinue {
     }
 }
 
+impl WriteAttribute for TemplateContinue {
+    fn write(&self, writer: &mut AttributeWriter) {
+        let expr_continue = &self.expr_continue;
+        writer.statement(quote! { #expr_continue; });
+    }
+}
+
 impl Parse for TemplateContinue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
@@ -110,6 +126,13 @@ pub struct TemplateBreak {
 
 impl WriteView for TemplateBreak {
     fn write(&self, writer: &mut ViewWriter) {
+        let expr_break = &self.expr_break;
+        writer.statement(quote! { #expr_break; });
+    }
+}
+
+impl WriteAttribute for TemplateBreak {
+    fn write(&self, writer: &mut AttributeWriter) {
         let expr_break = &self.expr_break;
         writer.statement(quote! { #expr_break; });
     }

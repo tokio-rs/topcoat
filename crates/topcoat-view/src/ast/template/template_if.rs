@@ -5,6 +5,7 @@ use syn::{
 
 use crate::ast::{
     ParseOption,
+    attributes::{AttributeWriter, WriteAttribute},
     template::TemplateBlock,
     view::{ViewWriter, WriteView},
 };
@@ -19,6 +20,17 @@ pub struct TemplateIf<T> {
 
 impl<T: WriteView> WriteView for TemplateIf<T> {
     fn write(&self, writer: &mut ViewWriter) {
+        writer.if_else(&self.cond, |then_writer, else_writer| {
+            self.then_branch.write(then_writer);
+            if let Some(else_branch) = self.else_branch.as_ref() {
+                else_branch.write(else_writer);
+            }
+        });
+    }
+}
+
+impl<T: WriteAttribute> WriteAttribute for TemplateIf<T> {
+    fn write(&self, writer: &mut AttributeWriter) {
         writer.if_else(&self.cond, |then_writer, else_writer| {
             self.then_branch.write(then_writer);
             if let Some(else_branch) = self.else_branch.as_ref() {
@@ -71,6 +83,15 @@ pub enum TemplateElse<T> {
 
 impl<T: WriteView> WriteView for TemplateElse<T> {
     fn write(&self, writer: &mut ViewWriter) {
+        match self {
+            Self::ElseIf { template_if, .. } => template_if.write(writer),
+            Self::Else { then_branch, .. } => then_branch.write(writer),
+        }
+    }
+}
+
+impl<T: WriteAttribute> WriteAttribute for TemplateElse<T> {
+    fn write(&self, writer: &mut AttributeWriter) {
         match self {
             Self::ElseIf { template_if, .. } => template_if.write(writer),
             Self::Else { then_branch, .. } => then_branch.write(writer),

@@ -6,6 +6,9 @@ use syn::{
 
 use crate::ast::{
     ParseOption,
+    attributes::{
+        AttributeWriter, MatchArmsBuilder as AttributeMatchArmsBuilder, WriteAttribute,
+    },
     view::{MatchArmsBuilder, ViewWriter, WriteView},
 };
 
@@ -22,6 +25,16 @@ impl<B: WriteView> WriteView for TemplateMatch<B> {
         writer.match_expr(&self.expr, |arms| {
             for arm in &self.arms {
                 arm.write(arms);
+            }
+        });
+    }
+}
+
+impl<B: WriteAttribute> WriteAttribute for TemplateMatch<B> {
+    fn write(&self, writer: &mut AttributeWriter) {
+        writer.match_expr(&self.expr, |arms| {
+            for arm in &self.arms {
+                arm.write_attribute(arms);
             }
         });
     }
@@ -90,6 +103,17 @@ pub struct TemplateMatchArm<B> {
 #[allow(private_bounds)]
 impl<B: WriteView> TemplateMatchArm<B> {
     pub(crate) fn write(&self, arms: &mut MatchArmsBuilder) {
+        arms.arm(
+            &self.pat,
+            self.guard.as_ref().map(|(_, expr)| expr.as_ref()),
+            |writer| self.body.write(writer),
+        );
+    }
+}
+
+#[allow(private_bounds)]
+impl<B: WriteAttribute> TemplateMatchArm<B> {
+    pub(crate) fn write_attribute(&self, arms: &mut AttributeMatchArmsBuilder) {
         arms.arm(
             &self.pat,
             self.guard.as_ref().map(|(_, expr)| expr.as_ref()),

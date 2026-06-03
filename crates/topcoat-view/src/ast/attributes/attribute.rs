@@ -8,7 +8,7 @@ use syn::{
 
 use crate::ast::{
     ParseOption,
-    attributes::{AttributeKey, AttributeValue},
+    attributes::{AttributeKey, AttributeValue, AttributeWriter, WriteAttribute},
     view::{ExprKind, ViewWriter, WriteView},
 };
 
@@ -38,6 +38,14 @@ impl WriteView for Attribute {
                 }
             }
         }
+    }
+}
+
+impl WriteAttribute for Attribute {
+    fn write(&self, writer: &mut AttributeWriter) {
+        let key = &self.key;
+        let value = &self.value;
+        writer.insert(quote! { #key }, quote! { #value });
     }
 }
 

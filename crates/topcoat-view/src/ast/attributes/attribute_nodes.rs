@@ -3,7 +3,7 @@ use std::ops::Deref;
 use syn::parse::{Parse, ParseStream};
 
 use crate::ast::{
-    attributes::AttributeNode,
+    attributes::{AttributeNode, AttributeWriter, WriteAttribute},
     view::{ViewWriter, WriteView},
 };
 
@@ -42,7 +42,15 @@ impl Parse for AttributeNodes {
 impl WriteView for AttributeNodes {
     fn write(&self, writer: &mut ViewWriter) {
         for node in self {
-            node.write(writer);
+            WriteView::write(node, writer);
+        }
+    }
+}
+
+impl WriteAttribute for AttributeNodes {
+    fn write(&self, writer: &mut AttributeWriter) {
+        for node in self {
+            WriteAttribute::write(node, writer);
         }
     }
 }

@@ -7,7 +7,7 @@ use syn::{
 
 use crate::ast::{
     ParseOption,
-    attributes::AttributeKey,
+    attributes::{AttributeKey, AttributeWriter, WriteAttribute},
     template::TemplateOrRuntimeExpr,
     view::{ExprKind, ViewWriter, WriteView},
 };
@@ -74,6 +74,23 @@ impl WriteView for EventHandler {
                     #key,
                     #value,
                 )
+            },
+        );
+    }
+}
+
+impl WriteAttribute for EventHandler {
+    fn write(&self, writer: &mut AttributeWriter) {
+        let key = &self.key;
+        let value = &self.value;
+        writer.insert_block(
+            1,
+            quote! {
+                {
+                    let __key = ::std::convert::Into::<::std::string::String>::into(#key);
+                    let (_, __js) = #value.into_evaluated_and_js();
+                    __attrs.insert(::std::format!("data-topcoat-on:{}", __key), __js);
+                }
             },
         );
     }

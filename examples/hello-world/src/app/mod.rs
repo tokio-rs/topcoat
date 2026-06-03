@@ -153,10 +153,10 @@ async fn combobox_content(cx: &Cx, input: ReadSignal<String>) -> Result {
 
 #[component]
 async fn combobox(content: Shard<(ReadSignal<String>,)>) -> Result {
-    let kek = attributes!(
-        pip="5"
-        :lel=(5 + 5)
-    );
+    // let kek = attributes!(
+    //     pip="5"
+    //     :lel=(5 + 5)
+    // );
     view! {
         signal input = "apple".to_owned();
         <div>

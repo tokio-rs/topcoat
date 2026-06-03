@@ -6,6 +6,7 @@ use syn::{
 
 use crate::ast::{
     ParseOption,
+    attributes::{AttributeWriter, WriteAttribute},
     view::{ViewWriter, WriteView},
 };
 
@@ -19,6 +20,12 @@ pub struct TemplateBlock<T> {
 
 impl<T: WriteView> WriteView for TemplateBlock<T> {
     fn write(&self, writer: &mut ViewWriter) {
+        self.children.write(writer);
+    }
+}
+
+impl<T: WriteAttribute> WriteAttribute for TemplateBlock<T> {
+    fn write(&self, writer: &mut AttributeWriter) {
         self.children.write(writer);
     }
 }

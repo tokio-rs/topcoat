@@ -6,7 +6,7 @@ use syn::{
 
 use crate::ast::{
     ParseOption,
-    attributes::AttributeKey,
+    attributes::{AttributeKey, AttributeWriter, WriteAttribute},
     template::TemplateOrRuntimeExpr,
     view::{ExprKind, ViewWriter, WriteView},
 };
@@ -29,8 +29,26 @@ impl WriteView for BindAttribute {
             quote! {
                 ::topcoat::runtime::BindAttribute::new(
                     #key,
-                    #value,
+                    ::topcoat::runtime::Expr::from(#value),
                 )
+            },
+        );
+    }
+}
+
+impl WriteAttribute for BindAttribute {
+    fn write(&self, writer: &mut AttributeWriter) {
+        let key = &self.key;
+        let value = &self.value;
+        writer.insert_block(
+            2,
+            quote! {
+                {
+                    let __key = ::std::string::String::from(#key);
+                    let (__evaluated, __js) = ::topcoat::runtime::Expr::from(#value).into_evaluated_and_js();
+                    __attrs.insert(__key.clone(), __evaluated);
+                    __attrs.insert(::std::format!("data-topcoat-bind:{}", __key), __js);
+                }
             },
         );
     }

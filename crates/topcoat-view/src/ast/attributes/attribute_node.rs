@@ -2,7 +2,9 @@ use syn::parse::{Parse, ParseStream};
 
 use crate::ast::{
     ParseOption,
-    attributes::{Attribute, AttributeNodes, BindAttribute, EventHandler},
+    attributes::{
+        Attribute, AttributeNodes, AttributeWriter, BindAttribute, EventHandler, WriteAttribute,
+    },
     template::{
         TemplateBreak, TemplateContinue, TemplateForLoop, TemplateIf, TemplateLet, TemplateMatch,
     },
@@ -26,15 +28,31 @@ pub enum AttributeNode {
 impl WriteView for AttributeNode {
     fn write(&self, writer: &mut ViewWriter) {
         match self {
-            Self::Attribute(inner) => inner.write(writer),
-            Self::BindAttribute(inner) => inner.write(writer),
-            Self::EventHandler(inner) => inner.write(writer),
-            Self::If(inner) => inner.write(writer),
-            Self::Let(inner) => inner.write(writer),
-            Self::ForLoop(inner) => inner.write(writer),
-            Self::Continue(inner) => inner.write(writer),
-            Self::Break(inner) => inner.write(writer),
-            Self::Match(inner) => inner.write(writer),
+            Self::Attribute(inner) => WriteView::write(inner, writer),
+            Self::BindAttribute(inner) => WriteView::write(inner.as_ref(), writer),
+            Self::EventHandler(inner) => WriteView::write(inner, writer),
+            Self::If(inner) => WriteView::write(inner.as_ref(), writer),
+            Self::Let(inner) => WriteView::write(inner, writer),
+            Self::ForLoop(inner) => WriteView::write(inner, writer),
+            Self::Continue(inner) => WriteView::write(inner, writer),
+            Self::Break(inner) => WriteView::write(inner, writer),
+            Self::Match(inner) => WriteView::write(inner, writer),
+        }
+    }
+}
+
+impl WriteAttribute for AttributeNode {
+    fn write(&self, writer: &mut AttributeWriter) {
+        match self {
+            Self::Attribute(inner) => WriteAttribute::write(inner, writer),
+            Self::BindAttribute(inner) => WriteAttribute::write(inner.as_ref(), writer),
+            Self::EventHandler(inner) => WriteAttribute::write(inner, writer),
+            Self::If(inner) => WriteAttribute::write(inner.as_ref(), writer),
+            Self::Let(inner) => WriteAttribute::write(inner, writer),
+            Self::ForLoop(inner) => WriteAttribute::write(inner, writer),
+            Self::Continue(inner) => WriteAttribute::write(inner, writer),
+            Self::Break(inner) => WriteAttribute::write(inner, writer),
+            Self::Match(inner) => WriteAttribute::write(inner, writer),
         }
     }
 }
