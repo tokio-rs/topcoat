@@ -23,7 +23,6 @@ pub struct RuntimeExpr {
 
 impl WriteView for RuntimeExpr {
     fn write(&self, writer: &mut ViewWriter) {
-        let expr = &self.expr;
         writer.write_expr(ExprKind::Node, self.to_token_stream());
     }
 }

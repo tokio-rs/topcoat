@@ -119,7 +119,7 @@ impl topcoat_pretty::PrettyPrint for BindAttribute {
 }
 
 pub enum EventHandlerValue {
-    Expr(TemplateOrRuntimeExpr),
+    Expr(Box<TemplateOrRuntimeExpr>),
     LitStr(LitStr),
 }
 
