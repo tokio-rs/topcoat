@@ -67,15 +67,26 @@ impl WriteView for EventHandler {
     fn write(&self, writer: &mut ViewWriter) {
         let key = &self.key;
         let value = &self.value;
-        writer.write_expr(
-            ExprKind::Attributes,
-            quote! {
-                ::topcoat::runtime::EventHandler::new(
-                    #key,
-                    #value,
-                )
-            },
-        );
+        match value {
+            EventHandlerValue::LitStr(value) => {
+                writer.write_str_unescaped("data-topcoat-on:");
+                key.write(writer);
+                writer.write_str_unescaped("=\"");
+                writer.write_str(&value.value());
+                writer.write_str_unescaped("\"");
+            }
+            EventHandlerValue::Expr(value) => {
+                writer.write_expr(
+                    ExprKind::Attributes,
+                    quote! {
+                        ::topcoat::runtime::EventHandler::new(
+                            #key,
+                            #value,
+                        )
+                    },
+                );
+            }
+        }
     }
 }
 

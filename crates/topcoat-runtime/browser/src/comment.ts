@@ -26,7 +26,6 @@ export function parseComment(node: Comment): CommentMarker | null {
 		const id = sig[1];
 		const valueExpr = new DOMParser().parseFromString(sig[2], "text/html")
 			.documentElement.textContent;
-		console.log(valueExpr);
 		const value = new Function("cx", `return ${valueExpr};`)(
 			new Context(new SignalRegistry()),
 		);
