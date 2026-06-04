@@ -105,7 +105,7 @@ mod tests {
         _cx: &Cx,
         _body: Body,
     ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send>> {
-        Box::pin(async { Ok((StatusCode::OK).into_response()) })
+        Box::pin(async { (StatusCode::OK).into_response() })
     }
 
     fn route(path: &'static str) -> Route {

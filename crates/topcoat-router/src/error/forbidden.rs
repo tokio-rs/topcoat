@@ -1,6 +1,6 @@
 use http::StatusCode;
 
-use crate::{IntoResponse, Response};
+use crate::Response;
 
 /// Builds a forbidden (HTTP 403) response.
 ///
@@ -48,7 +48,7 @@ impl std::fmt::Display for ForbiddenError {
 
 impl std::error::Error for ForbiddenError {}
 
-impl IntoResponse for ForbiddenError {
+impl axum::response::IntoResponse for ForbiddenError {
     fn into_response(self) -> Response {
         (StatusCode::FORBIDDEN, "forbidden").into_response()
     }

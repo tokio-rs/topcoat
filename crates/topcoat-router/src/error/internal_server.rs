@@ -1,7 +1,7 @@
 use http::StatusCode;
 use topcoat_core::error::Error;
 
-use crate::{IntoResponse, Response};
+use crate::Response;
 
 /// Builds an internal-server-error (HTTP 500) response.
 ///
@@ -55,7 +55,7 @@ impl std::fmt::Display for InternalServerError {
 
 impl std::error::Error for InternalServerError {}
 
-impl IntoResponse for InternalServerError {
+impl axum::response::IntoResponse for InternalServerError {
     fn into_response(self) -> Response {
         (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response()
     }

@@ -6,5 +6,5 @@ use topcoat::{
 
 #[route(GET)]
 async fn kek() -> Result<Response> {
-    Ok((StatusCode::OK).into_response())
+    (StatusCode::OK).into_response()
 }

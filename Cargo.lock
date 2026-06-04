@@ -2006,11 +2006,14 @@ name = "topcoat-router"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "form_urlencoded",
  "heck",
  "http",
  "inventory",
  "ref-cast",
  "serde",
+ "serde_json",
+ "serde_path_to_error",
  "serde_urlencoded",
  "thiserror",
  "tokio",

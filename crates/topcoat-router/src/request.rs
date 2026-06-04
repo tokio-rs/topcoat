@@ -40,11 +40,11 @@ impl axum::extract::FromRequest<Arc<State>> for CxBody {
 }
 
 pub trait FromRequest: Sized {
-    fn from_body(cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> + Send;
+    fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> + Send;
 }
 
 impl FromRequest for Body {
-    async fn from_body(_cx: &Cx, body: Body) -> Result<Self> {
+    async fn from_request(_cx: &Cx, body: Body) -> Result<Self> {
         Ok(body)
     }
 }

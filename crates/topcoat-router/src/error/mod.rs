@@ -21,7 +21,7 @@ use topcoat_core::error::{Error, Result};
 /// with the axum implementation.
 pub(crate) fn result_into_response<T: IntoResponse>(result: Result<T>) -> Response {
     match result {
-        Ok(value) => value.into_response(),
+        Ok(value) => value.into_response().unwrap_or_else(error_into_response),
         Err(error) => error_into_response(error),
     }
 }
@@ -34,7 +34,7 @@ pub(crate) fn error_into_response(error: Error) -> Response {
     macro_rules! try_downcast {
         ($ident:ident as $ty:ty) => {
             match $ident.downcast::<$ty>() {
-                Ok(error) => return error.into_response(),
+                Ok(error) => return axum::response::IntoResponse::into_response(error),
                 Err(error) => error,
             }
         };
@@ -46,7 +46,7 @@ pub(crate) fn error_into_response(error: Error) -> Response {
     let error = try_downcast!(error as RedirectError);
     let error = try_downcast!(error as UnauthorizedError);
 
-    InternalServerError::from(error).into_response()
+    axum::response::IntoResponse::into_response(internal_server_error(error))
 }
 
 /// Converts an absent or failed value into a router error response.

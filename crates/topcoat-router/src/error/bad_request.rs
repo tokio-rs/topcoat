@@ -25,6 +25,25 @@ pub fn bad_request(description: impl Into<String>) -> BadRequestError {
     BadRequestError::new(description.into())
 }
 
+/// Builds a bad-request (HTTP 400) response whose description includes an
+/// input path.
+///
+/// This is useful for structured request formats where the parser can report
+/// the field or element that failed validation.
+pub fn bad_request_at(
+    path: impl std::fmt::Display,
+    description: impl Into<String>,
+) -> BadRequestError {
+    let path = path.to_string();
+    let description = description.into();
+
+    if path == "." {
+        bad_request(description)
+    } else {
+        bad_request(format!("{path}: {description}"))
+    }
+}
+
 /// A bad-request response carried as the `Err` variant of a handler `Result`.
 ///
 /// Construct one with [`bad_request`].

@@ -16,11 +16,14 @@ topcoat-runtime.workspace = true
 topcoat-view = { workspace = true, features = ["axum"] }
 
 axum.workspace = true
+form_urlencoded.workspace = true
 heck.workspace = true
 http.workspace = true
 inventory = { workspace = true, optional = true }
 ref-cast.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

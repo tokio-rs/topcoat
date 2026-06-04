@@ -1,6 +1,6 @@
 use http::StatusCode;
 
-use crate::{IntoResponse, Response};
+use crate::Response;
 
 /// Builds an unauthorized (HTTP 401) response.
 ///
@@ -47,7 +47,7 @@ impl std::fmt::Display for UnauthorizedError {
 
 impl std::error::Error for UnauthorizedError {}
 
-impl IntoResponse for UnauthorizedError {
+impl axum::response::IntoResponse for UnauthorizedError {
     fn into_response(self) -> Response {
         (StatusCode::UNAUTHORIZED, "unauthorized").into_response()
     }

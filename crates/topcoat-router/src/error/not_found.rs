@@ -1,6 +1,6 @@
 use http::StatusCode;
 
-use crate::{IntoResponse, Response};
+use crate::Response;
 
 /// Builds a not-found (HTTP 404) response.
 ///
@@ -45,7 +45,7 @@ impl std::fmt::Display for NotFoundError {
 
 impl std::error::Error for NotFoundError {}
 
-impl IntoResponse for NotFoundError {
+impl axum::response::IntoResponse for NotFoundError {
     fn into_response(self) -> Response {
         (StatusCode::NOT_FOUND, "not found").into_response()
     }

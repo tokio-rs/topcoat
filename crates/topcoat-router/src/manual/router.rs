@@ -10,10 +10,7 @@ use topcoat_asset::{AssetBundle, AssetResolver, ServeAssetBundle};
 use topcoat_core::context::{MaybeAborted, State, WatchAbort};
 use topcoat_runtime::runtime::{DynShard, EncodedSignals, Shards};
 
-use crate::{
-    CxBody, IntoResponse, Layout, Layouts, Page, Pages, Route, Routes, not_found,
-    result_into_response,
-};
+use crate::{CxBody, Layout, Layouts, Page, Pages, Route, Routes, not_found, result_into_response};
 
 /// The core routing primitive that collects [`Page`]s, [`Layout`]s, and
 /// [`Route`]s, matches layouts to pages by path prefix, and converts into an
@@ -282,8 +279,9 @@ impl From<Router> for axum::Router {
         }
         axum_router = axum_router.nest("/_topcoat/shards", shard_router);
 
-        axum_router = axum_router
-            .fallback(async move |CxBody { cx: _, body: _ }: CxBody| not_found().into_response());
+        axum_router = axum_router.fallback(async move |CxBody { cx: _, body: _ }: CxBody| {
+            axum::response::IntoResponse::into_response(not_found())
+        });
 
         axum_router.with_state(Arc::new(state))
     }

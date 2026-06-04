@@ -1,4 +1,4 @@
-use crate::{IntoResponse, Response};
+use crate::Response;
 
 /// Builds a temporary (HTTP 307) redirect to `uri`.
 ///
@@ -64,7 +64,7 @@ impl std::fmt::Display for RedirectError {
 
 impl std::error::Error for RedirectError {}
 
-impl IntoResponse for RedirectError {
+impl axum::response::IntoResponse for RedirectError {
     fn into_response(self) -> Response {
         self.inner.into_response()
     }
