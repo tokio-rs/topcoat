@@ -1,4 +1,4 @@
-use topcoat_view::runtime::ViewPart;
+use topcoat_view::runtime::{NodeViewParts, ViewPart, ViewParts};
 
 #[derive(Debug, Clone)]
 pub struct Expr<T> {
@@ -15,5 +15,14 @@ impl<T> Expr<T> {
     #[inline]
     pub fn into_evaluated_and_js(self) -> (T, ViewPart) {
         (self.evaluated, self.js)
+    }
+}
+
+impl<T> NodeViewParts for Expr<T>
+where
+    T: NodeViewParts,
+{
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        self.evaluated.into_view_parts(parts);
     }
 }

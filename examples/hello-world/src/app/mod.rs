@@ -166,6 +166,7 @@ async fn combobox(content: Shard<(ReadSignal<String>,)>) -> Result {
                 :value=$(input.get())
                 @input=$(|e: ::topcoat::runtime::Event| { input.set(e.target.value); })
             >
+            $(5.0 + 1.0)
             track content(input)
 
 
