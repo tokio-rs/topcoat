@@ -10,7 +10,10 @@ impl JsViewParts for str {
     }
 }
 
-impl<T: JsViewParts> JsViewParts for &T {
+impl<T: JsViewParts> JsViewParts for &T
+where
+    T: ?Sized,
+{
     fn to_view_parts(&self, parts: &mut ViewParts) {
         <T as JsViewParts>::to_view_parts(*self, parts);
     }
