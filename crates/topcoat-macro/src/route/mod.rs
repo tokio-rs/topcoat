@@ -1,9 +1,10 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
     Ident, ItemFn, LitStr,
     parse::{Parse, ParseStream},
     parse_quote,
+    spanned::Spanned,
 };
 
 use crate::handler_args::{HandlerArgs, request_ident};
@@ -69,7 +70,7 @@ impl ToTokens for Route {
         let parse_request = self.1.args.request().map(|request| {
             let request_ident = request_ident();
             let request_ty = &request.ty;
-            quote! {
+            quote_spanned! {request_ty.span()=>
                 let #request_ident = <#request_ty as ::topcoat::router::FromRequest>::from_request(cx, body).await?;
             }
         });
