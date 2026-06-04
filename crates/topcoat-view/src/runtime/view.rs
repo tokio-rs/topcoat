@@ -2,9 +2,9 @@ use core::fmt;
 
 use topcoat_core::context::Cx;
 
-use crate::runtime::{Formatter, Fragment, Unescaped};
+use crate::runtime::{FmtHtml, Formatter, Unescaped};
 
-/// A self-contained HTML fragment.
+/// A self-contained piece of HTML content.
 ///
 /// A view may contain multiple sibling nodes, but opened tags must be closed
 /// so the fragment can be nested safely inside a larger document.
@@ -49,14 +49,14 @@ impl View {
     pub fn render(&self, cx: &Cx) -> String {
         let mut buf = String::with_capacity(self.size_hint);
         let mut f = Formatter::new(&mut buf);
-        self.fmt(cx, &mut f);
+        self.fmt_html(cx, &mut f);
         buf
     }
 }
 
-impl Fragment for View {
-    fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        self.part.fmt(cx, f);
+impl FmtHtml for View {
+    fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
+        self.part.fmt_html(cx, f);
     }
 
     #[inline]
@@ -135,7 +135,7 @@ pub enum ViewPart {
     /// An owned string rendered without escaping.
     #[non_exhaustive]
     UnescapedString(Unescaped<String>),
-    /// A custom fragment stored in a cloneable box.
+    /// A custom view part stored in a cloneable box.
     #[non_exhaustive]
     BoxDyn(Box<dyn DynViewPart>),
     /// A sequence of view parts rendered in order.
@@ -154,18 +154,18 @@ impl ViewPart {
     }
 }
 
-/// A boxed [`Fragment`] that can be cloned.
+/// A boxed [`FmtHtml`] that can be cloned.
 ///
-/// This is mainly useful when a custom fragment type needs to be stored in a
-/// [`ViewPart`].
-pub trait DynViewPart: 'static + Fragment + fmt::Debug + Send {
-    /// Clones this fragment into a fresh boxed value.
+/// This is mainly useful when a custom HTML formattable type needs to
+/// be stored in a [`ViewPart`].
+pub trait DynViewPart: 'static + FmtHtml + fmt::Debug + Send {
+    /// Clones this view part into a fresh boxed value.
     fn clone_box(&self) -> Box<dyn DynViewPart>;
 }
 
 impl<T> DynViewPart for T
 where
-    T: 'static + Fragment + fmt::Debug + Clone + Send,
+    T: 'static + FmtHtml + fmt::Debug + Clone + Send,
 {
     #[inline]
     fn clone_box(&self) -> Box<dyn DynViewPart> {
@@ -180,39 +180,39 @@ impl Clone for Box<dyn DynViewPart> {
     }
 }
 
-impl Fragment for ViewPart {
-    fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
+impl FmtHtml for ViewPart {
+    fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
         match self {
             Self::Empty => {}
-            Self::Bool(inner) => inner.fmt(cx, f),
-            Self::Char(inner) => inner.fmt(cx, f),
-            Self::I8(inner) => inner.fmt(cx, f),
-            Self::I16(inner) => inner.fmt(cx, f),
-            Self::I32(inner) => inner.fmt(cx, f),
-            Self::I64(inner) => inner.fmt(cx, f),
-            Self::I128(inner) => inner.fmt(cx, f),
-            Self::Isize(inner) => inner.fmt(cx, f),
-            Self::U8(inner) => inner.fmt(cx, f),
-            Self::U16(inner) => inner.fmt(cx, f),
-            Self::U32(inner) => inner.fmt(cx, f),
-            Self::U64(inner) => inner.fmt(cx, f),
-            Self::U128(inner) => inner.fmt(cx, f),
-            Self::Usize(inner) => inner.fmt(cx, f),
-            Self::F32(inner) => inner.fmt(cx, f),
-            Self::F64(inner) => inner.fmt(cx, f),
-            Self::String(inner) => inner.fmt(cx, f),
-            Self::StaticStr(inner) => inner.fmt(cx, f),
-            Self::UnescapedString(inner) => inner.fmt(cx, f),
-            Self::UnescapedStaticStr(inner) => inner.fmt(cx, f),
-            Self::BoxDyn(inner) => Fragment::fmt(inner, cx, f),
+            Self::Bool(inner) => inner.fmt_html(cx, f),
+            Self::Char(inner) => inner.fmt_html(cx, f),
+            Self::I8(inner) => inner.fmt_html(cx, f),
+            Self::I16(inner) => inner.fmt_html(cx, f),
+            Self::I32(inner) => inner.fmt_html(cx, f),
+            Self::I64(inner) => inner.fmt_html(cx, f),
+            Self::I128(inner) => inner.fmt_html(cx, f),
+            Self::Isize(inner) => inner.fmt_html(cx, f),
+            Self::U8(inner) => inner.fmt_html(cx, f),
+            Self::U16(inner) => inner.fmt_html(cx, f),
+            Self::U32(inner) => inner.fmt_html(cx, f),
+            Self::U64(inner) => inner.fmt_html(cx, f),
+            Self::U128(inner) => inner.fmt_html(cx, f),
+            Self::Usize(inner) => inner.fmt_html(cx, f),
+            Self::F32(inner) => inner.fmt_html(cx, f),
+            Self::F64(inner) => inner.fmt_html(cx, f),
+            Self::String(inner) => inner.fmt_html(cx, f),
+            Self::StaticStr(inner) => inner.fmt_html(cx, f),
+            Self::UnescapedString(inner) => inner.fmt_html(cx, f),
+            Self::UnescapedStaticStr(inner) => inner.fmt_html(cx, f),
+            Self::BoxDyn(inner) => FmtHtml::fmt_html(inner, cx, f),
             Self::BoxSlice(inner) => {
                 for part in inner.iter() {
-                    part.fmt(cx, f);
+                    part.fmt_html(cx, f);
                 }
             }
             Self::Vec(inner) => {
                 for part in inner.iter() {
-                    part.fmt(cx, f);
+                    part.fmt_html(cx, f);
                 }
             }
         }
@@ -241,7 +241,7 @@ impl Fragment for ViewPart {
             Self::String(inner) => inner.size_hint(),
             Self::UnescapedString(inner) => inner.len(),
             Self::UnescapedStaticStr(inner) => inner.len(),
-            Self::BoxDyn(inner) => Fragment::size_hint(inner),
+            Self::BoxDyn(inner) => FmtHtml::size_hint(inner),
             Self::BoxSlice(inner) => inner.iter().map(|part| part.size_hint()).sum(),
             Self::Vec(inner) => inner.iter().map(|part| part.size_hint()).sum(),
         }

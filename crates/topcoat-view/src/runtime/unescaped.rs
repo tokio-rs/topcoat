@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use topcoat_core::context::Cx;
 
-use crate::runtime::{Formatter, Fragment};
+use crate::runtime::{FmtHtml, Formatter};
 
 /// A wrapper that marks its contents as already-safe HTML.
 ///
@@ -24,16 +24,16 @@ impl<T> Unescaped<T> {
     }
 }
 
-impl Fragment for Unescaped<&str> {
+impl FmtHtml for Unescaped<&str> {
     #[inline]
-    fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
+    fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
         f.write_str_unescaped(self.0);
     }
 }
 
-impl Fragment for Unescaped<String> {
+impl FmtHtml for Unescaped<String> {
     #[inline]
-    fn fmt(&self, _cx: &Cx, f: &mut Formatter<'_>) {
+    fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
         f.write_str_unescaped(&self.0);
     }
 }

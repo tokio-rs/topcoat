@@ -15,7 +15,7 @@
 //! - `tower` (default) — [`ServeAssetBundle`] for serving a bundle over
 //!   HTTP via `tower-http`.
 //! - `bundler` — the [`Bundler`] type (pulls in `tokio` and `reqwest`).
-//! - `view` — integrates [`Asset`] with `topcoat-view`'s fragment system
+//! - `view` — integrates [`Asset`] with `topcoat-view`'s `ViewPart` system
 //!   so an `Asset` can be rendered directly into a view.
 //!
 //! # Example

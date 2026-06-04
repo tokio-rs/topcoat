@@ -6,7 +6,7 @@ use axum::{
     routing::{MethodFilter, get, on},
 };
 use serde::Deserialize;
-use topcoat_asset::{AssetBundle, AssetFragmentResolver, ServeAssetBundle};
+use topcoat_asset::{AssetBundle, AssetResolver, ServeAssetBundle};
 use topcoat_core::context::{MaybeAborted, State, WatchAbort};
 use topcoat_runtime::runtime::{DynShard, EncodedSignals, Shards};
 
@@ -199,7 +199,7 @@ impl From<Router> for axum::Router {
         let assets = value.assets;
         axum_router = axum_router.nest_service("/_topcoat/assets", ServeAssetBundle::new(&assets));
         let asset_resolver =
-            AssetFragmentResolver::new(Box::new(move |_cx, asset, f| match assets.get(asset) {
+            AssetResolver::new(Box::new(move |_cx, asset, f| match assets.get(asset) {
                 Some(asset) => {
                     f.write_str("/_topcoat/assets/");
                     f.write_str(asset.name().to_str().expect("asset had non-UTF8 name"));

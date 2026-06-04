@@ -1,22 +1,21 @@
 use topcoat_core::context::{Cx, app_state};
-use topcoat_view::runtime::{AttributeValueViewParts, DynViewPart, Formatter, Fragment, ViewParts};
+use topcoat_view::runtime::{AttributeValueViewParts, DynViewPart, FmtHtml, Formatter, ViewParts};
 
 use crate::Asset;
 
 /// User-provided callback that turns an [`Asset`] into rendered output
-/// (typically a URL or bundled path) when an [`Asset`] is used as a view
-/// fragment.
+/// (typically a URL or bundled path) when an [`Asset`] is used as a view part.
 pub type ResolveAssetFn = dyn Fn(&Cx, Asset, &mut Formatter<'_>) + Send + Sync;
 
 /// App-state hook that lets [`Asset`] be rendered directly inside a view.
 ///
 /// Install one into the app state before rendering any view that
 /// contains an [`Asset`] fragment; without it, formatting will panic.
-pub struct AssetFragmentResolver {
+pub struct AssetResolver {
     resolve_fn: Box<ResolveAssetFn>,
 }
 
-impl AssetFragmentResolver {
+impl AssetResolver {
     /// Build a resolver from a callback.
     pub fn new(resolve_fn: Box<ResolveAssetFn>) -> Self {
         Self { resolve_fn }
@@ -28,9 +27,9 @@ impl AssetFragmentResolver {
     }
 }
 
-impl Fragment for Asset {
-    fn fmt(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        app_state::<AssetFragmentResolver>(cx).resolve(cx, *self, f)
+impl FmtHtml for Asset {
+    fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
+        app_state::<AssetResolver>(cx).resolve(cx, *self, f)
     }
 }
 
