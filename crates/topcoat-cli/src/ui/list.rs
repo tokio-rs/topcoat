@@ -53,7 +53,10 @@ impl ListCommand {
         }
 
         for (name, registry_state) in &state.registries {
-            if selected.as_deref().is_some_and(|name_selected| name_selected != name) {
+            if selected
+                .as_deref()
+                .is_some_and(|name_selected| name_selected != name)
+            {
                 continue;
             }
             // Separate registry blocks with a blank line.
@@ -97,23 +100,21 @@ async fn list_registry(project: &Project, name: &str, state: &RegistryState, ins
         match state.components.get(*component_name) {
             None => {
                 if !installed_only {
-                    println!("    {component_name} {}", style(latest).dim());
+                    println!("    {component_name}");
                 }
             }
             Some(installed) if installed.version == latest => {
                 println!(
-                    "  {} {} {} (installed)",
+                    "  {} {} (installed)",
                     style("✓").green(),
                     style(component_name).bold(),
-                    style(&installed.version).green()
                 );
             }
-            Some(installed) => {
+            Some(_installed) => {
                 println!(
-                    "  {} {} {} → {latest} {}",
+                    "  {} {} {}",
                     style("↑").yellow(),
                     style(component_name).bold(),
-                    installed.version,
                     style("(update available)").yellow(),
                 );
             }
