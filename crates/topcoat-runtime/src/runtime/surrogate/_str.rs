@@ -5,7 +5,6 @@ use crate::runtime::{JsViewParts, impl_surrogate_mut, impl_surrogate_ref};
 
 #[derive(Debug, RefCast)]
 #[repr(transparent)]
-#[allow(non_camel_case_types)]
 pub struct Str(str);
 
 impl_surrogate_ref!(str, Str);

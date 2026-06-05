@@ -5,7 +5,6 @@ use crate::runtime::{JsViewParts, impl_surrogate, impl_surrogate_mut, impl_surro
 
 #[derive(Debug, RefCast, Clone, Copy)]
 #[repr(transparent)]
-#[allow(non_camel_case_types)]
 pub struct F64(f64);
 
 impl F64 {
