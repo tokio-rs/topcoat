@@ -10,6 +10,7 @@ members = [
     "crates/topcoat-router",
     "crates/topcoat-runtime",
     "crates/topcoat-tailwind",
+    "crates/topcoat-ui",
     "crates/topcoat-view",
 
     "examples/assets",
@@ -38,6 +39,7 @@ topcoat-pretty = { path = "crates/topcoat-pretty" }
 topcoat-router = { path = "crates/topcoat-router" }
 topcoat-runtime = { path = "crates/topcoat-runtime" }
 topcoat-tailwind = { path = "crates/topcoat-tailwind" }
+topcoat-ui = { path = "crates/topcoat-ui" }
 topcoat-view = { path = "crates/topcoat-view" }
 
 anyhow = "1.0"

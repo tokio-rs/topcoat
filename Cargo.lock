@@ -1990,11 +1990,14 @@ dependencies = [
  "indicatif",
  "notify",
  "proc-macro2",
+ "serde",
  "serde_json",
  "syn",
  "tokio",
+ "toml",
  "topcoat-asset",
  "topcoat-pretty",
+ "topcoat-ui",
  "topcoat-view",
 ]
 
@@ -2079,6 +2082,16 @@ version = "0.1.0"
 dependencies = [
  "thiserror",
  "ureq",
+]
+
+[[package]]
+name = "topcoat-ui"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "thiserror",
+ "toml",
 ]
 
 [[package]]
