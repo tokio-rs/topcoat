@@ -13,7 +13,7 @@ pub(super) struct AddCommand {
     registry: Option<String>,
     /// Registry location (a path, `file://` path, or `http(s)://` URL); sets or
     /// overrides the location stored for the registry
-    #[arg(short, long)]
+    #[arg(long)]
     url: Option<String>,
     /// Overwrite the component file if it already exists
     #[arg(short, long)]
@@ -78,5 +78,8 @@ fn confirm(prompt: &str) -> Result<bool, String> {
     std::io::stdin()
         .read_line(&mut input)
         .map_err(|error| format!("failed to read input: {error}"))?;
-    Ok(matches!(input.trim().to_ascii_lowercase().as_str(), "y" | "yes"))
+    Ok(matches!(
+        input.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
 }

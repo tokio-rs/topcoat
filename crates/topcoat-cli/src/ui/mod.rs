@@ -38,6 +38,6 @@ impl UiCommand {
 struct ProjectArg {
     /// Cargo workspace to operate on; its root holds `components.toml`
     /// (defaults to the current workspace)
-    #[arg(long)]
+    #[arg(short, long)]
     project: Option<PathBuf>,
 }
