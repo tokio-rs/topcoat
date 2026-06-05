@@ -79,7 +79,10 @@ mod tests {
     #[test]
     fn template_expr_tokens_are_raw_expression() {
         let expr = syn::parse_str::<TemplateOrRuntimeExpr>("(value + 1)").unwrap();
-        assert_eq!(expr.to_token_stream().to_string(), "value + 1");
+        assert_eq!(
+            expr.to_token_stream().to_string(),
+            ":: topcoat :: runtime :: Expr :: from (value + 1)"
+        );
     }
 
     #[test]
