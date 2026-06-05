@@ -4,7 +4,7 @@
 
 A batteries-included Rust web framework for server-rendered apps.
 
-Topcoat sits on top of Axum and turns it into a productive full-stack toolkit: HTML-first templates, file-system-shaped routing, per-request memoization, and a built-in asset pipeline with optional Tailwind support — all designed so you can stay in Rust and out of YAML.
+Topcoat sits on top of Axum and turns it into a productive full-stack toolkit: HTML-first templates, file-system-shaped routing, per-request memoization, and a built-in asset pipeline with optional Tailwind support — all designed so you can stay in Rust.
 
 ```rust
 use topcoat::{Result, router::{Router, page}, view::{component, view}};
@@ -74,14 +74,14 @@ src/app/
     └── health.rs       → GET /api/health
 ```
 
-Path params name themselves: `#[path_param] struct PostId(Uuid);` simultaneously declares the type *and* renames the enclosing module to `{post_id}`.
-
 ### Functions, not middleware
 
-Authentication, tenant lookup, feature flags, locale detection — anything request-scoped — is just a function that takes `&Cx`. No extractor towers, no ambient request state, no "did the middleware run?" panics.
+Authentication, tenant lookup, feature flags, locale detection — anything request-scoped — is just a function that takes `&Cx`.
 
 ```rust
-fn db(cx: &Cx) -> &Database { app_state(cx) }
+fn db(cx: &Cx) -> &Database {
+    app_state(cx)
+}
 
 #[memoize]
 async fn fetch_user(cx: &Cx, id: &str) -> Option<User> {
@@ -102,7 +102,7 @@ async fn user_avatar(cx: &Cx) -> Result {
 
 `#[memoize]` caches per request and keys on the arguments — so a layout reading the current user, a page checking authorization, and a deep component rendering an avatar all share one database hit. Concurrent callers even await the same in-flight future.
 
-### Assets with a content hash, no JS toolchain
+### Asset bundling
 
 ```rust
 const FERRIS: Asset = asset!("./ferris.png");
@@ -125,8 +125,6 @@ view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 - `topcoat asset bundle` — produce the asset bundle for release builds.
 
 ## Learn Topcoat
-
-The docs are ordered for newcomers — read top to bottom.
 
 **Rendering**
 - [The `view!` macro](docs/view.md) — templating syntax, control flow, conditional attributes.
