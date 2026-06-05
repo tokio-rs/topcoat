@@ -2,6 +2,7 @@
 # Run `cargo run -p topcoat-ui --bin <registry>-registry --features generate`.
 # Each component's version is the sha256 of its source file.
 
+version = 1
 name = "topcoat"
 
 [components.button]

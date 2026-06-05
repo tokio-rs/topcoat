@@ -7,6 +7,11 @@ use serde::Deserialize;
 /// The manifest file naming the components within a registry.
 pub const MANIFEST_FILE: &str = "registry.toml";
 
+/// The `registry.toml` format version this build writes and understands. Stored
+/// in the manifest's `version` field so older and newer formats can be told
+/// apart; manifests without the field are assumed to be version 1.
+pub const MANIFEST_VERSION: u32 = 1;
+
 /// The registry used when a project does not specify one of its own: the
 /// component registry published alongside this repository.
 pub const DEFAULT_REGISTRY: &str =
@@ -109,6 +114,9 @@ impl fmt::Display for Source {
 /// The parsed `registry.toml` manifest.
 #[derive(Deserialize)]
 struct Manifest {
+    /// The manifest format version. Required; used to tell formats apart so a
+    /// newer manifest can be rejected by an older build.
+    version: u32,
     /// The registry's own name, used when it is added to a project as a
     /// dependency's registry. Every registry must declare one.
     name: String,
@@ -146,6 +154,12 @@ impl Registry {
     pub async fn load(source: Source) -> Result<Self, Error> {
         let raw = source.child(MANIFEST_FILE).read().await?;
         let manifest: Manifest = toml::from_str(&raw)?;
+        if manifest.version > MANIFEST_VERSION {
+            return Err(Error::UnsupportedVersion {
+                found: manifest.version,
+                supported: MANIFEST_VERSION,
+            });
+        }
         Ok(Self {
             source,
             name: manifest.name,
@@ -230,4 +244,8 @@ pub enum Error {
     },
     #[error("failed to parse registry manifest")]
     Parse(#[from] toml::de::Error),
+    #[error(
+        "registry manifest has format version {found}, but this build supports up to {supported}"
+    )]
+    UnsupportedVersion { found: u32, supported: u32 },
 }

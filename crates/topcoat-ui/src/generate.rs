@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
-use crate::registry::MANIFEST_FILE;
+use crate::registry::{MANIFEST_FILE, MANIFEST_VERSION};
 
 /// The subdirectory of a registry holding the component source files.
 const COMPONENTS_DIR: &str = "components";
@@ -115,6 +115,7 @@ impl Registry {
              # Run `cargo run -p topcoat-ui --bin <registry>-registry --features generate`.\n\
              # Each component's version is the sha256 of its source file.\n\n",
         );
+        writeln!(out, "version = {MANIFEST_VERSION}").expect("writing to a String cannot fail");
         writeln!(out, "name = {}", quote(&self.name)).expect("writing to a String cannot fail");
 
         for component in components {
