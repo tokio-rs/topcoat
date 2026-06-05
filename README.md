@@ -6,6 +6,8 @@ A batteries-included Rust web framework for server-rendered apps.
 
 Topcoat sits on top of Axum and turns it into a productive full-stack toolkit: HTML-first templates, file-system-shaped routing, per-request memoization, and a built-in asset pipeline with optional Tailwind support — all designed so you can stay in Rust.
 
+See the [Getting started guide](docs/getting_started.md) to set up a new project.
+
 ```rust
 use topcoat::{Result, router::{Router, page}, view::{component, view}};
 
@@ -124,6 +126,9 @@ view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 - `topcoat asset bundle` — produce the asset bundle for release builds.
 
 ## Learn Topcoat
+
+**Start here**
+- [Getting started](docs/getting_started.md) — create a new project, install the CLI, run the dev server.
 
 **Rendering**
 - [The `view!` macro](docs/view.md) — templating syntax, control flow, conditional attributes.
