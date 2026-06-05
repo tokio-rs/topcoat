@@ -50,10 +50,8 @@ aggressively.
 
 ## Loading the bundle
 
-The router must be given the bundle that was produced by the asset bundler.
-`AssetBundle::load()` auto-detects the bundle by walking up from the current
-executable, picking up `<exe_dir>/assets/` (deployment) or `<cargo-target>/assets/`
-(`cargo run`, including cross-compilation and `examples/`):
+The router must load the generated asset bundle. Use `AssetBundle::load()` for
+the default bundle location:
 
 ```rust
 use topcoat::asset::AssetBundle;
@@ -69,8 +67,8 @@ async fn main() {
 }
 ```
 
-If the bundle lives somewhere else, use `AssetBundle::load_dir("path/to/assets")`
-instead.
+Use `AssetBundle::load_dir("path/to/assets")` when you write the bundle to
+a custom location.
 
 `Router::assets(...)` does two things:
 
