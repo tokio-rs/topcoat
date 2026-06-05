@@ -28,9 +28,10 @@ impl RemoveCommand {
         let removed = manage::remove(&project, &self.component, self.registry.as_deref())?;
 
         println!(
-            "{} removed {} from {}",
-            style("✓").green(),
-            style(removed.file.display()).bold(),
+            "{} removed {} {} from {}",
+            style("-").red(),
+            style(removed.name).bold(),
+            style(format!("({})", removed.file.display())).dim(),
             removed.registry
         );
         Ok(())

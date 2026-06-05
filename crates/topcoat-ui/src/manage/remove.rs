@@ -7,6 +7,8 @@ use super::state::InstallState;
 
 /// A component removed by [`remove`].
 pub struct Removed {
+    /// The component's name.
+    pub name: String,
     /// The project-relative path of the deleted file.
     pub file: PathBuf,
     /// The registry it had been added from.
@@ -53,6 +55,7 @@ pub fn remove(
     state.save(project)?;
 
     Ok(Removed {
+        name: component.to_string(),
         file: installed.file,
         registry: registry_name,
     })

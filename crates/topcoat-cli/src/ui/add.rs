@@ -45,11 +45,12 @@ impl AddCommand {
                 println!("{} already up to date", style("✓").green());
             }
             AddOutcome::Added(added) => {
-                for component in &added {
+                for component in added {
                     println!(
-                        "{} added {} from {}",
-                        style("✓").green(),
-                        style(component.file.display()).bold(),
+                        "{} added {} {} from {}",
+                        style("+").green(),
+                        style(component.name).bold(),
+                        style(format!("({})", component.file.display())).dim(),
                         component.registry
                     );
                 }

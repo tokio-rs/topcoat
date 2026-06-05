@@ -23,6 +23,8 @@ pub struct AddOptions {
 
 /// A component written into the project by [`add`].
 pub struct AddedComponent {
+    /// The component's name.
+    pub name: String,
     /// The project-relative path of the written file.
     pub file: PathBuf,
     /// The registry it was added from.
@@ -48,6 +50,7 @@ struct Pending {
 
 /// A file to write once planning has fully succeeded.
 struct PlannedWrite {
+    name: String,
     dir: PathBuf,
     file: PathBuf,
     relative_file: PathBuf,
@@ -194,6 +197,7 @@ pub async fn add(
                 .await
                 .map_err(|error| format!("failed to read component `{}`: {error}", component.name()))?;
             writes.push(PlannedWrite {
+                name: component.name().to_string(),
                 dir: dir.clone(),
                 file: file.clone(),
                 relative_file: relative_file.clone(),
@@ -271,6 +275,7 @@ pub async fn add(
             writes
                 .into_iter()
                 .map(|write| AddedComponent {
+                    name: write.name,
                     file: write.relative_file,
                     registry: write.registry,
                 })
