@@ -1,6 +1,7 @@
 mod add;
 mod list;
 mod module;
+mod project;
 mod remove;
 mod state;
 

@@ -11,3 +11,6 @@ name = "reg3"
 version = "0.1.0"
 source = "foo.rs"
 
+[components.button]
+version = "0.1.0"
+source = "button2.rs"

@@ -1,9 +1,11 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+
+use super::project::Project;
 
 /// The install-state file tracking which components a project has added.
 pub(super) const STATE_FILE: &str = "components.toml";
@@ -64,10 +66,11 @@ impl RegistryState {
 }
 
 impl InstallState {
-    pub(super) fn load(path: &Path) -> Result<Self, String> {
-        match std::fs::read_to_string(path) {
+    pub(super) fn load(project: &Project) -> Result<Self, String> {
+        let path = project.state_path();
+        match std::fs::read_to_string(&path) {
             Ok(raw) => {
-                let state: Self = toml::from_str(&raw)
+                let mut state: Self = toml::from_str(&raw)
                     .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
                 if state.version > STATE_VERSION {
                     return Err(format!(
@@ -77,6 +80,11 @@ impl InstallState {
                         STATE_VERSION
                     ));
                 }
+                // Normalize stored registry locations to a canonical relative
+                // form so they compare and round-trip consistently.
+                for registry in state.registries.values_mut() {
+                    registry.url = project.to_stored(&registry.url);
+                }
                 Ok(state)
             }
             Err(error) if error.kind() == ErrorKind::NotFound => Ok(Self::default()),
@@ -84,11 +92,12 @@ impl InstallState {
         }
     }
 
-    pub(super) fn save(&self, path: &Path) -> Result<(), String> {
+    pub(super) fn save(&self, project: &Project) -> Result<(), String> {
+        let path = project.state_path();
         let body = toml::to_string_pretty(self)
             .map_err(|error| format!("failed to serialize install state: {error}"))?;
         let contents = format!("# Topcoat UI install state. Managed by `topcoat ui`.\n{body}");
-        std::fs::write(path, contents)
+        std::fs::write(&path, contents)
             .map_err(|error| format!("failed to write {}: {error}", path.display()))
     }
 

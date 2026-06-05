@@ -1,10 +1,9 @@
-use std::path::Path;
-
 use clap::Args;
 use console::style;
 use topcoat_ui::{Registry, Source};
 
-use super::state::{InstallState, RegistryState, STATE_FILE};
+use super::project::{Project, ProjectArg};
+use super::state::{InstallState, RegistryState};
 
 #[derive(Args)]
 pub(super) struct ListCommand {
@@ -14,6 +13,8 @@ pub(super) struct ListCommand {
     /// Only show components that are installed
     #[arg(short, long)]
     installed: bool,
+    #[command(flatten)]
+    project: ProjectArg,
 }
 
 impl ListCommand {
@@ -25,12 +26,15 @@ impl ListCommand {
     }
 
     async fn run_inner(self) -> Result<(), String> {
-        let mut state = InstallState::load(Path::new(STATE_FILE))?;
+        let selected = self.registry;
+        let installed_only = self.installed;
+        let project = Project::locate(self.project).await?;
+        let mut state = InstallState::load(&project)?;
 
         // Ensure there is something to list: a named registry that isn't tracked
         // yet (only valid for one with a built-in location), or the project's
         // default registry when nothing has been added yet.
-        match &self.registry {
+        match &selected {
             Some(name) if !state.registries.contains_key(name) => {
                 let url = InstallState::default_url(name)
                     .ok_or_else(|| format!("unknown registry `{name}`"))?;
@@ -49,17 +53,13 @@ impl ListCommand {
         }
 
         for (name, registry_state) in &state.registries {
-            if self
-                .registry
-                .as_deref()
-                .is_some_and(|selected| selected != name)
-            {
+            if selected.as_deref().is_some_and(|name_selected| name_selected != name) {
                 continue;
             }
             // Separate registry blocks with a blank line.
             println!();
 
-            list_registry(name, registry_state, self.installed).await;
+            list_registry(&project, name, registry_state, installed_only).await;
         }
 
         Ok(())
@@ -69,14 +69,15 @@ impl ListCommand {
 /// Lists one registry's components. A component counts as installed only when it
 /// is tracked under *this* registry, so the same name installed from a different
 /// registry is not treated as installed here.
-async fn list_registry(name: &str, state: &RegistryState, installed_only: bool) {
+async fn list_registry(project: &Project, name: &str, state: &RegistryState, installed_only: bool) {
     println!(
         "{} {}",
         style(name).bold(),
         style(format!("({})", state.url)).dim()
     );
 
-    let registry = match Registry::load(Source::parse(&state.url)).await {
+    let working_url = project.to_working(&state.url);
+    let registry = match Registry::load(Source::parse(&working_url)).await {
         Ok(registry) => registry,
         Err(error) => {
             println!(

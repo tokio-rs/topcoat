@@ -10,7 +10,8 @@ pub const MANIFEST_FILE: &str = "registry.toml";
 /// The registry used when a project does not specify one of its own: the
 /// component registry published alongside this repository.
 pub const DEFAULT_REGISTRY: &str =
-    "https://raw.githubusercontent.com/tokio-rs/topcoat/main/crates/topcoat-ui/registry";
+    // TODO: "https://raw.githubusercontent.com/tokio-rs/topcoat/main/crates/topcoat-ui/registry";
+    "file://crates/topcoat-ui/registry";
 
 /// The location of a component registry.
 #[derive(Clone, Debug)]
@@ -40,20 +41,27 @@ impl Source {
     /// resolved against this source's directory (so a dependency can point at a
     /// sibling registry like `file://../other`); absolute `file://` paths and
     /// remote URLs are returned unchanged.
-    pub fn resolve(&self, location: &str) -> String {
+    pub fn resolve(&self, location: &str) -> Result<String, Error> {
         let Some(relative) = location.strip_prefix("file://") else {
-            return location.to_string();
+            return Ok(location.to_string());
         };
         if relative.starts_with('/') {
-            return location.to_string();
+            return Ok(location.to_string());
         }
         let Self::Path(base) = self else {
             // A relative local path under a remote registry has no meaningful
             // base; leave it as given.
-            return location.to_string();
+            return Ok(location.to_string());
         };
-        let resolved = normalize_lexically(&base.join(relative));
-        format!("file://{}", resolved.display())
+        // Canonicalize against the declaring registry's directory: this resolves
+        // `..` and symlinks and yields an absolute path, so the same directory
+        // reached via different relative locations resolves to one string.
+        let joined = base.join(relative);
+        let resolved = joined.canonicalize().map_err(|source| Error::ReadPath {
+            path: joined,
+            source,
+        })?;
+        Ok(format!("file://{}", resolved.display()))
     }
 
     /// Resolves a child file (e.g. the manifest or a component file) under this
@@ -68,12 +76,10 @@ impl Source {
     /// Reads the contents at this exact location as a string.
     async fn read(&self) -> Result<String, Error> {
         match self {
-            Self::Path(path) => {
-                std::fs::read_to_string(path).map_err(|source| Error::ReadPath {
-                    path: path.clone(),
-                    source,
-                })
-            }
+            Self::Path(path) => std::fs::read_to_string(path).map_err(|source| Error::ReadPath {
+                path: path.clone(),
+                source,
+            }),
             Self::Url(url) => {
                 let fetch = |source| Error::Fetch {
                     url: url.clone(),
@@ -159,11 +165,13 @@ impl Registry {
 
     /// Looks up a component by its registry name.
     pub fn get(&self, name: &str) -> Option<Component<'_>> {
-        self.components.get_key_value(name).map(|(name, entry)| Component {
-            name,
-            entry,
-            source: &self.source,
-        })
+        self.components
+            .get_key_value(name)
+            .map(|(name, entry)| Component {
+                name,
+                entry,
+                source: &self.source,
+            })
     }
 }
 
@@ -222,22 +230,4 @@ pub enum Error {
     },
     #[error("failed to parse registry manifest")]
     Parse(#[from] toml::de::Error),
-}
-
-/// Resolves `.` and `..` components in a path lexically (without touching the
-/// filesystem), so a resolved registry location is stored in a clean form.
-fn normalize_lexically(path: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for component in path.components() {
-        match component {
-            std::path::Component::CurDir => {}
-            std::path::Component::ParentDir
-                if matches!(out.components().next_back(), Some(std::path::Component::Normal(_))) =>
-            {
-                out.pop();
-            }
-            other => out.push(other.as_os_str()),
-        }
-    }
-    out
 }

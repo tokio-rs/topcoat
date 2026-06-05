@@ -6,7 +6,8 @@ use console::style;
 use topcoat_ui::{Dependency, Registry, Source};
 
 use super::module;
-use super::state::{InstallState, InstalledComponent, STATE_FILE};
+use super::project::{Project, ProjectArg};
+use super::state::{InstallState, InstalledComponent};
 
 #[derive(Args)]
 pub(super) struct AddCommand {
@@ -22,6 +23,8 @@ pub(super) struct AddCommand {
     /// Overwrite the component file if it already exists
     #[arg(short, long)]
     force: bool,
+    #[command(flatten)]
+    project: ProjectArg,
 }
 
 /// A component still to be planned: which registry it lives in, its name, and
@@ -35,11 +38,20 @@ struct Pending {
 
 /// A file to write once planning has fully succeeded.
 struct PlannedWrite {
-    components_dir: PathBuf,
+    dir: PathBuf,
     file: PathBuf,
+    relative_file: PathBuf,
     file_name: String,
     contents: String,
     registry: String,
+}
+
+/// A previously installed component to remove (because it is being replaced by
+/// the same-named component from a different registry).
+struct PlannedRemoval {
+    file: PathBuf,
+    dir: PathBuf,
+    file_name: String,
 }
 
 impl AddCommand {
@@ -51,22 +63,29 @@ impl AddCommand {
     }
 
     async fn run_inner(self) -> Result<(), String> {
-        let state_path = Path::new(STATE_FILE);
-        let mut state = InstallState::load(state_path)?;
-
-        // Resolve (and, with --url, create or update) the named registry. The
-        // location is sticky: it stays recorded for later commands.
-        let root_registry = self
-            .registry
-            .clone()
-            .unwrap_or_else(|| state.default_registry.clone());
-        state.registry_mut(&root_registry, self.url)?;
+        let project = Project::locate(self.project).await?;
+        let mut state = InstallState::load(&project)?;
 
         // Phase 1 — plan. Walk the requested component and its transitive
         // dependencies, loading registries and fetching sources, but touch
         // nothing on disk. Any failure here (missing component, unreachable
         // registry, registry-name conflict) leaves the project untouched.
         let mut registries: HashMap<String, Registry> = HashMap::new();
+
+        // Choose the registry to add from. With --registry it is used directly;
+        // otherwise the default registry is preferred, and pulling a component
+        // the default registry does not offer requires the user to confirm a
+        // non-default registry (or pass --registry).
+        let root_registry = resolve_root_registry(
+            &self.component,
+            self.registry.as_deref(),
+            self.url.as_deref(),
+            &project,
+            &mut state,
+            &mut registries,
+        )
+        .await?;
+
         let mut visited: HashSet<(String, String)> = HashSet::new();
         let mut queue: VecDeque<Pending> = VecDeque::new();
         queue.push_back(Pending {
@@ -76,21 +95,23 @@ impl AddCommand {
         });
 
         let mut writes: Vec<PlannedWrite> = Vec::new();
+        let mut removals: Vec<PlannedRemoval> = Vec::new();
 
         while let Some(pending) = queue.pop_front() {
             if !visited.insert((pending.registry.clone(), pending.component.clone())) {
                 continue;
             }
 
-            let (url, components_dir) = {
+            let (stored_url, components_dir) = {
                 let registry = state
                     .registries
                     .get(&pending.registry)
                     .expect("registry resolved before queueing");
                 (registry.url.clone(), registry.components_dir.clone())
             };
+            let working_url = project.to_working(&stored_url);
 
-            let registry = load_registry(&mut registries, &url).await?;
+            let registry = load_registry(&mut registries, &working_url).await?;
 
             let component = registry.get(&pending.component).ok_or_else(|| {
                 let available: Vec<&str> = registry.names().collect();
@@ -102,25 +123,67 @@ impl AddCommand {
                 )
             })?;
 
-            let file = components_dir.join(component.file_name());
+            let relative_file = components_dir.join(component.file_name());
+            let dir = project.resolve(&components_dir);
+            let file = dir.join(component.file_name());
+
+            // A file may hold only one component. If a different installed
+            // component (from another registry) already occupies this file,
+            // offer to remove it so this one can take its place. Same-named
+            // components that resolve to different files are left untouched.
+            let mut replacing = false;
+            if let Some((other_registry, other_component)) =
+                find_file_conflict(&state, &pending.registry, component.name(), &relative_file)
+            {
+                let prompt = format!(
+                    "{} is already provided by `{other_component}` from `{other_registry}`. Replace it with `{}` from `{}`?",
+                    relative_file.display(),
+                    component.name(),
+                    pending.registry
+                );
+                if !confirm(&prompt)? {
+                    return Err(format!(
+                        "aborted; {} is already provided by `{other_component}` from `{other_registry}`",
+                        relative_file.display()
+                    ));
+                }
+
+                let registry = state
+                    .registries
+                    .get_mut(&other_registry)
+                    .expect("conflicting registry exists");
+                if let Some(removed) = registry.components.remove(&other_component) {
+                    let removed_dir = registry.components_dir.clone();
+                    if let Some(file_name) = removed.file.file_name().and_then(|name| name.to_str()) {
+                        removals.push(PlannedRemoval {
+                            file: project.resolve(&removed.file),
+                            dir: project.resolve(&removed_dir),
+                            file_name: file_name.to_string(),
+                        });
+                    }
+                }
+                replacing = true;
+            }
+
             let exists = file.exists();
-            if exists && pending.root && !self.force {
+            if exists && pending.root && !self.force && !replacing {
                 return Err(format!(
                     "{} already exists; pass --force to overwrite",
-                    file.display()
+                    relative_file.display()
                 ));
             }
 
             // Write the source unless it is already present — dependencies never
-            // clobber existing files; only the root respects --force.
-            if !exists || (pending.root && self.force) {
+            // clobber existing files; only the root (or a replacement) rewrites.
+            if !exists || (pending.root && self.force) || replacing {
                 let contents = component
                     .fetch_source()
                     .await
                     .map_err(|error| format!("failed to read component `{}`: {error}", component.name()))?;
                 writes.push(PlannedWrite {
-                    components_dir: components_dir.clone(),
+                    dir: dir.clone(),
                     file: file.clone(),
+                    relative_file: relative_file.clone(),
                     file_name: component.file_name().to_string(),
                     contents,
                     registry: pending.registry.clone(),
@@ -136,7 +199,7 @@ impl AddCommand {
                     component.name().to_string(),
                     InstalledComponent {
                         version: component.version().to_string(),
-                        file: file.clone(),
+                        file: relative_file,
                     },
                 );
 
@@ -148,11 +211,16 @@ impl AddCommand {
                     Dependency::Same(name) => (pending.registry.clone(), name),
                     Dependency::Other { registry: location, name } => {
                         // Resolve the dependency's registry relative to the
-                        // registry that declared it, so `file://../other` points
-                        // at a sibling of the current registry.
-                        let resolved = Source::parse(&url).resolve(&location);
-                        let declared = load_registry(&mut registries, &resolved).await?.name();
-                        (state.resolve_registry(&resolved, declared)?, name)
+                        // registry that declared it, then store it relative to
+                        // the project.
+                        let resolved = Source::parse(&working_url)
+                            .resolve(&location)
+                            .map_err(|error| format!("failed to resolve dependency registry {location}: {error}"))?;
+                        let stored = project.to_stored(&resolved);
+                        let declared = load_registry(&mut registries, &project.to_working(&stored))
+                            .await?
+                            .name();
+                        (state.resolve_registry(&stored, declared)?, name)
                     }
                 };
                 queue.push_back(Pending {
@@ -163,16 +231,27 @@ impl AddCommand {
             }
         }
 
-        // Phase 2 — commit. Everything resolved, so write the files, wire up the
-        // module declarations, and persist the install state.
+        // Phase 2 — commit. Everything resolved, so remove anything being
+        // replaced, write the files, wire up the module declarations, and
+        // persist the install state.
+        for removal in &removals {
+            match std::fs::remove_file(&removal.file) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(format!("failed to remove {}: {error}", removal.file.display()));
+                }
+            }
+            module::undeclare(&removal.dir, &removal.file_name)?;
+        }
         for write in &writes {
-            std::fs::create_dir_all(&write.components_dir)
-                .map_err(|error| format!("failed to create {}: {error}", write.components_dir.display()))?;
+            std::fs::create_dir_all(&write.dir)
+                .map_err(|error| format!("failed to create {}: {error}", write.dir.display()))?;
             std::fs::write(&write.file, &write.contents)
                 .map_err(|error| format!("failed to write {}: {error}", write.file.display()))?;
-            module::declare(&write.components_dir, &write.file_name)?;
+            module::declare(&write.dir, &write.file_name)?;
         }
-        state.save(state_path)?;
+        state.save(&project)?;
 
         if writes.is_empty() {
             println!("{} already up to date", style("✓").green());
@@ -181,13 +260,166 @@ impl AddCommand {
                 println!(
                     "{} added {} from {}",
                     style("✓").green(),
-                    style(write.file.display()).bold(),
+                    style(write.relative_file.display()).bold(),
                     write.registry
                 );
             }
         }
         Ok(())
     }
+}
+
+/// Determines which registry the requested component should be added from.
+///
+/// With an explicit `--registry`, that registry is used and must offer the
+/// component. Otherwise the default registry is preferred; if it does not offer
+/// the component, the other registries are searched and the user is asked to
+/// confirm pulling from a non-default registry.
+async fn resolve_root_registry(
+    component: &str,
+    registry: Option<&str>,
+    url: Option<&str>,
+    project: &Project,
+    state: &mut InstallState,
+    registries: &mut HashMap<String, Registry>,
+) -> Result<String, String> {
+    if let Some(name) = registry {
+        let stored = url.map(|url| project.to_stored(url));
+        let working = {
+            let registry = state.registry_mut(name, stored)?;
+            project.to_working(&registry.url)
+        };
+        let loaded = load_registry(registries, &working).await?;
+        if loaded.get(component).is_none() {
+            let available: Vec<&str> = loaded.names().collect();
+            return Err(format!(
+                "unknown component `{component}` in registry `{name}`; available: {}",
+                available.join(", ")
+            ));
+        }
+        return Ok(name.to_string());
+    }
+
+    // A bare --url (no --registry) adds from the registry at that location,
+    // named by the registry's own declared name rather than the default name.
+    if let Some(url) = url {
+        let stored = project.to_stored(url);
+        let loaded = load_registry(registries, &project.to_working(&stored)).await?;
+        let name = loaded.name().to_string();
+        if loaded.get(component).is_none() {
+            let available: Vec<&str> = loaded.names().collect();
+            return Err(format!(
+                "unknown component `{component}` in registry `{name}`; available: {}",
+                available.join(", ")
+            ));
+        }
+        // The first registry added to a fresh project becomes its default.
+        let fresh = state.registries.is_empty();
+        let resolved = state.resolve_registry(&stored, &name)?;
+        if fresh {
+            state.default_registry = resolved.clone();
+        }
+        return Ok(resolved);
+    }
+
+    // Prefer the default registry whenever it offers the component.
+    let default = state.default_registry.clone();
+    let default_url = {
+        let registry = state.registry_mut(&default, None)?;
+        project.to_working(&registry.url)
+    };
+    if load_registry(registries, &default_url)
+        .await?
+        .get(component)
+        .is_some()
+    {
+        return Ok(default);
+    }
+
+    // Not in the default registry: look for it among the other registries.
+    let others: Vec<(String, String)> = state
+        .registries
+        .iter()
+        .filter(|(name, _)| **name != default)
+        .map(|(name, registry)| (name.clone(), registry.url.clone()))
+        .collect();
+
+    let mut offering: Vec<String> = Vec::new();
+    for (name, stored_url) in &others {
+        if load_registry(registries, &project.to_working(stored_url))
+            .await?
+            .get(component)
+            .is_some()
+        {
+            offering.push(name.clone());
+        }
+    }
+
+    match offering.as_slice() {
+        [] => Err(format!(
+            "unknown component `{component}`: not in the default registry `{default}` or any other registry"
+        )),
+        [name] => {
+            let prompt = format!(
+                "`{component}` is not in the default registry `{default}`. Add it from `{name}` instead?"
+            );
+            if confirm(&prompt)? {
+                Ok(name.clone())
+            } else {
+                Err(format!(
+                    "aborted; pass `--registry {name}` to add `{component}` from it"
+                ))
+            }
+        }
+        many => Err(format!(
+            "`{component}` is not in the default registry `{default}` but is available in {}; pass --registry to choose",
+            many.join(", ")
+        )),
+    }
+}
+
+/// Finds an installed component, other than the one being installed, whose file
+/// is the same project-relative path — i.e. a file collision. Same-named
+/// components from different registries that map to different files do not
+/// collide and are not reported.
+fn find_file_conflict(
+    state: &InstallState,
+    registry: &str,
+    component: &str,
+    file: &Path,
+) -> Option<(String, String)> {
+    for (registry_name, registry_state) in &state.registries {
+        for (component_name, installed) in &registry_state.components {
+            if (registry_name.as_str(), component_name.as_str()) != (registry, component)
+                && installed.file == file
+            {
+                return Some((registry_name.clone(), component_name.clone()));
+            }
+        }
+    }
+    None
+}
+
+/// Asks the user a yes/no question on the terminal, defaulting to no. Errors
+/// when there is no terminal to prompt on, so non-interactive use must be
+/// explicit (via `--registry`).
+fn confirm(prompt: &str) -> Result<bool, String> {
+    use std::io::{IsTerminal, Write};
+
+    if !std::io::stdin().is_terminal() {
+        return Err(format!(
+            "{prompt} (no terminal to prompt on; pass --registry to choose)"
+        ));
+    }
+
+    eprint!("{} {} ", style(prompt).yellow(), style("[y/N]").dim());
+    std::io::stderr().flush().ok();
+
+    let mut input = String::new();
+    std::io::stdin()
+        .read_line(&mut input)
+        .map_err(|error| format!("failed to read input: {error}"))?;
+    Ok(matches!(input.trim().to_ascii_lowercase().as_str(), "y" | "yes"))
 }
 
 /// Loads the registry at `url`, caching it so each registry is fetched once.
