@@ -20,6 +20,7 @@ members = [
     "examples/module-router",
     "examples/path-query-params",
     "examples/request-response",
+    "examples/runtime",
     "examples/tailwind",
 ]
 

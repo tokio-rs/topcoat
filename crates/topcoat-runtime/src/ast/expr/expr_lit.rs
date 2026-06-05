@@ -18,6 +18,11 @@ impl Expr {
         let mut parts = ViewParts::new();
 
         match &lit.lit {
+            Lit::Int(inner) => {
+                quote! { ::topcoat::runtime::Surrogated::into_surrogate(#inner) }.to_tokens(rust);
+                let value: i32 = inner.base10_parse()?;
+                value.into_surrogate().to_view_parts(&mut parts);
+            }
             Lit::Float(inner) => {
                 quote! { ::topcoat::runtime::Surrogated::into_surrogate(#inner) }.to_tokens(rust);
                 let value: f64 = inner.base10_parse()?;

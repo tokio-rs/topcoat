@@ -28,4 +28,8 @@ export class F64 {
 	toString(): string {
 		return this.v.toString();
 	}
+
+	valueOf(): number {
+		return this.v;
+	}
 }

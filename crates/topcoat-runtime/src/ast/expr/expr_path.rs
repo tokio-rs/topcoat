@@ -2,7 +2,10 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::ExprPath;
 
-use crate::ast::expr::{Expr, name_resolver::NameResolver};
+use crate::ast::expr::{
+    Expr,
+    name_resolver::{NameResolver, ResolvedIdent},
+};
 
 impl Expr {
     pub(super) fn expr_path(
@@ -15,8 +18,20 @@ impl Expr {
             syn::Error::new_spanned(path, "only single-identifier paths are supported")
         })?;
 
-        js.push_str(&names.resolve(ident));
-        path.to_tokens(rust);
+        let resolved = names.resolve(ident);
+        let (js_name, rust_ident) = match resolved {
+            ResolvedIdent::Local {
+                js_name,
+                rust_ident,
+            }
+            | ResolvedIdent::External {
+                js_name,
+                rust_ident,
+            } => (js_name, rust_ident),
+        };
+
+        js.push_str(&js_name);
+        rust_ident.to_tokens(rust);
         Ok(())
     }
 }
