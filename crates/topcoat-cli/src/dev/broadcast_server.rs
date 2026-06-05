@@ -7,8 +7,9 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
+use console::style;
 use futures_util::{SinkExt, StreamExt};
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 
@@ -34,8 +35,8 @@ pub async fn bind() -> TcpListener {
 /// Run the dev server.
 ///
 /// Serves `/dev.js` (the client reload script) and `/ws` (a WebSocket endpoint).
-/// When any WS client sends `"ready"`, broadcasts `"reload"` to all other
-/// connected clients.
+/// When any WS client sends a ready message, prints the app listener address
+/// and broadcasts `"reload"` to all other connected clients.
 pub async fn run(listener: TcpListener) {
     let (tx, _) = broadcast::channel::<()>(16);
     let tx = Arc::new(tx);
@@ -72,7 +73,21 @@ async fn handle_socket(ws: WebSocket, tx: Arc<broadcast::Sender<()>>) {
                 let Some(Ok(msg)) = msg else { break };
 
                 if let Message::Text(text) = msg
-                    && text == "ready" {
+                    && let Some(message) = ReadyMessage::parse(&text) {
+                        match message {
+                            ReadyMessage::Ready { addr: Some(addr) } => {
+                                eprintln!(
+                                    "  {} {}",
+                                    style("ready on").green().bold(),
+                                    style(format!("http://{addr}")).cyan()
+                                );
+                                eprintln!();
+                            }
+                            ReadyMessage::Ready { addr: None } => {
+                                eprintln!("  {}", style("ready").green().bold());
+                                eprintln!();
+                            }
+                        }
                         let _ = tx.send(());
                     }
             }
@@ -81,6 +96,22 @@ async fn handle_socket(ws: WebSocket, tx: Arc<broadcast::Sender<()>>) {
                     break;
                 }
             }
+        }
+    }
+}
+
+enum ReadyMessage {
+    Ready { addr: Option<SocketAddr> },
+}
+
+impl ReadyMessage {
+    fn parse(text: &str) -> Option<Self> {
+        if text == "ready" {
+            Some(Self::Ready { addr: None })
+        } else {
+            text.strip_prefix("ready ")
+                .and_then(|addr| addr.parse().ok())
+                .map(|addr| Self::Ready { addr: Some(addr) })
         }
     }
 }

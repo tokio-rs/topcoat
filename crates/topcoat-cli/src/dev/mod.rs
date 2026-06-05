@@ -210,9 +210,6 @@ async fn build_and_run(initial: bool, dev_url: &str) -> Option<Child> {
         return None;
     }
 
-    eprintln!("  {}", style("ready").green().bold());
-    eprintln!();
-
     Some(
         Command::new(&exe)
             .env("TOPCOAT_DEV_URL", dev_url)

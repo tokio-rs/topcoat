@@ -11,7 +11,8 @@ pub async fn serve(
     listener: TcpListener,
     app: impl Into<axum::Router>,
 ) -> Result<(), std::io::Error> {
-    crate::dev::notify_ready().await;
+    let addr = listener.local_addr().ok();
+    crate::dev::notify_ready(addr).await;
     axum::serve(listener, app.into()).await
 }
 
