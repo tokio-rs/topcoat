@@ -14,7 +14,13 @@
 //! Each component is versioned independently (see [`Component::version`]); that
 //! version is recorded per component in the project's install state so updates
 //! can be surfaced for individual components.
+//!
+//! The companion [`generate`] module (behind the `generate` feature) produces a
+//! registry's `registry.toml` from a programmatic description of its components,
+//! so the manifest is generated rather than hand-written.
 
+#[cfg(feature = "generate")]
+pub mod generate;
 mod registry;
 
 pub use registry::{Component, DEFAULT_REGISTRY, Dependency, Error, MANIFEST_FILE, Registry, Source};

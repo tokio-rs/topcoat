@@ -10,8 +10,8 @@ pub const MANIFEST_FILE: &str = "registry.toml";
 /// The registry used when a project does not specify one of its own: the
 /// component registry published alongside this repository.
 pub const DEFAULT_REGISTRY: &str =
-    // TODO: "https://raw.githubusercontent.com/tokio-rs/topcoat/main/crates/topcoat-ui/registry";
-    "file://crates/topcoat-ui/registry";
+    // TODO: "https://raw.githubusercontent.com/tokio-rs/topcoat/main/crates/topcoat-ui/src/topcoat";
+    "file://crates/topcoat-ui/src/topcoat";
 
 /// The location of a component registry.
 #[derive(Clone, Debug)]
