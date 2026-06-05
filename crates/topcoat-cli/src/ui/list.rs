@@ -1,9 +1,8 @@
 use clap::Args;
 use console::style;
-use topcoat_ui::{Registry, Source};
+use topcoat_ui::manage::{self, InstallStatus, Project};
 
-use super::project::{Project, ProjectArg};
-use super::state::{InstallState, RegistryState};
+use super::ProjectArg;
 
 #[derive(Args)]
 pub(super) struct ListCommand {
@@ -26,110 +25,64 @@ impl ListCommand {
     }
 
     async fn run_inner(self) -> Result<(), String> {
-        let selected = self.registry;
-        let installed_only = self.installed;
-        let project = Project::locate(self.project).await?;
-        let mut state = InstallState::load(&project)?;
+        let project = Project::locate(self.project.project)?;
+        let listings = manage::list(&project, self.registry.as_deref()).await?;
 
-        // Ensure there is something to list: a named registry that isn't tracked
-        // yet (only valid for one with a built-in location), or the project's
-        // default registry when nothing has been added yet.
-        match &selected {
-            Some(name) if !state.registries.contains_key(name) => {
-                let url = InstallState::default_url(name)
-                    .ok_or_else(|| format!("unknown registry `{name}`"))?;
-                state
-                    .registries
-                    .insert(name.clone(), RegistryState::new(url));
-            }
-            None if state.registries.is_empty() => {
-                let name = state.default_registry.clone();
-                let url = InstallState::default_url(&name).ok_or_else(|| {
-                    format!("default registry `{name}` has no known location; run `topcoat ui add` first")
-                })?;
-                state.registries.insert(name, RegistryState::new(url));
-            }
-            _ => {}
-        }
-
-        for (name, registry_state) in &state.registries {
-            if selected
-                .as_deref()
-                .is_some_and(|name_selected| name_selected != name)
-            {
-                continue;
-            }
+        for listing in &listings {
             // Separate registry blocks with a blank line.
             println!();
+            println!(
+                "{} {}",
+                style(&listing.name).bold(),
+                style(format!("({})", listing.url)).dim()
+            );
 
-            list_registry(&project, name, registry_state, installed_only).await;
+            let components = match &listing.outcome {
+                Ok(components) => components,
+                Err(error) => {
+                    println!(
+                        "  {}",
+                        style(format!("failed to load registry: {error}")).red()
+                    );
+                    continue;
+                }
+            };
+
+            for component in components {
+                match &component.status {
+                    InstallStatus::Available { .. } => {
+                        if !self.installed {
+                            println!("    {}", component.name);
+                        }
+                    }
+                    InstallStatus::UpToDate { .. } => {
+                        println!(
+                            "  {} {} {}",
+                            style("✓").green(),
+                            style(&component.name).bold(),
+                            style("(installed)").dim()
+                        );
+                    }
+                    InstallStatus::Update { .. } => {
+                        println!(
+                            "  {} {} {}",
+                            style("↑").yellow(),
+                            style(&component.name).bold(),
+                            style("(update available)").yellow(),
+                        );
+                    }
+                    InstallStatus::Orphaned { .. } => {
+                        println!(
+                            "  {} {} {}",
+                            style("?").red(),
+                            component.name,
+                            style("(not in registry)").red(),
+                        );
+                    }
+                }
+            }
         }
 
         Ok(())
-    }
-}
-
-/// Lists one registry's components. A component counts as installed only when it
-/// is tracked under *this* registry, so the same name installed from a different
-/// registry is not treated as installed here.
-async fn list_registry(project: &Project, name: &str, state: &RegistryState, installed_only: bool) {
-    println!(
-        "{} {}",
-        style(name).bold(),
-        style(format!("({})", state.url)).dim()
-    );
-
-    let working_url = project.to_working(&state.url);
-    let registry = match Registry::load(Source::parse(&working_url)).await {
-        Ok(registry) => registry,
-        Err(error) => {
-            println!(
-                "  {}",
-                style(format!("failed to load registry: {error}")).red()
-            );
-            return;
-        }
-    };
-
-    let names: Vec<&str> = registry.names().collect();
-    for component_name in &names {
-        let component = registry
-            .get(component_name)
-            .expect("name came from the registry");
-        let latest = component.version();
-        match state.components.get(*component_name) {
-            None => {
-                if !installed_only {
-                    println!("    {component_name}");
-                }
-            }
-            Some(installed) if installed.version == latest => {
-                println!(
-                    "  {} {} (installed)",
-                    style("✓").green(),
-                    style(component_name).bold(),
-                );
-            }
-            Some(_installed) => {
-                println!(
-                    "  {} {} {}",
-                    style("↑").yellow(),
-                    style(component_name).bold(),
-                    style("(update available)").yellow(),
-                );
-            }
-        }
-    }
-
-    // Components tracked under this registry that it no longer offers.
-    for (component_name, installed) in &state.components {
-        if !names.contains(&component_name.as_str()) {
-            println!(
-                "  {} {component_name} {} {}",
-                style("?").red(),
-                installed.version,
-                style("(not in registry)").red(),
-            );
-        }
     }
 }

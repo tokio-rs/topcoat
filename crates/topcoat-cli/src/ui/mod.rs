@@ -1,9 +1,8 @@
 mod add;
 mod list;
-mod module;
-mod project;
 mod remove;
-mod state;
+
+use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 
@@ -31,4 +30,14 @@ impl UiCommand {
             UiSubcommand::Remove(cmd) => cmd.run().await,
         }
     }
+}
+
+/// The `--project` selector shared by the `ui` subcommands: the cargo workspace
+/// to operate on, whose root holds `components.toml`.
+#[derive(Args)]
+struct ProjectArg {
+    /// Cargo workspace to operate on; its root holds `components.toml`
+    /// (defaults to the current workspace)
+    #[arg(long)]
+    project: Option<PathBuf>,
 }

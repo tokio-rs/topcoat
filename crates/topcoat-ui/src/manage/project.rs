@@ -1,39 +1,32 @@
 use std::path::{Path, PathBuf};
 
-use clap::Args;
-
 use super::state::STATE_FILE;
 
-/// The `--project` selector shared by the `ui` subcommands.
-#[derive(Args)]
-pub(super) struct ProjectArg {
-    /// Cargo workspace to operate on; its root holds `components.toml`
-    /// (defaults to the current workspace)
-    #[arg(long)]
-    project: Option<PathBuf>,
-}
-
-/// The cargo workspace a `ui` command operates on. Every relative path in the
-/// install state — registry `file://` locations, component directories, and
+/// The cargo workspace a management operation acts on. Every relative path in
+/// the install state — registry `file://` locations, component directories, and
 /// installed file paths — is relative to the project root (the directory that
-/// holds `components.toml`), so the commands behave the same regardless of the
+/// holds `components.toml`), so operations behave the same regardless of the
 /// working directory.
-pub(super) struct Project {
+pub struct Project {
     root: PathBuf,
 }
 
 impl Project {
-    /// Locates the project root: the cargo workspace root containing the
-    /// `--project` directory (or the current directory), falling back to that
+    /// Locates the project root: the cargo workspace root containing `dir` (or
+    /// the current directory when `dir` is `None`), falling back to that
     /// directory itself when it is not inside a workspace.
-    pub(super) async fn locate(arg: ProjectArg) -> Result<Self, String> {
-        let start = arg.project.unwrap_or_else(|| PathBuf::from("."));
-        let root = crate::cargo::workspace_root(&start)
-            .await
-            .unwrap_or_else(|| start.clone());
-        let root = std::fs::canonicalize(&root)
-            .map_err(|error| format!("could not resolve project directory {}: {error}", root.display()))?;
+    pub fn locate(dir: Option<PathBuf>) -> Result<Self, String> {
+        let start = dir.unwrap_or_else(|| PathBuf::from("."));
+        let root = workspace_root(&start).unwrap_or_else(|| start.clone());
+        let root = std::fs::canonicalize(&root).map_err(|error| {
+            format!("could not resolve project directory {}: {error}", root.display())
+        })?;
         Ok(Self { root })
+    }
+
+    /// The resolved project root directory.
+    pub fn root(&self) -> &Path {
+        &self.root
     }
 
     /// The path to the install-state file at the project root.
@@ -77,4 +70,19 @@ impl Project {
         let rest = rest.strip_prefix("./").unwrap_or(rest);
         format!("file://{rest}")
     }
+}
+
+/// The root of the cargo workspace containing `dir`, if it is inside one. Uses
+/// `cargo locate-project` so no JSON parsing or async runtime is required.
+fn workspace_root(dir: &Path) -> Option<PathBuf> {
+    let output = std::process::Command::new("cargo")
+        .args(["locate-project", "--workspace", "--message-format", "plain"])
+        .current_dir(dir)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    Path::new(stdout.trim()).parent().map(Path::to_path_buf)
 }

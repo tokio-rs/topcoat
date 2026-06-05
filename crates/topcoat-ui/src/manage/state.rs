@@ -104,7 +104,7 @@ impl InstallState {
     /// The built-in location for a registry name, if it has one. Only the
     /// built-in registry has a built-in location (the published registry).
     pub(super) fn default_url(name: &str) -> Option<String> {
-        (name == DEFAULT_REGISTRY_NAME).then(|| topcoat_ui::DEFAULT_REGISTRY.to_string())
+        (name == DEFAULT_REGISTRY_NAME).then(|| crate::DEFAULT_REGISTRY.to_string())
     }
 
     /// Returns the named registry, creating it if necessary. A given `url` sets

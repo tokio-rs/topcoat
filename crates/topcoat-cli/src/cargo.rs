@@ -1,6 +1,6 @@
 use std::fmt;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Stdio;
 
 use console::style;
@@ -24,27 +24,6 @@ pub async fn target_dir() -> Option<PathBuf> {
 
     let msg: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
     msg.get("target_directory")?.as_str().map(PathBuf::from)
-}
-
-/// The root of the cargo workspace containing `dir`, if it is inside one.
-pub async fn workspace_root(dir: &Path) -> Option<PathBuf> {
-    let output = Command::new("cargo")
-        .args(["metadata", "--no-deps", "--format-version=1"])
-        .current_dir(dir)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?
-        .wait_with_output()
-        .await
-        .ok()?;
-
-    if !output.status.success() {
-        return None;
-    }
-
-    let msg: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
-    msg.get("workspace_root")?.as_str().map(PathBuf::from)
 }
 
 #[derive(Default)]

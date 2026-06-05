@@ -21,6 +21,7 @@
 
 #[cfg(feature = "generate")]
 pub mod generate;
+pub mod manage;
 mod registry;
 
 pub use registry::{Component, DEFAULT_REGISTRY, Dependency, Error, MANIFEST_FILE, Registry, Source};

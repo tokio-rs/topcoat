@@ -26,10 +26,8 @@ glob.workspace = true
 indicatif.workspace = true
 notify.workspace = true
 proc-macro2 = { workspace = true, features = ["span-locations"] }
-serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 syn.workspace = true
-toml.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "process", "signal", "io-util", "time", "sync"] }
 
 [lints]
