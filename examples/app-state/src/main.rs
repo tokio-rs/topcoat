@@ -11,9 +11,7 @@ struct PageViews(AtomicU64);
 
 #[tokio::main]
 async fn main() {
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    topcoat::serve(
-        listener,
+    topcoat::start(
         Router::new()
             .discover()
             .app_state(PageViews(AtomicU64::new(0))),

@@ -36,7 +36,7 @@ pub mod view {
 }
 
 #[cfg(feature = "router")]
-pub use serve::serve;
+pub use serve::{serve, start};
 
 #[cfg(feature = "runtime")]
 pub mod runtime {

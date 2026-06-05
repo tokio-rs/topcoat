@@ -62,8 +62,7 @@ mod app;
 async fn main() {
     let router = app::router().assets(AssetBundle::load().unwrap());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    topcoat::serve(listener, router).await.unwrap();
+    topcoat::start(router).await.unwrap();
 }
 ```
 
