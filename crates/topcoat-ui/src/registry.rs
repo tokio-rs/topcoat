@@ -35,6 +35,27 @@ impl Source {
         }
     }
 
+    /// Resolves a dependency's registry location against this source — the
+    /// registry that declared the dependency. A relative `file://` location is
+    /// resolved against this source's directory (so a dependency can point at a
+    /// sibling registry like `file://../other`); absolute `file://` paths and
+    /// remote URLs are returned unchanged.
+    pub fn resolve(&self, location: &str) -> String {
+        let Some(relative) = location.strip_prefix("file://") else {
+            return location.to_string();
+        };
+        if relative.starts_with('/') {
+            return location.to_string();
+        }
+        let Self::Path(base) = self else {
+            // A relative local path under a remote registry has no meaningful
+            // base; leave it as given.
+            return location.to_string();
+        };
+        let resolved = normalize_lexically(&base.join(relative));
+        format!("file://{}", resolved.display())
+    }
+
     /// Resolves a child file (e.g. the manifest or a component file) under this
     /// source.
     fn child(&self, name: &str) -> Source {
@@ -82,6 +103,9 @@ impl fmt::Display for Source {
 /// The parsed `registry.toml` manifest.
 #[derive(Deserialize)]
 struct Manifest {
+    /// The registry's own name, used when it is added to a project as a
+    /// dependency's registry. Every registry must declare one.
+    name: String,
     #[serde(default)]
     components: BTreeMap<String, Entry>,
 }
@@ -90,11 +114,24 @@ struct Manifest {
 struct Entry {
     version: String,
     source: String,
+    #[serde(default)]
+    dependencies: Vec<Dependency>,
+}
+
+/// Another component that must be installed alongside a component.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+pub enum Dependency {
+    /// A component in the same registry, named directly.
+    Same(String),
+    /// A component in another registry, identified by that registry's location.
+    Other { registry: String, name: String },
 }
 
 /// A component registry loaded from a [`Source`].
 pub struct Registry {
     source: Source,
+    name: String,
     components: BTreeMap<String, Entry>,
 }
 
@@ -105,8 +142,14 @@ impl Registry {
         let manifest: Manifest = toml::from_str(&raw)?;
         Ok(Self {
             source,
+            name: manifest.name,
             components: manifest.components,
         })
+    }
+
+    /// The registry's own declared name.
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     /// The names of every component in the registry, sorted.
@@ -155,6 +198,11 @@ impl Component<'_> {
     pub async fn fetch_source(&self) -> Result<String, Error> {
         self.source.child(&self.entry.source).read().await
     }
+
+    /// The other components this component depends on.
+    pub fn dependencies(&self) -> &[Dependency] {
+        &self.entry.dependencies
+    }
 }
 
 /// An error loading a registry or one of its components.
@@ -174,4 +222,22 @@ pub enum Error {
     },
     #[error("failed to parse registry manifest")]
     Parse(#[from] toml::de::Error),
+}
+
+/// Resolves `.` and `..` components in a path lexically (without touching the
+/// filesystem), so a resolved registry location is stored in a clean form.
+fn normalize_lexically(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir
+                if matches!(out.components().next_back(), Some(std::path::Component::Normal(_))) =>
+            {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }

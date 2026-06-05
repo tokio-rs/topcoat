@@ -17,4 +17,4 @@
 
 mod registry;
 
-pub use registry::{Component, DEFAULT_REGISTRY, Error, MANIFEST_FILE, Registry, Source};
+pub use registry::{Component, DEFAULT_REGISTRY, Dependency, Error, MANIFEST_FILE, Registry, Source};

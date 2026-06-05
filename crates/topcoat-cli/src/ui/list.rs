@@ -4,13 +4,16 @@ use clap::Args;
 use console::style;
 use topcoat_ui::{Registry, Source};
 
-use super::state::{DEFAULT_REGISTRY_NAME, InstallState, RegistryState, STATE_FILE};
+use super::state::{InstallState, RegistryState, STATE_FILE};
 
 #[derive(Args)]
 pub(super) struct ListCommand {
     /// Limit the listing to a single named registry
     #[arg(short, long)]
     registry: Option<String>,
+    /// Only show components that are installed
+    #[arg(short, long)]
+    installed: bool,
 }
 
 impl ListCommand {
@@ -25,8 +28,8 @@ impl ListCommand {
         let mut state = InstallState::load(Path::new(STATE_FILE))?;
 
         // Ensure there is something to list: a named registry that isn't tracked
-        // yet (only valid for one with a built-in location), or the built-in
-        // `default` registry in a project that hasn't added anything.
+        // yet (only valid for one with a built-in location), or the project's
+        // default registry when nothing has been added yet.
         match &self.registry {
             Some(name) if !state.registries.contains_key(name) => {
                 let url = InstallState::default_url(name)
@@ -36,10 +39,11 @@ impl ListCommand {
                     .insert(name.clone(), RegistryState::new(url));
             }
             None if state.registries.is_empty() => {
-                let url = topcoat_ui::DEFAULT_REGISTRY.to_string();
-                state
-                    .registries
-                    .insert(DEFAULT_REGISTRY_NAME.to_string(), RegistryState::new(url));
+                let name = state.default_registry.clone();
+                let url = InstallState::default_url(&name).ok_or_else(|| {
+                    format!("default registry `{name}` has no known location; run `topcoat ui add` first")
+                })?;
+                state.registries.insert(name, RegistryState::new(url));
             }
             _ => {}
         }
@@ -55,7 +59,7 @@ impl ListCommand {
             // Separate registry blocks with a blank line.
             println!();
 
-            list_registry(name, registry_state).await;
+            list_registry(name, registry_state, self.installed).await;
         }
 
         Ok(())
@@ -65,7 +69,7 @@ impl ListCommand {
 /// Lists one registry's components. A component counts as installed only when it
 /// is tracked under *this* registry, so the same name installed from a different
 /// registry is not treated as installed here.
-async fn list_registry(name: &str, state: &RegistryState) {
+async fn list_registry(name: &str, state: &RegistryState, installed_only: bool) {
     println!(
         "{} {}",
         style(name).bold(),
@@ -91,7 +95,9 @@ async fn list_registry(name: &str, state: &RegistryState) {
         let latest = component.version();
         match state.components.get(*component_name) {
             None => {
-                println!("    {component_name} {}", style(latest).dim());
+                if !installed_only {
+                    println!("    {component_name} {}", style(latest).dim());
+                }
             }
             Some(installed) if installed.version == latest => {
                 println!(

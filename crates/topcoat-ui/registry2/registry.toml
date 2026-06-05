@@ -1,0 +1,9 @@
+# TODO: Remove this registry. It's for testing only.
+
+name = "reg2"
+
+[components.gadget]
+version = "0.1.0"
+source = "gadget.rs"
+dependencies = [{ registry = "file://../registry3", name = "foo" }]
+

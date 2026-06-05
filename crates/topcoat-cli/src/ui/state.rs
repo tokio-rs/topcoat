@@ -7,15 +7,21 @@ use serde::{Deserialize, Serialize};
 
 /// The install-state file tracking which components a project has added.
 pub(super) const STATE_FILE: &str = "components.toml";
-/// The name of the built-in registry, used when none is specified.
-pub(super) const DEFAULT_REGISTRY_NAME: &str = "default";
+/// The name of the built-in registry, used as the default when none is set.
+pub(super) const DEFAULT_REGISTRY_NAME: &str = "topcoat";
+/// The format version written into the install state.
+const STATE_VERSION: u32 = 1;
 const DEFAULT_COMPONENTS_DIR: &str = "src/components/ui";
 
 /// The contents of `components.toml`. Components are grouped under the named
 /// registry they were added from, so the same component name can be installed
 /// from different registries and tracked independently.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub(super) struct InstallState {
+    #[serde(default = "default_state_version")]
+    pub version: u32,
+    #[serde(default = "default_registry_name")]
+    pub default_registry: String,
     #[serde(default)]
     pub registries: BTreeMap<String, RegistryState>,
 }
@@ -37,6 +43,16 @@ pub(super) struct InstalledComponent {
     pub file: PathBuf,
 }
 
+impl Default for InstallState {
+    fn default() -> Self {
+        Self {
+            version: STATE_VERSION,
+            default_registry: default_registry_name(),
+            registries: BTreeMap::new(),
+        }
+    }
+}
+
 impl RegistryState {
     pub(super) fn new(url: String) -> Self {
         Self {
@@ -51,7 +67,17 @@ impl InstallState {
     pub(super) fn load(path: &Path) -> Result<Self, String> {
         match std::fs::read_to_string(path) {
             Ok(raw) => {
-                toml::from_str(&raw).map_err(|error| format!("failed to parse {}: {error}", path.display()))
+                let state: Self = toml::from_str(&raw)
+                    .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
+                if state.version > STATE_VERSION {
+                    return Err(format!(
+                        "{} has format version {} but this topcoat supports up to {}",
+                        path.display(),
+                        state.version,
+                        STATE_VERSION
+                    ));
+                }
+                Ok(state)
             }
             Err(error) if error.kind() == ErrorKind::NotFound => Ok(Self::default()),
             Err(error) => Err(format!("failed to read {}: {error}", path.display())),
@@ -59,21 +85,22 @@ impl InstallState {
     }
 
     pub(super) fn save(&self, path: &Path) -> Result<(), String> {
-        let body =
-            toml::to_string_pretty(self).map_err(|error| format!("failed to serialize install state: {error}"))?;
-        let contents = format!("# Topcoat UI install state. Managed by `topcoat ui add`.\n{body}");
-        std::fs::write(path, contents).map_err(|error| format!("failed to write {}: {error}", path.display()))
+        let body = toml::to_string_pretty(self)
+            .map_err(|error| format!("failed to serialize install state: {error}"))?;
+        let contents = format!("# Topcoat UI install state. Managed by `topcoat ui`.\n{body}");
+        std::fs::write(path, contents)
+            .map_err(|error| format!("failed to write {}: {error}", path.display()))
     }
 
     /// The built-in location for a registry name, if it has one. Only the
-    /// `default` registry has a built-in location (the published registry).
+    /// built-in registry has a built-in location (the published registry).
     pub(super) fn default_url(name: &str) -> Option<String> {
         (name == DEFAULT_REGISTRY_NAME).then(|| topcoat_ui::DEFAULT_REGISTRY.to_string())
     }
 
     /// Returns the named registry, creating it if necessary. A given `url` sets
     /// or overrides the registry's location. Creating a registry that does not
-    /// exist requires a `url`, except the built-in `default` registry.
+    /// exist requires a `url`, except the built-in registry.
     pub(super) fn registry_mut(
         &mut self,
         name: &str,
@@ -95,6 +122,40 @@ impl InstallState {
             }
         }
     }
+
+    /// Resolves the install-state registry name for a cross-registry dependency
+    /// at `url`, whose registry declares its own `name`. If a registry with the
+    /// same URL is already tracked it is reused; otherwise the registry is added
+    /// under its declared name, erroring if that name is already taken by a
+    /// different location.
+    pub(super) fn resolve_registry(&mut self, url: &str, name: &str) -> Result<String, String> {
+        if let Some(existing) = self
+            .registries
+            .iter()
+            .find(|(_, registry)| registry.url == url)
+            .map(|(existing, _)| existing.clone())
+        {
+            return Ok(existing);
+        }
+
+        if self.registries.contains_key(name) {
+            return Err(format!(
+                "cannot add registry {url} as `{name}`: that name is already used for a different location"
+            ));
+        }
+
+        self.registries
+            .insert(name.to_string(), RegistryState::new(url.to_string()));
+        Ok(name.to_string())
+    }
+}
+
+fn default_state_version() -> u32 {
+    STATE_VERSION
+}
+
+fn default_registry_name() -> String {
+    DEFAULT_REGISTRY_NAME.to_string()
 }
 
 fn default_components_dir() -> PathBuf {

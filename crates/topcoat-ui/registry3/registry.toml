@@ -5,14 +5,9 @@
 # be told which individual components have updates available. `source` is the
 # path of the component file within this `registry/` directory.
 
-name = "topcoat"
+name = "reg3"
 
-[components.button]
+[components.foo]
 version = "0.1.0"
-source = "button.rs"
-dependencies = ["kek", { registry = "file://../registry2", name = "gadget" }]
-
-[components.kek]
-version = "0.1.0"
-source = "kek.rs"
+source = "foo.rs"
 
