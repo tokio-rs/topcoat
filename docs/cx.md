@@ -101,6 +101,8 @@ The `topcoat::context` module exposes typed state accessors:
 ```rust
 use topcoat::context::{Cx, app_state};
 
+struct Database;
+
 fn db(cx: &Cx) -> &Database {
     app_state::<Database>(cx)
 }

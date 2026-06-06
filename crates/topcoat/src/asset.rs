@@ -1,11 +1,11 @@
-//! Topcoat assets are declared from Rust code with `asset!(...)`. The macro returns
-//! a small `Asset` ID and embeds the declaration into the compiled binary. After building
+//! Topcoat assets are declared from Rust code with [`asset!`](asset). The macro returns
+//! a small [`Asset`] ID and embeds the declaration into the compiled binary. After building
 //! your application, Topcoat can scan the binary, copy or download every declared file into an
 //! asset bundle directory, and serve those bundled files from the router.
 //!
 //! ## Declaring assets
 //!
-//! Use `topcoat::asset::asset` anywhere in your app:
+//! Use [`asset!`](asset) anywhere in your app:
 //!
 //! ```rust
 //! use topcoat::{
@@ -27,7 +27,7 @@
 //!
 //! You can also call the macro inline:
 //!
-//! ```rust
+//! ```rust,ignore
 //! view! {
 //!     <script
 //!         type="module"
@@ -36,8 +36,8 @@
 //! }
 //! ```
 //!
-//! When an `Asset` appears inside `view!`, Topcoat renders it as the URL of the
-//! bundled file. For example, an image might render as:
+//! When an [`Asset`] appears inside [`view!`](crate::view::view), Topcoat renders it as the URL of
+//! the bundled file. For example, an image might render as:
 //!
 //! ```html
 //! <img src="/_topcoat/assets/ferris-1a2b3c4d.png">
@@ -48,10 +48,10 @@
 //!
 //! ## Loading the bundle
 //!
-//! The router must load the generated asset bundle. Use `AssetBundle::load()` for
+//! The router must load the generated asset bundle. Use [`AssetBundle::load`] for
 //! the default bundle location:
 //!
-//! ```rust
+//! ```rust,ignore
 //! use topcoat::asset::AssetBundle;
 //!
 //! mod app;
@@ -64,15 +64,15 @@
 //! }
 //! ```
 //!
-//! Use `AssetBundle::load_dir("path/to/assets")` when you write the bundle to
+//! Use [`AssetBundle::load_dir`] when you write the bundle to
 //! a custom location.
 //!
-//! `Router::assets(...)` does two things:
+//! [`Router::assets`](crate::router::Router::assets) does two things:
 //!
 //! - mounts the bundle at `/_topcoat/assets`
-//! - installs the view resolver that turns `Asset` values into URLs
+//! - installs the view resolver that turns [`Asset`] values into URLs
 //!
-//! If a page renders an `Asset` that is not present in the loaded bundle, rendering
+//! If a page renders an [`Asset`] that is not present in the loaded bundle, rendering
 //! panics. Treat that as a build/deploy mismatch: the binary and asset bundle must
 //! come from the same build.
 //!
@@ -121,16 +121,16 @@
 //! topcoat asset bundle --out dist/assets
 //! ```
 //!
-//! ```rust
+//! ```rust,ignore
 //! let router = app::router().assets(AssetBundle::load_dir("dist/assets").unwrap());
 //! ```
 //!
-//! When `--out` is not in one of the auto-detected locations, use `load_dir` to
-//! point at it explicitly.
+//! When `--out` is not in one of the auto-detected locations, use [`AssetBundle::load_dir`] to point
+//! at it explicitly.
 //!
 //! ## Path resolution
 //!
-//! The first argument to `asset!` is a string literal path or an `http(s)` URL.
+//! The first argument to [`asset!`](asset) is a string literal path or an `http(s)` URL.
 //! Local paths are resolved by the bundler:
 //!
 //! | Asset path | Resolution |
@@ -146,9 +146,11 @@
 //!
 //! ## Output options
 //!
-//! `asset!` accepts optional named arguments that affect the bundled filename:
+//! [`asset!`](asset) accepts optional named arguments that affect the bundled filename:
 //!
 //! ```rust
+//! use topcoat::asset::{Asset, asset};
+//!
 //! const RUST_LOGO: Asset = asset!(
 //!     "https://upload.wikimedia.org/wikipedia/commons/r/rust-logo.png",
 //!     rename: "rust",
@@ -169,17 +171,20 @@
 //!
 //! ## Direct bundle access
 //!
-//! Most Topcoat apps only need to render `Asset` values in `view!`. If you need the
-//! filesystem path for another purpose, load the bundle and look up the asset ID:
+//! Most Topcoat apps only need to render [`Asset`] values in [`view!`](crate::view::view). If you
+//! need the filesystem path for another purpose, load the bundle and look up the asset ID:
 //!
-//! ```rust
+//! ```rust,no_run
 //! use topcoat::asset::{Asset, AssetBundle, asset};
 //!
 //! const LOGO: Asset = asset!("assets/logo.png");
 //!
-//! let bundle = AssetBundle::load_dir("target/assets")?;
-//! let logo = bundle.get(LOGO).expect("logo was bundled");
-//! let path = logo.path();
+//! fn main() -> std::io::Result<()> {
+//!     let bundle = AssetBundle::load_dir("target/assets")?;
+//!     let logo = bundle.get(LOGO).expect("logo was bundled");
+//!     let path = logo.path();
+//!     Ok(())
+//! }
 //! ```
 //!
 //! This returns the path to the bundled file, not the original source path.

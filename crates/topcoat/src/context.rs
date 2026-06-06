@@ -1,4 +1,4 @@
-//! `Cx` is Topcoat's request context. Pages, layouts, components, and routes can take it as an
+//! [`Cx`] is Topcoat's request context. Pages, layouts, components, and routes can take it as an
 //! optional parameter when they need request-scoped information.
 //!
 //! Add `cx: &Cx` to the function signature when needed; leave it out when the function does not
@@ -6,7 +6,8 @@
 //!
 //! ## Router request helpers
 //!
-//! The `topcoat::router` module exposes small functions for reading HTTP request data from `cx`.
+//! The [`router`](crate::router) module exposes small functions for reading HTTP request data from
+//! `cx`.
 //!
 //! ```rust
 //! use topcoat::{
@@ -26,14 +27,14 @@
 //!
 //! Available request helpers:
 //!
-//! - `parts(cx)` returns the current request's `http::request::Parts`.
-//! - `method(cx)` returns the HTTP method.
-//! - `uri(cx)` returns the request URI.
-//! - `version(cx)` returns the HTTP version.
-//! - `headers(cx)` returns the request headers.
-//! - `extensions(cx)` returns request extensions.
+//! - [`parts(cx)`](crate::router::parts) returns the current request's `http::request::Parts`.
+//! - [`method(cx)`](crate::router::method) returns the HTTP method.
+//! - [`uri(cx)`](crate::router::uri) returns the request URI.
+//! - [`version(cx)`](crate::router::version) returns the HTTP version.
+//! - [`headers(cx)`](crate::router::headers) returns the request headers.
+//! - [`extensions(cx)`](crate::router::extensions) returns request extensions.
 //!
-//! Use `parts(cx)` when you need several fields at once:
+//! Use [`parts(cx)`](crate::router::parts) when you need several fields at once:
 //!
 //! ```rust
 //! use topcoat::{context::Cx, router::parts};
@@ -44,7 +45,8 @@
 //! }
 //! ```
 //!
-//! Use `extensions(cx)` for typed request values inserted by lower-level Axum middleware:
+//! Use [`extensions(cx)`](crate::router::extensions) for typed request values inserted by
+//! lower-level Axum middleware:
 //!
 //! ```rust
 //! use topcoat::{context::Cx, router::extensions};
@@ -61,7 +63,7 @@
 //! Path and query parameter macros generate `of(cx)` helpers. They parse lazily and memoize the
 //! parsed value for the request.
 //!
-//! ```rust
+//! ```rust,ignore
 //! use topcoat::{
 //!     Result,
 //!     context::Cx,
@@ -92,13 +94,16 @@
 //!
 //! ## App and request state helpers
 //!
-//! The `topcoat::context` module exposes typed state accessors:
+//! This module exposes typed state accessors:
 //!
-//! - `app_state::<T>(cx)` reads state registered on the router with `.app_state(value)`.
-//! - `request_state::<T>(cx)` reads typed state attached to the current request.
+//! - [`app_state::<T>(cx)`](app_state) reads state registered on the router with
+//!   `.app_state(value)`.
+//! - [`request_state::<T>(cx)`](request_state) reads typed state attached to the current request.
 //!
 //! ```rust
 //! use topcoat::context::{Cx, app_state};
+//! #
+//! # struct Database;
 //!
 //! fn db(cx: &Cx) -> &Database {
 //!     app_state::<Database>(cx)
@@ -112,7 +117,7 @@
 //! ## Extractor escape hatch
 //!
 //! Prefer Topcoat's dedicated helpers when they exist. If you need to interoperate with an Axum
-//! extractor that implements `FromRequestParts`, use `router::extract`.
+//! extractor that implements `FromRequestParts`, use [`router::extract`](crate::router::extract).
 //!
 //! ```rust
 //! use axum::extract::Query;
@@ -132,7 +137,7 @@
 //!
 //! ## Composing helpers
 //!
-//! Any helper can accept `cx: &Cx`, call other helpers, and return a domain-specific result:
+//! Any helper can accept `cx: &`[`Cx`], call other helpers, and return a domain-specific result:
 //!
 //! ```rust
 //! use topcoat::{

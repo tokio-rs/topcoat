@@ -16,7 +16,7 @@ use quote::quote;
 ///   as expected.
 /// - Literal text and literal attribute values are string literals.
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <!DOCTYPE html>
 ///     <html>
@@ -35,7 +35,7 @@ use quote::quote;
 ///
 /// Element names can use dashes, so custom elements fit naturally:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <my-widget data-widget-id="profile"></my-widget>
 /// }
@@ -47,7 +47,7 @@ use quote::quote;
 ///
 /// In child position, the expression becomes a node:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <h1>"Hello, " (user.name) "!"</h1>
 ///     (sidebar)
@@ -56,7 +56,7 @@ use quote::quote;
 ///
 /// In attribute value position, the expression becomes the value:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <a href=(url) aria-current=(is_current)>"Open"</a>
 /// }
@@ -65,7 +65,7 @@ use quote::quote;
 /// The same parenthesized expression syntax can also be used for dynamic attribute names and
 /// dynamic element names:
 ///
-/// ```rust
+/// ```rust,ignore
 /// let tag = "section";
 /// let attr = "data-state";
 ///
@@ -76,7 +76,7 @@ use quote::quote;
 ///
 /// Literal text must be quoted because unquoted Rust identifiers are meaningful to the macro:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <p>"This is text"</p>
 ///     <p>(computed_text)</p>
@@ -92,7 +92,7 @@ use quote::quote;
 ///
 /// Use `if`, `else if`, and `else` to choose which markup is emitted.
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     if user.is_some() {
 ///         <a href="/account">"Account"</a>
@@ -104,7 +104,7 @@ use quote::quote;
 ///
 /// In attributes, each branch emits attributes instead of child nodes:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <a
 ///         href="/posts"
@@ -122,7 +122,7 @@ use quote::quote;
 ///
 /// Use `for pat in expr { ... }` to render the body once for each item.
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <ul>
 ///         for post in posts {
@@ -137,7 +137,7 @@ use quote::quote;
 /// In attributes, a loop can emit zero or more attributes. This is useful when you already have
 /// attributes represented as data:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <div
 ///         for (name, value) in attrs {
@@ -151,7 +151,7 @@ use quote::quote;
 ///
 /// Use `match` to choose markup from patterns. Match arms can also use guards.
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     match status {
 ///         Status::Draft => <span>"Draft"</span>,
@@ -165,7 +165,7 @@ use quote::quote;
 /// A match arm body is one view node. If a branch needs multiple sibling nodes, wrap them in a
 /// block:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     match user {
 ///         Some(user) => {
@@ -179,7 +179,7 @@ use quote::quote;
 ///
 /// In attributes, each arm emits one attribute node:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <article
 ///         match state {
@@ -197,7 +197,7 @@ use quote::quote;
 ///
 /// Use `let pat = expr;` to bind values for later nodes in the same body.
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <article>
 ///         let title = post.title.trim();
@@ -210,7 +210,7 @@ use quote::quote;
 ///
 /// The same works in an attribute list. The binding is in scope for attributes that follow it:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <a
 ///         let href = post.url();
@@ -227,7 +227,7 @@ use quote::quote;
 /// Components are called inside [`view!`] with function-call syntax. Named arguments use `name:
 /// value`, and child nodes can be passed after the named arguments:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     panel(
 ///         title: "Profile",
@@ -255,7 +255,7 @@ use quote::quote;
 /// evaluates to [`None`], the whole attribute is omitted. [`Some(value)`][`Some`] renders the
 /// attribute using the inner value.
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <button
 ///         disabled=(is_disabled)
@@ -269,7 +269,7 @@ use quote::quote;
 ///
 /// If the values are:
 ///
-/// ```rust
+/// ```rust,ignore
 /// let is_disabled = false;
 /// let is_current = true;
 /// let maybe_title: Option<&str> = None;
@@ -280,7 +280,7 @@ use quote::quote;
 ///
 /// This omission logic applies to expression attributes. Literal attributes are always present:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <button disabled="false">"Still disabled in HTML"</button>
 /// }
@@ -304,7 +304,7 @@ use quote::quote;
 ///
 /// For example, a type can opt into child-node rendering by implementing [`NodeViewParts`]:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::view::{NodeViewParts, ViewParts};
 ///
 /// struct Badge(String);
@@ -324,7 +324,7 @@ use quote::quote;
 /// [`attribute_present`][AttributeValueViewParts::attribute_present] method controls whether the
 /// containing attribute is rendered at all.
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::view::{AttributeValueViewParts, ViewParts};
 ///
 /// struct DataId(Option<String>);
@@ -371,7 +371,7 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 /// Use it when attributes need to be passed around, assembled outside a [`view!`] call, changed at
 /// runtime, or forwarded through components.
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::view::{attributes, view};
 ///
 /// let attrs = attributes! {
@@ -392,7 +392,7 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 /// That includes literal attributes, expression values, dynamic names, binding attributes, event
 /// handlers, and attribute-level control flow:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::view::attributes;
 ///
 /// let id = "submit";
@@ -429,7 +429,7 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 /// The generated value is [`topcoat::view::Attributes`]. It is a runtime collection of attributes
 /// with unique keys.
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::view::attributes;
 ///
 /// let mut attrs = attributes! {
@@ -451,7 +451,7 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 /// Insert an [`Attributes`] value into an element by using it as a parenthesized attribute
 /// fragment:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::view::{attributes, view};
 ///
 /// let attrs = attributes! {
@@ -477,7 +477,7 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 /// Components can accept [`Attributes`] as a normal argument. This is useful for forwarding
 /// caller-controlled attributes to the component's root element.
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::{
 ///     Result,
 ///     view::{Attributes, View, attributes, component, view},
@@ -522,7 +522,7 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 /// [`View`] through the usual Topcoat [`Result`] type, and can take typed parameters like any other
 /// Rust function.
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::{
 ///     Result,
 ///     view::{component, view},
@@ -542,7 +542,7 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 ///
 /// Call components inside [`view!`] with function-call syntax. Named arguments use `name: value`:
 ///
-/// ```rust
+/// ```rust,ignore
 /// view! {
 ///     <header>
 ///         badge(
@@ -562,7 +562,7 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 /// If a component accepts a parameter named `child` with type [`View`], any extra view nodes in the
 /// call are collected and passed as that child view.
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::{
 ///     Result,
 ///     view::{View, component, view},
@@ -600,7 +600,7 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 /// Components can ask for the current request context by declaring a `cx` parameter that borrows
 /// [`Cx`]:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,

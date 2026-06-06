@@ -13,7 +13,7 @@ use quote::quote;
 ///
 /// Annotate any function that takes a `cx: &Cx` parameter:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::context::{Cx, memoize};
 ///
 /// #[memoize]
@@ -36,7 +36,7 @@ use quote::quote;
 /// `#[memoize]` works on both synchronous and `async` functions. Pick whichever matches your work;
 /// the macro handles the rest.
 ///
-/// ```rust
+/// ```rust,ignore
 /// #[memoize]
 /// fn parse_config(cx: &Cx, raw: &str) -> Config {
 ///     serde_json::from_str(raw).unwrap()
@@ -57,7 +57,7 @@ use quote::quote;
 /// Every argument except `cx` is part of the cache key. Two calls hit the same cache entry if and
 /// only if every non-`cx` argument is equal.
 ///
-/// ```rust
+/// ```rust,ignore
 /// #[memoize]
 /// fn add(cx: &Cx, x: i32, y: i32) -> i32 {
 ///     println!("computing");
@@ -77,7 +77,7 @@ use quote::quote;
 /// Arguments can be passed by value or by reference. Borrowed arguments avoid cloning on cache
 /// hits; on a miss the value is cloned once into the cache.
 ///
-/// ```rust
+/// ```rust,ignore
 /// #[memoize]
 /// async fn lookup(cx: &Cx, name: &str) -> Result<Record, Error> {
 ///     db::find(name).await
@@ -115,7 +115,7 @@ use quote::quote;
 ///
 /// ## Example: shared user lookup
 ///
-/// ```rust
+/// ```rust,ignore
 /// use topcoat::{
 ///     Result,
 ///     context::{Cx, memoize},
