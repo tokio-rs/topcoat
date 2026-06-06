@@ -4,8 +4,7 @@ use crate::runtime::{Attribute, AttributeValueViewParts, AttributeViewParts, Vie
 
 /// A runtime collection of HTML attributes with unique keys.
 ///
-/// Prefer constructing `Attributes` with the
-/// [`attributes!`](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html)
+/// Prefer constructing `Attributes` with the [`attributes!`](macro.attributes.html)
 /// macro. The macro accepts the same attribute syntax as an element inside
 /// `view!`, including dynamic values, dynamic names, event handlers, and
 /// attribute-level control flow.
@@ -212,7 +211,10 @@ mod tests {
         attrs.insert("class", "button");
         attrs.insert("id", "submit");
         let rendered = render(attrs);
-        let parts: HashSet<&str> = rendered.split_terminator(' ').filter(|s| !s.is_empty()).collect();
+        let parts: HashSet<&str> = rendered
+            .split_terminator(' ')
+            .filter(|s| !s.is_empty())
+            .collect();
         let expected: HashSet<&str> = ["class=\"button\"", "id=\"submit\""].into_iter().collect();
         assert_eq!(parts, expected);
     }
