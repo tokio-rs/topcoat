@@ -9,8 +9,9 @@ use syn::{
     token::Paren,
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     template::TemplateExpr,
     view::{ExprKind, HtmlIdent, ViewWriter, WriteView},
 };

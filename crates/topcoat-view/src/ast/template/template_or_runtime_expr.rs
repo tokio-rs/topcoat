@@ -2,10 +2,9 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
 
-use crate::ast::{
-    ParseOption,
-    template::{RuntimeExpr, TemplateExpr},
-};
+use topcoat_core::ast::ParseOption;
+
+use crate::ast::template::{RuntimeExpr, TemplateExpr};
 
 /// An expression that can either be emitted directly or wrapped for runtime use.
 #[derive(Debug, PartialEq)]

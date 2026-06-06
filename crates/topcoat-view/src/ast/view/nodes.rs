@@ -2,10 +2,9 @@ use std::ops::Deref;
 
 use syn::parse::{Parse, ParseStream};
 
-use crate::ast::{
-    ParseOption,
-    view::{ClosingTag, Node, ViewWriter, WriteView},
-};
+use topcoat_core::ast::ParseOption;
+
+use crate::ast::view::{ClosingTag, Node, ViewWriter, WriteView};
 
 /// A sequence of sibling [`Node`]s — the shared building block used by both a
 /// top-level [`View`](super::View), a [`Component`](super::Component)'s

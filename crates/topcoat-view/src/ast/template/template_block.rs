@@ -4,8 +4,9 @@ use syn::{
     token::Brace,
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     attributes::{AttributeWriter, WriteAttribute},
     view::{ViewWriter, WriteView},
 };

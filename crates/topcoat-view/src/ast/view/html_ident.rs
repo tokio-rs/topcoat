@@ -9,7 +9,7 @@ use syn::{
     spanned::Spanned,
 };
 
-use crate::ast::ParseOption;
+use topcoat_core::ast::ParseOption;
 
 /// An HTML identifier — a sequence of identifier segments joined by `-`, `:`,
 /// or `.` with no intervening whitespace. Covers names like `data-foo`,

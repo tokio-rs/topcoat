@@ -20,10 +20,9 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::parse::{Parse, ParseStream};
 
-use crate::ast::{
-    ParseOption,
-    view::{ViewWriter, WriteView},
-};
+use topcoat_core::ast::ParseOption;
+
+use crate::ast::view::{ViewWriter, WriteView};
 
 /// The full list of attributes attached to a single tag.
 pub struct Attributes {

@@ -6,10 +6,9 @@ use syn::{
     token::Paren,
 };
 
-use crate::ast::{
-    ParseOption,
-    view::{ExprKind, ViewWriter, WriteView},
-};
+use topcoat_core::ast::ParseOption;
+
+use crate::ast::view::{ExprKind, ViewWriter, WriteView};
 
 mod kw {
     use syn::custom_keyword;

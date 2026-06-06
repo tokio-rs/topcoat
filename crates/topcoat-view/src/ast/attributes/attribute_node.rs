@@ -1,7 +1,8 @@
 use syn::parse::{Parse, ParseStream};
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     attributes::{
         Attribute, AttributeNodes, AttributeWriter, BindAttribute, EventHandler, WriteAttribute,
     },

@@ -6,8 +6,9 @@ use syn::{
     token::Paren,
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     template::RuntimeExpr,
     view::{ExprKind, Nodes, ViewWriter, WriteView},
 };

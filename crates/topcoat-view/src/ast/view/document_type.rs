@@ -3,10 +3,9 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::ast::{
-    ParseOption,
-    view::{ViewWriter, WriteView},
-};
+use topcoat_core::ast::ParseOption;
+
+use crate::ast::view::{ViewWriter, WriteView};
 
 mod kw {
     use syn::custom_keyword;

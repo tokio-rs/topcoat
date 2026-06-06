@@ -5,10 +5,9 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::ast::{
-    ParseOption,
-    view::{ExprKind, ViewWriter, WriteView},
-};
+use topcoat_core::ast::ParseOption;
+
+use crate::ast::view::{ExprKind, ViewWriter, WriteView};
 
 /// A parenthesized Rust expression embedded as a child node, e.g. `(5 + 6)`.
 #[derive(Debug, PartialEq)]

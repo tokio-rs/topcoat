@@ -6,7 +6,7 @@ edition = "2024"
 [features]
 axum = ["dep:axum"]
 discover = ["dep:inventory"]
-parsing = ["proc-macro2/span-locations"]
+parsing = ["proc-macro2/span-locations", "topcoat-core/parsing"]
 pretty = ["parsing", "dep:topcoat-pretty"]
 
 [dependencies]
