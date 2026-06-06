@@ -1,8 +1,8 @@
-# The `attributes!` macro
+# The [`attributes!`] macro
 
-The `attributes!` macro builds a `topcoat::view::Attributes` value from Topcoat's attribute syntax.
+The [`attributes!`] macro builds a [`topcoat::view::Attributes`] value from Topcoat's attribute syntax.
 
-Use it when attributes need to be passed around, assembled outside a `view!` call, changed at runtime, or forwarded through components.
+Use it when attributes need to be passed around, assembled outside a [`view!`] call, changed at runtime, or forwarded through components.
 
 ```rust
 use topcoat::view::{attributes, view};
@@ -20,7 +20,7 @@ view! {
 
 ## Syntax
 
-The body of `attributes!` has the same syntax as attributes inside an element in `view!`.
+The body of [`attributes!`] has the same syntax as attributes inside an element in [`view!`].
 
 That includes literal attributes, expression values, dynamic names, binding attributes, event handlers, and attribute-level control flow:
 
@@ -56,11 +56,11 @@ let attrs = attributes! {
 };
 ```
 
-`attributes!` produces attributes, not child nodes. Control-flow bodies inside the macro therefore emit attributes in the same way they do inside a `view!` element's opening tag.
+[`attributes!`] produces attributes, not child nodes. Control-flow bodies inside the macro therefore emit attributes in the same way they do inside a [`view!`] element's opening tag.
 
 ## Runtime Attributes
 
-The generated value is `topcoat::view::Attributes`. It is a runtime collection of attributes with unique keys.
+The generated value is [`topcoat::view::Attributes`]. It is a runtime collection of attributes with unique keys.
 
 ```rust
 use topcoat::view::attributes;
@@ -76,11 +76,11 @@ attrs.insert("disabled", true);
 assert!(attrs.contains_key("class"));
 ```
 
-Because `Attributes` is map-like, each key appears at most once. Inserting the same key again replaces the previous value. Do not rely on render order for attributes.
+Because [`Attributes`] is map-like, each key appears at most once. Inserting the same key again replaces the previous value. Do not rely on render order for attributes.
 
 ## Inserting Attributes Into Elements
 
-Insert an `Attributes` value into an element by using it as a parenthesized attribute fragment:
+Insert an [`Attributes`] value into an element by using it as a parenthesized attribute fragment:
 
 ```rust
 use topcoat::view::{attributes, view};
@@ -97,13 +97,13 @@ view! {
 }
 ```
 
-Any type that implements `AttributeViewParts` can be used in the same position. `Attributes` implements that trait, so it works as a complete reusable attribute fragment.
+Any type that implements [`AttributeViewParts`] can be used in the same position. [`Attributes`] implements that trait, so it works as a complete reusable attribute fragment.
 
-Inserting an `Attributes` value consumes it. Clone the value first if the same attribute collection needs to be inserted into more than one element.
+Inserting an [`Attributes`] value consumes it. Clone the value first if the same attribute collection needs to be inserted into more than one element.
 
 ## Passing Attributes To Components
 
-Components can accept `Attributes` as a normal argument. This is useful for forwarding caller-controlled attributes to the component's root element.
+Components can accept [`Attributes`] as a normal argument. This is useful for forwarding caller-controlled attributes to the component's root element.
 
 ```rust
 use topcoat::{
@@ -132,3 +132,9 @@ view! {
 ```
 
 Since the value is ordinary Rust data, you can build it in helper functions, add or replace attributes before rendering, and pass it through several layers before inserting it into an element.
+
+[`AttributeViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeViewParts.html
+[`Attributes`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Attributes.html
+[`attributes!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html
+[`topcoat::view::Attributes`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Attributes.html
+[`view!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.view.html

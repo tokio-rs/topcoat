@@ -1,6 +1,6 @@
-# The `view!` macro
+# The [`view!`] macro
 
-The `view!` macro is Topcoat's HTML templating syntax. It tries to be unsurprising by staying close to real HTML instead of inventing a Rust-shaped HTML dialect.
+The [`view!`] macro is Topcoat's HTML templating syntax. It tries to be unsurprising by staying close to real HTML instead of inventing a Rust-shaped HTML dialect.
 
 That means:
 
@@ -79,7 +79,7 @@ view! {
 
 ## Control Flow
 
-Control flow in `view!` is Rust control flow with markup bodies. The macro lowers these constructs into ordinary Rust statements that append to the view being built.
+Control flow in [`view!`] is Rust control flow with markup bodies. The macro lowers these constructs into ordinary Rust statements that append to the view being built.
 
 ### `if`
 
@@ -214,7 +214,7 @@ view! {
 
 ## Components
 
-Components are called inside `view!` with function-call syntax. Named arguments use `name: value`, and child nodes can be passed after the named arguments:
+Components are called inside [`view!`] with function-call syntax. Named arguments use `name: value`, and child nodes can be passed after the named arguments:
 
 ```rust
 view! {
@@ -229,15 +229,15 @@ view! {
 }
 ```
 
-All component parameters are named parameters, except `child`, which can be passed unnamed in the last position. Conceptually, those trailing child nodes are the same thing as a `child` parameter whose value is a `view! { ... }` containing those nodes.
+All component parameters are named parameters, except `child`, which can be passed unnamed in the last position. Conceptually, those trailing child nodes are the same thing as a `child` parameter whose value is a [`view! { ... }`][`view!`] containing those nodes.
 
-See [The `component` macro](component.md) for defining components and passing child content.
+See the [`component`] macro guide in [component.md](component.md) for defining components and passing child content.
 
 ## Conditional Attributes
 
 Expression attributes can remove themselves from the rendered markup.
 
-When an attribute value evaluates to `false`, the whole attribute is omitted. When it evaluates to `None`, the whole attribute is omitted. `Some(value)` renders the attribute using the inner value.
+When an attribute value evaluates to [`false`], the whole attribute is omitted. When it evaluates to [`None`], the whole attribute is omitted. [`Some(value)`][`Some`] renders the attribute using the inner value.
 
 ```rust
 view! {
@@ -269,19 +269,19 @@ view! {
 }
 ```
 
-For reusable runtime attribute collections, use [the `attributes!` macro](attributes.md). It accepts the same attribute syntax and creates a `topcoat::view::Attributes` value that can be passed around and inserted into an element as an attribute fragment.
+For reusable runtime attribute collections, use the [`attributes!`] macro. The [attributes guide](attributes.md) covers the same attribute syntax and the [`topcoat::view::Attributes`] value that can be passed around and inserted into an element as an attribute fragment.
 
 ## Custom Values In Markup
 
 The macro accepts dynamic Rust values by routing them through small runtime traits. Implement the trait for the position where your type should be accepted:
 
-- `NodeViewParts` for values used as child nodes: `(value)`.
-- `AttributeValueViewParts` for values used as attribute values: `name=(value)`.
-- `AttributeKeyViewParts` for values used as dynamic attribute names: `(name)="value"`.
-- `AttributeViewParts` for values that emit one or more full attributes in APIs that accept complete attribute fragments.
-- `ElementNameViewParts` for values used as dynamic element names: `<(name)>...</(name)>`.
+- [`NodeViewParts`] for values used as child nodes: `(value)`.
+- [`AttributeValueViewParts`] for values used as attribute values: `name=(value)`.
+- [`AttributeKeyViewParts`] for values used as dynamic attribute names: `(name)="value"`.
+- [`AttributeViewParts`] for values that emit one or more full attributes in APIs that accept complete attribute fragments.
+- [`ElementNameViewParts`] for values used as dynamic element names: `<(name)>...</(name)>`.
 
-For example, a type can opt into child-node rendering by implementing `NodeViewParts`:
+For example, a type can opt into child-node rendering by implementing [`NodeViewParts`]:
 
 ```rust
 use topcoat::view::{NodeViewParts, ViewParts};
@@ -299,7 +299,7 @@ view! {
 }
 ```
 
-For attribute values, implement `AttributeValueViewParts`. Its `attribute_present` method controls whether the containing attribute is rendered at all.
+For attribute values, implement [`AttributeValueViewParts`]. Its [`attribute_present`][AttributeValueViewParts::attribute_present] method controls whether the containing attribute is rendered at all.
 
 ```rust
 use topcoat::view::{AttributeValueViewParts, ViewParts};
@@ -322,3 +322,17 @@ view! {
     <article data-id=(DataId(Some("post-1".to_owned())))></article>
 }
 ```
+
+[`AttributeKeyViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeKeyViewParts.html
+[`AttributeValueViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeValueViewParts.html
+[AttributeValueViewParts::attribute_present]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeValueViewParts.html#tymethod.attribute_present
+[`AttributeViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeViewParts.html
+[`ElementNameViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.ElementNameViewParts.html
+[`NodeViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.NodeViewParts.html
+[`component`]: https://docs.rs/topcoat/latest/topcoat/view/attr.component.html
+[`attributes!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html
+[`false`]: https://doc.rust-lang.org/std/keyword.false.html
+[`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
+[`Some`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.Some
+[`topcoat::view::Attributes`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Attributes.html
+[`view!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.view.html

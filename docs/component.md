@@ -1,6 +1,6 @@
-# The `component` macro
+# The [`component`] macro
 
-Components are async functions annotated with `#[component]`. They return a `View` through the usual Topcoat `Result` type, and can take typed parameters like any other Rust function.
+Components are async functions annotated with [`#[component]`][`component`]. They return a [`View`] through the usual Topcoat [`Result`] type, and can take typed parameters like any other Rust function.
 
 ```rust
 use topcoat::{
@@ -20,7 +20,7 @@ async fn badge(label: &str, tone: &str) -> Result {
 
 ## Calling Components
 
-Call components inside `view!` with function-call syntax. Named arguments use `name: value`:
+Call components inside [`view!`] with function-call syntax. Named arguments use `name: value`:
 
 ```rust
 view! {
@@ -33,11 +33,11 @@ view! {
 }
 ```
 
-All component parameters are named parameters, except `child`, which can be passed unnamed in the last position. After the named arguments, unnamed child nodes are written like normal `view!` content; multiple child nodes do not need commas between them.
+All component parameters are named parameters, except `child`, which can be passed unnamed in the last position. After the named arguments, unnamed child nodes are written like normal [`view!`] content; multiple child nodes do not need commas between them.
 
 ## Child Content
 
-If a component accepts a parameter named `child` with type `View`, any extra view nodes in the call are collected and passed as that child view.
+If a component accepts a parameter named `child` with type [`View`], any extra view nodes in the call are collected and passed as that child view.
 
 ```rust
 use topcoat::{
@@ -69,11 +69,11 @@ view! {
 }
 ```
 
-Conceptually, those trailing child nodes are the same thing as a `child` parameter whose value is a `view! { ... }` containing those nodes.
+Conceptually, those trailing child nodes are the same thing as a `child` parameter whose value is a [`view! { ... }`][`view!`] containing those nodes.
 
 ## Request Context
 
-Components can ask for the current request context by declaring a parameter named `cx: &Cx`:
+Components can ask for the current request context by declaring a `cx` parameter that borrows [`Cx`]:
 
 ```rust
 use topcoat::{
@@ -90,3 +90,9 @@ async fn current_path(cx: &Cx) -> Result {
     }
 }
 ```
+
+[`Cx`]: https://docs.rs/topcoat/latest/topcoat/context/struct.Cx.html
+[`Result`]: https://docs.rs/topcoat/latest/topcoat/type.Result.html
+[`View`]: https://docs.rs/topcoat/latest/topcoat/view/struct.View.html
+[`component`]: https://docs.rs/topcoat/latest/topcoat/view/attr.component.html
+[`view!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.view.html
