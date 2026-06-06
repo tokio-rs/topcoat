@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{ExprLit, Lit};
-use topcoat_core::context::Cx;
+use topcoat_core::runtime::context::Cx;
 use topcoat_view::runtime::{View, ViewParts};
 
 use crate::{

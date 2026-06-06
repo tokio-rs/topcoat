@@ -2047,6 +2047,9 @@ dependencies = [
  "hashbrown 0.17.0",
  "http",
  "pin-project-lite",
+ "proc-macro2",
+ "quote",
+ "syn",
  "tokio",
 ]
 
@@ -2054,10 +2057,10 @@ dependencies = [
 name = "topcoat-macro"
 version = "0.1.0"
 dependencies = [
- "heck",
- "proc-macro2",
  "quote",
  "syn",
+ "topcoat-core",
+ "topcoat-router",
  "topcoat-runtime",
  "topcoat-view",
 ]
@@ -2081,11 +2084,14 @@ dependencies = [
  "heck",
  "http",
  "inventory",
+ "proc-macro2",
+ "quote",
  "ref-cast",
  "serde",
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
+ "syn",
  "thiserror",
  "tokio",
  "topcoat-asset",

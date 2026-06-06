@@ -1,21 +1,3 @@
-mod memoize;
-mod quote_option;
-
-#[cfg(feature = "router")]
-mod handler_args;
-#[cfg(feature = "router")]
-mod layout;
-#[cfg(feature = "router")]
-mod page;
-#[cfg(feature = "router")]
-mod path_param;
-#[cfg(feature = "router")]
-mod query_params;
-#[cfg(feature = "router")]
-mod route;
-#[cfg(feature = "router")]
-mod segment;
-
 use proc_macro::TokenStream;
 use quote::quote;
 
@@ -64,7 +46,7 @@ pub fn shard(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[cfg(feature = "router")]
 #[proc_macro_attribute]
 pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match page::Page::parse(attr.into(), item.into()) {
+    match topcoat_router::ast::page::Page::parse(attr.into(), item.into()) {
         Ok(value) => quote! { #value }.into(),
         Err(error) => error.to_compile_error().into(),
     }
@@ -73,7 +55,7 @@ pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[cfg(feature = "router")]
 #[proc_macro_attribute]
 pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match layout::Layout::parse(attr.into(), item.into()) {
+    match topcoat_router::ast::layout::Layout::parse(attr.into(), item.into()) {
         Ok(value) => quote! { #value }.into(),
         Err(error) => error.to_compile_error().into(),
     }
@@ -82,7 +64,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[cfg(feature = "router")]
 #[proc_macro_attribute]
 pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match route::Route::parse(attr.into(), item.into()) {
+    match topcoat_router::ast::route::Route::parse(attr.into(), item.into()) {
         Ok(value) => quote! { #value }.into(),
         Err(error) => error.to_compile_error().into(),
     }
@@ -91,7 +73,7 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[cfg(feature = "router")]
 #[proc_macro]
 pub fn segment(tokens: TokenStream) -> TokenStream {
-    let segment = syn::parse_macro_input!(tokens as segment::Segment);
+    let segment = syn::parse_macro_input!(tokens as topcoat_router::ast::segment::Segment);
     quote! { #segment }.into()
 }
 
@@ -192,7 +174,7 @@ pub fn segment(tokens: TokenStream) -> TokenStream {
 #[cfg(feature = "router")]
 #[proc_macro_attribute]
 pub fn path_param(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match path_param::PathParam::parse(attr.into(), item.into()) {
+    match topcoat_router::ast::path_param::PathParam::parse(attr.into(), item.into()) {
         Ok(value) => quote! { #value }.into(),
         Err(error) => error.to_compile_error().into(),
     }
@@ -247,7 +229,7 @@ pub fn path_param(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[cfg(feature = "router")]
 #[proc_macro_attribute]
 pub fn query_params(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match query_params::QueryParams::parse(attr.into(), item.into()) {
+    match topcoat_router::ast::query_params::QueryParams::parse(attr.into(), item.into()) {
         Ok(value) => quote! { #value }.into(),
         Err(error) => error.to_compile_error().into(),
     }
@@ -304,7 +286,7 @@ pub fn query_params(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// - The return type `T` must be `Send + Sync + 'static`.
 #[proc_macro_attribute]
 pub fn memoize(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match memoize::Memoize::parse(attr.into(), item.into()) {
+    match topcoat_core::ast::memoize::Memoize::parse(attr.into(), item.into()) {
         Ok(value) => quote! { #value }.into(),
         Err(error) => error.to_compile_error().into(),
     }

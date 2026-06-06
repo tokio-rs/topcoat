@@ -469,7 +469,7 @@ inside non-leaf overrides, otherwise the rest of the subtree is skipped.
 
 `quote::ToTokens` on `Option<T>` emits nothing for `None` and the inner value
 for `Some`. When generated code should still contain an `Option`, wrap with
-`crate::quote_option::QuoteOption` so it round-trips as
+the local `QuoteOption` helper so it round-trips as
 `::core::option::Option::Some(...)` / `::core::option::Option::None`.
 
 ---

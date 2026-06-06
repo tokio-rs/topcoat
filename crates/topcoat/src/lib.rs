@@ -6,12 +6,14 @@ pub mod dev;
 #[cfg(feature = "router")]
 mod serve;
 
-pub use topcoat_core::error::Error;
+pub use topcoat_core::runtime::error::Error;
 
 #[cfg(feature = "view")]
-pub type Result<T = view::View, E = topcoat_core::error::Error> = topcoat_core::error::Result<T, E>;
+pub type Result<T = view::View, E = topcoat_core::runtime::error::Error> =
+    topcoat_core::runtime::error::Result<T, E>;
 #[cfg(not(feature = "view"))]
-pub type Result<T, E = topcoat_core::error::Error> = topcoat_core::error::Result<T, E>;
+pub type Result<T, E = topcoat_core::runtime::error::Error> =
+    topcoat_core::runtime::error::Result<T, E>;
 
 #[cfg(feature = "asset")]
 pub mod asset {
@@ -19,14 +21,14 @@ pub mod asset {
 }
 
 pub mod context {
-    pub use topcoat_core::context::*;
+    pub use topcoat_core::runtime::context::*;
     pub use topcoat_macro::memoize;
 }
 
 #[cfg(feature = "router")]
 pub mod router {
     pub use topcoat_macro::{layout, page, path_param, query_params, route, segment};
-    pub use topcoat_router::*;
+    pub use topcoat_router::runtime::*;
 }
 
 #[cfg(feature = "view")]
@@ -56,5 +58,5 @@ pub mod internal {
     pub use serde;
     pub use serde_urlencoded;
 
-    pub use topcoat_core::internal::*;
+    pub use topcoat_core::runtime::internal::*;
 }
