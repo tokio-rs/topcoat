@@ -22,19 +22,19 @@ pub mod asset {
 
 pub mod context {
     pub use topcoat_core::runtime::context::*;
-    pub use topcoat_macro::memoize;
+    pub use topcoat_core_macro::memoize;
 }
 
 #[cfg(feature = "router")]
 pub mod router {
-    pub use topcoat_macro::{layout, page, path_param, query_params, route, segment};
     pub use topcoat_router::runtime::*;
+    pub use topcoat_router_macro::{layout, page, path_param, query_params, route, segment};
 }
 
 #[cfg(feature = "view")]
 pub mod view {
-    pub use topcoat_macro::{attributes, component, shard, view};
     pub use topcoat_view::runtime::*;
+    pub use topcoat_view_macro::{attributes, component, shard, view};
 }
 
 #[cfg(feature = "router")]
@@ -42,8 +42,8 @@ pub use serve::{serve, start};
 
 #[cfg(feature = "runtime")]
 pub mod runtime {
-    pub use topcoat_macro::expr;
     pub use topcoat_runtime::runtime::*;
+    pub use topcoat_runtime_macro::expr;
 }
 
 #[cfg(feature = "tailwind")]

@@ -1991,11 +1991,14 @@ dependencies = [
  "tokio-tungstenite 0.29.0",
  "topcoat-asset",
  "topcoat-core",
- "topcoat-macro",
+ "topcoat-core-macro",
  "topcoat-router",
+ "topcoat-router-macro",
  "topcoat-runtime",
+ "topcoat-runtime-macro",
  "topcoat-tailwind",
  "topcoat-view",
+ "topcoat-view-macro",
 ]
 
 [[package]]
@@ -2054,15 +2057,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "topcoat-macro"
+name = "topcoat-core-macro"
 version = "0.1.0"
 dependencies = [
  "quote",
  "syn",
  "topcoat-core",
- "topcoat-router",
- "topcoat-runtime",
- "topcoat-view",
 ]
 
 [[package]]
@@ -2102,6 +2102,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "topcoat-router-macro"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+ "topcoat-router",
+]
+
+[[package]]
 name = "topcoat-runtime"
 version = "0.1.0"
 dependencies = [
@@ -2116,6 +2125,14 @@ dependencies = [
  "topcoat-core",
  "topcoat-view",
  "uuid",
+]
+
+[[package]]
+name = "topcoat-runtime-macro"
+version = "0.1.0"
+dependencies = [
+ "syn",
+ "topcoat-runtime",
 ]
 
 [[package]]
@@ -2140,6 +2157,15 @@ dependencies = [
  "topcoat-core",
  "topcoat-pretty",
  "uuid",
+]
+
+[[package]]
+name = "topcoat-view-macro"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+ "topcoat-view",
 ]
 
 [[package]]

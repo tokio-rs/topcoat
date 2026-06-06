@@ -17,25 +17,25 @@ asset = [
 ]
 router = [
 	"dep:topcoat-router",
-	"topcoat-macro/router",
+	"dep:topcoat-router-macro",
 	"view",
 ]
 runtime = [
 	"dep:topcoat-runtime",
-	"topcoat-macro/runtime",
+	"dep:topcoat-runtime-macro",
 ]
 tailwind = [
 	"dep:topcoat-tailwind",
 ]
 view = [
 	"dep:topcoat-view",
+	"dep:topcoat-view-macro",
 	"topcoat-asset/view",
-	"topcoat-macro/view",
 ]
 
 discover = [
 	"dep:inventory",
-	"topcoat-macro/discover",
+	"topcoat-router-macro?/discover",
 	"topcoat-router/discover",
 	"topcoat-runtime/discover",
 	"topcoat-view/discover",
@@ -44,11 +44,14 @@ discover = [
 [dependencies]
 topcoat-asset = { workspace = true, optional = true }
 topcoat-core.workspace = true
-topcoat-macro.workspace = true
+topcoat-core-macro.workspace = true
 topcoat-router = { workspace = true, optional = true }
+topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }
+topcoat-runtime-macro = { workspace = true, optional = true }
 topcoat-tailwind = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true, features = ["axum"] }
+topcoat-view-macro = { workspace = true, optional = true }
 
 axum.workspace = true
 futures-util.workspace = true
