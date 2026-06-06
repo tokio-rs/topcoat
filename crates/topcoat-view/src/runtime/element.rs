@@ -38,3 +38,10 @@ impl ElementNameViewParts for Unescaped<&str> {
         parts.push(part);
     }
 }
+
+impl ElementNameViewParts for &String {
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        self.as_str().into_view_parts(parts);
+    }
+}

@@ -25,25 +25,35 @@ macro_rules! impl_primitive {
             }
         }
     };
+    ($ty:ty, ref) => {
+        impl_primitive!($ty);
+
+        impl NodeViewParts for &$ty {
+            #[inline]
+            fn into_view_parts(self, parts: &mut ViewParts) {
+                (*self).into_view_parts(parts)
+            }
+        }
+    };
 }
 
 impl_primitive!(ViewPart);
-impl_primitive!(bool);
-impl_primitive!(char);
-impl_primitive!(i8);
-impl_primitive!(i16);
-impl_primitive!(i32);
-impl_primitive!(i64);
-impl_primitive!(i128);
-impl_primitive!(isize);
-impl_primitive!(u8);
-impl_primitive!(u16);
-impl_primitive!(u32);
-impl_primitive!(u64);
-impl_primitive!(u128);
-impl_primitive!(usize);
-impl_primitive!(f32);
-impl_primitive!(f64);
+impl_primitive!(bool, ref);
+impl_primitive!(char, ref);
+impl_primitive!(i8, ref);
+impl_primitive!(i16, ref);
+impl_primitive!(i32, ref);
+impl_primitive!(i64, ref);
+impl_primitive!(i128, ref);
+impl_primitive!(isize, ref);
+impl_primitive!(u8, ref);
+impl_primitive!(u16, ref);
+impl_primitive!(u32, ref);
+impl_primitive!(u64, ref);
+impl_primitive!(u128, ref);
+impl_primitive!(usize, ref);
+impl_primitive!(f32, ref);
+impl_primitive!(f64, ref);
 impl_primitive!(String);
 impl_primitive!(Unescaped<String>);
 
@@ -60,6 +70,13 @@ impl NodeViewParts for Unescaped<&str> {
     fn into_view_parts(self, parts: &mut ViewParts) {
         let part: ViewPart = Unescaped::new_unchecked(String::from(*self)).into();
         parts.push(part);
+    }
+}
+
+impl NodeViewParts for &String {
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        self.as_str().into_view_parts(parts);
     }
 }
 
@@ -84,15 +101,5 @@ where
         for value in self {
             value.into_view_parts(parts);
         }
-    }
-}
-
-impl<T> NodeViewParts for &T
-where
-    T: NodeViewParts + Copy,
-{
-    #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        (*self).into_view_parts(parts);
     }
 }

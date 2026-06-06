@@ -38,3 +38,10 @@ impl AttributeKeyViewParts for Unescaped<&str> {
         parts.push(part);
     }
 }
+
+impl AttributeKeyViewParts for &String {
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        self.as_str().into_view_parts(parts);
+    }
+}
