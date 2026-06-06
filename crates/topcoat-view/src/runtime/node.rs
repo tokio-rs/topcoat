@@ -16,12 +16,6 @@ impl NodeViewParts for View {
     }
 }
 
-// Implements `NodeViewParts` for a value type and, where one is given, the
-// corresponding by-reference form too. The reference impls are spelled out per
-// type rather than via a single blanket `impl<T> NodeViewParts for &T where
-// T: NodeViewParts + Copy`: that bound silently excludes `&String` (because
-// `String: !Copy`), so a bare `(&user.name)` interpolation in a `view!` — the
-// most natural way to reference a struct field — would fail to compile.
 macro_rules! impl_primitive {
     ($ty:ty) => {
         impl NodeViewParts for $ty {
@@ -63,9 +57,6 @@ impl_primitive!(f64, ref);
 impl_primitive!(String);
 impl_primitive!(Unescaped<String>);
 
-/// A `&String` renders like its `&str`. This (and the per-type `&` impls above)
-/// replace a former blanket `impl<T> NodeViewParts for &T where T: Copy`, which
-/// could not cover `&String` because `String` is not `Copy`.
 impl NodeViewParts for &String {
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
@@ -112,4 +103,3 @@ where
         }
     }
 }
-
