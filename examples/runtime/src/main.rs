@@ -28,7 +28,7 @@ async fn home() -> Result {
                 topcoat::dev::script()
             </head>
             <body>
-                <button @click=$(|e| {
+                <button @click=$(|_e| {
                     raw!("console.log(${x})")
                 })>"press me"</button>
             </body>
