@@ -323,16 +323,16 @@ view! {
 }
 ```
 
-[`AttributeKeyViewParts`]: trait.AttributeKeyViewParts.html
-[`AttributeValueViewParts`]: trait.AttributeValueViewParts.html
-[AttributeValueViewParts::attribute_present]: trait.AttributeValueViewParts.html#tymethod.attribute_present
-[`AttributeViewParts`]: trait.AttributeViewParts.html
-[`ElementNameViewParts`]: trait.ElementNameViewParts.html
-[`NodeViewParts`]: trait.NodeViewParts.html
-[`component`]: attr.component.html
-[`attributes!`]: macro.attributes.html
+[`AttributeKeyViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeKeyViewParts.html
+[`AttributeValueViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeValueViewParts.html
+[AttributeValueViewParts::attribute_present]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeValueViewParts.html#tymethod.attribute_present
+[`AttributeViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeViewParts.html
+[`ElementNameViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.ElementNameViewParts.html
+[`NodeViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.NodeViewParts.html
+[`component`]: https://docs.rs/topcoat/latest/topcoat/view/attr.component.html
+[`attributes!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html
 [`false`]: https://doc.rust-lang.org/std/keyword.false.html
 [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
 [`Some`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.Some
-[`topcoat::view::Attributes`]: struct.Attributes.html
-[`view!`]: macro.view.html
+[`topcoat::view::Attributes`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Attributes.html
+[`view!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.view.html

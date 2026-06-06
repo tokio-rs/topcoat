@@ -91,8 +91,8 @@ async fn current_path(cx: &Cx) -> Result {
 }
 ```
 
-[`Cx`]: ../context/struct.Cx.html
-[`Result`]: ../type.Result.html
-[`View`]: struct.View.html
-[`component`]: attr.component.html
-[`view!`]: macro.view.html
+[`Cx`]: https://docs.rs/topcoat/latest/topcoat/context/struct.Cx.html
+[`Result`]: https://docs.rs/topcoat/latest/topcoat/type.Result.html
+[`View`]: https://docs.rs/topcoat/latest/topcoat/view/struct.View.html
+[`component`]: https://docs.rs/topcoat/latest/topcoat/view/attr.component.html
+[`view!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.view.html
