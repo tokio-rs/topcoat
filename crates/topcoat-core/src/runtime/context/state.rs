@@ -3,12 +3,11 @@
 //! [`State`] is a type-keyed map of values, looked up by their [`TypeId`].
 //! Each [`Cx`] carries two of them:
 //!
-//! - **App state** is registered once at startup and shared across every
-//!   request handled by the router. Within a request, [`app_state`] retrieves
-//!   a reference to a registered value by its type.
-//! - **Request state** is scoped to a single request and dropped when the
-//!   request ends. Within a request, [`request_state`] retrieves a reference
-//!   to a registered value by its type.
+//! - **App state** is registered once at startup and shared across every request handled by the
+//!   router. Within a request, [`app_state`] retrieves a reference to a registered value by its
+//!   type.
+//! - **Request state** is scoped to a single request and dropped when the request ends. Within a
+//!   request, [`request_state`] retrieves a reference to a registered value by its type.
 
 use std::any::{Any, type_name};
 

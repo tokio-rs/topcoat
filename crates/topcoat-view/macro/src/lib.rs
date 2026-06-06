@@ -1,15 +1,19 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
-/// The [`view!`] macro is Topcoat's HTML templating syntax. It tries to be unsurprising by staying close to real HTML instead of inventing a Rust-shaped HTML dialect.
+/// The [`view!`] macro is Topcoat's HTML templating syntax. It tries to be unsurprising by staying
+/// close to real HTML instead of inventing a Rust-shaped HTML dialect.
 ///
 /// That means:
 ///
 /// - HTML elements use their real names.
-/// - HTML void elements, such as `<br>`, `<hr>`, `<img>`, `<input>`, `<meta>`, and `<link>`, are written without closing tags.
+/// - HTML void elements, such as `<br>`, `<hr>`, `<img>`, `<input>`, `<meta>`, and `<link>`, are
+///   written without closing tags.
 /// - Non-void elements need matching closing tags.
-/// - Attribute names can use HTML separators like `-`, `:`, and `.`: `data-post-id`, `aria-label`, `xmlns:xlink`, `hx-get`, `class.active`.
-/// - Rust keywords are still valid HTML attribute names, so `type="button"` and `for="email"` work as expected.
+/// - Attribute names can use HTML separators like `-`, `:`, and `.`: `data-post-id`, `aria-label`,
+///   `xmlns:xlink`, `hx-get`, `class.active`.
+/// - Rust keywords are still valid HTML attribute names, so `type="button"` and `for="email"` work
+///   as expected.
 /// - Literal text and literal attribute values are string literals.
 ///
 /// ```rust
@@ -58,7 +62,8 @@ use quote::quote;
 /// }
 /// ```
 ///
-/// The same parenthesized expression syntax can also be used for dynamic attribute names and dynamic element names:
+/// The same parenthesized expression syntax can also be used for dynamic attribute names and
+/// dynamic element names:
 ///
 /// ```rust
 /// let tag = "section";
@@ -80,7 +85,8 @@ use quote::quote;
 ///
 /// ## Control Flow
 ///
-/// Control flow in [`view!`] is Rust control flow with markup bodies. The macro lowers these constructs into ordinary Rust statements that append to the view being built.
+/// Control flow in [`view!`] is Rust control flow with markup bodies. The macro lowers these
+/// constructs into ordinary Rust statements that append to the view being built.
 ///
 /// ### `if`
 ///
@@ -128,7 +134,8 @@ use quote::quote;
 /// }
 /// ```
 ///
-/// In attributes, a loop can emit zero or more attributes. This is useful when you already have attributes represented as data:
+/// In attributes, a loop can emit zero or more attributes. This is useful when you already have
+/// attributes represented as data:
 ///
 /// ```rust
 /// view! {
@@ -155,7 +162,8 @@ use quote::quote;
 /// }
 /// ```
 ///
-/// A match arm body is one view node. If a branch needs multiple sibling nodes, wrap them in a block:
+/// A match arm body is one view node. If a branch needs multiple sibling nodes, wrap them in a
+/// block:
 ///
 /// ```rust
 /// view! {
@@ -182,7 +190,8 @@ use quote::quote;
 /// }
 /// ```
 ///
-/// For multiple conditional attributes, put the `if`, `for`, or `match` at the level where it can emit the attributes you need.
+/// For multiple conditional attributes, put the `if`, `for`, or `match` at the level where it can
+/// emit the attributes you need.
 ///
 /// ### `let`
 ///
@@ -215,7 +224,8 @@ use quote::quote;
 ///
 /// ## Components
 ///
-/// Components are called inside [`view!`] with function-call syntax. Named arguments use `name: value`, and child nodes can be passed after the named arguments:
+/// Components are called inside [`view!`] with function-call syntax. Named arguments use `name:
+/// value`, and child nodes can be passed after the named arguments:
 ///
 /// ```rust
 /// view! {
@@ -230,15 +240,20 @@ use quote::quote;
 /// }
 /// ```
 ///
-/// All component parameters are named parameters, except `child`, which can be passed unnamed in the last position. Conceptually, those trailing child nodes are the same thing as a `child` parameter whose value is a [`view! { ... }`][`view!`] containing those nodes.
+/// All component parameters are named parameters, except `child`, which can be passed unnamed in
+/// the last position. Conceptually, those trailing child nodes are the same thing as a `child`
+/// parameter whose value is a [`view! { ... }`][`view!`] containing those nodes.
 ///
-/// See the [`component`] macro guide in [component.md](component.md) for defining components and passing child content.
+/// See the [`component`] macro guide in [component.md](component.md) for defining components and
+/// passing child content.
 ///
 /// ## Conditional Attributes
 ///
 /// Expression attributes can remove themselves from the rendered markup.
 ///
-/// When an attribute value evaluates to [`false`], the whole attribute is omitted. When it evaluates to [`None`], the whole attribute is omitted. [`Some(value)`][`Some`] renders the attribute using the inner value.
+/// When an attribute value evaluates to [`false`], the whole attribute is omitted. When it
+/// evaluates to [`None`], the whole attribute is omitted. [`Some(value)`][`Some`] renders the
+/// attribute using the inner value.
 ///
 /// ```rust
 /// view! {
@@ -260,7 +275,8 @@ use quote::quote;
 /// let maybe_title: Option<&str> = None;
 /// ```
 ///
-/// then the rendered opening tag includes `aria-current="page"`, but leaves out `disabled` and `title` completely.
+/// then the rendered opening tag includes `aria-current="page"`, but leaves out `disabled` and
+/// `title` completely.
 ///
 /// This omission logic applies to expression attributes. Literal attributes are always present:
 ///
@@ -270,16 +286,20 @@ use quote::quote;
 /// }
 /// ```
 ///
-/// For reusable runtime attribute collections, use the [`attributes!`] macro. The [attributes guide](attributes.md) covers the same attribute syntax and the [`topcoat::view::Attributes`] value that can be passed around and inserted into an element as an attribute fragment.
+/// For reusable runtime attribute collections, use the [`attributes!`] macro. The [attributes
+/// guide](attributes.md) covers the same attribute syntax and the [`topcoat::view::Attributes`]
+/// value that can be passed around and inserted into an element as an attribute fragment.
 ///
 /// ## Custom Values In Markup
 ///
-/// The macro accepts dynamic Rust values by routing them through small runtime traits. Implement the trait for the position where your type should be accepted:
+/// The macro accepts dynamic Rust values by routing them through small runtime traits. Implement
+/// the trait for the position where your type should be accepted:
 ///
 /// - [`NodeViewParts`] for values used as child nodes: `(value)`.
 /// - [`AttributeValueViewParts`] for values used as attribute values: `name=(value)`.
 /// - [`AttributeKeyViewParts`] for values used as dynamic attribute names: `(name)="value"`.
-/// - [`AttributeViewParts`] for values that emit one or more full attributes in APIs that accept complete attribute fragments.
+/// - [`AttributeViewParts`] for values that emit one or more full attributes in APIs that accept
+///   complete attribute fragments.
 /// - [`ElementNameViewParts`] for values used as dynamic element names: `<(name)>...</(name)>`.
 ///
 /// For example, a type can opt into child-node rendering by implementing [`NodeViewParts`]:
@@ -300,7 +320,9 @@ use quote::quote;
 /// }
 /// ```
 ///
-/// For attribute values, implement [`AttributeValueViewParts`]. Its [`attribute_present`][AttributeValueViewParts::attribute_present] method controls whether the containing attribute is rendered at all.
+/// For attribute values, implement [`AttributeValueViewParts`]. Its
+/// [`attribute_present`][AttributeValueViewParts::attribute_present] method controls whether the
+/// containing attribute is rendered at all.
 ///
 /// ```rust
 /// use topcoat::view::{AttributeValueViewParts, ViewParts};
@@ -343,9 +365,11 @@ pub fn view(tokens: TokenStream) -> TokenStream {
     quote! { #parsed }.into()
 }
 
-/// The [`attributes!`] macro builds a [`topcoat::view::Attributes`] value from Topcoat's attribute syntax.
+/// The [`attributes!`] macro builds a [`topcoat::view::Attributes`] value from Topcoat's attribute
+/// syntax.
 ///
-/// Use it when attributes need to be passed around, assembled outside a [`view!`] call, changed at runtime, or forwarded through components.
+/// Use it when attributes need to be passed around, assembled outside a [`view!`] call, changed at
+/// runtime, or forwarded through components.
 ///
 /// ```rust
 /// use topcoat::view::{attributes, view};
@@ -365,16 +389,14 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 ///
 /// The body of [`attributes!`] has the same syntax as attributes inside an element in [`view!`].
 ///
-/// That includes literal attributes, expression values, dynamic names, binding attributes, event handlers, and attribute-level control flow:
+/// That includes literal attributes, expression values, dynamic names, binding attributes, event
+/// handlers, and attribute-level control flow:
 ///
 /// ```rust
 /// use topcoat::view::attributes;
 ///
 /// let id = "submit";
-/// let extra = [
-///     ("data-state", "ready"),
-///     ("data-size", "compact"),
-/// ];
+/// let extra = [("data-state", "ready"), ("data-size", "compact")];
 ///
 /// let attrs = attributes! {
 ///     class="button"
@@ -399,11 +421,13 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 /// };
 /// ```
 ///
-/// [`attributes!`] produces attributes, not child nodes. Control-flow bodies inside the macro therefore emit attributes in the same way they do inside a [`view!`] element's opening tag.
+/// [`attributes!`] produces attributes, not child nodes. Control-flow bodies inside the macro
+/// therefore emit attributes in the same way they do inside a [`view!`] element's opening tag.
 ///
 /// ## Runtime Attributes
 ///
-/// The generated value is [`topcoat::view::Attributes`]. It is a runtime collection of attributes with unique keys.
+/// The generated value is [`topcoat::view::Attributes`]. It is a runtime collection of attributes
+/// with unique keys.
 ///
 /// ```rust
 /// use topcoat::view::attributes;
@@ -419,11 +443,13 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 /// assert!(attrs.contains_key("class"));
 /// ```
 ///
-/// Because [`Attributes`] is map-like, each key appears at most once. Inserting the same key again replaces the previous value. Do not rely on render order for attributes.
+/// Because [`Attributes`] is map-like, each key appears at most once. Inserting the same key again
+/// replaces the previous value. Do not rely on render order for attributes.
 ///
 /// ## Inserting Attributes Into Elements
 ///
-/// Insert an [`Attributes`] value into an element by using it as a parenthesized attribute fragment:
+/// Insert an [`Attributes`] value into an element by using it as a parenthesized attribute
+/// fragment:
 ///
 /// ```rust
 /// use topcoat::view::{attributes, view};
@@ -440,13 +466,16 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// Any type that implements [`AttributeViewParts`] can be used in the same position. [`Attributes`] implements that trait, so it works as a complete reusable attribute fragment.
+/// Any type that implements [`AttributeViewParts`] can be used in the same position. [`Attributes`]
+/// implements that trait, so it works as a complete reusable attribute fragment.
 ///
-/// Inserting an [`Attributes`] value consumes it. Clone the value first if the same attribute collection needs to be inserted into more than one element.
+/// Inserting an [`Attributes`] value consumes it. Clone the value first if the same attribute
+/// collection needs to be inserted into more than one element.
 ///
 /// ## Passing Attributes To Components
 ///
-/// Components can accept [`Attributes`] as a normal argument. This is useful for forwarding caller-controlled attributes to the component's root element.
+/// Components can accept [`Attributes`] as a normal argument. This is useful for forwarding
+/// caller-controlled attributes to the component's root element.
 ///
 /// ```rust
 /// use topcoat::{
@@ -474,7 +503,9 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// Since the value is ordinary Rust data, you can build it in helper functions, add or replace attributes before rendering, and pass it through several layers before inserting it into an element.
+/// Since the value is ordinary Rust data, you can build it in helper functions, add or replace
+/// attributes before rendering, and pass it through several layers before inserting it into an
+/// element.
 ///
 /// [`AttributeViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeViewParts.html
 /// [`Attributes`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Attributes.html
@@ -487,7 +518,9 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
     quote! { #parsed }.into()
 }
 
-/// Components are async functions annotated with [`#[component]`][`component`]. They return a [`View`] through the usual Topcoat [`Result`] type, and can take typed parameters like any other Rust function.
+/// Components are async functions annotated with [`#[component]`][`component`]. They return a
+/// [`View`] through the usual Topcoat [`Result`] type, and can take typed parameters like any other
+/// Rust function.
 ///
 /// ```rust
 /// use topcoat::{
@@ -520,11 +553,14 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// All component parameters are named parameters, except `child`, which can be passed unnamed in the last position. After the named arguments, unnamed child nodes are written like normal [`view!`] content; multiple child nodes do not need commas between them.
+/// All component parameters are named parameters, except `child`, which can be passed unnamed in
+/// the last position. After the named arguments, unnamed child nodes are written like normal
+/// [`view!`] content; multiple child nodes do not need commas between them.
 ///
 /// ## Child Content
 ///
-/// If a component accepts a parameter named `child` with type [`View`], any extra view nodes in the call are collected and passed as that child view.
+/// If a component accepts a parameter named `child` with type [`View`], any extra view nodes in the
+/// call are collected and passed as that child view.
 ///
 /// ```rust
 /// use topcoat::{
@@ -556,11 +592,13 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// Conceptually, those trailing child nodes are the same thing as a `child` parameter whose value is a [`view! { ... }`][`view!`] containing those nodes.
+/// Conceptually, those trailing child nodes are the same thing as a `child` parameter whose value
+/// is a [`view! { ... }`][`view!`] containing those nodes.
 ///
 /// ## Request Context
 ///
-/// Components can ask for the current request context by declaring a `cx` parameter that borrows [`Cx`]:
+/// Components can ask for the current request context by declaring a `cx` parameter that borrows
+/// [`Cx`]:
 ///
 /// ```rust
 /// use topcoat::{

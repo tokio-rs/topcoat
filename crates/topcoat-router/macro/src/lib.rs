@@ -43,17 +43,15 @@ pub fn segment(tokens: TokenStream) -> TokenStream {
 /// itself decide which URL segment carries that parameter. How the param
 /// gets into the URL depends on which router you use:
 ///
-/// - **Module router** ([`module_router!`](../router/macro.module_router.html)) —
-///   the macro also emits a `segment!(kind = Param, rename = "...")` for the
-///   enclosing module. The module's URL segment is replaced by the
-///   parameter, so a `PostId` defined anywhere in module `app::posts::id`
-///   turns that module into `{post_id}` in the URL.
+/// - **Module router** ([`module_router!`](../router/macro.module_router.html)) — the macro also
+///   emits a `segment!(kind = Param, rename = "...")` for the enclosing module. The module's URL
+///   segment is replaced by the parameter, so a `PostId` defined anywhere in module
+///   `app::posts::id` turns that module into `{post_id}` in the URL.
 ///
-/// - **Regular [`Router`](../router/struct.Router.html)** — the page's path
-///   string is the source of truth. Include a matching parameter name in
-///   the `#[page("...")]` path; the snake-cased struct name must equal the
-///   `{...}` placeholder for `of` to find the value. The `segment!` emitted
-///   by the macro is inert for this router.
+/// - **Regular [`Router`](../router/struct.Router.html)** — the page's path string is the source of
+///   truth. Include a matching parameter name in the `#[page("...")]` path; the snake-cased struct
+///   name must equal the `{...}` placeholder for `of` to find the value. The `segment!` emitted by
+///   the macro is inert for this router.
 ///
 /// # Reading the parameter
 ///
@@ -61,9 +59,9 @@ pub fn segment(tokens: TokenStream) -> TokenStream {
 /// type depends on the inner type:
 ///
 /// - **`&str`** — returns `&Self` directly with the borrowed segment value.
-/// - **Any other type** — returns `Result<&Self, &<T as FromStr>::Err>`,
-///   parsed via [`FromStr`](core::str::FromStr). Parsing is memoized per
-///   request, so repeated calls within a handler do not re-parse.
+/// - **Any other type** — returns `Result<&Self, &<T as FromStr>::Err>`, parsed via
+///   [`FromStr`](core::str::FromStr). Parsing is memoized per request, so repeated calls within a
+///   handler do not re-parse.
 ///
 /// A [`Deref`](core::ops::Deref) impl to the inner type is also generated.
 ///
@@ -121,10 +119,9 @@ pub fn segment(tokens: TokenStream) -> TokenStream {
 /// # Requirements
 ///
 /// - The item must be a tuple struct with exactly one unnamed field.
-/// - For non-`&str` inner types, the inner type must implement
-///   [`FromStr`](core::str::FromStr) and meet the requirements of
-///   [`#[memoize]`](macro@memoize) (the parsed `Result` must be
-///   `Send + Sync + 'static`).
+/// - For non-`&str` inner types, the inner type must implement [`FromStr`](core::str::FromStr) and
+///   meet the requirements of [`#[memoize]`](macro@memoize) (the parsed `Result` must be `Send +
+///   Sync + 'static`).
 #[proc_macro_attribute]
 pub fn path_param(attr: TokenStream, item: TokenStream) -> TokenStream {
     match topcoat_router::ast::path_param::PathParam::parse(attr.into(), item.into()) {
@@ -174,11 +171,9 @@ pub fn path_param(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Requirements
 ///
-/// - The struct's fields must be deserializable by `serde_urlencoded` (use
-///   `Option<T>` for optional parameters, since `serde_urlencoded` does not
-///   apply `#[serde(default)]` automatically).
-/// - The struct must be `Send + Sync + 'static` to be memoized across the
-///   request.
+/// - The struct's fields must be deserializable by `serde_urlencoded` (use `Option<T>` for optional
+///   parameters, since `serde_urlencoded` does not apply `#[serde(default)]` automatically).
+/// - The struct must be `Send + Sync + 'static` to be memoized across the request.
 #[proc_macro_attribute]
 pub fn query_params(attr: TokenStream, item: TokenStream) -> TokenStream {
     match topcoat_router::ast::query_params::QueryParams::parse(attr.into(), item.into()) {

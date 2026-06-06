@@ -8,7 +8,10 @@ use syn::parse::{Parse, ParseStream};
 /// # Example
 ///
 /// ```rust
-/// use syn::{Token, parse::{Parse, ParseStream}};
+/// use syn::{
+///     Token,
+///     parse::{Parse, ParseStream},
+/// };
 /// use topcoat_core::ast::ParseOption;
 ///
 /// struct MyStruct {

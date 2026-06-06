@@ -45,10 +45,10 @@ use quote::quote;
 ///
 /// - The function must accept a parameter named `cx` of type `&Cx`.
 /// - The function cannot take a `self` receiver.
-/// - Each non-`cx` argument is part of the cache key. For an owned argument of type `T`,
-///   `T` must be `Clone + Hash + Eq + Send + Sync + 'static`. For a borrowed argument of
-///   type `&Q`, `Q` must be `ToOwned` with `Q::Owned: Hash + Eq + Send + Sync + 'static`
-///   (e.g. `&str` works because `String: Hash + Eq + Send + Sync + 'static`).
+/// - Each non-`cx` argument is part of the cache key. For an owned argument of type `T`, `T` must
+///   be `Clone + Hash + Eq + Send + Sync + 'static`. For a borrowed argument of type `&Q`, `Q` must
+///   be `ToOwned` with `Q::Owned: Hash + Eq + Send + Sync + 'static` (e.g. `&str` works because
+///   `String: Hash + Eq + Send + Sync + 'static`).
 /// - The return type `T` must be `Send + Sync + 'static`.
 #[proc_macro_attribute]
 pub fn memoize(attr: TokenStream, item: TokenStream) -> TokenStream {

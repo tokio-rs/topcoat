@@ -7,8 +7,8 @@ use crate::RingBuffer;
 ///
 /// - `Always` — emit unconditionally.
 /// - `NoBreak` — only emit when the surrounding group fits on one line.
-/// - `Break` — only emit when the surrounding group breaks across lines
-///   (e.g. trailing commas added when wrapping).
+/// - `Break` — only emit when the surrounding group breaks across lines (e.g. trailing commas added
+///   when wrapping).
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TextMode {
     Always,
@@ -18,10 +18,10 @@ pub enum TextMode {
 
 /// How a group's breakpoints behave when it doesn't fit on one line.
 ///
-/// - `Consistent` — if any break in the group fires, all of them do
-///   (all-or-nothing; useful for things like function bodies).
-/// - `Inconsistent` — breaks fire individually as needed (useful for
-///   word-wrap-style flowing of comma-separated lists).
+/// - `Consistent` — if any break in the group fires, all of them do (all-or-nothing; useful for
+///   things like function bodies).
+/// - `Inconsistent` — breaks fire individually as needed (useful for word-wrap-style flowing of
+///   comma-separated lists).
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum BreakMode {
     Consistent,

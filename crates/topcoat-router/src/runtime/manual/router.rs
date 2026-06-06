@@ -152,8 +152,9 @@ impl Router {
     }
 
     /// Registers a unique value that is accessible to every request sent to
-    /// this router by its type `T`. The top-level [`app_state`](topcoat_core::runtime::context::app_state)
-    /// function can be used to retrieve a reference to this value via a request context.
+    /// this router by its type `T`. The top-level
+    /// [`app_state`](topcoat_core::runtime::context::app_state) function can be used to
+    /// retrieve a reference to this value via a request context.
     ///
     /// # Panics
     ///

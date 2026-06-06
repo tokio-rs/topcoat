@@ -12,7 +12,8 @@ use ref_cast::{RefCastCustom, ref_cast_custom};
 /// - **Static** — a literal string (e.g. `users`)
 /// - **Param** — a dynamic parameter in braces (e.g. `{id}`)
 /// - **CatchAll** — a wildcard tail in braces with `*` (e.g. `{*rest}`)
-/// - **Group** — a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to an Axum path
+/// - **Group** — a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to an
+///   Axum path
 ///
 /// The root path `"/"` is normalized to an empty inner string. Use [`Path::new`] to
 /// create a `&Path` from a string slice.
@@ -60,11 +61,14 @@ impl Path {
     ///
     /// let path = Path::new("/users/{id}/(auth)");
     /// let segs: Vec<_> = path.segments().collect();
-    /// assert_eq!(segs, vec![
-    ///     PathSegment::Static("users"),
-    ///     PathSegment::Param("id"),
-    ///     PathSegment::Group("auth"),
-    /// ]);
+    /// assert_eq!(
+    ///     segs,
+    ///     vec![
+    ///         PathSegment::Static("users"),
+    ///         PathSegment::Param("id"),
+    ///         PathSegment::Group("auth"),
+    ///     ]
+    /// );
     /// ```
     pub fn segments(&self) -> impl Iterator<Item = PathSegment<'_>> {
         self.inner.split("/").skip(1).map(PathSegment::new)
@@ -262,7 +266,8 @@ impl<'a> PathSegment<'a> {
     /// Panics if the segment is malformed:
     /// - Empty string
     /// - Missing closing `}` or `)`
-    /// - Invalid identifier (empty name, starts with a digit, contains non-alphanumeric/underscore characters)
+    /// - Invalid identifier (empty name, starts with a digit, contains non-alphanumeric/underscore
+    ///   characters)
     /// - Unexpected brackets in a static segment (e.g. `foo{bar}`)
     pub fn new(s: &'a str) -> Self {
         if s.starts_with('{') {
