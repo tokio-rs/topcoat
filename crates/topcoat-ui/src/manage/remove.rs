@@ -15,50 +15,63 @@ pub struct Removed {
     pub registry: String,
 }
 
-/// Removes a previously added component from the project.
+/// Removes previously added components from the project.
 ///
-/// With `registry`, the component is removed from that registry; otherwise the
-/// sole registry it is installed from is used (an error if it is installed from
-/// several).
+/// Each component's registry is resolved first — with `registry` it is removed
+/// from that registry, otherwise from the sole registry it is installed from (an
+/// error if it is installed from several) — so a bad name aborts before anything
+/// is deleted. The state is saved once, after all removals.
 pub fn remove(
     project: &Project,
-    component: &str,
+    components: &[String],
     registry: Option<&str>,
-) -> Result<Removed, String> {
+) -> Result<Vec<Removed>, String> {
     let mut state = InstallState::load(project)?;
 
-    let registry_name = resolve_registry(component, registry, &state)?;
-
-    let registry = state
-        .registries
-        .get_mut(&registry_name)
-        .expect("registry resolved above");
-    let installed = registry
-        .components
-        .remove(component)
-        .expect("component resolved above");
-    let components_dir = registry.components_dir.clone();
-
-    let file = project.resolve(&installed.file);
-    match std::fs::remove_file(&file) {
-        Ok(()) => {}
-        Err(error) if error.kind() == ErrorKind::NotFound => {}
-        Err(error) => {
-            return Err(format!("failed to remove {}: {error}", file.display()));
-        }
+    // Resolve every component up front so a typo or ambiguity fails before any
+    // file is deleted.
+    let mut targets: Vec<(String, String)> = Vec::new();
+    for component in components {
+        let registry_name = resolve_registry(component, registry, &state)?;
+        targets.push((registry_name, component.clone()));
     }
 
-    if let Some(file_name) = installed.file.file_name().and_then(|name| name.to_str()) {
-        module::undeclare(&project.resolve(&components_dir), file_name)?;
+    let mut removed = Vec::new();
+    for (registry_name, component) in targets {
+        let registry = state
+            .registries
+            .get_mut(&registry_name)
+            .expect("registry resolved above");
+        // `None` means the component was listed more than once and is already
+        // gone; skip it rather than reporting it twice.
+        let Some(installed) = registry.components.remove(&component) else {
+            continue;
+        };
+        let components_dir = registry.components_dir.clone();
+
+        let file = project.resolve(&installed.file);
+        match std::fs::remove_file(&file) {
+            Ok(()) => {}
+            Err(error) if error.kind() == ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(format!("failed to remove {}: {error}", file.display()));
+            }
+        }
+
+        if let Some(file_name) = installed.file.file_name().and_then(|name| name.to_str()) {
+            module::undeclare(&project.resolve(&components_dir), file_name)?;
+        }
+
+        removed.push(Removed {
+            name: component,
+            file: installed.file,
+            registry: registry_name,
+        });
     }
 
     state.save(project)?;
 
-    Ok(Removed {
-        name: component.to_string(),
-        file: installed.file,
-        registry: registry_name,
-    })
+    Ok(removed)
 }
 
 /// Determines which registry the component should be removed from: the one named

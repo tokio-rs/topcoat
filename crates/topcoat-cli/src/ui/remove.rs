@@ -6,9 +6,10 @@ use super::ProjectArg;
 
 #[derive(Args)]
 pub(super) struct RemoveCommand {
-    /// Name of the component to remove
-    component: String,
-    /// Registry the component was added from (searched across all if omitted)
+    /// Names of the components to remove
+    #[arg(required = true)]
+    components: Vec<String>,
+    /// Registry the components were added from (searched across all if omitted)
     #[arg(short, long)]
     registry: Option<String>,
     #[command(flatten)]
@@ -25,15 +26,17 @@ impl RemoveCommand {
 
     fn run_inner(self) -> Result<(), String> {
         let project = Project::locate(self.project.project)?;
-        let removed = manage::remove(&project, &self.component, self.registry.as_deref())?;
+        let removed = manage::remove(&project, &self.components, self.registry.as_deref())?;
 
-        println!(
-            "{} removed {} {} from {}",
-            style("-").red(),
-            style(removed.name).bold(),
-            style(format!("({})", removed.file.display())).dim(),
-            removed.registry
-        );
+        for component in removed {
+            println!(
+                "{} removed {} {} from {}",
+                style("-").red(),
+                style(component.name).bold(),
+                style(format!("({})", component.file.display())).dim(),
+                component.registry
+            );
+        }
         Ok(())
     }
 }

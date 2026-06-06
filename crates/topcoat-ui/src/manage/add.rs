@@ -10,8 +10,9 @@ use super::state::{InstallState, InstalledComponent};
 
 /// What to add and from where.
 pub struct AddOptions {
-    /// Name of the component to add (e.g. `button`).
-    pub component: String,
+    /// Names of the components to add (e.g. `button`). Each is resolved and
+    /// installed along with its transitive dependencies.
+    pub components: Vec<String>,
     /// Named registry to add from (defaults to the project's default registry).
     pub registry: Option<String>,
     /// Registry location (a path, `file://` path, or `http(s)://` URL); sets or
@@ -81,34 +82,36 @@ pub async fn add(
 ) -> Result<AddOutcome, String> {
     let mut state = InstallState::load(project)?;
 
-    // Phase 1 — plan. Walk the requested component and its transitive
+    // Phase 1 — plan. Walk the requested components and their transitive
     // dependencies, loading registries and fetching sources, but touch nothing
     // on disk. Any failure here (missing component, unreachable registry,
     // registry-name conflict) leaves the project untouched.
     let mut registries: HashMap<String, Registry> = HashMap::new();
+    let mut visited: HashSet<(String, String)> = HashSet::new();
+    let mut queue: VecDeque<Pending> = VecDeque::new();
 
-    // Choose the registry to add from. With --registry it is used directly;
+    // Choose the registry to add from for each requested component and seed it
+    // as a root of the dependency walk. With --registry it is used directly;
     // otherwise the default registry is preferred, and pulling a component the
     // default registry does not offer requires confirming a non-default
     // registry (or passing --registry).
-    let root_registry = resolve_root_registry(
-        &options.component,
-        options.registry.as_deref(),
-        options.url.as_deref(),
-        project,
-        &mut state,
-        &mut registries,
-        confirm,
-    )
-    .await?;
-
-    let mut visited: HashSet<(String, String)> = HashSet::new();
-    let mut queue: VecDeque<Pending> = VecDeque::new();
-    queue.push_back(Pending {
-        registry: root_registry,
-        component: options.component.clone(),
-        root: true,
-    });
+    for component in &options.components {
+        let root_registry = resolve_root_registry(
+            component,
+            options.registry.as_deref(),
+            options.url.as_deref(),
+            project,
+            &mut state,
+            &mut registries,
+            confirm,
+        )
+        .await?;
+        queue.push_back(Pending {
+            registry: root_registry,
+            component: component.clone(),
+            root: true,
+        });
+    }
 
     let mut writes: Vec<PlannedWrite> = Vec::new();
     let mut removals: Vec<PlannedRemoval> = Vec::new();

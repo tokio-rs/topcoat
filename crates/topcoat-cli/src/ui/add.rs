@@ -6,8 +6,9 @@ use super::ProjectArg;
 
 #[derive(Args)]
 pub(super) struct AddCommand {
-    /// Name of the component to add (e.g. `button`)
-    component: String,
+    /// Names of the components to add (e.g. `button card`)
+    #[arg(required = true)]
+    components: Vec<String>,
     /// Named registry to add from (defaults to the project's default registry)
     #[arg(short, long)]
     registry: Option<String>,
@@ -33,7 +34,7 @@ impl AddCommand {
     async fn run_inner(self) -> Result<(), String> {
         let project = Project::locate(self.project.project)?;
         let options = AddOptions {
-            component: self.component,
+            components: self.components,
             registry: self.registry,
             url: self.url,
             force: self.force,
