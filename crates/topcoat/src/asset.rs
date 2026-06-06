@@ -122,8 +122,7 @@
 //! ```
 //!
 //! ```rust
-//! let router = app::router()
-//!     .assets(AssetBundle::load_dir("dist/assets").unwrap());
+//! let router = app::router().assets(AssetBundle::load_dir("dist/assets").unwrap());
 //! ```
 //!
 //! When `--out` is not in one of the auto-detected locations, use `load_dir` to
