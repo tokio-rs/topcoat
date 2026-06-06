@@ -346,19 +346,19 @@ use quote::quote;
 /// }
 /// ```
 ///
-/// [`AttributeKeyViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeKeyViewParts.html
-/// [`AttributeValueViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeValueViewParts.html
-/// [AttributeValueViewParts::attribute_present]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeValueViewParts.html#tymethod.attribute_present
-/// [`AttributeViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeViewParts.html
-/// [`ElementNameViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.ElementNameViewParts.html
-/// [`NodeViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.NodeViewParts.html
-/// [`component`]: https://docs.rs/topcoat/latest/topcoat/view/attr.component.html
-/// [`attributes!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html
+/// [`AttributeKeyViewParts`]: trait.AttributeKeyViewParts.html
+/// [`AttributeValueViewParts`]: trait.AttributeValueViewParts.html
+/// [AttributeValueViewParts::attribute_present]: trait.AttributeValueViewParts.html#tymethod.attribute_present
+/// [`AttributeViewParts`]: trait.AttributeViewParts.html
+/// [`ElementNameViewParts`]: trait.ElementNameViewParts.html
+/// [`NodeViewParts`]: trait.NodeViewParts.html
+/// [`component`]: attr.component.html
+/// [`attributes!`]: macro.attributes.html
 /// [`false`]: https://doc.rust-lang.org/std/keyword.false.html
 /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
 /// [`Some`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.Some
-/// [`topcoat::view::Attributes`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Attributes.html
-/// [`view!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.view.html
+/// [`topcoat::view::Attributes`]: struct.Attributes.html
+/// [`view!`]: macro.view.html
 #[proc_macro]
 pub fn view(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse_macro_input!(tokens as topcoat_view::ast::view::View);
@@ -507,11 +507,11 @@ pub fn view(tokens: TokenStream) -> TokenStream {
 /// attributes before rendering, and pass it through several layers before inserting it into an
 /// element.
 ///
-/// [`AttributeViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeViewParts.html
-/// [`Attributes`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Attributes.html
-/// [`attributes!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html
-/// [`topcoat::view::Attributes`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Attributes.html
-/// [`view!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.view.html
+/// [`AttributeViewParts`]: trait.AttributeViewParts.html
+/// [`Attributes`]: struct.Attributes.html
+/// [`attributes!`]: macro.attributes.html
+/// [`topcoat::view::Attributes`]: struct.Attributes.html
+/// [`view!`]: macro.view.html
 #[proc_macro]
 pub fn attributes(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse_macro_input!(tokens as topcoat_view::ast::attributes::Attributes);
@@ -616,11 +616,11 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// [`Cx`]: https://docs.rs/topcoat/latest/topcoat/context/struct.Cx.html
-/// [`Result`]: https://docs.rs/topcoat/latest/topcoat/type.Result.html
-/// [`View`]: https://docs.rs/topcoat/latest/topcoat/view/struct.View.html
-/// [`component`]: https://docs.rs/topcoat/latest/topcoat/view/attr.component.html
-/// [`view!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.view.html
+/// [`Cx`]: ../context/struct.Cx.html
+/// [`Result`]: ../type.Result.html
+/// [`View`]: struct.View.html
+/// [`component`]: attr.component.html
+/// [`view!`]: macro.view.html
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     match topcoat_view::ast::component::Component::parse(attr.into(), item.into()) {
