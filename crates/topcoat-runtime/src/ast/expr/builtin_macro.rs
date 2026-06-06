@@ -201,15 +201,15 @@ impl<'a> RawRustLocalCollector<'a> {
 
 impl<'ast> Visit<'ast> for RawRustLocalCollector<'_> {
     fn visit_expr_path(&mut self, expr: &'ast ExprPath) {
-        if expr.qself.is_none() {
-            if let Some(ident) = expr.path.get_ident() {
-                let name = ident.to_string();
-                if !self.is_shadowed(ident)
-                    && self.names.is_surrogate_local(ident)
-                    && self.seen.insert(name)
-                {
-                    self.locals.push(ident.clone());
-                }
+        if expr.qself.is_none()
+            && let Some(ident) = expr.path.get_ident()
+        {
+            let name = ident.to_string();
+            if !self.is_shadowed(ident)
+                && self.names.is_surrogate_local(ident)
+                && self.seen.insert(name)
+            {
+                self.locals.push(ident.clone());
             }
         }
 
