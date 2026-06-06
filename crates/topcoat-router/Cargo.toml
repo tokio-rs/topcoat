@@ -12,6 +12,7 @@ parsing = [
 	"dep:proc-macro2",
 	"dep:quote",
 	"dep:syn",
+	"topcoat-core/parsing",
 ]
 
 [dependencies]

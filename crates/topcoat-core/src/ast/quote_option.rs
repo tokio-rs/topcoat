@@ -66,8 +66,9 @@ impl<'a, T> From<&'a Option<T>> for QuoteOption<&'a T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use quote::quote;
+
+    use super::*;
 
     #[test]
     fn some_quotes_as_option_some() {

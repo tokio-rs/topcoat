@@ -7,8 +7,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-
-use super::quote_option::QuoteOption;
+use topcoat_core::ast::QuoteOption;
 
 pub struct Segment {
     attrs: Punctuated<SegmentAttr, Token![,]>,
