@@ -2,7 +2,14 @@ use crate::runtime::{Unescaped, ViewPart, ViewParts};
 
 /// Converts a value used as an element name into view parts.
 ///
-/// Implement this for custom dynamic tag-name values accepted by `view!`.
+/// When this trait is implemented on a type, it can be used in the element name position of an
+/// element in the `view!` macro:
+///
+/// ```rust,ignore
+/// view! {
+///     <(tag_name)></(tag_name)>
+/// }
+/// ```
 pub trait ElementNameViewParts {
     /// Appends this element name to `parts`.
     fn into_view_parts(self, parts: &mut ViewParts);

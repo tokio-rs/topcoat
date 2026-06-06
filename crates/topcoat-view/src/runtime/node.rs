@@ -2,8 +2,14 @@ use crate::runtime::{Unescaped, View, ViewPart, ViewParts};
 
 /// Converts a value used in node position into view parts.
 ///
-/// The `view!` macro uses this for dynamic child content. Implement it for
-/// custom types that should be accepted where a node can appear.
+/// When this trait is implemented on a type, it can be used in the node position of an element
+/// in the `view!` macro:
+///
+/// ```rust,ignore
+/// view! {
+///     <div>(my_value)</div>
+/// }
+/// ```
 pub trait NodeViewParts {
     /// Appends this value to `parts`.
     fn into_view_parts(self, parts: &mut ViewParts);

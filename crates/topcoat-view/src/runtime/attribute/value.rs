@@ -2,8 +2,21 @@ use crate::runtime::{Unescaped, ViewPart, ViewParts};
 
 /// Converts a value used as an attribute value into view parts.
 ///
-/// Attribute values can also control presence. `false` and `None` omit the
-/// whole attribute; other built-in values are present.
+/// When this trait is implemented on a type, it can be used in the attribute value position of an
+/// element in the `view!` macro:
+///
+/// ```rust,ignore
+/// view! {
+///     <div class=(my_value)></div>
+/// }
+/// ```
+///
+/// For [boolean HTML attributes], a false value must be omitted from the markup entirely.
+/// [`attribute_present`](Self::attribute_present) is the hook that makes that decision.
+/// The built-in `bool` and `Option<T>` implementations use this so `false` and `None` omit the
+/// whole attribute.
+///
+/// [boolean HTML attributes]: https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML
 pub trait AttributeValueViewParts {
     /// Returns whether the containing attribute should be rendered.
     fn attribute_present(&self) -> bool;

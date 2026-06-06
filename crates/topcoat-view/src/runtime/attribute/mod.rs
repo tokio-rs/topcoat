@@ -28,7 +28,17 @@ impl<K, V> Attribute<K, V> {
 
 /// Converts one or more attributes into view parts.
 ///
-/// Implement this for custom attribute collections accepted by `view!`.
+/// When this trait is implemented on a type, it can be used in the attribute position of an element
+/// in the `view!` macro:
+///
+/// ```rust,ignore
+/// view! {
+///     <input (my_value)>
+/// }
+/// ```
+///
+/// The emitted view parts must contain a leading space for each attribute to separate them from
+/// the element name or preceding attributes.
 pub trait AttributeViewParts {
     /// Appends zero or more attributes to `parts`.
     fn into_view_parts(self, parts: &mut ViewParts);
