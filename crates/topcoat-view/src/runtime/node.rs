@@ -31,7 +31,7 @@ macro_rules! impl_primitive {
         impl NodeViewParts for &$ty {
             #[inline]
             fn into_view_parts(self, parts: &mut ViewParts) {
-                parts.push(*self);
+                (*self).into_view_parts(parts)
             }
         }
     };
@@ -57,13 +57,6 @@ impl_primitive!(f64, ref);
 impl_primitive!(String);
 impl_primitive!(Unescaped<String>);
 
-impl NodeViewParts for &String {
-    #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        self.as_str().into_view_parts(parts);
-    }
-}
-
 impl NodeViewParts for &str {
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
@@ -77,6 +70,13 @@ impl NodeViewParts for Unescaped<&str> {
     fn into_view_parts(self, parts: &mut ViewParts) {
         let part: ViewPart = Unescaped::new_unchecked(String::from(*self)).into();
         parts.push(part);
+    }
+}
+
+impl NodeViewParts for &String {
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        self.as_str().into_view_parts(parts);
     }
 }
 
