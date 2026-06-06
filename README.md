@@ -8,7 +8,7 @@ Topcoat sits on top of Axum and turns it into a productive full-stack toolkit: H
 
 See the [Getting started guide](docs/getting_started.md) to set up a new project.
 
-```rust
+```rust,ignore
 use topcoat::{Result, router::{Router, page}, view::{component, view}};
 
 #[tokio::main]
@@ -40,7 +40,7 @@ async fn hello(name: &str) -> Result {
 
 The `view!` macro doesn't invent a Rust-shaped HTML dialect. Element names, attribute names, and void elements stay the way you'd write them in a `.html` file — `aria-label`, `hx-get`, `xmlns:xlink`, `<br>`, `<input>`, all of it. Control flow is just Rust:
 
-```rust
+```rust,ignore
 view! {
     <ul>
         for post in posts {
@@ -60,7 +60,7 @@ Attributes that evaluate to `false` or `None` drop themselves from the rendered 
 
 Drop `module_router!()` at the root of your `app` module and every `#[page]`, `#[layout]`, and `#[route]` below it gets registered automatically. Module names are kebab-cased into URL segments. Modules prefixed with `_` are *groups* — they hold shared layouts but don't add a segment.
 
-```
+```text
 src/app/
 ├── mod.rs              → /            (and the root <html> layout)
 ├── about.rs            → /about
@@ -79,7 +79,7 @@ src/app/
 
 Authentication, tenant lookup, feature flags, locale detection — anything request-scoped — is just a function that takes `&Cx`.
 
-```rust
+```rust,ignore
 fn db(cx: &Cx) -> &Database {
     app_state(cx)
 }
@@ -105,7 +105,7 @@ async fn user_avatar(cx: &Cx) -> Result {
 
 ### Asset bundling
 
-```rust
+```rust,ignore
 const FERRIS: Asset = asset!("./ferris.png");
 
 view! { <img src=(FERRIS)> }
@@ -115,7 +115,7 @@ The bundler scans your compiled binary for `asset!` calls, copies (or downloads)
 
 Tailwind is the same story without a `node_modules`: enable the `tailwind` feature, drop a `build.rs` one-liner, and the standalone Tailwind CLI's output becomes a normal Topcoat asset.
 
-```rust
+```rust,ignore
 view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 ```
 
