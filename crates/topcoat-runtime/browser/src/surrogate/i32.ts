@@ -21,8 +21,8 @@ export class I32 {
 		return new I32(this.v);
 	}
 
-	toJSON(): number {
-		return this.v;
+	toJSON(): { t: "i32"; v: number } {
+		return { t: "i32", v: this.v };
 	}
 
 	toString(): string {

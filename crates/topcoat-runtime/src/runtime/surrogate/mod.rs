@@ -5,6 +5,8 @@ mod event;
 mod signal;
 mod string;
 
+use serde::{Deserialize, Serialize, de};
+
 pub use _f64::*;
 pub use _i32::*;
 pub use _str::*;
@@ -107,3 +109,50 @@ macro_rules! impl_surrogate_mut {
     };
 }
 pub(crate) use impl_surrogate_mut;
+
+#[derive(Serialize)]
+struct TaggedRef<'a, T>
+where
+    T: ?Sized,
+{
+    t: &'static str,
+    v: &'a T,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Tagged<T> {
+    t: std::string::String,
+    v: T,
+}
+
+pub(crate) fn serialize_tagged<T, S>(
+    serializer: S,
+    tag: &'static str,
+    value: &T,
+) -> Result<S::Ok, S::Error>
+where
+    T: Serialize + ?Sized,
+    S: serde::Serializer,
+{
+    TaggedRef { t: tag, v: value }.serialize(serializer)
+}
+
+pub(crate) fn deserialize_tagged<'de, T, D>(
+    deserializer: D,
+    expected: &'static str,
+) -> Result<T, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    let tagged = Tagged::<T>::deserialize(deserializer)?;
+    if tagged.t == expected {
+        Ok(tagged.v)
+    } else {
+        Err(de::Error::invalid_value(
+            de::Unexpected::Str(&tagged.t),
+            &expected,
+        ))
+    }
+}

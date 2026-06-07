@@ -34,7 +34,7 @@ fn raw_macro_interpolates_locals_and_desurrogates_them_for_rust() {
     assert_eq!(evaluated, 10);
     assert_eq!(
         render(js),
-        "(() =&gt; { let __local0 = cx.s.i32(5); return __local0 + 5; })()"
+        "(() =&gt; { let __local0 = cx.s({&quot;t&quot;:&quot;i32&quot;,&quot;v&quot;:5}); return __local0 + 5; })()"
     );
 }
 
@@ -50,7 +50,7 @@ fn raw_macro_interpolates_externals_without_shadowing_rust_expr() {
     assert_eq!(evaluated, 10.0);
     assert_eq!(
         render(js),
-        "(() => { const [__external0] = [cx.s.f64(5)]; return __external0 + 5; })()"
+        "(() => { const [__external0] = [cx.s({&quot;t&quot;:&quot;f64&quot;,&quot;v&quot;:5.0})]; return __external0 + 5; })()"
     );
 }
 

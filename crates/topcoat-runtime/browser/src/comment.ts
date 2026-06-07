@@ -1,5 +1,6 @@
 import { Context } from "./context";
 import { type SignalId, SignalRegistry } from "./signal";
+import type { SerializedSurrogate } from "./surrogate";
 
 export type ReactiveScopeId = string;
 
@@ -15,7 +16,7 @@ export type CommentMarker =
 	  }
 	| { kind: "scope-end"; id: ReactiveScopeId };
 
-const SIGNAL_RE = /^\s*::topcoat::signal\("([^"]*)", "([^"]*)"\)\s*$/;
+const SIGNAL_RE = /^\s*::topcoat::signal\(([\s\S]*)\)\s*$/;
 const EXPR_START_RE = /^\s*::topcoat::expr::start\("([^"]*)"\)\s*$/;
 const EXPR_END_RE = /^\s*::topcoat::expr::end\s*$/;
 const SCOPE_START_RE =
@@ -27,24 +28,21 @@ export function parseComment(node: Comment): CommentMarker | null {
 
 	const sig = SIGNAL_RE.exec(text);
 	if (sig) {
-		const id = sig[1];
-		const valueExpr = new DOMParser().parseFromString(sig[2], "text/html")
-			.documentElement.textContent;
-		const value = new Function("cx", `return ${valueExpr};`)(
-			new Context(new SignalRegistry()),
-		);
+		const payload = JSON.parse(sig[1]) as SignalPayload;
+		if (payload.t !== "signal" || typeof payload.id !== "string") {
+			throw new Error("Invalid signal marker");
+		}
+		const value = new Context(new SignalRegistry()).s(payload.v);
 		return {
 			kind: "signal",
-			id,
+			id: payload.id,
 			value,
 		};
 	}
 
 	const exprStart = EXPR_START_RE.exec(text);
 	if (exprStart) {
-		const js = new DOMParser().parseFromString(exprStart[1], "text/html")
-			.documentElement.textContent;
-		if (js === null) throw new Error("Failed to decode expression marker");
+		const js = decodeHtml(exprStart[1]);
 		return {
 			kind: "expr-start",
 			js,
@@ -71,4 +69,17 @@ export function parseComment(node: Comment): CommentMarker | null {
 	}
 
 	return null;
+}
+
+type SignalPayload = {
+	t: "signal";
+	id: SignalId;
+	v: SerializedSurrogate;
+};
+
+function decodeHtml(value: string): string {
+	const decoded = new DOMParser().parseFromString(value, "text/html")
+		.documentElement.textContent;
+	if (decoded === null) throw new Error("Failed to decode comment marker");
+	return decoded;
 }

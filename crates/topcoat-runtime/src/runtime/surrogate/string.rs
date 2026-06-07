@@ -1,7 +1,8 @@
 use ref_cast::RefCast;
-use topcoat_view::runtime::{Unescaped, ViewParts};
 
-use crate::runtime::{JsViewParts, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
+use crate::runtime::{
+    deserialize_tagged, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref, serialize_tagged,
+};
 
 #[derive(Debug, Clone, RefCast)]
 #[repr(transparent)]
@@ -18,13 +19,21 @@ impl_surrogate!(std::string::String, String);
 impl_surrogate_ref!(std::string::String, String);
 impl_surrogate_mut!(std::string::String, String);
 
-impl JsViewParts for String {
-    fn to_view_parts(&self, parts: &mut ViewParts) {
-        let inner = &self.0;
-        let escaped = format!("{inner:?}");
-        parts.push(Unescaped::new_unchecked("cx.s.String("));
-        parts.push(escaped);
-        parts.push(Unescaped::new_unchecked(")"));
+impl serde::Serialize for String {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serialize_tagged(serializer, "String", &self.0)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for String {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserialize_tagged(deserializer, "String").map(Self)
     }
 }
 

@@ -1,8 +1,8 @@
 export class Str {
 	constructor(private readonly v: string) {}
 
-	toJSON(): string {
-		return this.v;
+	toJSON(): { t: "str"; v: string } {
+		return { t: "str", v: this.v };
 	}
 
 	toString(): string {

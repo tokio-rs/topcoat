@@ -1,5 +1,9 @@
 import type { SignalId, SignalRegistry } from "./signal";
-import { surrogate, WriteSignal } from "./surrogate";
+import {
+	deserializeSurrogate,
+	type SerializedSurrogate,
+	WriteSignal,
+} from "./surrogate";
 
 /**
  * The `cx` object passed into every compiled expression. It is the only
@@ -10,11 +14,11 @@ import { surrogate, WriteSignal } from "./surrogate";
 export class Context {
 	constructor(private readonly registry: SignalRegistry) {}
 
-	signal(id: SignalId): WriteSignal<unknown> {
-		return new WriteSignal(this.registry.handle(id));
+	s(s: unknown) {
+		return deserializeSurrogate(s as SerializedSurrogate, this.registry);
 	}
 
-	get s() {
-		return surrogate;
+	signal(id: SignalId): WriteSignal<unknown> {
+		return new WriteSignal(id, this.registry.handle(id));
 	}
 }

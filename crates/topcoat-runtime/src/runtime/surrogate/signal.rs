@@ -1,9 +1,7 @@
 use ref_cast::RefCast;
-use topcoat_view::runtime::ViewParts;
+use serde::Serialize;
 
-use crate::runtime::{
-    JsViewParts, Signal, Surrogated, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref,
-};
+use crate::runtime::{Signal, Surrogated, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
 
 #[derive(RefCast)]
 #[repr(transparent)]
@@ -47,10 +45,21 @@ impl_surrogate!({T} Signal<T>, WriteSignal<T>);
 impl_surrogate_ref!({T} Signal<T>, WriteSignal<T>);
 impl_surrogate_mut!({T} Signal<T>, WriteSignal<T>);
 
-impl<T> JsViewParts for &WriteSignal<T> {
-    fn to_view_parts(&self, parts: &mut ViewParts) {
-        parts.push("cx.signal(\"");
-        parts.push(self.0.id().to_string());
-        parts.push("\")");
+impl<T> Serialize for WriteSignal<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct TaggedSignal {
+            t: &'static str,
+            id: std::string::String,
+        }
+
+        TaggedSignal {
+            t: "signal",
+            id: self.0.id().to_string(),
+        }
+        .serialize(serializer)
     }
 }

@@ -21,8 +21,8 @@ export class F64 {
 		return new F64(this.v);
 	}
 
-	toJSON(): number {
-		return this.v;
+	toJSON(): { t: "f64"; v: number } {
+		return { t: "f64", v: this.v };
 	}
 
 	toString(): string {

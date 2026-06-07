@@ -6,8 +6,8 @@ export class String {
 		return new String(this.v);
 	}
 
-	toJSON(): string {
-		return this.v;
+	toJSON(): { t: "String"; v: string } {
+		return { t: "String", v: this.v };
 	}
 
 	toString(): string {

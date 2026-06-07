@@ -1989,6 +1989,7 @@ dependencies = [
  "inventory",
  "reqwest",
  "serde",
+ "serde_json",
  "serde_urlencoded",
  "tokio",
  "tokio-tungstenite 0.29.0",

@@ -1,7 +1,8 @@
 use ref_cast::RefCast;
-use topcoat_view::runtime::{Unescaped, ViewParts};
 
-use crate::runtime::{JsViewParts, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
+use crate::runtime::{
+    deserialize_tagged, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref, serialize_tagged,
+};
 
 #[derive(Debug, RefCast, Clone, Copy)]
 #[repr(transparent)]
@@ -18,11 +19,21 @@ impl_surrogate!(i32, I32);
 impl_surrogate_ref!(i32, I32);
 impl_surrogate_mut!(i32, I32);
 
-impl JsViewParts for I32 {
-    fn to_view_parts(&self, parts: &mut ViewParts) {
-        parts.push(Unescaped::new_unchecked("cx.s.i32("));
-        parts.push(self.0);
-        parts.push(Unescaped::new_unchecked(")"));
+impl serde::Serialize for I32 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serialize_tagged(serializer, "i32", &self.0)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for I32 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserialize_tagged(deserializer, "i32").map(Self)
     }
 }
 

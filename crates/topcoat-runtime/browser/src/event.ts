@@ -1,5 +1,6 @@
 import type { Context } from "./context";
 import type { Scope } from "./scope";
+import { Event } from "./surrogate";
 
 const EVENT_HANDLER_PREFIX = "data-topcoat-on:";
 
@@ -13,5 +14,5 @@ export function setupEventHandler(el: Element, attr: Attr, scope: Scope): void {
 	const compile = new Function("cx", `return ${attr.value};`) as Compile;
 
 	const handler = compile(scope.runtime.context);
-	el.addEventListener(name, (event) => handler(scope.runtime.context.s.Event(event)));
+	el.addEventListener(name, (event) => handler(new Event(event)));
 }

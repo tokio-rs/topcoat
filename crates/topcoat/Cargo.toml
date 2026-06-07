@@ -63,6 +63,7 @@ tokio-tungstenite.workspace = true
 
 [dev-dependencies]
 reqwest = { workspace = true, features = ["json"] }
+serde_json.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints]

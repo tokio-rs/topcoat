@@ -1,7 +1,8 @@
 use ref_cast::RefCast;
-use topcoat_view::runtime::{Unescaped, ViewParts};
 
-use crate::runtime::{JsViewParts, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
+use crate::runtime::{
+    deserialize_tagged, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref, serialize_tagged,
+};
 
 #[derive(Debug, RefCast, Clone, Copy)]
 #[repr(transparent)]
@@ -18,11 +19,21 @@ impl_surrogate!(f64, F64);
 impl_surrogate_ref!(f64, F64);
 impl_surrogate_mut!(f64, F64);
 
-impl JsViewParts for F64 {
-    fn to_view_parts(&self, parts: &mut ViewParts) {
-        parts.push(Unescaped::new_unchecked("cx.s.f64("));
-        parts.push(self.0);
-        parts.push(Unescaped::new_unchecked(")"));
+impl serde::Serialize for F64 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serialize_tagged(serializer, "f64", &self.0)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for F64 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserialize_tagged(deserializer, "f64").map(Self)
     }
 }
 

@@ -70,7 +70,7 @@ impl Expr {
             let mut js_externals = TokenStream::new();
             for (index, binding) in externals.iter().enumerate() {
                 let rust_ident = &binding.rust_ident;
-                quote! { __js(&mut __parts, &#rust_ident); }.to_tokens(&mut js_externals);
+                quote! { __surrogate(&mut __parts, &#rust_ident); }.to_tokens(&mut js_externals);
                 if index < externals.len() - 1 {
                     quote! { __js_unescaped(&mut __parts, ", "); }.to_tokens(&mut js_externals);
                 }
