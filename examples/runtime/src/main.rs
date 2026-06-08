@@ -1,4 +1,5 @@
 mod counter;
+mod show;
 
 use topcoat::{
     Result,
@@ -35,6 +36,8 @@ async fn layout(slot: Slot<'_>) -> Result {
             <body>
                 <nav>
                     <a href="/counter">"counter"</a>
+                    " | "
+                    <a href="/show">"show"</a>
                 </nav>
 
                 <hr>

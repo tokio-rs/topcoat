@@ -5,6 +5,18 @@ export class Bool {
 		return new Bool(this.v);
 	}
 
+	not(): Bool {
+		return new Bool(!this.v);
+	}
+
+	eq(other: Bool): Bool {
+		return new Bool(this.v === other.v);
+	}
+
+	ne(other: Bool): Bool {
+		return new Bool(this.v !== other.v);
+	}
+
 	toJSON(): { t: "bool"; v: boolean } {
 		return { t: "bool", v: this.v };
 	}

@@ -60,7 +60,7 @@ macro_rules! impl_cmp_op {
     ($method:ident, $op:tt) => {
         impl F64 {
             #[inline]
-            pub fn $method(self, rhs: F64) -> Bool {
+            pub fn $method(&self, rhs: &F64) -> Bool {
                 Bool::new(self.0 $op rhs.0)
             }
         }

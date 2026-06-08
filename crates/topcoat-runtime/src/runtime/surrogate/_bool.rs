@@ -37,6 +37,29 @@ impl<'de> serde::Deserialize<'de> for Bool {
     }
 }
 
+impl core::ops::Not for Bool {
+    type Output = Bool;
+
+    #[inline]
+    fn not(self) -> Bool {
+        Bool(!self.0)
+    }
+}
+
+macro_rules! impl_cmp_op {
+    ($method:ident, $op:tt) => {
+        impl Bool {
+            #[inline]
+            pub fn $method(&self, rhs: &Bool) -> Bool {
+                Bool::new(self.0 $op rhs.0)
+            }
+        }
+    };
+}
+
+impl_cmp_op!(eq, ==);
+impl_cmp_op!(ne, !=);
+
 impl std::fmt::Display for Bool {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
