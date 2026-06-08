@@ -4,7 +4,7 @@ use crate::runtime::{Bool, F64, impl_surrogate_mut, impl_surrogate_ref, serializ
 
 #[derive(Debug, RefCast)]
 #[repr(transparent)]
-pub struct Str(str);
+pub struct Str(pub(super) str);
 
 impl_surrogate_ref!(str, Str);
 impl_surrogate_mut!(str, Str);

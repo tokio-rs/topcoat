@@ -19,28 +19,34 @@ impl Expr {
             syn::Error::new_spanned(&call.func, "unsupported call expression")
         })?;
 
-        match ident.to_string().as_str() {
-            "Some" => {
-                if call.args.len() != 1 {
-                    return Err(syn::Error::new_spanned(
-                        call,
-                        "`Some(...)` takes exactly one argument",
-                    ));
-                }
-                let arg = call.args.first().unwrap();
-
-                js.push_str("cx.some(");
-                let mut arg_rust = TokenStream::new();
-                Self::dispatch(arg, &mut arg_rust, js, names)?;
-                js.push(')');
-
-                quote! { ::topcoat::runtime::Option::some(#arg_rust) }.to_tokens(rust);
-                Ok(())
+        let (cx_method, rust_ctor) = match ident.to_string().as_str() {
+            "Some" => ("some", quote! { ::topcoat::runtime::Option::some }),
+            "Ok" => ("ok", quote! { ::topcoat::runtime::Result::ok }),
+            "Err" => ("err", quote! { ::topcoat::runtime::Result::err }),
+            _ => {
+                return Err(syn::Error::new_spanned(
+                    &call.func,
+                    "unsupported call expression",
+                ));
             }
-            _ => Err(syn::Error::new_spanned(
-                &call.func,
-                "unsupported call expression",
-            )),
+        };
+
+        if call.args.len() != 1 {
+            return Err(syn::Error::new_spanned(
+                call,
+                format!("`{ident}(...)` takes exactly one argument"),
+            ));
         }
+        let arg = call.args.first().unwrap();
+
+        js.push_str("cx.");
+        js.push_str(cx_method);
+        js.push('(');
+        let mut arg_rust = TokenStream::new();
+        Self::dispatch(arg, &mut arg_rust, js, names)?;
+        js.push(')');
+
+        quote! { #rust_ctor(#arg_rust) }.to_tokens(rust);
+        Ok(())
     }
 }
