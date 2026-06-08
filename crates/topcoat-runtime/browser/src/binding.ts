@@ -2,6 +2,7 @@ import { effect } from "@maverick-js/signals";
 
 import type { Context } from "./context";
 import type { Scope } from "./scope";
+import { isAttributeValueViewParts } from "./view";
 
 export const BIND_PREFIX = "data-topcoat-bind:";
 
@@ -36,6 +37,14 @@ export function setupBinding(el: Element, attr: Attr, scope: Scope): void {
 function write(el: Element, name: string, value: unknown): void {
 	if (PROPERTY_NAMES.has(name)) {
 		(el as unknown as Record<string, unknown>)[name] = value;
+	}
+	if (isAttributeValueViewParts(value)) {
+		if (!value.isAttributePresent()) {
+			el.removeAttribute(name);
+			return;
+		}
+		el.setAttribute(name, value.toAttributeValue());
+		return;
 	}
 	if (value == null || value === false) {
 		el.removeAttribute(name);

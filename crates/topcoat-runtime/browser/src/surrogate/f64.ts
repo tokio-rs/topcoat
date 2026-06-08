@@ -1,6 +1,7 @@
+import type { AttributeValueViewParts } from "../view";
 import { Bool } from "./bool";
 
-export class F64 {
+export class F64 implements AttributeValueViewParts {
 	constructor(private readonly v: number) {}
 
 	add(other: F64): F64 {
@@ -45,6 +46,14 @@ export class F64 {
 
 	clone(): F64 {
 		return new F64(this.v);
+	}
+
+	isAttributePresent(): boolean {
+		return true;
+	}
+
+	toAttributeValue(): string {
+		return this.v.toString();
 	}
 
 	toJSON(): { t: "f64"; v: number } {

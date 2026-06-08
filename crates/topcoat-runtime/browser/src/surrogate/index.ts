@@ -1,6 +1,8 @@
 import type { SignalId, SignalRegistry } from "../signal";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
+// biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
+import { Option } from "./option";
 import { WriteSignal as RuntimeWriteSignal } from "./signal";
 import { Str } from "./str";
 // biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
@@ -9,6 +11,8 @@ import { String } from "./string";
 export * from "./bool";
 export * from "./event";
 export * from "./f64";
+export * from "./option";
+export * from "./panic";
 export * from "./ref";
 export * from "./signal";
 export * from "./str";
@@ -19,6 +23,7 @@ export type SerializedSurrogate =
 	| { t: "i32"; v: number }
 	| { t: "str"; v: string }
 	| { t: "String"; v: string }
+	| { t: "Option"; v: SerializedSurrogate | null }
 	| { t: "signal"; id: SignalId; v?: SerializedSurrogate };
 
 export function deserializeSurrogate(
@@ -34,6 +39,10 @@ export function deserializeSurrogate(
 			return new Str(value.v);
 		case "String":
 			return new String(value.v);
+		case "Option":
+			return value.v === null
+				? Option.none()
+				: Option.some(deserializeSurrogate(value.v, registry));
 		case "signal":
 			return new RuntimeWriteSignal(value.id, registry.handle(value.id));
 		default:

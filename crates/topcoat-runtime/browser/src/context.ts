@@ -1,6 +1,8 @@
 import type { SignalId, SignalRegistry } from "./signal";
 import {
 	deserializeSurrogate,
+	// biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
+	Option,
 	type SerializedSurrogate,
 	WriteSignal,
 } from "./surrogate";
@@ -20,5 +22,13 @@ export class Context {
 
 	signal(id: SignalId): WriteSignal<unknown> {
 		return new WriteSignal(id, this.registry.handle(id));
+	}
+
+	some<T>(v: T): Option<T> {
+		return Option.some(v);
+	}
+
+	none<T>(): Option<T> {
+		return Option.none<T>();
 	}
 }

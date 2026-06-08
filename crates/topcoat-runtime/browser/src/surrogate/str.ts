@@ -1,7 +1,8 @@
+import type { AttributeValueViewParts } from "../view";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
 
-export class Str {
+export class Str implements AttributeValueViewParts {
 	constructor(protected readonly v: string) {}
 
 	eq(other: Str): Bool {
@@ -58,6 +59,14 @@ export class Str {
 
 	contains(other: Str): Bool {
 		return new Bool(this.v.includes(other.v));
+	}
+
+	isAttributePresent(): boolean {
+		return true;
+	}
+
+	toAttributeValue(): string {
+		return this.v;
 	}
 
 	toJSON(): { t: "str" | "String"; v: string } {

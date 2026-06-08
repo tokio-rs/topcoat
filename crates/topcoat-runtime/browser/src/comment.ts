@@ -28,6 +28,12 @@ export function parseComment(node: Comment): CommentMarker | null {
 
 	const sig = SIGNAL_RE.exec(text);
 	if (sig) {
+		type SignalPayload = {
+			t: "signal";
+			id: SignalId;
+			v: SerializedSurrogate;
+		};
+
 		const payload = JSON.parse(sig[1]) as SignalPayload;
 		if (payload.t !== "signal" || typeof payload.id !== "string") {
 			throw new Error("Invalid signal marker");
@@ -70,12 +76,6 @@ export function parseComment(node: Comment): CommentMarker | null {
 
 	return null;
 }
-
-type SignalPayload = {
-	t: "signal";
-	id: SignalId;
-	v: SerializedSurrogate;
-};
 
 function decodeHtml(value: string): string {
 	const decoded = new DOMParser().parseFromString(value, "text/html")

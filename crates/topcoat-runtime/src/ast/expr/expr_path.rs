@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::ToTokens;
+use quote::{ToTokens, quote};
 use syn::ExprPath;
 
 use crate::ast::expr::{
@@ -17,6 +17,12 @@ impl Expr {
         let ident = path.path.get_ident().ok_or_else(|| {
             syn::Error::new_spanned(path, "only single-identifier paths are supported")
         })?;
+
+        if ident == "None" {
+            js.push_str("cx.none()");
+            quote! { ::topcoat::runtime::Option::<_>::none() }.to_tokens(rust);
+            return Ok(());
+        }
 
         let resolved = names.resolve(ident);
         let (js_name, rust_ident) = match resolved {

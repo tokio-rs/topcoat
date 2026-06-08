@@ -2,6 +2,7 @@ mod _bool;
 mod _f64;
 mod _str;
 mod event;
+mod option;
 mod signal;
 mod string;
 
@@ -11,6 +12,7 @@ pub use _bool::*;
 pub use _f64::*;
 pub use _str::*;
 pub use event::*;
+pub use option::*;
 pub use signal::*;
 pub use string::*;
 

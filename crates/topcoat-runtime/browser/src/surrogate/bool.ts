@@ -1,4 +1,6 @@
-export class Bool {
+import type { AttributeValueViewParts } from "../view";
+
+export class Bool implements AttributeValueViewParts {
 	constructor(private readonly v: boolean) {}
 
 	clone(): Bool {
@@ -15,6 +17,14 @@ export class Bool {
 
 	ne(other: Bool): Bool {
 		return new Bool(this.v !== other.v);
+	}
+
+	isAttributePresent(): boolean {
+		return this.v;
+	}
+
+	toAttributeValue(): string {
+		return "true";
 	}
 
 	toJSON(): { t: "bool"; v: boolean } {
