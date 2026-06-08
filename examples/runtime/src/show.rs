@@ -7,7 +7,11 @@ async fn show() -> Result {
 
         <button @click=$(|_e| show.set(!show.get()))>
             "click to "
-            $(if show.get() { "hide" } else { "reveal" })
+            $(if show.get() {
+                "hide"
+            } else {
+                "reveal"
+            })
         </button>
 
         <div :style=$((!show.get()).then_some("display: none"))>
