@@ -1,7 +1,8 @@
 use ref_cast::RefCast;
 
 use crate::runtime::{
-    deserialize_tagged, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref, serialize_tagged,
+    Option, Surrogate, deserialize_tagged, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref,
+    serialize_tagged,
 };
 
 #[derive(Debug, RefCast, Clone, Copy)]
@@ -59,6 +60,25 @@ macro_rules! impl_cmp_op {
 
 impl_cmp_op!(eq, ==);
 impl_cmp_op!(ne, !=);
+
+impl Bool {
+    #[inline]
+    pub fn then<F, S>(self, f: F) -> Option<S::Real>
+    where
+        F: FnOnce() -> S,
+        S: Surrogate,
+    {
+        Option::new(self.0.then(|| f().into_real()))
+    }
+
+    #[inline]
+    pub fn then_some<S>(self, t: S) -> Option<S::Real>
+    where
+        S: Surrogate,
+    {
+        Option::new(self.0.then_some(t.into_real()))
+    }
+}
 
 impl std::fmt::Display for Bool {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

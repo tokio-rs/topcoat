@@ -2,7 +2,6 @@ import type { AttributeValueViewParts, NodeViewParts } from "../view";
 import { Bool } from "./bool";
 import { Panic } from "./panic";
 
-// biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
 export class Option<T> implements AttributeValueViewParts, NodeViewParts {
 	constructor(private readonly value: T | undefined) {}
 

@@ -10,7 +10,7 @@ async fn show() -> Result {
             $(if show.get() { "hide" } else { "reveal" })
         </button>
 
-        <div :style=$(if show.get() { "display: block" } else { "display: none" })>
+        <div :style=$((!show.get()).then_some("display: none"))>
             "hello world!"
         </div>
     }
