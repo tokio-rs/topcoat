@@ -10,16 +10,16 @@ fn render(parts: ViewParts) -> String {
 
 #[test]
 fn primitive_surrogates_serialize_as_tagged_json() {
-    let encoded = serde_json::to_string(&5_i32.into_surrogate()).unwrap();
-    assert_eq!(encoded, r#"{"t":"i32","v":5}"#);
+    let encoded = serde_json::to_string(&5_f64.into_surrogate()).unwrap();
+    assert_eq!(encoded, r#"{"t":"f64","v":5.0}"#);
 
-    let decoded: topcoat::runtime::I32 = serde_json::from_str(&encoded).unwrap();
-    assert_eq!(decoded.into_real(), 5);
+    let decoded: topcoat::runtime::F64 = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(decoded.into_real(), 5.0);
 }
 
 #[test]
 fn primitive_surrogate_deserialization_rejects_wrong_tag() {
-    let decoded = serde_json::from_str::<topcoat::runtime::F64>(r#"{"t":"i32","v":5}"#);
+    let decoded = serde_json::from_str::<topcoat::runtime::F64>(r#"{"t":"bool","v":5.0}"#);
     assert!(decoded.is_err());
 }
 
@@ -47,7 +47,7 @@ fn read_signal_deserializes_tagged_value() {
 #[test]
 fn read_signal_deserialization_rejects_wrong_value_tag() {
     let id = serde_json::to_string(&SignalId::new()).unwrap();
-    let encoded = format!(r#"[{{"id":{id},"value":{{"t":"i32","v":3}}}}]"#);
+    let encoded = format!(r#"[{{"id":{id},"value":{{"t":"bool","v":3.0}}}}]"#);
 
     let decoded = serde_json::from_str::<(ReadSignal<f64>,)>(&encoded);
     assert!(decoded.is_err());
