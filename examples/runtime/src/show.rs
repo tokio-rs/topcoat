@@ -17,5 +17,13 @@ async fn show() -> Result {
         <div :style=$((!show.get()).then_some("display: none"))>
             "hello world!"
         </div>
+
+        $({
+            while false {
+                let x =  5.0;
+                continue;
+            }
+            "kek"
+        })
     }
 }
