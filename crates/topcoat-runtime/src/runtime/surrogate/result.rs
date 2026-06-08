@@ -1,8 +1,8 @@
 use ref_cast::RefCast;
 
 use crate::runtime::{
-    Bool, Str, Surrogate, Surrogated, deserialize_tagged, impl_surrogate, impl_surrogate_mut,
-    impl_surrogate_ref, serialize_tagged,
+    Bool, Option, Str, Surrogate, Surrogated, deserialize_tagged, impl_surrogate,
+    impl_surrogate_mut, impl_surrogate_ref, serialize_tagged,
 };
 
 #[derive(Debug, Clone, RefCast)]
@@ -24,6 +24,23 @@ impl<T, E> Result<T, E> {
     pub fn is_err(&self) -> Bool {
         Bool::new(self.0.is_err())
     }
+
+    #[inline]
+    pub fn ok(self) -> Option<T> {
+        Option::new(self.0.ok())
+    }
+
+    #[inline]
+    pub fn err(self) -> Option<E> {
+        Option::new(self.0.err())
+    }
+}
+
+impl<T, E> Result<T, E> {
+    #[inline]
+    pub fn from_ok(v: impl Surrogate<Real = T>) -> Self {
+        Self(core::result::Result::Ok(v.into_real()))
+    }
 }
 
 impl<T, E> Result<T, E>
@@ -31,11 +48,6 @@ where
     T: Surrogated,
     E: std::fmt::Debug,
 {
-    #[inline]
-    pub fn ok(v: T::Surrogate) -> Self {
-        Self(std::result::Result::Ok(v.into_real()))
-    }
-
     #[inline]
     pub fn unwrap(self) -> T::Surrogate {
         self.0.unwrap().into_surrogate()
@@ -47,16 +59,18 @@ where
     }
 }
 
+impl<T, E> Result<T, E> {
+    #[inline]
+    pub fn from_err(v: impl Surrogate<Real = E>) -> Self {
+        Self(std::result::Result::Err(v.into_real()))
+    }
+}
+
 impl<T, E> Result<T, E>
 where
     T: std::fmt::Debug,
     E: Surrogated,
 {
-    #[inline]
-    pub fn err(v: E::Surrogate) -> Self {
-        Self(std::result::Result::Err(v.into_real()))
-    }
-
     #[inline]
     pub fn unwrap_err(self) -> E::Surrogate {
         self.0.unwrap_err().into_surrogate()

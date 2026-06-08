@@ -36,7 +36,7 @@ where
     T: Surrogated,
 {
     #[inline]
-    pub fn some(v: T::Surrogate) -> Self {
+    pub fn some(v: impl Surrogate<Real = T>) -> Self {
         Self(Some(v.into_real()))
     }
 
