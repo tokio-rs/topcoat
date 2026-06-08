@@ -56,6 +56,15 @@ impl_math_op!(Sub, sub, -);
 impl_math_op!(Mul, mul, *);
 impl_math_op!(Div, div, /);
 
+impl core::ops::Neg for F64 {
+    type Output = F64;
+
+    #[inline]
+    fn neg(self) -> F64 {
+        F64(-self.0)
+    }
+}
+
 macro_rules! impl_cmp_op {
     ($method:ident, $op:tt) => {
         impl F64 {

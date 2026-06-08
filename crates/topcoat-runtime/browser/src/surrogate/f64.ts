@@ -20,6 +20,10 @@ export class F64 implements AttributeValueViewParts, NodeViewParts {
 		return new F64(this.v / other.v);
 	}
 
+	neg(): F64 {
+		return new F64(-this.v);
+	}
+
 	eq(other: F64): Bool {
 		return new Bool(this.v === other.v);
 	}
