@@ -1,8 +1,8 @@
-import type { AttributeValueViewParts } from "../view";
+import type { AttributeValueViewParts, NodeViewParts } from "../view";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
 
-export class Str implements AttributeValueViewParts {
+export class Str implements AttributeValueViewParts, NodeViewParts {
 	constructor(protected readonly v: string) {}
 
 	eq(other: Str): Bool {
@@ -66,6 +66,10 @@ export class Str implements AttributeValueViewParts {
 	}
 
 	toAttributeValue(): string {
+		return this.v;
+	}
+
+	toNodeText(): string {
 		return this.v;
 	}
 

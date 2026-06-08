@@ -1,6 +1,6 @@
-import type { AttributeValueViewParts } from "../view";
+import type { AttributeValueViewParts, NodeViewParts } from "../view";
 
-export class Bool implements AttributeValueViewParts {
+export class Bool implements AttributeValueViewParts, NodeViewParts {
 	constructor(private readonly v: boolean) {}
 
 	clone(): Bool {
@@ -25,6 +25,10 @@ export class Bool implements AttributeValueViewParts {
 
 	toAttributeValue(): string {
 		return "true";
+	}
+
+	toNodeText(): string {
+		return this.v.toString();
 	}
 
 	toJSON(): { t: "bool"; v: boolean } {

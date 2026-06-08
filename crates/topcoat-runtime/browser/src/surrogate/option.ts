@@ -1,9 +1,9 @@
-import type { AttributeValueViewParts } from "../view";
+import type { AttributeValueViewParts, NodeViewParts } from "../view";
 import { Bool } from "./bool";
 import { Panic } from "./panic";
 
 // biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
-export class Option<T> implements AttributeValueViewParts {
+export class Option<T> implements AttributeValueViewParts, NodeViewParts {
 	constructor(private readonly value: T | undefined) {}
 
 	static some<T>(v: T): Option<T> {
@@ -51,6 +51,11 @@ export class Option<T> implements AttributeValueViewParts {
 
 	toAttributeValue(): string {
 		return (this.value as AttributeValueViewParts).toAttributeValue();
+	}
+
+	toNodeText(): string {
+		if (this.value === undefined) return "";
+		return (this.value as NodeViewParts).toNodeText();
 	}
 
 	toJSON(): { t: "Option"; v: unknown } {

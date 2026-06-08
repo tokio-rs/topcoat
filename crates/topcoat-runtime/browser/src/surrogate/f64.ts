@@ -1,7 +1,7 @@
-import type { AttributeValueViewParts } from "../view";
+import type { AttributeValueViewParts, NodeViewParts } from "../view";
 import { Bool } from "./bool";
 
-export class F64 implements AttributeValueViewParts {
+export class F64 implements AttributeValueViewParts, NodeViewParts {
 	constructor(private readonly v: number) {}
 
 	add(other: F64): F64 {
@@ -53,6 +53,10 @@ export class F64 implements AttributeValueViewParts {
 	}
 
 	toAttributeValue(): string {
+		return this.v.toString();
+	}
+
+	toNodeText(): string {
 		return this.v.toString();
 	}
 
