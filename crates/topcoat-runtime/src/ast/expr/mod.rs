@@ -2,16 +2,21 @@ mod block;
 mod builtin_macro;
 mod expr_binary;
 mod expr_block;
+mod expr_break;
 mod expr_call;
 mod expr_closure;
+mod expr_continue;
 mod expr_field;
 mod expr_if;
 mod expr_index;
 mod expr_lit;
+mod expr_loop;
 mod expr_method_call;
 mod expr_paren;
 mod expr_path;
+mod expr_return;
 mod expr_unary;
+mod expr_while;
 mod name_resolver;
 mod pat;
 mod stmt;
@@ -118,6 +123,11 @@ impl Expr {
             syn::Expr::Block(inner) => Self::expr_block(inner, rust, js, names)?,
             syn::Expr::Closure(inner) => Self::expr_closure(inner, rust, js, names)?,
             syn::Expr::If(inner) => Self::expr_if(inner, rust, js, names)?,
+            syn::Expr::Loop(inner) => Self::expr_loop(inner, rust, js, names)?,
+            syn::Expr::While(inner) => Self::expr_while(inner, rust, js, names)?,
+            syn::Expr::Continue(inner) => Self::expr_continue(inner, rust, js, names)?,
+            syn::Expr::Break(inner) => Self::expr_break(inner, rust, js, names)?,
+            syn::Expr::Return(inner) => Self::expr_return(inner, rust, js, names)?,
             syn::Expr::Path(inner) => Self::expr_path(inner, rust, js, names)?,
             syn::Expr::Macro(inner) => Self::expr_macro(inner, rust, js, names)?,
             other => return Err(syn::Error::new_spanned(other, "unsupported expression")),
