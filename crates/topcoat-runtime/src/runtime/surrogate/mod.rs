@@ -1,5 +1,5 @@
+mod _bool;
 mod _f64;
-mod _i32;
 mod _str;
 mod event;
 mod signal;
@@ -7,8 +7,8 @@ mod string;
 
 use serde::{Deserialize, Serialize, de};
 
+pub use _bool::*;
 pub use _f64::*;
-pub use _i32::*;
 pub use _str::*;
 pub use event::*;
 pub use signal::*;

@@ -1,3 +1,5 @@
+import { Bool } from "./bool";
+
 export class F64 {
 	constructor(private readonly v: number) {}
 
@@ -15,6 +17,30 @@ export class F64 {
 
 	div(other: F64): F64 {
 		return new F64(this.v / other.v);
+	}
+
+	eq(other: F64): Bool {
+		return new Bool(this.v === other.v);
+	}
+
+	ne(other: F64): Bool {
+		return new Bool(this.v !== other.v);
+	}
+
+	gt(other: F64): Bool {
+		return new Bool(this.v > other.v);
+	}
+
+	lt(other: F64): Bool {
+		return new Bool(this.v < other.v);
+	}
+
+	ge(other: F64): Bool {
+		return new Bool(this.v >= other.v);
+	}
+
+	le(other: F64): Bool {
+		return new Bool(this.v <= other.v);
 	}
 
 	clone(): F64 {

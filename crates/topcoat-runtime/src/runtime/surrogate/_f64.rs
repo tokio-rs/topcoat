@@ -1,7 +1,8 @@
 use ref_cast::RefCast;
 
 use crate::runtime::{
-    deserialize_tagged, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref, serialize_tagged,
+    Bool, deserialize_tagged, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref,
+    serialize_tagged,
 };
 
 #[derive(Debug, RefCast, Clone, Copy)]
@@ -37,7 +38,7 @@ impl<'de> serde::Deserialize<'de> for F64 {
     }
 }
 
-macro_rules! impl_binary_op {
+macro_rules! impl_math_op {
     ($trait:ident, $method:ident, $op:tt) => {
         impl core::ops::$trait for F64 {
             type Output = F64;
@@ -50,10 +51,28 @@ macro_rules! impl_binary_op {
     };
 }
 
-impl_binary_op!(Add, add, +);
-impl_binary_op!(Sub, sub, -);
-impl_binary_op!(Mul, mul, *);
-impl_binary_op!(Div, div, /);
+impl_math_op!(Add, add, +);
+impl_math_op!(Sub, sub, -);
+impl_math_op!(Mul, mul, *);
+impl_math_op!(Div, div, /);
+
+macro_rules! impl_cmp_op {
+    ($method:ident, $op:tt) => {
+        impl F64 {
+            #[inline]
+            pub fn $method(self, rhs: F64) -> Bool {
+                Bool::new(self.0 $op rhs.0)
+            }
+        }
+    };
+}
+
+impl_cmp_op!(eq, ==);
+impl_cmp_op!(ne, !=);
+impl_cmp_op!(gt, >);
+impl_cmp_op!(lt, <);
+impl_cmp_op!(ge, >=);
+impl_cmp_op!(le, <=);
 
 impl std::fmt::Display for F64 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

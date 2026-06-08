@@ -33,6 +33,13 @@ async fn layout(slot: Slot<'_>) -> Result {
                 topcoat::dev::script()
             </head>
             <body>
+                <nav>
+                    <a href="/counter">"counter"</a>
+                </nav>
+
+                <hr>
+                <br>
+
                 (slot.await?)
             </body>
         </html>

@@ -1,6 +1,6 @@
 use ref_cast::RefCast;
 
-use crate::runtime::{impl_surrogate_mut, impl_surrogate_ref, serialize_tagged};
+use crate::runtime::{Bool, impl_surrogate_mut, impl_surrogate_ref, serialize_tagged};
 
 #[derive(Debug, RefCast)]
 #[repr(transparent)]
@@ -23,3 +23,21 @@ impl std::fmt::Display for Str {
         self.0.fmt(f)
     }
 }
+
+macro_rules! impl_cmp_op {
+    ($method:ident, $op:tt) => {
+        impl Str {
+            #[inline]
+            pub fn $method(&self, rhs: &Str) -> Bool {
+                Bool::new(self.0 $op rhs.0)
+            }
+        }
+    };
+}
+
+impl_cmp_op!(eq, ==);
+impl_cmp_op!(ne, !=);
+impl_cmp_op!(gt, >);
+impl_cmp_op!(lt, <);
+impl_cmp_op!(ge, >=);
+impl_cmp_op!(le, <=);
