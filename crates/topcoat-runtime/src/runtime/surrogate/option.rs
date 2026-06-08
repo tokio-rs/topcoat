@@ -47,7 +47,7 @@ where
 
     #[inline]
     pub fn expect(self, msg: &Str) -> T::Surrogate {
-        self.0.expect(&msg.to_string()).into_surrogate()
+        self.0.expect(&msg.0).into_surrogate()
     }
 }
 
