@@ -1,7 +1,7 @@
 import { Bool } from "./bool";
 
 export class Str {
-	constructor(private readonly v: string) {}
+	constructor(protected readonly v: string) {}
 
 	eq(other: Str): Bool {
 		return new Bool(this.v === other.v);
@@ -27,7 +27,7 @@ export class Str {
 		return new Bool(this.v <= other.v);
 	}
 
-	toJSON(): { t: "str"; v: string } {
+	toJSON(): { t: "str" | "String"; v: string } {
 		return { t: "str", v: this.v };
 	}
 
