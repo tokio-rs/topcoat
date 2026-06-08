@@ -23,7 +23,7 @@ impl Expr {
             Lit::Str(inner) => {
                 quote! { ::topcoat::runtime::Surrogated::into_surrogate(#inner) }.to_tokens(rust);
                 let value = inner.value();
-                push_js_surrogate(js, &value.into_surrogate())?;
+                push_js_surrogate(js, value.as_str().into_surrogate())?;
             }
             other => return Err(syn::Error::new_spanned(other, "unsupported literal type")),
         }

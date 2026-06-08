@@ -30,8 +30,8 @@ async fn layout(slot: Slot<'_>) -> Result {
         <!DOCTYPE html>
         <html>
             <head>
-                <script type="module" src=(topcoat::runtime::SCRIPT)></script>
                 topcoat::dev::script()
+                topcoat::runtime::script()
             </head>
             <body>
                 <nav>
