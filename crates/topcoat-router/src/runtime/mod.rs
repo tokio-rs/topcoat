@@ -4,6 +4,8 @@ mod module;
 mod path;
 mod request;
 mod response;
+#[cfg(feature = "runtime")]
+mod runtime;
 mod serde;
 mod state;
 
@@ -13,6 +15,8 @@ pub use module::*;
 pub use path::*;
 pub use request::*;
 pub use response::*;
+#[cfg(feature = "runtime")]
+pub use runtime::*;
 pub use serde::{Form, Json};
 pub use state::*;
 

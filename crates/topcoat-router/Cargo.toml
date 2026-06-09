@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
+runtime = [
+	"dep:topcoat-runtime",
+]
 discover = [
 	"dep:inventory",
 	"topcoat-runtime/discover",
@@ -18,7 +21,7 @@ parsing = [
 [dependencies]
 topcoat-asset = { workspace = true, features = ["view"] }
 topcoat-core.workspace = true
-topcoat-runtime.workspace = true
+topcoat-runtime = { workspace = true, optional = true }
 topcoat-view = { workspace = true, features = ["axum"] }
 
 axum.workspace = true

@@ -56,6 +56,8 @@ pub struct Router {
     routes: Routes,
 
     shards: Shards,
+    #[cfg(feature = "runtime")]
+    actions: crate::runtime::Actions,
 
     assets: AssetBundle,
     state: State,
@@ -72,6 +74,8 @@ impl Router {
             layouts: Layouts::new(),
             routes: Routes::new(),
             shards: Shards::new(),
+            #[cfg(feature = "runtime")]
+            actions: crate::runtime::Actions::new(),
             assets: AssetBundle::empty(),
             state,
         }
@@ -122,9 +126,12 @@ impl Router {
         self
     }
 
-    /// Discovers and registers all `#[page]`, `#[layout]`, `#[route]`, and
-    /// `#[shard]` items
-    /// collected at link time across the crate and its dependencies.
+    #[cfg(feature = "runtime")]
+    pub fn action(mut self, action: impl Into<crate::runtime::ErasedAction>) -> Self {
+        self.actions.register(action);
+        self
+    }
+
     #[cfg(feature = "discover")]
     pub fn discover(mut self) -> Self {
         use topcoat_runtime::runtime::DynShard;
@@ -141,6 +148,10 @@ impl Router {
 
         for shard in inventory::iter::<&'static dyn DynShard>().cloned() {
             self = self.shard(shard);
+        }
+        #[cfg(feature = "runtime")]
+        for action in inventory::iter::<crate::runtime::ErasedAction>().cloned() {
+            self = self.action(action);
         }
 
         self
@@ -255,6 +266,29 @@ impl From<Router> for axum::Router {
                     },
                 ),
             );
+        }
+
+        #[cfg(feature = "runtime")]
+        {
+            for route in value.actions.into_iter().map(Route::from) {
+                axum_router = axum_router.route(
+                    &route.path().to_axum_path(),
+                    on(
+                        MethodFilter::try_from(route.method().clone())
+                            .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),
+                        async move |CxBody { cx, body }: CxBody| {
+                            let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
+
+                            match result {
+                                MaybeAborted::Completed(result) => result_into_response(result),
+                                MaybeAborted::Aborted(_value) => {
+                                    panic!("request was aborted with an unrecognized type");
+                                }
+                            }
+                        },
+                    ),
+                );
+            }
         }
 
         let mut shard_router = axum::Router::new();
