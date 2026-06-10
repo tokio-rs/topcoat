@@ -79,7 +79,7 @@ impl ToTokens for Action {
 
         quote! {
             #[allow(non_upper_case_globals)]
-            const #ident: ::topcoat::router::Action::<(#(#arg_tys,)*), #return_ty> = ::topcoat::router::Action::new(
+            const #ident: &::topcoat::router::Action::<(#(#arg_tys,)*), #return_ty> = &::topcoat::router::Action::new(
                 ::topcoat::router::ActionId::new(#id),
                 |cx, body| {
                     #item

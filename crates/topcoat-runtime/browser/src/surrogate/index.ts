@@ -1,4 +1,5 @@
 import type { SignalId, SignalRegistry } from "../signal";
+import { Action } from "./action";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
 import { Option } from "./option";
@@ -8,6 +9,7 @@ import { Str } from "./str";
 // biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
 import { String } from "./string";
 
+export * from "./action";
 export * from "./bool";
 export * from "./event";
 export * from "./f64";
@@ -29,7 +31,8 @@ export type SerializedSurrogate =
 			t: "Result";
 			v: { ok: SerializedSurrogate } | { err: SerializedSurrogate };
 	  }
-	| { t: "signal"; id: SignalId; v?: SerializedSurrogate };
+	| { t: "signal"; id: SignalId; v?: SerializedSurrogate }
+	| { t: "Action"; id: string };
 
 export function deserializeSurrogate(
 	value: SerializedSurrogate,
@@ -54,6 +57,8 @@ export function deserializeSurrogate(
 				: Result.from_err(deserializeSurrogate(value.v.err, registry));
 		case "signal":
 			return new RuntimeWriteSignal(value.id, registry.handle(value.id));
+		case "Action":
+			return new Action(value.id);
 		default:
 			throw new Error(`Unknown surrogate type: ${(value as { t: unknown }).t}`);
 	}

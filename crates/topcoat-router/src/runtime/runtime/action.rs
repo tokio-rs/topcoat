@@ -57,7 +57,7 @@ pub struct ErasedAction {
 
 impl ErasedAction {
     #[inline]
-    pub const fn new<A, R>(action: Action<A, R>) -> Self {
+    pub const fn new<A, R>(action: &Action<A, R>) -> Self {
         Self {
             id: action.id,
             handle: action.handle,

@@ -47,7 +47,7 @@ impl Expr {
 
         // `.call(...)` syntax
         Self::dispatch(&call.func, rust, js, names)?;
-        *js += ".call(";
+        *js += ".call";
         quote! { .call }.to_tokens(rust);
         Self::args(args, rust, js, names)?;
 
