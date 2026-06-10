@@ -25,13 +25,13 @@ pub type ActionHandlerFn =
     ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>>;
 
 #[derive(Debug, Clone)]
-pub struct Action<F> {
+pub struct Action<A, R> {
     id: ActionId,
     handle: ActionHandlerFn,
-    _phantom: PhantomData<F>,
+    _phantom: PhantomData<fn(A) -> R>,
 }
 
-impl<F> Action<F> {
+impl<A, R> Action<A, R> {
     pub const fn new(id: ActionId, handle: ActionHandlerFn) -> Self {
         Self {
             id,
@@ -61,8 +61,8 @@ impl ErasedAction {
     }
 }
 
-impl<F> From<Action<F>> for ErasedAction {
-    fn from(value: Action<F>) -> Self {
+impl<A, R> From<Action<A, R>> for ErasedAction {
+    fn from(value: Action<A, R>) -> Self {
         Self {
             id: value.id,
             handle: value.handle,

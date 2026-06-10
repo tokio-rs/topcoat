@@ -1,6 +1,8 @@
+use std::ops::Deref;
+
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{Expr as SynExpr, ExprCall, PathArguments, PathSegment};
+use syn::{Expr as SynExpr, ExprCall, Token, punctuated::Punctuated};
 
 use crate::ast::expr::{Expr, name_resolver::NameResolver};
 
@@ -11,87 +13,64 @@ impl Expr {
         js: &mut String,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
-        let segment = match &*call.func {
-            SynExpr::Path(path)
-                if path.qself.is_none()
-                    && path.path.leading_colon.is_none()
-                    && path.path.segments.len() == 1 =>
-            {
-                path.path.segments.first()
+        let args = &call.args;
+        // Special case for enum construction
+        if let SynExpr::Path(path) = call.func.deref()
+            && path.qself.is_none()
+            && path.path.leading_colon.is_none()
+            && path.path.segments.len() == 1
+        {
+            let segment = path.path.segments.first().unwrap();
+            let path_arguments = &segment.arguments;
+            match segment.ident.to_string().as_str() {
+                "Some" => {
+                    quote! { ::topcoat::runtime::Option #path_arguments ::some }.to_tokens(rust);
+                    *js += "cx.some";
+                    return Self::args(args, rust, js, names);
+                }
+                "Ok" => {
+                    quote! { ::topcoat::runtime::Result #path_arguments ::from_ok }.to_tokens(rust);
+                    *js += "cx.ok";
+                    return Self::args(args, rust, js, names);
+                }
+                "Err" => {
+                    quote! { ::topcoat::runtime::Result #path_arguments ::from_err }
+                        .to_tokens(rust);
+                    *js += "cx.err";
+                    return Self::args(args, rust, js, names);
+                }
+                _ => {
+                    // fall through to .call(...)
+                }
             }
-            _ => None,
-        };
-        let segment = segment
-            .ok_or_else(|| syn::Error::new_spanned(&call.func, "unsupported call expression"))?;
-        let PathSegment { ident, arguments } = segment;
-        if matches!(arguments, PathArguments::Parenthesized(_)) {
-            return Err(syn::Error::new_spanned(
-                arguments,
-                "parenthesized generic arguments are not supported",
-            ));
         }
 
-        let (cx_method, rust_ctor) = match ident.to_string().as_str() {
-            "Some" => (
-                "some",
-                constructor_path(
-                    quote! { ::topcoat::runtime::Option },
-                    arguments,
-                    quote! { some },
-                ),
-            ),
-            "Ok" => (
-                "ok",
-                constructor_path(
-                    quote! { ::topcoat::runtime::Result },
-                    arguments,
-                    quote! { from_ok },
-                ),
-            ),
-            "Err" => (
-                "err",
-                constructor_path(
-                    quote! { ::topcoat::runtime::Result },
-                    arguments,
-                    quote! { from_err },
-                ),
-            ),
-            _ => {
-                return Err(syn::Error::new_spanned(
-                    &call.func,
-                    "unsupported call expression",
-                ));
-            }
-        };
+        // `.call(...)` syntax
+        Self::dispatch(&call.func, rust, js, names)?;
+        *js += ".call(";
+        quote! { .call }.to_tokens(rust);
+        Self::args(args, rust, js, names)?;
 
-        if call.args.len() != 1 {
-            return Err(syn::Error::new_spanned(
-                call,
-                format!("`{ident}(...)` takes exactly one argument"),
-            ));
-        }
-        let arg = call.args.first().unwrap();
-
-        js.push_str("cx.");
-        js.push_str(cx_method);
-        js.push('(');
-        let mut arg_rust = TokenStream::new();
-        Self::dispatch(arg, &mut arg_rust, js, names)?;
-        js.push(')');
-
-        quote! { #rust_ctor(#arg_rust) }.to_tokens(rust);
         Ok(())
     }
-}
 
-fn constructor_path(
-    ty: TokenStream,
-    arguments: &PathArguments,
-    method: TokenStream,
-) -> TokenStream {
-    match arguments {
-        PathArguments::None => quote! { #ty::#method },
-        PathArguments::AngleBracketed(arguments) => quote! { #ty #arguments ::#method },
-        PathArguments::Parenthesized(_) => unreachable!("rejected by caller"),
+    fn args(
+        args: &Punctuated<syn::Expr, Token![,]>,
+        rust: &mut TokenStream,
+        js: &mut String,
+        names: &mut NameResolver,
+    ) -> syn::Result<()> {
+        let mut tokens = TokenStream::new();
+        *js += "(";
+        for (index, arg) in args.iter().enumerate() {
+            Self::dispatch(arg, &mut tokens, js, names)?;
+            if index < args.len() - 1 {
+                *js += ", ";
+                quote! { , }.to_tokens(&mut tokens);
+            }
+        }
+        *js += ")";
+        quote! { (#tokens) }.to_tokens(rust);
+        Ok(())
     }
 }
