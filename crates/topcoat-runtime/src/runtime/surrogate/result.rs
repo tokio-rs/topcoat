@@ -1,8 +1,9 @@
 use ref_cast::RefCast;
+use serde::{Deserialize, Serialize};
 
 use crate::runtime::{
-    Bool, Option, Str, Surrogate, Surrogated, deserialize_tagged, impl_surrogate,
-    impl_surrogate_mut, impl_surrogate_ref, serialize_tagged,
+    Bool, Option, Str, Surrogate, Surrogated, impl_surrogate, impl_surrogate_mut,
+    impl_surrogate_ref,
 };
 
 #[derive(Debug, Clone, RefCast)]
@@ -86,11 +87,11 @@ impl_surrogate!({T, E} std::result::Result<T, E>, Result<T, E>);
 impl_surrogate_ref!({T, E} std::result::Result<T, E>, Result<T, E>);
 impl_surrogate_mut!({T, E} std::result::Result<T, E>, Result<T, E>);
 
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
 enum Body<T, E> {
-    Ok(T),
-    Err(E),
+    Ok { t: String, ok: T },
+    Err { t: String, err: E },
 }
 
 impl<T, E> serde::Serialize for Result<T, E>
@@ -105,10 +106,16 @@ where
         S: serde::Serializer,
     {
         let body = match &self.0 {
-            std::result::Result::Ok(v) => Body::Ok(v.into_surrogate()),
-            std::result::Result::Err(e) => Body::Err(e.into_surrogate()),
+            std::result::Result::Ok(v) => Body::Ok {
+                t: "Result".to_owned(),
+                ok: v.into_surrogate(),
+            },
+            std::result::Result::Err(e) => Body::Err {
+                t: "Result".to_owned(),
+                err: e.into_surrogate(),
+            },
         };
-        serialize_tagged(serializer, "Result", &body)
+        body.serialize(serializer)
     }
 }
 
@@ -123,10 +130,10 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        let body: Body<T::Surrogate, E::Surrogate> = deserialize_tagged(deserializer, "Result")?;
+        let body = Body::<T::Surrogate, E::Surrogate>::deserialize(deserializer)?;
         Ok(Self(match body {
-            Body::Ok(v) => core::result::Result::Ok(v.into_real()),
-            Body::Err(e) => core::result::Result::Err(e.into_real()),
+            Body::Ok { ok, .. } => core::result::Result::Ok(ok.into_real()),
+            Body::Err { err, .. } => core::result::Result::Err(err.into_real()),
         }))
     }
 }

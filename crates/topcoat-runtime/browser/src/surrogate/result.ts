@@ -77,10 +77,10 @@ export class Result<T, E> {
 			: Result.from_err<T, E>(value as E);
 	}
 
-	dehydrate(): { t: "Result"; v: { ok: unknown } | { err: unknown } } {
+	dehydrate(): { t: "Result" } & ({ ok: unknown } | { err: unknown }) {
 		return {
 			t: "Result",
-			v: this.kind === "ok" ? { ok: this.value } : { err: this.value },
+			...(this.kind === "ok" ? { ok: this.value } : { err: this.value }),
 		};
 	}
 }
