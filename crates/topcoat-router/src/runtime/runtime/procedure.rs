@@ -6,9 +6,9 @@ use topcoat_core::runtime::{context::Cx, error::Result};
 use crate::runtime::{Body, PathSegment, Response, Route};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct ActionId(&'static str);
+pub struct ProcedureId(&'static str);
 
-impl ActionId {
+impl ProcedureId {
     #[inline]
     pub const fn new(inner: &'static str) -> Self {
         Self(inner)
@@ -20,22 +20,22 @@ impl ActionId {
     }
 }
 
-pub type ActionHandlerFn =
+pub type ProcedureHandlerFn =
     for<'cx> fn(
         cx: &'cx Cx,
         body: Body,
     ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>>;
 
 #[derive(Debug, Clone)]
-pub struct Action<A, R> {
-    id: ActionId,
-    handle: ActionHandlerFn,
+pub struct Procedure<A, R> {
+    id: ProcedureId,
+    handle: ProcedureHandlerFn,
     _phantom: PhantomData<fn(A) -> R>,
 }
 
-impl<A, R> Action<A, R> {
+impl<A, R> Procedure<A, R> {
     #[inline]
-    pub const fn new(id: ActionId, handle: ActionHandlerFn) -> Self {
+    pub const fn new(id: ProcedureId, handle: ProcedureHandlerFn) -> Self {
         Self {
             id,
             handle,
@@ -44,28 +44,28 @@ impl<A, R> Action<A, R> {
     }
 
     #[inline]
-    pub fn id(&self) -> ActionId {
+    pub fn id(&self) -> ProcedureId {
         self.id
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ErasedAction {
-    id: ActionId,
-    handle: ActionHandlerFn,
+pub struct ErasedProcedure {
+    id: ProcedureId,
+    handle: ProcedureHandlerFn,
 }
 
-impl ErasedAction {
+impl ErasedProcedure {
     #[inline]
-    pub const fn new<A, R>(action: &Action<A, R>) -> Self {
+    pub const fn new<A, R>(procedure: &Procedure<A, R>) -> Self {
         Self {
-            id: action.id,
-            handle: action.handle,
+            id: procedure.id,
+            handle: procedure.handle,
         }
     }
 
     #[inline]
-    pub fn id(&self) -> ActionId {
+    pub fn id(&self) -> ProcedureId {
         self.id
     }
 
@@ -75,14 +75,14 @@ impl ErasedAction {
     }
 }
 
-impl From<ErasedAction> for Route {
-    fn from(value: ErasedAction) -> Self {
+impl From<ErasedProcedure> for Route {
+    fn from(value: ErasedProcedure) -> Self {
         Self::new(
             Method::POST,
             Cow::Owned(
                 [
                     PathSegment::Static("_topcoat"),
-                    PathSegment::Static("actions"),
+                    PathSegment::Static("procedures"),
                     PathSegment::Static(value.id.0),
                 ]
                 .into_iter()
@@ -93,34 +93,34 @@ impl From<ErasedAction> for Route {
     }
 }
 #[cfg(feature = "discover")]
-inventory::collect!(ErasedAction);
+inventory::collect!(ErasedProcedure);
 
 #[derive(Clone, Default)]
-pub struct Actions {
-    actions: HashMap<ActionId, ErasedAction>,
+pub struct Procedures {
+    procedures: HashMap<ProcedureId, ErasedProcedure>,
 }
 
-impl Actions {
+impl Procedures {
     pub fn new() -> Self {
         Default::default()
     }
 
-    pub fn register(&mut self, action: impl Into<ErasedAction>) {
-        let action = action.into();
-        self.actions.insert(action.id, action);
+    pub fn register(&mut self, procedure: impl Into<ErasedProcedure>) {
+        let procedure = procedure.into();
+        self.procedures.insert(procedure.id, procedure);
     }
 
-    /// Returns `true` if no action has been registered.
+    /// Returns `true` if no procedure has been registered.
     pub fn is_empty(&self) -> bool {
-        self.actions.is_empty()
+        self.procedures.is_empty()
     }
 }
 
-impl IntoIterator for Actions {
-    type Item = ErasedAction;
-    type IntoIter = std::collections::hash_map::IntoValues<ActionId, ErasedAction>;
+impl IntoIterator for Procedures {
+    type Item = ErasedProcedure;
+    type IntoIter = std::collections::hash_map::IntoValues<ProcedureId, ErasedProcedure>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.actions.into_values()
+        self.procedures.into_values()
     }
 }

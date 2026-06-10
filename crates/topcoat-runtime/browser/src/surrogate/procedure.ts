@@ -1,7 +1,7 @@
 import type { Context } from "../context";
 import { Future } from "./future";
 
-export class Action<A extends unknown[] = unknown[], R = unknown> {
+export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 	constructor(
 		private readonly cx: Context,
 		private readonly id: string,
@@ -10,7 +10,7 @@ export class Action<A extends unknown[] = unknown[], R = unknown> {
 	call(...args: A): Future<R> {
 		return new Future(async () => {
 			const response = await fetch(
-				`/_topcoat/actions/${encodeURIComponent(this.id)}`,
+				`/_topcoat/procedures/${encodeURIComponent(this.id)}`,
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
@@ -19,7 +19,7 @@ export class Action<A extends unknown[] = unknown[], R = unknown> {
 			);
 			if (!response.ok) {
 				throw new Error(
-					`Action call failed: ${response.status} ${response.statusText}`,
+					`Procedure call failed: ${response.status} ${response.statusText}`,
 				);
 			}
 
@@ -27,7 +27,7 @@ export class Action<A extends unknown[] = unknown[], R = unknown> {
 		});
 	}
 
-	toJSON(): { t: "Action"; id: string } {
-		return { t: "Action", id: this.id };
+	toJSON(): { t: "Procedure"; id: string } {
+		return { t: "Procedure", id: this.id };
 	}
 }

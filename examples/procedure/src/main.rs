@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     asset::AssetBundle,
-    router::{Router, action, page},
+    router::{Router, page, procedure},
     runtime::Event,
     view::view,
 };
@@ -47,7 +47,7 @@ async fn home() -> Result {
     }
 }
 
-#[action]
+#[procedure]
 pub async fn print_on_server(input: String) -> Result<String> {
     println!("{}", input);
     Ok("Message received!".to_owned())

@@ -7,19 +7,19 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-pub struct ActionAttr {}
+pub struct ProcedureAttr {}
 
-impl Parse for ActionAttr {
+impl Parse for ProcedureAttr {
     fn parse(_input: ParseStream) -> syn::Result<Self> {
         Ok(Self {})
     }
 }
 
-pub struct ActionItem {
+pub struct ProcedureItem {
     item: ItemFn,
 }
 
-impl Parse for ActionItem {
+impl Parse for ProcedureItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             item: input.parse()?,
@@ -27,10 +27,10 @@ impl Parse for ActionItem {
     }
 }
 
-pub struct Action(ActionAttr, ActionItem);
+pub struct Procedure(ProcedureAttr, ProcedureItem);
 
-impl Action {
-    pub fn new(attr: ActionAttr, item: ActionItem) -> Self {
+impl Procedure {
+    pub fn new(attr: ProcedureAttr, item: ProcedureItem) -> Self {
         Self(attr, item)
     }
 
@@ -39,7 +39,7 @@ impl Action {
     }
 }
 
-impl ToTokens for Action {
+impl ToTokens for Procedure {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let item = &self.1.item;
         let ident = &item.sig.ident;
@@ -59,7 +59,7 @@ impl ToTokens for Action {
                         arg_index += 1;
                     }
                 },
-                _ => unreachable!("actions cannot have `self` receiver"),
+                _ => unreachable!("procedures cannot have `self` receiver"),
             }
         }
 
@@ -76,7 +76,7 @@ impl ToTokens for Action {
             })
             .collect::<Vec<_>>();
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
-            unreachable!("actions must return a value")
+            unreachable!("procedures must return a value")
         };
         let return_ty = quote! { <#return_ty as ::topcoat::internal::ResultExt>::T };
 
@@ -84,8 +84,8 @@ impl ToTokens for Action {
 
         quote! {
             #[allow(non_upper_case_globals)]
-            const #ident: &::topcoat::router::Action::<(#(#arg_tys,)*), #return_ty> = &::topcoat::router::Action::new(
-                ::topcoat::router::ActionId::new(#id),
+            const #ident: &::topcoat::router::Procedure::<(#(#arg_tys,)*), #return_ty> = &::topcoat::router::Procedure::new(
+                ::topcoat::router::ProcedureId::new(#id),
                 |cx, body| {
                     #item
                     Box::pin(async {
@@ -101,7 +101,7 @@ impl ToTokens for Action {
         .to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { ::topcoat::internal::inventory::submit! { ::topcoat::router::ErasedAction::new(#ident) } }.to_tokens(tokens);
+            quote! { ::topcoat::internal::inventory::submit! { ::topcoat::router::ErasedProcedure::new(#ident) } }.to_tokens(tokens);
         }
     }
 }

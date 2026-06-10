@@ -1,20 +1,20 @@
 import type { Context } from "../context";
 import type { SignalId } from "../signal";
-import { Action } from "./action";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
 import { Option } from "./option";
+import { Procedure } from "./procedure";
 import { Result } from "./result";
 import { WriteSignal as RuntimeWriteSignal } from "./signal";
 // biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
 import { Str, String } from "./string";
 
-export * from "./action";
 export * from "./bool";
 export * from "./event";
 export * from "./f64";
 export * from "./option";
 export * from "./panic";
+export * from "./procedure";
 export * from "./ref";
 export * from "./result";
 export * from "./signal";
@@ -31,7 +31,7 @@ export type SerializedSurrogate =
 			v: { ok: SerializedSurrogate } | { err: SerializedSurrogate };
 	  }
 	| { t: "Signal"; id: SignalId; v?: SerializedSurrogate }
-	| { t: "Action"; id: string };
+	| { t: "Procedure"; id: string };
 
 export function deserializeSurrogate(
 	value: SerializedSurrogate,
@@ -59,8 +59,8 @@ export function deserializeSurrogate(
 				value.id,
 				cx.getRegistry().handle(value.id),
 			);
-		case "Action":
-			return new Action(cx, value.id);
+		case "Procedure":
+			return new Procedure(cx, value.id);
 		default:
 			throw new Error(`Unknown surrogate type: ${(value as { t: unknown }).t}`);
 	}

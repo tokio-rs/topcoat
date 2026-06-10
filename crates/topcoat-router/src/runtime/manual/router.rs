@@ -55,7 +55,7 @@ pub struct Router {
     #[cfg(feature = "runtime")]
     shards: topcoat_runtime::runtime::Shards,
     #[cfg(feature = "runtime")]
-    actions: crate::runtime::Actions,
+    procedures: crate::runtime::Procedures,
 
     assets: AssetBundle,
     state: State,
@@ -74,7 +74,7 @@ impl Router {
             #[cfg(feature = "runtime")]
             shards: topcoat_runtime::runtime::Shards::new(),
             #[cfg(feature = "runtime")]
-            actions: crate::runtime::Actions::new(),
+            procedures: crate::runtime::Procedures::new(),
             assets: AssetBundle::empty(),
             state,
         }
@@ -127,8 +127,8 @@ impl Router {
     }
 
     #[cfg(feature = "runtime")]
-    pub fn action(mut self, action: impl Into<crate::runtime::ErasedAction>) -> Self {
-        self.actions.register(action);
+    pub fn procedure(mut self, procedure: impl Into<crate::runtime::ErasedProcedure>) -> Self {
+        self.procedures.register(procedure);
         self
     }
 
@@ -151,8 +151,8 @@ impl Router {
             {
                 self = self.shard(shard);
             }
-            for action in inventory::iter::<crate::runtime::ErasedAction>().cloned() {
-                self = self.action(action);
+            for procedure in inventory::iter::<crate::runtime::ErasedProcedure>().cloned() {
+                self = self.procedure(procedure);
             }
         }
 
@@ -272,7 +272,7 @@ impl From<Router> for axum::Router {
 
         #[cfg(feature = "runtime")]
         {
-            for route in value.actions.into_iter().map(Route::from) {
+            for route in value.procedures.into_iter().map(Route::from) {
                 axum_router = axum_router.route(
                     &route.path().to_axum_path(),
                     on(

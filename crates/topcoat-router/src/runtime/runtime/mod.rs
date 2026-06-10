@@ -1,4 +1,4 @@
-mod action;
+mod procedure;
 mod surrogate;
 
-pub use action::*;
+pub use procedure::*;
