@@ -1,7 +1,6 @@
 use std::{any::Any, sync::Arc};
 
 use axum::{
-    extract::Query,
     response::Html,
     routing::{MethodFilter, get, on},
 };
