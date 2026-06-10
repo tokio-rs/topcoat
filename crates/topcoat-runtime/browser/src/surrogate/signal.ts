@@ -21,7 +21,7 @@ export class WriteSignal<T> {
 		this.inner.set(new Ref(v));
 	}
 
-	toJSON(): { t: "signal"; id: SignalId } {
-		return { t: "signal", id: this.id };
+	toJSON(): { t: "Signal"; id: SignalId } {
+		return { t: "Signal", id: this.id };
 	}
 }

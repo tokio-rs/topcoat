@@ -1,5 +1,5 @@
 import type { Context } from "../context";
-import type { SignalId, SignalRegistry } from "../signal";
+import type { SignalId } from "../signal";
 import { Action } from "./action";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
@@ -30,7 +30,7 @@ export type SerializedSurrogate =
 			t: "Result";
 			v: { ok: SerializedSurrogate } | { err: SerializedSurrogate };
 	  }
-	| { t: "signal"; id: SignalId; v?: SerializedSurrogate }
+	| { t: "Signal"; id: SignalId; v?: SerializedSurrogate }
 	| { t: "Action"; id: string };
 
 export function deserializeSurrogate(
@@ -54,7 +54,7 @@ export function deserializeSurrogate(
 			return "ok" in value.v
 				? Result.from_ok(deserializeSurrogate(value.v.ok, cx))
 				: Result.from_err(deserializeSurrogate(value.v.err, cx));
-		case "signal":
+		case "Signal":
 			return new RuntimeWriteSignal(
 				value.id,
 				cx.getRegistry().handle(value.id),

@@ -57,7 +57,7 @@ impl<T> Serialize for WriteSignal<T> {
         }
 
         TaggedSignal {
-            t: "signal",
+            t: "Signal",
             id: self.0.id().to_string(),
         }
         .serialize(serializer)
