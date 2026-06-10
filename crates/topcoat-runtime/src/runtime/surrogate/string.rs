@@ -1,10 +1,7 @@
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
 
-use crate::runtime::{
-    Str, deserialize_tagged, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref,
-    serialize_tagged,
-};
+use crate::runtime::{Str, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
 
 #[derive(Debug, Clone, RefCast, Serialize, Deserialize)]
 #[repr(transparent)]
