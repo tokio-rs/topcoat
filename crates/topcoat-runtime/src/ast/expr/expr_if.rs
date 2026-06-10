@@ -29,7 +29,7 @@ impl Expr {
         js.push_str("{ if (");
         let mut cond = TokenStream::new();
         Self::dispatch(&if_expr.cond, &mut cond, js, names)?;
-        js.push_str(".valueOf()) ");
+        js.push_str(".dehydrate()) ");
 
         let mut then_tokens = TokenStream::new();
         Self::block(&if_expr.then_branch, &mut then_tokens, js, names)?;

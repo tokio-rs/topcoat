@@ -14,7 +14,7 @@ impl Expr {
         let mut cond = TokenStream::new();
         js.push_str("while (");
         Self::dispatch(&expr.cond, &mut cond, js, names)?;
-        js.push_str(".valueOf()) ");
+        js.push_str(".dehydrate()) ");
         quote! { while ::topcoat::runtime::Surrogate::into_real(#cond) }.to_tokens(rust);
 
         Self::block(&expr.body, rust, js, names)?;

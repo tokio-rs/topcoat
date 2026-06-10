@@ -1,12 +1,11 @@
 use ref_cast::RefCast;
+use serde::{Deserialize, Serialize};
 
-use crate::runtime::{
-    Bool, deserialize_tagged, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref,
-    serialize_tagged,
-};
+use crate::runtime::{Bool, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
 
-#[derive(Debug, RefCast, Clone, Copy)]
+#[derive(Debug, RefCast, Clone, Copy, Serialize, Deserialize)]
 #[repr(transparent)]
+#[serde(transparent)]
 pub struct F64(f64);
 
 impl F64 {
@@ -19,24 +18,6 @@ impl F64 {
 impl_surrogate!(f64, F64);
 impl_surrogate_ref!(f64, F64);
 impl_surrogate_mut!(f64, F64);
-
-impl serde::Serialize for F64 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serialize_tagged(serializer, "f64", &self.0)
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for F64 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserialize_tagged(deserializer, "f64").map(Self)
-    }
-}
 
 macro_rules! impl_math_op {
     ($trait:ident, $method:ident, $op:tt) => {

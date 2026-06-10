@@ -41,15 +41,11 @@ export class Bool implements AttributeValueViewParts, NodeViewParts {
 		return this.v.toString();
 	}
 
-	dehydrate(): { t: "bool"; v: boolean } {
-		return { t: "bool", v: this.v };
+	dehydrate(): boolean {
+		return this.v;
 	}
 
 	toString(): string {
 		return this.v.toString();
-	}
-
-	valueOf(): boolean {
-		return this.v;
 	}
 }

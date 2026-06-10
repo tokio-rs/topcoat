@@ -64,15 +64,11 @@ export class F64 implements AttributeValueViewParts, NodeViewParts {
 		return this.v.toString();
 	}
 
-	dehydrate(): { t: "f64"; v: number } {
-		return { t: "f64", v: this.v };
+	dehydrate(): number {
+		return this.v;
 	}
 
 	toString(): string {
 		return this.v.toString();
-	}
-
-	valueOf(): number {
-		return this.v;
 	}
 }

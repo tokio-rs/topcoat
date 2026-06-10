@@ -77,8 +77,8 @@ export class Str implements AttributeValueViewParts, NodeViewParts {
 		return this.v;
 	}
 
-	dehydrate(): { t: "str" | "String"; v: string } {
-		return { t: "str", v: this.v };
+	dehydrate(): string {
+		return this.v;
 	}
 
 	toString(): string {
@@ -96,7 +96,7 @@ export class String extends Str {
 		return new String(this.v);
 	}
 
-	dehydrate(): { t: "String"; v: string } {
-		return { t: "String", v: this.v };
+	dehydrate(): string {
+		return this.v;
 	}
 }
