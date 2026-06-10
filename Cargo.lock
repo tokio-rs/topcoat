@@ -2103,6 +2103,7 @@ dependencies = [
  "topcoat-runtime",
  "topcoat-view",
  "tower",
+ "uuid",
 ]
 
 [[package]]

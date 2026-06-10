@@ -1,3 +1,5 @@
+#[cfg(feature = "runtime")]
+pub mod action;
 mod handler_args;
 pub mod layout;
 pub mod page;

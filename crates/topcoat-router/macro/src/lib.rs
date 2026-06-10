@@ -336,3 +336,12 @@ pub fn query_params(attr: TokenStream, item: TokenStream) -> TokenStream {
         Err(error) => error.to_compile_error().into(),
     }
 }
+
+#[cfg(feature = "runtime")]
+#[proc_macro]
+pub fn action(tokens: TokenStream) -> TokenStream {
+    match topcoat_router::ast::action::Action::parse(attr.into(), item.into()) {
+        Ok(value) => quote! { #value }.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}

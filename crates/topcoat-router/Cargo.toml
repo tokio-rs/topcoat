@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-runtime = [
-	"dep:topcoat-runtime",
-]
 discover = [
 	"dep:inventory",
 	"topcoat-runtime/discover",
@@ -16,6 +13,9 @@ parsing = [
 	"dep:quote",
 	"dep:syn",
 	"topcoat-core/parsing",
+]
+runtime = [
+	"dep:topcoat-runtime",
 ]
 
 [dependencies]
@@ -40,6 +40,7 @@ syn = { workspace = true, optional = true, features = ["full"] }
 thiserror.workspace = true
 tokio.workspace = true
 tower.workspace = true
+uuid = { workspace = true, features = ["v4"] }
 
 [lints]
 workspace = true

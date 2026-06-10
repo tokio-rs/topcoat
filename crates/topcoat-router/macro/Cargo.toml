@@ -8,6 +8,7 @@ proc-macro = true
 
 [features]
 discover = ["topcoat-router/discover"]
+runtime = ["topcoat-router/runtime"]
 
 [dependencies]
 topcoat-router = { workspace = true, features = ["parsing"] }
