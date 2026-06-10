@@ -1,4 +1,5 @@
 use ref_cast::RefCast;
+use topcoat_runtime::runtime::Surrogated;
 
 #[derive(Debug, RefCast)]
 #[repr(transparent)]
@@ -11,8 +12,11 @@ impl<A, R> Action<A, R> {
     }
 }
 
-impl<A, R> Action<A, R> {
-    pub fn call(self, _args: A) -> R {
+impl<A, R> Action<A, R>
+where
+    A: Surrogated,
+{
+    pub fn call(self, _args: A::Surrogate) -> R {
         panic!("actions cannot be executed on the server");
     }
 }

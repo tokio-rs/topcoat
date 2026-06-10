@@ -66,11 +66,11 @@ impl Expr {
             Self::dispatch(arg, &mut tokens, js, names)?;
             if index < args.len() - 1 {
                 *js += ", ";
-                quote! { , }.to_tokens(&mut tokens);
             }
+            quote! { , }.to_tokens(&mut tokens);
         }
         *js += ")";
-        quote! { (#tokens) }.to_tokens(rust);
+        quote! { ((#tokens)) }.to_tokens(rust);
         Ok(())
     }
 }

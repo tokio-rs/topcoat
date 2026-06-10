@@ -6,6 +6,7 @@ mod option;
 mod result;
 mod signal;
 mod string;
+mod tuple;
 
 use serde::{Deserialize, Serialize, de};
 
