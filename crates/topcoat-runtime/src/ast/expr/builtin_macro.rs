@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, quote};
 use syn::{
-    Block, ExprClosure, ExprForLoop, ExprIf, ExprMacro, ExprPath, ExprWhile, LitStr, Pat, Stmt,
-    Token,
+    Block, ExprClosure, ExprForLoop, ExprIf, ExprMacro, ExprPath, ExprWhile, LitStr, Macro, Pat,
+    Stmt, StmtMacro, Token,
     parse::{Parse, ParseStream},
     visit::{self, Visit},
 };
@@ -21,7 +21,16 @@ impl Expr {
         js: &mut String,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
-        BuiltinMacro::parse(expr)?.lower(rust, js, names)
+        BuiltinMacro::parse(&expr.mac)?.lower(rust, js, names)
+    }
+
+    pub(super) fn stmt_macro(
+        stmt_macro: &StmtMacro,
+        rust: &mut TokenStream,
+        js: &mut String,
+        names: &mut NameResolver,
+    ) -> syn::Result<()> {
+        BuiltinMacro::parse(&stmt_macro.mac)?.lower(rust, js, names)
     }
 }
 
@@ -30,18 +39,15 @@ enum BuiltinMacro {
 }
 
 impl BuiltinMacro {
-    fn parse(expr: &ExprMacro) -> syn::Result<Self> {
-        let ident = expr.mac.path.get_ident().ok_or_else(|| {
-            syn::Error::new_spanned(
-                &expr.mac.path,
-                "only single-identifier macros are supported",
-            )
+    fn parse(mac: &Macro) -> syn::Result<Self> {
+        let ident = mac.path.get_ident().ok_or_else(|| {
+            syn::Error::new_spanned(&mac.path, "only single-identifier macros are supported")
         })?;
 
         match ident.to_string().as_str() {
-            "raw" => Ok(Self::Raw(syn::parse2(expr.mac.tokens.clone())?)),
+            "raw" => Ok(Self::Raw(syn::parse2(mac.tokens.clone())?)),
             _ => Err(syn::Error::new_spanned(
-                &expr.mac.path,
+                &mac.path,
                 "unsupported expression macro",
             )),
         }

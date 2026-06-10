@@ -57,6 +57,7 @@ impl Expr {
                     quote! { #value; }.to_tokens(rust);
                 }
             }
+            Stmt::Macro(stmt_macro) => Self::stmt_macro(stmt_macro, rust, js, names)?,
             other => return Err(syn::Error::new_spanned(other, "unsupported statement")),
         }
         Ok(())
