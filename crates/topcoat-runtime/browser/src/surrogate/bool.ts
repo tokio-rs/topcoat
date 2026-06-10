@@ -41,7 +41,7 @@ export class Bool implements AttributeValueViewParts, NodeViewParts {
 		return this.v.toString();
 	}
 
-	toJSON(): { t: "bool"; v: boolean } {
+	dehydrate(): { t: "bool"; v: boolean } {
 		return { t: "bool", v: this.v };
 	}
 

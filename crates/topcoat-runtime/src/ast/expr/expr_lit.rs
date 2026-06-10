@@ -36,7 +36,7 @@ fn push_js_surrogate<T>(js: &mut String, value: &T) -> syn::Result<()>
 where
     T: serde::Serialize + ?Sized,
 {
-    js.push_str("cx.s(");
+    js.push_str("cx.hydrate(");
     js.push_str(&serde_json::to_string(value).map_err(|err| {
         syn::Error::new(
             proc_macro2::Span::call_site(),

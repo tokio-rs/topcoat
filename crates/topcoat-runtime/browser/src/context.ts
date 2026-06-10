@@ -1,9 +1,9 @@
 import type { SignalId, SignalRegistry } from "./signal";
 import {
-	deserializeSurrogate,
+	type DehydratedSurrogate,
+	hydrateSurrogate,
 	Option,
 	Result,
-	type SerializedSurrogate,
 	WriteSignal,
 } from "./surrogate";
 
@@ -20,8 +20,8 @@ export class Context {
 		return this.registry;
 	}
 
-	s(s: unknown) {
-		return deserializeSurrogate(s as SerializedSurrogate, this);
+	hydrate(s: unknown) {
+		return hydrateSurrogate(s as DehydratedSurrogate, this);
 	}
 
 	signal(id: SignalId): WriteSignal<unknown> {

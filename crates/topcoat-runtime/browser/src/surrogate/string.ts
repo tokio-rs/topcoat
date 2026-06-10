@@ -77,7 +77,7 @@ export class Str implements AttributeValueViewParts, NodeViewParts {
 		return this.v;
 	}
 
-	toJSON(): { t: "str" | "String"; v: string } {
+	dehydrate(): { t: "str" | "String"; v: string } {
 		return { t: "str", v: this.v };
 	}
 
@@ -96,7 +96,7 @@ export class String extends Str {
 		return new String(this.v);
 	}
 
-	toJSON(): { t: "String"; v: string } {
+	dehydrate(): { t: "String"; v: string } {
 		return { t: "String", v: this.v };
 	}
 }

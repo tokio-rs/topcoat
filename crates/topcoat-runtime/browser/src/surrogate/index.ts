@@ -19,22 +19,22 @@ export * from "./ref";
 export * from "./result";
 export * from "./signal";
 
-export type SerializedSurrogate =
+export type DehydratedSurrogate =
 	| { t: "bool"; v: boolean }
 	| { t: "f64"; v: number }
 	| { t: "i32"; v: number }
 	| { t: "str"; v: string }
 	| { t: "String"; v: string }
-	| { t: "Option"; v: SerializedSurrogate | null }
+	| { t: "Option"; v: DehydratedSurrogate | null }
 	| {
 			t: "Result";
-			v: { ok: SerializedSurrogate } | { err: SerializedSurrogate };
+			v: { ok: DehydratedSurrogate } | { err: DehydratedSurrogate };
 	  }
-	| { t: "Signal"; id: SignalId; v?: SerializedSurrogate }
+	| { t: "Signal"; id: SignalId; v?: DehydratedSurrogate }
 	| { t: "Procedure"; id: string };
 
-export function deserializeSurrogate(
-	value: SerializedSurrogate,
+export function hydrateSurrogate(
+	value: DehydratedSurrogate,
 	cx: Context,
 ): unknown {
 	switch (value.t) {
@@ -49,11 +49,11 @@ export function deserializeSurrogate(
 		case "Option":
 			return value.v === null
 				? Option.none()
-				: Option.some(deserializeSurrogate(value.v, cx));
+				: Option.some(hydrateSurrogate(value.v, cx));
 		case "Result":
 			return "ok" in value.v
-				? Result.from_ok(deserializeSurrogate(value.v.ok, cx))
-				: Result.from_err(deserializeSurrogate(value.v.err, cx));
+				? Result.from_ok(hydrateSurrogate(value.v.ok, cx))
+				: Result.from_err(hydrateSurrogate(value.v.err, cx));
 		case "Signal":
 			return new RuntimeWriteSignal(
 				value.id,

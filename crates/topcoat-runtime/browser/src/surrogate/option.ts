@@ -57,7 +57,7 @@ export class Option<T> implements AttributeValueViewParts, NodeViewParts {
 		return (this.value as NodeViewParts).toNodeText();
 	}
 
-	toJSON(): { t: "Option"; v: unknown } {
+	dehydrate(): { t: "Option"; v: unknown } {
 		return { t: "Option", v: this.value === undefined ? null : this.value };
 	}
 }

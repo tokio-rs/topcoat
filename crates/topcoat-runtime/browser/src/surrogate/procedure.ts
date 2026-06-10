@@ -23,11 +23,11 @@ export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 				);
 			}
 
-			return this.cx.s(await response.json()) as R;
+			return this.cx.hydrate(await response.json()) as R;
 		});
 	}
 
-	toJSON(): { t: "Procedure"; id: string } {
+	dehydrate(): { t: "Procedure"; id: string } {
 		return { t: "Procedure", id: this.id };
 	}
 }

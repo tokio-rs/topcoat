@@ -77,7 +77,7 @@ export class Result<T, E> {
 			: Result.from_err<T, E>(value as E);
 	}
 
-	toJSON(): { t: "Result"; v: { ok: unknown } | { err: unknown } } {
+	dehydrate(): { t: "Result"; v: { ok: unknown } | { err: unknown } } {
 		return {
 			t: "Result",
 			v: this.kind === "ok" ? { ok: this.value } : { err: this.value },

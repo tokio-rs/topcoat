@@ -39,6 +39,7 @@ export function scan(
 		if (to && node === to) break;
 
 		const current = stack[stack.length - 1];
+		if (current === undefined) throw new Error("Stack was empty");
 
 		if (node.nodeType === Node.ELEMENT_NODE) {
 			processElement(node as Element, current);
@@ -67,6 +68,7 @@ function processMarker(
 	textExpressions: PendingTextExpression[],
 ): void {
 	const current = stack[stack.length - 1];
+	if (current === undefined) throw new Error("Stack was empty");
 
 	switch (marker.kind) {
 		case "signal": {
