@@ -63,13 +63,18 @@ impl ToTokens for Action {
             }
         }
 
-        let arg_tys = item.sig.inputs.iter().filter_map(|arg| match arg {
-            FnArg::Typed(PatType { pat, ty, .. }) => match pat.deref() {
-                Pat::Ident(PatIdent { ident, .. }) if ident == "cx" => None,
-                _ => Some(ty),
-            },
-            _ => None,
-        });
+        let arg_tys = item
+            .sig
+            .inputs
+            .iter()
+            .filter_map(|arg| match arg {
+                FnArg::Typed(PatType { pat, ty, .. }) => match pat.deref() {
+                    Pat::Ident(PatIdent { ident, .. }) if ident == "cx" => None,
+                    _ => Some(ty),
+                },
+                _ => None,
+            })
+            .collect::<Vec<_>>();
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("actions must return a value")
         };
@@ -84,7 +89,9 @@ impl ToTokens for Action {
                 |cx, body| {
                     #item
                     Box::pin(async {
-                        let ::topcoat::router::Json((#(#args,)*)) = <::topcoat::router::Json<_> as topcoat::router::FromRequest>::from_request(cx, body).await?;
+                        type Surrogate = <(#(#arg_tys,)*) as ::topcoat::runtime::Surrogated>::Surrogate;
+                        let ::topcoat::router::Json(args) = <::topcoat::router::Json<Surrogate> as topcoat::router::FromRequest>::from_request(cx, body).await?;
+                        let (#(#args,)*) = ::topcoat::runtime::Surrogate::into_real(args);
                         ::topcoat::router::IntoResponse::into_response(::topcoat::router::Json(#ident(#(#args_with_cx),*).await?))
                     })
                 },
