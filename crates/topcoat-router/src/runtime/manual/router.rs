@@ -5,7 +5,6 @@ use axum::{
     response::Html,
     routing::{MethodFilter, get, on},
 };
-use serde::Deserialize;
 use topcoat_asset::{AssetBundle, AssetResolver, ServeAssetBundle};
 use topcoat_core::runtime::context::{MaybeAborted, State, WatchAbort};
 
@@ -148,12 +147,14 @@ impl Router {
             self = self.route(route);
         }
 
-        for shard in inventory::iter::<&'static dyn DynShard>().cloned() {
-            self = self.shard(shard);
-        }
         #[cfg(feature = "runtime")]
-        for action in inventory::iter::<crate::runtime::ErasedAction>().cloned() {
-            self = self.action(action);
+        {
+            for shard in inventory::iter::<&'static dyn DynShard>().cloned() {
+                self = self.shard(shard);
+            }
+            for action in inventory::iter::<crate::runtime::ErasedAction>().cloned() {
+                self = self.action(action);
+            }
         }
 
         self
@@ -294,7 +295,7 @@ impl From<Router> for axum::Router {
 
             let mut shard_router = axum::Router::new();
             for shard in value.shards {
-                #[derive(Deserialize)]
+                #[derive(serde::Deserialize)]
                 struct SignalsQuery {
                     signals: String,
                 }
@@ -302,7 +303,7 @@ impl From<Router> for axum::Router {
                 shard_router = shard_router.route(
                     &("/".to_owned() + shard.id().as_str()),
                     get(
-                        async |Query(query): Query<SignalsQuery>,
+                        async |axum::extract::Query(query): axum::extract::Query<SignalsQuery>,
                                CxBody { cx, body: _ }: CxBody| {
                             use topcoat_runtime::runtime::EncodedSignals;
 
