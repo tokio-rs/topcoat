@@ -134,8 +134,6 @@ impl Router {
 
     #[cfg(feature = "discover")]
     pub fn discover(mut self) -> Self {
-        use topcoat_runtime::runtime::DynShard;
-
         for page in inventory::iter::<Page>().cloned() {
             self = self.page(page);
         }
@@ -148,7 +146,9 @@ impl Router {
 
         #[cfg(feature = "runtime")]
         {
-            for shard in inventory::iter::<&'static dyn DynShard>().cloned() {
+            for shard in
+                inventory::iter::<&'static dyn topcoat_runtime::runtime::DynShard>().cloned()
+            {
                 self = self.shard(shard);
             }
             for action in inventory::iter::<crate::runtime::ErasedAction>().cloned() {
