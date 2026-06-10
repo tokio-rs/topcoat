@@ -92,7 +92,8 @@ impl ToTokens for Action {
                         type Surrogate = <(#(#arg_tys,)*) as ::topcoat::runtime::Surrogated>::Surrogate;
                         let ::topcoat::router::Json(args) = <::topcoat::router::Json<Surrogate> as topcoat::router::FromRequest>::from_request(cx, body).await?;
                         let (#(#args,)*) = ::topcoat::runtime::Surrogate::into_real(args);
-                        ::topcoat::router::IntoResponse::into_response(::topcoat::router::Json(#ident(#(#args_with_cx),*).await?))
+                        let response = ::topcoat::runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
+                        ::topcoat::router::IntoResponse::into_response(::topcoat::router::Json(response))
                     })
                 },
             );

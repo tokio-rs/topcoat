@@ -38,8 +38,7 @@ async fn home(cx: &Cx) -> Result {
                 <button
                     @click=$(async |_e| {
                         let server_response = print_on_server(input.get()).await;
-                        input.set("".to_owned());
-                        raw!("console.log(${server_response})");
+                        input.set(server_response);
                     })
                 >
                     "Print on server"

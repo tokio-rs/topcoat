@@ -1,5 +1,10 @@
+import type { Context } from "../context";
+
 export class Action<A extends unknown[] = unknown[], R = unknown> {
-	constructor(private readonly id: string) {}
+	constructor(
+		private readonly cx: Context,
+		private readonly id: string,
+	) {}
 
 	async call(...args: A): Promise<R> {
 		const response = await fetch(
@@ -15,7 +20,7 @@ export class Action<A extends unknown[] = unknown[], R = unknown> {
 				`Action call failed: ${response.status} ${response.statusText}`,
 			);
 		}
-		return (await response.json()) as R;
+		return this.cx.s(await response.json()) as R;
 	}
 
 	toJSON(): { t: "Action"; id: string } {

@@ -1,3 +1,4 @@
+import type { Context } from "../context";
 import type { SignalId, SignalRegistry } from "../signal";
 import { Action } from "./action";
 import { Bool } from "./bool";
@@ -34,7 +35,7 @@ export type SerializedSurrogate =
 
 export function deserializeSurrogate(
 	value: SerializedSurrogate,
-	registry: SignalRegistry,
+	cx: Context,
 ): unknown {
 	switch (value.t) {
 		case "bool":
@@ -48,15 +49,18 @@ export function deserializeSurrogate(
 		case "Option":
 			return value.v === null
 				? Option.none()
-				: Option.some(deserializeSurrogate(value.v, registry));
+				: Option.some(deserializeSurrogate(value.v, cx));
 		case "Result":
 			return "ok" in value.v
-				? Result.from_ok(deserializeSurrogate(value.v.ok, registry))
-				: Result.from_err(deserializeSurrogate(value.v.err, registry));
+				? Result.from_ok(deserializeSurrogate(value.v.ok, cx))
+				: Result.from_err(deserializeSurrogate(value.v.err, cx));
 		case "signal":
-			return new RuntimeWriteSignal(value.id, registry.handle(value.id));
+			return new RuntimeWriteSignal(
+				value.id,
+				cx.getRegistry().handle(value.id),
+			);
 		case "Action":
-			return new Action(value.id);
+			return new Action(cx, value.id);
 		default:
 			throw new Error(`Unknown surrogate type: ${(value as { t: unknown }).t}`);
 	}

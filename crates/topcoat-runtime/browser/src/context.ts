@@ -16,8 +16,12 @@ import {
 export class Context {
 	constructor(private readonly registry: SignalRegistry) {}
 
+	getRegistry(): SignalRegistry {
+		return this.registry;
+	}
+
 	s(s: unknown) {
-		return deserializeSurrogate(s as SerializedSurrogate, this.registry);
+		return deserializeSurrogate(s as SerializedSurrogate, this);
 	}
 
 	signal(id: SignalId): WriteSignal<unknown> {
