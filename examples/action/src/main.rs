@@ -1,7 +1,6 @@
 use topcoat::{
     Result,
     asset::AssetBundle,
-    context::Cx,
     router::{Router, action, page},
     runtime::Event,
     view::view,
@@ -19,7 +18,7 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home(cx: &Cx) -> Result {
+async fn home() -> Result {
     view! {
         <!DOCTYPE html>
         <html>

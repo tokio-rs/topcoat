@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::ToTokens;
 use syn::ExprAwait;
 
 use crate::ast::expr::{Expr, NameResolver};
@@ -13,7 +13,8 @@ impl Expr {
     ) -> syn::Result<()> {
         *js += "(await ";
         Self::dispatch(&expr.base, rust, js, names)?;
-        quote! { .await }.to_tokens(rust);
+        expr.dot_token.to_tokens(rust);
+        expr.await_token.to_tokens(rust);
         *js += ")";
         Ok(())
     }

@@ -5,6 +5,7 @@ mod path;
 mod request;
 mod response;
 #[cfg(feature = "runtime")]
+#[allow(clippy::module_inception)]
 mod runtime;
 mod serde;
 mod state;
