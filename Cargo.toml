@@ -15,6 +15,7 @@ members = [
     "crates/topcoat-view",
     "crates/topcoat-view/macro",
 
+    "examples/action",
     "examples/app-state",
     "examples/assets",
     "examples/context",

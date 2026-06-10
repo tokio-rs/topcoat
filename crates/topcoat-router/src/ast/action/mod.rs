@@ -1,13 +1,11 @@
-use proc_macro2::TokenStream;
-use quote::{ToTokens, quote, quote_spanned};
-use syn::{
-    ItemFn,
-    parse::{Parse, ParseStream},
-    parse_quote,
-    spanned::Spanned,
-};
+use std::ops::Deref;
 
-use super::handler_args::request_ident;
+use proc_macro2::TokenStream;
+use quote::{ToTokens, format_ident, quote};
+use syn::{
+    FnArg, ItemFn, Pat, PatIdent, PatType, ReturnType,
+    parse::{Parse, ParseStream},
+};
 
 pub struct ActionAttr {}
 
@@ -43,22 +41,59 @@ impl Action {
 
 impl ToTokens for Action {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let attr = &self.0;
         let item = &self.1.item;
         let ident = &item.sig.ident;
+
+        let mut args = Vec::new();
+        let mut args_with_cx = Vec::new();
+        let mut arg_index = 0;
+        for arg in item.sig.inputs.iter() {
+            match arg {
+                FnArg::Typed(PatType { pat, .. }) => match pat.deref() {
+                    Pat::Ident(PatIdent { ident, .. }) if ident == "cx" => {
+                        args_with_cx.push(ident.clone());
+                    }
+                    _ => {
+                        args.push(format_ident!("arg{arg_index}"));
+                        args_with_cx.push(format_ident!("arg{arg_index}"));
+                        arg_index += 1;
+                    }
+                },
+                _ => unreachable!("actions cannot have `self` receiver"),
+            }
+        }
+
+        let arg_tys = item.sig.inputs.iter().filter_map(|arg| match arg {
+            FnArg::Typed(PatType { pat, ty, .. }) => match pat.deref() {
+                Pat::Ident(PatIdent { ident, .. }) if ident == "cx" => None,
+                _ => Some(ty),
+            },
+            _ => None,
+        });
+        let ReturnType::Type(_, return_ty) = &item.sig.output else {
+            unreachable!("actions must return a value")
+        };
+        let return_ty = quote! { <#return_ty as ::topcoat::internal::ResultExt>::T };
 
         let id = uuid::Uuid::new_v4().to_string();
 
         quote! {
             #[allow(non_upper_case_globals)]
-            const #ident: ::topcoat::router::Action = ::topcoat::router::Action::new(
+            const #ident: ::topcoat::router::Action::<(#(#arg_tys,)*), #return_ty> = ::topcoat::router::Action::new(
                 ::topcoat::router::ActionId::new(#id),
+                |cx, body| {
+                    #item
+                    Box::pin(async {
+                        let ::topcoat::router::Json((#(#args,)*)) = <::topcoat::router::Json<_> as topcoat::router::FromRequest>::from_request(cx, body).await?;
+                        ::topcoat::router::IntoResponse::into_response(::topcoat::router::Json(#ident(#(#args_with_cx),*).await?))
+                    })
+                },
             );
         }
         .to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { ::topcoat::internal::inventory::submit! { #ident } }.to_tokens(tokens);
+            quote! { ::topcoat::internal::inventory::submit! { ::topcoat::router::ErasedAction::new(#ident) } }.to_tokens(tokens);
         }
     }
 }

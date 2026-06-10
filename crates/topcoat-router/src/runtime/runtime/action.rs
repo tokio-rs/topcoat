@@ -9,10 +9,12 @@ use crate::runtime::{Body, PathSegment, Response, Route};
 pub struct ActionId(&'static str);
 
 impl ActionId {
+    #[inline]
     pub const fn new(inner: &'static str) -> Self {
         Self(inner)
     }
 
+    #[inline]
     pub fn as_str(&self) -> &str {
         self.0
     }
@@ -32,6 +34,7 @@ pub struct Action<A, R> {
 }
 
 impl<A, R> Action<A, R> {
+    #[inline]
     pub const fn new(id: ActionId, handle: ActionHandlerFn) -> Self {
         Self {
             id,
@@ -40,6 +43,7 @@ impl<A, R> Action<A, R> {
         }
     }
 
+    #[inline]
     pub fn id(&self) -> ActionId {
         self.id
     }
@@ -52,21 +56,22 @@ pub struct ErasedAction {
 }
 
 impl ErasedAction {
+    #[inline]
+    pub const fn new<A, R>(action: Action<A, R>) -> Self {
+        Self {
+            id: action.id,
+            handle: action.handle,
+        }
+    }
+
+    #[inline]
     pub fn id(&self) -> ActionId {
         self.id
     }
 
+    #[inline]
     pub async fn handle(&self, cx: &Cx, body: Body) -> Result<Response> {
         (self.handle)(cx, body).await
-    }
-}
-
-impl<A, R> From<Action<A, R>> for ErasedAction {
-    fn from(value: Action<A, R>) -> Self {
-        Self {
-            id: value.id,
-            handle: value.handle,
-        }
     }
 }
 

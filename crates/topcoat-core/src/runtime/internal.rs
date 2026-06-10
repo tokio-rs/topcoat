@@ -18,3 +18,13 @@ impl<'a, T> MemoizeAsRef for &'a Option<T> {
 impl<'a, T, E> MemoizeAsRef for &'a Result<T, E> {
     type AsRef = Result<&'a T, &'a E>;
 }
+
+pub trait ResultExt {
+    type T;
+    type E;
+}
+
+impl<T, E> ResultExt for Result<T, E> {
+    type T = T;
+    type E = E;
+}
