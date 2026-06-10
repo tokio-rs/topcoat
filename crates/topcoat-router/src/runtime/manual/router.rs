@@ -8,7 +8,6 @@ use axum::{
 use serde::Deserialize;
 use topcoat_asset::{AssetBundle, AssetResolver, ServeAssetBundle};
 use topcoat_core::runtime::context::{MaybeAborted, State, WatchAbort};
-use topcoat_runtime::runtime::{DynShard, EncodedSignals, Shards};
 
 use crate::runtime::{
     CxBody, Layout, Layouts, Page, Pages, Route, Routes, not_found, result_into_response,
@@ -55,7 +54,8 @@ pub struct Router {
     layouts: Layouts,
     routes: Routes,
 
-    shards: Shards,
+    #[cfg(feature = "runtime")]
+    shards: topcoat_runtime::runtime::Shards,
     #[cfg(feature = "runtime")]
     actions: crate::runtime::Actions,
 
@@ -73,7 +73,8 @@ impl Router {
             pages: Pages::new(),
             layouts: Layouts::new(),
             routes: Routes::new(),
-            shards: Shards::new(),
+            #[cfg(feature = "runtime")]
+            shards: topcoat_runtime::runtime::Shards::new(),
             #[cfg(feature = "runtime")]
             actions: crate::runtime::Actions::new(),
             assets: AssetBundle::empty(),
@@ -121,7 +122,8 @@ impl Router {
         self
     }
 
-    pub fn shard(mut self, shard: &'static dyn DynShard) -> Self {
+    #[cfg(feature = "runtime")]
+    pub fn shard(mut self, shard: &'static dyn topcoat_runtime::runtime::DynShard) -> Self {
         self.shards.register(shard);
         self
     }
@@ -289,32 +291,35 @@ impl From<Router> for axum::Router {
                     ),
                 );
             }
-        }
 
-        let mut shard_router = axum::Router::new();
-        for shard in value.shards {
-            #[derive(Deserialize)]
-            struct SignalsQuery {
-                signals: String,
+            let mut shard_router = axum::Router::new();
+            for shard in value.shards {
+                #[derive(Deserialize)]
+                struct SignalsQuery {
+                    signals: String,
+                }
+
+                shard_router = shard_router.route(
+                    &("/".to_owned() + shard.id().as_str()),
+                    get(
+                        async |Query(query): Query<SignalsQuery>,
+                               CxBody { cx, body: _ }: CxBody| {
+                            use topcoat_runtime::runtime::EncodedSignals;
+
+                            let signal_param = query.signals;
+                            // todo: handle errors properly
+
+                            let result = shard
+                                .dyn_render(&cx, EncodedSignals::new(signal_param))
+                                .await;
+
+                            result_into_response(result.map(|view| Html(view.render(&cx))))
+                        },
+                    ),
+                );
             }
-
-            shard_router = shard_router.route(
-                &("/".to_owned() + shard.id().as_str()),
-                get(
-                    async |Query(query): Query<SignalsQuery>, CxBody { cx, body: _ }: CxBody| {
-                        let signal_param = query.signals;
-                        // todo: handle errors properly
-
-                        let result = shard
-                            .dyn_render(&cx, EncodedSignals::new(signal_param))
-                            .await;
-
-                        result_into_response(result.map(|view| Html(view.render(&cx))))
-                    },
-                ),
-            );
+            axum_router = axum_router.nest("/_topcoat/shards", shard_router);
         }
-        axum_router = axum_router.nest("/_topcoat/shards", shard_router);
 
         axum_router = axum_router.fallback(async move |CxBody { cx: _, body: _ }: CxBody| {
             axum::response::IntoResponse::into_response(not_found())
