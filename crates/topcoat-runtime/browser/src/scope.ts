@@ -125,7 +125,9 @@ export class ReactiveScope extends Scope {
 		const params = untrack(() =>
 			this.track.map((id) => ({
 				id,
-				value: this.runtime.registry.get(id)?.(),
+				value: (
+					this.runtime.registry.get(id)?.() as { dehydrate: () => unknown }
+				).dehydrate(),
 			})),
 		);
 		const url = `${this.path}?signals=${encodeURIComponent(JSON.stringify(params))}`;

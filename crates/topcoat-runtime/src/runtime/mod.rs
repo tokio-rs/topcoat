@@ -12,7 +12,7 @@ pub use surrogate::*;
 
 use topcoat_asset::{Asset, asset};
 
-pub const SCRIPT: Asset = asset!("browser/dist/index.mjs", rename: "topcoat");
+pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");
 
 /// Macro helpers to shorten the generated source code.
 #[doc(hidden)]
@@ -31,7 +31,7 @@ pub mod internal {
 
     #[inline(always)]
     pub fn __surrogate(parts: &mut ViewParts, value: &(impl serde::Serialize + ?Sized)) {
-        Unescaped::new_unchecked("cx.s(").into_view_parts(parts);
+        Unescaped::new_unchecked("cx.hydrate(").into_view_parts(parts);
         let json = serde_json::to_string(value).expect("failed to serialize surrogate value");
         parts.push(json);
         Unescaped::new_unchecked(")").into_view_parts(parts);
