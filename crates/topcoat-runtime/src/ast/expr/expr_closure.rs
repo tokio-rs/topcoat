@@ -14,6 +14,11 @@ impl Expr {
         js: &mut String,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
+        let asyncness = &closure.asyncness;
+        if asyncness.is_some() {
+            js.push_str("async ");
+        }
+
         js.push('(');
         names.push_scope();
         let mut inputs = Vec::with_capacity(closure.inputs.len());
@@ -39,7 +44,7 @@ impl Expr {
 
         let capture = &closure.capture;
         let output = &closure.output;
-        quote! { #capture |#(#inputs),*| #output #body }.to_tokens(rust);
+        quote! { #asyncness #capture |#(#inputs),*| #output #body }.to_tokens(rust);
         Ok(())
     }
 }

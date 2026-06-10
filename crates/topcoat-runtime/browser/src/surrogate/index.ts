@@ -5,9 +5,8 @@ import { F64 } from "./f64";
 import { Option } from "./option";
 import { Result } from "./result";
 import { WriteSignal as RuntimeWriteSignal } from "./signal";
-import { Str } from "./str";
 // biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
-import { String } from "./string";
+import { Str, String } from "./string";
 
 export * from "./action";
 export * from "./bool";
@@ -18,7 +17,6 @@ export * from "./panic";
 export * from "./ref";
 export * from "./result";
 export * from "./signal";
-export * from "./str";
 
 export type SerializedSurrogate =
 	| { t: "bool"; v: boolean }

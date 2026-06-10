@@ -1,5 +1,6 @@
 mod block;
 mod builtin_macro;
+mod expr_await;
 mod expr_binary;
 mod expr_block;
 mod expr_break;
@@ -112,6 +113,7 @@ impl Expr {
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         match expr {
+            syn::Expr::Await(inner) => Self::expr_await(inner, rust, js, names)?,
             syn::Expr::Lit(inner) => Self::expr_lit(inner, rust, js)?,
             syn::Expr::Paren(inner) => Self::expr_paren(inner, rust, js, names)?,
             syn::Expr::Binary(inner) => Self::expr_binary(inner, rust, js, names)?,

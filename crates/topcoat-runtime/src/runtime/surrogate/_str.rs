@@ -44,6 +44,11 @@ impl_cmp_op!(le, <=);
 
 impl Str {
     #[inline]
+    pub fn to_owned(&self) -> super::String {
+        super::String::new(self.0.to_owned())
+    }
+
+    #[inline]
     pub fn is_empty(&self) -> Bool {
         Bool::new(self.0.is_empty())
     }

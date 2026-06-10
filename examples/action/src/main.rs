@@ -36,8 +36,10 @@ async fn home(cx: &Cx) -> Result {
                 >
 
                 <button
-                    @click=$(|_e| {
-                        print_on_server(input.get());
+                    @click=$(async |_e| {
+                        let server_response = print_on_server(input.get()).await;
+                        input.set("".to_owned());
+                        let _kek = raw!("console.log(${server_response})");
                     })
                 >
                     "Print on server"
@@ -48,7 +50,7 @@ async fn home(cx: &Cx) -> Result {
 }
 
 #[action]
-pub async fn print_on_server(cx: &Cx, input: String) -> Result<String> {
+pub async fn print_on_server(input: String) -> Result<String> {
     println!("{}", input);
     Ok("Message received!".to_owned())
 }

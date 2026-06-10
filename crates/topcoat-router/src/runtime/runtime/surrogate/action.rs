@@ -22,7 +22,7 @@ impl<A, R> Action<A, R>
 where
     A: Surrogated,
 {
-    pub fn call(&self, _args: A::Surrogate) -> R {
+    pub async fn call(&self, _args: A::Surrogate) -> R {
         panic!("actions cannot be executed on the server");
     }
 }

@@ -2,6 +2,10 @@ use topcoat_view::runtime::{AttributeKeyViewParts, AttributeViewParts, Unescaped
 
 use crate::runtime::{Event, Expr};
 
+pub trait EventHandlerFn {}
+
+impl<T, R> EventHandlerFn for T where T: Fn(Event) -> R {}
+
 /// An event handler attribute. Emits a JavaScript closure expression into a
 /// `data-topcoat-on:<event>` attribute on the element. The browser scanner
 /// wraps it in `new Function('__cx', …)` to obtain a real handler.
@@ -12,7 +16,7 @@ pub struct EventHandler<K, F> {
 
 impl<K, F> EventHandler<K, F>
 where
-    F: Fn(Event),
+    F: EventHandlerFn,
 {
     #[inline]
     pub fn new(key: K, value: Expr<F>) -> Self {
