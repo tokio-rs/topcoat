@@ -50,5 +50,5 @@ async fn home() -> Result {
 #[procedure]
 pub async fn print_on_server(input: String) -> Result<String> {
     println!("{}", input);
-    Ok("Message received!".to_owned())
+    Ok(format!("message received: {input}"))
 }
