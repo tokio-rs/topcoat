@@ -117,6 +117,37 @@ impl Router {
         self
     }
 
+    /// Registers an [`AssetBundle`](topcoat_asset::AssetBundle) of files
+    /// declared with `asset!`.
+    ///
+    /// This does two things: it mounts the bundle so its files are served, and
+    /// it installs the resolver that turns [`Asset`](topcoat_asset::Asset)
+    /// values rendered in a [`View`](topcoat_view::runtime::View) into their
+    /// bundled URLs. Without it, rendering a page that references an `Asset`
+    /// panics.
+    ///
+    /// Load the bundle produced by `topcoat dev` or `topcoat asset bundle` with
+    /// [`AssetBundle::load()`](topcoat_asset::AssetBundle::load) for the default
+    /// location, or
+    /// [`AssetBundle::load_dir()`](topcoat_asset::AssetBundle::load_dir) for a
+    /// custom one.
+    ///
+    /// The binary and the asset bundle must come from the same build: if a page
+    /// renders an `Asset` that isn't present in the loaded bundle, rendering
+    /// panics.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use topcoat::asset::AssetBundle;
+    /// use topcoat::router::Router;
+    ///
+    /// pub fn router() -> Router {
+    ///     Router::new()
+    ///         .page(about)
+    ///         .assets(AssetBundle::load().unwrap())
+    /// }
+    /// ```
     #[cfg(feature = "asset")]
     pub fn assets(mut self, assets: topcoat_asset::AssetBundle) -> Self {
         self.assets = assets;
@@ -135,6 +166,26 @@ impl Router {
         self
     }
 
+    /// Auto-registers every annotated [`Page`], [`Layout`], and [`Route`]
+    /// across the crate (and its dependencies) instead of listing each one by
+    /// hand.
+    ///
+    /// With the `discover` feature enabled, items annotated with `#[page]`,
+    /// `#[layout]`, and `#[route]` are collected at link time.
+    /// Calling `discover()` registers all of them at once.
+    ///
+    /// This also applies to `#[procedure]` and `#[shard]` when the `runtime`
+    /// feature is active.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use topcoat::router::Router;
+    ///
+    /// pub fn router() -> Router {
+    ///     Router::new().discover()
+    /// }
+    /// ```
     #[cfg(feature = "discover")]
     pub fn discover(mut self) -> Self {
         for page in inventory::iter::<Page>().cloned() {
