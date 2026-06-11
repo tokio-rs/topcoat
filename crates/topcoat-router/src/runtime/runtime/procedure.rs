@@ -1,9 +1,10 @@
-use std::{borrow::Cow, collections::HashMap, hash::Hash, marker::PhantomData, pin::Pin};
+use std::{hash::Hash, pin::Pin};
 
 use http::Method;
 use topcoat_core::runtime::{context::Cx, error::Result};
+use topcoat_runtime::runtime::Surrogated;
 
-use crate::runtime::{Body, PathSegment, Response, Route};
+use crate::runtime::{Body, Path, PathBuf, PathSegment, Response, Route, RouteHandlerFuture};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct ProcedureId(&'static str);
@@ -15,112 +16,62 @@ impl ProcedureId {
     }
 
     #[inline]
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         self.0
     }
 }
 
-pub type ProcedureHandlerFn =
-    for<'cx> fn(
-        cx: &'cx Cx,
-        body: Body,
-    ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>>;
+pub type ProcedureHandlerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send + 'a>>;
 
-#[derive(Debug, Clone)]
-pub struct Procedure<A, R> {
-    id: ProcedureId,
-    handle: ProcedureHandlerFn,
-    _phantom: PhantomData<fn(A) -> R>,
+/// An RPC handler reachable over `POST /_topcoat/procedures/{id}`.
+///
+/// Created by the `#[procedure]` macro, which generates a zero-sized type named
+/// after the handler function and implements this trait for it.
+pub trait Procedure: Send + Sync + 'static {
+    fn id(&self) -> ProcedureId;
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body) -> ProcedureHandlerFuture<'a>;
 }
 
-impl<A, R> Procedure<A, R> {
-    #[inline]
-    pub const fn new(id: ProcedureId, handle: ProcedureHandlerFn) -> Self {
-        Self {
-            id,
-            handle,
-            _phantom: PhantomData,
-        }
-    }
-
-    #[inline]
-    pub fn id(&self) -> ProcedureId {
-        self.id
-    }
+/// The typed view of a [`Procedure`], carrying its argument and return types
+/// for the client-side `.call(..)`.
+pub trait TypedProcedure: Procedure {
+    type Args: Surrogated;
+    type Return: Surrogated;
 }
 
-#[derive(Debug, Clone)]
-pub struct ErasedProcedure {
-    id: ProcedureId,
-    handle: ProcedureHandlerFn,
-}
-
-impl ErasedProcedure {
-    #[inline]
-    pub const fn new<A, R>(procedure: &Procedure<A, R>) -> Self {
-        Self {
-            id: procedure.id,
-            handle: procedure.handle,
-        }
-    }
-
-    #[inline]
-    pub fn id(&self) -> ProcedureId {
-        self.id
-    }
-
-    #[inline]
-    pub async fn handle(&self, cx: &Cx, body: Body) -> Result<Response> {
-        (self.handle)(cx, body).await
-    }
-}
-
-impl From<ErasedProcedure> for Route {
-    fn from(value: ErasedProcedure) -> Self {
-        Self::new(
-            Method::POST,
-            Cow::Owned(
-                [
-                    PathSegment::Static("_topcoat"),
-                    PathSegment::Static("procedures"),
-                    PathSegment::Static(value.id.0),
-                ]
-                .into_iter()
-                .collect(),
-            ),
-            value.handle,
-        )
-    }
-}
 #[cfg(feature = "discover")]
-inventory::collect!(ErasedProcedure);
+inventory::collect!(&'static dyn Procedure);
 
-#[derive(Clone, Default)]
-pub struct Procedures {
-    procedures: HashMap<ProcedureId, ErasedProcedure>,
+/// Adapts a [`Procedure`] into a [`Route`] at `/_topcoat/procedures/{id}`.
+#[derive(Clone)]
+pub struct ProcedureRoute {
+    procedure: &'static dyn Procedure,
+    path: PathBuf,
 }
 
-impl Procedures {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn register(&mut self, procedure: impl Into<ErasedProcedure>) {
-        let procedure = procedure.into();
-        self.procedures.insert(procedure.id, procedure);
-    }
-
-    /// Returns `true` if no procedure has been registered.
-    pub fn is_empty(&self) -> bool {
-        self.procedures.is_empty()
+impl ProcedureRoute {
+    pub fn new(procedure: &'static dyn Procedure) -> Self {
+        let path = [
+            PathSegment::Static("_topcoat"),
+            PathSegment::Static("procedures"),
+            PathSegment::Static(procedure.id().as_str()),
+        ]
+        .into_iter()
+        .collect();
+        Self { procedure, path }
     }
 }
 
-impl IntoIterator for Procedures {
-    type Item = ErasedProcedure;
-    type IntoIter = std::collections::hash_map::IntoValues<ProcedureId, ErasedProcedure>;
+impl Route for ProcedureRoute {
+    fn method(&self) -> Method {
+        Method::POST
+    }
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.procedures.into_values()
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body) -> RouteHandlerFuture<'a> {
+        self.procedure.handle(cx, body)
     }
 }

@@ -8,7 +8,7 @@ use topcoat_asset::{AssetBundle, AssetResolver, ServeAssetBundle};
 use topcoat_core::runtime::context::{MaybeAborted, State, WatchAbort};
 
 use crate::runtime::{
-    CxBody, Layout, Page, PageWithLayouts, Route, not_found, result_into_response,
+    CxBody, Layout, Layouts, Page, PageWithLayouts, Route, not_found, result_into_response,
 };
 
 /// The core routing primitive that collects [`Page`]s, [`Layout`]s, and
@@ -48,13 +48,11 @@ use crate::runtime::{
 /// ```
 #[derive(Default)]
 pub struct Router {
-    layouts: Vec<&'static dyn Layout>,
+    layouts: Layouts,
     page_registered: bool,
 
     #[cfg(feature = "runtime")]
     shards: topcoat_runtime::runtime::Shards,
-    #[cfg(feature = "runtime")]
-    procedures: crate::runtime::Procedures,
 
     assets: AssetBundle,
     state: State,
@@ -70,21 +68,19 @@ impl Router {
         state.register(());
 
         Self {
-            layouts: Vec::new(),
+            layouts: Layouts::new(),
             page_registered: false,
             #[cfg(feature = "runtime")]
             shards: topcoat_runtime::runtime::Shards::new(),
-            #[cfg(feature = "runtime")]
-            procedures: crate::runtime::Procedures::new(),
             assets: AssetBundle::empty(),
             state,
             inner: axum::Router::new(),
         }
     }
 
-    /// Returns `true` if no pages, layouts, routes or other API handlers have been registered.
+    /// Returns `true` if no pages, layouts, or routes have been registered.
     pub fn is_empty(&self) -> bool {
-        self.inner.has_routes()
+        !self.inner.has_routes() && self.layouts.is_empty()
     }
 
     /// Registers a [`Route`], an HTTP API handler bound to a specific path.
@@ -116,21 +112,22 @@ impl Router {
         self
     }
 
-    /// Registers a [`Page`]. Order doesn't matter — layout matching
-    /// is based on path prefixes, not registration order.
-    pub fn page(mut self, page: &'static dyn Page) -> Self {
+    /// Registers a [`Page`], wrapping it in every [`Layout`] whose path is a
+    /// prefix of the page's path. Layouts must be registered before the pages
+    /// they wrap, since each page snapshots its matching layouts here.
+    pub fn page(mut self, page: impl Page) -> Self {
         self.page_registered = true;
 
-        let mut layouts: Vec<_> = self
+        let page: Arc<dyn Page> = Arc::new(page);
+        let mut layouts: Layouts = self
             .layouts
             .iter()
-            .filter(|layout| layout.path().starts_with(page.path()))
+            .filter(|layout| page.path().starts_with(layout.path()))
             .cloned()
             .collect();
         layouts.sort_by_key(|layout| layout.path().len());
 
-        self = self.route(PageWithLayouts::new(page, layouts));
-        self
+        self.route(PageWithLayouts::new(page, layouts))
     }
 
     /// Registers a [`Layout`]. A layout applies to every page whose
@@ -138,10 +135,10 @@ impl Router {
     ///
     /// # Panics
     ///
-    /// Panics of a layout is registered after a page. Layouts must be registered first.
-    pub fn layout(mut self, layout: &'static dyn Layout) -> Self {
-        assert!(!self.page_registered);
-        self.layouts.push(layout);
+    /// Panics if a layout is registered after a page. Layouts must be registered first.
+    pub fn layout(mut self, layout: impl Layout) -> Self {
+        assert!(!self.page_registered, "layouts must be registered before pages");
+        self.layouts.push(Arc::new(layout));
         self
     }
 
@@ -151,22 +148,24 @@ impl Router {
         self
     }
 
+    /// Registers a [`Procedure`](crate::runtime::Procedure).
     #[cfg(feature = "runtime")]
-    pub fn procedure(mut self, procedure: impl Into<crate::runtime::ErasedProcedure>) -> Self {
-        self.procedures.register(procedure);
-        self
+    pub fn procedure(self, procedure: &'static dyn crate::runtime::Procedure) -> Self {
+        self.route(crate::runtime::ProcedureRoute::new(procedure))
     }
 
     #[cfg(feature = "discover")]
     pub fn discover(mut self) -> Self {
-        for page in inventory::iter::<Page>().cloned() {
-            self = self.page(page);
+        // Layouts must be registered before pages, since each page snapshots its
+        // matching layouts at registration time.
+        for layout in inventory::iter::<&'static dyn Layout>() {
+            self = self.layout(*layout);
         }
-        for layout in inventory::iter::<Layout>().cloned() {
-            self = self.layout(layout);
+        for page in inventory::iter::<&'static dyn Page>() {
+            self = self.page(*page);
         }
         for route in inventory::iter::<&'static dyn Route>() {
-            self = self.route(route);
+            self = self.route(*route);
         }
 
         #[cfg(feature = "runtime")]
@@ -176,8 +175,8 @@ impl Router {
             {
                 self = self.shard(shard);
             }
-            for procedure in inventory::iter::<crate::runtime::ErasedProcedure>().cloned() {
-                self = self.procedure(procedure);
+            for procedure in inventory::iter::<&'static dyn crate::runtime::Procedure>() {
+                self = self.procedure(*procedure);
             }
         }
 
@@ -231,7 +230,8 @@ impl Router {
 /// path are nested from innermost (most specific) to outermost.
 impl From<Router> for axum::Router {
     fn from(value: Router) -> Self {
-        let mut axum_router = axum::Router::<Arc<State>>::new();
+        // Pages and routes were registered into `inner` as they were added.
+        let mut axum_router = value.inner;
         let mut state = value.state;
 
         let assets = value.assets;
@@ -249,26 +249,6 @@ impl From<Router> for axum::Router {
 
         #[cfg(feature = "runtime")]
         {
-            for route in value.procedures.into_iter().map(Route::from) {
-                axum_router = axum_router.route(
-                    &route.path().to_axum_path(),
-                    on(
-                        MethodFilter::try_from(route.method().clone())
-                            .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),
-                        async move |CxBody { cx, body }: CxBody| {
-                            let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
-
-                            match result {
-                                MaybeAborted::Completed(result) => result_into_response(result),
-                                MaybeAborted::Aborted(_value) => {
-                                    panic!("request was aborted with an unrecognized type");
-                                }
-                            }
-                        },
-                    ),
-                );
-            }
-
             let mut shard_router = axum::Router::new();
             for shard in value.shards {
                 #[derive(serde::Deserialize)]

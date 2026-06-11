@@ -1,45 +1,45 @@
-use std::borrow::Cow;
-
 use http::Method;
+use topcoat_core::runtime::context::Cx;
 
-use crate::runtime::{Path, Route, RouteHandlerFn};
+use crate::runtime::{Body, Path, PathBuf, Route, RouteHandlerFuture};
 
 /// A route discovered by the module router, produced by the `#[route]` macro.
 ///
-/// Holds the module path (for deriving the URL path from the module tree)
-/// and the render function. The module router converts each `ModuleRoute` into
-/// a [`Route`] once the URL path has been computed.
-#[doc(hidden)]
-#[derive(Debug, Clone)]
-pub struct ModuleRoute {
-    /// The HTTP method triggering this route.
-    method: Method,
-    /// Module path where `#[route]` was declared, used to derive the URL path.
-    module_path: &'static str,
-    /// The route's async handler function, returning a [`Result`].
-    pub(super) render: RouteHandlerFn,
-}
-
-impl ModuleRoute {
-    /// Creates a new module route. Called by the expanded `#[route]` macro.
-    pub const fn new(method: Method, module_path: &'static str, render: RouteHandlerFn) -> Self {
-        Self {
-            method,
-            module_path,
-            render,
-        }
-    }
-
-    /// Converts into a [`Route`] with the given resolved URL path.
-    pub fn into_route(self, path: Cow<'static, Path>) -> Route {
-        Route::new(self.method, path, self.render)
-    }
-
-    /// Returns the module path used to derive the URL.
-    pub fn module_path(&self) -> &'static str {
-        self.module_path
-    }
+/// Carries the module path (used to derive the URL from the module tree) and
+/// the handler. The module router wraps it in a [`RouteFromModule`] once the
+/// URL path has been resolved.
+pub trait ModuleRoute: Send + Sync + 'static {
+    fn method(&self) -> Method;
+    fn module_path(&self) -> &'static str;
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body) -> RouteHandlerFuture<'a>;
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModuleRoute);
+inventory::collect!(&'static dyn ModuleRoute);
+
+/// Adapts a [`ModuleRoute`] into a [`Route`] with a resolved URL path.
+#[derive(Clone)]
+pub struct RouteFromModule {
+    route: &'static dyn ModuleRoute,
+    path: PathBuf,
+}
+
+impl RouteFromModule {
+    pub fn new(route: &'static dyn ModuleRoute, path: PathBuf) -> Self {
+        Self { route, path }
+    }
+}
+
+impl Route for RouteFromModule {
+    fn method(&self) -> Method {
+        self.route.method()
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body) -> RouteHandlerFuture<'a> {
+        self.route.handle(cx, body)
+    }
+}

@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use heck::ToKebabCase;
 
 use crate::runtime::{
-    ModuleLayout, ModulePage, ModuleRoute, PathBuf, PathSegment, Router, Segment, SegmentKind,
-    Segments,
+    LayoutFromModule, ModuleLayout, ModulePage, ModuleRoute, PageFromModule, PathBuf, PathSegment,
+    RouteFromModule, Router, Segment, SegmentKind, Segments,
 };
 
 /// The module-based router, created by the `module_router!` macro.
@@ -133,10 +133,9 @@ impl ModuleRouter {
     /// # Panics
     ///
     /// Panics if a page has already been registered for the same path.
-    pub fn page(mut self, page: ModulePage) -> Self {
-        let module_path = page.module_path();
-        let page = page.into_page(Cow::Owned(self.module_path_to_path(module_path)));
-        self.inner = self.inner.page(page);
+    pub fn page(mut self, page: &'static dyn ModulePage) -> Self {
+        let path = self.module_path_to_path(page.module_path());
+        self.inner = self.inner.page(PageFromModule::new(page, path));
         self
     }
 
@@ -145,10 +144,9 @@ impl ModuleRouter {
     /// # Panics
     ///
     /// Panics if a layout has already been registered for the same path.
-    pub fn layout(mut self, layout: ModuleLayout) -> Self {
-        let module_path = layout.module_path();
-        let layout = layout.into_layout(Cow::Owned(self.module_path_to_path(module_path)));
-        self.inner = self.inner.layout(layout);
+    pub fn layout(mut self, layout: &'static dyn ModuleLayout) -> Self {
+        let path = self.module_path_to_path(layout.module_path());
+        self.inner = self.inner.layout(LayoutFromModule::new(layout, path));
         self
     }
 
@@ -157,10 +155,9 @@ impl ModuleRouter {
     /// # Panics
     ///
     /// Panics if a route has already been registered for the same path.
-    pub fn route(mut self, route: ModuleRoute) -> Self {
-        let module_path = route.module_path();
-        let route = route.into_route(Cow::Owned(self.module_path_to_path(module_path)));
-        self.inner = self.inner.route(route);
+    pub fn route(mut self, route: &'static dyn ModuleRoute) -> Self {
+        let path = self.module_path_to_path(route.module_path());
+        self.inner = self.inner.route(RouteFromModule::new(route, path));
         self
     }
 
@@ -174,14 +171,16 @@ impl ModuleRouter {
         for segment in inventory::iter::<Segment>().cloned() {
             self = self.segment(segment);
         }
-        for page in inventory::iter::<ModulePage>().cloned() {
-            self = self.page(page);
+        // Layouts must be registered before pages, since each page snapshots its
+        // matching layouts at registration time.
+        for layout in inventory::iter::<&'static dyn ModuleLayout>() {
+            self = self.layout(*layout);
         }
-        for layout in inventory::iter::<ModuleLayout>().cloned() {
-            self = self.layout(layout);
+        for page in inventory::iter::<&'static dyn ModulePage>() {
+            self = self.page(*page);
         }
-        for route in inventory::iter::<ModuleRoute>().cloned() {
-            self = self.route(route);
+        for route in inventory::iter::<&'static dyn ModuleRoute>() {
+            self = self.route(*route);
         }
         self.inner = self.inner.discover();
         self
@@ -424,15 +423,29 @@ mod tests {
 
     // ── segment ordering assertion ───────────────────────────────────
 
+    #[derive(Debug)]
+    struct TestPage;
+
+    impl crate::runtime::ModulePage for TestPage {
+        fn module_path(&self) -> &'static str {
+            "my_crate::app::about"
+        }
+        fn render<'a>(
+            &'a self,
+            _cx: &'a topcoat_core::runtime::context::Cx,
+            _body: crate::runtime::Body,
+        ) -> crate::runtime::PageRenderFuture<'a> {
+            unimplemented!()
+        }
+    }
+
     #[test]
     #[should_panic(expected = "`segment` must be called before registering any resource")]
     fn segment_after_page_panics() {
+        static PAGE: TestPage = TestPage;
         let r = router("my_crate::app");
         // Register a page first, then try to add a segment.
-        let page = ModulePage::new("my_crate::app::about", |_, _| {
-            unimplemented!();
-        });
-        r.page(page)
+        r.page(&PAGE)
             .segment(seg("my_crate::app::users", Some(SegmentKind::Param), None));
     }
 }

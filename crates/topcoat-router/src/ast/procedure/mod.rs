@@ -82,26 +82,69 @@ impl ToTokens for Procedure {
 
         let id = uuid::Uuid::new_v4().to_string();
 
+        // The handler function name (`#ident`) is exposed to view code as a
+        // `&'static` reference value, so the zero-sized type backing it gets a
+        // separate, hidden name.
+        let ty = format_ident!("__TopcoatProcedure_{ident}");
+
+        let handle_body = quote! {
+            #item
+            Box::pin(async move {
+                type Surrogate = <(#(#arg_tys,)*) as ::topcoat::runtime::Surrogated>::Surrogate;
+                let ::topcoat::router::Json(args) = <::topcoat::router::Json<Surrogate> as ::topcoat::router::FromRequest>::from_request(cx, body).await?;
+                let (#(#args,)*) = ::topcoat::runtime::Surrogate::into_real(args);
+                let response = ::topcoat::runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
+                ::topcoat::router::IntoResponse::into_response(::topcoat::router::Json(response))
+            })
+        };
+
         quote! {
+            #[allow(non_camel_case_types)]
+            #[derive(Debug, Clone, Copy, Default)]
+            struct #ty;
+
+            impl ::topcoat::router::Procedure for #ty {
+                fn id(&self) -> ::topcoat::router::ProcedureId {
+                    ::topcoat::router::ProcedureId::new(#id)
+                }
+                fn handle<'__a>(
+                    &'__a self,
+                    cx: &'__a ::topcoat::context::Cx,
+                    body: ::topcoat::router::Body,
+                ) -> ::topcoat::router::ProcedureHandlerFuture<'__a> {
+                    #handle_body
+                }
+            }
+
+            impl ::topcoat::router::TypedProcedure for #ty {
+                type Args = (#(#arg_tys,)*);
+                type Return = #return_ty;
+            }
+
+            impl ::topcoat::runtime::Surrogated for #ty {
+                type Surrogate = ::topcoat::router::ProcedureSurrogate<#ty>;
+                fn into_surrogate(self) -> Self::Surrogate {
+                    ::topcoat::router::ProcedureSurrogate::new(self)
+                }
+            }
+
+            impl<'__a> ::topcoat::runtime::Surrogated for &'__a #ty {
+                type Surrogate = &'__a ::topcoat::router::ProcedureSurrogate<#ty>;
+                fn into_surrogate(self) -> Self::Surrogate {
+                    ::topcoat::router::ProcedureSurrogate::from_ref(self)
+                }
+            }
+
             #[allow(non_upper_case_globals)]
-            const #ident: &::topcoat::router::Procedure::<(#(#arg_tys,)*), #return_ty> = &::topcoat::router::Procedure::new(
-                ::topcoat::router::ProcedureId::new(#id),
-                |cx, body| {
-                    #item
-                    Box::pin(async {
-                        type Surrogate = <(#(#arg_tys,)*) as ::topcoat::runtime::Surrogated>::Surrogate;
-                        let ::topcoat::router::Json(args) = <::topcoat::router::Json<Surrogate> as topcoat::router::FromRequest>::from_request(cx, body).await?;
-                        let (#(#args,)*) = ::topcoat::runtime::Surrogate::into_real(args);
-                        let response = ::topcoat::runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
-                        ::topcoat::router::IntoResponse::into_response(::topcoat::router::Json(response))
-                    })
-                },
-            );
+            const #ident: &'static #ty = &#ty;
         }
         .to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { ::topcoat::internal::inventory::submit! { ::topcoat::router::ErasedProcedure::new(#ident) } }.to_tokens(tokens);
+            quote! {
+                ::topcoat::internal::inventory::submit! { #ident as &'static dyn ::topcoat::router::Procedure }
+            }
+            .to_tokens(tokens);
         }
     }
 }

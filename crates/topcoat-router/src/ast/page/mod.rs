@@ -63,32 +63,64 @@ impl ToTokens for Page {
             }
         });
 
-        let render = quote! {
-            |cx, body| {
-                #item
-                Box::pin(async move {
-                    #parse_request
-                    #ident(cx, #(#args),*).await
-                })
-            }
+        let render_body = quote! {
+            #item
+            Box::pin(async move {
+                #parse_request
+                #ident(cx, #(#args),*).await
+            })
         };
 
-        match attr.path.as_ref() {
-            Some(path) => quote! {
-                #[allow(non_upper_case_globals)]
-                const #ident: ::topcoat::router::Page = ::topcoat::router::Page::new(
-                    ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
-                    #render,
-                );
-            },
-            None => quote! {
-                #[allow(non_upper_case_globals)]
-                const #ident: ::topcoat::router::ModulePage = ::topcoat::router::ModulePage::new(module_path!(), #render);
-            }
-        }.to_tokens(tokens);
+        let (trait_path, trait_impl) = match attr.path.as_ref() {
+            Some(path) => (
+                quote! { ::topcoat::router::Page },
+                quote! {
+                    impl ::topcoat::router::Page for #ident {
+                        fn path(&self) -> &::topcoat::router::Path {
+                            ::topcoat::router::Path::new(#path)
+                        }
+                        fn render<'__a>(
+                            &'__a self,
+                            cx: &'__a ::topcoat::context::Cx,
+                            body: ::topcoat::router::Body,
+                        ) -> ::topcoat::router::PageRenderFuture<'__a> {
+                            #render_body
+                        }
+                    }
+                },
+            ),
+            None => (
+                quote! { ::topcoat::router::ModulePage },
+                quote! {
+                    impl ::topcoat::router::ModulePage for #ident {
+                        fn module_path(&self) -> &'static str {
+                            module_path!()
+                        }
+                        fn render<'__a>(
+                            &'__a self,
+                            cx: &'__a ::topcoat::context::Cx,
+                            body: ::topcoat::router::Body,
+                        ) -> ::topcoat::router::PageRenderFuture<'__a> {
+                            #render_body
+                        }
+                    }
+                },
+            ),
+        };
+
+        quote! {
+            #[allow(non_camel_case_types)]
+            #[derive(Debug, Clone, Copy)]
+            struct #ident;
+            #trait_impl
+        }
+        .to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { ::topcoat::internal::inventory::submit! { #ident } }.to_tokens(tokens);
+            quote! {
+                ::topcoat::internal::inventory::submit! { &#ident as &'static dyn #trait_path }
+            }
+            .to_tokens(tokens);
         }
     }
 }

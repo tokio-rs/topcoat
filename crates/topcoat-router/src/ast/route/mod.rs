@@ -75,44 +75,71 @@ impl ToTokens for Route {
             }
         });
 
-        let render = quote! {
-            |cx, body| {
-                #item
-                Box::pin(async move {
-                    #parse_request
-                    ::topcoat::router::IntoResponse::into_response(#ident(cx, #(#args),*).await?)
-                })
-            }
+        let method = &attr.method;
+        let handle_body = quote! {
+            #item
+            Box::pin(async move {
+                #parse_request
+                ::topcoat::router::IntoResponse::into_response(#ident(cx, #(#args),*).await?)
+            })
         };
 
-        match attr.path.as_ref() {
-            Some(path) => {
-                let method = &attr.method;
+        let (trait_path, trait_impl) = match attr.path.as_ref() {
+            Some(path) => (
+                quote! { ::topcoat::router::Route },
                 quote! {
-                    #[allow(non_upper_case_globals)]
-                    const #ident: ::topcoat::router::Route = ::topcoat::router::Route::new(
-                        ::topcoat::router::Method::#method,
-                        ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
-                        #render,
-                    );
-                }
-            }
-            None => {
-                let method = &attr.method;
+                    impl ::topcoat::router::Route for #ident {
+                        fn method(&self) -> ::topcoat::router::Method {
+                            ::topcoat::router::Method::#method
+                        }
+                        fn path(&self) -> &::topcoat::router::Path {
+                            ::topcoat::router::Path::new(#path)
+                        }
+                        fn handle<'__a>(
+                            &'__a self,
+                            cx: &'__a ::topcoat::context::Cx,
+                            body: ::topcoat::router::Body,
+                        ) -> ::topcoat::router::RouteHandlerFuture<'__a> {
+                            #handle_body
+                        }
+                    }
+                },
+            ),
+            None => (
+                quote! { ::topcoat::router::ModuleRoute },
                 quote! {
-                    #[allow(non_upper_case_globals)]
-                    const #ident: ::topcoat::router::ModuleRoute = ::topcoat::router::ModuleRoute::new(
-                        ::topcoat::router::Method::#method,
-                        module_path!(),
-                        #render,
-                    );
-                }
-            }
+                    impl ::topcoat::router::ModuleRoute for #ident {
+                        fn method(&self) -> ::topcoat::router::Method {
+                            ::topcoat::router::Method::#method
+                        }
+                        fn module_path(&self) -> &'static str {
+                            module_path!()
+                        }
+                        fn handle<'__a>(
+                            &'__a self,
+                            cx: &'__a ::topcoat::context::Cx,
+                            body: ::topcoat::router::Body,
+                        ) -> ::topcoat::router::RouteHandlerFuture<'__a> {
+                            #handle_body
+                        }
+                    }
+                },
+            ),
+        };
+
+        quote! {
+            #[allow(non_camel_case_types)]
+            #[derive(Clone, Copy)]
+            struct #ident;
+            #trait_impl
         }
         .to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { ::topcoat::internal::inventory::submit! { #ident } }.to_tokens(tokens);
+            quote! {
+                ::topcoat::internal::inventory::submit! { &#ident as &'static dyn #trait_path }
+            }
+            .to_tokens(tokens);
         }
     }
 }

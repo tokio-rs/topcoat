@@ -1,40 +1,39 @@
-use std::borrow::Cow;
+use topcoat_core::runtime::context::Cx;
 
-use crate::runtime::{Page, PageRenderFn, Path};
+use crate::runtime::{Body, Page, PageRenderFuture, Path, PathBuf};
 
 /// A page discovered by the module router, produced by the `#[page]` macro.
 ///
-/// Holds the module path (for deriving the URL path from the module tree)
-/// and the render function. The module router converts each `ModulePage` into
-/// a [`Page`] once the URL path has been computed.
-#[doc(hidden)]
-#[derive(Debug, Clone)]
-pub struct ModulePage {
-    /// Module path where `#[page]` was declared, used to derive the URL path.
-    module_path: &'static str,
-    /// The page's async render function, returning a [`Result`].
-    pub(super) render: PageRenderFn,
-}
-
-impl ModulePage {
-    /// Creates a new module page. Called by the expanded `#[page]` macro.
-    pub const fn new(module_path: &'static str, render: PageRenderFn) -> Self {
-        Self {
-            module_path,
-            render,
-        }
-    }
-
-    /// Converts into a [`Page`] with the given resolved URL path.
-    pub fn into_page(self, path: Cow<'static, Path>) -> Page {
-        Page::new(path, self.render)
-    }
-
-    /// Returns the module path used to derive the URL.
-    pub fn module_path(&self) -> &'static str {
-        self.module_path
-    }
+/// Carries the module path (used to derive the URL from the module tree) and
+/// the render function. The module router wraps it in a [`PageFromModule`]
+/// once the URL path has been resolved.
+pub trait ModulePage: std::fmt::Debug + Send + Sync + 'static {
+    fn module_path(&self) -> &'static str;
+    fn render<'a>(&'a self, cx: &'a Cx, body: Body) -> PageRenderFuture<'a>;
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModulePage);
+inventory::collect!(&'static dyn ModulePage);
+
+/// Adapts a [`ModulePage`] into a [`Page`] with a resolved URL path.
+#[derive(Debug)]
+pub struct PageFromModule {
+    page: &'static dyn ModulePage,
+    path: PathBuf,
+}
+
+impl PageFromModule {
+    pub fn new(page: &'static dyn ModulePage, path: PathBuf) -> Self {
+        Self { page, path }
+    }
+}
+
+impl Page for PageFromModule {
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn render<'a>(&'a self, cx: &'a Cx, body: Body) -> PageRenderFuture<'a> {
+        self.page.render(cx, body)
+    }
+}

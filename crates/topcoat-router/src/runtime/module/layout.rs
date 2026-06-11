@@ -1,40 +1,39 @@
-use std::borrow::Cow;
+use topcoat_core::runtime::context::Cx;
 
-use crate::runtime::{Layout, LayoutRenderFn, Path};
+use crate::runtime::{Layout, LayoutRenderFuture, Path, PathBuf, Slot};
 
 /// A layout discovered by the module router, produced by the `#[layout]` macro.
 ///
-/// Holds the module path (for deriving the URL prefix from the module tree)
-/// and the render function. The module router converts each `ModuleLayout`
-/// into a [`Layout`] once the URL path has been computed.
-#[doc(hidden)]
-#[derive(Debug, Clone)]
-pub struct ModuleLayout {
-    /// Module path where `#[layout]` was declared, used to derive the URL path.
-    module_path: &'static str,
-    /// The layout's async render function, receiving a [`Slot`] and returning a [`Result`].
-    render: LayoutRenderFn,
-}
-
-impl ModuleLayout {
-    /// Creates a new module layout. Called by the expanded `#[layout]` macro.
-    pub const fn new(module_path: &'static str, render: LayoutRenderFn) -> Self {
-        Self {
-            module_path,
-            render,
-        }
-    }
-
-    /// Converts into a [`Layout`] with the given resolved URL path.
-    pub fn into_layout(self, path: Cow<'static, Path>) -> Layout {
-        Layout::new(path, self.render)
-    }
-
-    /// Returns the module path used to derive the URL.
-    pub fn module_path(&self) -> &'static str {
-        self.module_path
-    }
+/// Carries the module path (used to derive the URL prefix from the module
+/// tree) and the render function. The module router wraps it in a
+/// [`LayoutFromModule`] once the URL path has been resolved.
+pub trait ModuleLayout: std::fmt::Debug + Send + Sync + 'static {
+    fn module_path(&self) -> &'static str;
+    fn render<'a>(&self, cx: &'a Cx, slot: Slot<'a>) -> LayoutRenderFuture<'a>;
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModuleLayout);
+inventory::collect!(&'static dyn ModuleLayout);
+
+/// Adapts a [`ModuleLayout`] into a [`Layout`] with a resolved URL path.
+#[derive(Debug)]
+pub struct LayoutFromModule {
+    layout: &'static dyn ModuleLayout,
+    path: PathBuf,
+}
+
+impl LayoutFromModule {
+    pub fn new(layout: &'static dyn ModuleLayout, path: PathBuf) -> Self {
+        Self { layout, path }
+    }
+}
+
+impl Layout for LayoutFromModule {
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn render<'a>(&self, cx: &'a Cx, slot: Slot<'a>) -> LayoutRenderFuture<'a> {
+        self.layout.render(cx, slot)
+    }
+}
