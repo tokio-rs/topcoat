@@ -8,7 +8,7 @@ use topcoat_asset::{AssetBundle, AssetResolver, ServeAssetBundle};
 use topcoat_core::runtime::context::{MaybeAborted, State, WatchAbort};
 
 use crate::runtime::{
-    CxBody, Layout, Layouts, Page, Pages, Route, Routes, not_found, result_into_response,
+    CxBody, Layout, Page, PageWithLayouts, Route, not_found, result_into_response,
 };
 
 /// The core routing primitive that collects [`Page`]s, [`Layout`]s, and
@@ -48,9 +48,8 @@ use crate::runtime::{
 /// ```
 #[derive(Default)]
 pub struct Router {
-    pages: Pages,
-    layouts: Layouts,
-    routes: Routes,
+    layouts: Vec<&'static dyn Layout>,
+    page_registered: bool,
 
     #[cfg(feature = "runtime")]
     shards: topcoat_runtime::runtime::Shards,
@@ -59,6 +58,8 @@ pub struct Router {
 
     assets: AssetBundle,
     state: State,
+
+    inner: axum::Router<Arc<State>>,
 }
 
 impl Router {
@@ -67,44 +68,23 @@ impl Router {
         let mut state = State::new();
         // Register `()` so APIs generic over an app state type can default to `S = ()`.
         state.register(());
+
         Self {
-            pages: Pages::new(),
-            layouts: Layouts::new(),
-            routes: Routes::new(),
+            layouts: Vec::new(),
+            page_registered: false,
             #[cfg(feature = "runtime")]
             shards: topcoat_runtime::runtime::Shards::new(),
             #[cfg(feature = "runtime")]
             procedures: crate::runtime::Procedures::new(),
             assets: AssetBundle::empty(),
             state,
+            inner: axum::Router::new(),
         }
     }
 
-    /// Returns `true` if no pages or layouts have been registered.
+    /// Returns `true` if no pages, layouts, routes or other API handlers have been registered.
     pub fn is_empty(&self) -> bool {
-        self.pages.is_empty() && self.layouts.is_empty() && self.routes.is_empty()
-    }
-
-    /// Registers a [`Page`]. Order doesn't matter — layout matching
-    /// is based on path prefixes, not registration order.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a page has already been registered for the same path.
-    pub fn page(mut self, page: Page) -> Self {
-        self.pages.register(page);
-        self
-    }
-
-    /// Registers a [`Layout`]. A layout applies to every page whose
-    /// path starts with the layout's path prefix.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a layout has already been registered for the same path.
-    pub fn layout(mut self, layout: Layout) -> Self {
-        self.layouts.register(layout);
-        self
+        self.inner.has_routes()
     }
 
     /// Registers a [`Route`], an HTTP API handler bound to a specific path.
@@ -115,8 +95,53 @@ impl Router {
     /// # Panics
     ///
     /// Panics if a route has already been registered for the same path.
-    pub fn route(mut self, route: Route) -> Self {
-        self.routes.register(route);
+    pub fn route(mut self, route: impl Route + Clone) -> Self {
+        self.inner = self.inner.route(
+            &route.path().to_axum_path(),
+            on(
+                MethodFilter::try_from(route.method())
+                    .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),
+                async move |CxBody { cx, body }: CxBody| {
+                    let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
+
+                    match result {
+                        MaybeAborted::Completed(result) => result_into_response(result),
+                        MaybeAborted::Aborted(_value) => {
+                            panic!("request was aborted with an unrecognized type");
+                        }
+                    }
+                },
+            ),
+        );
+        self
+    }
+
+    /// Registers a [`Page`]. Order doesn't matter — layout matching
+    /// is based on path prefixes, not registration order.
+    pub fn page(mut self, page: &'static dyn Page) -> Self {
+        self.page_registered = true;
+
+        let mut layouts: Vec<_> = self
+            .layouts
+            .iter()
+            .filter(|layout| layout.path().starts_with(page.path()))
+            .cloned()
+            .collect();
+        layouts.sort_by_key(|layout| layout.path().len());
+
+        self = self.route(PageWithLayouts::new(page, layouts));
+        self
+    }
+
+    /// Registers a [`Layout`]. A layout applies to every page whose
+    /// path starts with the layout's path prefix.
+    ///
+    /// # Panics
+    ///
+    /// Panics of a layout is registered after a page. Layouts must be registered first.
+    pub fn layout(mut self, layout: &'static dyn Layout) -> Self {
+        assert!(!self.page_registered);
+        self.layouts.push(layout);
         self
     }
 
@@ -140,7 +165,7 @@ impl Router {
         for layout in inventory::iter::<Layout>().cloned() {
             self = self.layout(layout);
         }
-        for route in inventory::iter::<Route>().cloned() {
+        for route in inventory::iter::<&'static dyn Route>() {
             self = self.route(route);
         }
 
@@ -221,54 +246,6 @@ impl From<Router> for axum::Router {
             }));
 
         state.register(asset_resolver);
-
-        for page in value.pages {
-            let mut layouts: Vec<_> = value.layouts.for_path(page.path()).cloned().collect();
-            layouts.sort_by_key(|layout| layout.path().len());
-
-            axum_router = axum_router.route(
-                &page.path().to_axum_path(),
-                get(async move |CxBody { cx, body }: CxBody| {
-                    let result = WatchAbort::new(&cx, async {
-                        let mut render = page.render(&cx, body);
-                        for layout in layouts.iter().rev() {
-                            render = layout.render(&cx, render);
-                        }
-                        render.await
-                    })
-                    .await;
-
-                    match result {
-                        MaybeAborted::Completed(result) => {
-                            result_into_response(result.map(|view| Html(view.render(&cx))))
-                        }
-                        MaybeAborted::Aborted(_value) => {
-                            panic!("request was aborted with an unrecognized type");
-                        }
-                    }
-                }),
-            );
-        }
-
-        for route in value.routes {
-            axum_router = axum_router.route(
-                &route.path().to_axum_path(),
-                on(
-                    MethodFilter::try_from(route.method().clone())
-                        .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),
-                    async move |CxBody { cx, body }: CxBody| {
-                        let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
-
-                        match result {
-                            MaybeAborted::Completed(result) => result_into_response(result),
-                            MaybeAborted::Aborted(_value) => {
-                                panic!("request was aborted with an unrecognized type");
-                            }
-                        }
-                    },
-                ),
-            );
-        }
 
         #[cfg(feature = "runtime")]
         {
