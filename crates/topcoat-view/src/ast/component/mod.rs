@@ -51,19 +51,6 @@ impl ToTokens for Component {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut item = self.item.item().clone();
         let mut generics = item.sig.generics.clone();
-        item.sig.generics.params.insert(0, parse_quote! { '__cx });
-        item.sig
-            .inputs
-            .insert(0, parse_quote! { __cx: &'__cx ::topcoat::context::Cx });
-
-        // `#[default]` / `#[into]` belong to the generated props struct; they
-        // are not valid attributes on the re-emitted function's parameters.
-        for input in item.sig.inputs.iter_mut() {
-            if let FnArg::Typed(pat_type) = input {
-                pat_type.attrs.retain(|attr| !is_props_attr(attr));
-            }
-        }
-
         let vis = &item.vis;
         let ident = &item.sig.ident;
         let props_ident = format_ident!(
@@ -71,14 +58,20 @@ impl ToTokens for Component {
             ident.unraw().to_string().to_pascal_case(),
             span = ident.span()
         );
+
+        item.sig.generics.params.insert(0, parse_quote! { '__cx });
+        item.sig
+            .inputs
+            .insert(0, parse_quote! { __cx: &'__cx ::topcoat::context::Cx });
+
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("validated in Parse");
         };
 
         let mut fields = Vec::new();
         let mut args = Vec::new();
-        let mut visitor = ImplicitLifetimeVisitor { used: false };
-        let mut impl_traits = ImplTraitParamVisitor {
+        let mut implicit_lifetime_visitor = ImplicitLifetimeVisitor { used: false };
+        let mut impl_traits_visitor = ImplTraitParamVisitor {
             prefix: String::new(),
             count: 0,
             params: Vec::new(),
@@ -95,32 +88,27 @@ impl ToTokens for Component {
                 args.push(quote! { cx });
             } else {
                 let mut ty = (*pat_type.ty).clone();
-                visitor.visit_type_mut(&mut ty);
-                impl_traits.prefix = pi.ident.unraw().to_string().to_pascal_case();
-                impl_traits.count = 0;
-                impl_traits.visit_type_mut(&mut ty);
+                implicit_lifetime_visitor.visit_type_mut(&mut ty);
+                impl_traits_visitor.prefix = pi.ident.unraw().to_string().to_pascal_case();
+                impl_traits_visitor.count = 0;
+                impl_traits_visitor.visit_type_mut(&mut ty);
 
-                let attrs: Vec<&Attribute> = pat_type
-                    .attrs
-                    .iter()
-                    .filter(|attr| is_props_attr(attr))
-                    .collect();
-                let child_default = (pi.ident == "child"
-                    && !attrs.iter().any(|attr| attr.path().is_ident("default")))
-                .then(|| quote! { #[default] });
-
+                let attrs: Vec<&Attribute> = pat_type.attrs.iter().collect();
                 let field_ident = &pi.ident;
-                fields.push(quote! { #(#attrs)* #child_default #vis #field_ident: #ty });
+                fields.push(quote! { #(#attrs)* #vis #field_ident: #ty });
                 args.push(quote! { props.#field_ident });
             }
         }
 
-        if visitor.used {
+        if implicit_lifetime_visitor.used {
             generics.params.insert(0, parse_quote! { '__implicit });
         }
-        generics
-            .params
-            .extend(impl_traits.params.into_iter().map(GenericParam::Type));
+        generics.params.extend(
+            impl_traits_visitor
+                .params
+                .into_iter()
+                .map(GenericParam::Type),
+        );
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
         let phantom_args = generics.params.iter().filter_map(|param| match param {
@@ -134,17 +122,6 @@ impl ToTokens for Component {
             }
             GenericParam::Const(_) => None,
         });
-
-        let props_pat = if fields.is_empty() {
-            quote! { _props }
-        } else {
-            quote! { props }
-        };
-
-        let body = quote! {
-            #item
-            #ident(cx, #(#args),*).await
-        };
 
         quote! {
             #[derive(::topcoat::view::Props)]
@@ -160,18 +137,14 @@ impl ToTokens for Component {
             impl #impl_generics ::topcoat::view::Component for #ident #ty_generics #where_clause {
                 type Props = #props_ident #ty_generics;
 
-                async fn render(self, cx: &::topcoat::context::Cx, #props_pat: Self::Props) -> #return_ty {
-                    let __cx = cx;
-                    #body
+                async fn render(self, cx: &::topcoat::context::Cx, props: Self::Props) -> #return_ty {
+                    #item
+                    #ident(cx, #(#args),*).await
                 }
             }
         }
         .to_tokens(tokens);
     }
-}
-
-fn is_props_attr(attr: &Attribute) -> bool {
-    attr.path().is_ident("default") || attr.path().is_ident("into")
 }
 
 /// Replaces every `impl Trait` in a parameter type with a fresh generic type
