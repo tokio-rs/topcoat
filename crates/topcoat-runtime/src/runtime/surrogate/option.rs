@@ -1,17 +1,17 @@
 use ref_cast::RefCast;
 
 use crate::runtime::{
-    Bool, Str, Surrogate, Surrogated, deserialize_tagged, impl_surrogate, impl_surrogate_mut,
-    impl_surrogate_ref, serialize_tagged,
+    BoolSurrogate, StrSurrogate, Surrogate, Surrogated, deserialize_tagged, impl_surrogate,
+    impl_surrogate_mut, impl_surrogate_ref, serialize_tagged,
 };
 
 #[derive(Debug, Clone, RefCast)]
 #[repr(transparent)]
-pub struct Option<T>(std::option::Option<T>);
+pub struct OptionSurrogate<T>(Option<T>);
 
-impl<T> Option<T> {
+impl<T> OptionSurrogate<T> {
     #[inline]
-    pub(crate) const fn new(v: std::option::Option<T>) -> Self {
+    pub(crate) const fn new(v: Option<T>) -> Self {
         Self(v)
     }
 
@@ -21,17 +21,17 @@ impl<T> Option<T> {
     }
 
     #[inline]
-    pub fn is_some(&self) -> Bool {
-        Bool::new(self.0.is_some())
+    pub fn is_some(&self) -> BoolSurrogate {
+        BoolSurrogate::new(self.0.is_some())
     }
 
     #[inline]
-    pub fn is_none(&self) -> Bool {
-        Bool::new(self.0.is_none())
+    pub fn is_none(&self) -> BoolSurrogate {
+        BoolSurrogate::new(self.0.is_none())
     }
 }
 
-impl<T> Option<T>
+impl<T> OptionSurrogate<T>
 where
     T: Surrogated,
 {
@@ -46,16 +46,16 @@ where
     }
 
     #[inline]
-    pub fn expect(self, msg: &Str) -> T::Surrogate {
+    pub fn expect(self, msg: &StrSurrogate) -> T::Surrogate {
         self.0.expect(&msg.0).into_surrogate()
     }
 }
 
-impl_surrogate!({T} std::option::Option<T>, Option<T>);
-impl_surrogate_ref!({T} std::option::Option<T>, Option<T>);
-impl_surrogate_mut!({T} std::option::Option<T>, Option<T>);
+impl_surrogate!({T} Option<T>, OptionSurrogate<T>);
+impl_surrogate_ref!({T} Option<T>, OptionSurrogate<T>);
+impl_surrogate_mut!({T} Option<T>, OptionSurrogate<T>);
 
-impl<T> serde::Serialize for Option<T>
+impl<T> serde::Serialize for OptionSurrogate<T>
 where
     for<'a> &'a T: Surrogated,
     for<'a> <&'a T as Surrogated>::Surrogate: serde::Serialize,
@@ -64,13 +64,13 @@ where
     where
         S: serde::Serializer,
     {
-        let inner: std::option::Option<<&T as Surrogated>::Surrogate> =
+        let inner: Option<<&T as Surrogated>::Surrogate> =
             self.0.as_ref().map(|v| v.into_surrogate());
         serialize_tagged(serializer, "Option", &inner)
     }
 }
 
-impl<'de, T> serde::Deserialize<'de> for Option<T>
+impl<'de, T> serde::Deserialize<'de> for OptionSurrogate<T>
 where
     T: Surrogated,
     T::Surrogate: serde::Deserialize<'de>,
@@ -79,7 +79,7 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        let inner: std::option::Option<T::Surrogate> = deserialize_tagged(deserializer, "Option")?;
+        let inner: Option<T::Surrogate> = deserialize_tagged(deserializer, "Option")?;
         Ok(Self(inner.map(|s| s.into_real())))
     }
 }

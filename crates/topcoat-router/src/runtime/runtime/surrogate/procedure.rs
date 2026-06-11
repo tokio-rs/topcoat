@@ -6,16 +6,16 @@ use crate::runtime::ProcedureId;
 
 #[derive(Debug, RefCast)]
 #[repr(transparent)]
-pub struct Procedure<A, R>(crate::runtime::Procedure<A, R>);
+pub struct ProcedureSurrogate<A, R>(crate::runtime::Procedure<A, R>);
 
-impl<A, R> Procedure<A, R> {
+impl<A, R> ProcedureSurrogate<A, R> {
     #[inline]
     pub(crate) const fn new(v: crate::runtime::Procedure<A, R>) -> Self {
         Self(v)
     }
 }
 
-impl<A, R> Procedure<A, R>
+impl<A, R> ProcedureSurrogate<A, R>
 where
     A: Surrogated,
     R: Surrogated,
@@ -25,11 +25,11 @@ where
     }
 }
 
-topcoat_runtime::impl_surrogate!({A, R} crate::runtime::Procedure<A, R>, Procedure<A, R>);
-topcoat_runtime::impl_surrogate_ref!({A, R} crate::runtime::Procedure<A, R>, Procedure<A, R>);
-topcoat_runtime::impl_surrogate_mut!({A, R} crate::runtime::Procedure<A, R>, Procedure<A, R>);
+topcoat_runtime::impl_surrogate!({A, R} crate::runtime::Procedure<A, R>, ProcedureSurrogate<A, R>);
+topcoat_runtime::impl_surrogate_ref!({A, R} crate::runtime::Procedure<A, R>, ProcedureSurrogate<A, R>);
+topcoat_runtime::impl_surrogate_mut!({A, R} crate::runtime::Procedure<A, R>, ProcedureSurrogate<A, R>);
 
-impl<A, R> Serialize for Procedure<A, R> {
+impl<A, R> Serialize for ProcedureSurrogate<A, R> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
