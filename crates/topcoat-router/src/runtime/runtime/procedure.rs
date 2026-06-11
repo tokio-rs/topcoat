@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, hash::Hash, marker::PhantomData, pin::Pin};
+use std::{borrow::Cow, hash::Hash, marker::PhantomData, pin::Pin};
 
 use http::Method;
 use topcoat_core::runtime::{context::Cx, error::Result};
@@ -94,33 +94,3 @@ impl From<ErasedProcedure> for Route {
 }
 #[cfg(feature = "discover")]
 inventory::collect!(ErasedProcedure);
-
-#[derive(Clone, Default)]
-pub struct Procedures {
-    procedures: HashMap<ProcedureId, ErasedProcedure>,
-}
-
-impl Procedures {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn register(&mut self, procedure: impl Into<ErasedProcedure>) {
-        let procedure = procedure.into();
-        self.procedures.insert(procedure.id, procedure);
-    }
-
-    /// Returns `true` if no procedure has been registered.
-    pub fn is_empty(&self) -> bool {
-        self.procedures.is_empty()
-    }
-}
-
-impl IntoIterator for Procedures {
-    type Item = ErasedProcedure;
-    type IntoIter = std::collections::hash_map::IntoValues<ProcedureId, ErasedProcedure>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.procedures.into_values()
-    }
-}

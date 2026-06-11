@@ -7,9 +7,9 @@ use axum::{
 use topcoat_asset::{AssetBundle, AssetResolver, ServeAssetBundle};
 use topcoat_core::runtime::context::{MaybeAborted, State, WatchAbort};
 
-use crate::runtime::{
-    CxBody, Layout, Layouts, Page, Pages, Route, Routes, not_found, result_into_response,
-};
+#[cfg(feature = "runtime")]
+use crate::runtime::ErasedProcedure;
+use crate::runtime::{CxBody, Layout, Page, Route, not_found, result_into_response};
 
 /// The core routing primitive that collects [`Page`]s, [`Layout`]s, and
 /// [`Route`]s, matches layouts to pages by path prefix, and converts into an
@@ -48,17 +48,19 @@ use crate::runtime::{
 /// ```
 #[derive(Default)]
 pub struct Router {
-    pages: Pages,
-    layouts: Layouts,
-    routes: Routes,
+    routes: Vec<Route>,
+    pages: Vec<Page>,
+    layouts: Vec<Layout>,
 
     #[cfg(feature = "runtime")]
     shards: topcoat_runtime::runtime::Shards,
     #[cfg(feature = "runtime")]
-    procedures: crate::runtime::Procedures,
+    procedures: Vec<ErasedProcedure>,
 
     assets: AssetBundle,
     state: State,
+
+    router: axum::Router<Arc<State>>,
 }
 
 impl Router {
@@ -68,42 +70,35 @@ impl Router {
         // Register `()` so APIs generic over an app state type can default to `S = ()`.
         state.register(());
         Self {
-            pages: Pages::new(),
-            layouts: Layouts::new(),
-            routes: Routes::new(),
+            routes: Vec::new(),
+            pages: Vec::new(),
+            layouts: Vec::new(),
             #[cfg(feature = "runtime")]
             shards: topcoat_runtime::runtime::Shards::new(),
             #[cfg(feature = "runtime")]
-            procedures: crate::runtime::Procedures::new(),
+            procedures: Vec::new(),
             assets: AssetBundle::empty(),
             state,
+            router: axum::Router::new(),
         }
     }
 
-    /// Returns `true` if no pages or layouts have been registered.
+    /// Returns `true` if no pages, layouts, routes or other handlers have been registered.
     pub fn is_empty(&self) -> bool {
-        self.pages.is_empty() && self.layouts.is_empty() && self.routes.is_empty()
+        !self.router.has_routes() && self.layouts.is_empty()
     }
 
     /// Registers a [`Page`]. Order doesn't matter — layout matching
     /// is based on path prefixes, not registration order.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a page has already been registered for the same path.
     pub fn page(mut self, page: Page) -> Self {
-        self.pages.register(page);
+        self.pages.push(page);
         self
     }
 
     /// Registers a [`Layout`]. A layout applies to every page whose
     /// path starts with the layout's path prefix.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a layout has already been registered for the same path.
     pub fn layout(mut self, layout: Layout) -> Self {
-        self.layouts.register(layout);
+        self.layouts.push(layout);
         self
     }
 
@@ -111,12 +106,8 @@ impl Router {
     ///
     /// Unlike pages, routes don't render a [`View`](topcoat_view::runtime::View)
     /// and aren't wrapped by layouts — they return a raw response.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a route has already been registered for the same path.
     pub fn route(mut self, route: Route) -> Self {
-        self.routes.register(route);
+        self.routes.push(route);
         self
     }
 
@@ -127,8 +118,8 @@ impl Router {
     }
 
     #[cfg(feature = "runtime")]
-    pub fn procedure(mut self, procedure: impl Into<crate::runtime::ErasedProcedure>) -> Self {
-        self.procedures.register(procedure);
+    pub fn procedure(mut self, procedure: impl Into<ErasedProcedure>) -> Self {
+        self.procedures.push(procedure.into());
         self
     }
 
@@ -223,7 +214,13 @@ impl From<Router> for axum::Router {
         state.register(asset_resolver);
 
         for page in value.pages {
-            let mut layouts: Vec<_> = value.layouts.for_path(page.path()).cloned().collect();
+            let path = page.path();
+            let mut layouts: Vec<_> = value
+                .layouts
+                .iter()
+                .filter(|layout| path.starts_with(layout.path()))
+                .cloned()
+                .collect();
             layouts.sort_by_key(|layout| layout.path().len());
 
             axum_router = axum_router.route(
