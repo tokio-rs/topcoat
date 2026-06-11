@@ -26,7 +26,7 @@ async fn home() -> Result {
 }
 
 #[component]
-async fn hello(#[into] name: String) -> Result {
+async fn hello(name: impl Into<String>) -> Result {
     view! {
         <h1>"Hello, " (name) "!"</h1>
     }

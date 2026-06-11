@@ -1,9 +1,12 @@
 use heck::ToPascalCase;
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
-    Expr, Ident, Path, Token, ext::IdentExt, parenthesized,
+    Expr, Ident, Path, Token,
+    ext::IdentExt,
+    parenthesized,
     parse::{Parse, ParseStream},
+    spanned::Spanned,
     token::Paren,
 };
 
@@ -100,7 +103,7 @@ impl WriteView for Component {
 
         writer.write_expr(
             ExprKind::Node,
-            quote! {
+            quote_spanned! {self.paren_token.span.span()=>
                 ::topcoat::view::Component::render(
                     #name(::core::marker::PhantomData),
                     __cx,
