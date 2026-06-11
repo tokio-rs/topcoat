@@ -87,8 +87,6 @@ async fn badge(#[into] label: String, #[default] tone: Tone) -> Result {
 }
 ```
 
-A `child` parameter is always optional and defaults to an empty [`View`].
-
 ## Generics
 
 Components can be generic; the function's generics carry over to the props struct. Because component futures must be `Send`, type parameters stored in props need a `Send` bound (and `Sync` when the view borrows them):

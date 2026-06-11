@@ -614,8 +614,6 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// A `child` parameter is always optional and defaults to an empty [`View`].
-///
 /// ## Generics
 ///
 /// Components can be generic; the function's generics carry over to the props struct. Because
