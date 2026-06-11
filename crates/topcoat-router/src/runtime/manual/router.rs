@@ -4,7 +4,6 @@ use axum::{
     response::Html,
     routing::{MethodFilter, get, on},
 };
-use topcoat_asset::{AssetBundle, AssetResolver, ServeAssetBundle};
 use topcoat_core::runtime::context::State;
 
 use crate::runtime::{CxBody, Layout, Page, Route, not_found, result_into_response};
@@ -50,12 +49,13 @@ pub struct Router {
     pages: Vec<Page>,
     layouts: Vec<Layout>,
 
+    #[cfg(feature = "asset")]
+    assets: topcoat_asset::AssetBundle,
     #[cfg(feature = "runtime")]
     shards: topcoat_runtime::runtime::Shards,
     #[cfg(feature = "runtime")]
     procedures: Vec<crate::runtime::ErasedProcedure>,
 
-    assets: AssetBundle,
     state: State,
 }
 
@@ -69,11 +69,12 @@ impl Router {
             routes: Vec::new(),
             pages: Vec::new(),
             layouts: Vec::new(),
+            #[cfg(feature = "asset")]
+            assets: topcoat_asset::AssetBundle::empty(),
             #[cfg(feature = "runtime")]
             shards: topcoat_runtime::runtime::Shards::new(),
             #[cfg(feature = "runtime")]
             procedures: Vec::new(),
-            assets: AssetBundle::empty(),
             state,
         }
     }
@@ -116,6 +117,12 @@ impl Router {
         self
     }
 
+    #[cfg(feature = "asset")]
+    pub fn assets(mut self, assets: topcoat_asset::AssetBundle) -> Self {
+        self.assets = assets;
+        self
+    }
+
     #[cfg(feature = "runtime")]
     pub fn shard(mut self, shard: &'static dyn topcoat_runtime::runtime::DynShard) -> Self {
         self.shards.register(shard);
@@ -152,11 +159,6 @@ impl Router {
             }
         }
 
-        self
-    }
-
-    pub fn assets(mut self, assets: AssetBundle) -> Self {
-        self.assets = assets;
         self
     }
 
@@ -203,20 +205,8 @@ impl Router {
 impl From<Router> for axum::Router {
     fn from(value: Router) -> Self {
         let mut axum_router = axum::Router::<Arc<State>>::new();
+        #[allow(unused_mut)]
         let mut state = value.state;
-
-        let assets = value.assets;
-        axum_router = axum_router.nest_service("/_topcoat/assets", ServeAssetBundle::new(&assets));
-        let asset_resolver =
-            AssetResolver::new(Box::new(move |_cx, asset, f| match assets.get(asset) {
-                Some(asset) => {
-                    f.write_str("/_topcoat/assets/");
-                    f.write_str(asset.name().to_str().expect("asset had non-UTF8 name"));
-                }
-                None => panic!("failed to resolve asset {asset:?} in router's asset bundle"),
-            }));
-
-        state.register(asset_resolver);
 
         for page in value.pages {
             let path = page.path();
@@ -254,6 +244,29 @@ impl From<Router> for axum::Router {
                     },
                 ),
             );
+        }
+
+        #[cfg(feature = "asset")]
+        {
+            let assets = value.assets;
+            axum_router = axum_router.nest_service(
+                "/_topcoat/assets",
+                topcoat_asset::ServeAssetBundle::new(&assets),
+            );
+            let asset_resolver =
+                topcoat_asset::AssetResolver::new(Box::new(move |_cx, asset, f| {
+                    match assets.get(asset) {
+                        Some(asset) => {
+                            f.write_str("/_topcoat/assets/");
+                            f.write_str(asset.name().to_str().expect("asset had non-UTF8 name"));
+                        }
+                        None => {
+                            panic!("failed to resolve asset {asset:?} in router's asset bundle")
+                        }
+                    }
+                }));
+
+            state.register(asset_resolver);
         }
 
         #[cfg(feature = "runtime")]
