@@ -19,14 +19,14 @@ async fn home() -> Result {
                 topcoat::dev::script()
             </head>
             <body>
-                hello()
+                hello(name: "World")
             </body>
         </html>
     }
 }
 
 #[component]
-async fn hello(name: impl Into<String>) -> Result {
+async fn hello(name: &str) -> Result {
     view! {
         <h1>"Hello, " (name) "!"</h1>
     }

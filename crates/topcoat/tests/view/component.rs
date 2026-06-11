@@ -132,3 +132,59 @@ async fn component_can_take_cx_param() {
 
     assert_eq!(result.unwrap().render(__cx), "<p>cx component</p>");
 }
+
+#[component]
+async fn shout(label: impl Into<String>) -> Result {
+    let label: String = label.into();
+    view! { <b>(label.to_uppercase())</b> }
+}
+
+#[tokio::test]
+async fn component_with_impl_trait_param_accepts_any_impl() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let result: Result = view! { shout(label: "hi") };
+
+    assert_eq!(result.unwrap().render(__cx), "<b>HI</b>");
+
+    let result: Result = view! { shout(label: String::from("owned")) };
+
+    assert_eq!(result.unwrap().render(__cx), "<b>OWNED</b>");
+}
+
+#[component]
+async fn item_list(items: impl IntoIterator<Item = u8> + Send) -> Result {
+    view! {
+        <ul>
+            for item in items {
+                <li>(item)</li>
+            }
+        </ul>
+    }
+}
+
+#[tokio::test]
+async fn component_with_bounded_impl_trait_param_renders() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let result: Result = view! { item_list(items: vec![1, 2, 3]) };
+
+    assert_eq!(
+        result.unwrap().render(__cx),
+        "<ul><li>1</li><li>2</li><li>3</li></ul>",
+    );
+}
+
+#[component]
+async fn count<T: Send + Sync>(items: Vec<T>) -> Result {
+    view! { <span>(items.len())</span> }
+}
+
+#[tokio::test]
+async fn generic_component_renders() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let result: Result = view! { count(items: vec!["a", "b", "c"]) };
+
+    assert_eq!(result.unwrap().render(__cx), "<span>3</span>");
+}

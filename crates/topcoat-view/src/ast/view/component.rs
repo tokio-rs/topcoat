@@ -98,7 +98,9 @@ impl WriteView for Component {
                 child.write(&mut child_writer);
             }
             let child = child_writer.into_token_stream();
-            quote! { .child(#child) }
+            quote_spanned! {self.paren_token.span.span()=>
+                .child(#child)
+            }
         });
 
         writer.write_expr(

@@ -8,9 +8,10 @@ use heck::ToPascalCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    Attribute, FnArg, GenericParam, Lifetime, Pat, ReturnType, TypeReference,
+    Attribute, FnArg, GenericParam, Lifetime, Pat, ReturnType, Type, TypeParam, TypeReference,
     ext::IdentExt,
     parse_quote,
+    spanned::Spanned,
     visit_mut::{self, VisitMut},
 };
 
@@ -23,7 +24,8 @@ use crate::ast::component::{ComponentAttr, ComponentItem};
 ///   typestate builder. `#[default]` and `#[into]` on function parameters are
 ///   forwarded to the corresponding props fields. A `child` parameter is
 ///   always `#[default]`, so calls without children fall back to an empty
-///   view.
+///   view. `impl Trait` parameter types are lifted into generic type
+///   parameters of the props struct (see [`ImplTraitParamVisitor`]).
 /// - a zero-sized marker struct named after the function that implements
 ///   [`topcoat::view::Component`] with a `render` method calling the original
 ///   function body.
@@ -76,6 +78,11 @@ impl ToTokens for Component {
         let mut fields = Vec::new();
         let mut args = Vec::new();
         let mut visitor = ImplicitLifetimeVisitor { used: false };
+        let mut impl_traits = ImplTraitParamVisitor {
+            prefix: String::new(),
+            count: 0,
+            params: Vec::new(),
+        };
 
         for input in self.item.item().sig.inputs.iter() {
             let FnArg::Typed(pat_type) = input else {
@@ -89,6 +96,9 @@ impl ToTokens for Component {
             } else {
                 let mut ty = (*pat_type.ty).clone();
                 visitor.visit_type_mut(&mut ty);
+                impl_traits.prefix = pi.ident.unraw().to_string().to_pascal_case();
+                impl_traits.count = 0;
+                impl_traits.visit_type_mut(&mut ty);
 
                 let attrs: Vec<&Attribute> = pat_type
                     .attrs
@@ -108,6 +118,9 @@ impl ToTokens for Component {
         if visitor.used {
             generics.params.insert(0, parse_quote! { '__implicit });
         }
+        generics
+            .params
+            .extend(impl_traits.params.into_iter().map(GenericParam::Type));
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
         let phantom_args = generics.params.iter().filter_map(|param| match param {
@@ -159,6 +172,44 @@ impl ToTokens for Component {
 
 fn is_props_attr(attr: &Attribute) -> bool {
     attr.path().is_ident("default") || attr.path().is_ident("into")
+}
+
+/// Replaces every `impl Trait` in a parameter type with a fresh generic type
+/// parameter named after the parameter (`label: impl Into<String>` becomes
+/// `__Label: Into<String> + Send`), since `impl Trait` cannot appear in the
+/// generated props struct's field types. `Send` is added because
+/// [`topcoat::view::Component`] futures must be `Send`, so a non-`Send` prop
+/// could never satisfy the trait anyway.
+///
+/// [`topcoat::view::Component`]: trait.Component.html
+struct ImplTraitParamVisitor {
+    /// The PascalCase name of the parameter currently being visited.
+    prefix: String,
+    /// How many `impl Trait` occurrences the current parameter contained.
+    count: usize,
+    params: Vec<TypeParam>,
+}
+
+impl VisitMut for ImplTraitParamVisitor {
+    fn visit_type_mut(&mut self, ty: &mut Type) {
+        // Recurse first so nested occurrences like
+        // `impl Iterator<Item = impl Send>` are replaced inside the bounds
+        // before the outer `impl Trait` is lifted out.
+        visit_mut::visit_type_mut(self, ty);
+
+        if let Type::ImplTrait(impl_trait) = ty {
+            self.count += 1;
+            let ident = if self.count == 1 {
+                format_ident!("__{}", self.prefix, span = impl_trait.span())
+            } else {
+                format_ident!("__{}{}", self.prefix, self.count, span = impl_trait.span())
+            };
+            let bounds = &impl_trait.bounds;
+            self.params
+                .push(parse_quote! { #ident: #bounds + ::core::marker::Send });
+            *ty = parse_quote! { #ident };
+        }
+    }
 }
 
 struct ImplicitLifetimeVisitor {

@@ -616,6 +616,29 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 ///
 /// A `child` parameter is always optional and defaults to an empty [`View`].
 ///
+/// ## Generics
+///
+/// Components can be generic; the function's generics carry over to the props struct. Because
+/// component futures must be `Send`, type parameters stored in props need a `Send` bound (and
+/// `Sync` when the view borrows them):
+///
+/// ```rust,ignore
+/// #[component]
+/// async fn count<T: Send + Sync>(items: Vec<T>) -> Result {
+///     view! { <span>(items.len())</span> }
+/// }
+/// ```
+///
+/// `impl Trait` parameters work too. Each occurrence is lifted into a generic type parameter on
+/// the props struct, keeping its bounds and adding `Send`:
+///
+/// ```rust,ignore
+/// #[component]
+/// async fn shout(label: impl Into<String>) -> Result {
+///     view! { <b>(label.into().to_uppercase())</b> }
+/// }
+/// ```
+///
 /// ## Request Context
 ///
 /// Components can ask for the current request context by declaring a `cx` parameter that borrows
