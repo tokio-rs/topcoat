@@ -134,7 +134,11 @@ impl ToTokens for Props {
             let args = base_args
                 .iter()
                 .cloned()
-                .chain(required.iter().map(|(field, state)| state_args(field, state)))
+                .chain(
+                    required
+                        .iter()
+                        .map(|(field, state)| state_args(field, state)),
+                )
                 .collect::<Vec<_>>();
             if args.is_empty() {
                 quote!(#builder_ident)
