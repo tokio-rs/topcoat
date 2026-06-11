@@ -629,6 +629,85 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
+/// Derives a typestate builder for a props struct.
+///
+/// For a struct `ButtonProps`, the derive generates a `ButtonPropsBuilder` whose `build()` method
+/// only becomes available once every required property has been set. Forgetting a property is a
+/// compile error, not a runtime panic.
+///
+/// ```rust,ignore
+/// use topcoat::view::Props;
+///
+/// #[derive(Props)]
+/// struct ButtonProps {
+///     #[into]
+///     label: String,
+///     kind: ButtonKind,
+///     #[default]
+///     disabled: bool,
+/// }
+///
+/// let props = ButtonProps::builder()
+///     .label("Save")
+///     .kind(ButtonKind::Primary)
+///     .build();
+/// ```
+///
+/// ## Field Attributes
+///
+/// - `#[default]` makes a property optional. If it is not set, the field is filled with
+///   [`Default::default()`]. The field's type must implement [`Default`].
+/// - `#[into]` makes the generated setter accept `impl Into<T>` instead of `T`, so
+///   `.label("Save")` works for a `String` field.
+///
+/// Both attributes can be combined on the same field.
+///
+/// ## Typestate
+///
+/// The builder tracks each required property in a type parameter that starts at [`Unset`] and
+/// flips to [`Set`] when the property's setter is called. `build()` is only implemented for the
+/// fully-[`Set`] builder, so this fails to compile:
+///
+/// ```rust,ignore
+/// // error: no method named `build` — `kind` was never set
+/// let props = ButtonProps::builder().label("Save").build();
+/// ```
+///
+/// Setters can be called more than once; later calls replace the earlier value.
+///
+/// ## Generics
+///
+/// Generic structs are supported. The struct's generics, bounds, and `where` clauses carry over
+/// to the builder:
+///
+/// ```rust,ignore
+/// #[derive(Props)]
+/// struct ListProps<T: Clone> {
+///     items: Vec<T>,
+///     #[default]
+///     compact: bool,
+/// }
+/// ```
+///
+/// ## The `Props` Trait
+///
+/// The derive also implements the [`Props`] trait, whose associated `Builder` type names the
+/// builder in its initial state. The generated `builder()` function is available both as an
+/// inherent function and through the trait.
+///
+/// [`Default`]: https://doc.rust-lang.org/std/default/trait.Default.html
+/// [`Default::default()`]: https://doc.rust-lang.org/std/default/trait.Default.html#tymethod.default
+/// [`Props`]: trait.Props.html
+/// [`Set`]: struct.Set.html
+/// [`Unset`]: struct.Unset.html
+#[proc_macro_derive(Props, attributes(default, into))]
+pub fn props(item: TokenStream) -> TokenStream {
+    match topcoat_view::ast::props::Props::parse(item.into()) {
+        Ok(value) => quote! { #value }.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
+
 #[proc_macro_attribute]
 pub fn shard(attr: TokenStream, item: TokenStream) -> TokenStream {
     match topcoat_view::ast::shard::Shard::parse(attr.into(), item.into()) {

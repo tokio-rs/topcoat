@@ -9,6 +9,7 @@ mod component;
 mod element;
 mod format;
 mod node;
+mod props;
 mod unescaped;
 mod view;
 
@@ -17,6 +18,7 @@ pub use component::*;
 pub use element::*;
 pub use format::*;
 pub use node::*;
+pub use props::*;
 pub use unescaped::*;
 pub use view::*;
 
