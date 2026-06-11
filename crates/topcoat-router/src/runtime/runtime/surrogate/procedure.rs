@@ -1,11 +1,8 @@
-use std::pin::Pin;
-
 use ref_cast::RefCast;
-use serde::{Deserialize, Serialize, de};
-use topcoat_core::runtime::{context::Cx, error::Result};
+use serde::Serialize;
 use topcoat_runtime::runtime::Surrogated;
 
-use crate::runtime::{Body, ProcedureId, Response};
+use crate::runtime::ProcedureId;
 
 #[derive(Debug, RefCast)]
 #[repr(transparent)]
@@ -38,50 +35,15 @@ impl<A, R> Serialize for Procedure<A, R> {
         S: serde::Serializer,
     {
         #[derive(Serialize)]
-        struct TaggedProcedure<'a> {
+        struct TaggedProcedure {
             t: &'static str,
-            id: &'a str,
+            id: ProcedureId,
         }
 
         TaggedProcedure {
             t: "Procedure",
-            id: self.0.id().as_str(),
+            id: self.0.id(),
         }
         .serialize(serializer)
-    }
-}
-
-impl<'de, A, R> Deserialize<'de> for Procedure<A, R> {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct TaggedProcedure {
-            t: std::string::String,
-            id: std::string::String,
-        }
-
-        let tagged = TaggedProcedure::deserialize(deserializer)?;
-        if tagged.t != "Procedure" {
-            return Err(de::Error::invalid_value(
-                de::Unexpected::Str(&tagged.t),
-                &"Procedure",
-            ));
-        }
-
-        fn stub_handler<'cx>(
-            _cx: &'cx Cx,
-            _body: Body,
-        ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>> {
-            Box::pin(async { panic!("deserialized procedures cannot be executed") })
-        }
-
-        let id: &'static str = Box::leak(tagged.id.into_boxed_str());
-        Ok(Self::new(crate::runtime::Procedure::new(
-            ProcedureId::new(id),
-            stub_handler,
-        )))
     }
 }

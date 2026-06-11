@@ -5,10 +5,8 @@ use axum::{
     routing::{MethodFilter, get, on},
 };
 use topcoat_asset::{AssetBundle, AssetResolver, ServeAssetBundle};
-use topcoat_core::runtime::context::{MaybeAborted, State, WatchAbort};
+use topcoat_core::runtime::context::State;
 
-#[cfg(feature = "runtime")]
-use crate::runtime::ErasedProcedure;
 use crate::runtime::{CxBody, Layout, Page, Route, not_found, result_into_response};
 
 /// The core routing primitive that collects [`Page`]s, [`Layout`]s, and
@@ -55,12 +53,10 @@ pub struct Router {
     #[cfg(feature = "runtime")]
     shards: topcoat_runtime::runtime::Shards,
     #[cfg(feature = "runtime")]
-    procedures: Vec<ErasedProcedure>,
+    procedures: Vec<crate::runtime::ErasedProcedure>,
 
     assets: AssetBundle,
     state: State,
-
-    router: axum::Router<Arc<State>>,
 }
 
 impl Router {
@@ -79,13 +75,22 @@ impl Router {
             procedures: Vec::new(),
             assets: AssetBundle::empty(),
             state,
-            router: axum::Router::new(),
         }
     }
 
     /// Returns `true` if no pages, layouts, routes or other handlers have been registered.
     pub fn is_empty(&self) -> bool {
-        !self.router.has_routes() && self.layouts.is_empty()
+        [
+            self.routes.is_empty(),
+            self.pages.is_empty(),
+            self.layouts.is_empty(),
+            #[cfg(feature = "runtime")]
+            self.shards.is_empty(),
+            #[cfg(feature = "runtime")]
+            self.procedures.is_empty(),
+        ]
+        .into_iter()
+        .all(core::convert::identity)
     }
 
     /// Registers a [`Page`]. Order doesn't matter — layout matching
@@ -118,7 +123,7 @@ impl Router {
     }
 
     #[cfg(feature = "runtime")]
-    pub fn procedure(mut self, procedure: impl Into<ErasedProcedure>) -> Self {
+    pub fn procedure(mut self, procedure: impl Into<crate::runtime::ErasedProcedure>) -> Self {
         self.procedures.push(procedure.into());
         self
     }
@@ -226,23 +231,14 @@ impl From<Router> for axum::Router {
             axum_router = axum_router.route(
                 &page.path().to_axum_path(),
                 get(async move |CxBody { cx, body }: CxBody| {
-                    let result = WatchAbort::new(&cx, async {
+                    let result = {
                         let mut render = page.render(&cx, body);
                         for layout in layouts.iter().rev() {
                             render = layout.render(&cx, render);
                         }
                         render.await
-                    })
-                    .await;
-
-                    match result {
-                        MaybeAborted::Completed(result) => {
-                            result_into_response(result.map(|view| Html(view.render(&cx))))
-                        }
-                        MaybeAborted::Aborted(_value) => {
-                            panic!("request was aborted with an unrecognized type");
-                        }
-                    }
+                    };
+                    result_into_response(result.map(|view| Html(view.render(&cx))))
                 }),
             );
         }
@@ -254,14 +250,7 @@ impl From<Router> for axum::Router {
                     MethodFilter::try_from(route.method().clone())
                         .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),
                     async move |CxBody { cx, body }: CxBody| {
-                        let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
-
-                        match result {
-                            MaybeAborted::Completed(result) => result_into_response(result),
-                            MaybeAborted::Aborted(_value) => {
-                                panic!("request was aborted with an unrecognized type");
-                            }
-                        }
+                        result_into_response(route.handle(&cx, body).await)
                     },
                 ),
             );
@@ -269,26 +258,20 @@ impl From<Router> for axum::Router {
 
         #[cfg(feature = "runtime")]
         {
-            for route in value.procedures.into_iter().map(Route::from) {
-                axum_router = axum_router.route(
-                    &route.path().to_axum_path(),
-                    on(
-                        MethodFilter::try_from(route.method().clone())
-                            .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),
-                        async move |CxBody { cx, body }: CxBody| {
-                            let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
-
-                            match result {
-                                MaybeAborted::Completed(result) => result_into_response(result),
-                                MaybeAborted::Aborted(_value) => {
-                                    panic!("request was aborted with an unrecognized type");
-                                }
-                            }
-                        },
-                    ),
+            let mut procedure_router = axum::Router::new();
+            for procedure in value.procedures.into_iter() {
+                procedure_router = procedure_router.route(
+                    &("/".to_owned() + procedure.id().as_str()),
+                    axum::routing::post(async move |CxBody { cx, body }: CxBody| {
+                        result_into_response(procedure.handle(&cx, body).await)
+                    }),
                 );
             }
+            axum_router = axum_router.nest("/_topcoat/procedures", procedure_router);
+        }
 
+        #[cfg(feature = "runtime")]
+        {
             let mut shard_router = axum::Router::new();
             for shard in value.shards {
                 #[derive(serde::Deserialize)]

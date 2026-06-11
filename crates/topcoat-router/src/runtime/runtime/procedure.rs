@@ -1,11 +1,12 @@
-use std::{borrow::Cow, hash::Hash, marker::PhantomData, pin::Pin};
+use std::{hash::Hash, marker::PhantomData, pin::Pin};
 
-use http::Method;
+use serde::{Deserialize, Serialize};
 use topcoat_core::runtime::{context::Cx, error::Result};
 
-use crate::runtime::{Body, PathSegment, Response, Route};
+use crate::runtime::{Body, Response};
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct ProcedureId(&'static str);
 
 impl ProcedureId {
@@ -75,22 +76,14 @@ impl ErasedProcedure {
     }
 }
 
-impl From<ErasedProcedure> for Route {
-    fn from(value: ErasedProcedure) -> Self {
-        Self::new(
-            Method::POST,
-            Cow::Owned(
-                [
-                    PathSegment::Static("_topcoat"),
-                    PathSegment::Static("procedures"),
-                    PathSegment::Static(value.id.0),
-                ]
-                .into_iter()
-                .collect(),
-            ),
-            value.handle,
-        )
+impl<A, R> From<Procedure<A, R>> for ErasedProcedure {
+    fn from(value: Procedure<A, R>) -> Self {
+        Self {
+            id: value.id,
+            handle: value.handle,
+        }
     }
 }
+
 #[cfg(feature = "discover")]
 inventory::collect!(ErasedProcedure);
