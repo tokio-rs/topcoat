@@ -3,7 +3,7 @@ use futures_util::SinkExt;
 use std::net::SocketAddr;
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::view::{View, component, view};
+use crate::view::{component, view};
 
 /// Notify the topcoat dev server that the application is ready.
 ///
@@ -43,11 +43,7 @@ fn http_to_ws(url: &str) -> String {
 }
 
 #[component]
-#[expect(
-    unused_variables,
-    reason = "child is required by the component macro contract but unused here"
-)]
-pub async fn script(child: View) -> Result {
+pub async fn script() -> Result {
     let Ok(base) = std::env::var("TOPCOAT_DEV_URL") else {
         return view! {};
     };

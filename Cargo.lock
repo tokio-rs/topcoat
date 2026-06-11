@@ -2161,6 +2161,7 @@ name = "topcoat-view"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "heck",
  "inventory",
  "proc-macro2",
  "quote",

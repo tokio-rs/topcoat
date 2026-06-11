@@ -595,6 +595,27 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 /// Conceptually, those trailing child nodes are the same thing as a `child` parameter whose value
 /// is a [`view! { ... }`][`view!`] containing those nodes.
 ///
+/// ## Props
+///
+/// The macro turns the function's parameters (except `cx`) into a generated props struct named
+/// after the component in PascalCase plus `Props` (`badge` becomes `BadgeProps`), which derives
+/// [`Props`] to get a typestate builder. Component calls in [`view!`] go through that builder, so
+/// leaving out a parameter is a compile error naming the missing property.
+///
+/// Parameters can use the same attributes as [`Props`] fields:
+///
+/// - `#[default]` makes the parameter optional; when not passed, it gets `Default::default()`.
+/// - `#[into]` lets callers pass anything that converts via `Into`.
+///
+/// ```rust,ignore
+/// #[component]
+/// async fn badge(#[into] label: String, #[default] tone: Tone) -> Result {
+///     // ...
+/// }
+/// ```
+///
+/// A `child` parameter is always optional and defaults to an empty [`View`].
+///
 /// ## Request Context
 ///
 /// Components can ask for the current request context by declaring a `cx` parameter that borrows
@@ -617,6 +638,7 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
 /// ```
 ///
 /// [`Cx`]: ../context/struct.Cx.html
+/// [`Props`]: derive.Props.html
 /// [`Result`]: ../type.Result.html
 /// [`View`]: struct.View.html
 /// [`component`]: attr.component.html
@@ -664,12 +686,12 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ## Typestate
 ///
-/// The builder tracks each required property in a type parameter that starts at [`Unset`] and
-/// flips to [`Set`] when the property's setter is called. `build()` is only implemented for the
-/// fully-[`Set`] builder, so this fails to compile:
+/// The builder tracks each required property in a type parameter that flips to [`Set`] when the
+/// property's setter is called. `build()` requires every marker to implement [`IsSet`], so this
+/// fails to compile:
 ///
 /// ```rust,ignore
-/// // error: no method named `build` — `kind` was never set
+/// // error: missing required property `kind`
 /// let props = ButtonProps::builder().label("Save").build();
 /// ```
 ///
@@ -697,9 +719,9 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// [`Default`]: https://doc.rust-lang.org/std/default/trait.Default.html
 /// [`Default::default()`]: https://doc.rust-lang.org/std/default/trait.Default.html#tymethod.default
+/// [`IsSet`]: trait.IsSet.html
 /// [`Props`]: trait.Props.html
 /// [`Set`]: struct.Set.html
-/// [`Unset`]: struct.Unset.html
 #[proc_macro_derive(Props, attributes(default, into))]
 pub fn props(item: TokenStream) -> TokenStream {
     match topcoat_view::ast::props::Props::parse(item.into()) {

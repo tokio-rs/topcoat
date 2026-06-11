@@ -1,3 +1,4 @@
+use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
@@ -10,7 +11,15 @@ use syn::{
 /// available, plus implementations of [`topcoat::view::Props`] and an inherent
 /// `builder()` function on the props struct.
 ///
+/// Each required field is tracked by a generic argument of the builder. It
+/// starts out as a generated marker type named after the field and flips to
+/// [`topcoat::view::Set`] when the field's setter is called. `build()` bounds
+/// every marker by [`topcoat::view::IsSet`], so forgetting a field produces a
+/// "missing required property" error naming the field.
+///
+/// [`topcoat::view::IsSet`]: trait.IsSet.html
 /// [`topcoat::view::Props`]: trait.Props.html
+/// [`topcoat::view::Set`]: struct.Set.html
 pub struct Props {
     vis: Visibility,
     ident: Ident,
@@ -96,8 +105,14 @@ impl ToTokens for Props {
             fields,
         } = self;
         let builder_ident = format_ident!("{ident}Builder");
+        let members_mod = format_ident!("__{}", ident.unraw().to_string().to_snake_case());
 
-        let states: Vec<&Ident> = fields.iter().filter_map(|f| f.state.as_ref()).collect();
+        // Required fields paired with their typestate parameter.
+        let required: Vec<(&Ident, &Ident)> = fields
+            .iter()
+            .filter_map(|f| f.state.as_ref().map(|state| (&f.ident, state)))
+            .collect();
+        let states: Vec<&Ident> = required.iter().map(|(_, state)| *state).collect();
         let field_idents: Vec<&Ident> = fields.iter().map(|f| &f.ident).collect();
         let field_tys: Vec<&Type> = fields.iter().map(|f| &f.ty).collect();
 
@@ -115,11 +130,11 @@ impl ToTokens for Props {
             })
             .collect();
 
-        let builder_ty = |state_args: &dyn Fn(&Ident) -> TokenStream| {
+        let builder_ty = |state_args: &dyn Fn(&Ident, &Ident) -> TokenStream| {
             let args = base_args
                 .iter()
                 .cloned()
-                .chain(states.iter().map(|state| state_args(state)))
+                .chain(required.iter().map(|(field, state)| state_args(field, state)))
                 .collect::<Vec<_>>();
             if args.is_empty() {
                 quote!(#builder_ident)
@@ -127,16 +142,28 @@ impl ToTokens for Props {
                 quote!(#builder_ident<#(#args),*>)
             }
         };
-        let unset_ty = builder_ty(&|_| quote!(::topcoat::view::Unset));
-        let set_ty = builder_ty(&|_| quote!(::topcoat::view::Set));
+        let unset_ty = builder_ty(&|field, _| quote!(#members_mod::#field));
+
+        // Hidden marker types named after the required fields, so the
+        // "missing required property" error names the field.
+        let members = (!required.is_empty()).then(|| {
+            let members = required.iter().map(|(field, _)| *field);
+            quote! {
+                #[doc(hidden)]
+                #[allow(non_camel_case_types)]
+                #vis mod #members_mod {
+                    #(pub struct #members;)*
+                }
+            }
+        });
 
         // Builder declaration generics: the struct's generics plus one marker
-        // parameter per required field, defaulting to `Unset`.
+        // parameter per required field, defaulting to the unset marker.
         let mut decl_generics = generics.clone();
-        for state in &states {
+        for (field, state) in &required {
             decl_generics
                 .params
-                .push(parse_quote!(#state = ::topcoat::view::Unset));
+                .push(parse_quote!(#state = #members_mod::#field));
         }
 
         // Setter impl generics: the struct's generics plus free marker
@@ -172,7 +199,7 @@ impl ToTokens for Props {
                 // Required field: setting it flips its marker to `Set`, so the
                 // builder has to be rebuilt under the new type.
                 Some(state) => {
-                    let ret_ty = builder_ty(&|other| {
+                    let ret_ty = builder_ty(&|_, other| {
                         if other == state {
                             quote!(::topcoat::view::Set)
                         } else {
@@ -225,6 +252,8 @@ impl ToTokens for Props {
         let builder_fn_doc = format!("Returns a [`{builder_ident}`] with no properties set.");
 
         quote! {
+            #members
+
             #[doc = #builder_doc]
             #[allow(non_camel_case_types)]
             #vis struct #builder_ident #decl_generics #where_clause {
@@ -236,13 +265,16 @@ impl ToTokens for Props {
             #[allow(non_camel_case_types, dead_code)]
             impl #state_impl_generics #builder_ident #state_ty_generics #where_clause {
                 #(#setters)*
-            }
 
-            #[automatically_derived]
-            #[allow(dead_code)]
-            impl #impl_generics #set_ty #where_clause {
                 /// Builds the props struct from the set properties.
-                #vis fn build(self) -> #ident #ty_generics {
+                ///
+                /// Only available once every required property has been set.
+                /// `#[default]` properties that were not set are filled with
+                /// `Default::default()`.
+                #vis fn build(self) -> #ident #ty_generics
+                where
+                    #(#states: ::topcoat::view::IsSet,)*
+                {
                     #ident {
                         #(#build_fields)*
                     }

@@ -17,7 +17,7 @@ use crate::runtime::{FmtHtml, Formatter, Unescaped};
 /// <!-- Invalid: unclosed tag would corrupt the parent document -->
 /// <div>Hello
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct View {
     part: ViewPart,
     size_hint: usize,
@@ -39,10 +39,7 @@ impl View {
     /// Returns a `View` that renders to an empty string.
     #[inline]
     pub fn empty() -> Self {
-        Self {
-            part: ViewPart::Empty,
-            size_hint: 0,
-        }
+        Self::default()
     }
 
     /// Renders the view into an HTML string.
@@ -69,11 +66,11 @@ impl FmtHtml for View {
 ///
 /// Most code creates view parts through [`ViewParts::push`] or the `view!`
 /// macro rather than constructing enum variants directly.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub enum ViewPart {
     /// Renders no content.
-    #[non_exhaustive]
+    #[default]
     Empty,
     /// A boolean rendered as text.
     #[non_exhaustive]
