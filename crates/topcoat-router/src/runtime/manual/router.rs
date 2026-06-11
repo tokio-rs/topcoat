@@ -4,12 +4,9 @@ use axum::{
     response::Html,
     routing::{MethodFilter, get, on},
 };
-use topcoat_asset::{AssetBundle, AssetResolver, ServeAssetBundle};
-use topcoat_core::runtime::context::{MaybeAborted, State, WatchAbort};
+use topcoat_core::runtime::context::State;
 
-use crate::runtime::{
-    CxBody, Layout, Layouts, Page, Pages, Route, Routes, not_found, result_into_response,
-};
+use crate::runtime::{CxBody, Layout, Page, Route, not_found, result_into_response};
 
 /// The core routing primitive that collects [`Page`]s, [`Layout`]s, and
 /// [`Route`]s, matches layouts to pages by path prefix, and converts into an
@@ -48,16 +45,17 @@ use crate::runtime::{
 /// ```
 #[derive(Default)]
 pub struct Router {
-    pages: Pages,
-    layouts: Layouts,
-    routes: Routes,
+    routes: Vec<Route>,
+    pages: Vec<Page>,
+    layouts: Vec<Layout>,
 
+    #[cfg(feature = "asset")]
+    assets: topcoat_asset::AssetBundle,
     #[cfg(feature = "runtime")]
     shards: topcoat_runtime::runtime::Shards,
     #[cfg(feature = "runtime")]
-    procedures: crate::runtime::Procedures,
+    procedures: Vec<crate::runtime::ErasedProcedure>,
 
-    assets: AssetBundle,
     state: State,
 }
 
@@ -68,42 +66,45 @@ impl Router {
         // Register `()` so APIs generic over an app state type can default to `S = ()`.
         state.register(());
         Self {
-            pages: Pages::new(),
-            layouts: Layouts::new(),
-            routes: Routes::new(),
+            routes: Vec::new(),
+            pages: Vec::new(),
+            layouts: Vec::new(),
+            #[cfg(feature = "asset")]
+            assets: topcoat_asset::AssetBundle::empty(),
             #[cfg(feature = "runtime")]
             shards: topcoat_runtime::runtime::Shards::new(),
             #[cfg(feature = "runtime")]
-            procedures: crate::runtime::Procedures::new(),
-            assets: AssetBundle::empty(),
+            procedures: Vec::new(),
             state,
         }
     }
 
-    /// Returns `true` if no pages or layouts have been registered.
+    /// Returns `true` if no pages, layouts, routes or other handlers have been registered.
     pub fn is_empty(&self) -> bool {
-        self.pages.is_empty() && self.layouts.is_empty() && self.routes.is_empty()
+        [
+            self.routes.is_empty(),
+            self.pages.is_empty(),
+            self.layouts.is_empty(),
+            #[cfg(feature = "runtime")]
+            self.shards.is_empty(),
+            #[cfg(feature = "runtime")]
+            self.procedures.is_empty(),
+        ]
+        .into_iter()
+        .all(core::convert::identity)
     }
 
     /// Registers a [`Page`]. Order doesn't matter — layout matching
     /// is based on path prefixes, not registration order.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a page has already been registered for the same path.
     pub fn page(mut self, page: Page) -> Self {
-        self.pages.register(page);
+        self.pages.push(page);
         self
     }
 
     /// Registers a [`Layout`]. A layout applies to every page whose
     /// path starts with the layout's path prefix.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a layout has already been registered for the same path.
     pub fn layout(mut self, layout: Layout) -> Self {
-        self.layouts.register(layout);
+        self.layouts.push(layout);
         self
     }
 
@@ -111,12 +112,45 @@ impl Router {
     ///
     /// Unlike pages, routes don't render a [`View`](topcoat_view::runtime::View)
     /// and aren't wrapped by layouts — they return a raw response.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a route has already been registered for the same path.
     pub fn route(mut self, route: Route) -> Self {
-        self.routes.register(route);
+        self.routes.push(route);
+        self
+    }
+
+    /// Registers an [`AssetBundle`](topcoat_asset::AssetBundle) of files
+    /// declared with `asset!`.
+    ///
+    /// This does two things: it mounts the bundle so its files are served, and
+    /// it installs the resolver that turns [`Asset`](topcoat_asset::Asset)
+    /// values rendered in a [`View`](topcoat_view::runtime::View) into their
+    /// bundled URLs. Without it, rendering a page that references an `Asset`
+    /// panics.
+    ///
+    /// Load the bundle produced by `topcoat dev` or `topcoat asset bundle` with
+    /// [`AssetBundle::load()`](topcoat_asset::AssetBundle::load) for the default
+    /// location, or
+    /// [`AssetBundle::load_dir()`](topcoat_asset::AssetBundle::load_dir) for a
+    /// custom one.
+    ///
+    /// The binary and the asset bundle must come from the same build: if a page
+    /// renders an `Asset` that isn't present in the loaded bundle, rendering
+    /// panics.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use topcoat::asset::AssetBundle;
+    /// use topcoat::router::Router;
+    ///
+    /// pub fn router() -> Router {
+    ///     Router::new()
+    ///         .page(about)
+    ///         .assets(AssetBundle::load().unwrap())
+    /// }
+    /// ```
+    #[cfg(feature = "asset")]
+    pub fn assets(mut self, assets: topcoat_asset::AssetBundle) -> Self {
+        self.assets = assets;
         self
     }
 
@@ -128,10 +162,30 @@ impl Router {
 
     #[cfg(feature = "runtime")]
     pub fn procedure(mut self, procedure: impl Into<crate::runtime::ErasedProcedure>) -> Self {
-        self.procedures.register(procedure);
+        self.procedures.push(procedure.into());
         self
     }
 
+    /// Auto-registers every annotated [`Page`], [`Layout`], and [`Route`]
+    /// across the crate (and its dependencies) instead of listing each one by
+    /// hand.
+    ///
+    /// With the `discover` feature enabled, items annotated with `#[page]`,
+    /// `#[layout]`, and `#[route]` are collected at link time.
+    /// Calling `discover()` registers all of them at once.
+    ///
+    /// This also applies to `#[procedure]` and `#[shard]` when the `runtime`
+    /// feature is active.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use topcoat::router::Router;
+    ///
+    /// pub fn router() -> Router {
+    ///     Router::new().discover()
+    /// }
+    /// ```
     #[cfg(feature = "discover")]
     pub fn discover(mut self) -> Self {
         for page in inventory::iter::<Page>().cloned() {
@@ -156,11 +210,6 @@ impl Router {
             }
         }
 
-        self
-    }
-
-    pub fn assets(mut self, assets: AssetBundle) -> Self {
-        self.assets = assets;
         self
     }
 
@@ -207,45 +256,30 @@ impl Router {
 impl From<Router> for axum::Router {
     fn from(value: Router) -> Self {
         let mut axum_router = axum::Router::<Arc<State>>::new();
+        #[allow(unused_mut)]
         let mut state = value.state;
 
-        let assets = value.assets;
-        axum_router = axum_router.nest_service("/_topcoat/assets", ServeAssetBundle::new(&assets));
-        let asset_resolver =
-            AssetResolver::new(Box::new(move |_cx, asset, f| match assets.get(asset) {
-                Some(asset) => {
-                    f.write_str("/_topcoat/assets/");
-                    f.write_str(asset.name().to_str().expect("asset had non-UTF8 name"));
-                }
-                None => panic!("failed to resolve asset {asset:?} in router's asset bundle"),
-            }));
-
-        state.register(asset_resolver);
-
         for page in value.pages {
-            let mut layouts: Vec<_> = value.layouts.for_path(page.path()).cloned().collect();
+            let path = page.path();
+            let mut layouts: Vec<_> = value
+                .layouts
+                .iter()
+                .filter(|layout| path.starts_with(layout.path()))
+                .cloned()
+                .collect();
             layouts.sort_by_key(|layout| layout.path().len());
 
             axum_router = axum_router.route(
                 &page.path().to_axum_path(),
                 get(async move |CxBody { cx, body }: CxBody| {
-                    let result = WatchAbort::new(&cx, async {
+                    let result = {
                         let mut render = page.render(&cx, body);
                         for layout in layouts.iter().rev() {
                             render = layout.render(&cx, render);
                         }
                         render.await
-                    })
-                    .await;
-
-                    match result {
-                        MaybeAborted::Completed(result) => {
-                            result_into_response(result.map(|view| Html(view.render(&cx))))
-                        }
-                        MaybeAborted::Aborted(_value) => {
-                            panic!("request was aborted with an unrecognized type");
-                        }
-                    }
+                    };
+                    result_into_response(result.map(|view| Html(view.render(&cx))))
                 }),
             );
         }
@@ -257,41 +291,51 @@ impl From<Router> for axum::Router {
                     MethodFilter::try_from(route.method().clone())
                         .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),
                     async move |CxBody { cx, body }: CxBody| {
-                        let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
-
-                        match result {
-                            MaybeAborted::Completed(result) => result_into_response(result),
-                            MaybeAborted::Aborted(_value) => {
-                                panic!("request was aborted with an unrecognized type");
-                            }
-                        }
+                        result_into_response(route.handle(&cx, body).await)
                     },
                 ),
             );
         }
 
+        #[cfg(feature = "asset")]
+        {
+            let assets = value.assets;
+            axum_router = axum_router.nest_service(
+                "/_topcoat/assets",
+                topcoat_asset::ServeAssetBundle::new(&assets),
+            );
+            let asset_resolver =
+                topcoat_asset::AssetResolver::new(Box::new(move |_cx, asset, f| {
+                    match assets.get(asset) {
+                        Some(asset) => {
+                            f.write_str("/_topcoat/assets/");
+                            f.write_str(asset.name().to_str().expect("asset had non-UTF8 name"));
+                        }
+                        None => {
+                            panic!("failed to resolve asset {asset:?} in router's asset bundle")
+                        }
+                    }
+                }));
+
+            state.register(asset_resolver);
+        }
+
         #[cfg(feature = "runtime")]
         {
-            for route in value.procedures.into_iter().map(Route::from) {
-                axum_router = axum_router.route(
-                    &route.path().to_axum_path(),
-                    on(
-                        MethodFilter::try_from(route.method().clone())
-                            .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),
-                        async move |CxBody { cx, body }: CxBody| {
-                            let result = WatchAbort::new(&cx, route.handle(&cx, body)).await;
-
-                            match result {
-                                MaybeAborted::Completed(result) => result_into_response(result),
-                                MaybeAborted::Aborted(_value) => {
-                                    panic!("request was aborted with an unrecognized type");
-                                }
-                            }
-                        },
-                    ),
+            let mut procedure_router = axum::Router::new();
+            for procedure in value.procedures.into_iter() {
+                procedure_router = procedure_router.route(
+                    &("/".to_owned() + procedure.id().as_str()),
+                    axum::routing::post(async move |CxBody { cx, body }: CxBody| {
+                        result_into_response(procedure.handle(&cx, body).await)
+                    }),
                 );
             }
+            axum_router = axum_router.nest("/_topcoat/procedures", procedure_router);
+        }
 
+        #[cfg(feature = "runtime")]
+        {
             let mut shard_router = axum::Router::new();
             for shard in value.shards {
                 #[derive(serde::Deserialize)]

@@ -14,6 +14,7 @@ default = [
 
 asset = [
 	"dep:topcoat-asset",
+	"topcoat-router/asset",
 ]
 router = [
 	"dep:topcoat-router",
