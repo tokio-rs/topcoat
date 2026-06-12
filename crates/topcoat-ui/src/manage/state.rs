@@ -23,6 +23,11 @@ pub(super) struct InstallState {
     pub version: u32,
     #[serde(default = "default_registry_name")]
     pub default_registry: String,
+    /// The base directory under which each registry's components are installed:
+    /// a registry added later gets `<base_dir>/<registry-name>` as its output
+    /// directory. Set once at `init` time.
+    #[serde(default = "default_base_dir")]
+    pub base_dir: PathBuf,
     #[serde(default)]
     pub registries: BTreeMap<String, RegistryState>,
 }
@@ -33,7 +38,7 @@ pub(super) struct RegistryState {
     /// The registry location: a path, a `file://` path, or an `http(s)://` URL.
     pub url: String,
     /// Where this registry's components are installed. Set to
-    /// `src/components/<registry-name>` when the registry is first added.
+    /// `<base-dir>/<registry-name>` when the registry is first added.
     pub components_dir: PathBuf,
     #[serde(default)]
     pub components: BTreeMap<String, InstalledComponent>,
@@ -50,16 +55,18 @@ impl Default for InstallState {
         Self {
             version: STATE_VERSION,
             default_registry: default_registry_name(),
+            base_dir: default_base_dir(),
             registries: BTreeMap::new(),
         }
     }
 }
 
 impl RegistryState {
-    pub(super) fn new(name: &str, url: String) -> Self {
+    /// Creates a registry whose components install under `base_dir/<name>`.
+    pub(super) fn new(name: &str, url: String, base_dir: &Path) -> Self {
         Self {
             url,
-            components_dir: default_components_dir(name),
+            components_dir: base_dir.join(name),
             components: BTreeMap::new(),
         }
     }
@@ -87,7 +94,10 @@ impl InstallState {
                 }
                 Ok(state)
             }
-            Err(error) if error.kind() == ErrorKind::NotFound => Ok(Self::default()),
+            Err(error) if error.kind() == ErrorKind::NotFound => Err(format!(
+                "no install state at {}; run `topcoat ui init` first",
+                path.display()
+            )),
             Err(error) => Err(format!("failed to read {}: {error}", path.display())),
         }
     }
@@ -115,6 +125,7 @@ impl InstallState {
         name: &str,
         url: Option<String>,
     ) -> Result<&mut RegistryState, String> {
+        let base_dir = self.base_dir.clone();
         match self.registries.entry(name.to_string()) {
             Entry::Occupied(entry) => {
                 let registry = entry.into_mut();
@@ -127,7 +138,7 @@ impl InstallState {
                 let url = url
                     .or_else(|| Self::default_url(name))
                     .ok_or_else(|| format!("unknown registry `{name}`; pass --url to define it"))?;
-                Ok(entry.insert(RegistryState::new(name, url)))
+                Ok(entry.insert(RegistryState::new(name, url, &base_dir)))
             }
         }
     }
@@ -153,9 +164,28 @@ impl InstallState {
             ));
         }
 
-        self.registries
-            .insert(name.to_string(), RegistryState::new(name, url.to_string()));
+        let registry = RegistryState::new(name, url.to_string(), &self.base_dir);
+        self.registries.insert(name.to_string(), registry);
         Ok(name.to_string())
+    }
+
+    /// Writes a fresh install state for a project that has none, recording
+    /// `base_dir` (default `src/components`) as the base for component output.
+    /// Errors if an install state already exists rather than clobbering it.
+    pub(super) fn create(project: &Project, base_dir: Option<PathBuf>) -> Result<Self, String> {
+        let path = project.state_path();
+        if path.exists() {
+            return Err(format!(
+                "{} already exists; the project is already initialized",
+                path.display()
+            ));
+        }
+        let mut state = Self::default();
+        if let Some(base_dir) = base_dir {
+            state.base_dir = base_dir;
+        }
+        state.save(project)?;
+        Ok(state)
     }
 }
 
@@ -167,7 +197,7 @@ fn default_registry_name() -> String {
     DEFAULT_REGISTRY_NAME.to_string()
 }
 
-/// The default install dir for a registry: `src/components/<registry-name>`.
-fn default_components_dir(name: &str) -> PathBuf {
-    Path::new("src/components").join(name)
+/// The default base directory for component install output.
+fn default_base_dir() -> PathBuf {
+    PathBuf::from("src/components")
 }

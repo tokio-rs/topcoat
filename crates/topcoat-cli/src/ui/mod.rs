@@ -1,4 +1,5 @@
 mod add;
+mod init;
 mod list;
 mod remove;
 
@@ -14,6 +15,8 @@ pub struct UiCommand {
 
 #[derive(Subcommand)]
 enum UiSubcommand {
+    /// Set up the project's install state (run before adding components)
+    Init(init::InitCommand),
     /// Add a premade UI component to your project
     Add(add::AddCommand),
     /// List registry components and their install status
@@ -25,6 +28,7 @@ enum UiSubcommand {
 impl UiCommand {
     pub async fn run(self) {
         match self.command {
+            UiSubcommand::Init(cmd) => cmd.run().await,
             UiSubcommand::Add(cmd) => cmd.run().await,
             UiSubcommand::List(cmd) => cmd.run().await,
             UiSubcommand::Remove(cmd) => cmd.run().await,
