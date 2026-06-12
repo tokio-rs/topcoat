@@ -65,7 +65,7 @@ pub async fn list(
 async fn listing_for(project: &Project, name: &str, state: &RegistryState) -> RegistryListing {
     let working_url = project.to_working(&state.url);
     let outcome = match Registry::load(Source::parse(&working_url)).await {
-        Ok(registry) => Ok(statuses(&registry, state)),
+        Ok(registry) => statuses(&registry, state).await,
         Err(error) => Err(error.to_string()),
     };
     RegistryListing {
@@ -76,8 +76,12 @@ async fn listing_for(project: &Project, name: &str, state: &RegistryState) -> Re
 }
 
 /// Classifies every component a registry offers, plus any tracked under it that
-/// it no longer offers.
-fn statuses(registry: &Registry, state: &RegistryState) -> Vec<ComponentStatus> {
+/// it no longer offers. Each offered component's source is fetched and hashed to
+/// learn its current version; a failure to do so fails the whole listing.
+async fn statuses(
+    registry: &Registry,
+    state: &RegistryState,
+) -> Result<Vec<ComponentStatus>, String> {
     let names: Vec<&str> = registry.names().collect();
     let mut out = Vec::new();
 
@@ -85,7 +89,9 @@ fn statuses(registry: &Registry, state: &RegistryState) -> Vec<ComponentStatus> 
         let component = registry
             .get(component_name)
             .expect("name came from the registry");
-        let latest = component.hash().to_string();
+        let latest = component.hash().await.map_err(|error| {
+            format!("failed to hash component `{component_name}`: {error}")
+        })?;
         let status = match state.components.get(*component_name) {
             None => InstallStatus::Available { hash: latest },
             Some(installed) if installed.hash == latest => InstallStatus::UpToDate { hash: latest },
@@ -111,5 +117,5 @@ fn statuses(registry: &Registry, state: &RegistryState) -> Vec<ComponentStatus> 
         }
     }
 
-    out
+    Ok(out)
 }

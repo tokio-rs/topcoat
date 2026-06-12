@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
-use crate::{Dependency, Registry, Source};
+use crate::{Dependency, Registry, Source, content_hash};
 
 use super::Confirm;
 use super::module;
@@ -188,13 +188,17 @@ pub async fn add(
             ));
         }
 
+        // Fetch the source once: it is hashed to record the component's version
+        // in the install state, and reused as the file contents when written.
+        let contents = component
+            .fetch_source()
+            .await
+            .map_err(|error| format!("failed to read component `{}`: {error}", component.name()))?;
+        let hash = content_hash(&contents);
+
         // Write the source unless it is already present — dependencies never
         // clobber existing files; only the root (or a replacement) rewrites.
         if !exists || (pending.root && options.overwrite) || replacing {
-            let contents = component
-                .fetch_source()
-                .await
-                .map_err(|error| format!("failed to read component `{}`: {error}", component.name()))?;
             writes.push(PlannedWrite {
                 name: component.name().to_string(),
                 dir: dir.clone(),
@@ -214,7 +218,7 @@ pub async fn add(
             .insert(
                 component.name().to_string(),
                 InstalledComponent {
-                    hash: component.hash().to_string(),
+                    hash,
                     file: relative_file,
                 },
             );

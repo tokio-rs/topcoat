@@ -1,15 +1,17 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 
 /// The manifest file naming the components within a registry.
 pub const MANIFEST_FILE: &str = "registry.toml";
 
-/// The `registry.toml` format version this build writes and understands. Stored
-/// in the manifest's `version` field so older and newer formats can be told
-/// apart; manifests without the field are assumed to be version 1.
+/// The `registry.toml` format version this build understands. Stored in the
+/// manifest's `version` field so older and newer formats can be told apart; a
+/// manifest declaring a newer version than this is rejected.
 pub const MANIFEST_VERSION: u32 = 1;
 
 /// The registry used when a project does not specify one of its own: the
@@ -111,7 +113,9 @@ impl fmt::Display for Source {
     }
 }
 
-/// The parsed `registry.toml` manifest.
+/// The parsed `registry.toml` manifest. Written by hand: it records no hashes —
+/// a component's hash is computed from its source on the fly (see
+/// [`content_hash`]).
 #[derive(Deserialize)]
 struct Manifest {
     /// The manifest format version. Required; used to tell formats apart so a
@@ -126,7 +130,6 @@ struct Manifest {
 
 #[derive(Deserialize)]
 struct Entry {
-    hash: String,
     source: String,
     #[serde(default)]
     dependencies: Vec<Dependency>,
@@ -202,10 +205,12 @@ impl Component<'_> {
         self.name
     }
 
-    /// The component's content hash, recorded per component in the install
-    /// state so that updates can be surfaced individually.
-    pub fn hash(&self) -> &str {
-        &self.entry.hash
+    /// Computes the component's content hash by fetching its source and hashing
+    /// it (see [`content_hash`]). The hash is recorded per component in the
+    /// install state so that updates can be surfaced individually; recomputing
+    /// it from the registry reveals when the source has changed.
+    pub async fn hash(&self) -> Result<String, Error> {
+        Ok(content_hash(&self.fetch_source().await?))
     }
 
     /// The file name written into the user's components directory.
@@ -225,6 +230,24 @@ impl Component<'_> {
     pub fn dependencies(&self) -> &[Dependency] {
         &self.entry.dependencies
     }
+}
+
+/// Computes the content hash recorded for a component, the sha256 of its source
+/// prefixed with `sha256:`. Hashing the same source always yields the same
+/// value, so a project can tell its installed component apart from an updated
+/// one by comparing the hash it recorded against a fresh hash of the registry's
+/// current source.
+pub fn content_hash(source: &str) -> String {
+    format!("sha256:{}", hex(Sha256::digest(source.as_bytes()).as_ref()))
+}
+
+/// Lowercase hex encoding of a byte slice.
+fn hex(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        write!(out, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    out
 }
 
 /// An error loading a registry or one of its components.
