@@ -41,11 +41,10 @@ impl DevCommand {
         let (tx, mut rx) = mpsc::unbounded_channel::<notify::Result<notify::Event>>();
         let mut watcher = recommended_watcher(move |event: notify::Result<notify::Event>| {
             if let Ok(ev) = &event
-                && matches!(ev.kind, EventKind::Access(_))
+                && !matches!(ev.kind, EventKind::Access(_))
             {
-                return;
+                let _ = tx.send(event);
             }
-            let _ = tx.send(event);
         })
         .expect("failed to create file watcher");
         for dir in &watch_dirs {
