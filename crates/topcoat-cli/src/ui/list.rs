@@ -29,6 +29,17 @@ impl ListCommand {
         let listings = manage::list(&project, self.registry.as_deref()).await?;
 
         for listing in &listings {
+            // Skip registries that have no components installed from them.
+            if self.installed
+                && listing.outcome.as_ref().is_ok_and(|components| {
+                    components.iter().all(|component| {
+                        matches!(component.status, InstallStatus::Available { .. })
+                    })
+                })
+            {
+                continue;
+            }
+
             // Separate registry blocks with a blank line.
             println!();
             println!(
