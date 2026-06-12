@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::{Registry, Source};
+
 use super::project::Project;
 
 /// The install-state file tracking which components a project has added.
@@ -169,10 +171,20 @@ impl InstallState {
         Ok(name.to_string())
     }
 
-    /// Writes a fresh install state for a project that has none, recording
-    /// `base_dir` (default `src/components`) as the base for component output.
-    /// Errors if an install state already exists rather than clobbering it.
-    pub(super) fn create(project: &Project, base_dir: Option<PathBuf>) -> Result<Self, String> {
+    /// Writes a fresh install state for a project that has none, seeding it with
+    /// the initial default registry so the other commands always have a registry
+    /// to work against without synthesizing one on the fly.
+    ///
+    /// `base_dir` overrides where components are installed (default
+    /// `src/components`). With a `url`, that registry becomes the default and is
+    /// loaded to learn its declared name; without one, the built-in `topcoat`
+    /// registry is used. Errors if an install state already exists rather than
+    /// clobbering it.
+    pub(super) async fn create(
+        project: &Project,
+        base_dir: Option<PathBuf>,
+        url: Option<String>,
+    ) -> Result<Self, String> {
         let path = project.state_path();
         if path.exists() {
             return Err(format!(
@@ -180,10 +192,33 @@ impl InstallState {
                 path.display()
             ));
         }
+
         let mut state = Self::default();
         if let Some(base_dir) = base_dir {
             state.base_dir = base_dir;
         }
+
+        // Resolve the initial default registry: with a url, load it to learn the
+        // name it declares for itself; otherwise fall back to the built-in one.
+        let (name, url) = match url {
+            Some(url) => {
+                let stored = project.to_stored(&url);
+                let working = project.to_working(&stored);
+                let registry = Registry::load(Source::parse(&working))
+                    .await
+                    .map_err(|error| format!("failed to load registry {working}: {error}"))?;
+                (registry.name().to_string(), stored)
+            }
+            None => (
+                DEFAULT_REGISTRY_NAME.to_string(),
+                Self::default_url(DEFAULT_REGISTRY_NAME).expect("built-in registry has a location"),
+            ),
+        };
+
+        let registry = RegistryState::new(&name, url, &state.base_dir);
+        state.default_registry = name.clone();
+        state.registries.insert(name, registry);
+
         state.save(project)?;
         Ok(state)
     }

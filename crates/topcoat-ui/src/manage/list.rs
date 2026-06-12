@@ -40,27 +40,14 @@ pub async fn list(
     project: &Project,
     selected: Option<&str>,
 ) -> Result<Vec<RegistryListing>, String> {
-    let mut state = InstallState::load(project)?;
+    let state = InstallState::load(project)?;
 
-    // Ensure there is something to list: a named registry that isn't tracked yet
-    // (only valid for one with a built-in location), or the project's default
-    // registry when nothing has been added yet.
-    match selected {
-        Some(name) if !state.registries.contains_key(name) => {
-            let url = InstallState::default_url(name)
-                .ok_or_else(|| format!("unknown registry `{name}`"))?;
-            let registry = RegistryState::new(name, url, &state.base_dir);
-            state.registries.insert(name.to_string(), registry);
+    // The install state always tracks at least the default registry (seeded by
+    // `init`), so a selected registry that isn't tracked is simply unknown.
+    if let Some(name) = selected {
+        if !state.registries.contains_key(name) {
+            return Err(format!("unknown registry `{name}`"));
         }
-        None if state.registries.is_empty() => {
-            let name = state.default_registry.clone();
-            let url = InstallState::default_url(&name).ok_or_else(|| {
-                format!("default registry `{name}` has no known location; run `topcoat ui add` first")
-            })?;
-            let registry = RegistryState::new(&name, url, &state.base_dir);
-            state.registries.insert(name, registry);
-        }
-        _ => {}
     }
 
     let mut listings = Vec::new();

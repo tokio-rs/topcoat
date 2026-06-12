@@ -21,7 +21,7 @@ mod remove;
 mod state;
 
 pub use add::{AddOptions, AddOutcome, AddedComponent, add};
-pub use init::{Initialized, init};
+pub use init::{InitOptions, Initialized, init};
 pub use list::{ComponentStatus, InstallStatus, RegistryListing, list};
 pub use project::Project;
 pub use remove::{Removed, remove};

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 use console::style;
-use topcoat_ui::manage::{self, Project};
+use topcoat_ui::manage::{self, InitOptions, Project};
 
 use super::ProjectArg;
 
@@ -11,27 +11,40 @@ pub(super) struct InitCommand {
     /// Base directory for component install output (defaults to `src/components`)
     #[arg(short, long)]
     base_dir: Option<PathBuf>,
+    /// Location of the default registry (a path, `file://` path, or
+    /// `http(s)://` URL); defaults to the built-in `topcoat` registry
+    #[arg(long)]
+    url: Option<String>,
     #[command(flatten)]
     project: ProjectArg,
 }
 
 impl InitCommand {
     pub(super) async fn run(self) {
-        if let Err(error) = self.run_inner() {
+        if let Err(error) = self.run_inner().await {
             eprintln!("{}", style(error).red());
             std::process::exit(1);
         }
     }
 
-    fn run_inner(self) -> Result<(), String> {
+    async fn run_inner(self) -> Result<(), String> {
         let project = Project::locate(self.project.project)?;
-        let initialized = manage::init(&project, self.base_dir)?;
+        let options = InitOptions {
+            base_dir: self.base_dir,
+            url: self.url,
+        };
+        let initialized = manage::init(&project, options).await?;
 
         println!(
             "{} initialized {} {}",
             style("+").green(),
             style(initialized.state_file.display()).bold(),
-            style(format!("(components install under {})", initialized.base_dir.display())).dim(),
+            style(format!(
+                "({} registry, components under {})",
+                initialized.registry,
+                initialized.base_dir.display()
+            ))
+            .dim(),
         );
         Ok(())
     }
