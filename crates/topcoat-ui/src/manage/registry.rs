@@ -32,7 +32,7 @@ pub struct RemovedRegistry {
 /// the name it declares for itself, used as the tracked name unless `name`
 /// overrides it. Adding a registry whose name or location is already tracked is
 /// an error, so the call never silently shadows an existing registry. Its
-/// components install under `<base_dir>/<name>`, fixed at this point.
+/// components install under `<components_dir>/<name>`, fixed at this point.
 pub async fn add_registry(
     project: &Project,
     url: &str,
@@ -59,7 +59,7 @@ pub async fn add_registry(
         ));
     }
 
-    let registry_state = RegistryState::new(&name, stored.clone(), &state.base_dir);
+    let registry_state = RegistryState::new(&name, stored.clone(), &state.components_dir);
     let components_dir = registry_state.components_dir.clone();
     state.registries.insert(name.clone(), registry_state);
     state.save(project)?;

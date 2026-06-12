@@ -10,11 +10,11 @@ use super::ProjectArg;
 pub(super) struct InitCommand {
     /// Base directory for component install output (defaults to `src/components`)
     #[arg(short, long)]
-    base_dir: Option<PathBuf>,
+    components_dir: Option<PathBuf>,
     /// Location of the default registry (a path, `file://` path, or
     /// `http(s)://` URL); defaults to the built-in `topcoat` registry
     #[arg(long)]
-    url: Option<String>,
+    registry_url: Option<String>,
     #[command(flatten)]
     project: ProjectArg,
 }
@@ -30,8 +30,8 @@ impl InitCommand {
     async fn run_inner(self) -> Result<(), String> {
         let project = Project::locate(self.project.project)?;
         let options = InitOptions {
-            base_dir: self.base_dir,
-            url: self.url,
+            components_dir: self.components_dir,
+            registry_url: self.registry_url,
         };
         let initialized = manage::init(&project, options).await?;
 
@@ -42,7 +42,7 @@ impl InitCommand {
             style(format!(
                 "({} registry, components under {})",
                 initialized.registry,
-                initialized.base_dir.display()
+                initialized.components_dir.display()
             ))
             .dim(),
         );
