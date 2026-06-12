@@ -1,6 +1,6 @@
 import { effect } from "@maverick-js/signals";
 
-import type { Context } from "./context";
+import { Context } from "./context";
 import type { Scope } from "./scope";
 import { isNodeViewParts } from "./view";
 
@@ -13,7 +13,7 @@ export function setupTextExpression(
 	scope: Scope,
 ): void {
 	const compute = new Function("cx", `return ${js};`) as Compute;
-	const { context } = scope.runtime;
+	const context = new Context(scope);
 
 	let first = true;
 	scope.run(() => {

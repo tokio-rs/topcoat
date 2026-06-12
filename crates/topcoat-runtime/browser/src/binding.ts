@@ -1,6 +1,6 @@
 import { effect } from "@maverick-js/signals";
 
-import type { Context } from "./context";
+import { Context } from "./context";
 import type { Scope } from "./scope";
 import { isAttributeValueViewParts } from "./view";
 
@@ -26,7 +26,7 @@ export function setupBinding(el: Element, attr: Attr, scope: Scope): void {
 	const name = attr.name.substring(BIND_PREFIX.length);
 	const compute = new Function("cx", `return ${attr.value};`) as Compute;
 
-	const { context } = scope.runtime;
+	const context = new Context(scope);
 	scope.run(() => {
 		effect(() => {
 			write(el, name, compute(context));

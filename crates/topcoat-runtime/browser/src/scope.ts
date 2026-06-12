@@ -3,29 +3,19 @@ import {
 	effect,
 	type Scope as MaverickScope,
 	scoped,
-	untrack,
 } from "@maverick-js/signals";
 
 import type { ReactiveScopeId } from "./comment";
-import type { Runtime } from "./runtime";
-import { scan } from "./scan";
-import type { SignalId } from "./signal";
 
-/**
- * A region of the DOM that owns disposable reactive resources (effects and
- * possibly child scopes). Disposing a scope recursively disposes its children
- * and removes any signals it owns from the registry.
- */
+export type HandleId = string;
+
 export class Scope {
-	readonly children = new Set<Scope>();
-	readonly signalIds = new Set<SignalId>();
+	private readonly children = new Set<Scope>();
+	private readonly handles = new Map<HandleId, unknown>();
 	private readonly mScope: MaverickScope = createScope();
 	private disposed = false;
 
-	constructor(
-		readonly parent: Scope | null,
-		readonly runtime: Runtime,
-	) {
+	constructor(readonly parent: Scope | null) {
 		parent?.children.add(this);
 	}
 
@@ -39,18 +29,27 @@ export class Scope {
 		this.disposed = true;
 
 		for (const child of this.children) child.dispose();
+
 		this.children.clear();
 
 		this.mScope.dispose();
-
-		for (const id of this.signalIds) this.runtime.registry.delete(id);
-		this.signalIds.clear();
 
 		this.parent?.children.delete(this);
 	}
 
 	get isDisposed(): boolean {
 		return this.disposed;
+	}
+
+	pushHandle(id: HandleId, value: unknown) {
+		this.handles.set(id, value);
+	}
+
+	handle(id: HandleId): unknown | undefined {
+		const handle = this.handles.get(id);
+		if (handle) return handle;
+		if (this.parent) return this.parent.handle(id);
+		return undefined;
 	}
 }
 
@@ -72,14 +71,13 @@ export class ReactiveScope extends Scope {
 
 	constructor(
 		parent: Scope,
-		runtime: Runtime,
 		readonly scopeId: ReactiveScopeId,
-		readonly track: SignalId[],
+		readonly track: HandleId[],
 		readonly path: string,
 		readonly startNode: Comment,
 	) {
-		super(parent, runtime);
-		this.contentScope = new Scope(this, runtime);
+		super(parent);
+		this.contentScope = new Scope(this);
 	}
 
 	attachEnd(end: Comment): void {
@@ -95,7 +93,6 @@ export class ReactiveScope extends Scope {
 		let first = true;
 		this.run(() => {
 			effect(() => {
-				for (const id of this.track) this.runtime.registry.read(id);
 				if (first) {
 					first = false;
 					return;
@@ -122,44 +119,44 @@ export class ReactiveScope extends Scope {
 		const ac = new AbortController();
 		this.abortController = ac;
 
-		const params = untrack(() =>
-			this.track.map((id) => ({
-				id,
-				value: (
-					this.runtime.registry.get(id)?.() as { dehydrate: () => unknown }
-				).dehydrate(),
-			})),
-		);
-		const url = `${this.path}?signals=${encodeURIComponent(JSON.stringify(params))}`;
-
-		let html: string;
-		try {
-			const res = await fetch(url, { signal: ac.signal });
-			html = await res.text();
-		} catch (e) {
-			if ((e as Error).name === "AbortError") return;
-			throw e;
-		}
-
-		if (this.isDisposed || this.abortController !== ac) return;
-		this.abortController = null;
-
-		const parent = this.startNode.parentNode;
-		const end = this.endNode;
-		if (!parent) return;
-
-		this.contentScope.dispose();
-		this.contentScope = new Scope(this, this.runtime);
-
-		let n: ChildNode | null = this.startNode.nextSibling;
-		while (n && n !== end) {
-			const next: ChildNode | null = n.nextSibling;
-			parent.removeChild(n);
-			n = next;
-		}
-		const fragment = document.createRange().createContextualFragment(html);
-		parent.insertBefore(fragment, end);
-
-		scan(parent, this.startNode, end, this.contentScope);
+		// const params = untrack(() =>
+		// 	this.track.map((id) => ({
+		// 		id,
+		// 		value: (
+		// 			this.runtime.registry.get(id)?.() as { dehydrate: () => unknown }
+		// 		).dehydrate(),
+		// 	})),
+		// );
+		// const url = `${this.path}?signals=${encodeURIComponent(JSON.stringify(params))}`;
+		//
+		// let html: string;
+		// try {
+		// 	const res = await fetch(url, { signal: ac.signal });
+		// 	html = await res.text();
+		// } catch (e) {
+		// 	if ((e as Error).name === "AbortError") return;
+		// 	throw e;
+		// }
+		//
+		// if (this.isDisposed || this.abortController !== ac) return;
+		// this.abortController = null;
+		//
+		// const parent = this.startNode.parentNode;
+		// const end = this.endNode;
+		// if (!parent) return;
+		//
+		// this.contentScope.dispose();
+		// this.contentScope = new Scope(this);
+		//
+		// let n: ChildNode | null = this.startNode.nextSibling;
+		// while (n && n !== end) {
+		// 	const next: ChildNode | null = n.nextSibling;
+		// 	parent.removeChild(n);
+		// 	n = next;
+		// }
+		// const fragment = document.createRange().createContextualFragment(html);
+		// parent.insertBefore(fragment, end);
+		//
+		// scan(parent, this.startNode, end, this.contentScope);
 	}
 }

@@ -1,48 +1,35 @@
-import { Context } from "./context";
-import { type SignalId, SignalRegistry } from "./signal";
-import type { DehydratedSurrogate } from "./surrogate";
+import type { HandleId } from "./scope";
 
 export type ReactiveScopeId = string;
 
 export type CommentMarker =
-	| { kind: "signal"; id: SignalId; value: unknown }
+	| { kind: "handle"; id: HandleId; value: unknown }
 	| { kind: "expr-start"; js: string }
 	| { kind: "expr-end" }
 	| {
 			kind: "scope-start";
 			id: ReactiveScopeId;
-			track: SignalId[];
+			track: HandleId[];
 			path: string;
 	  }
 	| { kind: "scope-end"; id: ReactiveScopeId };
 
-const SIGNAL_RE = /^\s*::topcoat::signal\(([\s\S]*)\)\s*$/;
-const EXPR_START_RE = /^\s*::topcoat::expr::start\("([^"]*)"\)\s*$/;
-const EXPR_END_RE = /^\s*::topcoat::expr::end\s*$/;
+const HANDLE_RE = /^::topcoat::handle\("([^"]+)", ([\s\S]*)\)$/;
+const EXPR_START_RE = /^::topcoat::expr::start\("([^"]*)"\)$/;
+const EXPR_END_RE = /^::topcoat::expr::end$/;
 const SCOPE_START_RE =
-	/^\s*::topcoat::scope::start\(("[^"]+"), (\[[^\]]*\]), ("[^"]*")\)\s*$/;
-const SCOPE_END_RE = /^\s*::topcoat::scope::end\(("[^"]+")\)\s*$/;
+	/^::topcoat::scope::start\(("[^"]+"), (\[[^\]]*\]), ("[^"]*")\)$/;
+const SCOPE_END_RE = /^::topcoat::scope::end\(("[^"]+")\)$/;
 
 export function parseComment(node: Comment): CommentMarker | null {
-	const text = node.data;
+	const text = node.data.trim();
 
-	const sig = SIGNAL_RE.exec(text);
-	if (sig) {
-		type SignalPayload = {
-			t: "signal";
-			id: SignalId;
-			v: DehydratedSurrogate;
-		};
-
-		const payload = JSON.parse(sig[1] ?? "") as SignalPayload;
-		if (payload.t !== "signal" || typeof payload.id !== "string") {
-			throw new Error("Invalid signal marker");
-		}
-		const value = new Context(new SignalRegistry()).hydrate(payload.v);
+	const handle = HANDLE_RE.exec(text);
+	if (handle) {
 		return {
-			kind: "signal",
-			id: payload.id,
-			value,
+			kind: "handle",
+			id: handle[1] as HandleId,
+			value: JSON.parse(handle[2] ?? "") as unknown,
 		};
 	}
 
@@ -64,7 +51,7 @@ export function parseComment(node: Comment): CommentMarker | null {
 		return {
 			kind: "scope-start",
 			id: JSON.parse(start[1] ?? "") as ReactiveScopeId,
-			track: JSON.parse(start[2] ?? "") as SignalId[],
+			track: JSON.parse(start[2] ?? "") as HandleId[],
 			path: JSON.parse(start[3] ?? "") as string,
 		};
 	}

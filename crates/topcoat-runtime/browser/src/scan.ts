@@ -1,5 +1,6 @@
 import { setupBinding } from "./binding";
 import { type CommentMarker, parseComment } from "./comment";
+import { Context } from "./context";
 import { setupEventHandler } from "./event";
 import { ReactiveScope, type Scope } from "./scope";
 import { setupTextExpression } from "./text";
@@ -46,7 +47,6 @@ export function scan(
 			continue;
 		}
 
-		// COMMENT_NODE
 		const marker = parseComment(node as Comment);
 		if (!marker) continue;
 
@@ -71,10 +71,10 @@ function processMarker(
 	if (current === undefined) throw new Error("Stack was empty");
 
 	switch (marker.kind) {
-		case "signal": {
-			if (current.runtime.registry.insert(marker.id, marker.value)) {
-				current.signalIds.add(marker.id);
-			}
+		case "handle": {
+			const handle = new Context(current).hydrate(marker.value);
+			console.log("handle:", handle);
+			current.pushHandle(marker.id, handle);
 			break;
 		}
 
@@ -99,7 +99,6 @@ function processMarker(
 		case "scope-start": {
 			const reactive = new ReactiveScope(
 				current,
-				current.runtime,
 				marker.id,
 				marker.track,
 				marker.path,

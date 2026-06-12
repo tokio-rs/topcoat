@@ -1,3 +1,4 @@
-import { Runtime } from "./runtime";
+import { scan } from "./scan";
+import { Scope } from "./scope";
 
-new Runtime().start(document.body);
+scan(document.documentElement, null, null, new Scope(null));

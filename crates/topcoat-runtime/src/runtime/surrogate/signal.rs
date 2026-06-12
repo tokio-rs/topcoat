@@ -1,7 +1,9 @@
 use ref_cast::RefCast;
-use serde::Serialize;
+use serde::{Serialize, ser::SerializeStruct};
 
-use crate::runtime::{Signal, Surrogated, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
+use crate::runtime::{
+    Signal, SignalId, Surrogated, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref,
+};
 
 #[derive(RefCast)]
 #[repr(transparent)]
@@ -45,21 +47,20 @@ impl_surrogate!({T} Signal<T>, SignalSurrogate<T>);
 impl_surrogate_ref!({T} Signal<T>, SignalSurrogate<T>);
 impl_surrogate_mut!({T} Signal<T>, SignalSurrogate<T>);
 
-impl<T> Serialize for SignalSurrogate<T> {
+impl<T> Serialize for SignalSurrogate<T>
+where
+    T: Surrogated,
+    <T as Surrogated>::Surrogate: Serialize,
+    for<'b> &'b T: Surrogated<Surrogate = &'b <T as Surrogated>::Surrogate>,
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        #[derive(Serialize)]
-        struct TaggedSignal {
-            t: &'static str,
-            id: std::string::String,
-        }
-
-        TaggedSignal {
-            t: "Signal",
-            id: self.0.id().to_string(),
-        }
-        .serialize(serializer)
+        let mut fields = serializer.serialize_struct("Signal", 3)?;
+        fields.serialize_field("t", "Signal")?;
+        fields.serialize_field("id", &self.0.id())?;
+        fields.serialize_field("v", self.read())?;
+        fields.end()
     }
 }

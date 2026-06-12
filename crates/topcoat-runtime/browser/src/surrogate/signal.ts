@@ -1,13 +1,20 @@
-import type { WriteSignal as MaverickWriteSignal } from "@maverick-js/signals";
-
-import type { SignalId } from "../signal";
+import {
+	type WriteSignal as MaverickWriteSignal,
+	signal as maverickSignal,
+} from "@maverick-js/signals";
+import type { HandleId } from "../scope";
 import { Ref } from "./ref";
 
 export class WriteSignal<T> {
+	private readonly inner: MaverickWriteSignal<T>;
+
 	constructor(
-		private readonly id: SignalId,
-		private readonly inner: MaverickWriteSignal<T>,
-	) {}
+		private readonly id: HandleId,
+		value: T,
+	) {
+		console.log("constructing signal: ", value);
+		this.inner = maverickSignal(value);
+	}
 
 	read(): Ref<T> {
 		return new Ref(
@@ -24,7 +31,7 @@ export class WriteSignal<T> {
 		this.inner.set(v);
 	}
 
-	dehydrate(): { t: "Signal"; id: SignalId } {
+	dehydrate(): { t: "Signal"; id: HandleId } {
 		return { t: "Signal", id: this.id };
 	}
 }

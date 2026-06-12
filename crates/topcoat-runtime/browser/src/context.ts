@@ -1,10 +1,9 @@
-import type { SignalId, SignalRegistry } from "./signal";
+import type { HandleId, Scope } from "./scope";
 import {
 	type DehydratedSurrogate,
 	hydrateSurrogate,
 	Option,
 	Result,
-	WriteSignal,
 } from "./surrogate";
 
 /**
@@ -14,18 +13,14 @@ import {
  * inaccessible from inside `new Function`.
  */
 export class Context {
-	constructor(private readonly registry: SignalRegistry) {}
+	constructor(private readonly scope: Scope) {}
 
-	getRegistry(): SignalRegistry {
-		return this.registry;
+	handle(id: HandleId): unknown {
+		return this.scope.handle(id);
 	}
 
 	hydrate(s: unknown) {
 		return hydrateSurrogate(s as DehydratedSurrogate, this);
-	}
-
-	signal(id: SignalId): WriteSignal<unknown> {
-		return new WriteSignal(id, this.registry.handle(id));
 	}
 
 	some<T>(v: T): Option<T> {

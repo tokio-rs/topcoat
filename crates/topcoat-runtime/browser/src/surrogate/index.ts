@@ -1,11 +1,10 @@
 import type { Context } from "../context";
-import type { SignalId } from "../signal";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
 import { Option } from "./option";
 import { Procedure } from "./procedure";
 import { Result } from "./result";
-import { WriteSignal as RuntimeWriteSignal } from "./signal";
+import { WriteSignal } from "./signal";
 // biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
 import { Str, String } from "./string";
 
@@ -30,7 +29,8 @@ export type DehydratedSurrogate =
 			t: "Result";
 			v: { ok: DehydratedSurrogate } | { err: DehydratedSurrogate };
 	  }
-	| { t: "Signal"; id: SignalId; v?: DehydratedSurrogate }
+	| { t: "Handle"; id: string }
+	| { t: "Signal"; id: string; v: DehydratedSurrogate }
 	| { t: "Procedure"; id: string };
 
 export function hydrateSurrogate(
@@ -62,10 +62,9 @@ export function hydrateSurrogate(
 						? Result.from_ok(hydrateSurrogate(value.v.ok, cx))
 						: Result.from_err(hydrateSurrogate(value.v.err, cx));
 				case "Signal":
-					return new RuntimeWriteSignal(
-						value.id,
-						cx.getRegistry().handle(value.id),
-					);
+					return new WriteSignal(value.id, hydrateSurrogate(value.v, cx));
+				case "Handle":
+					return cx.handle(value.id);
 				case "Procedure":
 					return new Procedure(cx, value.id);
 				default:
