@@ -19,11 +19,11 @@ pub struct ComponentStatus {
 
 /// How a component relates to what the project has installed from its registry.
 pub enum InstallStatus {
-    /// Offered by the registry but not installed; carries the latest version.
-    Available { version: String },
-    /// Installed at the registry's current version.
-    UpToDate { version: String },
-    /// Installed at an older version than the registry now offers.
+    /// Offered by the registry but not installed; carries the latest hash.
+    Available { hash: String },
+    /// Installed at the hash the registry currently offers.
+    UpToDate { hash: String },
+    /// Installed at a different hash than the registry now offers.
     Update { installed: String, latest: String },
     /// Tracked as installed under this registry, which no longer offers it.
     Orphaned { installed: String },
@@ -98,12 +98,12 @@ fn statuses(registry: &Registry, state: &RegistryState) -> Vec<ComponentStatus> 
         let component = registry
             .get(component_name)
             .expect("name came from the registry");
-        let latest = component.version().to_string();
+        let latest = component.hash().to_string();
         let status = match state.components.get(*component_name) {
-            None => InstallStatus::Available { version: latest },
-            Some(installed) if installed.version == latest => InstallStatus::UpToDate { version: latest },
+            None => InstallStatus::Available { hash: latest },
+            Some(installed) if installed.hash == latest => InstallStatus::UpToDate { hash: latest },
             Some(installed) => InstallStatus::Update {
-                installed: installed.version.clone(),
+                installed: installed.hash.clone(),
                 latest,
             },
         };
@@ -118,7 +118,7 @@ fn statuses(registry: &Registry, state: &RegistryState) -> Vec<ComponentStatus> 
             out.push(ComponentStatus {
                 name: component_name.clone(),
                 status: InstallStatus::Orphaned {
-                    installed: installed.version.clone(),
+                    installed: installed.hash.clone(),
                 },
             });
         }

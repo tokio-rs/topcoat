@@ -218,7 +218,7 @@ pub async fn add(
             .insert(
                 component.name().to_string(),
                 InstalledComponent {
-                    version: component.version().to_string(),
+                    hash: component.hash().to_string(),
                     file: relative_file,
                 },
             );

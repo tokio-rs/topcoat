@@ -11,9 +11,9 @@
 //! read at runtime, so the set of available components can change without
 //! rebuilding the CLI, and projects can point at custom or remote registries.
 //!
-//! Each component is versioned independently (see [`Component::version`]); that
-//! version is recorded per component in the project's install state so updates
-//! can be surfaced for individual components.
+//! Each component is versioned independently by a hash of its source (see
+//! [`Component::hash`]); that hash is recorded per component in the project's
+//! install state so updates can be surfaced for individual components.
 //!
 //! The companion [`generate`] module (behind the `generate` feature) produces a
 //! registry's `registry.toml` from a programmatic description of its components,

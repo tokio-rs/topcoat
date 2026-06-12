@@ -126,7 +126,7 @@ struct Manifest {
 
 #[derive(Deserialize)]
 struct Entry {
-    version: String,
+    hash: String,
     source: String,
     #[serde(default)]
     dependencies: Vec<Dependency>,
@@ -202,10 +202,10 @@ impl Component<'_> {
         self.name
     }
 
-    /// The component's version, recorded per component in the install state so
-    /// that updates can be surfaced individually.
-    pub fn version(&self) -> &str {
-        &self.entry.version
+    /// The component's content hash, recorded per component in the install
+    /// state so that updates can be surfaced individually.
+    pub fn hash(&self) -> &str {
+        &self.entry.hash
     }
 
     /// The file name written into the user's components directory.

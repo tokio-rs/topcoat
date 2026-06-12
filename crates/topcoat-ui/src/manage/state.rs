@@ -41,7 +41,7 @@ pub(super) struct RegistryState {
 
 #[derive(Serialize, Deserialize)]
 pub(super) struct InstalledComponent {
-    pub version: String,
+    pub hash: String,
     pub file: PathBuf,
 }
 
