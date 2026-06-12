@@ -12,37 +12,39 @@ use crate::ast::view::{ExprKind, ViewWriter, WriteView};
 mod kw {
     use syn::custom_keyword;
 
-    custom_keyword!(signal);
+    custom_keyword!(client);
 }
 
-pub struct SignalDeclaration {
-    pub signal_kw: kw::signal,
+pub struct ClientHandle {
+    pub client_kw: kw::client,
+    pub let_token: Token![let],
     pub ident: Ident,
     pub eq_token: Token![=],
     pub expr: Expr,
     pub semi_token: Token![;],
 }
 
-impl WriteView for SignalDeclaration {
+impl WriteView for ClientHandle {
     fn write(&self, writer: &mut ViewWriter) {
         let ident = &self.ident;
         let expr = &self.expr;
         writer.let_binding(&parse_quote! { #ident }, expr);
         writer.let_binding(
             &parse_quote! { #ident },
-            &parse_quote! { &::topcoat::runtime::Signal::new(#ident) },
+            &parse_quote! { &::topcoat::runtime::ClientHandle::new(#ident) },
         );
         writer.write_expr(
             ExprKind::Node,
-            quote! { ::topcoat::runtime::SignalDeclaration::new(#ident) },
+            quote! { ::topcoat::runtime::ClientHandleDeclaration::new(#ident) },
         );
     }
 }
 
-impl Parse for SignalDeclaration {
+impl Parse for ClientHandle {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            signal_kw: input.parse()?,
+            client_kw: input.parse()?,
+            let_token: input.parse()?,
             ident: input.parse()?,
             eq_token: input.parse()?,
             expr: input.parse()?,
@@ -51,14 +53,14 @@ impl Parse for SignalDeclaration {
     }
 }
 
-impl ParseOption for SignalDeclaration {
+impl ParseOption for ClientHandle {
     fn peek(input: ParseStream) -> bool {
-        input.peek(kw::signal)
+        input.peek(kw::client)
     }
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_pretty::PrettyPrint for SignalDeclaration {
+impl topcoat_pretty::PrettyPrint for ClientHandle {
     fn pretty_print(&self, _printer: &mut topcoat_pretty::Printer<'_>) {
         todo!();
     }

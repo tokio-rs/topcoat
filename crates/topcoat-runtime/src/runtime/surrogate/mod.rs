@@ -1,6 +1,7 @@
 mod _bool;
 mod _f64;
 mod _str;
+mod client_handle;
 mod event;
 mod option;
 mod result;
@@ -13,6 +14,7 @@ use serde::{Deserialize, Serialize, de};
 pub use _bool::*;
 pub use _f64::*;
 pub use _str::*;
+pub use client_handle::*;
 pub use event::*;
 pub use option::*;
 pub use result::*;

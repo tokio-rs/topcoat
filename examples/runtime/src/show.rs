@@ -1,9 +1,9 @@
-use topcoat::{Result, router::page, view::view};
+use topcoat::{Result, router::page, runtime::Signal, view::view};
 
 #[page]
 async fn show() -> Result {
     view! {
-        signal show = false;
+        client let show = Signal::new(false);
 
         <button @click=$(|_e| show.set(!show.get()))>
             "click to "

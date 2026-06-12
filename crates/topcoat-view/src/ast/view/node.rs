@@ -12,8 +12,7 @@ use crate::ast::{
         TemplateIf, TemplateLet, TemplateMatch,
     },
     view::{
-        Component, DocumentType, Element, Nodes, ReactiveScope, SignalDeclaration, ViewWriter,
-        WriteView,
+        ClientHandle, Component, DocumentType, Element, Nodes, ReactiveScope, ViewWriter, WriteView,
     },
 };
 
@@ -33,7 +32,7 @@ pub enum Node {
     Break(TemplateBreak),
     Match(TemplateMatch<Node>),
     Block(TemplateBlock<Nodes>),
-    SignalDecaration(SignalDeclaration),
+    SignalDecaration(ClientHandle),
     ReactiveScope(ReactiveScope),
 }
 
@@ -95,7 +94,7 @@ impl Parse for Node {
             Self::Match(input.parse()?)
         } else if TemplateBlock::<Nodes>::peek(input) {
             Self::Block(input.parse()?)
-        } else if SignalDeclaration::peek(input) {
+        } else if ClientHandle::peek(input) {
             Self::SignalDecaration(input.parse()?)
         } else if ReactiveScope::peek(input) {
             Self::ReactiveScope(input.parse()?)

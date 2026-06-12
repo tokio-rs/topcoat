@@ -2,6 +2,8 @@ use topcoat_view::runtime::{AttributeKeyViewParts, AttributeViewParts, Unescaped
 
 use crate::runtime::{Event, Expr};
 
+/// A function or closure that can be used as a DOM event handler. Notably this
+/// allows synchronous and asynchronous functions.
 pub trait EventHandlerFn {}
 
 impl<T, R> EventHandlerFn for T where T: Fn(Event) -> R {}

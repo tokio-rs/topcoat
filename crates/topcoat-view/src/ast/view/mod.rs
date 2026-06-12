@@ -1,3 +1,4 @@
+mod client_handle;
 mod component;
 mod document_type;
 mod element;
@@ -7,9 +8,9 @@ mod html_ident;
 mod node;
 mod nodes;
 mod reactive_scope;
-mod signal_declaration;
 mod view_writer;
 
+pub use client_handle::*;
 pub use component::*;
 pub use document_type::*;
 pub use element::*;
@@ -19,7 +20,6 @@ pub use html_ident::*;
 pub use node::*;
 pub use nodes::*;
 pub use reactive_scope::*;
-pub use signal_declaration::*;
 pub(crate) use view_writer::*;
 
 use proc_macro2::TokenStream;

@@ -1,10 +1,12 @@
 mod bind_attribute;
+mod client_handle;
 mod event_handler;
 mod expr;
 mod signal;
 mod surrogate;
 
 pub use bind_attribute::*;
+pub use client_handle::*;
 pub use event_handler::*;
 pub use expr::*;
 pub use signal::*;
