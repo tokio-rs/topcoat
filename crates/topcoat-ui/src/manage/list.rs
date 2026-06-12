@@ -51,14 +51,15 @@ pub async fn list(
                 .ok_or_else(|| format!("unknown registry `{name}`"))?;
             state
                 .registries
-                .insert(name.to_string(), RegistryState::new(url));
+                .insert(name.to_string(), RegistryState::new(name, url));
         }
         None if state.registries.is_empty() => {
             let name = state.default_registry.clone();
             let url = InstallState::default_url(&name).ok_or_else(|| {
                 format!("default registry `{name}` has no known location; run `topcoat ui add` first")
             })?;
-            state.registries.insert(name, RegistryState::new(url));
+            let registry = RegistryState::new(&name, url);
+            state.registries.insert(name, registry);
         }
         _ => {}
     }

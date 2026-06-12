@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::io::ErrorKind;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +13,6 @@ pub(super) const STATE_FILE: &str = "components.toml";
 pub(super) const DEFAULT_REGISTRY_NAME: &str = "topcoat";
 /// The format version written into the install state.
 const STATE_VERSION: u32 = 1;
-const DEFAULT_COMPONENTS_DIR: &str = "src/components/ui";
 
 /// The contents of `components.toml`. Components are grouped under the named
 /// registry they were added from, so the same component name can be installed
@@ -33,7 +32,8 @@ pub(super) struct InstallState {
 pub(super) struct RegistryState {
     /// The registry location: a path, a `file://` path, or an `http(s)://` URL.
     pub url: String,
-    #[serde(default = "default_components_dir")]
+    /// Where this registry's components are installed. Set to
+    /// `src/components/<registry-name>` when the registry is first added.
     pub components_dir: PathBuf,
     #[serde(default)]
     pub components: BTreeMap<String, InstalledComponent>,
@@ -56,10 +56,10 @@ impl Default for InstallState {
 }
 
 impl RegistryState {
-    pub(super) fn new(url: String) -> Self {
+    pub(super) fn new(name: &str, url: String) -> Self {
         Self {
             url,
-            components_dir: default_components_dir(),
+            components_dir: default_components_dir(name),
             components: BTreeMap::new(),
         }
     }
@@ -127,7 +127,7 @@ impl InstallState {
                 let url = url
                     .or_else(|| Self::default_url(name))
                     .ok_or_else(|| format!("unknown registry `{name}`; pass --url to define it"))?;
-                Ok(entry.insert(RegistryState::new(url)))
+                Ok(entry.insert(RegistryState::new(name, url)))
             }
         }
     }
@@ -154,7 +154,7 @@ impl InstallState {
         }
 
         self.registries
-            .insert(name.to_string(), RegistryState::new(url.to_string()));
+            .insert(name.to_string(), RegistryState::new(name, url.to_string()));
         Ok(name.to_string())
     }
 }
@@ -167,6 +167,7 @@ fn default_registry_name() -> String {
     DEFAULT_REGISTRY_NAME.to_string()
 }
 
-fn default_components_dir() -> PathBuf {
-    PathBuf::from(DEFAULT_COMPONENTS_DIR)
+/// The default install dir for a registry: `src/components/<registry-name>`.
+fn default_components_dir(name: &str) -> PathBuf {
+    Path::new("src/components").join(name)
 }
