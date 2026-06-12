@@ -22,7 +22,7 @@ pub(super) struct InstallState {
     /// Set once at `init` time.
     #[serde(default = "default_components_dir")]
     pub components_dir: PathBuf,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub registries: BTreeMap<String, RegistryState>,
 }
 
