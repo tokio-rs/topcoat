@@ -16,6 +16,8 @@ enum RegistrySubcommand {
     Add(AddCommand),
     /// Remove a registry from the project's install state
     Remove(RemoveCommand),
+    /// Set a tracked registry as the default used by `add`
+    Default(DefaultCommand),
 }
 
 #[derive(Args)]
@@ -36,11 +38,20 @@ struct RemoveCommand {
     project: ProjectArg,
 }
 
+#[derive(Args)]
+struct DefaultCommand {
+    /// Name of the registry to make the default
+    name: String,
+    #[command(flatten)]
+    project: ProjectArg,
+}
+
 impl RegistryCommand {
     pub(super) async fn run(self) {
         let result = match self.command {
             RegistrySubcommand::Add(cmd) => cmd.run().await,
             RegistrySubcommand::Remove(cmd) => cmd.run(),
+            RegistrySubcommand::Default(cmd) => cmd.run(),
         };
         if let Err(error) = result {
             eprintln!("{}", style(error).red());
@@ -79,6 +90,27 @@ impl RemoveCommand {
             style("-").red(),
             style(&removed.name).bold(),
             style(format!("({})", removed.url)).dim(),
+        );
+        if removed.was_default {
+            println!(
+                "  {}",
+                style("was the default; `add` now needs --registry until a new default is set")
+                    .yellow(),
+            );
+        }
+        Ok(())
+    }
+}
+
+impl DefaultCommand {
+    fn run(self) -> Result<(), String> {
+        let project = Project::locate(self.project.project)?;
+        manage::set_default(&project, &self.name)?;
+
+        println!(
+            "{} {} is now the default registry",
+            style("✓").green(),
+            style(&self.name).bold(),
         );
         Ok(())
     }

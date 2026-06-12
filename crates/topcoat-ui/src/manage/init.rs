@@ -34,7 +34,9 @@ pub async fn init(project: &Project, options: InitOptions) -> Result<Initialized
     let state = InstallState::create(project, options.base_dir, options.url).await?;
     Ok(Initialized {
         state_file: PathBuf::from(STATE_FILE),
-        registry: state.default_registry,
+        registry: state
+            .default_registry
+            .expect("init seeds a default registry"),
         base_dir: state.base_dir,
     })
 }

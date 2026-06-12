@@ -23,8 +23,11 @@ const STATE_VERSION: u32 = 1;
 pub(super) struct InstallState {
     #[serde(default = "default_state_version")]
     pub version: u32,
-    #[serde(default = "default_registry_name")]
-    pub default_registry: String,
+    /// The registry used by `add` when none is given. Optional: removing the
+    /// default registry leaves the project with none, after which adding a
+    /// component requires an explicit `--registry`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_registry: Option<String>,
     /// The base directory under which each registry's components are installed:
     /// a registry added later gets `<base_dir>/<registry-name>` as its output
     /// directory. Set once at `init` time.
@@ -56,7 +59,7 @@ impl Default for InstallState {
     fn default() -> Self {
         Self {
             version: STATE_VERSION,
-            default_registry: default_registry_name(),
+            default_registry: None,
             base_dir: default_base_dir(),
             registries: BTreeMap::new(),
         }
@@ -207,7 +210,7 @@ impl InstallState {
         };
 
         let registry = RegistryState::new(&name, url, &state.base_dir);
-        state.default_registry = name.clone();
+        state.default_registry = Some(name.clone());
         state.registries.insert(name, registry);
 
         state.save(project)?;
@@ -217,10 +220,6 @@ impl InstallState {
 
 fn default_state_version() -> u32 {
     STATE_VERSION
-}
-
-fn default_registry_name() -> String {
-    DEFAULT_REGISTRY_NAME.to_string()
 }
 
 /// The default base directory for component install output.

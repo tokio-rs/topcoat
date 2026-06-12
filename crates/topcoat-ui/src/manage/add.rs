@@ -313,8 +313,16 @@ async fn resolve_root_registry(
         return Ok(name.to_string());
     }
 
+    // With no explicit --registry, fall back to the default — but the project
+    // may have none (e.g. its default registry was removed), in which case the
+    // caller must choose one.
+    let Some(default) = state.default_registry.clone() else {
+        return Err(format!(
+            "no default registry to add `{component}` from; pass --registry to choose one"
+        ));
+    };
+
     // Prefer the default registry whenever it offers the component.
-    let default = state.default_registry.clone();
     let default_url = {
         let registry = state.registry_mut(&default)?;
         project.to_working(&registry.url)

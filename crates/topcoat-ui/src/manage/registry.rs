@@ -21,6 +21,9 @@ pub struct RemovedRegistry {
     pub name: String,
     /// The stored registry location it had.
     pub url: String,
+    /// Whether it had been the default registry, now leaving the project with
+    /// none.
+    pub was_default: bool,
 }
 
 /// Adds a registry to the project's install state.
@@ -72,8 +75,9 @@ pub async fn add_registry(
 ///
 /// A registry that still has components installed cannot be removed — those
 /// components must be removed first — so the registry never disappears out from
-/// under tracked files. The default registry is likewise protected, since the
-/// install state needs one to operate.
+/// under tracked files. Removing the default registry is allowed; it simply
+/// leaves the project with no default, after which `add` requires an explicit
+/// `--registry` until a new default is set.
 pub fn remove_registry(project: &Project, name: &str) -> Result<RemovedRegistry, String> {
     let mut state = InstallState::load(project)?;
 
@@ -89,20 +93,39 @@ pub fn remove_registry(project: &Project, name: &str) -> Result<RemovedRegistry,
             "registry `{name}` still has {count} component{plural} installed; remove them first"
         ));
     }
-    if state.default_registry == name {
-        return Err(format!(
-            "registry `{name}` is the default registry and cannot be removed"
-        ));
-    }
 
     let removed = state
         .registries
         .remove(name)
         .expect("registry resolved above");
+    // Clear the default if it pointed at the registry just removed.
+    let was_default = state.default_registry.as_deref() == Some(name);
+    if was_default {
+        state.default_registry = None;
+    }
     state.save(project)?;
 
     Ok(RemovedRegistry {
         name: name.to_string(),
         url: removed.url,
+        was_default,
     })
+}
+
+/// Sets a tracked registry as the project's default, used by `add` when no
+/// `--registry` is given. The registry must already be tracked.
+pub fn set_default(project: &Project, name: &str) -> Result<(), String> {
+    let mut state = InstallState::load(project)?;
+
+    if !state.registries.contains_key(name) {
+        return Err(format!(
+            "unknown registry `{name}`; add it with `topcoat ui registry add <url>`"
+        ));
+    }
+    if state.default_registry.as_deref() == Some(name) {
+        return Err(format!("registry `{name}` is already the default"));
+    }
+
+    state.default_registry = Some(name.to_string());
+    state.save(project)
 }
