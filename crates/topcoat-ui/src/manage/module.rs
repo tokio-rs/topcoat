@@ -42,6 +42,13 @@ fn module_file(dir: &Path) -> Result<PathBuf, String> {
     }
 }
 
+/// Verifies the components directory does not declare its module via both a
+/// sibling `<dir>.rs` and an inner `mod.rs`. Call this before mutating any files
+/// so an ambiguous layout aborts before components are written or removed.
+pub(super) fn check(dir: &Path) -> Result<(), String> {
+    module_file(dir).map(|_| ())
+}
+
 /// Declares the component file in the components directory's module file so it is
 /// reachable, creating or appending to the file as needed.
 pub(super) fn declare(dir: &Path, file_name: &str) -> Result<(), String> {

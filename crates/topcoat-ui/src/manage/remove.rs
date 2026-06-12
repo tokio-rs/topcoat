@@ -39,6 +39,9 @@ pub fn remove(
     // All registries install into one flat directory.
     let components_dir = state.components_dir.clone();
 
+    // Reject an ambiguous module layout up front, before deleting any file.
+    module::check(&project.resolve(&components_dir))?;
+
     let mut removed = Vec::new();
     for (registry_name, component) in targets {
         let registry = state

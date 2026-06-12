@@ -232,6 +232,8 @@ pub fn add(
 
     // Phase 2 — commit. Everything resolved, so remove anything being replaced,
     // write the files, wire up the module declarations, and persist the state.
+    // Reject an ambiguous module layout up front, before touching any file.
+    module::check(&project.resolve(&state.components_dir))?;
     for removal in &removals {
         match std::fs::remove_file(&removal.file) {
             Ok(()) => {}
