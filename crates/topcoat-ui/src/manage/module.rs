@@ -1,5 +1,5 @@
 use std::io::ErrorKind;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// The module name a component file is declared under, or `None` if the file is
 /// not an ordinary `*.rs` module (e.g. `mod.rs` itself).
@@ -10,14 +10,46 @@ fn module_name(file_name: &str) -> Option<&str> {
     }
 }
 
-/// Declares the component file in the components directory's `mod.rs` so it is
+/// The file that holds the components directory's module declarations.
+///
+/// By default this is a sibling `<dir>.rs` file next to the directory. If the
+/// user instead keeps a `mod.rs` inside the directory, that file is maintained
+/// — letting either Rust module style work.
+///
+/// Rust forbids declaring a module via both files at once, so when both exist
+/// this errors rather than silently picking one (which would leave a stale file
+/// and a project that does not compile).
+fn module_file(dir: &Path) -> Result<PathBuf, String> {
+    let mod_path = dir.join("mod.rs");
+
+    let sibling = dir.file_name().map(|name| {
+        let mut sibling = name.to_os_string();
+        sibling.push(".rs");
+        // A directory without a final component (e.g. the filesystem root) has no
+        // sibling to name; `None` falls back to `mod.rs` below.
+        dir.parent().unwrap_or(dir).join(sibling)
+    });
+
+    match sibling {
+        Some(sibling) if mod_path.exists() && sibling.exists() => Err(format!(
+            "components module declared at both {} and {}; delete one to choose a module style",
+            sibling.display(),
+            mod_path.display(),
+        )),
+        _ if mod_path.exists() => Ok(mod_path),
+        Some(sibling) => Ok(sibling),
+        None => Ok(mod_path),
+    }
+}
+
+/// Declares the component file in the components directory's module file so it is
 /// reachable, creating or appending to the file as needed.
 pub(super) fn declare(dir: &Path, file_name: &str) -> Result<(), String> {
     let Some(module) = module_name(file_name) else {
         return Ok(());
     };
 
-    let mod_path = dir.join("mod.rs");
+    let mod_path = module_file(dir)?;
     let declaration = format!("pub mod {module};");
 
     let mut contents = match std::fs::read_to_string(&mod_path) {
@@ -39,13 +71,13 @@ pub(super) fn declare(dir: &Path, file_name: &str) -> Result<(), String> {
 }
 
 /// Removes the component file's declaration from the components directory's
-/// `mod.rs`. The file is deleted entirely once it holds no more declarations.
+/// module file. The file is deleted entirely once it holds no more declarations.
 pub(super) fn undeclare(dir: &Path, file_name: &str) -> Result<(), String> {
     let Some(module) = module_name(file_name) else {
         return Ok(());
     };
 
-    let mod_path = dir.join("mod.rs");
+    let mod_path = module_file(dir)?;
     let declaration = format!("pub mod {module};");
 
     let contents = match std::fs::read_to_string(&mod_path) {
