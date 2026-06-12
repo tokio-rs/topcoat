@@ -8,7 +8,7 @@ use heck::ToPascalCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    Attribute, FnArg, GenericParam, Lifetime, Pat, ReturnType, Type, TypeParam, TypeReference,
+    FnArg, GenericParam, Lifetime, Pat, ReturnType, Type, TypeParam, TypeReference,
     ext::IdentExt,
     parse_quote,
     spanned::Spanned,
