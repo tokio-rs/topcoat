@@ -69,12 +69,7 @@ impl AddCommand {
             "{} added registry {} {}",
             style("+").green(),
             style(&added.name).bold(),
-            style(format!(
-                "({}, components under {})",
-                added.url,
-                added.components_dir.display()
-            ))
-            .dim(),
+            style(format!("({})", added.url)).dim(),
         );
         Ok(())
     }

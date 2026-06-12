@@ -36,6 +36,9 @@ pub fn remove(
         targets.push((registry_name, component.clone()));
     }
 
+    // All registries install into one flat directory.
+    let components_dir = state.components_dir.clone();
+
     let mut removed = Vec::new();
     for (registry_name, component) in targets {
         let registry = state
@@ -47,7 +50,6 @@ pub fn remove(
         let Some(installed) = registry.components.remove(&component) else {
             continue;
         };
-        let components_dir = registry.components_dir.clone();
 
         let file = project.resolve(&installed.file);
         match std::fs::remove_file(&file) {

@@ -117,13 +117,14 @@ pub async fn add(
             continue;
         }
 
-        let (stored_url, components_dir) = {
-            let registry = state
-                .registries
-                .get(&pending.registry)
-                .expect("registry resolved before queueing");
-            (registry.url.clone(), registry.components_dir.clone())
-        };
+        let stored_url = state
+            .registries
+            .get(&pending.registry)
+            .expect("registry resolved before queueing")
+            .url
+            .clone();
+        // All registries install into one flat directory.
+        let components_dir = state.components_dir.clone();
         let working_url = project.to_working(&stored_url);
 
         let registry = load_registry(&mut registries, &working_url).await?;
@@ -167,15 +168,14 @@ pub async fn add(
                 .registries
                 .get_mut(&other_registry)
                 .expect("conflicting registry exists");
-            if let Some(removed) = registry.components.remove(&other_component) {
-                let removed_dir = registry.components_dir.clone();
-                if let Some(file_name) = removed.file.file_name().and_then(|name| name.to_str()) {
-                    removals.push(PlannedRemoval {
-                        file: project.resolve(&removed.file),
-                        dir: project.resolve(&removed_dir),
-                        file_name: file_name.to_string(),
-                    });
-                }
+            if let Some(removed) = registry.components.remove(&other_component)
+                && let Some(file_name) = removed.file.file_name().and_then(|name| name.to_str())
+            {
+                removals.push(PlannedRemoval {
+                    file: project.resolve(&removed.file),
+                    dir: project.resolve(&components_dir),
+                    file_name: file_name.to_string(),
+                });
             }
             replacing = true;
         }

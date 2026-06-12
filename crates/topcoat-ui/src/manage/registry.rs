@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use crate::{Registry, Source};
 
 use super::project::Project;
@@ -11,8 +9,6 @@ pub struct AddedRegistry {
     pub name: String,
     /// The stored registry location (a path, `file://` path, or `http(s)://` URL).
     pub url: String,
-    /// Where this registry's components will be installed.
-    pub components_dir: PathBuf,
 }
 
 /// A registry removed from the install state by [`remove_registry`].
@@ -32,7 +28,7 @@ pub struct RemovedRegistry {
 /// the name it declares for itself, used as the tracked name unless `name`
 /// overrides it. Adding a registry whose name or location is already tracked is
 /// an error, so the call never silently shadows an existing registry. Its
-/// components install under `<components_dir>/<name>`, fixed at this point.
+/// components install into the project's shared, flat components directory.
 pub async fn add_registry(
     project: &Project,
     url: &str,
@@ -59,16 +55,10 @@ pub async fn add_registry(
         ));
     }
 
-    let registry_state = RegistryState::new(&name, stored.clone(), &state.components_dir);
-    let components_dir = registry_state.components_dir.clone();
-    state.registries.insert(name.clone(), registry_state);
+    state.registries.insert(name.clone(), RegistryState::new(stored.clone()));
     state.save(project)?;
 
-    Ok(AddedRegistry {
-        name,
-        url: stored,
-        components_dir,
-    })
+    Ok(AddedRegistry { name, url: stored })
 }
 
 /// Removes a registry from the project's install state.

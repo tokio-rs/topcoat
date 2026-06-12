@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -28,23 +28,19 @@ pub(super) struct InstallState {
     /// component requires an explicit `--registry`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_registry: Option<String>,
-    /// The base directory under which each registry's components are installed:
-    /// a registry added later gets `<components_dir>/<registry-name>` as its
-    /// output directory. Set once at `init` time.
+    /// The single directory all registries' components are installed into, flat.
+    /// Set once at `init` time.
     #[serde(default = "default_components_dir")]
     pub components_dir: PathBuf,
     #[serde(default)]
     pub registries: BTreeMap<String, RegistryState>,
 }
 
-/// One registry's location, install target, and tracked components.
+/// One registry's location and tracked components.
 #[derive(Serialize, Deserialize)]
 pub(super) struct RegistryState {
     /// The registry location: a path, a `file://` path, or an `http(s)://` URL.
     pub url: String,
-    /// Where this registry's components are installed. Set to
-    /// `<components-dir>/<registry-name>` when the registry is first added.
-    pub components_dir: PathBuf,
     #[serde(default)]
     pub components: BTreeMap<String, InstalledComponent>,
 }
@@ -67,11 +63,10 @@ impl Default for InstallState {
 }
 
 impl RegistryState {
-    /// Creates a registry whose components install under `components_dir/<name>`.
-    pub(super) fn new(name: &str, url: String, components_dir: &Path) -> Self {
+    /// Creates a registry tracking the given location, with no components yet.
+    pub(super) fn new(url: String) -> Self {
         Self {
             url,
-            components_dir: components_dir.join(name),
             components: BTreeMap::new(),
         }
     }
@@ -127,14 +122,13 @@ impl InstallState {
     /// unknown registry errors, since registries are added explicitly with
     /// `topcoat ui registry add`.
     pub(super) fn registry_mut(&mut self, name: &str) -> Result<&mut RegistryState, String> {
-        let components_dir = self.components_dir.clone();
         match self.registries.entry(name.to_string()) {
             Entry::Occupied(entry) => Ok(entry.into_mut()),
             Entry::Vacant(entry) => {
                 let url = Self::default_url(name).ok_or_else(|| {
                     format!("unknown registry `{name}`; add it with `topcoat ui registry add <url>`")
                 })?;
-                Ok(entry.insert(RegistryState::new(name, url, &components_dir)))
+                Ok(entry.insert(RegistryState::new(url)))
             }
         }
     }
@@ -160,7 +154,7 @@ impl InstallState {
             ));
         }
 
-        let registry = RegistryState::new(name, url.to_string(), &self.components_dir);
+        let registry = RegistryState::new(url.to_string());
         self.registries.insert(name.to_string(), registry);
         Ok(name.to_string())
     }
@@ -209,7 +203,7 @@ impl InstallState {
             ),
         };
 
-        let registry = RegistryState::new(&name, url, &state.components_dir);
+        let registry = RegistryState::new(url);
         state.default_registry = Some(name.clone());
         state.registries.insert(name, registry);
 
