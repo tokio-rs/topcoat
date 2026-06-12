@@ -198,7 +198,7 @@ impl ToTokens for Props {
             // Carry the field's own doc comment onto the setter; fall back to a
             // generated summary when the field is undocumented.
             let doc = if field.docs.is_empty() {
-                let generated = format!("Sets the `{}` property.", field_ident.unraw());
+                let generated = format!(" Sets the `{}` property.", field_ident.unraw());
                 quote! { #[doc = #generated] }
             } else {
                 let docs = &field.docs;
@@ -265,10 +265,10 @@ impl ToTokens for Props {
         });
 
         let builder_doc = format!(
-            "Typestate builder for [`{ident}`], created by [`{ident}::builder()`]. \
+            " Typestate builder for [`{ident}`], created by [`{ident}::builder()`]. \
              `build()` becomes available once every required property has been set.",
         );
-        let builder_fn_doc = format!("Returns a [`{builder_ident}`] with no properties set.");
+        let builder_fn_doc = format!(" Returns a [`{builder_ident}`] with no properties set.");
 
         quote! {
             #members
