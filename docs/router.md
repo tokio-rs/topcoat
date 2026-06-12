@@ -141,14 +141,13 @@ This finds all pages and layouts across your entire crate (and dependencies) and
 
 ## Serving
 
-Use `topcoat::serve` to run it:
+Use `topcoat::start` to run it:
 
 ```rust
 #[tokio::main]
 async fn main() {
     let router = my_app::router();
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    topcoat::serve(listener, router).await.unwrap();
+    topcoat::start(router).await.unwrap();
 }
 ```
 

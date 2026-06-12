@@ -316,7 +316,8 @@ impl<'a> Iterator for Lexer<'a> {
             }
 
             // We need to skip code (strings, chars, identifiers) to find the next comment
-            // Crucially, we must skip strings/chars correctly so we don't find false comments inside them.
+            // Crucially, we must skip strings/chars correctly so we don't find false comments
+            // inside them.
             match c {
                 '"' => self.skip_string(),
                 '\'' => self.skip_char(),

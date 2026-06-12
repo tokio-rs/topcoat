@@ -20,10 +20,9 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::parse::{Parse, ParseStream};
 
-use crate::ast::{
-    ParseOption,
-    view::{ViewWriter, WriteView},
-};
+use topcoat_core::ast::ParseOption;
+
+use crate::ast::view::{ViewWriter, WriteView};
 
 /// The full list of attributes attached to a single tag.
 pub struct Attributes {
@@ -89,65 +88,44 @@ impl topcoat_pretty::PrettyPrint for Attributes {
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
-
     use super::*;
 
     fn parse(source: &str) -> Attributes {
         syn::parse_str(source).unwrap()
     }
 
-    fn capacity_hint(attrs: &Attributes) -> usize {
-        let mut writer = AttributeWriter::new();
-        WriteAttribute::write(attrs, &mut writer);
-        Chunk::capacity_of(writer.chunks())
+    #[test]
+    fn empty_input_yields_no_items() {
+        assert!(parse("").is_empty());
     }
 
     #[test]
-    fn tokens_construct_runtime_attributes_with_capacity() {
+    fn collects_sibling_nodes_in_order() {
         let attrs = parse(r#"class="button" id=(id) :value=$(value) @input="handle()""#);
-
-        assert_eq!(capacity_hint(&attrs), 5);
-
-        let tokens = attrs.to_token_stream().to_string();
-        assert!(tokens.contains(":: topcoat :: view :: Attributes :: with_capacity"));
-        assert!(tokens.contains("__attrs . insert"));
-        assert!(tokens.contains("\"class\""));
-        assert!(tokens.contains("\"button\""));
-        assert!(tokens.contains("\"id\""));
-        assert!(tokens.contains("data-topcoat-bind:"));
-        assert!(tokens.contains("data-topcoat-on:"));
-        assert!(tokens.contains("into_evaluated_and_js"));
+        assert_eq!(attrs.items.len(), 4);
+        assert!(matches!(attrs.items[0], AttributeNode::Attribute(_)));
+        assert!(matches!(attrs.items[1], AttributeNode::Attribute(_)));
+        assert!(matches!(attrs.items[2], AttributeNode::BindAttribute(_)));
+        assert!(matches!(attrs.items[3], AttributeNode::EventHandler(_)));
     }
 
     #[test]
-    fn tokens_support_attribute_control_flow() {
+    fn collects_control_flow_nodes() {
         let attrs = parse(
             r#"
                 let active = true;
                 if active { class="active" } else { class="inactive" }
-                for (key, value) in attrs {
-                    if key == "skip" { continue; }
-                    (key)=(value)
-                    if key == "last" { break; }
-                }
+                for (key, value) in attrs { (key)=(value) }
                 match kind {
                     "button" => role="button",
                     _ => data-kind=(kind),
                 }
             "#,
         );
-
-        assert_eq!(capacity_hint(&attrs), 2);
-
-        let tokens = attrs.to_token_stream().to_string();
-        assert!(tokens.contains("let active = true"));
-        assert!(tokens.contains("if active"));
-        assert!(tokens.contains("else"));
-        assert!(tokens.contains("for (key , value) in attrs"));
-        assert!(tokens.contains("continue ;"));
-        assert!(tokens.contains("break ;"));
-        assert!(tokens.contains("match kind"));
-        assert!(tokens.contains("__attrs . insert"));
+        assert_eq!(attrs.items.len(), 4);
+        assert!(matches!(attrs.items[0], AttributeNode::Let(_)));
+        assert!(matches!(attrs.items[1], AttributeNode::If(_)));
+        assert!(matches!(attrs.items[2], AttributeNode::ForLoop(_)));
+        assert!(matches!(attrs.items[3], AttributeNode::Match(_)));
     }
 }

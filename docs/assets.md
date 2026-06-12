@@ -29,7 +29,7 @@ async fn about_page() -> Result {
 
 You can also call the macro inline:
 
-```rust
+```rust,ignore
 view! {
     <script
         type="module"
@@ -53,7 +53,7 @@ aggressively.
 The router must load the generated asset bundle. Use `AssetBundle::load()` for
 the default bundle location:
 
-```rust
+```rust,ignore
 use topcoat::asset::AssetBundle;
 
 mod app;
@@ -62,8 +62,7 @@ mod app;
 async fn main() {
     let router = app::router().assets(AssetBundle::load().unwrap());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    topcoat::serve(listener, router).await.unwrap();
+    topcoat::start(router).await.unwrap();
 }
 ```
 
@@ -124,7 +123,7 @@ runtime:
 topcoat asset bundle --out dist/assets
 ```
 
-```rust
+```rust,ignore
 let router = app::router()
     .assets(AssetBundle::load_dir("dist/assets").unwrap());
 ```
@@ -153,6 +152,8 @@ relative path when the asset is part of a crate-level assets directory.
 `asset!` accepts optional named arguments that affect the bundled filename:
 
 ```rust
+use topcoat::asset::{Asset, asset};
+
 const RUST_LOGO: Asset = asset!(
     "https://upload.wikimedia.org/wikipedia/commons/r/rust-logo.png",
     rename: "rust",
@@ -176,14 +177,17 @@ file changes unexpectedly.
 Most Topcoat apps only need to render `Asset` values in `view!`. If you need the
 filesystem path for another purpose, load the bundle and look up the asset ID:
 
-```rust
+```rust,no_run
 use topcoat::asset::{Asset, AssetBundle, asset};
 
 const LOGO: Asset = asset!("assets/logo.png");
 
-let bundle = AssetBundle::load_dir("target/assets")?;
-let logo = bundle.get(LOGO).expect("logo was bundled");
-let path = logo.path();
+fn main() -> std::io::Result<()> {
+    let bundle = AssetBundle::load_dir("target/assets")?;
+    let logo = bundle.get(LOGO).expect("logo was bundled");
+    let path = logo.path();
+    Ok(())
+}
 ```
 
 This returns the path to the bundled file, not the original source path.

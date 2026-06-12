@@ -2,10 +2,9 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
 
-use crate::ast::{
-    ParseOption,
-    template::{RuntimeExpr, TemplateExpr},
-};
+use topcoat_core::ast::ParseOption;
+
+use crate::ast::template::{RuntimeExpr, TemplateExpr};
 
 /// An expression that can either be emitted directly or wrapped for runtime use.
 #[derive(Debug, PartialEq)]
@@ -79,7 +78,10 @@ mod tests {
     #[test]
     fn template_expr_tokens_are_raw_expression() {
         let expr = syn::parse_str::<TemplateOrRuntimeExpr>("(value + 1)").unwrap();
-        assert_eq!(expr.to_token_stream().to_string(), "value + 1");
+        assert_eq!(
+            expr.to_token_stream().to_string(),
+            ":: topcoat :: runtime :: Expr :: from (value + 1)"
+        );
     }
 
     #[test]

@@ -23,11 +23,6 @@ impl AttributeWriter {
         Self { chunks: Vec::new() }
     }
 
-    #[allow(dead_code)]
-    pub(super) fn chunks(&self) -> &[Chunk] {
-        &self.chunks
-    }
-
     /// Records a single `__attrs.insert(key, value);` call.
     pub fn insert(&mut self, key: TokenStream, value: TokenStream) {
         self.chunks.push(Chunk::Insert {
@@ -224,5 +219,100 @@ impl MatchArmsBuilder {
             guard: guard.cloned(),
             body: Box::new(body),
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rendered(writer: AttributeWriter) -> String {
+        writer.into_token_stream().to_string()
+    }
+
+    #[test]
+    fn empty_writer_emits_zero_capacity_block() {
+        let writer = AttributeWriter::new();
+        let out = rendered(writer);
+        assert!(out.contains(":: topcoat :: view :: Attributes :: with_capacity (0usize)"));
+        assert!(!out.contains("insert"));
+    }
+
+    #[test]
+    fn insert_records_one_capacity_per_entry() {
+        let mut writer = AttributeWriter::new();
+        writer.insert(quote! { "class" }, quote! { "btn" });
+        writer.insert(quote! { "id" }, quote! { "x" });
+        let out = rendered(writer);
+        assert!(out.contains("with_capacity (2usize)"));
+        assert!(out.contains("__attrs . insert (\"class\" , \"btn\")"));
+        assert!(out.contains("__attrs . insert (\"id\" , \"x\")"));
+    }
+
+    #[test]
+    fn if_capacity_is_minimum_of_branches() {
+        let mut writer = AttributeWriter::new();
+        writer.if_else(&syn::parse_quote!(cond), |then_branch, else_branch| {
+            then_branch.insert(quote! { "a" }, quote! { "1" });
+            then_branch.insert(quote! { "b" }, quote! { "2" });
+            else_branch.insert(quote! { "c" }, quote! { "3" });
+        });
+        assert!(rendered(writer).contains("with_capacity (1usize)"));
+    }
+
+    #[test]
+    fn if_without_else_contributes_no_minimum_capacity() {
+        let mut writer = AttributeWriter::new();
+        writer.if_else(&syn::parse_quote!(cond), |then_branch, _| {
+            then_branch.insert(quote! { "a" }, quote! { "1" });
+        });
+        let out = rendered(writer);
+        assert!(out.contains("with_capacity (0usize)"));
+        assert!(!out.contains("else"));
+    }
+
+    #[test]
+    fn for_loop_contributes_no_static_capacity() {
+        let mut writer = AttributeWriter::new();
+        writer.for_loop(
+            &syn::parse_quote!((k, v)),
+            &syn::parse_quote!(items),
+            |body| body.insert(quote! { k }, quote! { v }),
+        );
+        let out = rendered(writer);
+        assert!(out.contains("with_capacity (0usize)"));
+        assert!(out.contains("for (k , v) in items"));
+    }
+
+    #[test]
+    fn match_capacity_is_minimum_over_arms() {
+        let mut writer = AttributeWriter::new();
+        writer.match_expr(&syn::parse_quote!(v), |arms| {
+            arms.arm(&syn::parse_quote!(A), None, |body| {
+                body.insert(quote! { "x" }, quote! { "1" });
+            });
+            arms.arm(
+                &syn::parse_quote!(B),
+                Some(&syn::parse_quote!(flag)),
+                |body| {
+                    body.insert(quote! { "x" }, quote! { "2" });
+                    body.insert(quote! { "y" }, quote! { "3" });
+                },
+            );
+        });
+        let out = rendered(writer);
+        assert!(out.contains("with_capacity (1usize)"));
+        assert!(out.contains("match v"));
+        assert!(out.contains("if flag"));
+    }
+
+    #[test]
+    fn let_and_statement_are_emitted_verbatim() {
+        let mut writer = AttributeWriter::new();
+        writer.let_binding(&syn::parse_quote!(x), &syn::parse_quote!(value));
+        writer.statement(quote! { break; });
+        let out = rendered(writer);
+        assert!(out.contains("let x = value"));
+        assert!(out.contains("break ;"));
     }
 }

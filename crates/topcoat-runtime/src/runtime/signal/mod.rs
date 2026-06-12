@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use topcoat_view::runtime::{NodeViewParts, Unescaped, ViewParts};
 use uuid::Uuid;
 
-use crate::runtime::{JsViewParts, Surrogated};
+use crate::runtime::{Surrogate, Surrogated};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -81,19 +81,35 @@ impl<'a, T> SignalDeclaration<'a, T> {
 impl<T> NodeViewParts for SignalDeclaration<'_, T>
 where
     for<'a> &'a T: Surrogated,
-    for<'a> <&'a T as Surrogated>::Surrogate: JsViewParts,
+    for<'a> <&'a T as Surrogated>::Surrogate: Serialize,
 {
     fn into_view_parts(self, parts: &mut ViewParts) {
-        let id = self.0.id().to_string();
+        #[derive(Serialize)]
+        struct SignalDeclarationPayload<'a, V>
+        where
+            V: ?Sized,
+        {
+            t: &'static str,
+            id: std::string::String,
+            v: &'a V,
+        }
+
+        let value = (&self.0.value).into_surrogate();
+        let payload = SignalDeclarationPayload {
+            t: "signal",
+            id: self.0.id().to_string(),
+            v: &value,
+        };
+        let json = serde_json::to_string(&payload)
+            .expect("failed to serialize signal declaration payload");
+
         parts.push(Unescaped::new_unchecked("<!-- ::topcoat::signal("));
-        parts.push(Unescaped::new_unchecked(format!("{id:?}")));
-        parts.push(Unescaped::new_unchecked(", \""));
-        (&self.0.value).into_surrogate().to_view_parts(parts);
-        parts.push(Unescaped::new_unchecked("\") -->"));
+        parts.push(Unescaped::new_unchecked(json));
+        parts.push(Unescaped::new_unchecked(") -->"));
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ReadSignal<T> {
     id: SignalId,
     value: T,
@@ -123,6 +139,30 @@ impl<T> Deref for ReadSignal<T> {
     }
 }
 
+impl<'de, T> Deserialize<'de> for ReadSignal<T>
+where
+    T: Surrogated,
+    T::Surrogate: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct EncodedReadSignal<S> {
+            id: SignalId,
+            value: S,
+        }
+
+        let encoded = EncodedReadSignal::<T::Surrogate>::deserialize(deserializer)?;
+        Ok(Self {
+            id: encoded.id,
+            value: encoded.value.into_real(),
+        })
+    }
+}
+
 pub trait Signals: Sized {
     fn ids(&self) -> impl Iterator<Item = SignalId>;
     fn decode(encoded_signals: EncodedSignals) -> Self;
@@ -140,7 +180,10 @@ macro_rules! impl_signals_for_tuple {
     ($($n:tt $t:ident),+) => {
         impl<$($t),+> Signals for ($(ReadSignal<$t>,)+)
         where
-            $($t: DeserializeOwned,)+
+            $(
+                $t: Surrogated,
+                <$t as Surrogated>::Surrogate: DeserializeOwned,
+            )+
         {
             fn ids(&self) -> impl Iterator<Item = SignalId> {
                 [$(self.$n.id),+].into_iter()

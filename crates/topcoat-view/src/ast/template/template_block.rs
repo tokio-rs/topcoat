@@ -4,8 +4,9 @@ use syn::{
     token::Brace,
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     attributes::{AttributeWriter, WriteAttribute},
     view::{ViewWriter, WriteView},
 };
@@ -70,5 +71,37 @@ impl<T: topcoat_pretty::PrettyPrint> topcoat_pretty::PrettyPrint for TemplateBlo
 
         "}".pretty_print(printer);
         printer.move_cursor(self.brace.span().close().end());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::view::Nodes;
+
+    fn parse(source: &str) -> TemplateBlock<Nodes> {
+        syn::parse_str(source).unwrap()
+    }
+
+    #[test]
+    fn parses_empty_block() {
+        assert!(parse("{}").children.is_empty());
+    }
+
+    #[test]
+    fn parses_single_child() {
+        let block = parse(r#"{ "hi" }"#);
+        assert_eq!(block.children.len(), 1);
+    }
+
+    #[test]
+    fn parses_multiple_children() {
+        let block = parse(r#"{ "a" "b" "c" }"#);
+        assert_eq!(block.children.len(), 3);
+    }
+
+    #[test]
+    fn requires_braces() {
+        assert!(syn::parse_str::<TemplateBlock<Nodes>>(r#""hi""#).is_err());
     }
 }

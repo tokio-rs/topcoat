@@ -77,6 +77,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "170433209e817da6aae2c51aa0dd443009a613425dd041ebfb2492d1c4c11a25"
 
 [[package]]
+name = "app-state"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "assets"
 version = "0.1.0"
 dependencies = [
@@ -327,6 +335,14 @@ name = "const-oid"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
+
+[[package]]
+name = "context"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
 
 [[package]]
 name = "core-foundation"
@@ -646,12 +662,8 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 name = "hello-world"
 version = "0.1.0"
 dependencies = [
- "axum",
- "serde",
- "serde_json",
  "tokio",
  "topcoat",
- "uuid",
 ]
 
 [[package]]
@@ -1187,6 +1199,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
+name = "path-query-params"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1239,6 +1259,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "procedure"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "topcoat",
 ]
 
 [[package]]
@@ -1368,6 +1396,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "request-response"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "serde",
+ "serde_json",
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "reqwest"
 version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1390,6 +1429,8 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -1414,6 +1455,14 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "runtime"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "topcoat",
 ]
 
 [[package]]
@@ -1946,17 +1995,22 @@ dependencies = [
  "axum",
  "futures-util",
  "inventory",
+ "reqwest",
  "serde",
+ "serde_json",
  "serde_urlencoded",
  "tokio",
  "tokio-tungstenite 0.29.0",
  "topcoat-asset",
  "topcoat-core",
- "topcoat-macro",
+ "topcoat-core-macro",
  "topcoat-router",
+ "topcoat-router-macro",
  "topcoat-runtime",
+ "topcoat-runtime-macro",
  "topcoat-tailwind",
  "topcoat-view",
+ "topcoat-view-macro",
 ]
 
 [[package]]
@@ -2009,19 +2063,19 @@ dependencies = [
  "hashbrown 0.17.0",
  "http",
  "pin-project-lite",
+ "proc-macro2",
+ "quote",
+ "syn",
  "tokio",
 ]
 
 [[package]]
-name = "topcoat-macro"
+name = "topcoat-core-macro"
 version = "0.1.0"
 dependencies = [
- "heck",
- "proc-macro2",
  "quote",
  "syn",
- "topcoat-runtime",
- "topcoat-view",
+ "topcoat-core",
 ]
 
 [[package]]
@@ -2043,11 +2097,14 @@ dependencies = [
  "heck",
  "http",
  "inventory",
+ "proc-macro2",
+ "quote",
  "ref-cast",
  "serde",
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
+ "syn",
  "thiserror",
  "tokio",
  "topcoat-asset",
@@ -2055,6 +2112,16 @@ dependencies = [
  "topcoat-runtime",
  "topcoat-view",
  "tower",
+ "uuid",
+]
+
+[[package]]
+name = "topcoat-router-macro"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+ "topcoat-router",
 ]
 
 [[package]]
@@ -2072,6 +2139,14 @@ dependencies = [
  "topcoat-core",
  "topcoat-view",
  "uuid",
+]
+
+[[package]]
+name = "topcoat-runtime-macro"
+version = "0.1.0"
+dependencies = [
+ "syn",
+ "topcoat-runtime",
 ]
 
 [[package]]
@@ -2098,6 +2173,7 @@ name = "topcoat-view"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "heck",
  "inventory",
  "proc-macro2",
  "quote",
@@ -2107,6 +2183,15 @@ dependencies = [
  "topcoat-core",
  "topcoat-pretty",
  "uuid",
+]
+
+[[package]]
+name = "topcoat-view-macro"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+ "topcoat-view",
 ]
 
 [[package]]

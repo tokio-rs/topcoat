@@ -4,8 +4,9 @@ use syn::{
     spanned::Spanned,
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     template::{
         RuntimeExpr, TemplateBlock, TemplateBreak, TemplateContinue, TemplateExpr, TemplateForLoop,
         TemplateIf, TemplateLet, TemplateMatch,

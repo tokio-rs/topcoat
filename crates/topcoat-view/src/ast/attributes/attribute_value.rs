@@ -11,6 +11,9 @@ use crate::ast::{
     view::{ExprKind, ViewWriter, WriteView},
 };
 
+/// The value part of an [`Attribute`](super::Attribute). Either a string
+/// literal (`"foo"`) or a parenthesized Rust expression (`(expr)`) that is
+/// evaluated at render time.
 pub enum AttributeValue {
     Expr(Box<TemplateExpr>),
     LitStr(LitStr),
@@ -56,5 +59,42 @@ impl topcoat_pretty::PrettyPrint for AttributeValue {
             Self::Expr(inner) => inner.pretty_print(printer),
             Self::LitStr(inner) => inner.pretty_print(printer),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(source: &str) -> AttributeValue {
+        syn::parse_str(source).unwrap()
+    }
+
+    fn parse_err(source: &str) -> String {
+        match syn::parse_str::<AttributeValue>(source) {
+            Ok(_) => panic!("expected parse error for `{source}`"),
+            Err(err) => err.to_string(),
+        }
+    }
+
+    #[test]
+    fn parses_literal_value() {
+        let value = parse(r#""hello""#);
+        let AttributeValue::LitStr(lit) = value else {
+            panic!("expected literal value");
+        };
+        assert_eq!(lit.value(), "hello");
+    }
+
+    #[test]
+    fn parses_expression_value() {
+        assert!(matches!(parse("(value)"), AttributeValue::Expr(_)));
+        assert!(matches!(parse("(a + b)"), AttributeValue::Expr(_)));
+    }
+
+    #[test]
+    fn rejects_bare_identifier() {
+        // Values must be quoted strings or parenthesized expressions.
+        assert!(parse_err("value").contains("expected"));
     }
 }

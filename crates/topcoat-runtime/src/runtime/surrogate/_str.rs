@@ -1,27 +1,93 @@
 use ref_cast::RefCast;
-use topcoat_view::runtime::{Unescaped, ViewParts};
 
-use crate::runtime::{JsViewParts, impl_surrogate_mut, impl_surrogate_ref};
+use crate::runtime::{
+    BoolSurrogate, F64Surrogate, StringSurrogate, impl_surrogate_mut, impl_surrogate_ref,
+    serialize_tagged,
+};
 
 #[derive(Debug, RefCast)]
 #[repr(transparent)]
-pub struct Str(str);
+pub struct StrSurrogate(pub(super) str);
 
-impl_surrogate_ref!(str, Str);
-impl_surrogate_mut!(str, Str);
+impl_surrogate_ref!(str, StrSurrogate);
+impl_surrogate_mut!(str, StrSurrogate);
 
-impl JsViewParts for Str {
-    fn to_view_parts(&self, parts: &mut ViewParts) {
-        let inner = &self.0;
-        let escaped = format!("{inner:?}");
-        parts.push(Unescaped::new_unchecked("cx.s.str("));
-        parts.push(escaped);
-        parts.push(Unescaped::new_unchecked(")"));
+impl serde::Serialize for StrSurrogate {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serialize_tagged(serializer, "str", &self.0)
     }
 }
 
-impl std::fmt::Display for Str {
+impl std::fmt::Display for StrSurrogate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+macro_rules! impl_cmp_op {
+    ($method:ident, $op:tt) => {
+        impl StrSurrogate {
+            #[inline]
+            pub fn $method(&self, rhs: &StrSurrogate) -> BoolSurrogate {
+                BoolSurrogate::new(self.0 $op rhs.0)
+            }
+        }
+    };
+}
+
+impl_cmp_op!(eq, ==);
+impl_cmp_op!(ne, !=);
+impl_cmp_op!(gt, >);
+impl_cmp_op!(lt, <);
+impl_cmp_op!(ge, >=);
+impl_cmp_op!(le, <=);
+
+impl StrSurrogate {
+    #[inline]
+    pub fn to_owned(&self) -> StringSurrogate {
+        StringSurrogate::new(self.0.to_owned())
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> BoolSurrogate {
+        BoolSurrogate::new(self.0.is_empty())
+    }
+
+    #[inline]
+    pub fn len(&self) -> F64Surrogate {
+        F64Surrogate::new(self.0.len() as f64)
+    }
+
+    #[inline]
+    pub fn trim(&self) -> &StrSurrogate {
+        StrSurrogate::ref_cast(self.0.trim())
+    }
+
+    #[inline]
+    pub fn trim_start(&self) -> &StrSurrogate {
+        StrSurrogate::ref_cast(self.0.trim_start())
+    }
+
+    #[inline]
+    pub fn trim_end(&self) -> &StrSurrogate {
+        StrSurrogate::ref_cast(self.0.trim_end())
+    }
+
+    #[inline]
+    pub fn starts_with(&self, other: &StrSurrogate) -> BoolSurrogate {
+        BoolSurrogate::new(self.0.starts_with(&other.0))
+    }
+
+    #[inline]
+    pub fn ends_with(&self, other: &StrSurrogate) -> BoolSurrogate {
+        BoolSurrogate::new(self.0.ends_with(&other.0))
+    }
+
+    #[inline]
+    pub fn contains(&self, other: &StrSurrogate) -> BoolSurrogate {
+        BoolSurrogate::new(self.0.contains(&other.0))
     }
 }

@@ -7,8 +7,9 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     attributes::Attributes,
     view::{ClosingTag, ElementName, ExprKind, Node, Nodes, OpeningTag, ViewWriter, WriteView},
 };

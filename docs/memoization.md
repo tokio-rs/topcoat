@@ -8,7 +8,7 @@ This is the per-request equivalent of memoization in libraries like React's `cac
 
 Annotate any function that takes a `cx: &Cx` parameter:
 
-```rust
+```rust,ignore
 use topcoat::context::{Cx, memoize};
 
 #[memoize]
@@ -25,7 +25,7 @@ Top-level `Option<T>` and `Result<T, E>` return types are borrowed ergonomically
 
 `#[memoize]` works on both synchronous and `async` functions. Pick whichever matches your work; the macro handles the rest.
 
-```rust
+```rust,ignore
 #[memoize]
 fn parse_config(cx: &Cx, raw: &str) -> Config {
     serde_json::from_str(raw).unwrap()
@@ -43,7 +43,7 @@ For async functions, concurrent callers with the same arguments share a single i
 
 Every argument except `cx` is part of the cache key. Two calls hit the same cache entry if and only if every non-`cx` argument is equal.
 
-```rust
+```rust,ignore
 #[memoize]
 fn add(cx: &Cx, x: i32, y: i32) -> i32 {
     println!("computing");
@@ -61,7 +61,7 @@ Each `#[memoize]` function has its own independent cache slot, so two functions 
 
 Arguments can be passed by value or by reference. Borrowed arguments avoid cloning on cache hits; on a miss the value is cloned once into the cache.
 
-```rust
+```rust,ignore
 #[memoize]
 async fn lookup(cx: &Cx, name: &str) -> Result<Record, Error> {
     db::find(name).await
@@ -94,7 +94,7 @@ It is *not* a substitute for a long-lived cache (Redis, an LRU, etc.). Cross-req
 
 ## Example: shared user lookup
 
-```rust
+```rust,ignore
 use topcoat::{
     context::{Cx, memoize},
     Result,

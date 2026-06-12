@@ -4,8 +4,9 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     attributes::{AttributeWriter, WriteAttribute},
     template::TemplateBlock,
     view::{ViewWriter, WriteView},
@@ -163,5 +164,62 @@ impl topcoat_pretty::PrettyPrint for TemplateBreak {
             .to_string()
             .pretty_print(printer);
         self.semi_token.pretty_print(printer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::view::Nodes;
+    use quote::ToTokens;
+
+    fn parse(source: &str) -> TemplateForLoop<Nodes> {
+        syn::parse_str(source).unwrap()
+    }
+
+    #[test]
+    fn parses_simple_for_loop() {
+        let loop_ = parse(r#"for x in xs { (x) }"#);
+        assert_eq!(loop_.pat.to_token_stream().to_string(), "x");
+        assert_eq!(loop_.expr.to_token_stream().to_string(), "xs");
+        assert_eq!(loop_.body.children.len(), 1);
+    }
+
+    #[test]
+    fn parses_tuple_pattern() {
+        let loop_ = parse(r#"for (k, v) in pairs { (k) }"#);
+        assert_eq!(loop_.pat.to_token_stream().to_string(), "(k , v)");
+    }
+
+    #[test]
+    fn parses_empty_body() {
+        let loop_ = parse(r#"for x in xs {}"#);
+        assert!(loop_.body.children.is_empty());
+    }
+
+    #[test]
+    fn parses_method_call_iterable() {
+        // `parse_without_eager_brace` lets the `{` start the body rather than
+        // being eaten by the expression.
+        let loop_ = parse(r#"for x in items.iter() { (x) }"#);
+        assert_eq!(loop_.expr.to_token_stream().to_string(), "items . iter ()");
+    }
+
+    #[test]
+    fn parses_continue_statement() {
+        let c: TemplateContinue = syn::parse_str("continue;").unwrap();
+        assert_eq!(c.expr_continue.to_token_stream().to_string(), "continue");
+    }
+
+    #[test]
+    fn parses_break_statement() {
+        let b: TemplateBreak = syn::parse_str("break;").unwrap();
+        assert_eq!(b.expr_break.to_token_stream().to_string(), "break");
+    }
+
+    #[test]
+    fn continue_and_break_require_trailing_semicolon() {
+        assert!(syn::parse_str::<TemplateContinue>("continue").is_err());
+        assert!(syn::parse_str::<TemplateBreak>("break").is_err());
     }
 }

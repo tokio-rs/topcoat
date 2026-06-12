@@ -1,15 +1,17 @@
 use crate::Result;
 use futures_util::SinkExt;
+use std::net::SocketAddr;
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::view::{View, component, view};
+use crate::view::{component, view};
 
 /// Notify the topcoat dev server that the application is ready.
 ///
 /// Connects to the dev server's WebSocket endpoint (derived from the
 /// `TOPCOAT_DEV_URL` HTTP base URL provided by `topcoat dev`) and sends a
-/// `"ready"` message. Does nothing if the env var is not set.
-pub async fn notify_ready() {
+/// ready message with the application listener address when available. Does
+/// nothing if the env var is not set.
+pub async fn notify_ready(addr: Option<SocketAddr>) {
     let Ok(base) = std::env::var("TOPCOAT_DEV_URL") else {
         return;
     };
@@ -21,7 +23,12 @@ pub async fn notify_ready() {
         return;
     };
 
-    let _ = ws.send(Message::Text("ready".into())).await;
+    let text = match addr {
+        Some(addr) => format!("ready {addr}"),
+        None => "ready".to_owned(),
+    };
+
+    let _ = ws.send(Message::Text(text.into())).await;
     let _ = ws.close(None).await;
 }
 
@@ -36,11 +43,7 @@ fn http_to_ws(url: &str) -> String {
 }
 
 #[component]
-#[expect(
-    unused_variables,
-    reason = "child is required by the component macro contract but unused here"
-)]
-pub async fn script(child: View) -> Result {
+pub async fn script() -> Result {
     let Ok(base) = std::env::var("TOPCOAT_DEV_URL") else {
         return view! {};
     };

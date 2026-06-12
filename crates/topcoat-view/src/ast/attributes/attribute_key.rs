@@ -9,8 +9,9 @@ use syn::{
     token::Paren,
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     template::TemplateExpr,
     view::{ExprKind, HtmlIdent, ViewWriter, WriteView},
 };
@@ -79,5 +80,42 @@ impl topcoat_pretty::PrettyPrint for AttributeKey {
             Self::Ident(inner) => inner.pretty_print(printer),
             Self::Expr(inner) => inner.pretty_print(printer),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(source: &str) -> AttributeKey {
+        syn::parse_str(source).unwrap()
+    }
+
+    #[test]
+    fn parses_plain_ident() {
+        let key = parse("class");
+        assert!(matches!(key, AttributeKey::Ident(_)));
+        assert_eq!(key.to_string(), "class");
+    }
+
+    #[test]
+    fn parses_html_ident_with_separators() {
+        assert_eq!(parse("data-foo").to_string(), "data-foo");
+        assert_eq!(parse("xmlns:xlink").to_string(), "xmlns:xlink");
+        assert_eq!(parse("class.active").to_string(), "class.active");
+    }
+
+    #[test]
+    fn parses_rust_keyword_as_key() {
+        // `type` and `for` are valid HTML attribute names.
+        assert_eq!(parse("type").to_string(), "type");
+        assert_eq!(parse("for").to_string(), "for");
+    }
+
+    #[test]
+    fn parses_expression_key() {
+        let key = parse("(name)");
+        assert!(matches!(key, AttributeKey::Expr(_)));
+        assert_eq!(key.to_string(), "<expr>");
     }
 }

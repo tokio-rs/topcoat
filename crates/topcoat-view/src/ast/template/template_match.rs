@@ -4,8 +4,9 @@ use syn::{
     token::Brace,
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     attributes::{AttributeWriter, MatchArmsBuilder as AttributeMatchArmsBuilder, WriteAttribute},
     view::{MatchArmsBuilder, ViewWriter, WriteView},
 };
@@ -189,5 +190,74 @@ impl topcoat_pretty::PrettyPrint for TemplateMatchArm<crate::ast::attributes::At
         } else {
             ",".pretty_print(printer);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::view::Node;
+    use quote::ToTokens;
+
+    fn parse(source: &str) -> TemplateMatch<Node> {
+        syn::parse_str(source).unwrap()
+    }
+
+    #[test]
+    fn parses_match_with_one_arm() {
+        let m = parse(r#"match v { _ => "x", }"#);
+        assert_eq!(m.expr.to_token_stream().to_string(), "v");
+        assert_eq!(m.arms.len(), 1);
+        assert!(m.arms[0].comma.is_some());
+    }
+
+    #[test]
+    fn parses_match_with_multiple_arms() {
+        let m = parse(
+            r#"match status {
+                A => "a",
+                B => "b",
+                C => "c",
+            }"#,
+        );
+        assert_eq!(m.arms.len(), 3);
+    }
+
+    #[test]
+    fn parses_arm_with_guard() {
+        let m = parse(r#"match v { x if x > 0 => "pos", _ => "neg", }"#);
+        let guard = m.arms[0].guard.as_ref().expect("guard");
+        assert_eq!(guard.1.to_token_stream().to_string(), "x > 0");
+    }
+
+    #[test]
+    fn parses_struct_pattern() {
+        let m = parse(r#"match v { Foo { bar } => (bar), _ => "x", }"#);
+        assert_eq!(m.arms[0].pat.to_token_stream().to_string(), "Foo { bar }");
+    }
+
+    #[test]
+    fn allows_or_pattern_with_leading_vert() {
+        // `parse_multi_with_leading_vert` accepts a leading `|`; it's not
+        // preserved in the resulting pattern.
+        let m = parse(r#"match v { | A | B => "ab", _ => "x", }"#);
+        let rendered = m.arms[0].pat.to_token_stream().to_string();
+        assert!(rendered.contains("A"));
+        assert!(rendered.contains("B"));
+        assert!(rendered.contains('|'));
+    }
+
+    #[test]
+    fn final_arm_may_omit_trailing_comma() {
+        let m = parse(r#"match v { _ => "x" }"#);
+        assert!(m.arms[0].comma.is_none());
+    }
+
+    #[test]
+    fn parses_block_body() {
+        let m = parse(r#"match v { _ => { "a" "b" } }"#);
+        let Node::Block(_) = &*m.arms[0].body else {
+            panic!("expected block body");
+        };
     }
 }

@@ -4,6 +4,10 @@ use syn::{
     spanned::Spanned,
 };
 
+/// The annotated `async fn` that becomes a component. Validates the function
+/// signature: components must be `async`, must declare a return type, must
+/// not take a `self` receiver, and must use identifier patterns for their
+/// arguments.
 pub struct ComponentItem {
     item: ItemFn,
 }
@@ -49,5 +53,44 @@ impl Parse for ComponentItem {
             }
         }
         Ok(Self { item })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_err(source: &str) -> String {
+        match syn::parse_str::<ComponentItem>(source) {
+            Ok(_) => panic!("expected parse error for `{source}`"),
+            Err(err) => err.to_string(),
+        }
+    }
+
+    #[test]
+    fn accepts_async_fn_with_return_type() {
+        syn::parse_str::<ComponentItem>("async fn badge(label: &str) -> Result {}").unwrap();
+    }
+
+    #[test]
+    fn rejects_non_async_fn() {
+        assert!(parse_err("fn badge() -> Result {}").contains("components must be async"));
+    }
+
+    #[test]
+    fn rejects_missing_return_type() {
+        assert!(parse_err("async fn badge() {}").contains("must have a return type"));
+    }
+
+    #[test]
+    fn rejects_self_receiver() {
+        let err = parse_err("async fn badge(&self) -> Result {}");
+        assert!(err.contains("cannot take a `self` receiver"));
+    }
+
+    #[test]
+    fn rejects_non_ident_pattern() {
+        let err = parse_err("async fn badge((a, b): (u8, u8)) -> Result {}");
+        assert!(err.contains("must be identifier patterns"));
     }
 }

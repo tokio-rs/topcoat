@@ -13,6 +13,8 @@ impl Expr {
     ) -> syn::Result<()> {
         let op = match unary.op {
             UnOp::Deref(_) => "deref",
+            UnOp::Not(_) => "not",
+            UnOp::Neg(_) => "neg",
             other => return Err(syn::Error::new_spanned(other, "unsupported operator")),
         };
 

@@ -1,8 +1,9 @@
 {
 	"name": "@topcoat-rs/runtime",
 	"version": "0.0.1",
+	"type": "module",
 	"scripts": {
-		"build": "tsup"
+		"build": "tsup && tsc"
 	},
 	"dependencies": {
 		"@maverick-js/signals": "^6.0.0"

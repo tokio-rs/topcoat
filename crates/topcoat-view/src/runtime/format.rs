@@ -1,6 +1,6 @@
 use std::{ops::Deref, rc::Rc, sync::Arc};
 
-use topcoat_core::context::Cx;
+use topcoat_core::runtime::context::Cx;
 
 /// An HTML-aware writer.
 ///

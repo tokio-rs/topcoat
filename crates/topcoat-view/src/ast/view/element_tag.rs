@@ -3,7 +3,9 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::ast::{ParseOption, attributes::Attributes, view::ElementName};
+use topcoat_core::ast::ParseOption;
+
+use crate::ast::{attributes::Attributes, view::ElementName};
 
 /// An element's opening tag: `<name attr=value ...>`.
 pub struct OpeningTag {
@@ -75,5 +77,36 @@ impl topcoat_pretty::PrettyPrint for ClosingTag {
         self.slash.pretty_print(printer);
         self.name.pretty_print(printer);
         self.gt.pretty_print(printer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_opening_tag_without_attributes() {
+        let tag: OpeningTag = syn::parse_str("<div>").unwrap();
+        assert_eq!(tag.name.string_name().as_deref(), Some("div"));
+        assert!(tag.attributes.is_empty());
+    }
+
+    #[test]
+    fn parses_opening_tag_with_attributes() {
+        let tag: OpeningTag = syn::parse_str(r#"<a href="/" class="link">"#).unwrap();
+        assert_eq!(tag.name.string_name().as_deref(), Some("a"));
+        assert_eq!(tag.attributes.items.len(), 2);
+    }
+
+    #[test]
+    fn parses_closing_tag() {
+        let tag: ClosingTag = syn::parse_str("</div>").unwrap();
+        assert_eq!(tag.name.string_name().as_deref(), Some("div"));
+    }
+
+    #[test]
+    fn closing_tag_rejects_opening_tag() {
+        // `<div>` is an opening tag, not a closing one.
+        assert!(syn::parse_str::<ClosingTag>("<div>").is_err());
     }
 }

@@ -4,6 +4,10 @@ use syn::{
     spanned::Spanned,
 };
 
+/// The annotated `async fn` that becomes a shard. Validates the function
+/// signature: shards must be `async`, must declare a return type, must not
+/// take a `self` receiver, and must use identifier patterns for their
+/// arguments.
 pub struct ShardItem {
     item: ItemFn,
 }
@@ -49,5 +53,44 @@ impl Parse for ShardItem {
             }
         }
         Ok(Self { item })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_err(source: &str) -> String {
+        match syn::parse_str::<ShardItem>(source) {
+            Ok(_) => panic!("expected parse error for `{source}`"),
+            Err(err) => err.to_string(),
+        }
+    }
+
+    #[test]
+    fn accepts_async_fn_with_return_type() {
+        syn::parse_str::<ShardItem>("async fn counter(cx: &Cx) -> Result {}").unwrap();
+    }
+
+    #[test]
+    fn rejects_non_async_fn() {
+        assert!(parse_err("fn counter() -> Result {}").contains("shards must be async"));
+    }
+
+    #[test]
+    fn rejects_missing_return_type() {
+        assert!(parse_err("async fn counter() {}").contains("must have a return type"));
+    }
+
+    #[test]
+    fn rejects_self_receiver() {
+        let err = parse_err("async fn counter(&self) -> Result {}");
+        assert!(err.contains("cannot take a `self` receiver"));
+    }
+
+    #[test]
+    fn rejects_non_ident_pattern() {
+        let err = parse_err("async fn counter((a, b): (u8, u8)) -> Result {}");
+        assert!(err.contains("must be identifier patterns"));
     }
 }

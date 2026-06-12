@@ -1,35 +1,35 @@
 use ref_cast::RefCast;
-use topcoat_view::runtime::{Unescaped, ViewParts};
+use serde::{Deserialize, Serialize};
 
-use crate::runtime::{JsViewParts, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
+use crate::runtime::{StrSurrogate, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
 
-#[derive(Debug, Clone, RefCast)]
+#[derive(Debug, Clone, RefCast, Serialize, Deserialize)]
 #[repr(transparent)]
-pub struct String(std::string::String);
+#[serde(transparent)]
+pub struct StringSurrogate(String);
 
-impl String {
+impl StringSurrogate {
     #[inline]
-    pub(crate) const fn new(v: std::string::String) -> Self {
+    pub(crate) const fn new(v: String) -> Self {
         Self(v)
     }
 }
 
-impl_surrogate!(std::string::String, String);
-impl_surrogate_ref!(std::string::String, String);
-impl_surrogate_mut!(std::string::String, String);
+impl_surrogate!(String, StringSurrogate);
+impl_surrogate_ref!(String, StringSurrogate);
+impl_surrogate_mut!(String, StringSurrogate);
 
-impl JsViewParts for String {
-    fn to_view_parts(&self, parts: &mut ViewParts) {
-        let inner = &self.0;
-        let escaped = format!("{inner:?}");
-        parts.push(Unescaped::new_unchecked("cx.s.String("));
-        parts.push(escaped);
-        parts.push(Unescaped::new_unchecked(")"));
+impl std::fmt::Display for StringSurrogate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
-impl std::fmt::Display for String {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+impl std::ops::Deref for StringSurrogate {
+    type Target = StrSurrogate;
+
+    #[inline]
+    fn deref(&self) -> &StrSurrogate {
+        StrSurrogate::ref_cast(self.0.as_str())
     }
 }

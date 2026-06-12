@@ -1,16 +1,15 @@
 import { signal, type WriteSignal } from "@maverick-js/signals";
-import { Ref } from "./surrogate";
 
 export type SignalId = string;
 
 export class SignalRegistry {
-	private readonly signals = new Map<SignalId, WriteSignal<Ref<unknown>>>();
+	private readonly signals = new Map<SignalId, WriteSignal<unknown>>();
 
 	has(id: SignalId): boolean {
 		return this.signals.has(id);
 	}
 
-	get(id: SignalId): WriteSignal<Ref<unknown>> | undefined {
+	get(id: SignalId): WriteSignal<unknown> | undefined {
 		return this.signals.get(id);
 	}
 
@@ -20,7 +19,7 @@ export class SignalRegistry {
 	 */
 	insert(id: SignalId, value: unknown): boolean {
 		if (this.signals.has(id)) return false;
-		this.signals.set(id, signal(new Ref(value)));
+		this.signals.set(id, signal(value));
 		return true;
 	}
 
@@ -32,7 +31,7 @@ export class SignalRegistry {
 	 * Returns the signal handle for the given id. Calling the handle reads the
 	 * current value and participates in maverick tracking. Throws if unknown.
 	 */
-	handle(id: SignalId): WriteSignal<Ref<unknown>> {
+	handle(id: SignalId): WriteSignal<unknown> {
 		const s = this.signals.get(id);
 		if (!s) throw new Error(`Unknown signal id: ${id}`);
 		return s;

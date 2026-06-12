@@ -2,7 +2,14 @@ use crate::runtime::{Unescaped, ViewPart, ViewParts};
 
 /// Converts a value used as an attribute key into view parts.
 ///
-/// Implement this for custom dynamic attribute-name values accepted by `view!`.
+/// When this trait is implemented on a type, it can be used in the attribute key position of an
+/// element in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+///
+/// ```rust,ignore
+/// view! {
+///     <div (my_key)="value"></div>
+/// }
+/// ```
 pub trait AttributeKeyViewParts {
     /// Appends this attribute key to `parts`.
     fn into_view_parts(self, parts: &mut ViewParts);
@@ -36,5 +43,12 @@ impl AttributeKeyViewParts for Unescaped<&str> {
     fn into_view_parts(self, parts: &mut ViewParts) {
         let part: ViewPart = Unescaped::new_unchecked(String::from(*self)).into();
         parts.push(part);
+    }
+}
+
+impl AttributeKeyViewParts for &String {
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        self.as_str().into_view_parts(parts);
     }
 }

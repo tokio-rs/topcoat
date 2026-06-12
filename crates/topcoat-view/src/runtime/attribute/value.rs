@@ -2,8 +2,21 @@ use crate::runtime::{Unescaped, ViewPart, ViewParts};
 
 /// Converts a value used as an attribute value into view parts.
 ///
-/// Attribute values can also control presence. `false` and `None` omit the
-/// whole attribute; other built-in values are present.
+/// When this trait is implemented on a type, it can be used in the attribute value position of an
+/// element in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+///
+/// ```rust,ignore
+/// view! {
+///     <div class=(my_value)></div>
+/// }
+/// ```
+///
+/// For [boolean HTML attributes], a false value must be omitted from the markup entirely.
+/// [`attribute_present`](Self::attribute_present) is the hook that makes that decision.
+/// The built-in `bool` and `Option<T>` implementations use this so `false` and `None` omit the
+/// whole attribute.
+///
+/// [boolean HTML attributes]: https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML
 pub trait AttributeValueViewParts {
     /// Returns whether the containing attribute should be rendered.
     fn attribute_present(&self) -> bool;
@@ -26,23 +39,38 @@ macro_rules! impl_primitive {
             }
         }
     };
+    ($ty:ty, ref) => {
+        impl_primitive!($ty);
+
+        impl AttributeValueViewParts for &$ty {
+            #[inline]
+            fn attribute_present(&self) -> bool {
+                (*self).attribute_present()
+            }
+
+            #[inline]
+            fn into_view_parts(self, parts: &mut ViewParts) {
+                (*self).into_view_parts(parts);
+            }
+        }
+    };
 }
 
-impl_primitive!(char);
-impl_primitive!(i8);
-impl_primitive!(i16);
-impl_primitive!(i32);
-impl_primitive!(i64);
-impl_primitive!(i128);
-impl_primitive!(isize);
-impl_primitive!(u8);
-impl_primitive!(u16);
-impl_primitive!(u32);
-impl_primitive!(u64);
-impl_primitive!(u128);
-impl_primitive!(usize);
-impl_primitive!(f32);
-impl_primitive!(f64);
+impl_primitive!(char, ref);
+impl_primitive!(i8, ref);
+impl_primitive!(i16, ref);
+impl_primitive!(i32, ref);
+impl_primitive!(i64, ref);
+impl_primitive!(i128, ref);
+impl_primitive!(isize, ref);
+impl_primitive!(u8, ref);
+impl_primitive!(u16, ref);
+impl_primitive!(u32, ref);
+impl_primitive!(u64, ref);
+impl_primitive!(u128, ref);
+impl_primitive!(usize, ref);
+impl_primitive!(f32, ref);
+impl_primitive!(f64, ref);
 impl_primitive!(String);
 impl_primitive!(Unescaped<String>);
 
@@ -72,6 +100,18 @@ impl AttributeValueViewParts for Unescaped<&str> {
     }
 }
 
+impl AttributeValueViewParts for &String {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        self.as_str().attribute_present()
+    }
+
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        self.as_str().into_view_parts(parts);
+    }
+}
+
 impl AttributeValueViewParts for bool {
     #[inline]
     fn attribute_present(&self) -> bool {
@@ -81,6 +121,18 @@ impl AttributeValueViewParts for bool {
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
         parts.push(self);
+    }
+}
+
+impl AttributeValueViewParts for &bool {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        (*self).attribute_present()
+    }
+
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        (*self).into_view_parts(parts)
     }
 }
 
@@ -98,21 +150,6 @@ where
         if let Some(value) = self {
             value.into_view_parts(parts);
         }
-    }
-}
-
-impl<T> AttributeValueViewParts for &T
-where
-    T: AttributeValueViewParts + Copy,
-{
-    #[inline]
-    fn attribute_present(&self) -> bool {
-        (*self).attribute_present()
-    }
-
-    #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        (*self).into_view_parts(parts);
     }
 }
 

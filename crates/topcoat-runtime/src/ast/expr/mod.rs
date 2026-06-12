@@ -1,14 +1,23 @@
 mod block;
+mod builtin_macro;
+mod expr_await;
 mod expr_binary;
 mod expr_block;
+mod expr_break;
+mod expr_call;
 mod expr_closure;
+mod expr_continue;
 mod expr_field;
+mod expr_if;
 mod expr_index;
 mod expr_lit;
+mod expr_loop;
 mod expr_method_call;
 mod expr_paren;
 mod expr_path;
+mod expr_return;
 mod expr_unary;
+mod expr_while;
 mod name_resolver;
 mod pat;
 mod stmt;
@@ -51,13 +60,15 @@ impl Expr {
         let externals = names.externals();
 
         if !externals.is_empty() {
-            let rust_externals = externals.iter().map(|(ident, _)| {
-                quote! { let #ident = ::topcoat::runtime::Surrogated::into_surrogate(#ident); }
+            let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
+            let rust_external_values = externals.iter().map(|binding| {
+                let ident = &binding.original_ident;
+                quote! { ::topcoat::runtime::Surrogated::into_surrogate(#ident) }
             });
 
             let mut js_head = "(() => { const [".to_owned();
-            for (index, (_, name)) in externals.iter().enumerate() {
-                js_head += name;
+            for (index, binding) in externals.iter().enumerate() {
+                js_head += &binding.js_name;
                 if index < externals.len() - 1 {
                     js_head += ", ";
                 }
@@ -65,8 +76,9 @@ impl Expr {
             js_head += "] = [";
 
             let mut js_externals = TokenStream::new();
-            for (index, (ident, _)) in externals.iter().enumerate() {
-                quote! { __js(&mut __parts, &#ident); }.to_tokens(&mut js_externals);
+            for (index, binding) in externals.iter().enumerate() {
+                let rust_ident = &binding.rust_ident;
+                quote! { __surrogate(&mut __parts, &#rust_ident); }.to_tokens(&mut js_externals);
                 if index < externals.len() - 1 {
                     quote! { __js_unescaped(&mut __parts, ", "); }.to_tokens(&mut js_externals);
                 }
@@ -77,7 +89,7 @@ impl Expr {
             Ok(quote! {{
                 use ::topcoat::runtime::internal::*;
 
-                #(#rust_externals)*
+                let (#(#rust_external_idents,)*) = (#(#rust_external_values,)*);
                 let mut __parts = ::topcoat::view::ViewParts::new();
                 __js_unescaped(&mut __parts, #js_head);
                 #js_externals
@@ -101,16 +113,25 @@ impl Expr {
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         match expr {
+            syn::Expr::Await(inner) => Self::expr_await(inner, rust, js, names)?,
             syn::Expr::Lit(inner) => Self::expr_lit(inner, rust, js)?,
             syn::Expr::Paren(inner) => Self::expr_paren(inner, rust, js, names)?,
             syn::Expr::Binary(inner) => Self::expr_binary(inner, rust, js, names)?,
             syn::Expr::Unary(inner) => Self::expr_unary(inner, rust, js, names)?,
             syn::Expr::MethodCall(inner) => Self::expr_method_call(inner, rust, js, names)?,
+            syn::Expr::Call(inner) => Self::expr_call(inner, rust, js, names)?,
             syn::Expr::Field(inner) => Self::expr_field(inner, rust, js, names)?,
             syn::Expr::Index(inner) => Self::expr_index(inner, rust, js, names)?,
             syn::Expr::Block(inner) => Self::expr_block(inner, rust, js, names)?,
             syn::Expr::Closure(inner) => Self::expr_closure(inner, rust, js, names)?,
+            syn::Expr::If(inner) => Self::expr_if(inner, rust, js, names)?,
+            syn::Expr::Loop(inner) => Self::expr_loop(inner, rust, js, names)?,
+            syn::Expr::While(inner) => Self::expr_while(inner, rust, js, names)?,
+            syn::Expr::Continue(inner) => Self::expr_continue(inner, rust, js, names)?,
+            syn::Expr::Break(inner) => Self::expr_break(inner, rust, js, names)?,
+            syn::Expr::Return(inner) => Self::expr_return(inner, rust, js, names)?,
             syn::Expr::Path(inner) => Self::expr_path(inner, rust, js, names)?,
+            syn::Expr::Macro(inner) => Self::expr_macro(inner, rust, js, names)?,
             other => return Err(syn::Error::new_spanned(other, "unsupported expression")),
         }
         Ok(())

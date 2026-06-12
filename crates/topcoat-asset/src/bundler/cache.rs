@@ -54,7 +54,8 @@ impl Cache {
                 source,
             })?;
 
-        // Write to a sibling tempfile then rename so a partial download can't be mistaken for a hit.
+        // Write to a sibling tempfile then rename so a partial download can't be mistaken for a
+        // hit.
         let tmp = path.with_extension("download");
         fs::write(&tmp, &bytes)
             .await

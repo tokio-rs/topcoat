@@ -5,18 +5,27 @@ members = [
     "crates/topcoat-asset",
     "crates/topcoat-cli",
     "crates/topcoat-core",
-    "crates/topcoat-macro",
+    "crates/topcoat-core/macro",
     "crates/topcoat-pretty",
     "crates/topcoat-router",
+    "crates/topcoat-router/macro",
     "crates/topcoat-runtime",
+    "crates/topcoat-runtime/macro",
     "crates/topcoat-tailwind",
     "crates/topcoat-ui",
     "crates/topcoat-view",
+    "crates/topcoat-view/macro",
 
+    "examples/app-state",
     "examples/assets",
+    "examples/context",
     "examples/hello-world",
     "examples/manual-router",
     "examples/module-router",
+    "examples/path-query-params",
+    "examples/procedure",
+    "examples/request-response",
+    "examples/runtime",
     "examples/tailwind",
 ]
 
@@ -34,13 +43,16 @@ opt-level = 1
 topcoat = { path = "crates/topcoat" }
 topcoat-asset = { path = "crates/topcoat-asset" }
 topcoat-core = { path = "crates/topcoat-core" }
-topcoat-macro = { path = "crates/topcoat-macro" }
+topcoat-core-macro = { path = "crates/topcoat-core/macro" }
 topcoat-pretty = { path = "crates/topcoat-pretty" }
 topcoat-router = { path = "crates/topcoat-router" }
+topcoat-router-macro = { path = "crates/topcoat-router/macro" }
 topcoat-runtime = { path = "crates/topcoat-runtime" }
+topcoat-runtime-macro = { path = "crates/topcoat-runtime/macro" }
 topcoat-tailwind = { path = "crates/topcoat-tailwind" }
 topcoat-ui = { path = "crates/topcoat-ui" }
 topcoat-view = { path = "crates/topcoat-view" }
+topcoat-view-macro = { path = "crates/topcoat-view/macro" }
 
 anyhow = "1.0"
 anymap3 = "1.0"

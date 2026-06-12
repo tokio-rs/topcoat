@@ -1,253 +1,155 @@
 # Topcoat
 
-> Very early-stage and experimental. Expect breaking changes.
+> Early-stage and experimental. Expect breaking changes.
 
-A batteries-included web framework for building server-rendered web apps in Rust.
+A batteries-included Rust web framework for server-rendered apps.
 
-Topcoat takes the opposite bet from Leptos and Dioxus: instead of running Rust in the browser via WASM, it keeps all rendering on the server and uses [HTMX](https://htmx.org) for interactivity. The result is minimal JavaScript, no hydration overhead, and a simple mental model — the server owns the state.
+Topcoat sits on top of Axum and turns it into a productive full-stack toolkit: HTML-first templates, file-system-shaped routing, per-request memoization, and a built-in asset pipeline with optional Tailwind support — all designed so you can stay in Rust.
 
-Built on top of [Axum](https://github.com/tokio-rs/axum).
+See the [Getting started guide](docs/getting_started.md) to set up a new project.
 
-## Features
-
-- **Optional module-based router** — routes are derived from your module structure, no registration boilerplate; or register routes manually if you prefer
-- **`view!` macro** — write HTML that looks like HTML, with Rust control flow (`if`, `match`, `for`, `let`)
-- **No surprising HTML** — void elements stay void, no self-closing components, no camelCase attributes
-- **Layouts** — wrap pages in shared layouts via a `Slot` composition model
-- **Components** — reusable async functions that render to a `View`
-- **Dev server** — `topcoat dev` watches for changes and hot-reloads the browser
-- **Axum compatible** — you can drop down to raw Axum when needed
-
-## Quick start
-
-```toml
-# Cargo.toml
-[dependencies]
-topcoat = "0.1"
-tokio = { version = "1", features = ["full"] }
-```
-
-```
-src/
-  main.rs
-  app/
-    mod.rs       # layout + home page
-    about.rs     # /about
-    _group/
-      mod.rs
-      contact.rs # /contact  (group prefix _ is stripped from the path)
-```
-
-**`src/main.rs`**
-```rust
-mod app;
+```rust,ignore
+use topcoat::{Result, router::{Router, page}, view::{component, view}};
 
 #[tokio::main]
 async fn main() {
-    let router = app::router();
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    topcoat::serve(listener, router).await.unwrap();
-}
-```
-
-**`src/app/mod.rs`**
-```rust
-mod _group;
-mod about;
-
-use topcoat::{
-    Result,
-    router::{Slot, layout, page},
-    view::view,
-};
-
-pub fn router() -> topcoat::router::Router {
-    topcoat::router::module_router!()
-}
-
-#[layout]
-async fn layout(slot: Slot<'_>) -> Result {
-    view! {
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>"hello world"</title>
-                topcoat::dev::script()
-            </head>
-            <body>
-                <nav>
-                    <a href="/">"home"</a>
-                    <span>" | "</span>
-                    <a href="/about">"about"</a>
-                </nav>
-                <hr>
-                (slot.await?)
-            </body>
-        </html>
-    }
-}
-
-#[page]
-async fn home_page() -> Result {
-    view! { "home" }
-}
-```
-
-**`src/app/about.rs`**
-```rust
-use topcoat::{Result, router::page, view::view};
-
-#[page]
-async fn about_page() -> Result {
-    view! { "about" }
-}
-```
-
-## Module-based routing
-
-Routes are derived automatically from your module structure. The rules are:
-
-| Module | Route |
-|---|---|
-| `app` | `/` |
-| `app::about` | `/about` |
-| `app::settings` | `/settings` |
-| `app::settings::profile` | `/settings/profile` |
-| `app::_group::contact` | `/contact` |
-| `app::_group` | *(group root, no route)* |
-
-Modules prefixed with `_` are **groups** — they organize code without adding a path segment.
-
-## Manual routing
-
-If you prefer not to use the module router, you can register pages and layouts explicitly. Annotate each function with an explicit path and register them on the router directly:
-
-```rust
-use topcoat::{
-    Result,
-    router::{Router, Slot, layout, page},
-    view::view,
-};
-
-#[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result {
-    view! {
-        <html><body>(slot.await?)</body></html>
-    }
+    topcoat::start(Router::new().discover()).await.unwrap();
 }
 
 #[page("/")]
-async fn home_page() -> Result {
-    view! { "home" }
-}
-
-#[page("/about")]
-async fn about_page() -> Result {
-    view! { "about" }
-}
-
-pub fn router() -> Router {
-    Router::new()
-        .layout(root_layout)
-        .page(home_page)
-        .page(about_page)
-}
-```
-
-## The `view!` macro
-
-The `view!` macro is a templating system that aims to be close to real HTML with no surprises:
-
-- Elements use their real HTML names
-- Void elements (`<hr>`, `<br>`, `<input>`, etc.) do not need a closing tag
-- Components use a function-call syntax with named parameters `component_name(name: value, <div>"foo"</div>)`
-- Rust expressions are wrapped in `()`
-- String literals must be quoted
-
-```rust
-view! {
-    <div class="container">
-        <h1>"Hello, " (name) "!"</h1>
-
-        if logged_in {
-            <a href="/dashboard">"Go to dashboard"</a>
-        } else {
-            <a href="/login">"Log in"</a>
-        }
-
-        <ul>
-            for item in &items {
-                <li>(item)</li>
-            }
-        </ul>
-
-        <input type="text" value=(default_value)>
-        <hr>
-    </div>
-}
-```
-
-## Components
-
-Components are async functions annotated with `#[component]`. They receive typed parameters including child `View`s.
-
-```rust
-use topcoat::{Result, component, view::{View, view}};
-
-#[component]
-async fn button<'a>(id: &'a str, child: View) -> Result {
+async fn home() -> Result {
     view! {
-        <button id=(id) class="button">(child)</button>
-    }
-}
-```
-
-Components are invoked with function-call syntax inside `view!`. Named arguments use `name: value` and any other positional arguments are appended to the component's child `View`:
-
-```rust
-view! {
-    button(id: "submit", "Click me")
-}
-```
-
-## Layouts
-
-A `#[layout]` wraps all pages found in the same module (and submodules). It receives a `Slot` — a future that resolves to the page's rendered output.
-
-```rust
-#[layout]
-async fn layout(slot: Slot<'_>) -> Result {
-    view! {
+        <!DOCTYPE html>
         <html>
             <body>
-                (slot.await?)
+                hello(name: "World")
             </body>
         </html>
     }
 }
+
+#[component]
+async fn hello(name: &str) -> Result {
+    view! { <h1>"Hello, " (name) "!"</h1> }
+}
 ```
 
-## Dev server
+## What makes Topcoat different
 
-```sh
-topcoat dev
-# or
-cargo topcoat dev
+### HTML that's still HTML
+
+The `view!` macro doesn't invent a Rust-shaped HTML dialect. Element names, attribute names, and void elements stay the way you'd write them in a `.html` file — `aria-label`, `hx-get`, `xmlns:xlink`, `<br>`, `<input>`, all of it. Control flow is just Rust:
+
+```rust,ignore
+view! {
+    <ul>
+        for post in posts {
+            <li>
+                <a href=(post.url) aria-current=(is_current.then_some("page"))>
+                    (post.title)
+                </a>
+            </li>
+        }
+    </ul>
+}
 ```
 
-Topcoat watches your source files, rebuilds on changes, and sends a reload signal to the browser. The `topcoat::dev::script()` component in your layout handles the client side — it's a no-op in production.
+Attributes that evaluate to `false` or `None` drop themselves from the rendered HTML. Components are called with familiar function-call syntax and can take trailing child nodes.
 
-## Architecture
+### Your module tree is your route table
 
-Topcoat is built on top of Axum, adding module-based routing, server-side templating, and a component model on top of Axum's solid HTTP foundation. `topcoat::router::Router` is convertible to `axum::Router` if you need to drop down to raw Axum.
+Drop `module_router!()` at the root of your `app` module and every `#[page]`, `#[layout]`, and `#[route]` below it gets registered automatically. Module names are kebab-cased into URL segments. Modules prefixed with `_` are *groups* — they hold shared layouts but don't add a segment.
 
-## Planned
+```text
+src/app/
+├── mod.rs              → /            (and the root <html> layout)
+├── about.rs            → /about
+├── _marketing/
+│   ├── mod.rs                         (layout, no segment)
+│   └── pricing.rs      → /pricing
+├── posts/
+│   ├── mod.rs          → /posts
+│   └── id/
+│       └── mod.rs      → /posts/{post_id}
+└── api/
+    └── health.rs       → GET /api/health
+```
 
-- **Component library** — an official UI component library built on Topcoat and Tailwind, in the spirit of shadcn/ui but designed for server-rendered HTMX apps: copy-paste components that live in your codebase, styled with Tailwind, interactive via HTMX without any client-side JavaScript framework
-- **Server actions** — bring form submissions and mutations into the same server-side model as pages, without writing explicit API endpoints (similar to Next.js server actions)
-- **Batteries included auth** — a built-in authentication system covering the common cases out of the box
-- **Request-level memoization** — deduplicate repeated calls to the same data-fetching function within a single request, similar to React's `cache()`
-- **Request hooks** — a request context that allows defining hooks like `use_auth()` which fetch data on demand (e.g. the current user from the database) and can be called from any component without threading the value down through every layer of the tree
-- **Partial page re-rendering** — leverage HTMX to swap only the content that changed during navigation, so shared elements like the nav bar are not re-fetched or re-rendered on every page transition
-- **Strong security model** — safe defaults with no surprises; things like CSRF protection, output escaping, and secure session handling should work correctly out of the box without requiring explicit opt-in
-- **`view!` formatter** — source code formatting for the `view!` macro via `topcoat fmt`
+### Functions, not middleware
+
+Authentication, tenant lookup, feature flags, locale detection — anything request-scoped — is just a function that takes `&Cx`.
+
+```rust,ignore
+fn db(cx: &Cx) -> &Database {
+    app_state(cx)
+}
+
+#[memoize]
+async fn fetch_user(cx: &Cx, id: &str) -> Option<User> {
+    db(cx).load_user(id).await
+}
+
+async fn require_auth(cx: &Cx) -> Result<&User, UnauthorizedError> {
+    let id = session_cookie(cx).ok_or_unauthorized()?;
+    fetch_user(cx, id).await.ok_or_unauthorized()
+}
+
+#[component]
+async fn user_avatar(cx: &Cx) -> Result {
+    let user = require_auth(cx).await?;
+    view! { <img src=(user.avatar_url) alt=(format!("{}'s avatar", user.name))> }
+}
+```
+
+`#[memoize]` caches per request and keys on the arguments — so a layout reading the current user, a page checking authorization, and a deep component rendering an avatar all share one database hit. Concurrent callers even await the same in-flight future.
+
+### Asset bundling
+
+```rust,ignore
+const FERRIS: Asset = asset!("./ferris.png");
+
+view! { <img src=(FERRIS)> }
+```
+
+The bundler scans your compiled binary for `asset!` calls, copies (or downloads) every file, and serves them at `/_topcoat/assets/ferris-<hash>.png`. Remote assets can be pinned with a SHA-256 checksum.
+
+Tailwind is the same story without a `node_modules`: enable the `tailwind` feature, drop a `build.rs` one-liner, and the standalone Tailwind CLI's output becomes a normal Topcoat asset.
+
+```rust,ignore
+view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
+```
+
+### The CLI
+
+- `topcoat dev` — rebuild, rebundle assets, restart the app on changes.
+- `topcoat fmt` — format the inside of `view!` so it reads cleanly next to `rustfmt`.
+- `topcoat asset` — produce the asset bundle for release builds.
+
+## Learn Topcoat
+
+**Start here**
+- [Getting started](docs/getting_started.md) — create a new project, install the CLI, run the dev server.
+
+**Rendering**
+- [The `view!` macro](docs/view.md) — templating syntax, control flow, conditional attributes.
+- [The `component` macro](docs/component.md) — async functions as components, with child content.
+- [The `attributes!` macro](docs/attributes.md) — reusable runtime attribute fragments.
+
+**Routing**
+- [Router](docs/router.md) — pages, layouts, and API routes; manual and auto-discovered.
+- [Module-based routing](docs/module_router.md) — derive the route table from your module tree.
+
+**Working with requests**
+- [Request context (`Cx`)](docs/context.md) — the value pages, layouts, and components read from.
+- [App state](docs/app_state.md) — share long-lived values across requests, keyed by type.
+- [Path and query params](docs/path_and_query_params.md) — typed `T::of(cx)` accessors.
+- [Request and response bodies](docs/request_response.md) — JSON, forms, custom extractors and responses.
+
+**Patterns**
+- [Functions, not middlewares](docs/functions_not_middlewares.md) — the recommended way to model auth and other request-scoped concerns.
+- [Memoization](docs/memoization.md) — `#[memoize]` for per-request caching and fan-out dedup.
+
+**Project infrastructure**
+- [Assets](docs/assets.md) — declare assets in Rust, serve them with content-hashed URLs.
+- [Tailwind](docs/tailwind.md) — Tailwind CSS without Node, wired into the asset pipeline.
+- [Source code formatting](docs/source_formatting.md) — `topcoat fmt` for macro bodies.

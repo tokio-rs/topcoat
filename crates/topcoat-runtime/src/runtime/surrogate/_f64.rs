@@ -1,50 +1,70 @@
 use ref_cast::RefCast;
-use topcoat_view::runtime::{Unescaped, ViewParts};
+use serde::{Deserialize, Serialize};
 
-use crate::runtime::{JsViewParts, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
+use crate::runtime::{BoolSurrogate, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
 
-#[derive(Debug, RefCast, Clone, Copy)]
+#[derive(Debug, RefCast, Clone, Copy, Serialize, Deserialize)]
 #[repr(transparent)]
-pub struct F64(f64);
+#[serde(transparent)]
+pub struct F64Surrogate(f64);
 
-impl F64 {
+impl F64Surrogate {
     #[inline]
     pub(crate) const fn new(v: f64) -> Self {
         Self(v)
     }
 }
 
-impl_surrogate!(f64, F64);
-impl_surrogate_ref!(f64, F64);
-impl_surrogate_mut!(f64, F64);
+impl_surrogate!(f64, F64Surrogate);
+impl_surrogate_ref!(f64, F64Surrogate);
+impl_surrogate_mut!(f64, F64Surrogate);
 
-impl JsViewParts for F64 {
-    fn to_view_parts(&self, parts: &mut ViewParts) {
-        parts.push(Unescaped::new_unchecked("cx.s.f64("));
-        parts.push(self.0);
-        parts.push(Unescaped::new_unchecked(")"));
-    }
-}
-
-macro_rules! impl_binary_op {
+macro_rules! impl_math_op {
     ($trait:ident, $method:ident, $op:tt) => {
-        impl core::ops::$trait for F64 {
-            type Output = F64;
+        impl core::ops::$trait for F64Surrogate {
+            type Output = F64Surrogate;
 
             #[inline]
-            fn $method(self, rhs: F64) -> F64 {
-                F64(self.0 $op rhs.0)
+            fn $method(self, rhs: F64Surrogate) -> F64Surrogate {
+                F64Surrogate(self.0 $op rhs.0)
             }
         }
     };
 }
 
-impl_binary_op!(Add, add, +);
-impl_binary_op!(Sub, sub, -);
-impl_binary_op!(Mul, mul, *);
-impl_binary_op!(Div, div, /);
+impl_math_op!(Add, add, +);
+impl_math_op!(Sub, sub, -);
+impl_math_op!(Mul, mul, *);
+impl_math_op!(Div, div, /);
 
-impl std::fmt::Display for F64 {
+impl core::ops::Neg for F64Surrogate {
+    type Output = F64Surrogate;
+
+    #[inline]
+    fn neg(self) -> F64Surrogate {
+        F64Surrogate(-self.0)
+    }
+}
+
+macro_rules! impl_cmp_op {
+    ($method:ident, $op:tt) => {
+        impl F64Surrogate {
+            #[inline]
+            pub fn $method(&self, rhs: &F64Surrogate) -> BoolSurrogate {
+                BoolSurrogate::new(self.0 $op rhs.0)
+            }
+        }
+    };
+}
+
+impl_cmp_op!(eq, ==);
+impl_cmp_op!(ne, !=);
+impl_cmp_op!(gt, >);
+impl_cmp_op!(lt, <);
+impl_cmp_op!(ge, >=);
+impl_cmp_op!(le, <=);
+
+impl std::fmt::Display for F64Surrogate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }

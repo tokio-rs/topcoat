@@ -72,3 +72,32 @@ impl topcoat_pretty::PrettyPrint for AttributeNodes {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(source: &str) -> AttributeNodes {
+        syn::parse_str(source).unwrap()
+    }
+
+    #[test]
+    fn parses_empty_input() {
+        assert!(parse("").is_empty());
+    }
+
+    #[test]
+    fn collects_sibling_nodes_without_separators() {
+        let nodes = parse(r#"class="x" id="y" data-z="z""#);
+        assert_eq!(nodes.len(), 3);
+    }
+
+    #[test]
+    fn collects_mixed_node_kinds() {
+        let nodes = parse(r#"class="x" :value=(v) @click="alert()""#);
+        assert_eq!(nodes.len(), 3);
+        assert!(matches!(nodes[0], AttributeNode::Attribute(_)));
+        assert!(matches!(nodes[1], AttributeNode::BindAttribute(_)));
+        assert!(matches!(nodes[2], AttributeNode::EventHandler(_)));
+    }
+}

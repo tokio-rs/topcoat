@@ -2,6 +2,7 @@ import { effect } from "@maverick-js/signals";
 
 import type { Context } from "./context";
 import type { Scope } from "./scope";
+import { isNodeViewParts } from "./view";
 
 type Compute = (ctx: Context) => unknown;
 
@@ -49,7 +50,9 @@ function toText(value: unknown): string {
 	while (isRefLike(current)) {
 		current = current.deref();
 	}
-	return current == null ? "" : String(current);
+	if (current == null) return "";
+	if (isNodeViewParts(current)) return current.toNodeText();
+	return String(current);
 }
 
 function isRefLike(value: unknown): value is { deref: () => unknown } {

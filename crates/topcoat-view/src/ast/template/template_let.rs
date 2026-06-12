@@ -3,8 +3,9 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     attributes::{AttributeWriter, WriteAttribute},
     view::{ViewWriter, WriteView},
 };
@@ -48,5 +49,33 @@ impl topcoat_pretty::PrettyPrint for TemplateLet {
     fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         self.expr_let.pretty_print(printer);
         self.semi_token.pretty_print(printer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quote::ToTokens;
+
+    fn parse(source: &str) -> TemplateLet {
+        syn::parse_str(source).unwrap()
+    }
+
+    #[test]
+    fn parses_identifier_binding() {
+        let let_ = parse("let x = 1;");
+        assert_eq!(let_.expr_let.pat.to_token_stream().to_string(), "x");
+        assert_eq!(let_.expr_let.expr.to_token_stream().to_string(), "1");
+    }
+
+    #[test]
+    fn parses_destructuring_pattern() {
+        let let_ = parse("let (a, b) = pair;");
+        assert_eq!(let_.expr_let.pat.to_token_stream().to_string(), "(a , b)");
+    }
+
+    #[test]
+    fn requires_trailing_semicolon() {
+        assert!(syn::parse_str::<TemplateLet>("let x = 1").is_err());
     }
 }

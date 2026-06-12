@@ -1,35 +1,19 @@
 export class Ref<T> {
-	constructor(private readonly pointee: T) {}
+	constructor(
+		private readonly read: () => T,
+		private readonly write: (v: T) => void,
+	) {}
 
 	deref(): T {
-		return this.pointee;
+		return this.read();
 	}
 
-	toJSON(): unknown {
-		return toJSONValue(this.pointee);
-	}
-}
-
-function toJSONValue(value: unknown): unknown {
-	if (value === null || typeof value !== "object") return value;
-
-	const toJSON = (value as { toJSON?: unknown }).toJSON;
-	if (typeof toJSON === "function") {
-		return toJSONValue(toJSON.call(value));
+	deref_mut() {
+		// TODO
+		this.write(this.read());
 	}
 
-	if (Array.isArray(value)) {
-		return value.map(toJSONValue);
+	dehydrate(): unknown {
+		throw new Error("Ref<T> cannot be dehydrated");
 	}
-
-	if (Object.getPrototypeOf(value) === Object) {
-		return Object.fromEntries(
-			Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-				key,
-				toJSONValue(item),
-			]),
-		);
-	}
-
-	return value;
 }

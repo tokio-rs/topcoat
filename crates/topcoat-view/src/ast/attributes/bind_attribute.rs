@@ -4,8 +4,9 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     attributes::{AttributeKey, AttributeWriter, WriteAttribute},
     template::TemplateOrRuntimeExpr,
     view::{ExprKind, ViewWriter, WriteView},
@@ -75,5 +76,55 @@ impl topcoat_pretty::PrettyPrint for BindAttribute {
         self.key.pretty_print(printer);
         self.eq.pretty_print(printer);
         self.value.pretty_print(printer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(source: &str) -> BindAttribute {
+        syn::parse_str(source).unwrap()
+    }
+
+    fn parse_err(source: &str) -> String {
+        match syn::parse_str::<BindAttribute>(source) {
+            Ok(_) => panic!("expected parse error for `{source}`"),
+            Err(err) => err.to_string(),
+        }
+    }
+
+    #[test]
+    fn parses_template_expr_value() {
+        let attr = parse(":value=(v)");
+        assert!(matches!(attr.key, AttributeKey::Ident(_)));
+        assert!(matches!(attr.value, TemplateOrRuntimeExpr::Template(_)));
+    }
+
+    #[test]
+    fn parses_runtime_expr_value() {
+        let attr = parse(":value=$(v)");
+        assert!(matches!(attr.value, TemplateOrRuntimeExpr::Runtime(_)));
+    }
+
+    #[test]
+    fn parses_expression_key() {
+        let attr = parse(":(name)=(v)");
+        assert!(matches!(attr.key, AttributeKey::Expr(_)));
+    }
+
+    #[test]
+    fn parses_html_ident_key() {
+        let attr = parse(":data-foo=(v)");
+        let AttributeKey::Ident(ident) = &attr.key else {
+            panic!("expected ident key");
+        };
+        assert_eq!(ident.to_string(), "data-foo");
+    }
+
+    #[test]
+    fn rejects_literal_value() {
+        // Bindings must carry a Rust expression, not a string literal.
+        assert!(parse_err(r#":value="v""#).contains("expected"));
     }
 }

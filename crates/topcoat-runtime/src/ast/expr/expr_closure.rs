@@ -2,7 +2,10 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Expr as SynExpr, ExprClosure};
 
-use crate::ast::expr::{Expr, name_resolver::NameResolver};
+use crate::ast::expr::{
+    Expr,
+    name_resolver::{LocalBindingKind, NameResolver},
+};
 
 impl Expr {
     pub(super) fn expr_closure(
@@ -11,6 +14,11 @@ impl Expr {
         js: &mut String,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
+        let asyncness = &closure.asyncness;
+        if asyncness.is_some() {
+            js.push_str("async ");
+        }
+
         js.push('(');
         names.push_scope();
         let mut inputs = Vec::with_capacity(closure.inputs.len());
@@ -20,7 +28,7 @@ impl Expr {
             }
             let mut tokens = TokenStream::new();
             let (ident, name) = Self::pat(input, &mut tokens, js, names)?;
-            names.bind_local(&ident, name)?;
+            names.bind_local(&ident, name, LocalBindingKind::Plain)?;
             inputs.push(tokens);
         }
         js.push_str(") => ");
@@ -36,7 +44,7 @@ impl Expr {
 
         let capture = &closure.capture;
         let output = &closure.output;
-        quote! { #capture |#(#inputs),*| #output #body }.to_tokens(rust);
+        quote! { #asyncness #capture |#(#inputs),*| #output #body }.to_tokens(rust);
         Ok(())
     }
 }

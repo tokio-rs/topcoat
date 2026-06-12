@@ -3,8 +3,9 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     attributes::{AttributeWriter, WriteAttribute},
     template::TemplateBlock,
     view::{ViewWriter, WriteView},
@@ -145,5 +146,63 @@ impl<T: topcoat_pretty::PrettyPrint> topcoat_pretty::PrettyPrint for TemplateEls
                 then_branch.pretty_print(printer);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::view::Nodes;
+    use quote::ToTokens;
+
+    fn parse(source: &str) -> TemplateIf<Nodes> {
+        syn::parse_str(source).unwrap()
+    }
+
+    #[test]
+    fn parses_if_without_else() {
+        let if_ = parse(r#"if cond { "yes" }"#);
+        assert_eq!(if_.cond.to_token_stream().to_string(), "cond");
+        assert_eq!(if_.then_branch.children.len(), 1);
+        assert!(if_.else_branch.is_none());
+    }
+
+    #[test]
+    fn parses_if_else() {
+        let if_ = parse(r#"if cond { "yes" } else { "no" }"#);
+        assert!(matches!(if_.else_branch, Some(TemplateElse::Else { .. })));
+    }
+
+    #[test]
+    fn parses_else_if_chain() {
+        let if_ = parse(r#"if a { "a" } else if b { "b" } else { "c" }"#);
+        let Some(TemplateElse::ElseIf { template_if, .. }) = if_.else_branch else {
+            panic!("expected else-if chain");
+        };
+        assert!(matches!(
+            template_if.else_branch,
+            Some(TemplateElse::Else { .. }),
+        ));
+    }
+
+    #[test]
+    fn parses_complex_condition() {
+        // `parse_without_eager_brace` lets the `{` start the body rather than
+        // being eaten by a struct-literal in the condition.
+        let if_ = parse(r#"if user.is_some() && active { "x" }"#);
+        assert_eq!(
+            if_.cond.to_token_stream().to_string(),
+            "user . is_some () && active",
+        );
+    }
+
+    #[test]
+    fn parses_empty_branches() {
+        let if_ = parse(r#"if c {} else {}"#);
+        assert!(if_.then_branch.children.is_empty());
+        let Some(TemplateElse::Else { then_branch, .. }) = if_.else_branch else {
+            panic!("expected else branch");
+        };
+        assert!(then_branch.children.is_empty());
     }
 }

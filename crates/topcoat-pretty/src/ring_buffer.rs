@@ -16,9 +16,9 @@ use std::{
 /// ```
 /// # use topcoat_pretty::RingBuffer;
 /// let mut buffer = RingBuffer::new();
-/// buffer.push_back("first");   // index 0
-/// buffer.push_back("second");  // index 1
-/// buffer.push_back("third");   // index 2
+/// buffer.push_back("first"); // index 0
+/// buffer.push_back("second"); // index 1
+/// buffer.push_back("third"); // index 2
 ///
 /// buffer.pop_front(); // removes "first"
 ///

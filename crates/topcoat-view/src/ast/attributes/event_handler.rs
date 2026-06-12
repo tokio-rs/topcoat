@@ -5,13 +5,17 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     attributes::{AttributeKey, AttributeWriter, WriteAttribute},
     template::TemplateOrRuntimeExpr,
     view::{ExprKind, ViewWriter, WriteView},
 };
 
+/// The value attached to an [`EventHandler`]. Either a Rust expression
+/// (`(expr)` or `$(expr)`) compiled to a handler, or a string literal holding
+/// raw JavaScript that runs on the event.
 pub enum EventHandlerValue {
     Expr(Box<TemplateOrRuntimeExpr>),
     LitStr(LitStr),
@@ -131,5 +135,60 @@ impl topcoat_pretty::PrettyPrint for EventHandler {
         self.key.pretty_print(printer);
         self.eq.pretty_print(printer);
         self.value.pretty_print(printer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(source: &str) -> EventHandler {
+        syn::parse_str(source).unwrap()
+    }
+
+    fn parse_err(source: &str) -> String {
+        match syn::parse_str::<EventHandler>(source) {
+            Ok(_) => panic!("expected parse error for `{source}`"),
+            Err(err) => err.to_string(),
+        }
+    }
+
+    #[test]
+    fn parses_template_expr_value() {
+        let handler = parse("@click=(handler)");
+        assert!(matches!(handler.key, AttributeKey::Ident(_)));
+        let EventHandlerValue::Expr(expr) = &handler.value else {
+            panic!("expected expression value");
+        };
+        assert!(matches!(**expr, TemplateOrRuntimeExpr::Template(_)));
+    }
+
+    #[test]
+    fn parses_runtime_expr_value() {
+        let handler = parse("@click=$(handler)");
+        let EventHandlerValue::Expr(expr) = &handler.value else {
+            panic!("expected expression value");
+        };
+        assert!(matches!(**expr, TemplateOrRuntimeExpr::Runtime(_)));
+    }
+
+    #[test]
+    fn parses_literal_js_value() {
+        let handler = parse(r#"@click="alert(1)""#);
+        let EventHandlerValue::LitStr(lit) = &handler.value else {
+            panic!("expected literal value");
+        };
+        assert_eq!(lit.value(), "alert(1)");
+    }
+
+    #[test]
+    fn parses_expression_key() {
+        let handler = parse("@(name)=(handler)");
+        assert!(matches!(handler.key, AttributeKey::Expr(_)));
+    }
+
+    #[test]
+    fn rejects_missing_value() {
+        assert!(parse_err("@click").contains("expected `=`"));
     }
 }

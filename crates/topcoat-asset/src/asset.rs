@@ -210,27 +210,24 @@ fn normalize(path: &Path) -> PathBuf {
 /// Local paths are resolved when the [`Bundler`](crate::Bundler) runs,
 /// not at macro-expansion time:
 ///
-/// - Paths starting with `./` or `../` are anchored to the directory of
-///   the source file the macro was invoked in.
-/// - Other relative paths are anchored to the declaring crate's
-///   `CARGO_MANIFEST_DIR`.
+/// - Paths starting with `./` or `../` are anchored to the directory of the source file the macro
+///   was invoked in.
+/// - Other relative paths are anchored to the declaring crate's `CARGO_MANIFEST_DIR`.
 /// - Absolute paths are used as-is.
-/// - Strings parseable as `http://` or `https://` URIs are downloaded by
-///   the bundler and cached on disk.
+/// - Strings parseable as `http://` or `https://` URIs are downloaded by the bundler and cached on
+///   disk.
 ///
 /// # Options
 ///
 /// Options control how the bundler names the output file and (optionally)
 /// pins its contents. All are optional:
 ///
-/// - `rename: "name"` — replace the file stem (everything before the
-///   final `.`) with `"name"`.
-/// - `extension: "ext"` — override the output extension (without the
-///   leading dot). Useful when the source has no extension or a wrong one.
-/// - `checksum: "<sha256-hex>"` — assert the SHA-256 of the raw,
-///   unbundled source file. The bundler returns
-///   [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's
-///   actual hash differs. Recommended for remote assets.
+/// - `rename: "name"` — replace the file stem (everything before the final `.`) with `"name"`.
+/// - `extension: "ext"` — override the output extension (without the leading dot). Useful when the
+///   source has no extension or a wrong one.
+/// - `checksum: "<sha256-hex>"` — assert the SHA-256 of the raw, unbundled source file. The bundler
+///   returns [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's actual hash
+///   differs. Recommended for remote assets.
 ///
 /// Output filenames always include a short content hash so bundles stay
 /// cache-friendly: e.g. `logo-1a2b3c4d.png`, or `1a2b3c4d.png` if the

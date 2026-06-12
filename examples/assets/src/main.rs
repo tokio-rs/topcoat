@@ -11,8 +11,7 @@ async fn main() {
         .page(home)
         .assets(AssetBundle::load().unwrap());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    topcoat::serve(listener, router).await.unwrap();
+    topcoat::start(router).await.unwrap();
 }
 
 #[page("/")]

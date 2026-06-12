@@ -1,12 +1,21 @@
+mod _bool;
 mod _f64;
 mod _str;
 mod event;
+mod option;
+mod result;
 mod signal;
 mod string;
+mod tuple;
 
+use serde::{Deserialize, Serialize, de};
+
+pub use _bool::*;
 pub use _f64::*;
 pub use _str::*;
 pub use event::*;
+pub use option::*;
+pub use result::*;
 pub use signal::*;
 pub use string::*;
 
@@ -22,6 +31,7 @@ pub trait Surrogate {
     fn into_real(self) -> Self::Real;
 }
 
+#[macro_export]
 macro_rules! impl_surrogate {
     (
         $({$($g:tt)*})? $real:ty, $surrogate:ty
@@ -50,6 +60,7 @@ macro_rules! impl_surrogate {
 }
 pub(crate) use impl_surrogate;
 
+#[macro_export]
 macro_rules! impl_surrogate_ref {
     (
         $({$($g:tt)*})? $real:ty, $surrogate:ty
@@ -78,6 +89,7 @@ macro_rules! impl_surrogate_ref {
 }
 pub(crate) use impl_surrogate_ref;
 
+#[macro_export]
 macro_rules! impl_surrogate_mut {
     (
         $({$($g:tt)*})? $real:ty, $surrogate:ty
@@ -105,3 +117,50 @@ macro_rules! impl_surrogate_mut {
     };
 }
 pub(crate) use impl_surrogate_mut;
+
+#[derive(Serialize)]
+struct TaggedRef<'a, T>
+where
+    T: ?Sized,
+{
+    t: &'static str,
+    v: &'a T,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Tagged<T> {
+    t: std::string::String,
+    v: T,
+}
+
+pub(crate) fn serialize_tagged<T, S>(
+    serializer: S,
+    tag: &'static str,
+    value: &T,
+) -> ::core::result::Result<S::Ok, S::Error>
+where
+    T: Serialize + ?Sized,
+    S: serde::Serializer,
+{
+    TaggedRef { t: tag, v: value }.serialize(serializer)
+}
+
+pub(crate) fn deserialize_tagged<'de, T, D>(
+    deserializer: D,
+    expected: &'static str,
+) -> ::core::result::Result<T, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    let tagged = Tagged::<T>::deserialize(deserializer)?;
+    if tagged.t == expected {
+        Ok(tagged.v)
+    } else {
+        Err(de::Error::invalid_value(
+            de::Unexpected::Str(&tagged.t),
+            &expected,
+        ))
+    }
+}

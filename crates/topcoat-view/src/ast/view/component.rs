@@ -1,13 +1,18 @@
+use heck::ToPascalCase;
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
-    Expr, Ident, Path, Token, parenthesized,
+    Expr, Ident, Path, Token,
+    ext::IdentExt,
+    parenthesized,
     parse::{Parse, ParseStream},
+    spanned::Spanned,
     token::Paren,
 };
 
+use topcoat_core::ast::ParseOption;
+
 use crate::ast::{
-    ParseOption,
     template::RuntimeExpr,
     view::{ExprKind, Nodes, ViewWriter, WriteView},
 };
@@ -32,6 +37,8 @@ pub struct NamedArg {
     pub value: NamedArgValue,
 }
 
+/// The value of a [`NamedArg`]. Either a plain Rust expression or a `$(...)`
+/// runtime expression.
 pub enum NamedArgValue {
     Expr(Expr),
     Runtime(RuntimeExpr),
@@ -69,24 +76,40 @@ impl topcoat_pretty::PrettyPrint for NamedArgValue {
 impl WriteView for Component {
     fn write(&self, writer: &mut ViewWriter) {
         let name = &self.path;
-        let fields = self.named_args.iter().map(|arg| {
+
+        // The component's props struct lives next to the component under the
+        // same path, named after it in PascalCase plus `Props`.
+        let mut props_path = self.path.clone();
+        let segment = props_path.segments.last_mut().expect("non-empty path");
+        segment.ident = format_ident!(
+            "{}Props",
+            segment.ident.unraw().to_string().to_pascal_case(),
+            span = segment.ident.span()
+        );
+
+        let setters = self.named_args.iter().map(|arg| {
             let ident = &arg.ident;
             let value = &arg.value;
-            quote! { #ident: #value }
+            quote! { .#ident(#value) }
         });
-        let mut child_writer = ViewWriter::new_nested();
-        for child in &self.children {
-            child.write(&mut child_writer);
-        }
-        let child = child_writer.into_token_stream();
+        let child = (!self.children.is_empty()).then(|| {
+            let mut child_writer = ViewWriter::new_nested();
+            for child in &self.children {
+                child.write(&mut child_writer);
+            }
+            let child = child_writer.into_token_stream();
+            quote_spanned! {self.paren_token.span.span()=>
+                .child(#child)
+            }
+        });
 
         writer.write_expr(
             ExprKind::Node,
-            quote! {
-                <#name as ::topcoat::view::Component>::render(
-                    #name { #(#fields),* },
+            quote_spanned! {self.paren_token.span.span()=>
+                ::topcoat::view::Component::render(
+                    #name(::core::marker::PhantomData),
                     __cx,
-                    #child,
+                    #props_path::builder()#(#setters)*#child.build(),
                 ).await?
             },
         );

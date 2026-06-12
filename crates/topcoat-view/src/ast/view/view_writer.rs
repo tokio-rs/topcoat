@@ -188,7 +188,7 @@ impl ViewWriter {
         if self.nested {
             format_expr
         } else {
-            quote! { async { Ok(#format_expr) }.await }
+            quote! { async { ::topcoat::Result::Ok(#format_expr) }.await }
         }
     }
 }
@@ -272,5 +272,139 @@ impl MatchArmsBuilder {
             guard: guard.cloned(),
             body: Box::new(body),
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rendered(writer: ViewWriter) -> String {
+        writer.into_token_stream().to_string()
+    }
+
+    #[test]
+    fn empty_top_level_writer_emits_view_empty() {
+        let out = rendered(ViewWriter::new());
+        assert!(out.contains("async"));
+        assert!(out.contains(":: topcoat :: view :: View :: empty"));
+    }
+
+    #[test]
+    fn empty_nested_writer_omits_async_wrapper() {
+        // Nested writers (e.g. component children) are spliced into a parent
+        // and must not introduce their own async block.
+        let out = rendered(ViewWriter::new_nested());
+        assert!(!out.contains("async"));
+        assert!(out.contains(":: topcoat :: view :: View :: empty"));
+    }
+
+    #[test]
+    fn adjacent_literal_text_is_concatenated() {
+        let mut writer = ViewWriter::new();
+        writer.write_str_unescaped("<div>");
+        writer.write_str("hello");
+        writer.write_str_unescaped("</div>");
+        let out = rendered(writer);
+        assert!(out.contains("__unescaped (& mut __parts , \"<div>hello</div>\")"));
+    }
+
+    #[test]
+    fn expression_breaks_static_segment_with_kind_helper() {
+        let mut writer = ViewWriter::new();
+        writer.write_str_unescaped("<p>");
+        writer.write_expr(ExprKind::Node, quote! { value });
+        writer.write_str_unescaped("</p>");
+        let out = rendered(writer);
+        assert!(out.contains("__unescaped (& mut __parts , \"<p>\")"));
+        assert!(out.contains("__node (& mut __parts , value)"));
+        assert!(out.contains("__unescaped (& mut __parts , \"</p>\")"));
+    }
+
+    #[test]
+    fn if_else_renders_both_branches() {
+        let mut writer = ViewWriter::new();
+        writer.if_else(&syn::parse_quote!(cond), |then_branch, else_branch| {
+            then_branch.write_str_unescaped("yes");
+            else_branch.write_str_unescaped("no");
+        });
+        let out = rendered(writer);
+        assert!(out.contains("if cond"));
+        assert!(out.contains("else"));
+        assert!(out.contains("\"yes\""));
+        assert!(out.contains("\"no\""));
+    }
+
+    #[test]
+    fn if_without_else_omits_else_branch() {
+        let mut writer = ViewWriter::new();
+        writer.if_else(&syn::parse_quote!(cond), |then_branch, _| {
+            then_branch.write_str_unescaped("yes");
+        });
+        let out = rendered(writer);
+        assert!(out.contains("if cond"));
+        assert!(!out.contains("else"));
+    }
+
+    #[test]
+    fn for_loop_wraps_body_in_for_in_expr() {
+        let mut writer = ViewWriter::new();
+        writer.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
+            body.write_str_unescaped("x")
+        });
+        let out = rendered(writer);
+        assert!(out.contains("for x in xs"));
+    }
+
+    #[test]
+    fn match_expr_renders_arms_with_optional_guard() {
+        let mut writer = ViewWriter::new();
+        writer.match_expr(&syn::parse_quote!(v), |arms| {
+            arms.arm(&syn::parse_quote!(A), None, |body| {
+                body.write_str_unescaped("a");
+            });
+            arms.arm(
+                &syn::parse_quote!(B),
+                Some(&syn::parse_quote!(flag)),
+                |body| {
+                    body.write_str_unescaped("b");
+                },
+            );
+        });
+        let out = rendered(writer);
+        assert!(out.contains("match v"));
+        assert!(out.contains("A =>"));
+        assert!(out.contains("B if flag =>"));
+    }
+
+    #[test]
+    fn let_binding_emits_let_statement() {
+        let mut writer = ViewWriter::new();
+        writer.let_binding(&syn::parse_quote!(x), &syn::parse_quote!(value));
+        writer.write_str_unescaped("ok");
+        let out = rendered(writer);
+        assert!(out.contains("let x = value"));
+    }
+
+    #[test]
+    fn expr_kind_selects_matching_helper() {
+        for (kind, expected) in [
+            (ExprKind::Unescaped, "__unescaped"),
+            (ExprKind::Node, "__node"),
+            (ExprKind::ElementName, "__element_name"),
+            (ExprKind::Attribute, "__attribute"),
+            (ExprKind::AttributeUnescaped, "__attribute_unescaped"),
+            (ExprKind::AttributeKey, "__attribute_key"),
+            (ExprKind::AttributeValue, "__attribute_value"),
+            (ExprKind::Attributes, "__attributes"),
+        ] {
+            let mut writer = ViewWriter::new();
+            writer.write_expr(kind, quote! { v });
+            assert!(
+                rendered(writer).contains(expected),
+                "expected helper `{expected}` for kind `{}`",
+                expected,
+            );
+        }
     }
 }

@@ -11,6 +11,12 @@ use uuid::Uuid;
 
 use crate::ast::shard::{ShardAttr, ShardItem};
 
+/// A parsed `#[shard] async fn ...`. Expands into a `const` of type
+/// [`topcoat::runtime::Shard`] paired with a unique [`ShardId`], so the shard
+/// can be invoked by id and (when `discover` is enabled) auto-registered with
+/// the runtime inventory.
+///
+/// [`ShardId`]: ::topcoat::runtime::ShardId
 pub struct Shard {
     _attr: ShardAttr,
     item: ShardItem,
