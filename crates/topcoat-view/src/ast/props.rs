@@ -2,8 +2,8 @@ use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    Data, DeriveInput, Fields, GenericParam, Generics, Ident, Type, Visibility, ext::IdentExt,
-    parse_quote,
+    Attribute, Data, DeriveInput, Fields, GenericParam, Generics, Ident, Type, Visibility,
+    ext::IdentExt, parse_quote,
 };
 
 /// A parsed `#[derive(Props)]` struct. Expands into a typestate builder where
@@ -30,6 +30,9 @@ pub struct Props {
 struct PropsField {
     ident: Ident,
     ty: Type,
+    /// The field's doc comments (`#[doc = ...]` attributes), forwarded onto the
+    /// generated setter method.
+    docs: Vec<Attribute>,
     /// `#[into]`: the setter accepts `impl Into<T>`.
     into: bool,
     /// The typestate parameter tracking whether this field has been set.
@@ -68,6 +71,7 @@ impl Props {
 
             let mut default = false;
             let mut into = false;
+            let mut docs = Vec::new();
             for attr in &field.attrs {
                 if attr.path().is_ident("default") {
                     attr.meta.require_path_only()?;
@@ -75,6 +79,8 @@ impl Props {
                 } else if attr.path().is_ident("into") {
                     attr.meta.require_path_only()?;
                     into = true;
+                } else if attr.path().is_ident("doc") {
+                    docs.push(attr.clone());
                 }
             }
 
@@ -82,6 +88,7 @@ impl Props {
             fields.push(PropsField {
                 ident,
                 ty: field.ty,
+                docs,
                 into,
                 state,
             });
@@ -188,7 +195,15 @@ impl ToTokens for Props {
         let setters = fields.iter().map(|field| {
             let field_ident = &field.ident;
             let ty = &field.ty;
-            let doc = format!("Sets the `{}` property.", field_ident.unraw());
+            // Carry the field's own doc comment onto the setter; fall back to a
+            // generated summary when the field is undocumented.
+            let doc = if field.docs.is_empty() {
+                let generated = format!("Sets the `{}` property.", field_ident.unraw());
+                quote! { #[doc = #generated] }
+            } else {
+                let docs = &field.docs;
+                quote! { #(#docs)* }
+            };
 
             let (param_ty, value) = if field.into {
                 (
@@ -212,7 +227,7 @@ impl ToTokens for Props {
                     });
                     let other_idents = field_idents.iter().filter(|other| **other != field_ident);
                     quote! {
-                        #[doc = #doc]
+                        #doc
                         #vis fn #field_ident(self, #field_ident: #param_ty) -> #ret_ty {
                             #builder_ident {
                                 #field_ident: ::core::option::Option::Some(#value),
@@ -224,7 +239,7 @@ impl ToTokens for Props {
                 }
                 // `#[default]` field: setting it does not change the typestate.
                 None => quote! {
-                    #[doc = #doc]
+                    #doc
                     #vis fn #field_ident(mut self, #field_ident: #param_ty) -> Self {
                         self.#field_ident = ::core::option::Option::Some(#value);
                         self
