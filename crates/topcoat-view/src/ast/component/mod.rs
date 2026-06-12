@@ -69,9 +69,7 @@ impl ToTokens for Component {
         // them here to avoid a "cannot find attribute" error.
         for arg in &mut item.sig.inputs {
             if let FnArg::Typed(pat_type) = arg {
-                pat_type
-                    .attrs
-                    .retain(|attr| !attr.path().is_ident("default") && !attr.path().is_ident("into"));
+                pat_type.attrs.clear();
             }
         }
 
