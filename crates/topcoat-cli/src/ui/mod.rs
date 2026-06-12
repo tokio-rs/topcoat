@@ -1,6 +1,7 @@
 mod add;
 mod init;
 mod list;
+mod registry;
 mod remove;
 
 use std::path::PathBuf;
@@ -23,6 +24,8 @@ enum UiSubcommand {
     List(list::ListCommand),
     /// Remove a previously added UI component from your project
     Remove(remove::RemoveCommand),
+    /// Manage the registries tracked in the install state
+    Registry(registry::RegistryCommand),
 }
 
 impl UiCommand {
@@ -32,6 +35,7 @@ impl UiCommand {
             UiSubcommand::Add(cmd) => cmd.run().await,
             UiSubcommand::List(cmd) => cmd.run().await,
             UiSubcommand::Remove(cmd) => cmd.run().await,
+            UiSubcommand::Registry(cmd) => cmd.run().await,
         }
     }
 }

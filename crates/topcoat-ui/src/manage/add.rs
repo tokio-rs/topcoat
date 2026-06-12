@@ -15,9 +15,6 @@ pub struct AddOptions {
     pub components: Vec<String>,
     /// Named registry to add from (defaults to the project's default registry).
     pub registry: Option<String>,
-    /// Registry location (a path, `file://` path, or `http(s)://` URL); sets or
-    /// overrides the location stored for the registry.
-    pub url: Option<String>,
     /// Overwrite the component file if it already exists.
     pub overwrite: bool,
 }
@@ -99,7 +96,6 @@ pub async fn add(
         let root_registry = resolve_root_registry(
             component,
             options.registry.as_deref(),
-            options.url.as_deref(),
             project,
             &mut state,
             &mut registries,
@@ -296,16 +292,14 @@ pub async fn add(
 async fn resolve_root_registry(
     component: &str,
     registry: Option<&str>,
-    url: Option<&str>,
     project: &Project,
     state: &mut InstallState,
     registries: &mut HashMap<String, Registry>,
     confirm: &mut Confirm<'_>,
 ) -> Result<String, String> {
     if let Some(name) = registry {
-        let stored = url.map(|url| project.to_stored(url));
         let working = {
-            let registry = state.registry_mut(name, stored)?;
+            let registry = state.registry_mut(name)?;
             project.to_working(&registry.url)
         };
         let loaded = load_registry(registries, &working).await?;
@@ -319,32 +313,10 @@ async fn resolve_root_registry(
         return Ok(name.to_string());
     }
 
-    // A bare --url (no --registry) adds from the registry at that location,
-    // named by the registry's own declared name rather than the default name.
-    if let Some(url) = url {
-        let stored = project.to_stored(url);
-        let loaded = load_registry(registries, &project.to_working(&stored)).await?;
-        let name = loaded.name().to_string();
-        if loaded.get(component).is_none() {
-            let available: Vec<&str> = loaded.names().collect();
-            return Err(format!(
-                "unknown component `{component}` in registry `{name}`; available: {}",
-                available.join(", ")
-            ));
-        }
-        // The first registry added to a fresh project becomes its default.
-        let fresh = state.registries.is_empty();
-        let resolved = state.resolve_registry(&stored, &name)?;
-        if fresh {
-            state.default_registry = resolved.clone();
-        }
-        return Ok(resolved);
-    }
-
     // Prefer the default registry whenever it offers the component.
     let default = state.default_registry.clone();
     let default_url = {
-        let registry = state.registry_mut(&default, None)?;
+        let registry = state.registry_mut(&default)?;
         project.to_working(&registry.url)
     };
     if load_registry(registries, &default_url)

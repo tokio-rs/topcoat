@@ -119,27 +119,18 @@ impl InstallState {
         (name == DEFAULT_REGISTRY_NAME).then(|| crate::DEFAULT_REGISTRY.to_string())
     }
 
-    /// Returns the named registry, creating it if necessary. A given `url` sets
-    /// or overrides the registry's location. Creating a registry that does not
-    /// exist requires a `url`, except the built-in registry.
-    pub(super) fn registry_mut(
-        &mut self,
-        name: &str,
-        url: Option<String>,
-    ) -> Result<&mut RegistryState, String> {
+    /// Returns the named registry. A registry that does not exist is created
+    /// only for the built-in `topcoat`, whose location is known; any other
+    /// unknown registry errors, since registries are added explicitly with
+    /// `topcoat ui registry add`.
+    pub(super) fn registry_mut(&mut self, name: &str) -> Result<&mut RegistryState, String> {
         let base_dir = self.base_dir.clone();
         match self.registries.entry(name.to_string()) {
-            Entry::Occupied(entry) => {
-                let registry = entry.into_mut();
-                if let Some(url) = url {
-                    registry.url = url;
-                }
-                Ok(registry)
-            }
+            Entry::Occupied(entry) => Ok(entry.into_mut()),
             Entry::Vacant(entry) => {
-                let url = url
-                    .or_else(|| Self::default_url(name))
-                    .ok_or_else(|| format!("unknown registry `{name}`; pass --url to define it"))?;
+                let url = Self::default_url(name).ok_or_else(|| {
+                    format!("unknown registry `{name}`; add it with `topcoat ui registry add <url>`")
+                })?;
                 Ok(entry.insert(RegistryState::new(name, url, &base_dir)))
             }
         }

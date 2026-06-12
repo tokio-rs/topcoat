@@ -12,10 +12,6 @@ pub(super) struct AddCommand {
     /// Named registry to add from (defaults to the project's default registry)
     #[arg(short, long)]
     registry: Option<String>,
-    /// Registry location (a path, `file://` path, or `http(s)://` URL); sets or
-    /// overrides the location stored for the registry
-    #[arg(long)]
-    url: Option<String>,
     /// Overwrite the component file if it already exists
     #[arg(short, long)]
     overwrite: bool,
@@ -36,7 +32,6 @@ impl AddCommand {
         let options = AddOptions {
             components: self.components,
             registry: self.registry,
-            url: self.url,
             overwrite: self.overwrite,
         };
 
