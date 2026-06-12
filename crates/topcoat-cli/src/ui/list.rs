@@ -83,7 +83,7 @@ impl ListCommand {
                             "  {} {} {}",
                             style("?").red(),
                             component.name,
-                            style("(not in registry)").red(),
+                            style("(orphaned)").red(),
                         );
                     }
                 }
