@@ -17,7 +17,7 @@ pub(super) struct RemoveCommand {
 }
 
 impl RemoveCommand {
-    pub(super) async fn run(self) {
+    pub(super) fn run(self) {
         if let Err(error) = self.run_inner() {
             eprintln!("{}", style(error).red());
             std::process::exit(1);

@@ -3,10 +3,9 @@ use std::path::{Path, PathBuf};
 use super::state::STATE_FILE;
 
 /// The cargo workspace a management operation acts on. Every relative path in
-/// the install state — registry `file://` locations, component directories, and
-/// installed file paths — is relative to the project root (the directory that
-/// holds `components.toml`), so operations behave the same regardless of the
-/// working directory.
+/// the install state — the components directory and installed file paths — is
+/// relative to the project root (the directory that holds `components.toml`), so
+/// operations behave the same regardless of the working directory.
 pub struct Project {
     root: PathBuf,
 }
@@ -37,38 +36,6 @@ impl Project {
     /// Resolves a project-relative path against the project root.
     pub(super) fn resolve(&self, path: &Path) -> PathBuf {
         self.root.join(path)
-    }
-
-    /// Converts a stored registry location into one usable from any working
-    /// directory: a relative `file://` location is made absolute against the
-    /// project root; remote URLs and absolute paths are left unchanged.
-    pub(super) fn to_working(&self, url: &str) -> String {
-        let Some(rest) = url.strip_prefix("file://") else {
-            return url.to_string();
-        };
-        let rest = rest.strip_prefix("./").unwrap_or(rest);
-        if Path::new(rest).is_absolute() {
-            return url.to_string();
-        }
-        format!("file://{}", self.root.join(rest).display())
-    }
-
-    /// Converts a registry location into the form stored in `components.toml`: a
-    /// `file://` path inside the project is made relative to the project root;
-    /// remote URLs and paths outside the project are left as they are.
-    pub(super) fn to_stored(&self, url: &str) -> String {
-        let Some(rest) = url.strip_prefix("file://") else {
-            return url.to_string();
-        };
-        let path = Path::new(rest);
-        if path.is_absolute() {
-            return match path.strip_prefix(&self.root) {
-                Ok(relative) => format!("file://{}", relative.display()),
-                Err(_) => url.to_string(),
-            };
-        }
-        let rest = rest.strip_prefix("./").unwrap_or(rest);
-        format!("file://{rest}")
     }
 }
 

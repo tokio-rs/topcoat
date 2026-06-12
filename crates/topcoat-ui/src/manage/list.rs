@@ -1,13 +1,15 @@
-use crate::{Registry, Source};
+use std::collections::BTreeSet;
+
+use crate::Registry;
 
 use super::project::Project;
 use super::state::{InstallState, RegistryState};
+use super::workspace::Workspace;
 
-/// One registry's listing: its name and location, and either the status of its
+/// One registry's listing: its crate name, and either the status of its
 /// components or the error encountered loading it.
 pub struct RegistryListing {
     pub name: String,
-    pub url: String,
     pub outcome: Result<Vec<ComponentStatus>, String>,
 }
 
@@ -31,57 +33,66 @@ pub enum InstallStatus {
 
 /// Lists registries and the install status of their components.
 ///
-/// A component counts as installed only when it is tracked under *that*
-/// registry, so the same name installed from a different registry is not treated
-/// as installed here. With `selected`, only that registry is listed. Failures to
-/// load an individual registry are reported per registry (in `outcome`) rather
-/// than failing the whole listing.
-pub async fn list(
-    project: &Project,
-    selected: Option<&str>,
-) -> Result<Vec<RegistryListing>, String> {
+/// The registries listed are those the project can add from — the default plus
+/// any dependency registry — together with any registry still tracked in the
+/// install state (so components from a since-removed dependency are not hidden).
+/// A component counts as installed only when it is tracked under *that* registry.
+/// With `selected`, only that registry is listed. Failures to load an individual
+/// registry are reported per registry (in `outcome`) rather than failing the
+/// whole listing.
+pub fn list(project: &Project, selected: Option<&str>) -> Result<Vec<RegistryListing>, String> {
     let state = InstallState::load(project)?;
+    let workspace = Workspace::load(project)?;
 
-    // The install state always tracks at least the default registry (seeded by
-    // `init`), so a selected registry that isn't tracked is simply unknown.
-    if let Some(name) = selected {
-        if !state.registries.contains_key(name) {
-            return Err(format!("unknown registry `{name}`"));
-        }
+    // The registries worth listing: discoverable dependency registries plus any
+    // still tracked in the install state.
+    let names: BTreeSet<String> = workspace
+        .available_registries()
+        .into_iter()
+        .chain(state.registries.keys().cloned())
+        .collect();
+
+    if let Some(name) = selected
+        && !names.contains(name)
+    {
+        return Err(format!("unknown registry `{name}`"));
     }
 
-    let mut listings = Vec::new();
-    for (name, registry_state) in &state.registries {
-        if selected.is_some_and(|chosen| chosen != name) {
-            continue;
-        }
-        listings.push(listing_for(project, name, registry_state).await);
-    }
+    let empty = RegistryState::default();
+    let listings = names
+        .iter()
+        .filter(|name| selected.is_none_or(|chosen| chosen == name.as_str()))
+        .map(|name| {
+            let tracked = state.registries.get(name).unwrap_or(&empty);
+            listing_for(&workspace, name, tracked)
+        })
+        .collect();
 
     Ok(listings)
 }
 
-/// Builds one registry's listing, loading it and classifying its components.
-async fn listing_for(project: &Project, name: &str, state: &RegistryState) -> RegistryListing {
-    let working_url = project.to_working(&state.url);
-    let outcome = match Registry::load(Source::parse(&working_url)).await {
-        Ok(registry) => statuses(&registry, state).await,
-        Err(error) => Err(error.to_string()),
+/// Builds one registry's listing, resolving and loading it and classifying its
+/// components. When the registry cannot be resolved or loaded, any components
+/// still tracked under it are reported as orphaned rather than losing them to a
+/// bare load error.
+fn listing_for(workspace: &Workspace, name: &str, state: &RegistryState) -> RegistryListing {
+    let outcome = match workspace.registry_dir(name).and_then(|dir| {
+        Registry::load(dir).map_err(|error| format!("failed to load registry `{name}`: {error}"))
+    }) {
+        Ok(registry) => statuses(&registry, state),
+        Err(error) if state.components.is_empty() => Err(error),
+        Err(_) => Ok(orphaned(state)),
     };
     RegistryListing {
         name: name.to_string(),
-        url: state.url.clone(),
         outcome,
     }
 }
 
 /// Classifies every component a registry offers, plus any tracked under it that
-/// it no longer offers. Each offered component's source is fetched and hashed to
+/// it no longer offers. Each offered component's source is read and hashed to
 /// learn its current version; a failure to do so fails the whole listing.
-async fn statuses(
-    registry: &Registry,
-    state: &RegistryState,
-) -> Result<Vec<ComponentStatus>, String> {
+fn statuses(registry: &Registry, state: &RegistryState) -> Result<Vec<ComponentStatus>, String> {
     let names: Vec<&str> = registry.names().collect();
     let mut out = Vec::new();
 
@@ -89,9 +100,9 @@ async fn statuses(
         let component = registry
             .get(component_name)
             .expect("name came from the registry");
-        let latest = component.hash().await.map_err(|error| {
-            format!("failed to hash component `{component_name}`: {error}")
-        })?;
+        let latest = component
+            .hash()
+            .map_err(|error| format!("failed to hash component `{component_name}`: {error}"))?;
         let status = match state.components.get(*component_name) {
             None => InstallStatus::Available { hash: latest },
             Some(installed) if installed.hash == latest => InstallStatus::UpToDate { hash: latest },
@@ -118,4 +129,19 @@ async fn statuses(
     }
 
     Ok(out)
+}
+
+/// Reports every tracked component as orphaned, used when the registry itself
+/// can no longer be loaded.
+fn orphaned(state: &RegistryState) -> Vec<ComponentStatus> {
+    state
+        .components
+        .iter()
+        .map(|(name, installed)| ComponentStatus {
+            name: name.clone(),
+            status: InstallStatus::Orphaned {
+                installed: installed.hash.clone(),
+            },
+        })
+        .collect()
 }

@@ -28,7 +28,7 @@ enum Command {
 pub async fn run() {
     let cli = TopcoatCli::parse();
     match cli.command {
-        Command::Ui(cmd) => cmd.run().await,
+        Command::Ui(cmd) => cmd.run(),
         Command::Fmt(cmd) => cmd.run().await,
         Command::Dev(cmd) => cmd.run().await,
         Command::Asset(cmd) => cmd.run().await,

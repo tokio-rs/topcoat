@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fmt;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -14,116 +13,20 @@ pub const MANIFEST_FILE: &str = "registry.toml";
 /// manifest declaring a newer version than this is rejected.
 pub const MANIFEST_VERSION: u32 = 1;
 
-/// The registry used when a project does not specify one of its own: the
-/// component registry published alongside this repository.
-pub const DEFAULT_REGISTRY: &str =
-    // TODO: "https://raw.githubusercontent.com/tokio-rs/topcoat/main/crates/topcoat-ui/src/topcoat";
-    "file://crates/topcoat-ui/src/topcoat";
-
-/// The location of a component registry.
-#[derive(Clone, Debug)]
-pub enum Source {
-    /// A local directory containing the manifest and component files.
-    Path(PathBuf),
-    /// A remote base URL under which the manifest and component files are served.
-    Url(String),
-}
-
-impl Source {
-    /// Interprets a string as a remote URL if it looks like one (`http://` or
-    /// `https://`), otherwise as a local filesystem path. A `file://` prefix
-    /// names a local path explicitly.
-    pub fn parse(location: &str) -> Self {
-        if let Some(path) = location.strip_prefix("file://") {
-            Self::Path(PathBuf::from(path))
-        } else if location.starts_with("http://") || location.starts_with("https://") {
-            Self::Url(location.trim_end_matches('/').to_string())
-        } else {
-            Self::Path(PathBuf::from(location))
-        }
-    }
-
-    /// Resolves a dependency's registry location against this source — the
-    /// registry that declared the dependency. A relative `file://` location is
-    /// resolved against this source's directory (so a dependency can point at a
-    /// sibling registry like `file://../other`); absolute `file://` paths and
-    /// remote URLs are returned unchanged.
-    pub fn resolve(&self, location: &str) -> Result<String, Error> {
-        let Some(relative) = location.strip_prefix("file://") else {
-            return Ok(location.to_string());
-        };
-        if relative.starts_with('/') {
-            return Ok(location.to_string());
-        }
-        let Self::Path(base) = self else {
-            // A relative local path under a remote registry has no meaningful
-            // base; leave it as given.
-            return Ok(location.to_string());
-        };
-        // Canonicalize against the declaring registry's directory: this resolves
-        // `..` and symlinks and yields an absolute path, so the same directory
-        // reached via different relative locations resolves to one string.
-        let joined = base.join(relative);
-        let resolved = joined.canonicalize().map_err(|source| Error::ReadPath {
-            path: joined,
-            source,
-        })?;
-        Ok(format!("file://{}", resolved.display()))
-    }
-
-    /// Resolves a child file (e.g. the manifest or a component file) under this
-    /// source.
-    fn child(&self, name: &str) -> Source {
-        match self {
-            Self::Path(base) => Self::Path(base.join(name)),
-            Self::Url(base) => Self::Url(format!("{base}/{name}")),
-        }
-    }
-
-    /// Reads the contents at this exact location as a string.
-    async fn read(&self) -> Result<String, Error> {
-        match self {
-            Self::Path(path) => std::fs::read_to_string(path).map_err(|source| Error::ReadPath {
-                path: path.clone(),
-                source,
-            }),
-            Self::Url(url) => {
-                let fetch = |source| Error::Fetch {
-                    url: url.clone(),
-                    source,
-                };
-                reqwest::get(url)
-                    .await
-                    .and_then(reqwest::Response::error_for_status)
-                    .map_err(fetch)?
-                    .text()
-                    .await
-                    .map_err(fetch)
-            }
-        }
-    }
-}
-
-impl fmt::Display for Source {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Path(path) => write!(f, "{}", path.display()),
-            Self::Url(url) => write!(f, "{url}"),
-        }
-    }
-}
+/// The crate name of the registry used when a project does not specify one: the
+/// built-in `topcoat-ui` crate, which carries the default component registry and
+/// reaches a project transitively through the `topcoat` crate.
+pub const DEFAULT_REGISTRY_CRATE: &str = "topcoat-ui";
 
 /// The parsed `registry.toml` manifest. Written by hand: it records no hashes —
 /// a component's hash is computed from its source on the fly (see
-/// [`content_hash`]).
+/// [`content_hash`]). The registry's identity is its crate name, so the manifest
+/// names only the format version and the components.
 #[derive(Deserialize)]
 struct Manifest {
     /// The manifest format version. Required; used to tell formats apart so a
     /// newer manifest can be rejected by an older build.
     version: u32,
-    /// The registry's own name, used when it is added to a project as a
-    /// dependency's registry. Every registry must declare one.
-    name: String,
     #[serde(default)]
     components: BTreeMap<String, Entry>,
 }
@@ -141,21 +44,26 @@ struct Entry {
 pub enum Dependency {
     /// A component in the same registry, named directly.
     Same(String),
-    /// A component in another registry, identified by that registry's location.
+    /// A component in another registry, identified by that registry's crate
+    /// name. The crate must itself be a dependency of the project.
     Other { registry: String, name: String },
 }
 
-/// A component registry loaded from a [`Source`].
+/// A component registry loaded from a crate's registry directory.
 pub struct Registry {
-    source: Source,
-    name: String,
+    dir: PathBuf,
     components: BTreeMap<String, Entry>,
 }
 
 impl Registry {
-    /// Loads a registry by reading and parsing its manifest from `source`.
-    pub async fn load(source: Source) -> Result<Self, Error> {
-        let raw = source.child(MANIFEST_FILE).read().await?;
+    /// Loads a registry by reading and parsing the `registry.toml` in `dir` (a
+    /// registry crate's declared registry directory).
+    pub fn load(dir: PathBuf) -> Result<Self, Error> {
+        let manifest_path = dir.join(MANIFEST_FILE);
+        let raw = std::fs::read_to_string(&manifest_path).map_err(|source| Error::Read {
+            path: manifest_path,
+            source,
+        })?;
         let manifest: Manifest = toml::from_str(&raw)?;
         if manifest.version > MANIFEST_VERSION {
             return Err(Error::UnsupportedVersion {
@@ -164,15 +72,9 @@ impl Registry {
             });
         }
         Ok(Self {
-            source,
-            name: manifest.name,
+            dir,
             components: manifest.components,
         })
-    }
-
-    /// The registry's own declared name.
-    pub fn name(&self) -> &str {
-        &self.name
     }
 
     /// The names of every component in the registry, sorted.
@@ -187,7 +89,7 @@ impl Registry {
             .map(|(name, entry)| Component {
                 name,
                 entry,
-                source: &self.source,
+                dir: &self.dir,
             })
     }
 }
@@ -196,7 +98,7 @@ impl Registry {
 pub struct Component<'a> {
     name: &'a str,
     entry: &'a Entry,
-    source: &'a Source,
+    dir: &'a Path,
 }
 
 impl Component<'_> {
@@ -205,12 +107,12 @@ impl Component<'_> {
         self.name
     }
 
-    /// Computes the component's content hash by fetching its source and hashing
+    /// Computes the component's content hash by reading its source and hashing
     /// it (see [`content_hash`]). The hash is recorded per component in the
     /// install state so that updates can be surfaced individually; recomputing
     /// it from the registry reveals when the source has changed.
-    pub async fn hash(&self) -> Result<String, Error> {
-        Ok(content_hash(&self.fetch_source().await?))
+    pub fn hash(&self) -> Result<String, Error> {
+        Ok(content_hash(&self.read_source()?))
     }
 
     /// The file name written into the user's components directory.
@@ -222,8 +124,9 @@ impl Component<'_> {
     }
 
     /// Reads the component's Rust source from the registry.
-    pub async fn fetch_source(&self) -> Result<String, Error> {
-        self.source.child(&self.entry.source).read().await
+    pub fn read_source(&self) -> Result<String, Error> {
+        let path = self.dir.join(&self.entry.source);
+        std::fs::read_to_string(&path).map_err(|source| Error::Read { path, source })
     }
 
     /// The other components this component depends on.
@@ -254,16 +157,10 @@ fn hex(bytes: &[u8]) -> String {
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("failed to read {path:?}")]
-    ReadPath {
+    Read {
         path: PathBuf,
         #[source]
         source: std::io::Error,
-    },
-    #[error("failed to fetch {url}")]
-    Fetch {
-        url: String,
-        #[source]
-        source: reqwest::Error,
     },
     #[error("failed to parse registry manifest")]
     Parse(#[from] toml::de::Error),

@@ -9,7 +9,7 @@ pub(super) struct AddCommand {
     /// Names of the components to add (e.g. `button card`)
     #[arg(required = true)]
     components: Vec<String>,
-    /// Named registry to add from (defaults to the project's default registry)
+    /// Registry crate to add from (defaults to the built-in default registry)
     #[arg(short, long)]
     registry: Option<String>,
     /// Overwrite the component file if it already exists
@@ -20,14 +20,14 @@ pub(super) struct AddCommand {
 }
 
 impl AddCommand {
-    pub(super) async fn run(self) {
-        if let Err(error) = self.run_inner().await {
+    pub(super) fn run(self) {
+        if let Err(error) = self.run_inner() {
             eprintln!("{}", style(error).red());
             std::process::exit(1);
         }
     }
 
-    async fn run_inner(self) -> Result<(), String> {
+    fn run_inner(self) -> Result<(), String> {
         let project = Project::locate(self.project.project)?;
         let options = AddOptions {
             components: self.components,
@@ -36,7 +36,7 @@ impl AddCommand {
         };
 
         let mut confirm = confirm;
-        match manage::add(&project, &options, &mut confirm).await? {
+        match manage::add(&project, &options, &mut confirm)? {
             AddOutcome::UpToDate => {
                 println!("{} already up to date", style("✓").green());
             }

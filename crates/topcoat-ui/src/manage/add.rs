@@ -1,19 +1,20 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
-use crate::{Dependency, Registry, Source, content_hash};
+use crate::{DEFAULT_REGISTRY_CRATE, Dependency, Registry, content_hash};
 
 use super::Confirm;
 use super::module;
 use super::project::Project;
 use super::state::{InstallState, InstalledComponent};
+use super::workspace::Workspace;
 
 /// What to add and from where.
 pub struct AddOptions {
     /// Names of the components to add (e.g. `button`). Each is resolved and
     /// installed along with its transitive dependencies.
     pub components: Vec<String>,
-    /// Named registry to add from (defaults to the project's default registry).
+    /// Registry crate to add from (defaults to the built-in default registry).
     pub registry: Option<String>,
     /// Overwrite the component file if it already exists.
     pub overwrite: bool,
@@ -25,7 +26,7 @@ pub struct AddedComponent {
     pub name: String,
     /// The project-relative path of the written file.
     pub file: PathBuf,
-    /// The registry it was added from.
+    /// The registry crate it was added from.
     pub registry: String,
 }
 
@@ -37,9 +38,9 @@ pub enum AddOutcome {
     Added(Vec<AddedComponent>),
 }
 
-/// A component still to be planned: which registry it lives in, its name, and
-/// whether it is the component the user explicitly asked for (the root) versus
-/// one pulled in as a dependency.
+/// A component still to be planned: which registry crate it lives in, its name,
+/// and whether it is the component the user explicitly asked for (the root)
+/// versus one pulled in as a dependency.
 struct Pending {
     registry: String,
     component: String,
@@ -68,40 +69,39 @@ struct PlannedRemoval {
 /// Adds a component (and its transitive dependencies) to the project.
 ///
 /// The operation is transactional: it walks the requested component and its
-/// dependencies, loading registries and fetching sources without touching disk,
+/// dependencies, loading registries and reading sources without touching disk,
 /// and only commits the writes once everything resolves. Interactive decisions
 /// — pulling from a non-default registry, or replacing a file owned by another
 /// registry — are delegated to `confirm`.
-pub async fn add(
+pub fn add(
     project: &Project,
     options: &AddOptions,
     confirm: &mut Confirm<'_>,
 ) -> Result<AddOutcome, String> {
     let mut state = InstallState::load(project)?;
+    let workspace = Workspace::load(project)?;
 
     // Phase 1 — plan. Walk the requested components and their transitive
-    // dependencies, loading registries and fetching sources, but touch nothing
-    // on disk. Any failure here (missing component, unreachable registry,
-    // registry-name conflict) leaves the project untouched.
+    // dependencies, loading registries and reading sources, but touch nothing on
+    // disk. Any failure here (missing component, registry not a dependency)
+    // leaves the project untouched.
     let mut registries: HashMap<String, Registry> = HashMap::new();
     let mut visited: HashSet<(String, String)> = HashSet::new();
     let mut queue: VecDeque<Pending> = VecDeque::new();
 
-    // Choose the registry to add from for each requested component and seed it
-    // as a root of the dependency walk. With --registry it is used directly;
+    // Choose the registry to add from for each requested component and seed it as
+    // a root of the dependency walk. With --registry it is used directly;
     // otherwise the default registry is preferred, and pulling a component the
-    // default registry does not offer requires confirming a non-default
-    // registry (or passing --registry).
+    // default registry does not offer requires confirming a non-default registry
+    // (or passing --registry).
     for component in &options.components {
         let root_registry = resolve_root_registry(
             component,
             options.registry.as_deref(),
-            project,
-            &mut state,
+            &workspace,
             &mut registries,
             confirm,
-        )
-        .await?;
+        )?;
         queue.push_back(Pending {
             registry: root_registry,
             component: component.clone(),
@@ -117,17 +117,10 @@ pub async fn add(
             continue;
         }
 
-        let stored_url = state
-            .registries
-            .get(&pending.registry)
-            .expect("registry resolved before queueing")
-            .url
-            .clone();
         // All registries install into one flat directory.
         let components_dir = state.components_dir.clone();
-        let working_url = project.to_working(&stored_url);
 
-        let registry = load_registry(&mut registries, &working_url).await?;
+        let registry = load_registry(&mut registries, &workspace, &pending.registry)?;
 
         let component = registry.get(&pending.component).ok_or_else(|| {
             let available: Vec<&str> = registry.names().collect();
@@ -188,11 +181,10 @@ pub async fn add(
             ));
         }
 
-        // Fetch the source once: it is hashed to record the component's version
-        // in the install state, and reused as the file contents when written.
+        // Read the source once: it is hashed to record the component's version in
+        // the install state, and reused as the file contents when written.
         let contents = component
-            .fetch_source()
-            .await
+            .read_source()
             .map_err(|error| format!("failed to read component `{}`: {error}", component.name()))?;
         let hash = content_hash(&contents);
 
@@ -210,37 +202,25 @@ pub async fn add(
             });
         }
 
-        state
-            .registries
-            .get_mut(&pending.registry)
-            .expect("registry resolved above")
-            .components
-            .insert(
-                component.name().to_string(),
-                InstalledComponent {
-                    hash,
-                    file: relative_file,
-                },
-            );
-
-        // Collect dependencies before releasing the borrow on the registry
-        // cache, so the loop below can load further registries into it.
+        // Collect dependencies before recording the component, so the borrow on
+        // the registry cache is released before the state is mutated.
         let dependencies = component.dependencies().to_vec();
+
+        state.registry_mut(&pending.registry).components.insert(
+            component.name().to_string(),
+            InstalledComponent {
+                hash,
+                file: relative_file,
+            },
+        );
+
         for dependency in dependencies {
+            // A dependency names a registry crate directly: `Same` for the
+            // current one, `Other` for another (which must itself be a project
+            // dependency, enforced when its registry is loaded on pop).
             let (registry, component) = match dependency {
                 Dependency::Same(name) => (pending.registry.clone(), name),
-                Dependency::Other { registry: location, name } => {
-                    // Resolve the dependency's registry relative to the registry
-                    // that declared it, then store it relative to the project.
-                    let resolved = Source::parse(&working_url)
-                        .resolve(&location)
-                        .map_err(|error| format!("failed to resolve dependency registry {location}: {error}"))?;
-                    let stored = project.to_stored(&resolved);
-                    let declared = load_registry(&mut registries, &project.to_working(&stored))
-                        .await?
-                        .name();
-                    (state.resolve_registry(&stored, declared)?, name)
-                }
+                Dependency::Other { registry, name } => (registry, name),
             };
             queue.push_back(Pending {
                 registry,
@@ -289,24 +269,19 @@ pub async fn add(
 
 /// Determines which registry the requested component should be added from.
 ///
-/// With an explicit `--registry`, that registry is used and must offer the
+/// With an explicit `--registry`, that registry crate is used and must offer the
 /// component. Otherwise the default registry is preferred; if it does not offer
-/// the component, the other registries are searched and the user is asked to
-/// confirm pulling from a non-default registry.
-async fn resolve_root_registry(
+/// the component, the project's other dependency registries are searched and the
+/// user is asked to confirm pulling from a non-default registry.
+fn resolve_root_registry(
     component: &str,
     registry: Option<&str>,
-    project: &Project,
-    state: &mut InstallState,
+    workspace: &Workspace,
     registries: &mut HashMap<String, Registry>,
     confirm: &mut Confirm<'_>,
 ) -> Result<String, String> {
     if let Some(name) = registry {
-        let working = {
-            let registry = state.registry_mut(name)?;
-            project.to_working(&registry.url)
-        };
-        let loaded = load_registry(registries, &working).await?;
+        let loaded = load_registry(registries, workspace, name)?;
         if loaded.get(component).is_none() {
             let available: Vec<&str> = loaded.names().collect();
             return Err(format!(
@@ -317,50 +292,40 @@ async fn resolve_root_registry(
         return Ok(name.to_string());
     }
 
-    // With no explicit --registry, fall back to the default — but the project
-    // may have none (e.g. its default registry was removed), in which case the
-    // caller must choose one.
-    let Some(default) = state.default_registry.clone() else {
-        return Err(format!(
-            "no default registry to add `{component}` from; pass --registry to choose one"
-        ));
+    // Prefer the default registry whenever it offers the component. It may not be
+    // reachable at all (e.g. the project does not depend on `topcoat`), in which
+    // case fall through to the project's other registries.
+    let default = DEFAULT_REGISTRY_CRATE;
+    let offers_default = match load_registry(registries, workspace, default) {
+        Ok(registry) => registry.get(component).is_some(),
+        Err(_) => false,
     };
-
-    // Prefer the default registry whenever it offers the component.
-    let default_url = {
-        let registry = state.registry_mut(&default)?;
-        project.to_working(&registry.url)
-    };
-    if load_registry(registries, &default_url)
-        .await?
-        .get(component)
-        .is_some()
-    {
-        return Ok(default);
+    if offers_default {
+        return Ok(default.to_string());
     }
 
-    // Not in the default registry: look for it among the other registries.
-    let others: Vec<(String, String)> = state
-        .registries
-        .iter()
-        .filter(|(name, _)| **name != default)
-        .map(|(name, registry)| (name.clone(), registry.url.clone()))
+    // Not in the default registry: look for it among the project's other
+    // dependency registries, skipping any that fail to load.
+    let others: Vec<String> = workspace
+        .available_registries()
+        .into_iter()
+        .filter(|name| name != default)
         .collect();
 
     let mut offering: Vec<String> = Vec::new();
-    for (name, stored_url) in &others {
-        if load_registry(registries, &project.to_working(stored_url))
-            .await?
-            .get(component)
-            .is_some()
-        {
+    for name in &others {
+        let offers = match load_registry(registries, workspace, name) {
+            Ok(registry) => registry.get(component).is_some(),
+            Err(_) => false,
+        };
+        if offers {
             offering.push(name.clone());
         }
     }
 
     match offering.as_slice() {
         [] => Err(format!(
-            "unknown component `{component}`: not in the default registry `{default}` or any other registry"
+            "unknown component `{component}`: not in the default registry `{default}` or any dependency registry"
         )),
         [name] => {
             let prompt = format!(
@@ -403,16 +368,18 @@ fn find_file_conflict(
     None
 }
 
-/// Loads the registry at `url`, caching it so each registry is fetched once.
-async fn load_registry<'a>(
+/// Loads the registry crate `name`, caching it so each registry is resolved and
+/// read once. Resolving validates that the crate is a usable registry dependency.
+fn load_registry<'a>(
     cache: &'a mut HashMap<String, Registry>,
-    url: &str,
+    workspace: &Workspace,
+    name: &str,
 ) -> Result<&'a Registry, String> {
-    if !cache.contains_key(url) {
-        let loaded = Registry::load(Source::parse(url))
-            .await
-            .map_err(|error| format!("failed to load registry {url}: {error}"))?;
-        cache.insert(url.to_string(), loaded);
+    if !cache.contains_key(name) {
+        let dir = workspace.registry_dir(name)?;
+        let loaded = Registry::load(dir)
+            .map_err(|error| format!("failed to load registry `{name}`: {error}"))?;
+        cache.insert(name.to_string(), loaded);
     }
-    Ok(&cache[url])
+    Ok(&cache[name])
 }

@@ -5,11 +5,14 @@
 //! component's source straight into the user's project, where it can be freely
 //! modified.
 //!
-//! This crate models the *registry* that backs that command. A registry is just
-//! a [`Source`] — a local directory or a remote base URL — containing a
-//! `registry.toml` manifest alongside the component source files. Registries are
-//! read at runtime, so the set of available components can change without
-//! rebuilding the CLI, and projects can point at custom or remote registries.
+//! This crate models the *registry* that backs that command. A registry is a
+//! cargo crate that carries a `[package.metadata.topcoat-ui]` key pointing at a
+//! directory holding a `registry.toml` manifest alongside the component source
+//! files. Registries are referenced solely by their crate name and must be a
+//! dependency of the consuming project, so the component source the registry
+//! ships against the right version of its crate is always present locally.
+//! Registries are read at runtime, so the set of available components can change
+//! without rebuilding the CLI.
 //!
 //! Each component is versioned independently by a hash of its source (see
 //! [`content_hash`]). A `registry.toml` records no hashes: it names each
@@ -24,5 +27,5 @@ pub mod manage;
 mod registry;
 
 pub use registry::{
-    Component, DEFAULT_REGISTRY, Dependency, Error, MANIFEST_FILE, Registry, Source, content_hash,
+    Component, DEFAULT_REGISTRY_CRATE, Dependency, Error, MANIFEST_FILE, Registry, content_hash,
 };

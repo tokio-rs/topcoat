@@ -17,16 +17,16 @@ pub(super) struct ListCommand {
 }
 
 impl ListCommand {
-    pub(super) async fn run(self) {
-        if let Err(error) = self.run_inner().await {
+    pub(super) fn run(self) {
+        if let Err(error) = self.run_inner() {
             eprintln!("{}", style(error).red());
             std::process::exit(1);
         }
     }
 
-    async fn run_inner(self) -> Result<(), String> {
+    fn run_inner(self) -> Result<(), String> {
         let project = Project::locate(self.project.project)?;
-        let listings = manage::list(&project, self.registry.as_deref()).await?;
+        let listings = manage::list(&project, self.registry.as_deref())?;
 
         for listing in &listings {
             // Skip registries that have no components installed from them.
@@ -42,11 +42,7 @@ impl ListCommand {
 
             // Separate registry blocks with a blank line.
             println!();
-            println!(
-                "{} {}",
-                style(&listing.name).bold(),
-                style(format!("({})", listing.url)).dim()
-            );
+            println!("{}", style(&listing.name).bold());
 
             let components = match &listing.outcome {
                 Ok(components) => components,

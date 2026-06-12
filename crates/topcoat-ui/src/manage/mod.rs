@@ -17,15 +17,14 @@ mod init;
 mod list;
 mod module;
 mod project;
-mod registry;
 mod remove;
 mod state;
+mod workspace;
 
 pub use add::{AddOptions, AddOutcome, AddedComponent, add};
 pub use init::{InitOptions, Initialized, init};
 pub use list::{ComponentStatus, InstallStatus, RegistryListing, list};
 pub use project::Project;
-pub use registry::{AddedRegistry, RemovedRegistry, add_registry, remove_registry, set_default};
 pub use remove::{Removed, remove};
 
 /// A callback the caller supplies to answer a yes/no question — e.g. whether to

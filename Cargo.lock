@@ -2009,6 +2009,7 @@ dependencies = [
  "topcoat-runtime",
  "topcoat-runtime-macro",
  "topcoat-tailwind",
+ "topcoat-ui",
  "topcoat-view",
  "topcoat-view-macro",
 ]
@@ -2161,8 +2162,8 @@ dependencies = [
 name = "topcoat-ui"
 version = "0.1.0"
 dependencies = [
- "reqwest",
  "serde",
+ "serde_json",
  "sha2",
  "thiserror",
  "toml",
