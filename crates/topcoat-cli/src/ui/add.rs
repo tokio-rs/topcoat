@@ -18,7 +18,7 @@ pub(super) struct AddCommand {
     url: Option<String>,
     /// Overwrite the component file if it already exists
     #[arg(short, long)]
-    force: bool,
+    overwrite: bool,
     #[command(flatten)]
     project: ProjectArg,
 }
@@ -37,7 +37,7 @@ impl AddCommand {
             components: self.components,
             registry: self.registry,
             url: self.url,
-            force: self.force,
+            overwrite: self.overwrite,
         };
 
         let mut confirm = confirm;

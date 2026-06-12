@@ -19,7 +19,7 @@ pub struct AddOptions {
     /// overrides the location stored for the registry.
     pub url: Option<String>,
     /// Overwrite the component file if it already exists.
-    pub force: bool,
+    pub overwrite: bool,
 }
 
 /// A component written into the project by [`add`].
@@ -185,16 +185,16 @@ pub async fn add(
         }
 
         let exists = file.exists();
-        if exists && pending.root && !options.force && !replacing {
+        if exists && pending.root && !options.overwrite && !replacing {
             return Err(format!(
-                "{} already exists; pass --force to overwrite",
+                "{} already exists; pass --overwrite to replace it",
                 relative_file.display()
             ));
         }
 
         // Write the source unless it is already present — dependencies never
         // clobber existing files; only the root (or a replacement) rewrites.
-        if !exists || (pending.root && options.force) || replacing {
+        if !exists || (pending.root && options.overwrite) || replacing {
             let contents = component
                 .fetch_source()
                 .await
