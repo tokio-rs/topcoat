@@ -8,7 +8,7 @@ axum.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
-topcoat.workspace = true
+topcoat = { workspace = true, features = ["multipart"] }
 
 [lints]
 workspace = true

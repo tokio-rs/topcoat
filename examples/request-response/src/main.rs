@@ -4,7 +4,8 @@ use topcoat::{
     Result,
     context::Cx,
     router::{
-        Body, Form, FromRequest, IntoResponse, Json, Response, Router, bad_request, headers, route,
+        Body, Bytes, Form, FromRequest, IntoResponse, Json, Multipart, RawForm, Response, Router,
+        bad_request, headers, route,
     },
 };
 
@@ -57,7 +58,50 @@ async fn form_echo(Form(input): Form<Search>) -> Result<Form<Search>> {
     Ok(Form(input))
 }
 
+// RawForm yields the urlencoded bytes without deserializing them.
+#[route(POST "/api/raw-form")]
+async fn raw_form(RawForm(bytes): RawForm) -> Result<String> {
+    Ok(format!("received {} bytes of form data", bytes.len()))
+}
+
+// --- Multipart form data ----------------------------------------------------
+
+// Multipart streams multipart/form-data fields, commonly used for file uploads.
+// Available with the `multipart` feature.
+#[route(POST "/api/files")]
+async fn files(mut multipart: Multipart) -> Result<String> {
+    let mut total = 0;
+
+    while let Some(field) = multipart.next_field().await? {
+        let name = field.name().map(str::to_owned);
+        let data = field.bytes().await?;
+
+        println!("field {name:?}: {} bytes", data.len());
+        total += data.len();
+    }
+
+    Ok(format!("received {total} bytes across all fields"))
+}
+
+// --- Optional request bodies ------------------------------------------------
+
+// Option<Json<T>> is None when the request carries no JSON body, and still
+// errors when a malformed body is present.
+#[route(POST "/api/maybe-user")]
+async fn maybe_user(user: Option<Json<User>>) -> Result<String> {
+    match user {
+        Some(Json(user)) => Ok(format!("got user {}", user.name)),
+        None => Ok("no user provided".to_string()),
+    }
+}
+
 // --- Raw request bodies -----------------------------------------------------
+
+// Bytes buffers the whole request body for the handler.
+#[route(POST "/api/bytes")]
+async fn bytes(body: Bytes) -> Result<String> {
+    Ok(format!("received {} bytes", body.len()))
+}
 
 // Body gives the handler the raw stream when it wants to parse bytes itself.
 #[route(POST "/api/upload")]
@@ -87,9 +131,9 @@ async fn report() -> Result<Csv> {
     Ok(Csv("name,total\nAda,42\nGrace,64\n".to_string()))
 }
 
-// --- Custom request extractors ---------------------------------------------
+// --- Custom request parsing -------------------------------------------------
 
-// SignedJson<T> is an example extractor that validates a header before parsing JSON.
+// SignedJson<T> is an example parser that validates a header before parsing JSON.
 struct SignedJson<T>(T);
 
 impl<T> FromRequest for SignedJson<T>
