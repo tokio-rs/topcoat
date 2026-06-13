@@ -17,6 +17,10 @@ parsing = [
 	"dep:syn",
 	"topcoat-core/parsing",
 ]
+multipart = [
+	"dep:futures-util",
+	"dep:multer",
+]
 runtime = [
 	"dep:topcoat-runtime",
 ]
@@ -28,10 +32,13 @@ topcoat-runtime = { workspace = true, optional = true }
 topcoat-view = { workspace = true, features = ["axum"] }
 
 axum.workspace = true
+bytes.workspace = true
 form_urlencoded.workspace = true
+futures-util = { workspace = true, optional = true }
 heck.workspace = true
 http.workspace = true
 inventory = { workspace = true, optional = true }
+multer = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 ref-cast.workspace = true

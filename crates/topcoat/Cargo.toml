@@ -16,6 +16,10 @@ asset = [
 	"dep:topcoat-asset",
 	"topcoat-router/asset",
 ]
+multipart = [
+	"router",
+	"topcoat-router/multipart",
+]
 router = [
 	"dep:topcoat-router",
 	"dep:topcoat-router-macro",
