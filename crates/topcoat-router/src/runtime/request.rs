@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use axum::body::to_bytes;
 use axum::extract::{FromRequestParts, RawPathParams};
 use topcoat_core::runtime::{
     context::{Cx, State},
@@ -7,6 +8,8 @@ use topcoat_core::runtime::{
 };
 
 use crate::runtime::error::{BadRequestError, bad_request};
+
+pub use bytes::{Bytes, BytesMut};
 
 pub type Body = axum::body::Body;
 
@@ -46,6 +49,29 @@ pub trait FromRequest: Sized {
 impl FromRequest for Body {
     async fn from_request(_cx: &Cx, body: Body) -> Result<Self> {
         Ok(body)
+    }
+}
+
+impl FromRequest for Bytes {
+    async fn from_request(_cx: &Cx, body: Body) -> Result<Self> {
+        to_bytes(body, usize::MAX)
+            .await
+            .map_err(|error| bad_request(format!("failed to read request body: {error}")).into())
+    }
+}
+
+impl FromRequest for BytesMut {
+    async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
+        let bytes = Bytes::from_request(cx, body).await?;
+        Ok(Self::from(&bytes[..]))
+    }
+}
+
+impl FromRequest for String {
+    async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
+        let bytes = Bytes::from_request(cx, body).await?;
+        Self::from_utf8(bytes.into())
+            .map_err(|error| bad_request(format!("request body is not valid UTF-8: {error}")).into())
     }
 }
 

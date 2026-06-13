@@ -32,6 +32,7 @@ topcoat-runtime = { workspace = true, optional = true }
 topcoat-view = { workspace = true, features = ["axum"] }
 
 axum.workspace = true
+bytes.workspace = true
 form_urlencoded.workspace = true
 futures-util = { workspace = true, optional = true }
 heck.workspace = true

@@ -9,8 +9,8 @@ use http::{
 use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{
-    Body, FromRequest, IntoResponse, OptionalFromRequest, Response, bad_request, bad_request_at,
-    headers, method, uri,
+    Body, Bytes, FromRequest, IntoResponse, OptionalFromRequest, Response, bad_request,
+    bad_request_at, headers, method, uri,
 };
 
 /// `application/x-www-form-urlencoded` request extractor and response wrapper.
@@ -43,21 +43,7 @@ where
     T: DeserializeOwned,
 {
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
-        if matches!(method(cx), &Method::GET | &Method::HEAD) {
-            return Self::from_bytes(uri(cx).query().unwrap_or_default().as_bytes());
-        }
-
-        if !form_content_type(headers(cx)) {
-            return Err(bad_request(
-                "expected request with `Content-Type: application/x-www-form-urlencoded`",
-            )
-            .into());
-        }
-
-        let bytes = to_bytes(body, usize::MAX)
-            .await
-            .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
-
+        let RawForm(bytes) = RawForm::from_request(cx, body).await?;
         Self::from_bytes(&bytes)
     }
 }
@@ -113,6 +99,39 @@ where
             serde_urlencoded::to_string(&self.0)?,
         )
             .into_response()
+    }
+}
+
+/// Extractor for the raw bytes of an `application/x-www-form-urlencoded`
+/// request.
+///
+/// For `GET` and `HEAD` requests it yields the raw query string; for other
+/// methods it yields the raw request body and requires a
+/// `Content-Type: application/x-www-form-urlencoded` header. Unlike [`Form`],
+/// the bytes are returned without deserialization.
+#[derive(Debug, Clone, Default)]
+#[must_use]
+pub struct RawForm(pub Bytes);
+
+impl FromRequest for RawForm {
+    async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
+        if matches!(method(cx), &Method::GET | &Method::HEAD) {
+            let query = uri(cx).query().unwrap_or_default();
+            return Ok(Self(Bytes::copy_from_slice(query.as_bytes())));
+        }
+
+        if !form_content_type(headers(cx)) {
+            return Err(bad_request(
+                "expected request with `Content-Type: application/x-www-form-urlencoded`",
+            )
+            .into());
+        }
+
+        let bytes = to_bytes(body, usize::MAX)
+            .await
+            .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
+
+        Ok(Self(bytes))
     }
 }
 

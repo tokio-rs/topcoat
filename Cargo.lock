@@ -2124,6 +2124,7 @@ name = "topcoat-router"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "bytes",
  "form_urlencoded",
  "futures-util",
  "heck",
