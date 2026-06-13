@@ -9,7 +9,8 @@ use http::{
 use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{
-    Body, FromRequest, IntoResponse, Response, bad_request, bad_request_at, headers, method, uri,
+    Body, FromRequest, IntoResponse, OptionalFromRequest, Response, bad_request, bad_request_at,
+    headers, method, uri,
 };
 
 /// `application/x-www-form-urlencoded` request extractor and response wrapper.
@@ -58,6 +59,26 @@ where
             .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
 
         Self::from_bytes(&bytes)
+    }
+}
+
+impl<T> OptionalFromRequest for Form<T>
+where
+    T: DeserializeOwned,
+{
+    async fn from_request(cx: &Cx, body: Body) -> Result<Option<Self>> {
+        if matches!(method(cx), &Method::GET | &Method::HEAD) {
+            return match uri(cx).query() {
+                Some(query) => Ok(Some(Self::from_bytes(query.as_bytes())?)),
+                None => Ok(None),
+            };
+        }
+
+        if headers(cx).get(CONTENT_TYPE).is_some() {
+            Ok(Some(<Self as FromRequest>::from_request(cx, body).await?))
+        } else {
+            Ok(None)
+        }
     }
 }
 

@@ -12,7 +12,8 @@ use topcoat_core::runtime::{
 };
 
 use crate::runtime::{
-    Body, FromRequest, IntoResponse, Response, bad_request, bad_request_at, headers,
+    Body, FromRequest, IntoResponse, OptionalFromRequest, Response, bad_request, bad_request_at,
+    headers,
 };
 
 /// JSON request extractor and response wrapper.
@@ -56,6 +57,19 @@ where
             .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
 
         Self::from_bytes(&bytes)
+    }
+}
+
+impl<T> OptionalFromRequest for Json<T>
+where
+    T: DeserializeOwned,
+{
+    async fn from_request(cx: &Cx, body: Body) -> Result<Option<Self>> {
+        if headers(cx).get(CONTENT_TYPE).is_some() {
+            Ok(Some(<Self as FromRequest>::from_request(cx, body).await?))
+        } else {
+            Ok(None)
+        }
     }
 }
 

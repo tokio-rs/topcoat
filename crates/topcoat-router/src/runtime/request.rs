@@ -48,3 +48,22 @@ impl FromRequest for Body {
         Ok(body)
     }
 }
+
+/// Customizes the behavior of `Option<Self>` as a [`FromRequest`] extractor.
+///
+/// Implementing this trait lets `Option<Self>` be extracted from a request,
+/// yielding `None` when the request carries no value for the extractor (for
+/// example, a missing body) while still surfacing an error for values that are
+/// present but malformed.
+pub trait OptionalFromRequest: Sized {
+    fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Option<Self>>> + Send;
+}
+
+impl<T> FromRequest for Option<T>
+where
+    T: OptionalFromRequest,
+{
+    async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
+        T::from_request(cx, body).await
+    }
+}
