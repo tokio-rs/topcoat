@@ -3,14 +3,14 @@ use std::ops::{Deref, DerefMut};
 use ::serde::{Serialize, de::DeserializeOwned};
 use axum::body::to_bytes;
 use http::{
-    HeaderMap, Method,
+    Method,
     header::{CONTENT_TYPE, HeaderValue},
 };
 use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{
     Body, Bytes, FromRequest, IntoResponse, OptionalFromRequest, Response, bad_request,
-    bad_request_at, headers, method, uri,
+    bad_request_at, content_type, method, uri,
 };
 
 /// `application/x-www-form-urlencoded` request extractor and response wrapper.
@@ -60,7 +60,7 @@ where
             };
         }
 
-        if headers(cx).get(CONTENT_TYPE).is_some() {
+        if content_type(cx).is_some() {
             Ok(Some(<Self as FromRequest>::from_request(cx, body).await?))
         } else {
             Ok(None)
@@ -120,7 +120,7 @@ impl FromRequest for RawForm {
             return Ok(Self(Bytes::copy_from_slice(query.as_bytes())));
         }
 
-        if !form_content_type(headers(cx)) {
+        if !form_content_type(content_type(cx)) {
             return Err(bad_request(
                 "expected request with `Content-Type: application/x-www-form-urlencoded`",
             )
@@ -135,12 +135,8 @@ impl FromRequest for RawForm {
     }
 }
 
-fn form_content_type(headers: &HeaderMap) -> bool {
-    let Some(content_type) = headers.get(CONTENT_TYPE) else {
-        return false;
-    };
-
-    let Ok(content_type) = content_type.to_str() else {
+fn form_content_type(content_type: Option<&str>) -> bool {
+    let Some(content_type) = content_type else {
         return false;
     };
 
