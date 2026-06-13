@@ -70,8 +70,9 @@ impl FromRequest for BytesMut {
 impl FromRequest for String {
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
         let bytes = Bytes::from_request(cx, body).await?;
-        Self::from_utf8(bytes.into())
-            .map_err(|error| bad_request(format!("request body is not valid UTF-8: {error}")).into())
+        Self::from_utf8(bytes.into()).map_err(|error| {
+            bad_request(format!("request body is not valid UTF-8: {error}")).into()
+        })
     }
 }
 
