@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use axum::body::to_bytes;
 use axum::extract::{FromRequestParts, RawPathParams};
 use topcoat_core::runtime::{
     context::{Cx, State},
@@ -9,6 +8,7 @@ use topcoat_core::runtime::{
 
 use crate::runtime::error::{BadRequestError, bad_request};
 
+pub use axum::body::to_bytes;
 pub use bytes::{Bytes, BytesMut};
 
 pub type Body = axum::body::Body;

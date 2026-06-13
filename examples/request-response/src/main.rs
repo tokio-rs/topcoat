@@ -1,11 +1,10 @@
-use axum::body::to_bytes;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use topcoat::{
     Result,
     context::Cx,
     router::{
         Body, Bytes, Form, FromRequest, IntoResponse, Json, Multipart, RawForm, Response, Router,
-        bad_request, headers, route,
+        bad_request, headers, route, to_bytes,
     },
 };
 
@@ -99,7 +98,7 @@ async fn maybe_user(user: Option<Json<User>>) -> Result<String> {
 
 // Bytes buffers the whole request body for the handler.
 #[route(POST "/api/bytes")]
-async fn bytes(body: Bytes) -> Result<String> {
+async fn read_bytes(body: Bytes) -> Result<String> {
     Ok(format!("received {} bytes", body.len()))
 }
 
