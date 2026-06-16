@@ -18,27 +18,22 @@ A cookie is a `Cookie` from the [`cookie`] crate. Build a bare one with `Cookie:
 use topcoat::{
     Result,
     context::Cx,
-    cookie::{Cookie, Cookies, SameSite, cookies},
+    cookie::{Cookie, Cookies, cookies},
     router::route,
 };
 
-#[route(GET "/api/visit")]
-async fn visit(cx: &Cx) -> Result<String> {
+#[route(POST "/api/theme")]
+async fn toggle_theme(cx: &Cx) -> Result<String> {
     let jar = cookies(cx);
 
-    let count: u32 = jar
-        .get("visits")
-        .and_then(|c| c.value().parse().ok())
-        .unwrap_or(0);
+    let next = match jar.get("theme") {
+        Some(theme) if theme.value() == "dark" => "light",
+        _ => "dark",
+    };
 
-    let cookie = Cookie::build(("visits", (count + 1).to_string()))
-        .path("/")
-        .http_only(true)
-        .same_site(SameSite::Lax)
-        .build();
-    jar.add(cookie);
+    jar.add(Cookie::build(("theme", next)).path("/").build());
 
-    Ok(format!("visit #{}", count + 1))
+    Ok(next.to_owned())
 }
 ```
 
