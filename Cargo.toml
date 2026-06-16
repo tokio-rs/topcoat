@@ -19,6 +19,7 @@ members = [
     "examples/app-state",
     "examples/assets",
     "examples/context",
+    "examples/cookies",
     "examples/hello-world",
     "examples/manual-router",
     "examples/module-router",

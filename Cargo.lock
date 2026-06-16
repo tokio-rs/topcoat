@@ -408,6 +408,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cookies"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
