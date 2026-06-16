@@ -226,6 +226,13 @@ pub trait Cookies {
     }
 }
 
+/// Builds the root jar from the request. A named `fn` (rather than a closure)
+/// so its type is a stable marker shared by [`cookies`] and [`write_cookies`]:
+/// the latter peeks the memoize cache under this exact marker.
+fn parse_jar(cx: &Cx, (): ()) -> CookieJar {
+    CookieJar::from_request(cx)
+}
+
 /// Returns the request's root [`CookieJar`], parsing the incoming `Cookie`
 /// header on first access and memoizing it for the rest of the request.
 ///
@@ -233,8 +240,7 @@ pub trait Cookies {
 /// default attributes on top.
 #[must_use]
 pub fn cookies(cx: &Cx) -> &CookieJar {
-    cx.cache()
-        .memoize(cx, (), (), |cx, ()| CookieJar::from_request(cx))
+    cx.cache().memoize(cx, (), (), parse_jar)
 }
 
 /// Returns the root jar wrapped in a [`SignedJar`], using the [`Key`]
@@ -263,10 +269,14 @@ pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
 /// entries.
 ///
 /// Called by the router after each handler runs. If no cookie helper was used
-/// during the request, the jar is empty and this appends nothing.
+/// during the request, the jar was never built — we skip without parsing the
+/// incoming `Cookie` header at all.
 #[doc(hidden)]
 pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
-    for value in cookies(cx).delta_headers() {
+    let Some(jar) = cx.cache().get::<_, CookieJar, _>(parse_jar, ()) else {
+        return;
+    };
+    for value in jar.delta_headers() {
         headers.append(http::header::SET_COOKIE, value);
     }
 }
