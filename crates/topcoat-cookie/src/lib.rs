@@ -471,7 +471,12 @@ mod tests {
 
         // A different key cannot verify the signature.
         let reader = cx_with(&[&echoed]);
-        assert!(cookies(&reader).signed(&Key::generate()).get("user_id").is_none());
+        assert!(
+            cookies(&reader)
+                .signed(&Key::generate())
+                .get("user_id")
+                .is_none()
+        );
 
         // Neither can the correct key once the value is altered.
         let tampered = format!("{}x", &echoed[..echoed.len() - 1]);
@@ -494,7 +499,9 @@ mod tests {
         let key = Key::generate();
 
         let writer = cx_with(&[]);
-        cookies(&writer).private(&key).add(("session", "secret-token"));
+        cookies(&writer)
+            .private(&key)
+            .add(("session", "secret-token"));
         let echoed = pair(&set_cookies(&writer)[0]).to_owned();
 
         // Encryption hides the plaintext from the wire.
@@ -513,11 +520,18 @@ mod tests {
         let key = Key::generate();
 
         let writer = cx_with(&[]);
-        cookies(&writer).private(&key).add(("session", "secret-token"));
+        cookies(&writer)
+            .private(&key)
+            .add(("session", "secret-token"));
         let echoed = pair(&set_cookies(&writer)[0]).to_owned();
 
         let reader = cx_with(&[&echoed]);
-        assert!(cookies(&reader).private(&Key::generate()).get("session").is_none());
+        assert!(
+            cookies(&reader)
+                .private(&Key::generate())
+                .get("session")
+                .is_none()
+        );
     }
 
     #[test]
@@ -529,7 +543,10 @@ mod tests {
         let echoed = pair(&set_cookies(&writer)[0]).to_owned();
 
         let reader = cx_with_key(&[&echoed], key);
-        assert_eq!(signed_cookies(&reader).get("user_id").unwrap().value(), "42");
+        assert_eq!(
+            signed_cookies(&reader).get("user_id").unwrap().value(),
+            "42"
+        );
     }
 
     #[test]
