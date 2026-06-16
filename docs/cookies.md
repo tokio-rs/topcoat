@@ -213,4 +213,4 @@ async fn login(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-Both functions panic if no `Key` was registered — a startup-time bug, not a runtime one. Generate the key once and persist it; regenerating it on every boot invalidates every signed and encrypted cookie already in the wild.
+Both functions panic if no `Key` was registered. Generate the key once and persist it; regenerating it on every boot invalidates every signed and encrypted cookie already in the wild.

@@ -92,7 +92,7 @@ impl MemoizeCache {
     ///
     /// Only observes entries written by the synchronous [`memoize`](Self::memoize); the async
     /// variant stores its cells as `OnceCell<V>` and is not visible here.
-    pub fn get<'a, K, V, F>(&'a self, marker: F, key: K) -> Option<&'a V>
+    pub fn get<K, V, F>(&self, marker: F, key: K) -> Option<&V>
     where
         K: Copy,
         MemoizeKey<K>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<K> as ToOwnedKey>::Owned>,
