@@ -16,6 +16,11 @@ asset = [
 	"dep:topcoat-asset",
 	"topcoat-router/asset",
 ]
+cookie = [
+	"dep:topcoat-cookie",
+	"router",
+	"topcoat-router/cookie",
+]
 multipart = [
 	"router",
 	"topcoat-router/multipart",
@@ -50,6 +55,7 @@ discover = [
 
 [dependencies]
 topcoat-asset = { workspace = true, optional = true }
+topcoat-cookie = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-core-macro.workspace = true
 topcoat-router = { workspace = true, optional = true }

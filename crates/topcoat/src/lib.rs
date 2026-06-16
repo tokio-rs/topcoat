@@ -20,6 +20,9 @@ pub type Result<T, E = topcoat_core::runtime::error::Error> =
 #[cfg(feature = "asset")]
 pub mod asset;
 
+#[cfg(feature = "cookie")]
+pub mod cookie;
+
 pub mod context;
 
 #[cfg(feature = "router")]
