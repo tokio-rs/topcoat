@@ -26,25 +26,37 @@ fn cookies(cx: &Cx) -> impl Cookies {
         .override_secure(true)
 }
 
-// Reads the visit count from the request. Returns 0 when the cookie is missing
-// or its signature fails to verify.
-fn visits(cx: &Cx) -> u32 {
-    cookies(cx)
-        .get("visits")
-        .and_then(|c| c.value().parse().ok())
-        .unwrap_or(0)
+// A handle to the request's visit count, tied to the request context so it can
+// write the cookie back when incremented.
+struct Visits<'cx> {
+    cx: &'cx Cx,
+    count: u32,
 }
 
-// Queues a Set-Cookie with the new count; the router writes it to the response
-// automatically. Path and HttpOnly come from the jar defaults.
-fn set_visits(cx: &Cx, count: u32) {
-    cookies(cx).add(cookie!("visits" = count.to_string()));
+impl<'cx> Visits<'cx> {
+    // Reads the count from the request. Starts at 0 when the cookie is missing
+    // or its signature fails to verify.
+    fn of(cx: &'cx Cx) -> Self {
+        let count = cookies(cx)
+            .get("visits")
+            .and_then(|c| c.value().parse().ok())
+            .unwrap_or(0);
+
+        Self { cx, count }
+    }
+
+    // Bumps the count and queues a Set-Cookie; the router writes it to the
+    // response automatically.
+    fn increment(&mut self) {
+        self.count += 1;
+        cookies(self.cx).add(cookie!("visits" = self.count.to_string()));
+    }
 }
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
-    let count = visits(cx) + 1;
-    set_visits(cx, count);
+    let mut visits = Visits::of(cx);
+    visits.increment();
 
     view! {
         <!DOCTYPE html>
@@ -53,7 +65,7 @@ async fn home(cx: &Cx) -> Result {
                 topcoat::dev::script()
             </head>
             <body>
-                <p>"You have visited this page " (count) " times."</p>
+                <p>"You have visited this page " (visits.count) " times."</p>
             </body>
         </html>
     }
