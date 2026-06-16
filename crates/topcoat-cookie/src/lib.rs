@@ -280,3 +280,282 @@ pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
         headers.append(http::header::SET_COOKIE, value);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use http::{HeaderMap, Request, header, request::Parts};
+    use topcoat_core::runtime::context::State;
+
+    use super::*;
+
+    /// Builds a `Cx` whose request carries the given `Cookie` header values (one
+    /// per entry, so multi-header parsing can be exercised). No `Parts` are
+    /// registered when `cookie_headers` is empty *and* `with_parts` is false.
+    fn cx_with(cookie_headers: &[&str]) -> Cx {
+        let mut builder = Request::builder();
+        for value in cookie_headers {
+            builder = builder.header(header::COOKIE, *value);
+        }
+        let (parts, ()) = builder.body(()).unwrap().into_parts();
+
+        let mut request_state = State::new();
+        request_state.register::<Parts>(parts);
+        Cx::new(Arc::new(State::new()), request_state)
+    }
+
+    /// Like [`cx_with`], but also registers `key` as app state so the
+    /// `signed_cookies`/`private_cookies` helpers can find it.
+    fn cx_with_key(cookie_headers: &[&str], key: Key) -> Cx {
+        let mut builder = Request::builder();
+        for value in cookie_headers {
+            builder = builder.header(header::COOKIE, *value);
+        }
+        let (parts, ()) = builder.body(()).unwrap().into_parts();
+
+        let mut request_state = State::new();
+        request_state.register::<Parts>(parts);
+        let mut app_state = State::new();
+        app_state.register::<Key>(key);
+        Cx::new(Arc::new(app_state), request_state)
+    }
+
+    /// The `Set-Cookie` header values the request would emit.
+    fn set_cookies(cx: &Cx) -> Vec<String> {
+        let mut headers = HeaderMap::new();
+        write_cookies(cx, &mut headers);
+        headers
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .map(|value| value.to_str().unwrap().to_owned())
+            .collect()
+    }
+
+    /// The leading `name=value` pair of a `Set-Cookie` value, i.e. what the
+    /// browser would echo back in a `Cookie` header.
+    fn pair(set_cookie: &str) -> &str {
+        set_cookie.split(';').next().unwrap()
+    }
+
+    #[test]
+    fn reads_incoming_cookies() {
+        let cx = cx_with(&["theme=dark; lang=en"]);
+        let jar = cookies(&cx);
+
+        assert_eq!(jar.get("theme").unwrap().value(), "dark");
+        assert_eq!(jar.get("lang").unwrap().value(), "en");
+        assert!(jar.get("missing").is_none());
+    }
+
+    #[test]
+    fn reads_cookies_across_multiple_headers() {
+        let cx = cx_with(&["theme=dark", "lang=en"]);
+        let jar = cookies(&cx);
+
+        assert_eq!(jar.get("theme").unwrap().value(), "dark");
+        assert_eq!(jar.get("lang").unwrap().value(), "en");
+    }
+
+    #[test]
+    fn reading_does_not_produce_a_delta() {
+        // Cookies that arrived on the request are "original" and must not be
+        // echoed back as Set-Cookie just because they were read.
+        let cx = cx_with(&["theme=dark"]);
+        let _ = cookies(&cx).get("theme");
+
+        assert!(set_cookies(&cx).is_empty());
+    }
+
+    #[test]
+    fn add_emits_set_cookie() {
+        let cx = cx_with(&[]);
+        cookies(&cx).add(("theme", "dark"));
+
+        let set = set_cookies(&cx);
+        assert_eq!(set.len(), 1);
+        assert_eq!(pair(&set[0]), "theme=dark");
+    }
+
+    #[test]
+    fn remove_emits_expiring_cookie() {
+        let cx = cx_with(&["session=abc123"]);
+        cookies(&cx).remove(("session", ""));
+
+        let set = set_cookies(&cx);
+        assert_eq!(set.len(), 1);
+        assert!(set[0].starts_with("session="));
+        assert!(set[0].contains("Max-Age=0"), "{}", set[0]);
+    }
+
+    #[test]
+    fn write_cookies_skips_when_jar_untouched() {
+        // The jar is never accessed, so nothing should be written. Crucially,
+        // we register no `Parts`: if `write_cookies` parsed the request anyway
+        // it would panic looking them up, proving it short-circuits.
+        let cx = Cx::default();
+        let mut headers = HeaderMap::new();
+        write_cookies(&cx, &mut headers);
+
+        assert!(headers.get(header::SET_COOKIE).is_none());
+    }
+
+    #[test]
+    fn default_attribute_only_fills_when_unset() {
+        let cx = cx_with(&[]);
+        // Already has an explicit `Secure=false`, so the default is ignored.
+        cookies(&cx)
+            .default_secure(true)
+            .add(Cookie::build(("a", "b")).secure(false).build());
+
+        assert!(!set_cookies(&cx)[0].contains("Secure"));
+    }
+
+    #[test]
+    fn override_attribute_replaces_existing() {
+        let cx = cx_with(&[]);
+        cookies(&cx)
+            .override_secure(true)
+            .add(Cookie::build(("a", "b")).secure(false).build());
+
+        assert!(set_cookies(&cx)[0].contains("Secure"));
+    }
+
+    #[test]
+    fn host_prefix_applies_name_and_attributes() {
+        let cx = cx_with(&[]);
+        cookies(&cx).override_prefix_host().add(("session", "abc"));
+
+        let set = &set_cookies(&cx)[0];
+        assert!(set.starts_with("__Host-session=abc"), "{set}");
+        assert!(set.contains("Secure"), "{set}");
+        assert!(set.contains("Path=/"), "{set}");
+    }
+
+    #[test]
+    fn host_prefix_reads_back_under_bare_name() {
+        // The browser sends the prefixed name; the adapter strips it on read.
+        let cx = cx_with(&["__Host-session=abc"]);
+        let cookie = cookies(&cx)
+            .override_prefix_host()
+            .get("session")
+            .expect("prefixed cookie should be found");
+
+        assert_eq!(cookie.name(), "session");
+        assert_eq!(cookie.value(), "abc");
+    }
+
+    #[test]
+    fn signed_cookie_round_trips() {
+        let key = Key::generate();
+
+        let writer = cx_with(&[]);
+        cookies(&writer).signed(&key).add(("user_id", "42"));
+        let echoed = pair(&set_cookies(&writer)[0]).to_owned();
+
+        let reader = cx_with(&[&echoed]);
+        let cookie = cookies(&reader)
+            .signed(&key)
+            .get("user_id")
+            .expect("valid signature should verify");
+        assert_eq!(cookie.value(), "42");
+    }
+
+    #[test]
+    fn signed_cookie_rejects_wrong_key_and_tampering() {
+        let key = Key::generate();
+
+        let writer = cx_with(&[]);
+        cookies(&writer).signed(&key).add(("user_id", "42"));
+        let echoed = pair(&set_cookies(&writer)[0]).to_owned();
+
+        // A different key cannot verify the signature.
+        let reader = cx_with(&[&echoed]);
+        assert!(cookies(&reader).signed(&Key::generate()).get("user_id").is_none());
+
+        // Neither can the correct key once the value is altered.
+        let tampered = format!("{}x", &echoed[..echoed.len() - 1]);
+        let reader = cx_with(&[&tampered]);
+        assert!(cookies(&reader).signed(&key).get("user_id").is_none());
+    }
+
+    #[test]
+    fn signed_value_stays_readable() {
+        // Signing authenticates but does not hide the value.
+        let key = Key::generate();
+        let cx = cx_with(&[]);
+        cookies(&cx).signed(&key).add(("user_id", "42"));
+
+        assert!(set_cookies(&cx)[0].contains("42"));
+    }
+
+    #[test]
+    fn private_cookie_round_trips_and_hides_value() {
+        let key = Key::generate();
+
+        let writer = cx_with(&[]);
+        cookies(&writer).private(&key).add(("session", "secret-token"));
+        let echoed = pair(&set_cookies(&writer)[0]).to_owned();
+
+        // Encryption hides the plaintext from the wire.
+        assert!(!echoed.contains("secret-token"), "{echoed}");
+
+        let reader = cx_with(&[&echoed]);
+        let cookie = cookies(&reader)
+            .private(&key)
+            .get("session")
+            .expect("correct key should decrypt");
+        assert_eq!(cookie.value(), "secret-token");
+    }
+
+    #[test]
+    fn private_cookie_rejects_wrong_key() {
+        let key = Key::generate();
+
+        let writer = cx_with(&[]);
+        cookies(&writer).private(&key).add(("session", "secret-token"));
+        let echoed = pair(&set_cookies(&writer)[0]).to_owned();
+
+        let reader = cx_with(&[&echoed]);
+        assert!(cookies(&reader).private(&Key::generate()).get("session").is_none());
+    }
+
+    #[test]
+    fn signed_cookies_helper_uses_app_state_key() {
+        let key = Key::generate();
+
+        let writer = cx_with_key(&[], key.clone());
+        signed_cookies(&writer).add(("user_id", "42"));
+        let echoed = pair(&set_cookies(&writer)[0]).to_owned();
+
+        let reader = cx_with_key(&[&echoed], key);
+        assert_eq!(signed_cookies(&reader).get("user_id").unwrap().value(), "42");
+    }
+
+    #[test]
+    fn composes_signing_with_prefix_and_defaults() {
+        // Layers stack in any order: the cookie is signed, prefixed, and gets a
+        // default SameSite, and still verifies on read.
+        let key = Key::generate();
+
+        let writer = cx_with(&[]);
+        cookies(&writer)
+            .signed(&key)
+            .override_prefix_host()
+            .default_same_site(SameSite::Lax)
+            .add(("session", "abc"));
+
+        let set = &set_cookies(&writer)[0];
+        assert!(set.starts_with("__Host-session="), "{set}");
+        assert!(set.contains("SameSite=Lax"), "{set}");
+        let echoed = pair(set).to_owned();
+
+        let reader = cx_with(&[&echoed]);
+        let cookie = cookies(&reader)
+            .signed(&key)
+            .override_prefix_host()
+            .get("session")
+            .expect("composed layers should round-trip");
+        assert_eq!(cookie.value(), "abc");
+    }
+}
