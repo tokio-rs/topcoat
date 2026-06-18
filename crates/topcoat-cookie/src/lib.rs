@@ -411,7 +411,11 @@ mod tests {
             .default_max_age(time::Duration::hours(1))
             .remove(("session", ""));
 
-        assert!(set_cookies(&cx)[0].contains("Max-Age=0"), "{:?}", set_cookies(&cx));
+        assert!(
+            set_cookies(&cx)[0].contains("Max-Age=0"),
+            "{:?}",
+            set_cookies(&cx)
+        );
     }
 
     #[test]
