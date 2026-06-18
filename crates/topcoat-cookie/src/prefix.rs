@@ -50,27 +50,20 @@ impl Prefix {
     /// cookie does not already set them, leaving any explicit caller value
     /// untouched.
     fn conform(self, cookie: &mut Cookie<'static>, mode: Conform) {
-        match (self, mode) {
-            (Prefix::Host, Conform::Override) => {
-                cookie.set_secure(true);
+        let force = matches!(mode, Conform::Override);
+
+        // Both prefixes require `Secure`.
+        if force || cookie.secure().is_none() {
+            cookie.set_secure(true);
+        }
+
+        // `__Host-` additionally requires `Path=/` and no `Domain`.
+        if self == Prefix::Host {
+            if force || cookie.path().is_none() {
                 cookie.set_path("/");
+            }
+            if force {
                 cookie.unset_domain();
-            }
-            (Prefix::Host, Conform::Default) => {
-                if cookie.secure().is_none() {
-                    cookie.set_secure(true);
-                }
-                if cookie.path().is_none() {
-                    cookie.set_path("/");
-                }
-            }
-            (Prefix::Secure, Conform::Override) => {
-                cookie.set_secure(true);
-            }
-            (Prefix::Secure, Conform::Default) => {
-                if cookie.secure().is_none() {
-                    cookie.set_secure(true);
-                }
             }
         }
     }
@@ -107,6 +100,14 @@ impl<J> Prefixed<J> {
             conform,
         }
     }
+
+    /// Prepends the prefix and applies its required attributes under `mode`.
+    fn prepare(&self, cookie: impl Into<Cookie<'static>>, mode: Conform) -> Cookie<'static> {
+        let mut cookie = cookie.into();
+        self.prefix.apply_name(&mut cookie);
+        self.prefix.conform(&mut cookie, mode);
+        cookie
+    }
 }
 
 impl<J: Cookies> Cookies for Prefixed<J> {
@@ -118,18 +119,12 @@ impl<J: Cookies> Cookies for Prefixed<J> {
     }
 
     fn add<C: Into<Cookie<'static>>>(&self, cookie: C) {
-        let mut cookie = cookie.into();
-        self.prefix.apply_name(&mut cookie);
-        self.prefix.conform(&mut cookie, self.conform);
-        self.inner.add(cookie);
+        self.inner.add(self.prepare(cookie, self.conform));
     }
 
     fn remove<C: Into<Cookie<'static>>>(&self, cookie: C) {
-        let mut cookie = cookie.into();
-        self.prefix.apply_name(&mut cookie);
-        // A removal cookie must carry the prefix's required attributes (notably
-        // `Path=/` for `__Host-`) so the browser matches and clears it.
-        self.prefix.conform(&mut cookie, Conform::Override);
-        self.inner.remove(cookie);
+        // A removal must force the required attributes (notably `Path=/` for
+        // `__Host-`) so the browser matches and clears it.
+        self.inner.remove(self.prepare(cookie, Conform::Override));
     }
 }

@@ -130,8 +130,8 @@ where
     ///
     /// Writes to the response like [`commit`](Self::commit), but deletes the
     /// cookie instead of saving a value; the in-memory value is dropped. The
-    /// removal goes through the jar, so prefixes still apply their required
-    /// attributes (for example `Path=/` for `__Host-`).
+    /// removal goes through the jar, so the `Path`/`Domain` and prefix attributes
+    /// the cookie was written with are reapplied and the browser can match it.
     pub fn remove(self) {
         self.jar.remove(Cookie::new(self.key, ""));
     }

@@ -10,9 +10,9 @@ use crate::Cookies;
 /// hatch are implemented: the closure runs on `add`, mutating the cookie before
 /// it is forwarded inward.
 ///
-/// The transform applies to writes only — `get` delegates unchanged (incoming
-/// requests carry no attributes), and `remove` is left untouched so a removal
-/// cookie's `Max-Age=0` is never clobbered.
+/// The transform runs on `add` and `remove` alike, so `Path`/`Domain` defaults
+/// reach the removal cookie and the browser can match it. `get` delegates
+/// unchanged.
 #[derive(Debug, Clone, Copy)]
 pub struct Map<J, F> {
     inner: J,
@@ -41,6 +41,8 @@ where
     }
 
     fn remove<C: Into<Cookie<'static>>>(&self, cookie: C) {
+        let mut cookie = cookie.into();
+        (self.f)(&mut cookie);
         self.inner.remove(cookie);
     }
 }

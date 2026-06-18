@@ -355,8 +355,9 @@
 //! cookie_store::<Cart>(private_cookies(cx), "cart").remove();
 //! ```
 //!
-//! The removal goes through the jar, so prefixes still apply their required
-//! attributes (such as `Path=/` for `__Host-`).
+//! The removal goes through the jar, so the `Path`/`Domain` and prefix
+//! attributes the cookie was written with are reapplied — the browser matches
+//! the removal against the original and clears it.
 //!
 //! ### A helper per store
 //!

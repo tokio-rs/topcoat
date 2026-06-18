@@ -391,6 +391,30 @@ mod tests {
     }
 
     #[test]
+    fn remove_replays_path_default_so_browser_matches() {
+        // A cookie written with `default_path` must be removed with the same
+        // Path, or the browser won't match and clear it.
+        let cx = cx_with(&["session=abc123"]);
+        cookies(&cx).default_path("/app").remove(("session", ""));
+
+        let set = &set_cookies(&cx)[0];
+        assert!(set.contains("Path=/app"), "{set}");
+        assert!(set.contains("Max-Age=0"), "{set}");
+    }
+
+    #[test]
+    fn remove_keeps_expiry_despite_max_age_default() {
+        // A `default_max_age` must not leak onto a removal: the jar still expires
+        // it with Max-Age=0.
+        let cx = cx_with(&["session=abc123"]);
+        cookies(&cx)
+            .default_max_age(time::Duration::hours(1))
+            .remove(("session", ""));
+
+        assert!(set_cookies(&cx)[0].contains("Max-Age=0"), "{:?}", set_cookies(&cx));
+    }
+
+    #[test]
     fn write_cookies_skips_when_jar_untouched() {
         // The jar is never accessed, so nothing should be written. Crucially,
         // we register no `Parts`: if `write_cookies` parsed the request anyway
