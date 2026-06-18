@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
 use topcoat::{
     Result,
     context::Cx,
-    cookie::{Cookies, Key, cookie, signed_cookies},
+    cookie::{CookieStore, Cookies, Key, cookie_store, signed_cookies},
     router::{Router, page},
     view::view,
 };
@@ -26,37 +27,25 @@ fn cookies(cx: &Cx) -> impl Cookies {
         .override_secure(true)
 }
 
-// A handle to the request's visit count, tied to the request context so it can
-// write the cookie back when incremented.
-struct Visits<'cx> {
-    cx: &'cx Cx,
-    count: u32,
+#[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+struct Visits(u32);
+
+impl Visits {
+    fn increment(&mut self) {
+        self.0 += 1;
+    }
 }
 
-impl<'cx> Visits<'cx> {
-    // Reads the count from the request. Starts at 0 when the cookie is missing
-    // or its signature fails to verify.
-    fn of(cx: &'cx Cx) -> Self {
-        let count = cookies(cx)
-            .get("visits")
-            .and_then(|c| c.value().parse().ok())
-            .unwrap_or(0);
-
-        Self { cx, count }
-    }
-
-    // Bumps the count and queues a Set-Cookie; the router writes it to the
-    // response automatically.
-    fn increment(&mut self) {
-        self.count += 1;
-        cookies(self.cx).add(cookie!("visits" = self.count.to_string()));
-    }
+fn visits(cx: &Cx) -> CookieStore<Visits, impl Cookies> {
+    cookie_store(cookies(cx), "visits").parse_or_default()
 }
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
-    let mut visits = Visits::of(cx);
-    visits.increment();
+    let visits = visits(cx).update(Visits::increment);
+    visits.update(Visits::increment);
+    visits.commit()?;
 
     view! {
         <!DOCTYPE html>
@@ -65,7 +54,7 @@ async fn home(cx: &Cx) -> Result {
                 topcoat::dev::script()
             </head>
             <body>
-                <p>"You have visited this page " (visits.count) " times."</p>
+                <p>"You have visited this page " (visits.get().0) " times."</p>
             </body>
         </html>
     }

@@ -411,6 +411,7 @@ dependencies = [
 name = "cookies"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "tokio",
  "topcoat",
 ]
@@ -2316,6 +2317,8 @@ version = "0.1.0"
 dependencies = [
  "cookie",
  "http",
+ "serde",
+ "serde_json",
  "topcoat-core",
 ]
 

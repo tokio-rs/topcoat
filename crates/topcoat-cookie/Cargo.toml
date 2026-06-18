@@ -8,6 +8,8 @@ topcoat-core.workspace = true
 
 cookie = { workspace = true, features = ["secure", "percent-encode"] }
 http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

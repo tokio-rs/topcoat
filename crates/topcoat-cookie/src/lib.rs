@@ -4,12 +4,14 @@ mod map;
 mod prefix;
 mod private;
 mod signed;
+mod store;
 
-pub use jar::CookieJar;
-pub use map::Map;
-pub use prefix::{Prefix, Prefixed};
-pub use private::PrivateJar;
-pub use signed::SignedJar;
+pub use jar::*;
+pub use map::*;
+pub use prefix::*;
+pub use private::*;
+pub use signed::*;
+pub use store::*;
 
 use prefix::Conform;
 
