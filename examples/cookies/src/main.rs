@@ -37,12 +37,18 @@ impl Visits {
     }
 }
 
+// Builds a typed store over the "visits" cookie, reading the current value from
+// the request and falling back to Visits::default() (zero) when it's missing.
+// Like the cookies jar above, wrapping it in a helper keeps the name and jar
+// consistent across handlers.
 fn visits(cx: &Cx) -> CookieStore<Visits, impl Cookies> {
     cookie_store(cookies(cx), "visits").parse_or_default()
 }
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
+    // Increment the visit counter and queue the appropriate `Set-Cookie`
+    // header in the HTTP response.
     let visits = visits(cx).update(Visits::increment).commit()?;
 
     view! {
