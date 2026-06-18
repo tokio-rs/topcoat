@@ -125,6 +125,16 @@ where
     /// Equivalent to dropping the store without calling [`commit`](Self::commit);
     /// it exists to make that intent explicit at the call site.
     pub fn rollback(self) {}
+
+    /// Queues a removal of the backing cookie, expiring it on the client.
+    ///
+    /// Writes to the response like [`commit`](Self::commit), but deletes the
+    /// cookie instead of saving a value; the in-memory value is dropped. The
+    /// removal goes through the jar, so prefixes still apply their required
+    /// attributes (for example `Path=/` for `__Host-`).
+    pub fn remove(self) {
+        self.jar.remove(Cookie::new(self.key, ""));
+    }
 }
 
 /// A [`CookieStore`] that has not yet read its backing cookie.
@@ -166,6 +176,13 @@ where
     /// ```
     pub fn set(self, value: T) -> CookieStore<T, J> {
         CookieStore::new(self.jar, self.key, value)
+    }
+
+    /// Queues a removal of the backing cookie without reading it first.
+    ///
+    /// Use this to delete the cookie regardless of its current contents.
+    pub fn remove(self) {
+        self.jar.remove(Cookie::new(self.key, ""));
     }
 
     /// Reads and deserializes the backing cookie.

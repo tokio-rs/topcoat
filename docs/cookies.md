@@ -278,6 +278,14 @@ cookie_store::<Cart>(private_cookies(cx), "cart")
     .commit()?;
 ```
 
+To delete a cookie, `remove` queues an expiring removal. It's available both on a parsed store and directly on the unparsed one when you just want to clear the cookie without reading it — for example on logout:
+
+```rust
+cookie_store::<Cart>(private_cookies(cx), "cart").remove();
+```
+
+The removal goes through the jar, so prefixes still apply their required attributes (such as `Path=/` for `__Host-`).
+
 ### A helper per store
 
 As with the jar combinators, the idiomatic pattern is to wrap each store in a small helper so its name and backing jar stay consistent everywhere it's used:
