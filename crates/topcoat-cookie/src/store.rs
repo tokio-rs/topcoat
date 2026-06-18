@@ -35,13 +35,13 @@ use crate::{Cookie, Cookies};
 ///
 /// #[route(POST "/api/cart")]
 /// async fn add_item(cx: &Cx) -> Result<String> {
-///     let mut cart = cookie_store::<Cart>(private_cookies(cx), "cart").parse_or_default();
-///
-///     cart.update(|cart| cart.items.push("widget".to_owned()));
-///
 ///     // `commit` writes the cookie and hands the value back; without it the
 ///     // change is discarded.
-///     let cart = cart.commit()?;
+///     let cart = cookie_store::<Cart>(private_cookies(cx), "cart")
+///         .parse_or_default()
+///         .update(|cart| cart.items.push("widget".to_owned()))
+///         .commit()?;
+///
 ///     Ok(format!("{} items in cart", cart.items.len()))
 /// }
 /// ```
@@ -81,28 +81,31 @@ where
         self.value.clone()
     }
 
-    /// Replaces the in-memory value.
+    /// Replaces the in-memory value, returning the store so calls can be chained.
     ///
     /// Like every mutation, this is not persisted until [`commit`](Self::commit).
-    pub fn set(&mut self, value: T) {
+    pub fn set(mut self, value: T) -> Self {
         self.value = value;
+        self
     }
 
-    /// Mutates the in-memory value in place, returning whatever `f` returns.
+    /// Mutates the in-memory value in place, returning the store so calls can be
+    /// chained.
     ///
     /// Like every mutation, this is not persisted until [`commit`](Self::commit).
     ///
     /// ```rust,ignore
-    /// let count = cart.update(|cart| {
-    ///     cart.items.push("widget".to_owned());
-    ///     cart.items.len()
-    /// });
+    /// let cart = cookie_store::<Cart>(private_cookies(cx), "cart")
+    ///     .parse_or_default()
+    ///     .update(|cart| cart.items.push("widget".to_owned()))
+    ///     .commit()?;
     /// ```
-    pub fn update<F, R>(&mut self, f: F) -> R
+    pub fn update<F>(mut self, f: F) -> Self
     where
-        F: FnOnce(&mut T) -> R,
+        F: FnOnce(&mut T),
     {
-        f(&mut self.value)
+        f(&mut self.value);
+        self
     }
 
     /// Serializes the current value, queues it on the backing jar as a

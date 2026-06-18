@@ -43,9 +43,7 @@ fn visits(cx: &Cx) -> CookieStore<Visits, impl Cookies> {
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
-    let visits = visits(cx).update(Visits::increment);
-    visits.update(Visits::increment);
-    visits.commit()?;
+    let visits = visits(cx).update(Visits::increment).commit()?;
 
     view! {
         <!DOCTYPE html>
@@ -54,7 +52,7 @@ async fn home(cx: &Cx) -> Result {
                 topcoat::dev::script()
             </head>
             <body>
-                <p>"You have visited this page " (visits.get().0) " times."</p>
+                <p>"You have visited this page " (visits.0) " times."</p>
             </body>
         </html>
     }
