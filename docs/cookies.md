@@ -209,3 +209,88 @@ async fn login(cx: &Cx) -> Result<&'static str> {
 ```
 
 Both functions panic if no `Key` was registered. Generate the key once and persist it; regenerating it on every boot invalidates every signed and encrypted cookie already in the wild.
+
+## Typed cookie stores
+
+The jar API works in terms of individual `Cookie` values. When you want to keep a *structured* value in a cookie — a cart, a preferences object, a visit counter — a `CookieStore<T>` wraps the read/serialize/write cycle so you work with your own type instead of strings. The value is stored as JSON, and `T` only needs `Serialize` and `DeserializeOwned`.
+
+A store is built on top of a jar with `cookie_store(jar, name)`, so signing, encryption, prefixes, and default attributes all compose through the jar you hand it — a store over `private_cookies(cx)` is encrypted, a store over `cookies(cx).signed(key)` is signed, and so on.
+
+```rust
+use serde::{Deserialize, Serialize};
+use topcoat::{
+    Result,
+    context::Cx,
+    cookie::{cookie_store, private_cookies},
+    router::route,
+};
+
+#[derive(Default, Serialize, Deserialize)]
+struct Cart {
+    items: Vec<String>,
+}
+
+#[route(POST "/api/cart")]
+async fn add_item(cx: &Cx) -> Result<String> {
+    let cart = cookie_store::<Cart>(private_cookies(cx), "cart")
+        .parse_or_default()
+        .update(|cart| cart.items.push("widget".to_owned()))
+        .commit()?;
+
+    Ok(format!("{} items in cart", cart.items.len()))
+}
+```
+
+### Reading the incoming value
+
+`cookie_store(jar, name)` returns an *unparsed* store. Reading the incoming cookie is a separate, fallible step, because a cookie can be absent or present-but-malformed (for example after you change `T`'s shape). The `parse*` methods mirror `Option`/`Result`'s `unwrap*` family and let you choose how to handle those cases:
+
+- `parse()` returns `Ok(None)` when the cookie is absent and `Err` when it is present but won't deserialize, so you can distinguish the two.
+- `parse_or(value)` falls back to `value` when the cookie is absent or malformed.
+- `parse_or_else(f)` falls back to `f()`.
+- `parse_or_default()` falls back to `T::default()`.
+
+The `parse_or*` methods deliberately treat a malformed cookie the same as a missing one. Because you can't migrate a cookie that already lives on the client, this means a change to `T` resets stale cookies to the fallback instead of failing every returning visitor. Use `parse()` when you need to surface corruption instead.
+
+Once parsed, you hold a `CookieStore<T>` whose value is known, so reads and mutations no longer return `Result`:
+
+- `read()` borrows the value; `get()` clones it (when `T: Clone`).
+- `set(value)` replaces the value and `update(f)` mutates it in place. Both return the store so calls can be chained.
+
+### Nothing is written until `commit`
+
+Reads and mutations touch only the in-memory value. **No `Set-Cookie` is queued until you call `commit`**, which serializes the value, writes it through the jar, and hands the value back:
+
+```rust
+let cart = cookie_store::<Cart>(private_cookies(cx), "cart")
+    .parse_or_default()
+    .update(|cart| cart.items.push("widget".to_owned()))
+    .commit()?;
+```
+
+Dropping the store without committing — or calling `rollback()` to say so explicitly — discards the pending changes. This makes it easy to update a cookie only once some other work has succeeded: do the work first, and `commit` last.
+
+To overwrite a cookie without reading its current contents, `set` on the unparsed store skips the parse step entirely:
+
+```rust
+cookie_store::<Cart>(private_cookies(cx), "cart")
+    .set(Cart::default())
+    .commit()?;
+```
+
+### A helper per store
+
+As with the jar combinators, the idiomatic pattern is to wrap each store in a small helper so its name and backing jar stay consistent everywhere it's used:
+
+```rust
+use topcoat::{
+    context::Cx,
+    cookie::{CookieStore, Cookies, cookie_store, signed_cookies},
+};
+
+fn cart(cx: &Cx) -> CookieStore<Cart, impl Cookies> {
+    cookie_store(signed_cookies(cx), "cart").parse_or_default()
+}
+```
+
+Every handler then calls `cart(cx)`, mutates, and commits, without repeating the name or the jar configuration.
