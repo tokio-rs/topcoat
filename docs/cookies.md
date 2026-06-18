@@ -232,7 +232,7 @@ struct Cart {
 
 #[route(POST "/api/cart")]
 async fn add_item(cx: &Cx) -> Result<String> {
-    let cart = cookie_store::<Cart>(private_cookies(cx), "cart")
+    let cart = cookie_store::<Cart, _>(private_cookies(cx), "cart")
         .parse_or_default()
         .update(|cart| cart.items.push("widget".to_owned()))
         .commit()?;
@@ -262,7 +262,7 @@ Once parsed, you hold a `CookieStore<T>` whose value is known, so reads and muta
 Reads and mutations touch only the in-memory value. **No `Set-Cookie` is queued until you call `commit`**, which serializes the value, writes it through the jar, and hands the value back:
 
 ```rust
-let cart = cookie_store::<Cart>(private_cookies(cx), "cart")
+let cart = cookie_store::<Cart, _>(private_cookies(cx), "cart")
     .parse_or_default()
     .update(|cart| cart.items.push("widget".to_owned()))
     .commit()?;
@@ -273,7 +273,7 @@ Dropping the store without committing — or calling `rollback()` to say so expl
 To overwrite a cookie without reading its current contents, `set` on the unparsed store skips the parse step entirely:
 
 ```rust
-cookie_store::<Cart>(private_cookies(cx), "cart")
+cookie_store::<Cart, _>(private_cookies(cx), "cart")
     .set(Cart::default())
     .commit()?;
 ```
@@ -281,7 +281,7 @@ cookie_store::<Cart>(private_cookies(cx), "cart")
 To delete a cookie, `remove` queues an expiring removal. It's available both on a parsed store and directly on the unparsed one when you just want to clear the cookie without reading it — for example on logout:
 
 ```rust
-cookie_store::<Cart>(private_cookies(cx), "cart").remove();
+cookie_store::<Cart, _>(private_cookies(cx), "cart").remove();
 ```
 
 The removal goes through the jar, so the `Path`/`Domain` and prefix attributes the cookie was written with are reapplied — the browser matches the removal against the original and clears it.

@@ -279,7 +279,7 @@
 //!
 //! #[route(POST "/api/cart")]
 //! async fn add_item(cx: &Cx) -> Result<String> {
-//!     let cart = cookie_store::<Cart>(private_cookies(cx), "cart")
+//!     let cart = cookie_store::<Cart, _>(private_cookies(cx), "cart")
 //!         .parse_or_default()
 //!         .update(|cart| cart.items.push("widget".to_owned()))
 //!         .commit()?;
@@ -325,7 +325,7 @@
 //! value, writes it through the jar, and hands the value back:
 //!
 //! ```rust,ignore
-//! let cart = cookie_store::<Cart>(private_cookies(cx), "cart")
+//! let cart = cookie_store::<Cart, _>(private_cookies(cx), "cart")
 //!     .parse_or_default()
 //!     .update(|cart| cart.items.push("widget".to_owned()))
 //!     .commit()?;
@@ -341,7 +341,7 @@
 //! entirely:
 //!
 //! ```rust,ignore
-//! cookie_store::<Cart>(private_cookies(cx), "cart")
+//! cookie_store::<Cart, _>(private_cookies(cx), "cart")
 //!     .set(Cart::default())
 //!     .commit()?;
 //! ```
@@ -352,7 +352,7 @@
 //! without reading it — for example on logout:
 //!
 //! ```rust,ignore
-//! cookie_store::<Cart>(private_cookies(cx), "cart").remove();
+//! cookie_store::<Cart, _>(private_cookies(cx), "cart").remove();
 //! ```
 //!
 //! The removal goes through the jar, so the `Path`/`Domain` and prefix
