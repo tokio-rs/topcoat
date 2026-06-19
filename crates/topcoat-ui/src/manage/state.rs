@@ -22,8 +22,23 @@ pub(super) struct InstallState {
     /// Set once at `init` time.
     #[serde(default = "default_components_dir")]
     pub components_dir: PathBuf,
+    /// The theme installed at `init` time, if one was chosen. The CSS itself
+    /// lives in the project; this records which theme it came from so updates
+    /// can be surfaced the same way components are.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<InstalledTheme>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub registries: BTreeMap<String, RegistryState>,
+}
+
+/// The theme a project installed: which registry and style it came from, the
+/// hash of the style's source when installed, and where the CSS was written.
+#[derive(Serialize, Deserialize)]
+pub(super) struct InstalledTheme {
+    pub name: String,
+    pub registry: String,
+    pub hash: String,
+    pub file: PathBuf,
 }
 
 /// One registry crate's tracked components.
@@ -44,6 +59,7 @@ impl Default for InstallState {
         Self {
             version: STATE_VERSION,
             components_dir: default_components_dir(),
+            theme: None,
             registries: BTreeMap::new(),
         }
     }

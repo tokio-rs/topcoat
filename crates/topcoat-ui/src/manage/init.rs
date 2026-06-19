@@ -1,12 +1,29 @@
 use std::path::PathBuf;
 
+use crate::{DEFAULT_REGISTRY_CRATE, Registry, content_hash};
+
+use super::ChooseTheme;
 use super::project::Project;
-use super::state::{InstallState, STATE_FILE};
+use super::state::{InstallState, InstalledTheme, STATE_FILE};
+use super::workspace::Workspace;
 
 /// How to set up a project's install state.
 pub struct InitOptions {
     /// Base directory for component install output (default `src/components`).
     pub components_dir: Option<PathBuf>,
+    /// The theme to install by name. When `None`, the user is asked to choose
+    /// one — a theme is always installed, never skipped.
+    pub theme: Option<String>,
+}
+
+/// The theme installed by [`init`].
+pub struct InstalledThemeInfo {
+    /// The style's name, e.g. `nova`.
+    pub name: String,
+    /// The registry crate it came from.
+    pub registry: String,
+    /// The project-relative path of the written stylesheet.
+    pub file: PathBuf,
 }
 
 /// The result of [`init`].
@@ -15,18 +32,123 @@ pub struct Initialized {
     pub state_file: PathBuf,
     /// The base directory recorded for component install output.
     pub components_dir: PathBuf,
+    /// The theme that was installed.
+    pub theme: InstalledThemeInfo,
 }
 
 /// Sets up a project's initial install state, which the other commands (`add`,
 /// `remove`, `list`) require before they will run.
 ///
-/// Registries are discovered from the project's dependencies, so nothing about
-/// them is recorded here; init only fixes where components install. Errors if
+/// Besides fixing where components install, init always installs a theme: the
+/// chosen style's CSS is copied into the project as its Tailwind input, and the
+/// theme is recorded in the install state. The theme is named by
+/// [`InitOptions::theme`], or chosen via `choose` when none is given. Errors if
 /// the project is already initialized rather than clobbering its state.
-pub fn init(project: &Project, options: InitOptions) -> Result<Initialized, String> {
-    let state = InstallState::create(project, options.components_dir)?;
+pub fn init(
+    project: &Project,
+    options: InitOptions,
+    choose: &mut ChooseTheme<'_>,
+) -> Result<Initialized, String> {
+    // Resolve the theme — load the registry, prompt if needed, read the source —
+    // before touching disk, so an unreachable registry or a bad theme name (or a
+    // declined prompt) leaves the project untouched rather than half-initialized.
+    // The already-initialized check happens up front, before any prompt.
+    if project.state_path().exists() {
+        return Err(format!(
+            "{} already exists; the project is already initialized",
+            project.state_path().display()
+        ));
+    }
+    let theme = plan_theme(project, options.theme.as_deref(), choose)?;
+
+    // Commit: write the stylesheet, then create and record the install state.
+    let file = project.resolve(&theme.file);
+    if let Some(parent) = file.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| format!("failed to create {}: {error}", parent.display()))?;
+    }
+    std::fs::write(&file, &theme.contents)
+        .map_err(|error| format!("failed to write {}: {error}", file.display()))?;
+
+    let mut state = InstallState::create(project, options.components_dir)?;
+    state.theme = Some(InstalledTheme {
+        name: theme.name.clone(),
+        registry: theme.registry.clone(),
+        hash: theme.hash,
+        file: theme.file.clone(),
+    });
+    state.save(project)?;
+
     Ok(Initialized {
         state_file: PathBuf::from(STATE_FILE),
-        components_dir: state.components_dir,
+        components_dir: state.components_dir.clone(),
+        theme: InstalledThemeInfo {
+            name: theme.name,
+            registry: theme.registry,
+            file: theme.file,
+        },
+    })
+}
+
+/// A theme resolved and read but not yet written.
+struct ThemePlan {
+    name: String,
+    registry: String,
+    hash: String,
+    /// Project-relative destination of the stylesheet.
+    file: PathBuf,
+    /// The stylesheet's CSS, read from the registry.
+    contents: String,
+}
+
+/// Resolves the project's theme without writing anything. A theme is mandatory,
+/// so this either produces a plan or fails: the default registry must be
+/// reachable and offer at least one style, and an explicitly named theme must
+/// exist. When no theme was named, `choose` picks one from those offered.
+fn plan_theme(
+    project: &Project,
+    requested: Option<&str>,
+    choose: &mut ChooseTheme<'_>,
+) -> Result<ThemePlan, String> {
+    let registry_crate = DEFAULT_REGISTRY_CRATE;
+    let workspace = Workspace::load(project)?;
+    let dir = workspace.registry_dir(registry_crate).map_err(|error| {
+        format!("cannot install a theme: {error} (the project must depend on `topcoat` with the `ui` feature)")
+    })?;
+    let registry = Registry::load(dir)
+        .map_err(|error| format!("failed to load registry `{registry_crate}`: {error}"))?;
+
+    let names: Vec<String> = registry.style_names().map(str::to_string).collect();
+    if names.is_empty() {
+        return Err(format!(
+            "registry `{registry_crate}` offers no themes to install"
+        ));
+    }
+
+    let chosen = match requested {
+        Some(name) if names.iter().any(|known| known == name) => name.to_string(),
+        Some(name) => {
+            return Err(format!(
+                "unknown theme `{name}`; available: {}",
+                names.join(", ")
+            ));
+        }
+        None => choose(&names)?,
+    };
+
+    let style = registry
+        .style(&chosen)
+        .expect("chosen theme came from the registry");
+    let contents = style
+        .read_source()
+        .map_err(|error| format!("failed to read theme `{chosen}`: {error}"))?;
+
+    Ok(ThemePlan {
+        name: chosen,
+        registry: registry_crate.to_string(),
+        hash: content_hash(&contents),
+        // Installed at the project root by default, alongside `components.toml`.
+        file: PathBuf::from(style.file_name()),
+        contents,
     })
 }

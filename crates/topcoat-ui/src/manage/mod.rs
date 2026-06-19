@@ -22,7 +22,7 @@ mod state;
 mod workspace;
 
 pub use add::{AddOptions, AddOutcome, AddedComponent, add};
-pub use init::{InitOptions, Initialized, init};
+pub use init::{InitOptions, Initialized, InstalledThemeInfo, init};
 pub use list::{ComponentStatus, InstallStatus, RegistryListing, list};
 pub use project::Project;
 pub use remove::{Removed, remove};
@@ -31,3 +31,9 @@ pub use remove::{Removed, remove};
 /// pull a component from a non-default registry, or replace a file provided by
 /// another registry. Returning `Err` aborts the operation.
 pub type Confirm<'a> = dyn FnMut(&str) -> Result<bool, String> + 'a;
+
+/// A callback the caller supplies to pick a theme during [`init`] when one was
+/// not named explicitly. Given the available theme names, it returns the chosen
+/// one — a theme is mandatory, so there is no way to decline. Returning `Err`
+/// aborts init.
+pub type ChooseTheme<'a> = dyn FnMut(&[String]) -> Result<String, String> + 'a;
