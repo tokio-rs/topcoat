@@ -35,10 +35,10 @@ impl WriteView for AttributeSpread {
 impl WriteAttribute for AttributeSpread {
     fn write(&self, writer: &mut AttributeWriter) {
         // A spread contributes an unknown number of attributes, so it adds no
-        // static capacity. It merges into the collection being built, with its
-        // keys replacing any already present.
+        // static capacity. It extends the collection being built, with its keys
+        // replacing any already present.
         let expr = &self.expr.expr;
-        writer.insert_block(0, quote! { __attrs.merge(#expr); });
+        writer.insert_block(0, quote! { __attrs.extend(#expr); });
     }
 }
 

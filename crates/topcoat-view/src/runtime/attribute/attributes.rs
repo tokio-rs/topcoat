@@ -90,13 +90,15 @@ impl Attributes {
         self.map.clear();
     }
 
-    /// Inserts every attribute from `other`, replacing any keys already present.
+    /// Inserts every `(key, value)` entry from `iter`, replacing any keys
+    /// already present.
     ///
-    /// This backs spreading one attribute collection into another, such as the
-    /// `(attrs)` spread inside the [`attributes!`](macro.attributes.html) macro.
+    /// This backs spreading attributes into a collection, such as the `(attrs)`
+    /// spread inside the [`attributes!`](macro.attributes.html) macro. Any
+    /// iterator of key/value pairs works, including another [`Attributes`].
     #[inline]
-    pub fn merge(&mut self, other: impl Into<Attributes>) {
-        self.map.extend(other.into().map);
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = (String, ViewPart)>) {
+        self.map.extend(iter);
     }
 
     /// Returns an iterator over attribute keys and rendered values.
