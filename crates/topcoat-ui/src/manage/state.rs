@@ -107,8 +107,8 @@ impl InstallState {
     }
 
     /// Writes a fresh install state for a project that has none, recording where
-    /// components install. Registries are not tracked here — they are discovered
-    /// from the project's dependencies — so this only sets up the file the other
+    /// components install. Registries are not tracked here; they are discovered
+    /// from the project's dependencies, so this only sets up the file the other
     /// commands require. Errors if an install state already exists rather than
     /// clobbering it.
     pub(super) fn create(

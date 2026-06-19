@@ -32,7 +32,7 @@ pub struct AddedComponent {
 
 /// The result of [`add`].
 pub enum AddOutcome {
-    /// Nothing was written — every needed file was already present.
+    /// Nothing was written; every needed file was already present.
     UpToDate,
     /// One or more components were written.
     Added(Vec<AddedComponent>),
@@ -71,8 +71,8 @@ struct PlannedRemoval {
 /// The operation is transactional: it walks the requested component and its
 /// dependencies, loading registries and reading sources without touching disk,
 /// and only commits the writes once everything resolves. Interactive decisions
-/// — pulling from a non-default registry, or replacing a file owned by another
-/// registry — are delegated to `confirm`.
+/// (pulling from a non-default registry, or replacing a file owned by another
+/// registry) are delegated to `confirm`.
 pub fn add(
     project: &Project,
     options: &AddOptions,
@@ -81,7 +81,7 @@ pub fn add(
     let mut state = InstallState::load(project)?;
     let workspace = Workspace::load(project)?;
 
-    // Phase 1 — plan. Walk the requested components and their transitive
+    // Phase 1: plan. Walk the requested components and their transitive
     // dependencies, loading registries and reading sources, but touch nothing on
     // disk. Any failure here (missing component, registry not a dependency)
     // leaves the project untouched.
@@ -188,7 +188,7 @@ pub fn add(
             .map_err(|error| format!("failed to read component `{}`: {error}", component.name()))?;
         let hash = content_hash(&contents);
 
-        // Write the source unless it is already present — dependencies never
+        // Write the source unless it is already present. Dependencies never
         // clobber existing files; only the root (or a replacement) rewrites.
         if !exists || (pending.root && options.overwrite) || replacing {
             writes.push(PlannedWrite {
@@ -230,7 +230,7 @@ pub fn add(
         }
     }
 
-    // Phase 2 — commit. Everything resolved, so remove anything being replaced,
+    // Phase 2: commit. Everything resolved, so remove anything being replaced,
     // write the files, wire up the module declarations, and persist the state.
     // Reject an ambiguous module layout up front, before touching any file.
     module::check(&project.resolve(&state.components_dir))?;
@@ -349,7 +349,7 @@ fn resolve_root_registry(
 }
 
 /// Finds an installed component, other than the one being installed, whose file
-/// is the same project-relative path — i.e. a file collision. Same-named
+/// is the same project-relative path (a file collision). Same-named
 /// components from different registries that map to different files do not
 /// collide and are not reported.
 fn find_file_conflict(

@@ -13,14 +13,14 @@ use super::project::Project;
 /// A registry is a crate, referenced by name. To be used as a registry a crate
 /// must (a) be reachable in the project's dependency graph and (b) be a *direct*
 /// dependency declared in the project's `Cargo.toml`. The sole exception is the
-/// built-in [`DEFAULT_REGISTRY_CRATE`], which is accepted when it is reachable
-/// at all — it is expected to arrive transitively through the `topcoat` crate
-/// rather than being depended on directly.
+/// built-in [`DEFAULT_REGISTRY_CRATE`], which is accepted whenever it is
+/// reachable, since it arrives transitively through the `topcoat` crate rather
+/// than being depended on directly.
 pub(super) struct Workspace {
     /// Every resolved package, indexed by crate name.
     packages: HashMap<String, Package>,
     /// The names of crates declared as direct dependencies by any workspace
-    /// member — the crates a registry may be referenced from.
+    /// member; the crates a registry may be referenced from.
     direct_deps: HashSet<String>,
 }
 

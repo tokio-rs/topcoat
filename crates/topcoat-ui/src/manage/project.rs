@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use super::state::STATE_FILE;
 
 /// The cargo workspace a management operation acts on. Every relative path in
-/// the install state — the components directory and installed file paths — is
+/// the install state (the components directory and installed file paths) is
 /// relative to the project root (the directory that holds `components.toml`), so
 /// operations behave the same regardless of the working directory.
 pub struct Project {

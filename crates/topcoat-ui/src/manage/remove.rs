@@ -17,10 +17,10 @@ pub struct Removed {
 
 /// Removes previously added components from the project.
 ///
-/// Each component's registry is resolved first — with `registry` it is removed
-/// from that registry, otherwise from the sole registry it is installed from (an
-/// error if it is installed from several) — so a bad name aborts before anything
-/// is deleted. The state is saved once, after all removals.
+/// Each component's registry is resolved first, so a bad name aborts before
+/// anything is deleted: with `registry` it is removed from that registry,
+/// otherwise from the sole registry it is installed from (an error if it is
+/// installed from several). The state is saved once, after all removals.
 pub fn remove(
     project: &Project,
     components: &[String],

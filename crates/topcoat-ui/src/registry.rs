@@ -18,14 +18,13 @@ pub const MANIFEST_VERSION: u32 = 1;
 /// reaches a project transitively through the `topcoat` crate.
 pub const DEFAULT_REGISTRY_CRATE: &str = "topcoat-ui";
 
-/// The parsed `registry.toml` manifest. Written by hand: it records no hashes —
-/// a component's hash is computed from its source on the fly (see
-/// [`content_hash`]). The registry's identity is its crate name, so the manifest
-/// names only the format version and the components.
+/// The parsed `registry.toml` manifest. Written by hand: it records no hashes,
+/// since a component's hash is computed from its source (see [`content_hash`]).
+/// The registry's identity is its crate name, so the manifest names only the
+/// format version and the components.
 #[derive(Deserialize)]
 struct Manifest {
-    /// The manifest format version. Required; used to tell formats apart so a
-    /// newer manifest can be rejected by an older build.
+    /// The manifest format version (see [`MANIFEST_VERSION`]).
     version: u32,
     #[serde(default)]
     themes: BTreeMap<String, ThemeEntry>,
@@ -130,10 +129,8 @@ impl Component<'_> {
         self.name
     }
 
-    /// Computes the component's content hash by reading its source and hashing
-    /// it (see [`content_hash`]). The hash is recorded per component in the
-    /// install state so that updates can be surfaced individually; recomputing
-    /// it from the registry reveals when the source has changed.
+    /// Computes the component's content hash by reading and hashing its source
+    /// (see [`content_hash`]).
     pub fn hash(&self) -> Result<String, Error> {
         Ok(content_hash(&self.read_source()?))
     }
@@ -180,8 +177,7 @@ impl Theme<'_> {
             .unwrap_or(&self.entry.source)
     }
 
-    /// Computes the theme's content hash by reading its source and hashing it,
-    /// so an installed theme can be told apart from an updated one (see
+    /// Computes the theme's content hash by reading and hashing its source (see
     /// [`content_hash`]).
     pub fn hash(&self) -> Result<String, Error> {
         Ok(content_hash(&self.read_source()?))

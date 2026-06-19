@@ -33,8 +33,8 @@ pub enum InstallStatus {
 
 /// Lists registries and the install status of their components.
 ///
-/// The registries listed are those the project can add from — the default plus
-/// any dependency registry — together with any registry still tracked in the
+/// The registries listed are those the project can add from (the default plus
+/// any dependency registry), together with any registry still tracked in the
 /// install state (so components from a since-removed dependency are not hidden).
 /// A component counts as installed only when it is tracked under *that* registry.
 /// With `selected`, only that registry is listed. Failures to load an individual

@@ -12,7 +12,7 @@ pub struct InitOptions {
     /// Base directory for component install output (default `src/components`).
     pub components_dir: Option<PathBuf>,
     /// The theme to install by name. When `None`, the user is asked to choose
-    /// one — a theme is always installed, never skipped.
+    /// one; a theme is always installed, never skipped.
     pub theme: Option<String>,
 }
 
@@ -49,7 +49,7 @@ pub fn init(
     options: InitOptions,
     choose: &mut ChooseTheme<'_>,
 ) -> Result<Initialized, String> {
-    // Resolve the theme — load the registry, prompt if needed, read the source —
+    // Resolve the theme (load the registry, prompt if needed, read the source)
     // before touching disk, so an unreachable registry or a bad theme name (or a
     // declined prompt) leaves the project untouched rather than half-initialized.
     // The already-initialized check happens up front, before any prompt.

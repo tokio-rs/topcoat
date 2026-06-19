@@ -13,8 +13,8 @@ fn module_name(file_name: &str) -> Option<&str> {
 /// The file that holds the components directory's module declarations.
 ///
 /// By default this is a sibling `<dir>.rs` file next to the directory. If the
-/// user instead keeps a `mod.rs` inside the directory, that file is maintained
-/// — letting either Rust module style work.
+/// user instead keeps a `mod.rs` inside the directory, that file is maintained,
+/// so either Rust module style works.
 ///
 /// Rust forbids declaring a module via both files at once, so when both exist
 /// this errors rather than silently picking one (which would leave a stale file
