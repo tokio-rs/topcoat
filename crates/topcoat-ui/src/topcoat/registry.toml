@@ -5,8 +5,20 @@
 
 version = 1
 
+[themes.lyra]
+source = "themes/lyra.css"
+
+[themes.maia]
+source = "themes/maia.css"
+
+[themes.mira]
+source = "themes/mira.css"
+
 [themes.nova]
 source = "themes/nova.css"
+
+[themes.vega]
+source = "themes/vega.css"
 
 [components.button]
 source = "components/button.rs"
