@@ -52,6 +52,75 @@ async fn search(Form(input): Form<Search>) -> Result<Json<Search>> {
 
 For `GET` and `HEAD` requests, `Form<T>` reads the query string instead of the request body. For other methods, it expects `Content-Type: application/x-www-form-urlencoded`.
 
+`RawForm` uses the same source selection (query string for `GET` and `HEAD`, body otherwise) but yields the raw `Bytes` without deserializing them:
+
+```rust
+use topcoat::{
+    Result,
+    router::{RawForm, route},
+};
+
+#[route(POST "/api/raw-form")]
+async fn raw_form(RawForm(bytes): RawForm) -> Result<String> {
+    Ok(format!("received {} bytes", bytes.len()))
+}
+```
+
+## Multipart form data
+
+Enable the `multipart` feature to extract `multipart/form-data` requests (commonly used for file uploads) with `Multipart`:
+
+```rust
+use topcoat::{
+    Result,
+    router::{Multipart, route},
+};
+
+#[route(POST "/api/files")]
+async fn files(mut multipart: Multipart) -> Result<String> {
+    let mut total = 0;
+
+    while let Some(field) = multipart.next_field().await? {
+        let name = field.name().map(str::to_owned);
+        let data = field.bytes().await?;
+
+        println!("field {name:?}: {} bytes", data.len());
+        total += data.len();
+    }
+
+    Ok(format!("received {total} bytes"))
+}
+```
+
+Each `Field` exposes `name`, `file_name`, `content_type`, and `headers`, along with `bytes`, `text`, and `chunk` for reading the data. A `Field` also implements `Stream`, so its chunks can be consumed with the usual stream combinators.
+
+## Optional request parsing
+
+Wrap `Json<T>`, `Form<T>`, or `Multipart` in `Option` to make the body optional. The request parser yields `None` when the request carries no body of that kind, and still reports an error when a body is present but malformed:
+
+```rust
+use serde::Deserialize;
+use topcoat::{
+    Result,
+    router::{Json, route},
+};
+
+#[derive(Deserialize)]
+struct Filter {
+    tag: String,
+}
+
+#[route(POST "/api/items")]
+async fn items(filter: Option<Json<Filter>>) -> Result<String> {
+    match filter {
+        Some(Json(filter)) => Ok(format!("filtering by {}", filter.tag)),
+        None => Ok("no filter".to_string()),
+    }
+}
+```
+
+For `Json` and `Multipart`, `None` means the request had no `Content-Type` header. For `Form`, a `GET` or `HEAD` request yields `None` only when there is no query string. Implement `OptionalFromRequest` to give a custom extractor the same `Option<_>` behavior.
+
 ## Handler signatures
 
 A page or route can take `cx: &Cx`, one request parameter, both, or neither:
@@ -121,7 +190,26 @@ A raw `Result<CreateUser>` is not automatically serialized as JSON. It only work
 
 ## Raw bodies
 
-`Body` implements `FromRequest`, so a handler can receive the raw body when it needs to parse bytes itself:
+Several extractors hand the handler the request body without imposing a content type:
+
+- `Body` — the raw, unbuffered body stream, for handlers that read or forward it themselves.
+- `Bytes` — the fully buffered body as `Bytes`.
+- `String` — the fully buffered body decoded as UTF-8 (a non-UTF-8 body is rejected with `400`).
+- `BytesMut` — the fully buffered body in a mutable buffer.
+
+```rust
+use topcoat::{
+    Result,
+    router::{Bytes, route},
+};
+
+#[route(POST "/api/upload")]
+async fn upload(body: Bytes) -> Result<String> {
+    Ok(format!("received {} bytes", body.len()))
+}
+```
+
+Use `Body` directly when you need the unbuffered stream:
 
 ```rust
 use topcoat::{
@@ -129,14 +217,16 @@ use topcoat::{
     router::{Body, route},
 };
 
-#[route(POST "/api/upload")]
-async fn upload(body: Body) -> Result<&'static str> {
+#[route(POST "/api/stream")]
+async fn stream(body: Body) -> Result<&'static str> {
     let _ = body;
     Ok("received")
 }
 ```
 
-## Custom request extractors
+`Bytes`, `String`, `Vec<u8>`, and `&'static str` also work as return types, so a handler can echo raw bytes or text straight back as a response.
+
+## Custom request parsing
 
 Implement `FromRequest` when a handler needs request-specific parsing that is not covered by `Json<T>` or `Form<T>`.
 

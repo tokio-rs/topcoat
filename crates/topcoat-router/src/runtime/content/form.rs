@@ -3,13 +3,14 @@ use std::ops::{Deref, DerefMut};
 use ::serde::{Serialize, de::DeserializeOwned};
 use axum::body::to_bytes;
 use http::{
-    HeaderMap, Method,
+    Method,
     header::{CONTENT_TYPE, HeaderValue},
 };
 use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{
-    Body, FromRequest, IntoResponse, Response, bad_request, bad_request_at, headers, method, uri,
+    Body, Bytes, FromRequest, IntoResponse, OptionalFromRequest, Response, bad_request,
+    bad_request_at, content_type, method, uri,
 };
 
 /// `application/x-www-form-urlencoded` request extractor and response wrapper.
@@ -42,22 +43,28 @@ where
     T: DeserializeOwned,
 {
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
-        if matches!(method(cx), &Method::GET | &Method::HEAD) {
-            return Self::from_bytes(uri(cx).query().unwrap_or_default().as_bytes());
-        }
-
-        if !form_content_type(headers(cx)) {
-            return Err(bad_request(
-                "expected request with `Content-Type: application/x-www-form-urlencoded`",
-            )
-            .into());
-        }
-
-        let bytes = to_bytes(body, usize::MAX)
-            .await
-            .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
-
+        let RawForm(bytes) = RawForm::from_request(cx, body).await?;
         Self::from_bytes(&bytes)
+    }
+}
+
+impl<T> OptionalFromRequest for Form<T>
+where
+    T: DeserializeOwned,
+{
+    async fn from_request(cx: &Cx, body: Body) -> Result<Option<Self>> {
+        if matches!(method(cx), &Method::GET | &Method::HEAD) {
+            return match uri(cx).query() {
+                Some(query) => Ok(Some(Self::from_bytes(query.as_bytes())?)),
+                None => Ok(None),
+            };
+        }
+
+        if content_type(cx).is_some() {
+            Ok(Some(<Self as FromRequest>::from_request(cx, body).await?))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -95,12 +102,41 @@ where
     }
 }
 
-fn form_content_type(headers: &HeaderMap) -> bool {
-    let Some(content_type) = headers.get(CONTENT_TYPE) else {
-        return false;
-    };
+/// Extractor for the raw bytes of an `application/x-www-form-urlencoded`
+/// request.
+///
+/// For `GET` and `HEAD` requests it yields the raw query string; for other
+/// methods it yields the raw request body and requires a
+/// `Content-Type: application/x-www-form-urlencoded` header. Unlike [`Form`],
+/// the bytes are returned without deserialization.
+#[derive(Debug, Clone, Default)]
+#[must_use]
+pub struct RawForm(pub Bytes);
 
-    let Ok(content_type) = content_type.to_str() else {
+impl FromRequest for RawForm {
+    async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
+        if matches!(method(cx), &Method::GET | &Method::HEAD) {
+            let query = uri(cx).query().unwrap_or_default();
+            return Ok(Self(Bytes::copy_from_slice(query.as_bytes())));
+        }
+
+        if !form_content_type(content_type(cx)) {
+            return Err(bad_request(
+                "expected request with `Content-Type: application/x-www-form-urlencoded`",
+            )
+            .into());
+        }
+
+        let bytes = to_bytes(body, usize::MAX)
+            .await
+            .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
+
+        Ok(Self(bytes))
+    }
+}
+
+fn form_content_type(content_type: Option<&str>) -> bool {
+    let Some(content_type) = content_type else {
         return false;
     };
 

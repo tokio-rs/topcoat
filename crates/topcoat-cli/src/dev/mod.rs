@@ -3,7 +3,7 @@ mod broadcast_server;
 use clap::Args;
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
-use notify::{RecursiveMode, Watcher, recommended_watcher};
+use notify::{EventKind, RecursiveMode, Watcher, recommended_watcher};
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -38,9 +38,13 @@ impl DevCommand {
         let mut current_build: Option<BuildFut> = Some(spawn_build(true, &dev_url));
         let mut child: Option<Child> = None;
 
-        let (tx, mut rx) = mpsc::channel::<notify::Result<notify::Event>>(16);
-        let mut watcher = recommended_watcher(move |event| {
-            let _ = tx.blocking_send(event);
+        let (tx, mut rx) = mpsc::unbounded_channel::<notify::Result<notify::Event>>();
+        let mut watcher = recommended_watcher(move |event: notify::Result<notify::Event>| {
+            if let Ok(ev) = &event
+                && !matches!(ev.kind, EventKind::Access(_))
+            {
+                let _ = tx.send(event);
+            }
         })
         .expect("failed to create file watcher");
         for dir in &watch_dirs {

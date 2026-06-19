@@ -85,6 +85,32 @@ impl MemoizeCache {
         cell.get_or_init(|| f(cx, params))
     }
 
+    /// Returns the already-computed value for `(F, key)`, or `None` if nothing has been
+    /// memoized under that marker and key yet. Unlike [`memoize`](Self::memoize) this never
+    /// inserts a cell or runs anything: `marker` is taken only to fix the partition type `F`
+    /// (matching the function the value was memoized with) and is never called.
+    ///
+    /// Only observes entries written by the synchronous [`memoize`](Self::memoize); the async
+    /// variant stores its cells as `OnceCell<V>` and is not visible here.
+    pub fn get<K, V, F>(&self, marker: F, key: K) -> Option<&V>
+    where
+        K: Copy,
+        MemoizeKey<K>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<K> as ToOwnedKey>::Owned>,
+        <MemoizeKey<K> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
+        V: Send + Sync + 'static,
+        F: 'static,
+    {
+        let _ = marker;
+        let index = {
+            let guard = self.entries.lock().unwrap();
+            let cache =
+                guard.get::<MarkedHashMap<F, <MemoizeKey<K> as ToOwnedKey>::Owned, usize>>()?;
+            *cache.get(&MemoizeKey(key))?
+        };
+        let cell: &OnceLock<V> = self.values.get(index).unwrap().downcast_ref().unwrap();
+        cell.get()
+    }
+
     /// Async counterpart to [`memoize`](Self::memoize). Concurrent callers with the same key
     /// share a single in-flight future via `tokio::sync::OnceCell`.
     pub async fn memoize_async<'a, K, P, V, F, Fut>(

@@ -100,6 +100,24 @@ pub fn headers(cx: &Cx) -> &http::HeaderMap {
     &parts(cx).headers
 }
 
+/// Returns the `Content-Type` header of the current request as a string slice,
+/// or [`None`] when it is absent or not valid UTF-8.
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use topcoat::{context::Cx, router::content_type};
+///
+/// async fn is_json(cx: &Cx) -> bool {
+///     content_type(cx).is_some_and(|value| value.starts_with("application/json"))
+/// }
+/// ```
+#[inline]
+#[must_use]
+pub fn content_type(cx: &Cx) -> Option<&str> {
+    headers(cx).get(http::header::CONTENT_TYPE)?.to_str().ok()
+}
+
 /// Returns the [`Extensions`] of the current request.
 ///
 /// Extensions carry typed values attached to the request, typically by

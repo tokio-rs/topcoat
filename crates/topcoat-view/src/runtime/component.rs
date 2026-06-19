@@ -5,6 +5,10 @@ use crate::runtime::{Props, View};
 pub trait Component {
     type Props: Props;
 
+    fn props_builder() -> <Self::Props as Props>::Builder {
+        Self::Props::builder()
+    }
+
     fn render(
         self,
         cx: &Cx,

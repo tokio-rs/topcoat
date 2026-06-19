@@ -700,8 +700,8 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// - `#[default]` makes a property optional. If it is not set, the field is filled with
 ///   [`Default::default()`]. The field's type must implement [`Default`].
-/// - `#[into]` makes the generated setter accept `impl Into<T>` instead of `T`, so
-///   `.label("Save")` works for a `String` field.
+/// - `#[into]` makes the generated setter accept `impl Into<T>` instead of `T`, so `.label("Save")`
+///   works for a `String` field.
 ///
 /// Both attributes can be combined on the same field.
 ///

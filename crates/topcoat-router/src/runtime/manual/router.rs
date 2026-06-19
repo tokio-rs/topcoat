@@ -6,7 +6,7 @@ use axum::{
 };
 use topcoat_core::runtime::context::State;
 
-use crate::runtime::{CxBody, Layout, Page, Route, not_found, result_into_response};
+use crate::runtime::{CxBody, Layout, Page, Route, finalize, not_found, result_into_response};
 
 /// The core routing primitive that collects [`Page`]s, [`Layout`]s, and
 /// [`Route`]s, matches layouts to pages by path prefix, and converts into an
@@ -279,7 +279,10 @@ impl From<Router> for axum::Router {
                         }
                         render.await
                     };
-                    result_into_response(result.map(|view| Html(view.render(&cx))))
+                    finalize(
+                        &cx,
+                        result_into_response(result.map(|view| Html(view.render(&cx)))),
+                    )
                 }),
             );
         }
@@ -291,7 +294,7 @@ impl From<Router> for axum::Router {
                     MethodFilter::try_from(route.method().clone())
                         .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),
                     async move |CxBody { cx, body }: CxBody| {
-                        result_into_response(route.handle(&cx, body).await)
+                        finalize(&cx, result_into_response(route.handle(&cx, body).await))
                     },
                 ),
             );
@@ -327,7 +330,7 @@ impl From<Router> for axum::Router {
                 procedure_router = procedure_router.route(
                     &("/".to_owned() + procedure.id().as_str()),
                     axum::routing::post(async move |CxBody { cx, body }: CxBody| {
-                        result_into_response(procedure.handle(&cx, body).await)
+                        finalize(&cx, result_into_response(procedure.handle(&cx, body).await))
                     }),
                 );
             }
@@ -357,7 +360,10 @@ impl From<Router> for axum::Router {
                                 .dyn_render(&cx, EncodedSignals::new(signal_param))
                                 .await;
 
-                            result_into_response(result.map(|view| Html(view.render(&cx))))
+                            finalize(
+                                &cx,
+                                result_into_response(result.map(|view| Html(view.render(&cx)))),
+                            )
                         },
                     ),
                 );

@@ -8,7 +8,7 @@ use heck::ToPascalCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    Attribute, FnArg, GenericParam, Lifetime, Pat, ReturnType, Type, TypeParam, TypeReference,
+    FnArg, GenericParam, Lifetime, Pat, ReturnType, Type, TypeParam, TypeReference,
     ext::IdentExt,
     parse_quote,
     spanned::Spanned,
@@ -19,15 +19,13 @@ use crate::ast::component::{ComponentAttr, ComponentItem};
 
 /// A parsed `#[component] async fn ...`. Expands into:
 ///
-/// - a props struct named after the function in PascalCase plus `Props`
-///   (`button` becomes `ButtonProps`), deriving [`Props`] so it gets a
-///   typestate builder. `#[default]` and `#[into]` on function parameters are
-///   forwarded to the corresponding props fields. `impl Trait` parameter
+/// - a props struct named after the function in PascalCase plus `Props` (`button` becomes
+///   `ButtonProps`), deriving [`Props`] so it gets a typestate builder. `#[default]` and `#[into]`
+///   on function parameters are forwarded to the corresponding props fields. `impl Trait` parameter
 ///   types are lifted into generic type parameters of the props struct (see
 ///   [`ImplTraitParamVisitor`]).
 /// - a zero-sized marker struct named after the function that implements
-///   [`topcoat::view::Component`] with a `render` method calling the original
-///   function body.
+///   [`topcoat::view::Component`] with a `render` method calling the original function body.
 ///
 /// [`Props`]: derive.Props.html
 /// [`topcoat::view::Component`]: trait.Component.html
@@ -58,10 +56,22 @@ impl ToTokens for Component {
             span = ident.span()
         );
 
+        let attrs = item.attrs;
+        item.attrs = vec![];
         item.sig.generics.params.insert(0, parse_quote! { '__cx });
         item.sig
             .inputs
             .insert(0, parse_quote! { __cx: &'__cx ::topcoat::context::Cx });
+
+        // The `#[default]` and `#[into]` helper attributes are only meaningful to
+        // the `Props` derive, which sees them on the generated struct's fields.
+        // They are not valid on the re-emitted function's parameters, so strip
+        // them here to avoid a "cannot find attribute" error.
+        for arg in &mut item.sig.inputs {
+            if let FnArg::Typed(pat_type) = arg {
+                pat_type.attrs.clear();
+            }
+        }
 
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("validated in Parse");
@@ -92,7 +102,7 @@ impl ToTokens for Component {
                 impl_traits_visitor.count = 0;
                 impl_traits_visitor.visit_type_mut(&mut ty);
 
-                let attrs: Vec<&Attribute> = pat_type.attrs.iter().collect();
+                let attrs = &pat_type.attrs;
                 let field_ident = &pi.ident;
                 fields.push(quote! { #(#attrs)* #vis #field_ident: #ty });
                 args.push(quote! { props.#field_ident });
@@ -123,6 +133,7 @@ impl ToTokens for Component {
         });
 
         quote! {
+            #(#attrs)*
             #[derive(::topcoat::view::Props)]
             #vis struct #props_ident #impl_generics #where_clause {
                 #(#fields),*

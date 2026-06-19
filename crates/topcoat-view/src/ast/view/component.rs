@@ -1,10 +1,7 @@
-use heck::ToPascalCase;
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote, quote_spanned};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    Expr, Ident, Path, Token,
-    ext::IdentExt,
-    parenthesized,
+    Expr, Ident, Path, Token, parenthesized,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Paren,
@@ -77,16 +74,6 @@ impl WriteView for Component {
     fn write(&self, writer: &mut ViewWriter) {
         let name = &self.path;
 
-        // The component's props struct lives next to the component under the
-        // same path, named after it in PascalCase plus `Props`.
-        let mut props_path = self.path.clone();
-        let segment = props_path.segments.last_mut().expect("non-empty path");
-        segment.ident = format_ident!(
-            "{}Props",
-            segment.ident.unraw().to_string().to_pascal_case(),
-            span = segment.ident.span()
-        );
-
         let setters = self.named_args.iter().map(|arg| {
             let ident = &arg.ident;
             let value = &arg.value;
@@ -106,11 +93,15 @@ impl WriteView for Component {
         writer.write_expr(
             ExprKind::Node,
             quote_spanned! {self.paren_token.span.span()=>
-                ::topcoat::view::Component::render(
-                    #name(::core::marker::PhantomData),
-                    __cx,
-                    #props_path::builder()#(#setters)*#child.build(),
-                ).await?
+                {
+                    use ::topcoat::view::Component;
+                    let props = #name::props_builder()#(#setters)*#child.build();
+                    Component::render(
+                        #name(::core::marker::PhantomData),
+                        __cx,
+                        props,
+                    ).await?
+                }
             },
         );
     }
