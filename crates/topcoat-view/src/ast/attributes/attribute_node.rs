@@ -4,7 +4,8 @@ use topcoat_core::ast::ParseOption;
 
 use crate::ast::{
     attributes::{
-        Attribute, AttributeNodes, AttributeWriter, BindAttribute, EventHandler, WriteAttribute,
+        Attribute, AttributeNodes, AttributeSpread, AttributeWriter, BindAttribute, EventHandler,
+        WriteAttribute,
     },
     template::{
         TemplateBreak, TemplateContinue, TemplateForLoop, TemplateIf, TemplateLet, TemplateMatch,
@@ -16,6 +17,7 @@ use crate::ast::{
 /// of every construct that can appear at attribute-list position.
 pub enum AttributeNode {
     Attribute(Attribute),
+    Spread(AttributeSpread),
     BindAttribute(Box<BindAttribute>),
     EventHandler(EventHandler),
     If(Box<TemplateIf<AttributeNodes>>),
@@ -30,6 +32,7 @@ impl WriteView for AttributeNode {
     fn write(&self, writer: &mut ViewWriter) {
         match self {
             Self::Attribute(inner) => WriteView::write(inner, writer),
+            Self::Spread(inner) => WriteView::write(inner, writer),
             Self::BindAttribute(inner) => WriteView::write(inner.as_ref(), writer),
             Self::EventHandler(inner) => WriteView::write(inner, writer),
             Self::If(inner) => WriteView::write(inner.as_ref(), writer),
@@ -46,6 +49,7 @@ impl WriteAttribute for AttributeNode {
     fn write(&self, writer: &mut AttributeWriter) {
         match self {
             Self::Attribute(inner) => WriteAttribute::write(inner, writer),
+            Self::Spread(inner) => WriteAttribute::write(inner, writer),
             Self::BindAttribute(inner) => WriteAttribute::write(inner.as_ref(), writer),
             Self::EventHandler(inner) => WriteAttribute::write(inner, writer),
             Self::If(inner) => WriteAttribute::write(inner.as_ref(), writer),
@@ -76,6 +80,8 @@ impl Parse for AttributeNode {
             Self::BindAttribute(input.parse()?)
         } else if EventHandler::peek(input) {
             Self::EventHandler(input.parse()?)
+        } else if AttributeSpread::peek(input) {
+            Self::Spread(input.parse()?)
         } else if Attribute::peek(input) {
             Self::Attribute(input.parse()?)
         } else {
@@ -89,6 +95,7 @@ impl Parse for AttributeNode {
 impl ParseOption for AttributeNode {
     fn peek(input: ParseStream) -> bool {
         Attribute::peek(input)
+            || AttributeSpread::peek(input)
             || BindAttribute::peek(input)
             || EventHandler::peek(input)
             || TemplateIf::<AttributeNodes>::peek(input)
@@ -105,6 +112,7 @@ impl topcoat_pretty::PrettyPrint for AttributeNode {
     fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         match self {
             Self::Attribute(inner) => inner.pretty_print(printer),
+            Self::Spread(inner) => inner.pretty_print(printer),
             Self::BindAttribute(inner) => inner.pretty_print(printer),
             Self::EventHandler(inner) => inner.pretty_print(printer),
             Self::If(inner) => inner.pretty_print(printer),

@@ -90,6 +90,17 @@ impl Attributes {
         self.map.clear();
     }
 
+    /// Inserts every `(key, value)` entry from `iter`, replacing any keys
+    /// already present.
+    ///
+    /// This backs spreading attributes into a collection, such as the `(attrs)`
+    /// spread inside the [`attributes!`](macro.attributes.html) macro. Any
+    /// iterator of key/value pairs works, including another [`Attributes`].
+    #[inline]
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = (String, ViewPart)>) {
+        self.map.extend(iter);
+    }
+
     /// Returns an iterator over attribute keys and rendered values.
     #[inline]
     pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
