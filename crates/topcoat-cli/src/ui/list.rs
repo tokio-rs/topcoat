@@ -2,7 +2,7 @@ use clap::Args;
 use console::style;
 use topcoat_ui::manage::{self, InstallStatus, Project};
 
-use super::ProjectArg;
+use super::PackageArg;
 
 #[derive(Args)]
 pub(super) struct ListCommand {
@@ -13,7 +13,7 @@ pub(super) struct ListCommand {
     #[arg(short, long)]
     installed: bool,
     #[command(flatten)]
-    project: ProjectArg,
+    package: PackageArg,
 }
 
 impl ListCommand {
@@ -25,7 +25,7 @@ impl ListCommand {
     }
 
     fn run_inner(self) -> Result<(), String> {
-        let project = Project::locate(self.project.project)?;
+        let project = Project::locate(self.package.package)?;
         let listings = manage::list(&project, self.registry.as_deref())?;
 
         for listing in &listings {

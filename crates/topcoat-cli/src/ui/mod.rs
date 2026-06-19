@@ -36,12 +36,12 @@ impl UiCommand {
     }
 }
 
-/// The `--project` selector shared by the `ui` subcommands: the cargo workspace
-/// to operate on, whose root holds `components.toml`.
+/// The `--package` selector shared by the `ui` subcommands: the cargo crate to
+/// operate on, whose root holds `components.toml`.
 #[derive(Args)]
-struct ProjectArg {
-    /// Cargo workspace to operate on; its root holds `components.toml`
-    /// (defaults to the current workspace)
+struct PackageArg {
+    /// Cargo crate to operate on; its root holds `components.toml`
+    /// (defaults to the crate containing the current directory)
     #[arg(short, long)]
-    project: Option<PathBuf>,
+    package: Option<PathBuf>,
 }

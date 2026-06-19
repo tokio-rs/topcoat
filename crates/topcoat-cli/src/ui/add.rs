@@ -2,7 +2,7 @@ use clap::Args;
 use console::style;
 use topcoat_ui::manage::{self, AddOptions, AddOutcome, Project};
 
-use super::ProjectArg;
+use super::PackageArg;
 
 #[derive(Args)]
 pub(super) struct AddCommand {
@@ -16,7 +16,7 @@ pub(super) struct AddCommand {
     #[arg(short, long)]
     overwrite: bool,
     #[command(flatten)]
-    project: ProjectArg,
+    package: PackageArg,
 }
 
 impl AddCommand {
@@ -28,7 +28,7 @@ impl AddCommand {
     }
 
     fn run_inner(self) -> Result<(), String> {
-        let project = Project::locate(self.project.project)?;
+        let project = Project::locate(self.package.package)?;
         let options = AddOptions {
             components: self.components,
             registry: self.registry,

@@ -4,7 +4,7 @@ use clap::Args;
 use console::style;
 use topcoat_ui::manage::{self, InitOptions, Project};
 
-use super::ProjectArg;
+use super::PackageArg;
 
 #[derive(Args)]
 pub(super) struct InitCommand {
@@ -15,7 +15,7 @@ pub(super) struct InitCommand {
     #[arg(short, long)]
     theme: Option<String>,
     #[command(flatten)]
-    project: ProjectArg,
+    package: PackageArg,
 }
 
 impl InitCommand {
@@ -27,7 +27,7 @@ impl InitCommand {
     }
 
     fn run_inner(self) -> Result<(), String> {
-        let project = Project::locate(self.project.project)?;
+        let project = Project::locate(self.package.package)?;
         let options = InitOptions {
             components_dir: self.components_dir,
             theme: self.theme,
