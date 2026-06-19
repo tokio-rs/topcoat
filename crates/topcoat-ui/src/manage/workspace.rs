@@ -6,19 +6,19 @@ use serde::Deserialize;
 
 use crate::DEFAULT_REGISTRY_CRATE;
 
-use super::project::Project;
+use super::package::Package;
 
-/// The cargo dependency graph of a project, used to resolve registries.
+/// The cargo dependency graph of a package, used to resolve registries.
 ///
 /// A registry is a crate, referenced by name. To be used as a registry a crate
-/// must (a) be reachable in the project's dependency graph and (b) be a *direct*
-/// dependency declared in the project's `Cargo.toml`. The sole exception is the
+/// must (a) be reachable in the package's dependency graph and (b) be a *direct*
+/// dependency declared in the package's `Cargo.toml`. The sole exception is the
 /// built-in [`DEFAULT_REGISTRY_CRATE`], which is accepted whenever it is
 /// reachable, since it arrives transitively through the `topcoat` crate rather
 /// than being depended on directly.
 pub(super) struct Workspace {
     /// Every resolved package, indexed by crate name.
-    packages: HashMap<String, Package>,
+    packages: HashMap<String, MetadataPackage>,
     /// The names of crates declared as direct dependencies by any workspace
     /// member; the crates a registry may be referenced from.
     direct_deps: HashSet<String>,
@@ -26,13 +26,13 @@ pub(super) struct Workspace {
 
 #[derive(Deserialize)]
 struct Metadata {
-    packages: Vec<Package>,
+    packages: Vec<MetadataPackage>,
     /// Package ids of the workspace's own members.
     workspace_default_members: Vec<String>,
 }
 
 #[derive(Deserialize)]
-struct Package {
+struct MetadataPackage {
     name: String,
     id: String,
     manifest_path: PathBuf,
@@ -49,12 +49,12 @@ struct Dependency {
 }
 
 impl Workspace {
-    /// Resolves the project's dependency graph by running `cargo metadata` at the
-    /// project root.
-    pub(super) fn load(project: &Project) -> Result<Self, String> {
+    /// Resolves the package's dependency graph by running `cargo metadata` at the
+    /// package root.
+    pub(super) fn load(package: &Package) -> Result<Self, String> {
         let output = Command::new("cargo")
             .args(["metadata", "--format-version=1"])
-            .current_dir(project.root())
+            .current_dir(package.root())
             .output()
             .map_err(|error| format!("failed to run `cargo metadata`: {error}"))?;
         if !output.status.success() {
@@ -118,7 +118,7 @@ impl Workspace {
         Ok(crate_root.join(registry))
     }
 
-    /// The crate names of every registry the project may add from: the built-in
+    /// The crate names of every registry the package may add from: the built-in
     /// default plus any direct dependency that declares a registry, sorted.
     pub(super) fn available_registries(&self) -> Vec<String> {
         let mut names: Vec<String> = self
@@ -138,7 +138,7 @@ impl Workspace {
 
 /// The registry directory a crate declares via `[package.metadata.topcoat-ui]`,
 /// if any.
-fn registry_subdir(package: &Package) -> Option<&str> {
+fn registry_subdir(package: &MetadataPackage) -> Option<&str> {
     package
         .metadata
         .get("topcoat-ui")?

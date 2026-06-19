@@ -4,9 +4,9 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use super::project::Project;
+use super::package::Package;
 
-/// The install-state file tracking which components a project has added.
+/// The install-state file tracking which components a package has added.
 pub(super) const STATE_FILE: &str = "components.toml";
 /// The format version written into the install state.
 const STATE_VERSION: u32 = 1;
@@ -23,7 +23,7 @@ pub(super) struct InstallState {
     #[serde(default = "default_components_dir")]
     pub components_dir: PathBuf,
     /// The theme installed at `init` time, if one was chosen. The CSS itself
-    /// lives in the project; this records which theme it came from so updates
+    /// lives in the package; this records which theme it came from so updates
     /// can be surfaced the same way components are.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<InstalledTheme>,
@@ -31,7 +31,7 @@ pub(super) struct InstallState {
     pub registries: BTreeMap<String, RegistryState>,
 }
 
-/// The theme a project installed: which registry and theme it came from, the
+/// The theme a package installed: which registry and theme it came from, the
 /// hash of the theme's source when installed, and where the CSS was written.
 #[derive(Serialize, Deserialize)]
 pub(super) struct InstalledTheme {
@@ -66,8 +66,8 @@ impl Default for InstallState {
 }
 
 impl InstallState {
-    pub(super) fn load(project: &Project) -> Result<Self, String> {
-        let path = project.state_path();
+    pub(super) fn load(package: &Package) -> Result<Self, String> {
+        let path = package.state_path();
         match std::fs::read_to_string(&path) {
             Ok(raw) => {
                 let state: Self = toml::from_str(&raw)
@@ -90,8 +90,8 @@ impl InstallState {
         }
     }
 
-    pub(super) fn save(&self, project: &Project) -> Result<(), String> {
-        let path = project.state_path();
+    pub(super) fn save(&self, package: &Package) -> Result<(), String> {
+        let path = package.state_path();
         let body = toml::to_string_pretty(self)
             .map_err(|error| format!("failed to serialize install state: {error}"))?;
         let contents = format!("# Topcoat UI install state. Managed by `topcoat ui`.\n{body}");
@@ -106,19 +106,19 @@ impl InstallState {
         self.registries.entry(name.to_string()).or_default()
     }
 
-    /// Writes a fresh install state for a project that has none, recording where
+    /// Writes a fresh install state for a package that has none, recording where
     /// components install. Registries are not tracked here; they are discovered
-    /// from the project's dependencies, so this only sets up the file the other
+    /// from the package's dependencies, so this only sets up the file the other
     /// commands require. Errors if an install state already exists rather than
     /// clobbering it.
     pub(super) fn create(
-        project: &Project,
+        package: &Package,
         components_dir: Option<PathBuf>,
     ) -> Result<Self, String> {
-        let path = project.state_path();
+        let path = package.state_path();
         if path.exists() {
             return Err(format!(
-                "{} already exists; the project is already initialized",
+                "{} already exists; the package is already initialized",
                 path.display()
             ));
         }
@@ -128,7 +128,7 @@ impl InstallState {
             state.components_dir = components_dir;
         }
 
-        state.save(project)?;
+        state.save(package)?;
         Ok(state)
     }
 }

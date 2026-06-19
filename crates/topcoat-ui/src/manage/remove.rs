@@ -2,31 +2,31 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use super::module;
-use super::project::Project;
+use super::package::Package;
 use super::state::InstallState;
 
 /// A component removed by [`remove`].
 pub struct Removed {
     /// The component's name.
     pub name: String,
-    /// The project-relative path of the deleted file.
+    /// The package-relative path of the deleted file.
     pub file: PathBuf,
     /// The registry it had been added from.
     pub registry: String,
 }
 
-/// Removes previously added components from the project.
+/// Removes previously added components from the package.
 ///
 /// Each component's registry is resolved first, so a bad name aborts before
 /// anything is deleted: with `registry` it is removed from that registry,
 /// otherwise from the sole registry it is installed from (an error if it is
 /// installed from several). The state is saved once, after all removals.
 pub fn remove(
-    project: &Project,
+    package: &Package,
     components: &[String],
     registry: Option<&str>,
 ) -> Result<Vec<Removed>, String> {
-    let mut state = InstallState::load(project)?;
+    let mut state = InstallState::load(package)?;
 
     // Resolve every component up front so a typo or ambiguity fails before any
     // file is deleted.
@@ -40,7 +40,7 @@ pub fn remove(
     let components_dir = state.components_dir.clone();
 
     // Reject an ambiguous module layout up front, before deleting any file.
-    module::check(&project.resolve(&components_dir))?;
+    module::check(&package.resolve(&components_dir))?;
 
     let mut removed = Vec::new();
     for (registry_name, component) in targets {
@@ -54,7 +54,7 @@ pub fn remove(
             continue;
         };
 
-        let file = project.resolve(&installed.file);
+        let file = package.resolve(&installed.file);
         match std::fs::remove_file(&file) {
             Ok(()) => {}
             Err(error) if error.kind() == ErrorKind::NotFound => {}
@@ -64,7 +64,7 @@ pub fn remove(
         }
 
         if let Some(file_name) = installed.file.file_name().and_then(|name| name.to_str()) {
-            module::undeclare(&project.resolve(&components_dir), file_name)?;
+            module::undeclare(&package.resolve(&components_dir), file_name)?;
         }
 
         removed.push(Removed {
@@ -74,7 +74,7 @@ pub fn remove(
         });
     }
 
-    state.save(project)?;
+    state.save(package)?;
 
     Ok(removed)
 }

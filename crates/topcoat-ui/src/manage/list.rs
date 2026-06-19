@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::Registry;
 
-use super::project::Project;
+use super::package::Package;
 use super::state::{InstallState, RegistryState};
 use super::workspace::Workspace;
 
@@ -19,7 +19,7 @@ pub struct ComponentStatus {
     pub status: InstallStatus,
 }
 
-/// How a component relates to what the project has installed from its registry.
+/// How a component relates to what the package has installed from its registry.
 pub enum InstallStatus {
     /// Offered by the registry but not installed; carries the latest hash.
     Available { hash: String },
@@ -33,16 +33,16 @@ pub enum InstallStatus {
 
 /// Lists registries and the install status of their components.
 ///
-/// The registries listed are those the project can add from (the default plus
+/// The registries listed are those the package can add from (the default plus
 /// any dependency registry), together with any registry still tracked in the
 /// install state (so components from a since-removed dependency are not hidden).
 /// A component counts as installed only when it is tracked under *that* registry.
 /// With `selected`, only that registry is listed. Failures to load an individual
 /// registry are reported per registry (in `outcome`) rather than failing the
 /// whole listing.
-pub fn list(project: &Project, selected: Option<&str>) -> Result<Vec<RegistryListing>, String> {
-    let state = InstallState::load(project)?;
-    let workspace = Workspace::load(project)?;
+pub fn list(package: &Package, selected: Option<&str>) -> Result<Vec<RegistryListing>, String> {
+    let state = InstallState::load(package)?;
+    let workspace = Workspace::load(package)?;
 
     // The registries worth listing: discoverable dependency registries plus any
     // still tracked in the install state.

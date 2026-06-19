@@ -1,6 +1,6 @@
 use clap::Args;
 use console::style;
-use topcoat_ui::manage::{self, AddOptions, AddOutcome, Project};
+use topcoat_ui::manage::{self, AddOptions, AddOutcome, Package};
 
 use super::PackageArg;
 
@@ -28,7 +28,7 @@ impl AddCommand {
     }
 
     fn run_inner(self) -> Result<(), String> {
-        let project = Project::locate(self.package.package)?;
+        let package = Package::locate(self.package.package)?;
         let options = AddOptions {
             components: self.components,
             registry: self.registry,
@@ -36,7 +36,7 @@ impl AddCommand {
         };
 
         let mut confirm = confirm;
-        match manage::add(&project, &options, &mut confirm)? {
+        match manage::add(&package, &options, &mut confirm)? {
             AddOutcome::UpToDate => {
                 println!("{} already up to date", style("✓").green());
             }

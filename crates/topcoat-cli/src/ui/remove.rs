@@ -1,6 +1,6 @@
 use clap::Args;
 use console::style;
-use topcoat_ui::manage::{self, Project};
+use topcoat_ui::manage::{self, Package};
 
 use super::PackageArg;
 
@@ -25,8 +25,8 @@ impl RemoveCommand {
     }
 
     fn run_inner(self) -> Result<(), String> {
-        let project = Project::locate(self.package.package)?;
-        let removed = manage::remove(&project, &self.components, self.registry.as_deref())?;
+        let package = Package::locate(self.package.package)?;
+        let removed = manage::remove(&package, &self.components, self.registry.as_deref())?;
 
         for component in removed {
             println!(

@@ -15,13 +15,13 @@ pub struct UiCommand {
 
 #[derive(Subcommand)]
 enum UiSubcommand {
-    /// Set up the project's install state (run before adding components)
+    /// Set up the package's install state (run before adding components)
     Init(init::InitCommand),
-    /// Add a premade UI component to your project
+    /// Add a premade UI component to your package
     Add(add::AddCommand),
     /// List registry components and their install status
     List(list::ListCommand),
-    /// Remove a previously added UI component from your project
+    /// Remove a previously added UI component from your package
     Remove(remove::RemoveCommand),
 }
 

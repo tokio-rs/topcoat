@@ -18,7 +18,7 @@ fn module_name(file_name: &str) -> Option<&str> {
 ///
 /// Rust forbids declaring a module via both files at once, so when both exist
 /// this errors rather than silently picking one (which would leave a stale file
-/// and a project that does not compile).
+/// and a package that does not compile).
 fn module_file(dir: &Path) -> Result<PathBuf, String> {
     let mod_path = dir.join("mod.rs");
 

@@ -5,7 +5,7 @@ use crate::{DEFAULT_REGISTRY_CRATE, Dependency, Registry, content_hash};
 
 use super::Confirm;
 use super::module;
-use super::project::Project;
+use super::package::Package;
 use super::state::{InstallState, InstalledComponent};
 use super::workspace::Workspace;
 
@@ -20,11 +20,11 @@ pub struct AddOptions {
     pub overwrite: bool,
 }
 
-/// A component written into the project by [`add`].
+/// A component written into the package by [`add`].
 pub struct AddedComponent {
     /// The component's name.
     pub name: String,
-    /// The project-relative path of the written file.
+    /// The package-relative path of the written file.
     pub file: PathBuf,
     /// The registry crate it was added from.
     pub registry: String,
@@ -66,7 +66,7 @@ struct PlannedRemoval {
     file_name: String,
 }
 
-/// Adds a component (and its transitive dependencies) to the project.
+/// Adds a component (and its transitive dependencies) to the package.
 ///
 /// The operation is transactional: it walks the requested component and its
 /// dependencies, loading registries and reading sources without touching disk,
@@ -74,17 +74,17 @@ struct PlannedRemoval {
 /// (pulling from a non-default registry, or replacing a file owned by another
 /// registry) are delegated to `confirm`.
 pub fn add(
-    project: &Project,
+    package: &Package,
     options: &AddOptions,
     confirm: &mut Confirm<'_>,
 ) -> Result<AddOutcome, String> {
-    let mut state = InstallState::load(project)?;
-    let workspace = Workspace::load(project)?;
+    let mut state = InstallState::load(package)?;
+    let workspace = Workspace::load(package)?;
 
     // Phase 1: plan. Walk the requested components and their transitive
     // dependencies, loading registries and reading sources, but touch nothing on
     // disk. Any failure here (missing component, registry not a dependency)
-    // leaves the project untouched.
+    // leaves the package untouched.
     let mut registries: HashMap<String, Registry> = HashMap::new();
     let mut visited: HashSet<(String, String)> = HashSet::new();
     let mut queue: VecDeque<Pending> = VecDeque::new();
@@ -133,7 +133,7 @@ pub fn add(
         })?;
 
         let relative_file = components_dir.join(component.file_name());
-        let dir = project.resolve(&components_dir);
+        let dir = package.resolve(&components_dir);
         let file = dir.join(component.file_name());
 
         // A file may hold only one component. If a different installed component
@@ -165,8 +165,8 @@ pub fn add(
                 && let Some(file_name) = removed.file.file_name().and_then(|name| name.to_str())
             {
                 removals.push(PlannedRemoval {
-                    file: project.resolve(&removed.file),
-                    dir: project.resolve(&components_dir),
+                    file: package.resolve(&removed.file),
+                    dir: package.resolve(&components_dir),
                     file_name: file_name.to_string(),
                 });
             }
@@ -216,7 +216,7 @@ pub fn add(
 
         for dependency in dependencies {
             // A dependency names a registry crate directly: `Same` for the
-            // current one, `Other` for another (which must itself be a project
+            // current one, `Other` for another (which must itself be a package
             // dependency, enforced when its registry is loaded on pop).
             let (registry, component) = match dependency {
                 Dependency::Same(name) => (pending.registry.clone(), name),
@@ -233,7 +233,7 @@ pub fn add(
     // Phase 2: commit. Everything resolved, so remove anything being replaced,
     // write the files, wire up the module declarations, and persist the state.
     // Reject an ambiguous module layout up front, before touching any file.
-    module::check(&project.resolve(&state.components_dir))?;
+    module::check(&package.resolve(&state.components_dir))?;
     for removal in &removals {
         match std::fs::remove_file(&removal.file) {
             Ok(()) => {}
@@ -254,7 +254,7 @@ pub fn add(
             .map_err(|error| format!("failed to write {}: {error}", write.file.display()))?;
         module::declare(&write.dir, &write.file_name)?;
     }
-    state.save(project)?;
+    state.save(package)?;
 
     if writes.is_empty() {
         Ok(AddOutcome::UpToDate)
@@ -276,7 +276,7 @@ pub fn add(
 ///
 /// With an explicit `--registry`, that registry crate is used and must offer the
 /// component. Otherwise the default registry is preferred; if it does not offer
-/// the component, the project's other dependency registries are searched and the
+/// the component, the package's other dependency registries are searched and the
 /// user is asked to confirm pulling from a non-default registry.
 fn resolve_root_registry(
     component: &str,
@@ -298,8 +298,8 @@ fn resolve_root_registry(
     }
 
     // Prefer the default registry whenever it offers the component. It may not be
-    // reachable at all (e.g. the project does not depend on `topcoat`), in which
-    // case fall through to the project's other registries.
+    // reachable at all (e.g. the package does not depend on `topcoat`), in which
+    // case fall through to the package's other registries.
     let default = DEFAULT_REGISTRY_CRATE;
     let offers_default = match load_registry(registries, workspace, default) {
         Ok(registry) => registry.get(component).is_some(),
@@ -309,7 +309,7 @@ fn resolve_root_registry(
         return Ok(default.to_string());
     }
 
-    // Not in the default registry: look for it among the project's other
+    // Not in the default registry: look for it among the package's other
     // dependency registries, skipping any that fail to load.
     let others: Vec<String> = workspace
         .available_registries()
@@ -352,7 +352,7 @@ fn resolve_root_registry(
 }
 
 /// Finds an installed component, other than the one being installed, whose file
-/// is the same project-relative path (a file collision). Same-named
+/// is the same package-relative path (a file collision). Same-named
 /// components from different registries that map to different files do not
 /// collide and are not reported.
 fn find_file_conflict(

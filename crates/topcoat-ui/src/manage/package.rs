@@ -6,11 +6,11 @@ use super::state::STATE_FILE;
 /// install state (the components directory and installed file paths) is relative
 /// to the crate root (the directory that holds `components.toml`), so operations
 /// behave the same regardless of the working directory.
-pub struct Project {
+pub struct Package {
     root: PathBuf,
 }
 
-impl Project {
+impl Package {
     /// Locates the crate root: the cargo crate root containing `dir` (or the
     /// current directory when `dir` is `None`), falling back to that directory
     /// itself when it is not inside a crate.
@@ -19,24 +19,24 @@ impl Project {
         let root = crate_root(&start).unwrap_or_else(|| start.clone());
         let root = std::fs::canonicalize(&root).map_err(|error| {
             format!(
-                "could not resolve project directory {}: {error}",
+                "could not resolve package directory {}: {error}",
                 root.display()
             )
         })?;
         Ok(Self { root })
     }
 
-    /// The resolved project root directory.
+    /// The resolved package root directory.
     pub fn root(&self) -> &Path {
         &self.root
     }
 
-    /// The path to the install-state file at the project root.
+    /// The path to the install-state file at the package root.
     pub(super) fn state_path(&self) -> PathBuf {
         self.root.join(STATE_FILE)
     }
 
-    /// Resolves a project-relative path against the project root.
+    /// Resolves a package-relative path against the package root.
     pub(super) fn resolve(&self, path: &Path) -> PathBuf {
         self.root.join(path)
     }

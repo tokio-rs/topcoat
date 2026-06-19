@@ -1,6 +1,6 @@
 use clap::Args;
 use console::style;
-use topcoat_ui::manage::{self, InstallStatus, Project};
+use topcoat_ui::manage::{self, InstallStatus, Package};
 
 use super::PackageArg;
 
@@ -25,8 +25,8 @@ impl ListCommand {
     }
 
     fn run_inner(self) -> Result<(), String> {
-        let project = Project::locate(self.package.package)?;
-        let listings = manage::list(&project, self.registry.as_deref())?;
+        let package = Package::locate(self.package.package)?;
+        let listings = manage::list(&package, self.registry.as_deref())?;
 
         for listing in &listings {
             // Skip registries that have no components installed from them.

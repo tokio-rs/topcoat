@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 use console::style;
-use topcoat_ui::manage::{self, InitOptions, Project};
+use topcoat_ui::manage::{self, InitOptions, Package};
 
 use super::PackageArg;
 
@@ -27,14 +27,14 @@ impl InitCommand {
     }
 
     fn run_inner(self) -> Result<(), String> {
-        let project = Project::locate(self.package.package)?;
+        let package = Package::locate(self.package.package)?;
         let options = InitOptions {
             components_dir: self.components_dir,
             theme: self.theme,
         };
 
         let mut choose = choose_theme;
-        let initialized = manage::init(&project, options, &mut choose)?;
+        let initialized = manage::init(&package, options, &mut choose)?;
 
         println!(
             "{} initialized {} {}",
