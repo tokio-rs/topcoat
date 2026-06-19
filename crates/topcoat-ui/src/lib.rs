@@ -27,6 +27,6 @@ pub mod manage;
 mod registry;
 
 pub use registry::{
-    Component, DEFAULT_REGISTRY_CRATE, Dependency, Error, MANIFEST_FILE, Registry, Style,
+    Component, DEFAULT_REGISTRY_CRATE, Dependency, Error, MANIFEST_FILE, Registry, Theme,
     content_hash,
 };

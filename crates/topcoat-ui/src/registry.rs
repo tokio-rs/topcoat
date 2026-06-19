@@ -28,7 +28,7 @@ struct Manifest {
     /// newer manifest can be rejected by an older build.
     version: u32,
     #[serde(default)]
-    styles: BTreeMap<String, StyleEntry>,
+    themes: BTreeMap<String, ThemeEntry>,
     #[serde(default)]
     components: BTreeMap<String, Entry>,
 }
@@ -41,7 +41,7 @@ struct Entry {
 }
 
 #[derive(Deserialize)]
-struct StyleEntry {
+struct ThemeEntry {
     source: String,
 }
 
@@ -59,7 +59,7 @@ pub enum Dependency {
 /// A component registry loaded from a crate's registry directory.
 pub struct Registry {
     dir: PathBuf,
-    styles: BTreeMap<String, StyleEntry>,
+    themes: BTreeMap<String, ThemeEntry>,
     components: BTreeMap<String, Entry>,
 }
 
@@ -81,7 +81,7 @@ impl Registry {
         }
         Ok(Self {
             dir,
-            styles: manifest.styles,
+            themes: manifest.themes,
             components: manifest.components,
         })
     }
@@ -102,14 +102,14 @@ impl Registry {
             })
     }
 
-    /// The names of every style (theme) the registry offers, sorted.
-    pub fn style_names(&self) -> impl Iterator<Item = &str> {
-        self.styles.keys().map(String::as_str)
+    /// The names of every theme the registry offers, sorted.
+    pub fn theme_names(&self) -> impl Iterator<Item = &str> {
+        self.themes.keys().map(String::as_str)
     }
 
-    /// Looks up a style (theme) by its registry name.
-    pub fn style(&self, name: &str) -> Option<Style<'_>> {
-        self.styles.get_key_value(name).map(|(name, entry)| Style {
+    /// Looks up a theme by its registry name.
+    pub fn theme(&self, name: &str) -> Option<Theme<'_>> {
+        self.themes.get_key_value(name).map(|(name, entry)| Theme {
             name,
             entry,
             dir: &self.dir,
@@ -158,16 +158,16 @@ impl Component<'_> {
     }
 }
 
-/// A single style (theme) within a [`Registry`]: a CSS file that becomes a
-/// project's Tailwind input, copied into the project at `init` time.
-pub struct Style<'a> {
+/// A single theme within a [`Registry`]: a CSS file that becomes a project's
+/// Tailwind input, copied into the project at `init` time.
+pub struct Theme<'a> {
     name: &'a str,
-    entry: &'a StyleEntry,
+    entry: &'a ThemeEntry,
     dir: &'a Path,
 }
 
-impl Style<'_> {
-    /// The name used to select the style, e.g. `nova`.
+impl Theme<'_> {
+    /// The name used to select the theme, e.g. `nova`.
     pub fn name(&self) -> &str {
         self.name
     }
@@ -180,14 +180,14 @@ impl Style<'_> {
             .unwrap_or(&self.entry.source)
     }
 
-    /// Computes the style's content hash by reading its source and hashing it,
+    /// Computes the theme's content hash by reading its source and hashing it,
     /// so an installed theme can be told apart from an updated one (see
     /// [`content_hash`]).
     pub fn hash(&self) -> Result<String, Error> {
         Ok(content_hash(&self.read_source()?))
     }
 
-    /// Reads the style's CSS source from the registry.
+    /// Reads the theme's CSS source from the registry.
     pub fn read_source(&self) -> Result<String, Error> {
         let path = self.dir.join(&self.entry.source);
         std::fs::read_to_string(&path).map_err(|source| Error::Read { path, source })

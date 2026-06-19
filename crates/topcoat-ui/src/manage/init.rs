@@ -18,7 +18,7 @@ pub struct InitOptions {
 
 /// The theme installed by [`init`].
 pub struct InstalledThemeInfo {
-    /// The style's name, e.g. `nova`.
+    /// The theme's name, e.g. `nova`.
     pub name: String,
     /// The registry crate it came from.
     pub registry: String,
@@ -40,7 +40,7 @@ pub struct Initialized {
 /// `remove`, `list`) require before they will run.
 ///
 /// Besides fixing where components install, init always installs a theme: the
-/// chosen style's CSS is copied into the project as its Tailwind input, and the
+/// chosen theme's CSS is copied into the project as its Tailwind input, and the
 /// theme is recorded in the install state. The theme is named by
 /// [`InitOptions::theme`], or chosen via `choose` when none is given. Errors if
 /// the project is already initialized rather than clobbering its state.
@@ -103,7 +103,7 @@ struct ThemePlan {
 
 /// Resolves the project's theme without writing anything. A theme is mandatory,
 /// so this either produces a plan or fails: the default registry must be
-/// reachable and offer at least one style, and an explicitly named theme must
+/// reachable and offer at least one theme, and an explicitly named theme must
 /// exist. When no theme was named, `choose` picks one from those offered.
 fn plan_theme(
     project: &Project,
@@ -118,7 +118,7 @@ fn plan_theme(
     let registry = Registry::load(dir)
         .map_err(|error| format!("failed to load registry `{registry_crate}`: {error}"))?;
 
-    let names: Vec<String> = registry.style_names().map(str::to_string).collect();
+    let names: Vec<String> = registry.theme_names().map(str::to_string).collect();
     if names.is_empty() {
         return Err(format!(
             "registry `{registry_crate}` offers no themes to install"
@@ -136,10 +136,10 @@ fn plan_theme(
         None => choose(&names)?,
     };
 
-    let style = registry
-        .style(&chosen)
+    let theme = registry
+        .theme(&chosen)
         .expect("chosen theme came from the registry");
-    let contents = style
+    let contents = theme
         .read_source()
         .map_err(|error| format!("failed to read theme `{chosen}`: {error}"))?;
 
@@ -148,7 +148,7 @@ fn plan_theme(
         registry: registry_crate.to_string(),
         hash: content_hash(&contents),
         // Installed at the project root by default, alongside `components.toml`.
-        file: PathBuf::from(style.file_name()),
+        file: PathBuf::from(theme.file_name()),
         contents,
     })
 }

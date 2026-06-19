@@ -31,8 +31,8 @@ pub(super) struct InstallState {
     pub registries: BTreeMap<String, RegistryState>,
 }
 
-/// The theme a project installed: which registry and style it came from, the
-/// hash of the style's source when installed, and where the CSS was written.
+/// The theme a project installed: which registry and theme it came from, the
+/// hash of the theme's source when installed, and where the CSS was written.
 #[derive(Serialize, Deserialize)]
 pub(super) struct InstalledTheme {
     pub name: String,

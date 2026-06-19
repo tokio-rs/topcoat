@@ -1,11 +1,11 @@
 # The built-in `topcoat` component registry, shipped by the `topcoat-ui` crate.
 # Hand-written: each component names its source file; hashes are computed from
 # the source at runtime. The registry's identity is its crate name (`topcoat-ui`),
-# so the manifest records only the format version, the styles, and the components.
+# so the manifest records only the format version, the themes, and the components.
 
 version = 1
 
-[styles.nova]
+[themes.nova]
 source = "themes/nova.css"
 
 [components.button]
