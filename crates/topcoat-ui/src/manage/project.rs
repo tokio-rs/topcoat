@@ -18,7 +18,10 @@ impl Project {
         let start = dir.unwrap_or_else(|| PathBuf::from("."));
         let root = workspace_root(&start).unwrap_or_else(|| start.clone());
         let root = std::fs::canonicalize(&root).map_err(|error| {
-            format!("could not resolve project directory {}: {error}", root.display())
+            format!(
+                "could not resolve project directory {}: {error}",
+                root.display()
+            )
         })?;
         Ok(Self { root })
     }

@@ -125,8 +125,7 @@ impl Workspace {
             .packages
             .values()
             .filter(|package| {
-                (package.name == DEFAULT_REGISTRY_CRATE
-                    || self.direct_deps.contains(&package.name))
+                (package.name == DEFAULT_REGISTRY_CRATE || self.direct_deps.contains(&package.name))
                     && registry_subdir(package).is_some()
             })
             .map(|package| package.name.clone())

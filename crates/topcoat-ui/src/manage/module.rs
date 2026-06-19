@@ -74,7 +74,8 @@ pub(super) fn declare(dir: &Path, file_name: &str) -> Result<(), String> {
     contents.push_str(&declaration);
     contents.push('\n');
 
-    std::fs::write(&mod_path, contents).map_err(|error| format!("failed to write {}: {error}", mod_path.display()))
+    std::fs::write(&mod_path, contents)
+        .map_err(|error| format!("failed to write {}: {error}", mod_path.display()))
 }
 
 /// Removes the component file's declaration from the components directory's
@@ -108,5 +109,6 @@ pub(super) fn undeclare(dir: &Path, file_name: &str) -> Result<(), String> {
 
     let mut updated = kept.join("\n");
     updated.push('\n');
-    std::fs::write(&mod_path, updated).map_err(|error| format!("failed to write {}: {error}", mod_path.display()))
+    std::fs::write(&mod_path, updated)
+        .map_err(|error| format!("failed to write {}: {error}", mod_path.display()))
 }

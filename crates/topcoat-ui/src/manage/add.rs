@@ -239,7 +239,10 @@ pub fn add(
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => {
-                return Err(format!("failed to remove {}: {error}", removal.file.display()));
+                return Err(format!(
+                    "failed to remove {}: {error}",
+                    removal.file.display()
+                ));
             }
         }
         module::undeclare(&removal.dir, &removal.file_name)?;

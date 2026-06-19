@@ -111,7 +111,10 @@ fn resolve_registry(
         [name] => Ok((*name).clone()),
         many => Err(format!(
             "component `{component}` is installed from multiple registries ({}); pass --registry to choose",
-            many.iter().map(|name| name.as_str()).collect::<Vec<_>>().join(", ")
+            many.iter()
+                .map(|name| name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         )),
     }
 }
