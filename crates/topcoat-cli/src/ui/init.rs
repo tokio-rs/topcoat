@@ -56,11 +56,14 @@ impl InitCommand {
     }
 }
 
-/// Prompts the user to pick a theme from those the registry offers. A theme is
-/// mandatory, so this loops until a valid choice is made and errors when there
-/// is no terminal to prompt on (non-interactive use must pass `--theme`).
+/// Prompts the user to pick a theme from those the registry offers, navigating
+/// with the arrow keys and selecting with enter. A theme is mandatory, so this
+/// errors when there is no terminal to prompt on (non-interactive use must pass
+/// `--theme`) and when the prompt is cancelled (e.g. ctrl-c / esc).
 fn choose_theme(themes: &[String]) -> Result<String, String> {
-    use std::io::{IsTerminal, Write};
+    use std::io::IsTerminal;
+
+    use dialoguer::{Select, theme::ColorfulTheme};
 
     if !std::io::stdin().is_terminal() {
         return Err(format!(
@@ -69,37 +72,15 @@ fn choose_theme(themes: &[String]) -> Result<String, String> {
         ));
     }
 
-    eprintln!("{}", style("Choose a theme:").bold());
-    for (index, theme) in themes.iter().enumerate() {
-        eprintln!("  {} {}", style(format!("{})", index + 1)).dim(), theme);
-    }
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose a theme")
+        .items(themes)
+        .default(0)
+        .interact_opt()
+        .map_err(|error| format!("failed to read input: {error}"))?;
 
-    loop {
-        eprint!(
-            "{} ",
-            style(format!("Theme [1-{}]:", themes.len())).yellow()
-        );
-        std::io::stderr().flush().ok();
-
-        let mut input = String::new();
-        std::io::stdin()
-            .read_line(&mut input)
-            .map_err(|error| format!("failed to read input: {error}"))?;
-        let input = input.trim();
-
-        // Accept either the number or the theme name itself.
-        if let Ok(choice) = input.parse::<usize>()
-            && (1..=themes.len()).contains(&choice)
-        {
-            return Ok(themes[choice - 1].clone());
-        }
-        if let Some(theme) = themes.iter().find(|name| name.as_str() == input) {
-            return Ok(theme.clone());
-        }
-
-        eprintln!(
-            "{}",
-            style(format!("'{input}' is not one of the choices")).red()
-        );
+    match selection {
+        Some(index) => Ok(themes[index].clone()),
+        None => Err("no theme selected".to_string()),
     }
 }
