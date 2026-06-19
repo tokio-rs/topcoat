@@ -90,6 +90,15 @@ impl Attributes {
         self.map.clear();
     }
 
+    /// Inserts every attribute from `other`, replacing any keys already present.
+    ///
+    /// This backs spreading one attribute collection into another, such as the
+    /// `(attrs)` spread inside the [`attributes!`](macro.attributes.html) macro.
+    #[inline]
+    pub fn merge(&mut self, other: impl Into<Attributes>) {
+        self.map.extend(other.into().map);
+    }
+
     /// Returns an iterator over attribute keys and rendered values.
     #[inline]
     pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
