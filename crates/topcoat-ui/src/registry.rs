@@ -169,12 +169,11 @@ impl Theme<'_> {
         self.name
     }
 
-    /// The file name written into the user's project (e.g. `nova.css`).
+    /// The file name written into the user's project. Every theme installs to
+    /// the same `styles.css` (it becomes the project's Tailwind input), rather
+    /// than carrying its registry source name (e.g. `nova.css`) into the project.
     pub fn file_name(&self) -> &str {
-        Path::new(&self.entry.source)
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or(&self.entry.source)
+        "styles.css"
     }
 
     /// Computes the theme's content hash by reading and hashing its source (see
