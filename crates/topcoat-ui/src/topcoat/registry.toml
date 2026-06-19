@@ -22,7 +22,3 @@ source = "themes/vega.css"
 
 [components.button]
 source = "components/button.rs"
-dependencies = ["kek"]
-
-[components.kek]
-source = "components/kek.rs"
