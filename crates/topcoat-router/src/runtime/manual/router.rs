@@ -270,7 +270,7 @@ impl From<Router> for axum::Router {
             layouts.sort_by_key(|layout| layout.path().len());
 
             axum_router = axum_router.route(
-                &page.path().to_axum_path(),
+                &page.path().to_matchit_path(),
                 get(async move |CxBody { cx, body }: CxBody| {
                     let result = {
                         let mut render = page.render(&cx, body);
@@ -289,7 +289,7 @@ impl From<Router> for axum::Router {
 
         for route in value.routes {
             axum_router = axum_router.route(
-                &route.path().to_axum_path(),
+                &route.path().to_matchit_path(),
                 on(
                     MethodFilter::try_from(route.method().clone())
                         .unwrap_or_else(|_| panic!("unsupported method {:?}", route.method())),

@@ -12,8 +12,8 @@ use ref_cast::{RefCastCustom, ref_cast_custom};
 /// - **Static** — a literal string (e.g. `users`)
 /// - **Param** — a dynamic parameter in braces (e.g. `{id}`)
 /// - **CatchAll** — a wildcard tail in braces with `*` (e.g. `{*rest}`)
-/// - **Group** — a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to an
-///   Axum path
+/// - **Group** — a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to a
+///   `matchit` path
 ///
 /// The root path `"/"` is normalized to an empty inner string. Use [`Path::from_str`] to
 /// create a `&Path` from a string slice.
@@ -25,7 +25,7 @@ use ref_cast::{RefCastCustom, ref_cast_custom};
 ///
 /// let path = Path::from_str("/users/(group)/{id}");
 /// assert_eq!(path.segments().count(), 3);
-/// assert_eq!(path.to_axum_path(), "/users/{id}");
+/// assert_eq!(path.to_matchit_path(), "/users/{id}");
 /// ```
 #[derive(Debug, PartialEq, Eq, Hash, RefCastCustom)]
 #[repr(transparent)]
@@ -123,11 +123,12 @@ impl Path {
         self.inner.split("/").skip(1).map(PathSegment::new)
     }
 
-    /// Converts this path to an Axum-compatible path string, stripping group segments.
+    /// Converts this path to a `matchit`-compatible route string, stripping group
+    /// segments.
     ///
     /// Group segments (e.g. `(auth)`) are used for layout matching but are not
-    /// part of the URL that Axum routes against. This method removes them and
-    /// returns the remaining path.
+    /// part of the URL that the router matches against. This method removes them
+    /// and returns the remaining path.
     ///
     /// # Examples
     ///
@@ -135,17 +136,17 @@ impl Path {
     /// use topcoat_router::runtime::Path;
     ///
     /// let path = Path::from_str("/(auth)/dashboard/{id}");
-    /// assert_eq!(path.to_axum_path(), "/dashboard/{id}");
+    /// assert_eq!(path.to_matchit_path(), "/dashboard/{id}");
     ///
     /// let root = Path::from_str("/");
-    /// assert_eq!(root.to_axum_path(), "/");
+    /// assert_eq!(root.to_matchit_path(), "/");
     ///
     /// // A path made up entirely of group segments collapses to the root URL,
     /// // e.g. a page in a `(marketing)` group that should serve `/`.
     /// let group_root = Path::from_str("/(marketing)");
-    /// assert_eq!(group_root.to_axum_path(), "/");
+    /// assert_eq!(group_root.to_matchit_path(), "/");
     /// ```
-    pub fn to_axum_path(&self) -> Cow<'static, str> {
+    pub fn to_matchit_path(&self) -> Cow<'static, str> {
         if self.inner.is_empty() {
             return Cow::Borrowed("/");
         }
@@ -156,7 +157,7 @@ impl Path {
             .inner;
         // Stripping groups can leave nothing behind (e.g. `/(marketing)` or
         // `/(a)/(b)`). Such a path addresses the root URL, so normalize the empty
-        // result back to "/" — Axum rejects route paths that don't start with "/".
+        // result back to "/" — matchit rejects route paths that don't start with "/".
         if stripped.is_empty() {
             return Cow::Borrowed("/");
         }
@@ -572,7 +573,7 @@ mod tests {
     fn path_root_slash_normalized() {
         let path = Path::from_str("/");
         assert_eq!(&path.inner, "");
-        assert_eq!(path.to_axum_path(), "/");
+        assert_eq!(path.to_matchit_path(), "/");
         assert_eq!(path.segments().count(), 0);
     }
 
@@ -600,27 +601,27 @@ mod tests {
     #[test]
     fn path_to_axum_strips_groups() {
         let path = Path::from_str("/(auth)/dashboard/{id}");
-        assert_eq!(path.to_axum_path(), "/dashboard/{id}");
+        assert_eq!(path.to_matchit_path(), "/dashboard/{id}");
     }
 
     #[test]
     fn path_to_axum_empty() {
         let path = Path::from_str("");
-        assert_eq!(path.to_axum_path(), "/");
+        assert_eq!(path.to_matchit_path(), "/");
     }
 
     #[test]
     fn path_to_axum_group_only_is_root() {
         // A page inside a route group that should serve `/`.
-        assert_eq!(Path::from_str("/(marketing)").to_axum_path(), "/");
+        assert_eq!(Path::from_str("/(marketing)").to_matchit_path(), "/");
         // Nested groups collapse the same way.
-        assert_eq!(Path::from_str("/(a)/(b)").to_axum_path(), "/");
+        assert_eq!(Path::from_str("/(a)/(b)").to_matchit_path(), "/");
     }
 
     #[test]
     fn path_to_axum_no_groups() {
         let path = Path::from_str("/users/{id}");
-        assert_eq!(path.to_axum_path(), "/users/{id}");
+        assert_eq!(path.to_matchit_path(), "/users/{id}");
     }
 
     #[test]
