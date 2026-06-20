@@ -77,7 +77,7 @@ impl ToTokens for Page {
             Some(path) => quote! {
                 #[allow(non_upper_case_globals)]
                 const #ident: ::topcoat::router::Page = ::topcoat::router::Page::new(
-                    ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
+                    ::std::borrow::Cow::Borrowed(::topcoat::router::Path::from_str(#path)),
                     #render,
                 );
             },

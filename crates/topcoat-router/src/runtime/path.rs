@@ -15,7 +15,7 @@ use ref_cast::{RefCastCustom, ref_cast_custom};
 /// - **Group** — a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to an
 ///   Axum path
 ///
-/// The root path `"/"` is normalized to an empty inner string. Use [`Path::new`] to
+/// The root path `"/"` is normalized to an empty inner string. Use [`Path::from_str`] to
 /// create a `&Path` from a string slice.
 ///
 /// # Examples
@@ -23,7 +23,7 @@ use ref_cast::{RefCastCustom, ref_cast_custom};
 /// ```
 /// use topcoat_router::runtime::Path;
 ///
-/// let path = Path::new("/users/(group)/{id}");
+/// let path = Path::from_str("/users/(group)/{id}");
 /// assert_eq!(path.segments().count(), 3);
 /// assert_eq!(path.to_axum_path(), "/users/{id}");
 /// ```
@@ -39,16 +39,65 @@ impl Path {
     /// The root path `"/"` is normalized to an empty inner representation so that
     /// it produces zero segments, matching the convention that the root layout
     /// applies to all pages.
-    pub const fn new(s: &str) -> &Self {
+    ///
+    /// This is the panicking counterpart of [`try_from_str`](Path::try_from_str).
+    /// Because it is a `const fn`, malformed paths handed to the routing macros
+    /// are rejected at compile time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `s` is not a well-formed path; see [`PathError`] for the
+    /// conditions that are rejected.
+    pub const fn from_str(s: &str) -> &Self {
+        match Self::try_from_str(s) {
+            Ok(path) => path,
+            Err(err) => panic!("{}", err.message()),
+        }
+    }
+
+    /// Creates a `&Path` from a string slice, validating its segments.
+    ///
+    /// The root path `"/"` is normalized to an empty inner representation. Every
+    /// other path must be a sequence of `/`-prefixed, non-empty segments, each a
+    /// valid [`PathSegment`]. Returns [`PathError`] if `s` is malformed.
+    pub const fn try_from_str(s: &str) -> Result<&Self, PathError> {
         let s = match s.as_bytes() {
             [b'/'] => "",
             _ => s,
         };
-        Self::from_str(s)
+        let bytes = s.as_bytes();
+        let len = bytes.len();
+        // The root path is empty and has no segments to validate.
+        if len == 0 {
+            return Ok(Self::from_str_unchecked(s));
+        }
+        if bytes[0] != b'/' {
+            return Err(PathError::MissingLeadingSlash);
+        }
+        // Walk the `/`-separated segments, validating each `bytes[start..end)`.
+        let mut start = 1;
+        let mut i = 1;
+        while i <= len {
+            if i == len || bytes[i] == b'/' {
+                if let Err(err) = validate_segment(bytes, start, i) {
+                    return Err(err);
+                }
+                start = i + 1;
+            }
+            i += 1;
+        }
+        Ok(Self::from_str_unchecked(s))
     }
 
+    /// Creates a `&Path` from a string slice without validating or normalizing it.
+    ///
+    /// This is a zero-cost reference cast. Unlike [`from_str`](Path::from_str), it
+    /// performs no segment validation and does *not* normalize the root path `"/"`
+    /// to an empty inner string. The caller must pass an already-valid, normalized
+    /// path string (for example one obtained from another `Path`); passing
+    /// anything else yields a `Path` that misbehaves when its segments are read.
     #[ref_cast_custom]
-    const fn from_str(s: &str) -> &Self;
+    pub const fn from_str_unchecked(s: &str) -> &Self;
 
     /// Returns an iterator over the [`PathSegment`]s of this path.
     ///
@@ -59,7 +108,7 @@ impl Path {
     /// ```
     /// use topcoat_router::runtime::{Path, PathSegment};
     ///
-    /// let path = Path::new("/users/{id}/(auth)");
+    /// let path = Path::from_str("/users/{id}/(auth)");
     /// let segs: Vec<_> = path.segments().collect();
     /// assert_eq!(
     ///     segs,
@@ -85,15 +134,15 @@ impl Path {
     /// ```
     /// use topcoat_router::runtime::Path;
     ///
-    /// let path = Path::new("/(auth)/dashboard/{id}");
+    /// let path = Path::from_str("/(auth)/dashboard/{id}");
     /// assert_eq!(path.to_axum_path(), "/dashboard/{id}");
     ///
-    /// let root = Path::new("/");
+    /// let root = Path::from_str("/");
     /// assert_eq!(root.to_axum_path(), "/");
     ///
     /// // A path made up entirely of group segments collapses to the root URL,
     /// // e.g. a page in a `(marketing)` group that should serve `/`.
-    /// let group_root = Path::new("/(marketing)");
+    /// let group_root = Path::from_str("/(marketing)");
     /// assert_eq!(group_root.to_axum_path(), "/");
     /// ```
     pub fn to_axum_path(&self) -> Cow<'static, str> {
@@ -127,9 +176,9 @@ impl Path {
     /// ```
     /// use topcoat_router::runtime::Path;
     ///
-    /// let path = Path::new("/users/{id}/posts");
-    /// assert!(path.starts_with(Path::new("/users/{id}")));
-    /// assert!(!path.starts_with(Path::new("/posts/{id}")));
+    /// let path = Path::from_str("/users/{id}/posts");
+    /// assert!(path.starts_with(Path::from_str("/users/{id}")));
+    /// assert!(!path.starts_with(Path::from_str("/posts/{id}")));
     /// ```
     pub fn starts_with(&self, other: &Path) -> bool {
         if self.inner.len() < other.inner.len() {
@@ -169,6 +218,55 @@ impl ToOwned for Path {
     }
 }
 
+/// The reason a string could not be parsed into a [`Path`] by
+/// [`Path::try_from_str`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum PathError {
+    /// The path was non-empty but did not start with `/`.
+    MissingLeadingSlash,
+    /// A segment was empty, as produced by a trailing or doubled `/`.
+    EmptySegment,
+    /// A `{` parameter or catch-all segment was missing its closing `}`.
+    MissingClosingBrace,
+    /// A `(` group segment was missing its closing `)`.
+    MissingClosingParen,
+    /// A static segment contained a `{`, `}`, `(`, or `)`.
+    UnexpectedBracket,
+    /// A param, catch-all, or group name was empty.
+    EmptyName,
+    /// A name did not start with an ASCII letter or `_`.
+    InvalidNameStart,
+    /// A name contained a character other than an ASCII alphanumeric or `_`.
+    InvalidNameChar,
+}
+
+impl PathError {
+    /// A human-readable description of the error.
+    const fn message(&self) -> &'static str {
+        match self {
+            Self::MissingLeadingSlash => "invalid path: must be empty or start with `/`",
+            Self::EmptySegment => "invalid path: empty segment",
+            Self::MissingClosingBrace => "invalid path: missing closing `}`",
+            Self::MissingClosingParen => "invalid path: missing closing `)`",
+            Self::UnexpectedBracket => "invalid path: unexpected bracket in static segment",
+            Self::EmptyName => "invalid path: segment name must not be empty",
+            Self::InvalidNameStart => {
+                "invalid path: segment name must start with a letter or underscore"
+            }
+            Self::InvalidNameChar => "invalid path: segment name contains an invalid character",
+        }
+    }
+}
+
+impl Display for PathError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.message())
+    }
+}
+
+impl std::error::Error for PathError {}
+
 /// An owned route path, similar to [`std::path::PathBuf`] but for URL paths.
 ///
 /// `PathBuf` is the owned counterpart of [`Path`]. It can be built incrementally
@@ -198,7 +296,8 @@ impl PathBuf {
 
 impl Borrow<Path> for PathBuf {
     fn borrow(&self) -> &Path {
-        Path::new(&self.inner)
+        // A `PathBuf` only ever holds a valid path, so skip re-validation.
+        Path::from_str_unchecked(&self.inner)
     }
 }
 
@@ -206,7 +305,8 @@ impl Deref for PathBuf {
     type Target = Path;
 
     fn deref(&self) -> &Self::Target {
-        Path::new(&self.inner)
+        // A `PathBuf` only ever holds a valid path, so skip re-validation.
+        Path::from_str_unchecked(&self.inner)
     }
 }
 
@@ -369,6 +469,68 @@ impl<'a> PathSegment<'a> {
     }
 }
 
+/// Validates a single segment `bytes[start..end)` of a [`Path`], applying the
+/// same rules as [`PathSegment::new`]. Operates on bytes (rather than a `&str`
+/// subslice) so it can run in the `const` context of [`Path::try_from_str`].
+const fn validate_segment(bytes: &[u8], start: usize, end: usize) -> Result<(), PathError> {
+    if start >= end {
+        return Err(PathError::EmptySegment);
+    }
+    match bytes[start] {
+        b'{' => {
+            if bytes[end - 1] != b'}' {
+                return Err(PathError::MissingClosingBrace);
+            }
+            // The name sits between the braces; a leading `*` marks a catch-all.
+            let mut name_start = start + 1;
+            let name_end = end - 1;
+            if name_start < name_end && bytes[name_start] == b'*' {
+                name_start += 1;
+            }
+            validate_ident(bytes, name_start, name_end)
+        }
+        b'(' => {
+            if bytes[end - 1] != b')' {
+                return Err(PathError::MissingClosingParen);
+            }
+            validate_ident(bytes, start + 1, end - 1)
+        }
+        _ => {
+            // A static segment must not contain any of the reserved brackets.
+            let mut i = start;
+            while i < end {
+                match bytes[i] {
+                    b'{' | b'}' | b'(' | b')' => return Err(PathError::UnexpectedBracket),
+                    _ => {}
+                }
+                i += 1;
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Validates that `bytes[start..end)` is a valid identifier: non-empty, starting
+/// with an ASCII letter or `_`, and otherwise only ASCII alphanumerics or `_`.
+const fn validate_ident(bytes: &[u8], start: usize, end: usize) -> Result<(), PathError> {
+    if start >= end {
+        return Err(PathError::EmptyName);
+    }
+    let first = bytes[start];
+    if !first.is_ascii_alphabetic() && first != b'_' {
+        return Err(PathError::InvalidNameStart);
+    }
+    let mut i = start + 1;
+    while i < end {
+        let ch = bytes[i];
+        if !ch.is_ascii_alphanumeric() && ch != b'_' {
+            return Err(PathError::InvalidNameChar);
+        }
+        i += 1;
+    }
+    Ok(())
+}
+
 fn assert_valid_ident(name: &str, kind: &str, raw: &str) {
     if name.is_empty() {
         panic!("invalid segment: {kind} name must not be empty in `{raw}`");
@@ -408,7 +570,7 @@ mod tests {
 
     #[test]
     fn path_root_slash_normalized() {
-        let path = Path::new("/");
+        let path = Path::from_str("/");
         assert_eq!(&path.inner, "");
         assert_eq!(path.to_axum_path(), "/");
         assert_eq!(path.segments().count(), 0);
@@ -416,7 +578,7 @@ mod tests {
 
     #[test]
     fn path_segments() {
-        let path = Path::new("/dashboard/{id}/(auth)");
+        let path = Path::from_str("/dashboard/{id}/(auth)");
         let segs: Vec<_> = path.segments().collect();
         assert_eq!(
             segs,
@@ -430,62 +592,114 @@ mod tests {
 
     #[test]
     fn path_single_segment() {
-        let path = Path::new("/home");
+        let path = Path::from_str("/home");
         let segs: Vec<_> = path.segments().collect();
         assert_eq!(segs, vec![PathSegment::Static("home")]);
     }
 
     #[test]
     fn path_to_axum_strips_groups() {
-        let path = Path::new("/(auth)/dashboard/{id}");
+        let path = Path::from_str("/(auth)/dashboard/{id}");
         assert_eq!(path.to_axum_path(), "/dashboard/{id}");
     }
 
     #[test]
     fn path_to_axum_empty() {
-        let path = Path::new("");
+        let path = Path::from_str("");
         assert_eq!(path.to_axum_path(), "/");
     }
 
     #[test]
     fn path_to_axum_group_only_is_root() {
         // A page inside a route group that should serve `/`.
-        assert_eq!(Path::new("/(marketing)").to_axum_path(), "/");
+        assert_eq!(Path::from_str("/(marketing)").to_axum_path(), "/");
         // Nested groups collapse the same way.
-        assert_eq!(Path::new("/(a)/(b)").to_axum_path(), "/");
+        assert_eq!(Path::from_str("/(a)/(b)").to_axum_path(), "/");
     }
 
     #[test]
     fn path_to_axum_no_groups() {
-        let path = Path::new("/users/{id}");
+        let path = Path::from_str("/users/{id}");
         assert_eq!(path.to_axum_path(), "/users/{id}");
     }
 
     #[test]
     fn path_starts_with_match() {
-        let path = Path::new("/users/{id}/posts");
-        let prefix = Path::new("/users/{id}");
+        let path = Path::from_str("/users/{id}/posts");
+        let prefix = Path::from_str("/users/{id}");
         assert!(path.starts_with(prefix));
     }
 
     #[test]
     fn path_starts_with_no_match() {
-        let path = Path::new("/users/{id}");
-        let prefix = Path::new("/posts/{id}");
+        let path = Path::from_str("/users/{id}");
+        let prefix = Path::from_str("/posts/{id}");
         assert!(!path.starts_with(prefix));
     }
 
     #[test]
     fn path_starts_with_longer_prefix() {
-        let path = Path::new("/users");
-        let prefix = Path::new("/users/{id}/posts");
+        let path = Path::from_str("/users");
+        let prefix = Path::from_str("/users/{id}/posts");
         assert!(!path.starts_with(prefix));
     }
 
     #[test]
     fn path_display() {
-        let path = Path::new("/users/{id}");
+        let path = Path::from_str("/users/{id}");
         assert_eq!(path.to_string(), "/users/{id}");
+    }
+
+    // ── Path validation ──
+
+    #[test]
+    fn try_from_str_accepts_valid_paths() {
+        for input in [
+            "",
+            "/",
+            "/users",
+            "/users/{id}",
+            "/users/{id}/posts/{*rest}",
+            "/(auth)/dashboard/{user_id}",
+            "/{_private}",
+        ] {
+            assert!(Path::try_from_str(input).is_ok(), "rejected `{input}`");
+        }
+    }
+
+    #[test]
+    fn try_from_str_reports_errors() {
+        use PathError::*;
+        let cases = [
+            ("users", MissingLeadingSlash),
+            ("/users/", EmptySegment),
+            ("/users//posts", EmptySegment),
+            ("/foo{bar}", UnexpectedBracket),
+            ("/{id", MissingClosingBrace),
+            ("/(auth", MissingClosingParen),
+            ("/{}", EmptyName),
+            ("/{*}", EmptyName),
+            ("/{0id}", InvalidNameStart),
+            ("/{id-name}", InvalidNameChar),
+            ("/(my-group)", InvalidNameChar),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(Path::try_from_str(input), Err(expected), "for `{input}`");
+        }
+    }
+
+    #[test]
+    fn from_str_validates_in_const_context() {
+        // Compiles only because the path is valid; a malformed literal here would
+        // be a compile-time error from the panic in `from_str`.
+        const PATH: &Path = Path::from_str("/users/{id}/(auth)");
+        assert_eq!(PATH.segments().count(), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "unexpected bracket")]
+    fn from_str_panics_on_invalid() {
+        Path::from_str("/foo{bar}");
     }
 
     // ── PathBuf ──
@@ -527,7 +741,7 @@ mod tests {
 
     #[test]
     fn pathbuf_to_owned_roundtrip() {
-        let path = Path::new("/users/{id}");
+        let path = Path::from_str("/users/{id}");
         let buf = path.to_owned();
         assert_eq!(&*buf, path);
     }

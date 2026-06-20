@@ -92,7 +92,7 @@ impl ToTokens for Route {
                     #[allow(non_upper_case_globals)]
                     const #ident: ::topcoat::router::Route = ::topcoat::router::Route::new(
                         ::topcoat::router::Method::#method,
-                        ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
+                        ::std::borrow::Cow::Borrowed(::topcoat::router::Path::from_str(#path)),
                         #render,
                     );
                 }
