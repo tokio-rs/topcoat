@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use http::{HeaderValue, Method, StatusCode};
@@ -54,7 +54,9 @@ impl Router {
         let path_params = RawPathParams::from_pairs(matched.params.iter());
 
         // Select the layers whose path is a prefix of the route's, ordered
-        // least- to most-specific so the outermost layer runs first.
+        // least- to most-specific so the outermost layer runs first. Reversing
+        // before the (stable) sort means that among layers sharing a path the
+        // most recently registered ends up outermost.
         let route = &*self.routes[index];
         let route_path = route.path();
         let mut layers: Vec<&dyn Layer> = self
@@ -62,6 +64,7 @@ impl Router {
             .iter()
             .map(|layer| &**layer)
             .filter(|layer| route_path.starts_with(&layer.path()))
+            .rev()
             .collect();
         layers.sort_by_key(|layer| layer.path().len());
 
@@ -191,8 +194,11 @@ impl RouterBuilder {
     /// Registers a [`Layer`] that wraps every matched route whose path begins
     /// with the layer's path, like a layout.
     ///
-    /// When several layers match a route they nest from least-specific
-    /// (outermost) to most-specific (innermost).
+    /// When layers at *different* paths match a route they nest from
+    /// least-specific (outermost) to most-specific (innermost). Multiple layers
+    /// may share the same path; among those, the most recently registered runs
+    /// first (outermost), so `.layer(a).layer(b)` runs `b` around `a` when both
+    /// sit at the same path.
     pub fn layer(mut self, layer: impl Layer) -> Self {
         self.layers.push(Box::new(layer));
         self
@@ -200,9 +206,25 @@ impl RouterBuilder {
 
     /// Registers every layer annotated with `#[layer]` and collected at link
     /// time.
+    ///
+    /// Unlike [`layer`](Self::layer), at most one discovered layer is allowed
+    /// per path. Link-time collection order is non-deterministic, so two
+    /// discovered layers sharing a path would have an undefined run order; this
+    /// rejects that rather than pick an arbitrary one. To stack several layers
+    /// on one path, register them explicitly with [`layer`](Self::layer), whose
+    /// order is well-defined.
+    ///
+    /// # Panics
+    ///
+    /// Panics if two discovered layers share the same path.
     #[cfg(feature = "discover")]
     pub fn discover_layers(mut self) -> Self {
+        let mut seen: HashSet<Cow<'static, crate::runtime::Path>> = HashSet::new();
         for layer in inventory::iter::<crate::runtime::LayerFn>().cloned() {
+            let path = layer.path();
+            if !seen.insert(path.clone()) {
+                panic!("multiple discovered layers registered for the same path {path:?}");
+            }
             self = self.layer(layer);
         }
         self

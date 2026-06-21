@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashSet;
 
 use heck::ToKebabCase;
 
@@ -172,29 +173,92 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Discovers and registers all segments, pages, layouts, and routes
+    /// Registers every [`Segment`] override declared with `segment!` and
     /// collected at link time.
     ///
-    /// Segments are registered first, since they must precede pages and
-    /// layouts, then the pages, layouts, and routes.
+    /// Segments must be registered before any pages or layouts, since they
+    /// affect path computation.
     #[cfg(feature = "discover")]
-    pub fn discover(mut self) -> Self {
+    pub fn discover_segments(mut self) -> Self {
         for segment in inventory::iter::<Segment>().cloned() {
             self = self.segment(segment);
         }
+        self
+    }
+
+    /// Registers every [`ModulePageFn`] annotated with `#[page]` and collected
+    /// at link time, deriving each path from the module tree.
+    #[cfg(feature = "discover")]
+    pub fn discover_pages(mut self) -> Self {
         for page in inventory::iter::<ModulePageFn>().cloned() {
             self = self.page(page);
         }
+        self
+    }
+
+    /// Registers every [`ModuleLayoutFn`] annotated with `#[layout]` and
+    /// collected at link time, deriving each path from the module tree.
+    #[cfg(feature = "discover")]
+    pub fn discover_layouts(mut self) -> Self {
         for layout in inventory::iter::<ModuleLayoutFn>().cloned() {
             self = self.layout(layout);
         }
+        self
+    }
+
+    /// Registers every [`ModuleRouteFn`] annotated with `#[route]` and collected
+    /// at link time, deriving each path from the module tree.
+    #[cfg(feature = "discover")]
+    pub fn discover_routes(mut self) -> Self {
         for route in inventory::iter::<ModuleRouteFn>().cloned() {
             self = self.route(route);
         }
+        self
+    }
+
+    /// Registers every [`ModuleLayerFn`] annotated with `#[layer]` and collected
+    /// at link time, deriving each path from the module tree.
+    ///
+    /// At most one discovered layer is allowed per path. Link-time collection
+    /// order is non-deterministic, so two discovered layers sharing a path would
+    /// have an undefined run order; this rejects that rather than pick an
+    /// arbitrary one. To stack several layers on one path, register them
+    /// manually with [`RouterBuilder::layer`](crate::RouterBuilder::layer),
+    /// whose order is well-defined.
+    ///
+    /// # Panics
+    ///
+    /// Panics if two discovered layers resolve to the same path.
+    #[cfg(feature = "discover")]
+    pub fn discover_layers(mut self) -> Self {
+        let mut seen = HashSet::new();
         for layer in inventory::iter::<ModuleLayerFn>().cloned() {
+            let path = self.module_path_to_path(layer.module_path());
+            if !seen.insert(path.clone()) {
+                panic!("multiple discovered layers registered for the same path {path}");
+            }
             self = self.layer(layer);
         }
         self
+    }
+
+    /// Discovers and registers all segments, pages, layouts, routes, and layers
+    /// collected at link time.
+    ///
+    /// Segments are registered first, since they must precede pages and
+    /// layouts.
+    ///
+    /// # Panics
+    ///
+    /// Panics if two discovered layers resolve to the same path; see
+    /// [`discover_layers`](Self::discover_layers).
+    #[cfg(feature = "discover")]
+    pub fn discover(self) -> Self {
+        self.discover_segments()
+            .discover_pages()
+            .discover_layouts()
+            .discover_routes()
+            .discover_layers()
     }
 }
 
