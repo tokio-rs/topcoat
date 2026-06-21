@@ -113,9 +113,7 @@ Values are keyed by Rust type. Asking for a type that was not registered panics,
 
 ## Request body parsing
 
-Handlers can receive one request body parameter in addition to `cx: &Cx`. The parameter can be any type that implements `FromRequest`, including Topcoat's built-in `Json<T>`, `Form<T>`, `Multipart` (with the `multipart` feature), `Body`, `Bytes`, and `String` extractors.
-
-See [Request and response bodies](./request_response.md) for the built-in extractors and the `FromRequest` trait for custom parsing.
+Handlers can receive one request body parameter in addition to `cx: &Cx`. See [Request and response bodies](./request_response.md) for the built-in extractors and the `FromRequest` trait for custom parsing.
 
 ## Composing helpers
 

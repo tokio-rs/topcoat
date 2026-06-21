@@ -94,6 +94,9 @@
 //! }
 //! ```
 //!
+//! See [`path_param`](crate::router::path_param) and
+//! [`query_params`](crate::router::query_params) for the exact return types and parsing rules.
+//!
 //! ## App and request context helpers
 //!
 //! This module exposes typed context accessors:
@@ -119,11 +122,8 @@
 //!
 //! ## Request body parsing
 //!
-//! Handlers can receive one request body parameter in addition to `cx: &`[`Cx`]. The parameter can
-//! be any type that implements [`FromRequest`](crate::router::FromRequest), including Topcoat's
-//! built-in [`Json<T>`](crate::router::Json), [`Form<T>`](crate::router::Form), optional
-//! `Multipart`, [`Body`](crate::router::Body), [`Bytes`](crate::router::Bytes), and `String`
-//! extractors.
+//! Handlers can receive one request body parameter in addition to `cx: &`[`Cx`]. See
+//! [`FromRequest`](crate::router::FromRequest) for custom parsing and the built-in extractors.
 //!
 //! ## Composing helpers
 //!
