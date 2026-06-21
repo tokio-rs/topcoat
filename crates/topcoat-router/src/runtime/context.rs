@@ -1,6 +1,7 @@
-use axum::extract::RawPathParams;
 use http::request::Parts;
-use topcoat_core::runtime::context::{Cx, app_context, request_context};
+use topcoat_core::runtime::context::{Cx, request_context};
+
+use crate::runtime::RawPathParams;
 
 /// Returns the [`Parts`] of the current request.
 ///
@@ -148,41 +149,4 @@ pub fn extensions(cx: &Cx) -> &http::Extensions {
 #[doc(hidden)]
 pub fn raw_path_params(cx: &Cx) -> &RawPathParams {
     request_context::<RawPathParams>(cx)
-}
-
-/// Runs an [`axum`] extractor against the current request.
-///
-/// Prefer the dedicated `topcoat` accessors ([`parts`], [`method`], [`uri`],
-/// [`version`], [`headers`], [`extensions`], and others whenever possible.
-/// This function exists as an escape hatch for interoperability with
-/// third-party libraries that only expose their API through
-/// [`FromRequestParts`], or for porting existing `axum` code.
-///
-/// [`FromRequestParts`]: axum::extract::FromRequestParts
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// use axum::extract::Query;
-/// use serde::Deserialize;
-/// use topcoat::{context::Cx, router::extract};
-///
-/// #[derive(Deserialize)]
-/// struct Pagination {
-///     page: usize,
-/// }
-///
-/// async fn page(cx: &Cx) -> usize {
-///     let Query(p): Query<Pagination> = extract::<_, ()>(cx).await.unwrap();
-///     p.page
-/// }
-/// ```
-pub async fn extract<T, S>(
-    cx: &Cx,
-) -> Result<T, <T as axum::extract::FromRequestParts<S>>::Rejection>
-where
-    T: axum::extract::FromRequestParts<S>,
-    S: Send + Sync + 'static,
-{
-    T::from_request_parts(&mut parts(cx).clone(), app_context::<S>(cx)).await
 }

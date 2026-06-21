@@ -44,6 +44,7 @@ heck.workspace = true
 http.workspace = true
 http-body.workspace = true
 http-body-util.workspace = true
+percent-encoding.workspace = true
 inventory = { workspace = true, optional = true }
 multer = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
