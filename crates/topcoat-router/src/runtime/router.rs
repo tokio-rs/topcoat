@@ -589,6 +589,24 @@ mod tests {
         assert_eq!(body_str(&call(&router, Method::HEAD, "/users")), "head");
     }
 
+    #[test]
+    #[should_panic(expected = "duplicate route registered for `GET /users`")]
+    fn duplicate_method_and_path_panics_at_build() {
+        RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/users", "a"))
+            .route(TestRoute::new(Method::GET, "/users", "b"))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate route registered for `GET /about`")]
+    fn duplicate_pages_panic_at_build() {
+        RouterBuilder::new()
+            .page(PageFn::new(path("/about"), page_render))
+            .page(PageFn::new(path("/about"), page_render))
+            .build();
+    }
+
     // ── layers ──
 
     #[test]
