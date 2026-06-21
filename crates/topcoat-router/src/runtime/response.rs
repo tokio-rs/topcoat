@@ -347,8 +347,12 @@ impl_into_response_tuples!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
 impl_into_response_tuples!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 impl_into_response_tuples!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13);
 impl_into_response_tuples!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14);
-impl_into_response_tuples!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15);
-impl_into_response_tuples!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16);
+impl_into_response_tuples!(
+    T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15
+);
+impl_into_response_tuples!(
+    T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16
+);
 
 #[cfg(test)]
 mod tests {
@@ -437,7 +441,10 @@ mod tests {
     #[test]
     fn header_map_applies_headers() {
         let mut headers = HeaderMap::new();
-        headers.insert(HeaderName::from_static("x-test"), HeaderValue::from_static("1"));
+        headers.insert(
+            HeaderName::from_static("x-test"),
+            HeaderValue::from_static("1"),
+        );
         let (parts, body) = run(headers);
         assert_eq!(header(&parts, "x-test"), "1");
         assert!(body.is_empty());
@@ -543,9 +550,10 @@ mod tests {
     fn parts_template_seeds_status_and_headers() {
         let (mut template, _) = Response::new(Body::empty()).into_parts();
         template.status = StatusCode::IM_A_TEAPOT;
-        template
-            .headers
-            .insert(HeaderName::from_static("x-test"), HeaderValue::from_static("1"));
+        template.headers.insert(
+            HeaderName::from_static("x-test"),
+            HeaderValue::from_static("1"),
+        );
 
         let (parts, body) = run((template, "hi"));
         assert_eq!(parts.status, StatusCode::IM_A_TEAPOT);

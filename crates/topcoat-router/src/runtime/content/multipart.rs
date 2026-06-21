@@ -203,10 +203,7 @@ mod tests {
             builder = builder.header(CONTENT_TYPE, content_type);
         }
 
-        let (parts, ()) = builder
-            .body(())
-            .expect("request should build")
-            .into_parts();
+        let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
         let mut cx = Cx::empty();
         cx.insert(parts);
@@ -233,9 +230,10 @@ mod tests {
     #[tokio::test]
     async fn from_request_reads_fields_and_metadata() {
         let cx = cx_with_content_type(Some(&multipart_content_type()));
-        let mut multipart = <Multipart as FromRequest>::from_request(&cx, Body::from(sample_body()))
-            .await
-            .expect("valid multipart request");
+        let mut multipart =
+            <Multipart as FromRequest>::from_request(&cx, Body::from(sample_body()))
+                .await
+                .expect("valid multipart request");
 
         let greeting = multipart
             .next_field()
@@ -256,10 +254,16 @@ mod tests {
         assert_eq!(upload.file_name(), Some("hello.txt"));
         assert_eq!(upload.content_type(), Some("text/plain"));
         assert_eq!(
-            upload.headers().get(CONTENT_TYPE).map(|value| value.as_bytes()),
+            upload
+                .headers()
+                .get(CONTENT_TYPE)
+                .map(|value| value.as_bytes()),
             Some(b"text/plain".as_slice())
         );
-        assert_eq!(&upload.bytes().await.expect("field bytes")[..], b"file body");
+        assert_eq!(
+            &upload.bytes().await.expect("field bytes")[..],
+            b"file body"
+        );
 
         assert!(
             multipart
@@ -274,9 +278,10 @@ mod tests {
     #[tokio::test]
     async fn field_chunk_streams_field_data() {
         let cx = cx_with_content_type(Some(&multipart_content_type()));
-        let mut multipart = <Multipart as FromRequest>::from_request(&cx, Body::from(sample_body()))
-            .await
-            .expect("valid multipart request");
+        let mut multipart =
+            <Multipart as FromRequest>::from_request(&cx, Body::from(sample_body()))
+                .await
+                .expect("valid multipart request");
 
         let mut field = multipart
             .next_field()
@@ -334,9 +339,10 @@ mod tests {
     #[tokio::test]
     async fn optional_from_request_with_multipart_content_type_is_some() {
         let cx = cx_with_content_type(Some(&multipart_content_type()));
-        let multipart = <Multipart as OptionalFromRequest>::from_request(&cx, Body::from(sample_body()))
-            .await
-            .expect("a valid multipart request is not an error");
+        let multipart =
+            <Multipart as OptionalFromRequest>::from_request(&cx, Body::from(sample_body()))
+                .await
+                .expect("a valid multipart request is not an error");
 
         let mut multipart = multipart.expect("a multipart payload is present");
         let field = multipart
