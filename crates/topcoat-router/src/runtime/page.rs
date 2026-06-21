@@ -103,12 +103,6 @@ impl LayoutFn {
 inventory::collect!(LayoutFn);
 
 /// A [`PageFn`] paired with the [`LayoutFn`]s that wrap it.
-///
-/// Produced by [`RouterBuilder::build`](crate::RouterBuilder::build), which
-/// matches each page against the registered layouts by path prefix. It
-/// implements [`Route`] so a page is dispatched like any other route: it
-/// responds to `GET`, renders the page nested inside its layouts (most specific
-/// innermost), and replies with the resulting HTML.
 pub struct PageWithLayouts {
     page: PageFn,
     /// The matching layouts, ordered by ascending path length (outermost first).
