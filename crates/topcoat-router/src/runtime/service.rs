@@ -12,7 +12,7 @@ use crate::runtime::{Body, Request, Response, Router};
 /// [`Router`].
 ///
 /// The wrapped [`Router`] is shared behind an [`Arc`], so the service is cheap
-/// to clone — one clone is handed to each accepted connection.
+/// to clone. One clone is handed to each accepted connection.
 #[derive(Clone)]
 pub struct RouterService {
     router: Arc<Router>,
