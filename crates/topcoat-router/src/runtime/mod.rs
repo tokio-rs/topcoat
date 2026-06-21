@@ -16,7 +16,7 @@ mod service;
 pub use body::*;
 pub use content::*;
 pub use context::*;
-pub use endpoint::*;
+pub(crate) use endpoint::*;
 pub use error::*;
 pub use manual::*;
 pub use module::*;
