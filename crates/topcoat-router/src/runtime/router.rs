@@ -7,8 +7,8 @@ use http::{HeaderValue, Method, StatusCode};
 use topcoat_core::runtime::context::{ContextMap, Cx};
 
 use crate::runtime::{
-    Body, Endpoint, LayoutFn, PageFn, PageWithLayouts, RawPathParams, Request, Response, Route,
-    finalize, not_found, respond,
+    Body, Endpoint, Layer, LayoutFn, Next, PageFn, PageWithLayouts, RawPathParams, Request,
+    Response, Route, finalize, not_found, respond,
 };
 
 /// A finalized collection of [`Route`]s, ready to dispatch requests.
@@ -22,6 +22,9 @@ pub struct Router {
     /// The endpoint handling each path, matched against the request URL and
     /// indexing into `routes` by HTTP method.
     endpoints: matchit::Router<Endpoint>,
+    /// The layers wrapping every matched route, in registration order; the
+    /// last-registered layer is the outermost and runs first.
+    layers: Vec<Box<dyn Layer>>,
     /// The values shared by every request, read back via
     /// [`app_context`](topcoat_core::runtime::context::app_context).
     app_context: Arc<ContextMap>,
@@ -54,7 +57,8 @@ impl Router {
         cx.insert(path_params);
         cx.insert(parts);
 
-        let response = respond(self.routes[index].handle(&cx, body).await);
+        let next = Next::new(&self.layers, &*self.routes[index]);
+        let response = respond(next.run(&mut cx, body).await);
         finalize(&cx, response)
     }
 }
@@ -97,6 +101,7 @@ pub struct RouterBuilder {
     routes: Vec<Box<dyn Route>>,
     pages: Vec<PageFn>,
     layouts: Vec<LayoutFn>,
+    layers: Vec<Box<dyn Layer>>,
     context: ContextMap,
 }
 
@@ -110,6 +115,7 @@ impl RouterBuilder {
             routes: Vec::new(),
             pages: Vec::new(),
             layouts: Vec::new(),
+            layers: Vec::new(),
             context,
         }
     }
@@ -170,6 +176,15 @@ impl RouterBuilder {
         self
     }
 
+    /// Registers a [`Layer`] that wraps every matched route.
+    ///
+    /// Layers nest like an onion: the most recently registered layer is the
+    /// outermost and runs first.
+    pub fn layer(mut self, layer: impl Layer) -> Self {
+        self.layers.push(Box::new(layer));
+        self
+    }
+
     /// Registers a unique value that is accessible to every request sent to
     /// this router by its type `T`. The top-level
     /// [`app_context`](topcoat_core::runtime::context::app_context) function can be used to
@@ -217,6 +232,7 @@ impl RouterBuilder {
             mut routes,
             pages,
             layouts,
+            layers,
             context,
         } = self;
 
@@ -253,6 +269,7 @@ impl RouterBuilder {
         Router {
             routes,
             endpoints,
+            layers,
             app_context: Arc::new(context),
         }
     }
