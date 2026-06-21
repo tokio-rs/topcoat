@@ -5,9 +5,6 @@ extern crate self as topcoat;
 #[cfg(feature = "router")]
 pub mod dev;
 
-#[cfg(feature = "router")]
-mod serve;
-
 pub use topcoat_core::runtime::error::Error;
 
 #[cfg(feature = "view")]
@@ -32,7 +29,7 @@ pub mod router;
 pub mod view;
 
 #[cfg(feature = "router")]
-pub use serve::{serve, start};
+pub use topcoat_router::runtime::{serve, start};
 
 #[cfg(feature = "runtime")]
 pub mod runtime;
