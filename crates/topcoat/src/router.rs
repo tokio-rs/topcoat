@@ -66,7 +66,6 @@
 //! For file-system-shaped routing, call [`module_router!`] from the root module of your route
 //! tree. It returns a [`RouterBuilder`], so you can keep chaining builder extensions before
 //! `.build()`.
-//!
 pub use topcoat_router::runtime::*;
 pub use topcoat_router_macro::*;
 
