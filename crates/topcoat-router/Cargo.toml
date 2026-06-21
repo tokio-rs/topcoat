@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-cookie = [
-	"dep:topcoat-cookie",
-]
 discover = [
 	"dep:inventory",
 	"topcoat-runtime/discover",
@@ -26,7 +23,6 @@ runtime = [
 ]
 
 [dependencies]
-topcoat-cookie = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-runtime = { workspace = true, optional = true }
 topcoat-view.workspace = true

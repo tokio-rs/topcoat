@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use topcoat::{
     Result,
     context::Cx,
-    cookie::{CookieStore, Cookies, Key, cookie_store, signed_cookies},
-    router::{Router, page},
+    cookie::{CookieStore, Cookies, Key, RouterBuilderCookieExt, cookie_store, signed_cookies},
+    router::{Router, RouterBuilderDiscoverExt, page},
     view::view,
 };
 
@@ -12,9 +12,15 @@ async fn main() {
     // The Key signs cookies so the client can't forge the counter. Generate it
     // once at startup and share it across requests as app context. A real app
     // would load a persisted key instead of generating a fresh one each boot.
-    topcoat::start(Router::new().discover().app_context(Key::generate()))
-        .await
-        .unwrap();
+    topcoat::start(
+        Router::builder()
+            .discover()
+            .cookies()
+            .app_context(Key::generate())
+            .build(),
+    )
+    .await
+    .unwrap();
 }
 
 // The application cookie jar: signed with the registered Key, with our defaults

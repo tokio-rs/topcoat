@@ -253,7 +253,7 @@ mod tests {
     use topcoat_core::runtime::context::{ContextMap, Cx};
 
     use super::*;
-    use crate::{Key, cookies, write_cookies};
+    use crate::{CookieJarCell, Key, cookies, write_cookies};
 
     #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
     struct Cart {
@@ -457,6 +457,7 @@ mod tests {
 
         let mut request_context = ContextMap::new();
         request_context.insert::<Parts>(parts);
+        request_context.insert(CookieJarCell::new());
         Cx::new(Arc::new(ContextMap::new()), request_context)
     }
 

@@ -130,11 +130,14 @@ impl Bundler {
                 (false, _) => format!("{stem}.{short_hash}"),
             };
 
-            let content_type = options.content_type().map(str::to_owned).unwrap_or_else(|| {
-                mime_guess::from_path(&file)
-                    .first_or_octet_stream()
-                    .to_string()
-            });
+            let content_type = options
+                .content_type()
+                .map(str::to_owned)
+                .unwrap_or_else(|| {
+                    mime_guess::from_path(&file)
+                        .first_or_octet_stream()
+                        .to_string()
+                });
 
             let id = asset.id();
             let dst = out_dir.join(&file);

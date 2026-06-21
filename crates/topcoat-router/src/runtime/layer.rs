@@ -117,7 +117,14 @@ impl<'a> Next<'a> {
     /// remain.
     pub fn run(self, cx: &'a mut Cx, body: Body) -> LayerFuture<'a> {
         match self.layers.split_first() {
-            Some((layer, layers)) => layer.handle(cx, body, Next { layers, route: self.route }),
+            Some((layer, layers)) => layer.handle(
+                cx,
+                body,
+                Next {
+                    layers,
+                    route: self.route,
+                },
+            ),
             None => self.route.handle(cx, body),
         }
     }

@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 
 use bytes::Bytes;
-use http::header::{CONTENT_TYPE, HeaderName, HeaderValue};
 use http::StatusCode;
-use topcoat_core::runtime::context::Cx;
+use http::header::{CONTENT_TYPE, HeaderName, HeaderValue};
 use topcoat_core::runtime::error::Result;
 
 use crate::runtime::Body;
@@ -12,25 +11,6 @@ pub type Response<T = Body> = http::Response<T>;
 
 const TEXT_PLAIN: HeaderValue = HeaderValue::from_static("text/plain; charset=utf-8");
 const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("application/octet-stream");
-
-/// Applies request-scoped side effects to a finished response before it is sent.
-///
-/// Currently this writes any pending cookie changes (with the `cookie` feature)
-/// onto the response as `Set-Cookie` headers. It is a no-op otherwise.
-#[inline]
-pub(crate) fn finalize(cx: &Cx, response: Response) -> Response {
-    #[cfg(feature = "cookie")]
-    {
-        let mut response = response;
-        topcoat_cookie::write_cookies(cx, response.headers_mut());
-        response
-    }
-    #[cfg(not(feature = "cookie"))]
-    {
-        let _ = cx;
-        response
-    }
-}
 
 /// Converts a value into an HTTP [`Response`].
 ///

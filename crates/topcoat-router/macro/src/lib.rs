@@ -158,10 +158,11 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Handler signature
 ///
 /// The function is `async` and takes [`cx: &mut Cx`](../context/struct.Cx.html), the request
-/// [`body: Body`](../router/struct.Body.html), and a [`next: Next<'_>`](../router/struct.Next.html),
-/// returning `Result<T>` where `T` implements [`IntoResponse`](../router/trait.IntoResponse.html).
-/// Call [`next.run(cx, body)`](../router/struct.Next.html#method.run) to invoke the inner layers and
-/// ultimately the route.
+/// [`body: Body`](../router/struct.Body.html), and a [`next:
+/// Next<'_>`](../router/struct.Next.html), returning `Result<T>` where `T` implements
+/// [`IntoResponse`](../router/trait.IntoResponse.html). Call [`next.run(cx,
+/// body)`](../router/struct.Next.html#method.run) to invoke the inner layers and ultimately the
+/// route.
 ///
 /// # Examples
 ///

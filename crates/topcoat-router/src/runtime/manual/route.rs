@@ -25,8 +25,7 @@ pub trait Route: Send + Sync + 'static {
 }
 
 /// The async handler function backing a [`RouteFn`].
-pub type RouteHandlerFn =
-    for<'cx> fn(cx: &'cx Cx, body: Body) -> RouteFuture<'cx>;
+pub type RouteHandlerFn = for<'cx> fn(cx: &'cx Cx, body: Body) -> RouteFuture<'cx>;
 
 /// A [`Route`] backed by a plain handler function.
 ///

@@ -3,6 +3,8 @@ mod macros;
 mod map;
 mod prefix;
 mod private;
+#[cfg(feature = "router")]
+mod router;
 mod signed;
 mod store;
 
@@ -10,14 +12,17 @@ pub use jar::*;
 pub use map::*;
 pub use prefix::*;
 pub use private::*;
+#[cfg(feature = "router")]
+pub use router::*;
 pub use signed::*;
 pub use store::*;
 
 use prefix::Conform;
+use std::sync::OnceLock;
 
 pub use cookie::{Cookie, Expiration, Key, SameSite, time};
 
-use topcoat_core::runtime::context::{Cx, app_context, memoize_cache};
+use topcoat_core::runtime::context::{Cx, app_context, request_context};
 
 /// A request-scoped cookie jar.
 ///
@@ -33,7 +38,7 @@ pub trait Cookies {
     fn get(&self, name: &str) -> Option<Cookie<'static>>;
 
     /// Adds `cookie`. It is serialized into a `Set-Cookie` response header once
-    /// the handler returns.
+    /// the cookie router layer handles the response.
     fn add<C: Into<Cookie<'static>>>(&self, cookie: C);
 
     /// Removes `cookie`. If the request carried an original cookie with the
@@ -228,11 +233,23 @@ pub trait Cookies {
     }
 }
 
-/// Builds the root jar from the request. A named `fn` (rather than a closure)
-/// so its type is a stable marker shared by [`cookies`] and [`write_cookies`]:
-/// the latter peeks the memoize cache under this exact marker.
-fn parse_jar(cx: &Cx, (): ()) -> CookieJar {
-    CookieJar::from_request(cx)
+#[derive(Debug, Default)]
+pub(crate) struct CookieJarCell {
+    jar: OnceLock<CookieJar>,
+}
+
+impl CookieJarCell {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    fn get_or_init(&self, cx: &Cx) -> &CookieJar {
+        self.jar.get_or_init(|| CookieJar::from_request(cx))
+    }
+
+    fn get(&self) -> Option<&CookieJar> {
+        self.jar.get()
+    }
 }
 
 /// Returns the request's root [`CookieJar`], parsing the incoming `Cookie`
@@ -240,9 +257,13 @@ fn parse_jar(cx: &Cx, (): ()) -> CookieJar {
 ///
 /// Use the [`Cookies`] combinators to layer signing, encryption, prefixes, or
 /// default attributes on top.
+///
+/// # Panics
+///
+/// Panics if the cookie router layer has not been installed for this request.
 #[must_use]
 pub fn cookies(cx: &Cx) -> &CookieJar {
-    memoize_cache(cx).eq_cache().memoize(cx, (), (), parse_jar)
+    request_context::<CookieJarCell>(cx).get_or_init(cx)
 }
 
 /// Returns the root jar wrapped in a [`SignedJar`], using the [`Key`]
@@ -275,10 +296,7 @@ pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
 /// incoming `Cookie` header at all.
 #[doc(hidden)]
 pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
-    let Some(jar) = memoize_cache(cx)
-        .eq_cache()
-        .get::<_, CookieJar, _>(parse_jar, ())
-    else {
+    let Some(jar) = request_context::<CookieJarCell>(cx).get() else {
         return;
     };
     for value in jar.delta_headers() {
@@ -307,6 +325,7 @@ mod tests {
 
         let mut request_context = ContextMap::new();
         request_context.insert::<Parts>(parts);
+        request_context.insert(CookieJarCell::new());
         Cx::new(Arc::new(ContextMap::new()), request_context)
     }
 
@@ -321,6 +340,7 @@ mod tests {
 
         let mut request_context = ContextMap::new();
         request_context.insert::<Parts>(parts);
+        request_context.insert(CookieJarCell::new());
         let mut app_context = ContextMap::new();
         app_context.insert::<Key>(key);
         Cx::new(Arc::new(app_context), request_context)
@@ -426,7 +446,9 @@ mod tests {
         // The jar is never accessed, so nothing should be written. Crucially,
         // we register no `Parts`: if `write_cookies` parsed the request anyway
         // it would panic looking them up, proving it short-circuits.
-        let cx = Cx::default();
+        let mut request_context = ContextMap::new();
+        request_context.insert(CookieJarCell::new());
+        let cx = Cx::new(Arc::new(ContextMap::new()), request_context);
         let mut headers = HeaderMap::new();
         write_cookies(&cx, &mut headers);
 

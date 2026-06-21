@@ -18,8 +18,6 @@ asset = [
 ]
 cookie = [
 	"dep:topcoat-cookie",
-	"router",
-	"topcoat-router/cookie",
 ]
 multipart = [
 	"router",
@@ -30,6 +28,7 @@ router = [
 	"dep:topcoat-router-macro",
 	"view",
 	"topcoat-asset?/router",
+	"topcoat-cookie?/router",
 ]
 runtime = [
 	"dep:topcoat-runtime",

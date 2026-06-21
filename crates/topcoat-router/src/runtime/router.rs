@@ -8,7 +8,7 @@ use topcoat_core::runtime::context::{ContextMap, Cx};
 
 use crate::runtime::{
     Body, Endpoint, Layer, LayoutFn, Next, PageFn, PageWithLayouts, RawPathParams, Request,
-    Response, Route, finalize, not_found, respond,
+    Response, Route, not_found, respond,
 };
 
 /// A finalized collection of [`Route`]s, ready to dispatch requests.
@@ -73,8 +73,7 @@ impl Router {
         cx.insert(parts);
 
         let next = Next::new(&layers, route);
-        let response = respond(next.run(&mut cx, body).await);
-        finalize(&cx, response)
+        respond(next.run(&mut cx, body).await)
     }
 }
 

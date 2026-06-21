@@ -1,12 +1,23 @@
 # Cookies
 
-Topcoat reads and writes cookies through a request-scoped **cookie jar**. Call `cookies(cx)` from any handler to get the jar, read incoming cookies, and queue changes. Anything you add or remove during the request is serialized into `Set-Cookie` response headers automatically once the handler returns. You don't need to touch headers yourself.
+Topcoat reads and writes cookies through a request-scoped **cookie jar**. Install cookie support on your router with `.cookies()`, then call `cookies(cx)` from any handler to get the jar, read incoming cookies, and queue changes. Anything you add or remove during the request is serialized into `Set-Cookie` response headers automatically once the handler returns. You don't need to touch headers yourself.
 
 Cookies are part of the default feature set, and everything below is re-exported from `topcoat::cookie`. Topcoat builds on the [`cookie`] crate: a cookie is a [`Cookie`], and signing and encryption use its [`Key`].
 
 [`cookie`]: https://docs.rs/cookie
 [`Cookie`]: https://docs.rs/cookie/latest/cookie/struct.Cookie.html
 [`Key`]: https://docs.rs/cookie/latest/cookie/struct.Key.html
+
+```rust,ignore
+use topcoat::{
+    cookie::RouterBuilderCookieExt,
+    router::Router,
+};
+
+let router = Router::builder()
+    .cookies()
+    .build();
+```
 
 ## Reading and writing
 
@@ -180,14 +191,16 @@ In a real app you generate the `Key` once at startup and share it across request
 
 ```rust
 use topcoat::{
-    cookie::Key,
-    router::Router,
+    cookie::{Key, RouterBuilderCookieExt},
+    router::{Router, RouterBuilderDiscoverExt},
 };
 
 pub fn router() -> Router {
-    Router::new()
+    Router::builder()
         .discover()
+        .cookies()
         .app_context(Key::generate())
+        .build()
 }
 ```
 
