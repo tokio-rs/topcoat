@@ -1,51 +1,11 @@
-use std::sync::Arc;
+use topcoat_core::runtime::{context::Cx, error::Result};
 
-use axum::extract::{FromRequestParts, RawPathParams};
-use topcoat_core::runtime::{
-    context::{ContextMap, Cx},
-    error::Result,
-};
-
-use crate::runtime::{
-    Body,
-    error::{BadRequestError, bad_request},
-    to_bytes,
-};
+use crate::runtime::{Body, error::bad_request, to_bytes};
 
 pub use bytes::{Bytes, BytesMut};
 
 /// An incoming HTTP request, carrying a [`Body`] by default.
 pub type Request<T = Body> = http::Request<T>;
-
-pub(crate) struct CxBody {
-    pub(crate) cx: Cx,
-    pub(crate) body: Body,
-}
-
-impl axum::extract::FromRequest<Arc<ContextMap>> for CxBody {
-    type Rejection = BadRequestError;
-
-    async fn from_request(
-        req: axum::extract::Request,
-        context: &Arc<ContextMap>,
-    ) -> Result<Self, Self::Rejection> {
-        let mut cx = Cx::new(context.clone(), ContextMap::new());
-
-        let (mut parts, body) = req.into_parts();
-
-        cx.insert(
-            RawPathParams::from_request_parts(&mut parts, context)
-                .await
-                .map_err(|error| bad_request(error.to_string()))?,
-        );
-        cx.insert(parts);
-
-        Ok(Self {
-            cx,
-            body: Body::new(body),
-        })
-    }
-}
 
 pub trait FromRequest: Sized {
     fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> + Send;
