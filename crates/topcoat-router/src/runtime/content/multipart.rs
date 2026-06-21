@@ -178,3 +178,218 @@ fn is_client_error(error: &multer::Error) -> bool {
         _ => false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use http::{Request, header::CONTENT_TYPE};
+    use topcoat_core::runtime::context::Cx;
+
+    use super::*;
+    use crate::runtime::{BadRequestError, Body, FromRequest, OptionalFromRequest};
+
+    const BOUNDARY: &str = "X-TOPCOAT-BOUNDARY";
+
+    /// The `Content-Type` header value for a `multipart/form-data` request using
+    /// [`BOUNDARY`].
+    fn multipart_content_type() -> String {
+        format!("multipart/form-data; boundary={BOUNDARY}")
+    }
+
+    /// Builds a `Cx` carrying request `Parts` with the given `Content-Type`
+    /// header, or no header at all when `content_type` is [`None`].
+    fn cx_with_content_type(content_type: Option<&str>) -> Cx {
+        let mut builder = Request::builder();
+        if let Some(content_type) = content_type {
+            builder = builder.header(CONTENT_TYPE, content_type);
+        }
+
+        let (parts, ()) = builder
+            .body(())
+            .expect("request should build")
+            .into_parts();
+
+        let mut cx = Cx::empty();
+        cx.insert(parts);
+        cx
+    }
+
+    /// A two-field multipart body: a plain text `greeting` field and an
+    /// `upload` file field with a filename and content type.
+    fn sample_body() -> String {
+        format!(
+            "--{BOUNDARY}\r\n\
+             Content-Disposition: form-data; name=\"greeting\"\r\n\
+             \r\n\
+             hello\r\n\
+             --{BOUNDARY}\r\n\
+             Content-Disposition: form-data; name=\"upload\"; filename=\"hello.txt\"\r\n\
+             Content-Type: text/plain\r\n\
+             \r\n\
+             file body\r\n\
+             --{BOUNDARY}--\r\n"
+        )
+    }
+
+    #[tokio::test]
+    async fn from_request_reads_fields_and_metadata() {
+        let cx = cx_with_content_type(Some(&multipart_content_type()));
+        let mut multipart = <Multipart as FromRequest>::from_request(&cx, Body::from(sample_body()))
+            .await
+            .expect("valid multipart request");
+
+        let greeting = multipart
+            .next_field()
+            .await
+            .expect("reading the first field succeeds")
+            .expect("a first field is present");
+        assert_eq!(greeting.name(), Some("greeting"));
+        assert_eq!(greeting.file_name(), None);
+        assert_eq!(greeting.content_type(), None);
+        assert_eq!(greeting.text().await.expect("field text"), "hello");
+
+        let upload = multipart
+            .next_field()
+            .await
+            .expect("reading the second field succeeds")
+            .expect("a second field is present");
+        assert_eq!(upload.name(), Some("upload"));
+        assert_eq!(upload.file_name(), Some("hello.txt"));
+        assert_eq!(upload.content_type(), Some("text/plain"));
+        assert_eq!(
+            upload.headers().get(CONTENT_TYPE).map(|value| value.as_bytes()),
+            Some(b"text/plain".as_slice())
+        );
+        assert_eq!(&upload.bytes().await.expect("field bytes")[..], b"file body");
+
+        assert!(
+            multipart
+                .next_field()
+                .await
+                .expect("reading past the end succeeds")
+                .is_none(),
+            "the stream is exhausted after both fields"
+        );
+    }
+
+    #[tokio::test]
+    async fn field_chunk_streams_field_data() {
+        let cx = cx_with_content_type(Some(&multipart_content_type()));
+        let mut multipart = <Multipart as FromRequest>::from_request(&cx, Body::from(sample_body()))
+            .await
+            .expect("valid multipart request");
+
+        let mut field = multipart
+            .next_field()
+            .await
+            .expect("reading the first field succeeds")
+            .expect("a first field is present");
+
+        let mut data = Vec::new();
+        while let Some(chunk) = field.chunk().await.expect("reading a chunk succeeds") {
+            data.extend_from_slice(&chunk);
+        }
+        assert_eq!(data, b"hello");
+    }
+
+    #[tokio::test]
+    async fn from_request_without_content_type_is_bad_request() {
+        let cx = cx_with_content_type(None);
+        let error = <Multipart as FromRequest>::from_request(&cx, Body::empty())
+            .await
+            .expect_err("missing content type is rejected");
+
+        assert!(error.downcast_ref::<BadRequestError>().is_some());
+    }
+
+    #[tokio::test]
+    async fn from_request_with_non_multipart_content_type_is_bad_request() {
+        let cx = cx_with_content_type(Some("application/json"));
+        let error = <Multipart as FromRequest>::from_request(&cx, Body::empty())
+            .await
+            .expect_err("a non-multipart content type is rejected");
+
+        assert!(error.downcast_ref::<BadRequestError>().is_some());
+    }
+
+    #[tokio::test]
+    async fn optional_from_request_without_content_type_is_none() {
+        let cx = cx_with_content_type(None);
+        let multipart = <Multipart as OptionalFromRequest>::from_request(&cx, Body::empty())
+            .await
+            .expect("an absent content type is not an error");
+
+        assert!(multipart.is_none());
+    }
+
+    #[tokio::test]
+    async fn optional_from_request_with_non_multipart_content_type_is_none() {
+        let cx = cx_with_content_type(Some("application/json"));
+        let multipart = <Multipart as OptionalFromRequest>::from_request(&cx, Body::empty())
+            .await
+            .expect("a non-multipart content type is not an error");
+
+        assert!(multipart.is_none());
+    }
+
+    #[tokio::test]
+    async fn optional_from_request_with_multipart_content_type_is_some() {
+        let cx = cx_with_content_type(Some(&multipart_content_type()));
+        let multipart = <Multipart as OptionalFromRequest>::from_request(&cx, Body::from(sample_body()))
+            .await
+            .expect("a valid multipart request is not an error");
+
+        let mut multipart = multipart.expect("a multipart payload is present");
+        let field = multipart
+            .next_field()
+            .await
+            .expect("reading the first field succeeds")
+            .expect("a first field is present");
+        assert_eq!(field.name(), Some("greeting"));
+    }
+
+    #[tokio::test]
+    async fn optional_from_request_with_multipart_without_boundary_is_bad_request() {
+        let cx = cx_with_content_type(Some("multipart/form-data"));
+        let error = <Multipart as OptionalFromRequest>::from_request(&cx, Body::empty())
+            .await
+            .expect_err("a multipart content type without a boundary is rejected");
+
+        assert!(error.downcast_ref::<BadRequestError>().is_some());
+    }
+
+    #[tokio::test]
+    async fn truncated_field_data_is_bad_request() {
+        // The headers are complete, so `next_field` yields the field, but the
+        // data is never terminated by a boundary, so reading it fails with a
+        // client error that maps to a `400`.
+        let body = format!(
+            "--{BOUNDARY}\r\n\
+             Content-Disposition: form-data; name=\"greeting\"\r\n\
+             \r\n\
+             hello"
+        );
+        let cx = cx_with_content_type(Some(&multipart_content_type()));
+        let mut multipart = <Multipart as FromRequest>::from_request(&cx, Body::from(body))
+            .await
+            .expect("valid multipart request");
+
+        let field = multipart
+            .next_field()
+            .await
+            .expect("reading the first field succeeds")
+            .expect("a first field is present");
+        let error = field
+            .bytes()
+            .await
+            .expect_err("reading truncated field data fails");
+
+        assert!(error.downcast_ref::<BadRequestError>().is_some());
+    }
+
+    #[test]
+    fn malformed_body_errors_are_classified_as_client_errors() {
+        assert!(is_client_error(&multer::Error::NoMultipart));
+        assert!(is_client_error(&multer::Error::IncompleteStream));
+        assert!(is_client_error(&multer::Error::IncompleteHeaders));
+    }
+}
