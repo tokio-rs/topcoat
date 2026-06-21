@@ -44,22 +44,22 @@ impl Cx {
     pub fn id(&self) -> CxId {
         self.id
     }
-
-    #[inline]
-    #[doc(hidden)]
-    pub fn memoize_cache(&self) -> &MemoizeCache {
-        &self.memoize_cache
-    }
-
-    #[inline]
-    #[doc(hidden)]
-    pub fn abort_store(&self) -> &AbortStore {
-        &self.abort_store
-    }
 }
 
 impl Default for Cx {
     fn default() -> Self {
         Cx::new(Arc::new(ContextMap::default()), ContextMap::default())
     }
+}
+
+#[inline]
+#[doc(hidden)]
+pub fn memoize_cache(cx: &Cx) -> &MemoizeCache {
+    &cx.memoize_cache
+}
+
+#[inline]
+#[doc(hidden)]
+pub fn abort_store(cx: &Cx) -> &AbortStore {
+    &cx.abort_store
 }

@@ -163,4 +163,4 @@
 //! shared request reads stay in ordinary Rust functions.
 
 pub use topcoat_core::runtime::context::*;
-pub use topcoat_core_macro::memoize;
+pub use topcoat_core_macro::*;

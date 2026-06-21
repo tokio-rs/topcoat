@@ -17,7 +17,7 @@ use prefix::Conform;
 
 pub use cookie::{Cookie, Expiration, Key, SameSite, time};
 
-use topcoat_core::runtime::context::{Cx, app_context};
+use topcoat_core::runtime::context::{Cx, app_context, memoize_cache};
 
 /// A request-scoped cookie jar.
 ///
@@ -242,7 +242,7 @@ fn parse_jar(cx: &Cx, (): ()) -> CookieJar {
 /// default attributes on top.
 #[must_use]
 pub fn cookies(cx: &Cx) -> &CookieJar {
-    cx.memoize_cache().eq_cache().memoize(cx, (), (), parse_jar)
+    memoize_cache(cx).eq_cache().memoize(cx, (), (), parse_jar)
 }
 
 /// Returns the root jar wrapped in a [`SignedJar`], using the [`Key`]
@@ -275,8 +275,7 @@ pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
 /// incoming `Cookie` header at all.
 #[doc(hidden)]
 pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
-    let Some(jar) = cx
-        .memoize_cache()
+    let Some(jar) = memoize_cache(cx)
         .eq_cache()
         .get::<_, CookieJar, _>(parse_jar, ())
     else {
