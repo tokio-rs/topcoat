@@ -11,8 +11,8 @@ use crate::runtime::{abort::AbortStore, memoize::MemoizeCache};
 #[derive(Debug)]
 pub struct Cx {
     id: CxId,
-    pub(crate) app_context: Arc<ContextMap>,
-    pub(crate) request_context: ContextMap,
+    app_context: Arc<ContextMap>,
+    request_context: ContextMap,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
 }
