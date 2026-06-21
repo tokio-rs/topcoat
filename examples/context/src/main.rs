@@ -1,13 +1,15 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Router, headers, page, uri},
+    router::{Router, RouterBuilderDiscoverExt, headers, page, uri},
     view::view,
 };
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::new().discover()).await.unwrap();
+    topcoat::start(Router::builder().discover().build())
+        .await
+        .unwrap();
 }
 
 // Small functions can take cx and read request data directly.

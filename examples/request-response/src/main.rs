@@ -4,13 +4,15 @@ use topcoat::{
     context::Cx,
     router::{
         Body, Bytes, Form, FromRequest, IntoResponse, Json, Multipart, RawForm, Response, Router,
-        bad_request, headers, route, to_bytes,
+        RouterBuilderDiscoverExt, bad_request, headers, route, to_bytes,
     },
 };
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::new().discover()).await.unwrap();
+    topcoat::start(Router::builder().discover().build())
+        .await
+        .unwrap();
 }
 
 // --- JSON requests and responses -------------------------------------------

@@ -3,8 +3,8 @@ mod show;
 
 use topcoat::{
     Result,
-    asset::AssetBundle,
-    router::{Slot, layout, module_router, page, redirect},
+    asset::{AssetBundle, RouterBuilderAssetExt},
+    router::{RouterBuilderDiscoverExt, Slot, layout, module_router, page, redirect},
     view::view,
 };
 
@@ -13,7 +13,8 @@ async fn main() {
     topcoat::start(
         module_router!()
             .assets(AssetBundle::load().unwrap())
-            .discover(),
+            .discover()
+            .build(),
     )
     .await
     .unwrap();

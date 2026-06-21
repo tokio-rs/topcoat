@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use topcoat_core::runtime::{context::Cx, error::Result};
+use topcoat_core::runtime::context::Cx;
 use topcoat_router::runtime::{Body, Layer, LayerFuture, Next, Path, RouterBuilder};
 
 use crate::{CookieJarCell, write_cookies};
@@ -61,7 +61,7 @@ mod tests {
     use topcoat_core::runtime::{context::Cx, error::Result};
     use topcoat_router::runtime::{Body, Path, Response, Route, RouteFuture, Router};
 
-    use crate::{Cookies, cookies};
+    use crate::{Cookies, RouterBuilderCookieExt, cookies};
 
     struct AddCookie;
 

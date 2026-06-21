@@ -4,7 +4,6 @@ use std::path::PathBuf as FsPathBuf;
 use http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use http::{HeaderValue, Method, StatusCode};
 use topcoat_core::runtime::context::Cx;
-use topcoat_core::runtime::error::Result;
 use topcoat_router::runtime::{Body, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder};
 
 use crate::{AssetBundle, AssetResolver, BundledAsset};
@@ -29,7 +28,7 @@ pub struct AssetRoute {
     path: PathBuf,
     /// Absolute path to the bundled file on disk.
     file: FsPathBuf,
-    /// Content type derived from the bundled filename's extension.
+    /// Content type specified in the manifest.
     content_type: HeaderValue,
 }
 
