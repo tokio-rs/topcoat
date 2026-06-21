@@ -11,11 +11,24 @@ use crate::runtime::{
     Response, Route, not_found, respond,
 };
 
-/// A finalized collection of [`Route`]s, ready to dispatch requests.
+/// A finalized Topcoat routing table.
 ///
-/// A `Router` is produced from a [`RouterBuilder`] via
-/// [`build`](RouterBuilder::build); start one with [`Router::builder`].
-/// Dispatch a request to its matching route with [`handle`](Self::handle).
+/// Build one with [`Router::builder`], register pages, layouts, layers, routes,
+/// and app context values on the returned [`RouterBuilder`], then call
+/// [`RouterBuilder::build`]. Most applications use the `topcoat` facade and
+/// pass the finished router to `topcoat::start`.
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use topcoat::router::{Router, RouterBuilderDiscoverExt};
+///
+/// let router = Router::builder()
+///     .discover()
+///     .build();
+///
+/// topcoat::start(router).await?;
+/// ```
 pub struct Router {
     /// The registered routes, indexed by the values stored in `endpoints`.
     routes: Vec<Box<dyn Route>>,
@@ -94,20 +107,32 @@ fn method_not_allowed(endpoint: &Endpoint) -> Response {
     response
 }
 
-/// Collects [`Route`]s before they are finalized into a [`Router`].
+/// Builds a [`Router`] for a Topcoat application.
 ///
-/// Register routes with [`route`](Self::route), then call
-/// [`build`](Self::build) to produce the immutable [`Router`].
+/// This is the common construction surface used by manual routing,
+/// auto-discovery, `module_router!`, and builder extension traits. Register
+/// [`page`](Self::page), [`layout`](Self::layout), [`layer`](Self::layer), and
+/// [`route`](Self::route) handlers directly, or let a discovery helper add
+/// them, then call [`build`](Self::build) once at the end.
+///
+/// Builder extension traits add application-wide behavior before finalization,
+/// such as assets, cookies, or typed [`app_context`](Self::app_context) values.
 ///
 /// # Examples
 ///
 /// ```rust,ignore
-/// use topcoat::router::Router;
+/// use topcoat::{
+///     asset::{AssetBundle, RouterBuilderAssetExt},
+///     cookie::RouterBuilderCookieExt,
+///     router::{Router, RouterBuilderDiscoverExt},
+/// };
 ///
 /// pub fn router() -> Router {
 ///     Router::builder()
-///         .route(api_health)
-///         .route(create_user)
+///         .discover()
+///         .cookies()
+///         .assets(AssetBundle::load().unwrap())
+///         .app_context(AppConfig::load())
 ///         .build()
 /// }
 /// ```
