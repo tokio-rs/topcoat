@@ -1,3 +1,4 @@
+mod body;
 mod content;
 mod context;
 mod error;
@@ -7,6 +8,7 @@ mod path;
 mod request;
 mod response;
 
+pub use body::*;
 pub use content::*;
 pub use context::*;
 pub use error::*;

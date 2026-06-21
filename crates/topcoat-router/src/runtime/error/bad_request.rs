@@ -1,6 +1,7 @@
 use http::StatusCode;
+use topcoat_core::runtime::error::Result;
 
-use crate::runtime::Response;
+use crate::runtime::{IntoResponse, Response};
 
 /// Builds a bad-request (HTTP 400) response with a client-safe description.
 ///
@@ -75,11 +76,8 @@ impl std::fmt::Display for BadRequestError {
 
 impl std::error::Error for BadRequestError {}
 
-impl axum::response::IntoResponse for BadRequestError {
-    fn into_response(self) -> Response {
-        <(StatusCode, String) as axum::response::IntoResponse>::into_response((
-            StatusCode::BAD_REQUEST,
-            self.to_string(),
-        ))
+impl IntoResponse for BadRequestError {
+    fn into_response(self) -> Result<Response> {
+        (StatusCode::BAD_REQUEST, self.to_string()).into_response()
     }
 }

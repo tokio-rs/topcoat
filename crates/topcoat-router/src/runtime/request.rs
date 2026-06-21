@@ -6,12 +6,13 @@ use topcoat_core::runtime::{
     error::Result,
 };
 
-use crate::runtime::error::{BadRequestError, bad_request};
+use crate::runtime::{
+    Body,
+    error::{BadRequestError, bad_request},
+    to_bytes,
+};
 
-pub use axum::body::to_bytes;
 pub use bytes::{Bytes, BytesMut};
-
-pub type Body = axum::body::Body;
 
 pub(crate) struct CxBody {
     pub(crate) cx: Cx,
@@ -36,7 +37,10 @@ impl axum::extract::FromRequest<Arc<ContextMap>> for CxBody {
         );
         cx.insert(parts);
 
-        Ok(Self { cx, body })
+        Ok(Self {
+            cx,
+            body: Body::new(body),
+        })
     }
 }
 

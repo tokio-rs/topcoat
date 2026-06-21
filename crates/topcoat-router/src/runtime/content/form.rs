@@ -1,7 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
 use ::serde::{Serialize, de::DeserializeOwned};
-use axum::body::to_bytes;
 use http::{
     Method,
     header::{CONTENT_TYPE, HeaderValue},
@@ -10,7 +9,7 @@ use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{
     Body, Bytes, FromRequest, IntoResponse, OptionalFromRequest, Response, bad_request,
-    bad_request_at, content_type, method, uri,
+    bad_request_at, content_type, method, to_bytes, uri,
 };
 
 /// `application/x-www-form-urlencoded` request extractor and response wrapper.

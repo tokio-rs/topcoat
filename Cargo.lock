@@ -2364,9 +2364,12 @@ dependencies = [
  "axum",
  "bytes",
  "form_urlencoded",
+ "futures-core",
  "futures-util",
  "heck",
  "http",
+ "http-body",
+ "http-body-util",
  "inventory",
  "multer",
  "proc-macro2",
@@ -2434,7 +2437,6 @@ dependencies = [
 name = "topcoat-view"
 version = "0.1.0"
 dependencies = [
- "axum",
  "heck",
  "inventory",
  "proc-macro2",

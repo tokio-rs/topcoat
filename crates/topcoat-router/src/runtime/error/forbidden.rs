@@ -1,6 +1,7 @@
 use http::StatusCode;
+use topcoat_core::runtime::error::Result;
 
-use crate::runtime::Response;
+use crate::runtime::{IntoResponse, Response};
 
 /// Builds a forbidden (HTTP 403) response.
 ///
@@ -48,8 +49,8 @@ impl std::fmt::Display for ForbiddenError {
 
 impl std::error::Error for ForbiddenError {}
 
-impl axum::response::IntoResponse for ForbiddenError {
-    fn into_response(self) -> Response {
+impl IntoResponse for ForbiddenError {
+    fn into_response(self) -> Result<Response> {
         (StatusCode::FORBIDDEN, "forbidden").into_response()
     }
 }

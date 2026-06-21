@@ -1,7 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
 use ::serde::{Serialize, de::DeserializeOwned};
-use axum::body::to_bytes;
 use http::header::{CONTENT_TYPE, HeaderValue};
 use topcoat_core::runtime::{
     context::Cx,
@@ -10,7 +9,7 @@ use topcoat_core::runtime::{
 
 use crate::runtime::{
     Body, FromRequest, IntoResponse, OptionalFromRequest, Response, bad_request, bad_request_at,
-    content_type,
+    content_type, to_bytes,
 };
 
 /// JSON request extractor and response wrapper.

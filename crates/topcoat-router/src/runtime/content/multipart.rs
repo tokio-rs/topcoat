@@ -1,7 +1,7 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use axum::body::Bytes;
+use bytes::Bytes;
 use futures_util::Stream;
 use http::HeaderMap;
 use topcoat_core::runtime::{
