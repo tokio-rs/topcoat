@@ -1,6 +1,7 @@
 mod body;
 mod content;
 mod context;
+mod endpoint;
 mod error;
 mod manual;
 mod module;
@@ -12,6 +13,7 @@ mod response;
 pub use body::*;
 pub use content::*;
 pub use context::*;
+pub use endpoint::*;
 pub use error::*;
 pub use manual::*;
 pub use module::*;
