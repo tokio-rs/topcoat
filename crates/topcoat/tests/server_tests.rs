@@ -54,7 +54,7 @@ async fn state_page(cx: &Cx) -> Result {
 }
 
 fn test_router() -> Router {
-    Router::new()
+    Router::builder()
         .layout(root)
         .page(home)
         .page(about)
@@ -63,6 +63,7 @@ fn test_router() -> Router {
         .route(health)
         .route(echo)
         .app_context(Marker("hello-from-state"))
+        .build()
 }
 
 async fn spawn_server(router: Router) -> SocketAddr {
