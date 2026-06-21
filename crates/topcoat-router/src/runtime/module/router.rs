@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::HashSet;
 
 use heck::ToKebabCase;
 
@@ -231,7 +230,7 @@ impl ModuleRouterBuilder {
     /// Panics if two discovered layers resolve to the same path.
     #[cfg(feature = "discover")]
     pub fn discover_layers(mut self) -> Self {
-        let mut seen = HashSet::new();
+        let mut seen = std::collections::HashSet::new();
         for layer in inventory::iter::<ModuleLayerFn>().cloned() {
             let path = self.module_path_to_path(layer.module_path());
             if !seen.insert(path.clone()) {
