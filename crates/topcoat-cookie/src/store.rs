@@ -456,7 +456,7 @@ mod tests {
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
         let mut request_context = ContextMap::new();
-        request_context.register::<Parts>(parts);
+        request_context.insert::<Parts>(parts);
         Cx::new(Arc::new(ContextMap::new()), request_context)
     }
 

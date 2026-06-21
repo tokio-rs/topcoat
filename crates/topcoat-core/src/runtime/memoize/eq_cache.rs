@@ -1,9 +1,3 @@
-//! Per-request memoization for expensive computations.
-//!
-//! Functions annotated with `#[memoize]` are evaluated at most once per set of arguments
-//! within the same request context. Repeated calls with equal arguments return the cached
-//! result instead of recomputing it.
-
 use std::{
     any::Any,
     collections::hash_map::RandomState,
@@ -21,22 +15,23 @@ use crate::runtime::context::Cx;
 
 /// The per-request store backing `#[memoize]`.
 ///
+/// This cache variant holds an owned instance of the key, allowing it to guarantee equality
+/// through the `Eq` trait.
+///
 /// `entries` maps an `(F, K)` shape to an index into `values` via [`anymap3::Map`], where `F` is
 /// the memoized function (used as a marker type to keep different functions' caches disjoint) and
 /// `K` is the owned key type. `values` holds the actual cells (`OnceLock<V>` / `OnceCell<V>`)
 /// behind a stable address so we can hand out `&V` references whose lifetime is tied to the cache.
+#[derive(Default)]
 #[doc(hidden)]
-pub struct MemoizeCache {
+pub struct MemoizeEqCache {
     entries: Mutex<anymap3::Map<dyn Any + Send + Sync>>,
     values: boxcar::Vec<Box<dyn Any + Send + Sync + 'static>>,
 }
 
-impl MemoizeCache {
-    pub(super) fn new() -> Self {
-        Self {
-            entries: Mutex::new(anymap3::Map::new()),
-            values: boxcar::Vec::new(),
-        }
+impl MemoizeEqCache {
+    pub fn new() -> Self {
+        Default::default()
     }
 
     /// Returns a stable reference to the cell associated with `(Marker, key)`, creating a default
@@ -133,7 +128,7 @@ impl MemoizeCache {
     }
 }
 
-impl std::fmt::Debug for MemoizeCache {
+impl std::fmt::Debug for MemoizeEqCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MemoizeCache").finish()
     }
@@ -253,7 +248,7 @@ mod tests {
 
     #[test]
     fn sync_same_key_runs_body_once() {
-        let cache = MemoizeCache::new();
+        let cache = MemoizeEqCache::new();
         let cx = Cx::default();
         let n = counter();
         let f = move |_: &Cx, (x, y): (i32, i32)| {
@@ -271,7 +266,7 @@ mod tests {
 
     #[test]
     fn sync_different_keys_run_body_per_key() {
-        let cache = MemoizeCache::new();
+        let cache = MemoizeEqCache::new();
         let cx = Cx::default();
         let n = counter();
         let f = move |_: &Cx, (x, y): (i32, i32)| {
@@ -288,7 +283,7 @@ mod tests {
 
     #[test]
     fn sync_different_functions_dont_collide() {
-        let cache = MemoizeCache::new();
+        let cache = MemoizeEqCache::new();
         let cx = Cx::default();
         let n1 = counter();
         let n2 = counter();
@@ -312,7 +307,7 @@ mod tests {
 
     #[test]
     fn sync_borrowed_str_key_dedupes_by_value() {
-        let cache = MemoizeCache::new();
+        let cache = MemoizeEqCache::new();
         let cx = Cx::default();
         let n = counter();
         let f = move |_: &Cx, (s,): (&str,)| {
@@ -333,7 +328,7 @@ mod tests {
 
     #[test]
     fn sync_zero_arity_key() {
-        let cache = MemoizeCache::new();
+        let cache = MemoizeEqCache::new();
         let cx = Cx::default();
         let n = counter();
         let f = move |_: &Cx, (): ()| {
@@ -351,7 +346,7 @@ mod tests {
 
     #[tokio::test]
     async fn async_same_key_runs_body_once() {
-        let cache = MemoizeCache::new();
+        let cache = MemoizeEqCache::new();
         let cx = Cx::default();
         let n = counter();
         let f = async move |_: &Cx, (x, y): (i32, i32)| {
@@ -369,7 +364,7 @@ mod tests {
 
     #[tokio::test]
     async fn async_different_keys_run_body_per_key() {
-        let cache = MemoizeCache::new();
+        let cache = MemoizeEqCache::new();
         let cx = Cx::default();
         let n = counter();
         let f = async move |_: &Cx, (x, y): (i32, i32)| {

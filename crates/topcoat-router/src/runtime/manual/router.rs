@@ -64,7 +64,7 @@ impl Router {
     pub fn new() -> Self {
         let mut context = ContextMap::new();
         // Register `()` so APIs generic over an app context type can default to `S = ()`.
-        context.register(());
+        context.insert(());
         Self {
             routes: Vec::new(),
             pages: Vec::new(),
@@ -245,7 +245,7 @@ impl Router {
     where
         T: Any + Send + Sync,
     {
-        self.context.register(value);
+        self.context.insert(value);
         self
     }
 }
@@ -320,7 +320,7 @@ impl From<Router> for axum::Router {
                     }
                 }));
 
-            context.register(asset_resolver);
+            context.insert(asset_resolver);
         }
 
         #[cfg(feature = "runtime")]

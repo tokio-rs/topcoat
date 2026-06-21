@@ -25,19 +25,17 @@ impl axum::extract::FromRequest<Arc<ContextMap>> for CxBody {
         req: axum::extract::Request,
         context: &Arc<ContextMap>,
     ) -> Result<Self, Self::Rejection> {
-        let app_context = context.clone();
-        let (mut parts, body) = req.into_parts();
-        let body = Body::from(body);
+        let mut cx = Cx::new(context.clone(), ContextMap::new());
 
-        let mut request_context = ContextMap::new();
-        request_context.register(
+        let (mut parts, body) = req.into_parts();
+
+        cx.insert(
             RawPathParams::from_request_parts(&mut parts, context)
                 .await
                 .map_err(|error| bad_request(error.to_string()))?,
         );
-        request_context.register(parts);
+        cx.insert(parts);
 
-        let cx = Cx::new(app_context, request_context);
         Ok(Self { cx, body })
     }
 }

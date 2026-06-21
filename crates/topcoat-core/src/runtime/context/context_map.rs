@@ -107,7 +107,7 @@ impl ContextMap {
     /// # Panics
     ///
     /// Panics if a value of type `T` has already been registered.
-    pub fn register<T>(&mut self, value: T)
+    pub fn insert<T>(&mut self, value: T)
     where
         T: Any + Send + Sync,
     {
@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn register_and_get_returns_value() {
         let mut context = ContextMap::new();
-        context.register(Database("primary"));
+        context.insert(Database("primary"));
 
         assert_eq!(context.get::<Database>(), Some(&Database("primary")));
     }
@@ -158,8 +158,8 @@ mod tests {
     #[test]
     fn multiple_types_coexist() {
         let mut context = ContextMap::new();
-        context.register(Database("primary"));
-        context.register(Config(42));
+        context.insert(Database("primary"));
+        context.insert(Config(42));
 
         assert_eq!(context.get::<Database>(), Some(&Database("primary")));
         assert_eq!(context.get::<Config>(), Some(&Config(42)));
@@ -169,14 +169,14 @@ mod tests {
     #[should_panic(expected = "duplicate context entry")]
     fn register_panics_on_duplicate_type() {
         let mut context = ContextMap::new();
-        context.register(Database("primary"));
-        context.register(Database("replica"));
+        context.insert(Database("primary"));
+        context.insert(Database("replica"));
     }
 
     #[test]
     fn app_context_returns_registered_value() {
         let mut context = ContextMap::new();
-        context.register(Database("primary"));
+        context.insert(Database("primary"));
         let cx = Cx::new(Arc::new(context), ContextMap::new());
 
         let db: &Database = app_context(&cx);
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn request_context_returns_registered_value() {
         let mut context = ContextMap::new();
-        context.register(Database("primary"));
+        context.insert(Database("primary"));
         let cx = Cx::new(Arc::new(ContextMap::new()), context);
 
         let db: &Database = request_context(&cx);

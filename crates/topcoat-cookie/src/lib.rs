@@ -242,7 +242,7 @@ fn parse_jar(cx: &Cx, (): ()) -> CookieJar {
 /// default attributes on top.
 #[must_use]
 pub fn cookies(cx: &Cx) -> &CookieJar {
-    cx.cache().memoize(cx, (), (), parse_jar)
+    cx.memoize_cache().eq_cache().memoize(cx, (), (), parse_jar)
 }
 
 /// Returns the root jar wrapped in a [`SignedJar`], using the [`Key`]
@@ -275,7 +275,11 @@ pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
 /// incoming `Cookie` header at all.
 #[doc(hidden)]
 pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
-    let Some(jar) = cx.cache().get::<_, CookieJar, _>(parse_jar, ()) else {
+    let Some(jar) = cx
+        .memoize_cache()
+        .eq_cache()
+        .get::<_, CookieJar, _>(parse_jar, ())
+    else {
         return;
     };
     for value in jar.delta_headers() {
@@ -303,7 +307,7 @@ mod tests {
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
         let mut request_context = ContextMap::new();
-        request_context.register::<Parts>(parts);
+        request_context.insert::<Parts>(parts);
         Cx::new(Arc::new(ContextMap::new()), request_context)
     }
 
@@ -317,9 +321,9 @@ mod tests {
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
         let mut request_context = ContextMap::new();
-        request_context.register::<Parts>(parts);
+        request_context.insert::<Parts>(parts);
         let mut app_context = ContextMap::new();
-        app_context.register::<Key>(key);
+        app_context.insert::<Key>(key);
         Cx::new(Arc::new(app_context), request_context)
     }
 

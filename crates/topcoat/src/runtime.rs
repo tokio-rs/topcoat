@@ -1,5 +1,5 @@
 pub use topcoat_runtime::runtime::*;
-pub use topcoat_runtime_macro::expr;
+pub use topcoat_runtime_macro::*;
 
 #[cfg(feature = "view")]
 #[topcoat::view::component]

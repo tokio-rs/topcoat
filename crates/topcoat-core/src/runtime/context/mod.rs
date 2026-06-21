@@ -1,32 +1,19 @@
-mod abort;
 mod context_map;
-mod memoize;
+mod id;
 
-pub use abort::*;
 pub use context_map::*;
-pub use memoize::*;
+pub use id::*;
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
-};
+use std::{any::Any, sync::Arc};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CxId(u64);
-
-impl CxId {
-    fn new() -> Self {
-        static COUNTER: AtomicU64 = AtomicU64::new(0);
-        Self(COUNTER.fetch_add(1, Ordering::Relaxed))
-    }
-}
+use crate::runtime::{abort::AbortStore, memoize::MemoizeCache};
 
 #[derive(Debug)]
 pub struct Cx {
     id: CxId,
-    app_context: Arc<ContextMap>,
-    request_context: ContextMap,
-    cache: MemoizeCache,
+    pub(crate) app_context: Arc<ContextMap>,
+    pub(crate) request_context: ContextMap,
+    memoize_cache: MemoizeCache,
     abort_store: AbortStore,
 }
 
@@ -36,7 +23,7 @@ impl Cx {
             id: CxId::new(),
             app_context,
             request_context,
-            cache: MemoizeCache::new(),
+            memoize_cache: MemoizeCache::new(),
             abort_store: AbortStore::new(),
         }
     }
@@ -46,6 +33,13 @@ impl Cx {
         Self::new(Arc::new(ContextMap::new()), ContextMap::new())
     }
 
+    pub fn insert<T>(&mut self, value: T)
+    where
+        T: Any + Send + Sync,
+    {
+        self.request_context.insert(value);
+    }
+
     #[inline]
     pub fn id(&self) -> CxId {
         self.id
@@ -53,8 +47,8 @@ impl Cx {
 
     #[inline]
     #[doc(hidden)]
-    pub fn cache(&self) -> &MemoizeCache {
-        &self.cache
+    pub fn memoize_cache(&self) -> &MemoizeCache {
+        &self.memoize_cache
     }
 
     #[inline]
