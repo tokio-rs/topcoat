@@ -36,8 +36,13 @@ impl AssetRoute {
     /// Builds the route that serves `asset`.
     pub fn new(asset: &BundledAsset) -> Self {
         let name = asset.name().to_str().expect("asset had non-UTF8 name");
-        let content_type = HeaderValue::from_str(asset.content_type())
-            .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream"));
+        let content_type = HeaderValue::from_str(asset.content_type()).unwrap_or_else(|_| {
+            panic!(
+                "asset `{}` has Content-Type \"{}\" that cannot be converted into a header value",
+                name,
+                asset.content_type()
+            )
+        });
         Self {
             path: Path::new(&format!("{ASSET_ROUTE_PREFIX}/{name}")).to_owned(),
             file: asset.path().to_path_buf(),
