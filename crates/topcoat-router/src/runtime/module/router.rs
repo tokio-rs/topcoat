@@ -421,11 +421,7 @@ mod tests {
     #[test]
     fn override_kind_static_promotes_group_module() {
         // A `_`-prefixed module forced back to a static URL segment.
-        let builder = builder_with(Segment::new(
-            "app::_group",
-            Some(SegmentKind::Static),
-            None,
-        ));
+        let builder = builder_with(Segment::new("app::_group", Some(SegmentKind::Static), None));
         assert_eq!(
             builder.module_path_to_path("app::_group").to_string(),
             "/group"
@@ -435,7 +431,11 @@ mod tests {
     #[test]
     fn override_rename_is_used_verbatim() {
         // A rename is used as-is, without kebab-casing.
-        let builder = builder_with(Segment::new("app::blog_post", None, Some("articles".into())));
+        let builder = builder_with(Segment::new(
+            "app::blog_post",
+            None,
+            Some("articles".into()),
+        ));
         assert_eq!(
             builder.module_path_to_path("app::blog_post").to_string(),
             "/articles"
@@ -446,9 +446,7 @@ mod tests {
     fn override_applies_at_intermediate_segment() {
         let builder = builder_with(Segment::new("app::users", Some(SegmentKind::Param), None));
         assert_eq!(
-            builder
-                .module_path_to_path("app::users::posts")
-                .to_string(),
+            builder.module_path_to_path("app::users::posts").to_string(),
             "/{users}/posts"
         );
     }
@@ -458,9 +456,11 @@ mod tests {
     #[test]
     #[should_panic(expected = "must be called before registering any resource")]
     fn segment_after_resource_panics() {
-        builder()
-            .page(page_at("app::home"))
-            .segment(Segment::new("app::users", Some(SegmentKind::Param), None));
+        builder().page(page_at("app::home")).segment(Segment::new(
+            "app::users",
+            Some(SegmentKind::Param),
+            None,
+        ));
     }
 
     // ── resource registration and conversion ──
