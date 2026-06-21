@@ -57,3 +57,7 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 ### Tooling
 
 - [`docs/source_formatting.md`](docs/source_formatting.md) — `topcoat fmt`, which formats Topcoat macro bodies (like `view!`) alongside `rustfmt`, plus editor integration.
+
+## Safety
+
+This project only uses safe code. Unsafe is not allowed.
