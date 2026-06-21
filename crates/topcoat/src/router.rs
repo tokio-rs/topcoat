@@ -1,2 +1,17 @@
 pub use topcoat_router::runtime::*;
 pub use topcoat_router_macro::*;
+
+#[cfg(feature = "discover")]
+pub trait RouterBuilderDiscoverExt {
+    fn discover(self) -> Self;
+}
+
+#[cfg(feature = "discover")]
+impl RouterBuilderDiscoverExt for RouterBuilder {
+    fn discover(mut self) -> Self {
+        self = self.discover_routes();
+        self = self.discover_pages();
+        self = self.discover_layouts();
+        self
+    }
+}

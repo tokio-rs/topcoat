@@ -126,6 +126,16 @@ impl RouterBuilder {
         self
     }
 
+    /// Registers every route annotated with `#[route]` and collected at link
+    /// time.
+    #[cfg(feature = "discover")]
+    pub fn discover_routes(mut self) -> Self {
+        for route in inventory::iter::<crate::runtime::RouteFn>().cloned() {
+            self = self.route(route);
+        }
+        self
+    }
+
     /// Registers a [`PageFn`]. Order doesn't matter — layout matching is based
     /// on path prefixes, not registration order.
     pub fn page(mut self, page: PageFn) -> Self {
@@ -133,10 +143,30 @@ impl RouterBuilder {
         self
     }
 
+    /// Registers every [`PageFn`] annotated with `#[page]` and collected at
+    /// link time.
+    #[cfg(feature = "discover")]
+    pub fn discover_pages(mut self) -> Self {
+        for page in inventory::iter::<PageFn>().cloned() {
+            self = self.page(page);
+        }
+        self
+    }
+
     /// Registers a [`LayoutFn`]. A layout applies to every page whose path
     /// starts with the layout's path prefix.
     pub fn layout(mut self, layout: LayoutFn) -> Self {
         self.layouts.push(layout);
+        self
+    }
+
+    /// Registers every [`LayoutFn`] annotated with `#[layout]` and collected at
+    /// link time.
+    #[cfg(feature = "discover")]
+    pub fn discover_layouts(mut self) -> Self {
+        for layout in inventory::iter::<LayoutFn>().cloned() {
+            self = self.layout(layout);
+        }
         self
     }
 
