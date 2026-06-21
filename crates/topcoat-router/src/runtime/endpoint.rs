@@ -83,6 +83,11 @@ fn standard_slot(method: &Method) -> Option<usize> {
 pub(crate) struct Endpoint {
     standard: [RouteIndex; STANDARD_METHODS.len()],
     other: HashMap<Method, usize>,
+    /// The layers wrapping every route at this path, as indices into the
+    /// router's layer list, precomputed at build time and ordered from
+    /// least- to most-specific so the outermost layer runs first. Shared by
+    /// every method at the path, including the `405` fallback.
+    layers: Box<[usize]>,
 }
 
 impl Endpoint {
@@ -120,6 +125,17 @@ impl Endpoint {
             .filter(|(slot, _)| !self.standard[*slot].is_none())
             .map(|(_, method)| method)
             .chain(self.other.keys())
+    }
+
+    /// Records the precomputed layer stack wrapping this path's routes.
+    pub(crate) fn set_layers(&mut self, layers: Box<[usize]>) {
+        self.layers = layers;
+    }
+
+    /// Returns the precomputed layer stack wrapping this path's routes, as
+    /// indices into the router's layer list.
+    pub(crate) fn layers(&self) -> &[usize] {
+        &self.layers
     }
 }
 

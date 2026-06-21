@@ -3,12 +3,11 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use http::{HeaderValue, Method, StatusCode};
 use topcoat_core::runtime::context::{ContextMap, Cx};
 
 use crate::runtime::{
-    Body, Endpoint, Layer, LayoutFn, Next, PageFn, PageWithLayouts, RawPathParams, Request,
-    Response, Route, not_found, respond,
+    Endpoint, Layer, LayoutFn, Next, PageFn, PageWithLayouts, Path, RawPathParams, Request,
+    Response, Route, Terminal, respond,
 };
 
 /// A finalized Topcoat routing table.
@@ -58,53 +57,58 @@ impl Router {
     pub async fn handle(&self, request: Request) -> Response {
         let (parts, body) = request.into_parts();
 
-        let Ok(matched) = self.endpoints.at(parts.uri.path()) else {
-            return respond(not_found());
+        // Resolve the layer stack and the chain's terminal. A matched path
+        // reuses its endpoint's precomputed layer stack — whether the method
+        // matches (a route) or not (405) — so both flow through the same layers.
+        // An unmatched path (404) has no precomputed stack, so its layers are
+        // selected from the request path on this cold path.
+        let not_found_layers: Vec<usize>;
+        let (layers, terminal, path_params) = match self.endpoints.at(parts.uri.path()) {
+            Ok(matched) => {
+                let path_params = RawPathParams::from_pairs(matched.params.iter());
+                let terminal = match matched.value.get(&parts.method) {
+                    Some(index) => Terminal::Route(&*self.routes[index]),
+                    None => Terminal::MethodNotAllowed(matched.value),
+                };
+                (matched.value.layers(), terminal, path_params)
+            }
+            Err(_) => {
+                not_found_layers = layers_for(request_path(&parts.uri), &self.layers);
+                (
+                    not_found_layers.as_slice(),
+                    Terminal::NotFound,
+                    RawPathParams::default(),
+                )
+            }
         };
-        let Some(index) = matched.value.get(&parts.method) else {
-            return method_not_allowed(matched.value);
-        };
-        let path_params = RawPathParams::from_pairs(matched.params.iter());
-
-        // Select the layers whose path is a prefix of the route's, ordered
-        // least- to most-specific so the outermost layer runs first. Reversing
-        // before the (stable) sort means that among layers sharing a path the
-        // most recently registered ends up outermost.
-        let route = &*self.routes[index];
-        let route_path = route.path();
-        let mut layers: Vec<&dyn Layer> = self
-            .layers
-            .iter()
-            .map(|layer| &**layer)
-            .filter(|layer| route_path.starts_with(&layer.path()))
-            .rev()
-            .collect();
-        layers.sort_by_key(|layer| layer.path().len());
 
         let mut cx = Cx::new(self.app_context.clone(), ContextMap::new());
         cx.insert(path_params);
         cx.insert(parts);
 
-        let next = Next::new(&layers, route);
+        let next = Next::new(&self.layers, layers, terminal);
         respond(next.run(&mut cx, body).await)
     }
 }
 
-/// Builds a `405 Method Not Allowed` response whose `Allow` header lists the
-/// methods the matched endpoint actually supports.
-fn method_not_allowed(endpoint: &Endpoint) -> Response {
-    let allow = endpoint
-        .methods()
-        .map(Method::as_str)
-        .collect::<Vec<_>>()
-        .join(", ");
+/// Parses a request URI's path into a [`Path`], falling back to the root path
+/// when it is malformed so layer selection still resolves the root layers.
+fn request_path(uri: &http::Uri) -> &Path {
+    Path::from_str(uri.path()).unwrap_or(Path::new("/"))
+}
 
-    let mut response = Response::new(Body::empty());
-    *response.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
-    if let Ok(allow) = HeaderValue::from_str(&allow) {
-        response.headers_mut().insert(http::header::ALLOW, allow);
-    }
-    response
+/// Selects the layers whose path is a prefix of `path`, as indices into
+/// `layers`, ordered least- to most-specific so the outermost layer runs first.
+///
+/// Reversing the filtered indices before the stable sort means that among
+/// layers sharing a path the most recently registered ends up outermost.
+fn layers_for(path: &Path, layers: &[Box<dyn Layer>]) -> Vec<usize> {
+    let mut indices: Vec<usize> = (0..layers.len())
+        .filter(|&i| path.starts_with(&layers[i].path()))
+        .rev()
+        .collect();
+    indices.sort_by_key(|&i| layers[i].path().len());
+    indices
 }
 
 /// Builds a [`Router`] for a Topcoat application.
@@ -339,20 +343,29 @@ impl RouterBuilder {
         // Group routes that share a path into a single endpoint first, since
         // matchit rejects inserting the same path twice. Two routes that resolve
         // to the same path *and* method are ambiguous, so reject them here.
+        // Remember each group's first route path (with its group segments
+        // intact, which `to_matchit_path` strips) to select the endpoint's
+        // layers below.
         let mut grouped: HashMap<Cow<'static, str>, Endpoint> = HashMap::new();
+        let mut paths: HashMap<Cow<'static, str>, Cow<'static, Path>> = HashMap::new();
         for (index, route) in routes.iter().enumerate() {
-            let path = route.path().to_matchit_path();
+            let route_path = route.path();
+            let path = route_path.to_matchit_path();
             let method = route.method();
             let endpoint = grouped.entry(path.clone()).or_default();
             if endpoint.get(&method).is_some() {
                 panic!("duplicate route registered for `{method} {path}`");
             }
             endpoint.insert(method, index);
+            paths.entry(path).or_insert(route_path);
         }
 
+        // Precompute the layer stack wrapping each endpoint once, so dispatch
+        // only has to index into it rather than filter and sort per request.
         let mut endpoints = matchit::Router::new();
         for (path, mut endpoint) in grouped {
             endpoint.alias_head_to_get();
+            endpoint.set_layers(layers_for(&paths[&path], &layers).into_boxed_slice());
             endpoints
                 .insert(path.clone(), endpoint)
                 .unwrap_or_else(|error| panic!("failed to register route {path:?}: {error}"));
@@ -378,13 +391,15 @@ mod tests {
     use std::pin::Pin;
 
     use bytes::Bytes;
+    use http::StatusCode;
     use http::header::{HeaderName, HeaderValue};
     use topcoat_core::runtime::error::Result;
     use topcoat_view::runtime::{View, ViewParts};
 
     use super::*;
     use crate::runtime::{
-        IntoResponse, LayerFuture, LayoutFn, PageFn, Path, RouteFuture, Slot, to_bytes,
+        Body, IntoResponse, LayerFuture, LayoutFn, Method, PageFn, Path, RouteFuture, Slot,
+        to_bytes,
     };
 
     const TRACE: HeaderName = HeaderName::from_static("x-trace");
@@ -421,6 +436,10 @@ mod tests {
     /// A `Layer` that appends its label to the `x-trace` response header, so a
     /// test can observe which layers ran and in what order. Because each layer
     /// appends *after* `next` returns, the innermost layer's label appears first.
+    ///
+    /// When `next` resolves to an error (a 404 or 405, which reach the layer as
+    /// `Err`), it materializes the error response and tags that, so the same
+    /// trace assertions work whether or not a route matched.
     struct TraceLayer {
         path: &'static str,
         label: &'static str,
@@ -440,7 +459,10 @@ mod tests {
         fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
             let label = self.label;
             Box::pin(async move {
-                let mut response = next.run(cx, body).await?;
+                let mut response = match next.run(cx, body).await {
+                    Ok(response) => response,
+                    Err(error) => respond(Err::<(), _>(error)),
+                };
                 let trace = match response.headers().get(&TRACE).and_then(|v| v.to_str().ok()) {
                     Some(existing) => format!("{existing},{label}"),
                     None => label.to_owned(),
@@ -697,16 +719,47 @@ mod tests {
         assert_eq!(body_str(&call(&router, Method::GET, "/about")), "PAGE");
     }
 
-    // ── method_not_allowed helper ──
+    // ── 404 and 405 through layers ──
 
     #[test]
-    fn method_not_allowed_lists_supported_methods() {
-        let mut endpoint = Endpoint::default();
-        endpoint.insert(Method::GET, 0);
-        endpoint.insert(Method::POST, 1);
+    fn not_found_runs_through_matching_layers() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/admin/users", "admin"))
+            .layer(TraceLayer::new("/", "root"))
+            .layer(TraceLayer::new("/admin", "admin"))
+            .build();
 
-        let response = method_not_allowed(&endpoint);
+        // A 404 under /admin runs both the root layer and the /admin layer,
+        // selected from the request path even though no route matched.
+        let response = call(&router, Method::GET, "/admin/missing");
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(trace(&response), "admin,root");
+    }
+
+    #[test]
+    fn not_found_outside_a_layer_does_not_run_it() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/admin/users", "admin"))
+            .layer(TraceLayer::new("/admin", "admin"))
+            .build();
+
+        // The /admin layer does not wrap a 404 outside its prefix.
+        let response = call(&router, Method::GET, "/public/missing");
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert!(response.headers().get(&TRACE).is_none());
+    }
+
+    #[test]
+    fn method_not_allowed_runs_through_layers_and_lists_methods() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/users", "list"))
+            .layer(TraceLayer::new("/", "root"))
+            .build();
+
+        let response = call(&router, Method::DELETE, "/users");
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+        // The layer wrapping the path observes the 405.
+        assert_eq!(trace(&response), "root");
 
         let allow = response
             .headers()
@@ -715,6 +768,6 @@ mod tests {
             .to_str()
             .unwrap();
         assert!(allow.contains("GET"), "allow header was {allow:?}");
-        assert!(allow.contains("POST"), "allow header was {allow:?}");
+        assert!(allow.contains("HEAD"), "allow header was {allow:?}");
     }
 }
