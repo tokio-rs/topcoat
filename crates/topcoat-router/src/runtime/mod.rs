@@ -9,6 +9,9 @@ mod path;
 mod path_params;
 mod request;
 mod response;
+mod router;
+mod serve;
+mod service;
 
 pub use body::*;
 pub use content::*;
@@ -21,5 +24,8 @@ pub use path::*;
 pub use path_params::*;
 pub use request::*;
 pub use response::*;
+pub use router::*;
+pub use serve::*;
+pub use service::*;
 
 pub use http::Method;

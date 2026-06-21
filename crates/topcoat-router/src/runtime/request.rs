@@ -14,6 +14,9 @@ use crate::runtime::{
 
 pub use bytes::{Bytes, BytesMut};
 
+/// An incoming HTTP request, carrying a [`Body`] by default.
+pub type Request<T = Body> = http::Request<T>;
+
 pub(crate) struct CxBody {
     pub(crate) cx: Cx,
     pub(crate) body: Body,

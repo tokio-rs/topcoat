@@ -44,6 +44,9 @@ heck.workspace = true
 http.workspace = true
 http-body.workspace = true
 http-body-util.workspace = true
+hyper = { workspace = true, features = ["server", "http1", "http2"] }
+hyper-util = { workspace = true, features = ["server-auto", "tokio"] }
+matchit.workspace = true
 percent-encoding.workspace = true
 inventory = { workspace = true, optional = true }
 multer = { workspace = true, optional = true }
@@ -56,7 +59,7 @@ serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
 syn = { workspace = true, optional = true, features = ["full"] }
 thiserror.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["net", "rt"] }
 tower.workspace = true
 uuid = { workspace = true, features = ["v4"] }
 
