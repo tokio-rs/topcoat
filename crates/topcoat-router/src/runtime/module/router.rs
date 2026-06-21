@@ -197,9 +197,25 @@ impl ModuleRouterBuilder {
 
     /// Registers every [`ModuleLayoutFn`] annotated with `#[layout]` and
     /// collected at link time, deriving each path from the module tree.
+    ///
+    /// At most one discovered layout is allowed per path: a page's layouts nest
+    /// by path prefix, so two layouts resolving to the same path would have an
+    /// undefined nesting order. To attach more than one layout to a page, give
+    /// them distinct paths or compose them in a single layout component.
+    ///
+    /// # Panics
+    ///
+    /// Panics if two discovered layouts resolve to the same path.
     #[cfg(feature = "discover")]
     pub fn discover_layouts(mut self) -> Self {
+        let mut seen = std::collections::HashSet::new();
         for layout in inventory::iter::<ModuleLayoutFn>().cloned() {
+            if !seen.insert(self.module_path_to_path(layout.module_path())) {
+                panic!(
+                    "multiple discovered layouts registered for the same path \"{}\"",
+                    self.module_path_to_path(layout.module_path())
+                );
+            }
             self = self.layout(layout);
         }
         self
@@ -232,9 +248,11 @@ impl ModuleRouterBuilder {
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
         for layer in inventory::iter::<ModuleLayerFn>().cloned() {
-            let path = self.module_path_to_path(layer.module_path());
-            if !seen.insert(path.clone()) {
-                panic!("multiple discovered layers registered for the same path {path}");
+            if !seen.insert(self.module_path_to_path(layer.module_path())) {
+                panic!(
+                    "multiple discovered layers registered for the same path \"{}\"",
+                    self.module_path_to_path(layer.module_path())
+                );
             }
             self = self.layer(layer);
         }

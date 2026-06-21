@@ -207,9 +207,25 @@ impl RouterBuilder {
 
     /// Registers every [`LayoutFn`] annotated with `#[layout]` and collected at
     /// link time.
+    ///
+    /// At most one discovered layout is allowed per path: a page's layouts nest
+    /// by path prefix, so two layouts sharing a path would have an undefined
+    /// nesting order. To attach more than one layout to a page, give them
+    /// distinct paths or compose them in a single layout component.
+    ///
+    /// # Panics
+    ///
+    /// Panics if two discovered layouts share the same path.
     #[cfg(feature = "discover")]
     pub fn discover_layouts(mut self) -> Self {
+        let mut seen = std::collections::HashSet::<Cow<'static, crate::runtime::Path>>::new();
         for layout in inventory::iter::<LayoutFn>().cloned() {
+            if !seen.insert(layout.path()) {
+                panic!(
+                    "multiple discovered layouts registered for the same path \"{}\"",
+                    layout.path()
+                );
+            }
             self = self.layout(layout);
         }
         self
@@ -245,9 +261,11 @@ impl RouterBuilder {
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::<Cow<'static, crate::runtime::Path>>::new();
         for layer in inventory::iter::<crate::runtime::LayerFn>().cloned() {
-            let path = layer.path();
-            if !seen.insert(path.clone()) {
-                panic!("multiple discovered layers registered for the same path {path:?}");
+            if !seen.insert(layer.path()) {
+                panic!(
+                    "multiple discovered layers registered for the same path \"{}\"",
+                    layer.path()
+                );
             }
             self = self.layer(layer);
         }
@@ -306,7 +324,7 @@ impl RouterBuilder {
         for page in pages {
             let mut matching: Vec<LayoutFn> = layouts
                 .iter()
-                .filter(|layout| page.path().starts_with(layout.path()))
+                .filter(|layout| page.path().starts_with(&layout.path()))
                 .cloned()
                 .collect();
             matching.sort_by_key(|layout| layout.path().len());

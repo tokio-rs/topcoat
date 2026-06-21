@@ -85,8 +85,8 @@ impl LayoutFn {
     }
 
     /// Returns the path prefix this layout applies to.
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn path(&self) -> Cow<'static, Path> {
+        self.path.clone()
     }
 
     /// Renders the layout, embedding the given [`Slot`] as child content.
