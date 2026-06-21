@@ -7,7 +7,8 @@ use http::{HeaderValue, Method, StatusCode};
 use topcoat_core::runtime::context::{ContextMap, Cx};
 
 use crate::runtime::{
-    Body, Endpoint, RawPathParams, Request, Response, Route, finalize, not_found, respond,
+    Body, Endpoint, LayoutFn, PageFn, PageWithLayouts, RawPathParams, Request, Response, Route,
+    finalize, not_found, respond,
 };
 
 /// A finalized collection of [`Route`]s, ready to dispatch requests.
@@ -94,6 +95,8 @@ fn method_not_allowed(endpoint: &Endpoint) -> Response {
 /// ```
 pub struct RouterBuilder {
     routes: Vec<Box<dyn Route>>,
+    pages: Vec<PageFn>,
+    layouts: Vec<LayoutFn>,
     context: ContextMap,
 }
 
@@ -105,14 +108,35 @@ impl RouterBuilder {
         context.insert(());
         Self {
             routes: Vec::new(),
+            pages: Vec::new(),
+            layouts: Vec::new(),
             context,
         }
+    }
+
+    /// Returns `true` if no routes, pages, or layouts have been registered.
+    pub fn is_empty(&self) -> bool {
+        self.routes.is_empty() && self.pages.is_empty() && self.layouts.is_empty()
     }
 
     /// Registers a [`Route`], an HTTP handler bound to a specific method and
     /// path.
     pub fn route(mut self, route: impl Route) -> Self {
         self.routes.push(Box::new(route));
+        self
+    }
+
+    /// Registers a [`PageFn`]. Order doesn't matter — layout matching is based
+    /// on path prefixes, not registration order.
+    pub fn page(mut self, page: PageFn) -> Self {
+        self.pages.push(page);
+        self
+    }
+
+    /// Registers a [`LayoutFn`]. A layout applies to every page whose path
+    /// starts with the layout's path prefix.
+    pub fn layout(mut self, layout: LayoutFn) -> Self {
+        self.layouts.push(layout);
         self
     }
 
@@ -153,12 +177,35 @@ impl RouterBuilder {
         self
     }
 
-    /// Finalizes the registered routes into a [`Router`].
+    /// Finalizes the registered routes, pages, and layouts into a [`Router`].
+    ///
+    /// Each [`PageFn`] is matched against the registered [`LayoutFn`]s by path
+    /// prefix and wired into a [`PageWithLayouts`], which is registered as a
+    /// `GET` route alongside the explicit routes.
     pub fn build(self) -> Router {
+        let RouterBuilder {
+            mut routes,
+            pages,
+            layouts,
+            context,
+        } = self;
+
+        // Wire each page to the layouts whose path is a prefix of the page's,
+        // ordered from least- to most-specific so the page nests innermost.
+        for page in pages {
+            let mut matching: Vec<LayoutFn> = layouts
+                .iter()
+                .filter(|layout| page.path().starts_with(layout.path()))
+                .cloned()
+                .collect();
+            matching.sort_by_key(|layout| layout.path().len());
+            routes.push(Box::new(PageWithLayouts::new(page, matching)));
+        }
+
         // Group routes that share a path into a single endpoint first, since
         // matchit rejects inserting the same path twice.
         let mut grouped: HashMap<Cow<'static, str>, Endpoint> = HashMap::new();
-        for (index, route) in self.routes.iter().enumerate() {
+        for (index, route) in routes.iter().enumerate() {
             grouped
                 .entry(route.path().to_matchit_path())
                 .or_default()
@@ -174,9 +221,9 @@ impl RouterBuilder {
         }
 
         Router {
-            routes: self.routes,
+            routes,
             endpoints,
-            app_context: Arc::new(self.context),
+            app_context: Arc::new(context),
         }
     }
 }

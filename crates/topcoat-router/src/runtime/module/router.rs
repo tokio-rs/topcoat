@@ -3,16 +3,16 @@ use std::borrow::Cow;
 use heck::ToKebabCase;
 
 use crate::runtime::{
-    ModuleLayout, ModulePage, ModuleRoute, PathBuf, PathSegment, Router, Segment, SegmentKind,
-    Segments,
+    ModuleLayoutFn, ModulePageFn, ModuleRouteFn, PathBuf, PathSegment, RouterBuilder, Segment,
+    SegmentKind, Segments,
 };
 
-/// The module-based router, created by the `module_router!` macro.
+/// The module-based router builder, created by the `module_router!` macro.
 ///
-/// Translates Rust module paths into route paths and builds a [`Router`].
-/// The module tree rooted at `root_module_path` becomes the route tree: each
-/// module maps to a path segment, with `_`-prefixed modules becoming groups
-/// and static names kebab-cased.
+/// Translates Rust module paths into route paths and builds a
+/// [`RouterBuilder`]. The module tree rooted at `root_module_path` becomes the
+/// route tree: each module maps to a path segment, with `_`-prefixed modules
+/// becoming groups and static names kebab-cased.
 ///
 /// Segment overrides (kind, rename) registered via `segment!` are applied during
 /// the module-to-path translation. Overrides must be registered before any pages
@@ -25,21 +25,21 @@ use crate::runtime::{
 /// 4. Kebab-case static segment names, leave others as-is
 /// 5. Collect into a [`PathBuf`]
 #[doc(hidden)]
-pub struct ModuleRouter {
-    inner: Router,
+pub struct ModuleRouterBuilder {
+    inner: RouterBuilder,
     root_module_path: &'static str,
     segments: Segments,
 }
 
-impl ModuleRouter {
-    /// Creates a new `ModuleRouter` rooted at the given module path.
+impl ModuleRouterBuilder {
+    /// Creates a new `ModuleRouterBuilder` rooted at the given module path.
     ///
     /// The `root_module_path` is the `module_path!()` of the module calling
     /// `module_router!`.
     pub fn new(root_module_path: &'static str) -> Self {
         Self {
             root_module_path,
-            inner: Router::new(),
+            inner: RouterBuilder::new(),
             segments: Segments::new(),
         }
     }
@@ -128,68 +128,67 @@ impl ModuleRouter {
         path_buf
     }
 
-    /// Registers a [`ModulePage`], computing its route path from the module path.
+    /// Registers a [`ModulePageFn`], computing its route path from the module path.
     ///
     /// # Panics
     ///
     /// Panics if a page has already been registered for the same path.
-    pub fn page(mut self, page: ModulePage) -> Self {
+    pub fn page(mut self, page: ModulePageFn) -> Self {
         let module_path = page.module_path();
         let page = page.into_page(Cow::Owned(self.module_path_to_path(module_path)));
         self.inner = self.inner.page(page);
         self
     }
 
-    /// Registers a [`ModuleLayout`], computing its route path from the module path.
+    /// Registers a [`ModuleLayoutFn`], computing its route path from the module path.
     ///
     /// # Panics
     ///
     /// Panics if a layout has already been registered for the same path.
-    pub fn layout(mut self, layout: ModuleLayout) -> Self {
+    pub fn layout(mut self, layout: ModuleLayoutFn) -> Self {
         let module_path = layout.module_path();
         let layout = layout.into_layout(Cow::Owned(self.module_path_to_path(module_path)));
         self.inner = self.inner.layout(layout);
         self
     }
 
-    /// Registers a [`ModuleRoute`], computing its route path from the module path.
+    /// Registers a [`ModuleRouteFn`], computing its route path from the module path.
     ///
     /// # Panics
     ///
     /// Panics if a route has already been registered for the same path.
-    pub fn route(mut self, route: ModuleRoute) -> Self {
+    pub fn route(mut self, route: ModuleRouteFn) -> Self {
         let module_path = route.module_path();
         let route = route.into_route(Cow::Owned(self.module_path_to_path(module_path)));
         self.inner = self.inner.route(route);
         self
     }
 
-    /// Discovers and registers all segments, pages, and layouts collected at link time.
+    /// Discovers and registers all segments, pages, layouts, and routes
+    /// collected at link time.
     ///
-    /// Segments are registered first (they must precede pages/layouts), then
-    /// pages and layouts, and finally the inner router's own `discover()` is
-    /// called to pick up any non-module-router pages and layouts.
+    /// Segments are registered first, since they must precede pages and
+    /// layouts, then the pages, layouts, and routes.
     #[cfg(feature = "discover")]
     pub fn discover(mut self) -> Self {
         for segment in inventory::iter::<Segment>().cloned() {
             self = self.segment(segment);
         }
-        for page in inventory::iter::<ModulePage>().cloned() {
+        for page in inventory::iter::<ModulePageFn>().cloned() {
             self = self.page(page);
         }
-        for layout in inventory::iter::<ModuleLayout>().cloned() {
+        for layout in inventory::iter::<ModuleLayoutFn>().cloned() {
             self = self.layout(layout);
         }
-        for route in inventory::iter::<ModuleRoute>().cloned() {
+        for route in inventory::iter::<ModuleRouteFn>().cloned() {
             self = self.route(route);
         }
-        self.inner = self.inner.discover();
         self
     }
 }
 
-impl From<ModuleRouter> for Router {
-    fn from(value: ModuleRouter) -> Self {
+impl From<ModuleRouterBuilder> for RouterBuilder {
+    fn from(value: ModuleRouterBuilder) -> Self {
         value.inner
     }
 }
@@ -200,8 +199,8 @@ mod tests {
 
     use super::*;
 
-    fn router(root: &'static str) -> ModuleRouter {
-        ModuleRouter::new(root)
+    fn router(root: &'static str) -> ModuleRouterBuilder {
+        ModuleRouterBuilder::new(root)
     }
 
     fn seg(
@@ -429,7 +428,7 @@ mod tests {
     fn segment_after_page_panics() {
         let r = router("my_crate::app");
         // Register a page first, then try to add a segment.
-        let page = ModulePage::new("my_crate::app::about", |_, _| {
+        let page = ModulePageFn::new("my_crate::app::about", |_, _| {
             unimplemented!();
         });
         r.page(page)

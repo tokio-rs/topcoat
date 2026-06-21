@@ -95,14 +95,14 @@ impl ToTokens for Layout {
         match attr.path.as_ref() {
             Some(path) => quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: ::topcoat::router::Layout = ::topcoat::router::Layout::new(
+                const #ident: ::topcoat::router::LayoutFn = ::topcoat::router::LayoutFn::new(
                     ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
                     #render,
                 );
             },
             None => quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: ::topcoat::router::ModuleLayout = ::topcoat::router::ModuleLayout::new(module_path!(), #render);
+                const #ident: ::topcoat::router::ModuleLayoutFn = ::topcoat::router::ModuleLayoutFn::new(module_path!(), #render);
             }
         }.to_tokens(tokens);
 

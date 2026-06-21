@@ -76,14 +76,14 @@ impl ToTokens for Page {
         match attr.path.as_ref() {
             Some(path) => quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: ::topcoat::router::Page = ::topcoat::router::Page::new(
+                const #ident: ::topcoat::router::PageFn = ::topcoat::router::PageFn::new(
                     ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
                     #render,
                 );
             },
             None => quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: ::topcoat::router::ModulePage = ::topcoat::router::ModulePage::new(module_path!(), #render);
+                const #ident: ::topcoat::router::ModulePageFn = ::topcoat::router::ModulePageFn::new(module_path!(), #render);
             }
         }.to_tokens(tokens);
 
