@@ -92,26 +92,27 @@
 //! }
 //! ```
 //!
-//! ## App and request state helpers
+//! ## App and request context helpers
 //!
-//! This module exposes typed state accessors:
+//! This module exposes typed context accessors:
 //!
-//! - [`app_state::<T>(cx)`](app_state) reads state registered on the router with
-//!   `.app_state(value)`.
-//! - [`request_state::<T>(cx)`](request_state) reads typed state attached to the current request.
+//! - [`app_context::<T>(cx)`](app_context) reads values registered on the router with
+//!   `.app_context(value)`.
+//! - [`request_context::<T>(cx)`](request_context) reads typed values attached to the current
+//!   request.
 //!
 //! ```rust
-//! use topcoat::context::{Cx, app_state};
+//! use topcoat::context::{Cx, app_context};
 //! #
 //! # struct Database;
 //!
 //! fn db(cx: &Cx) -> &Database {
-//!     app_state::<Database>(cx)
+//!     app_context::<Database>(cx)
 //! }
 //! ```
 //!
-//! State is keyed by Rust type. Asking for a type that was not registered panics, so these helpers
-//! are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or
+//! Values are keyed by Rust type. Asking for a type that was not registered panics, so these
+//! helpers are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or
 //! `current_tenant(cx)`.
 //!
 //! ## Extractor escape hatch

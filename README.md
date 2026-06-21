@@ -81,7 +81,7 @@ Authentication, tenant lookup, feature flags, locale detection — anything requ
 
 ```rust,ignore
 fn db(cx: &Cx) -> &Database {
-    app_state(cx)
+    app_context(cx)
 }
 
 #[memoize]
@@ -141,7 +141,7 @@ view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 
 **Working with requests**
 - [Request context (`Cx`)](https://github.com/tokio-rs/topcoat/blob/main/docs/context.md) — the value pages, layouts, and components read from.
-- [App state](https://github.com/tokio-rs/topcoat/blob/main/docs/app_state.md) — share long-lived values across requests, keyed by type.
+- [App context](https://github.com/tokio-rs/topcoat/blob/main/docs/app_context.md) — share long-lived values across requests, keyed by type.
 - [Path and query params](https://github.com/tokio-rs/topcoat/blob/main/docs/path_and_query_params.md) — typed `T::of(cx)` accessors.
 - [Request and response bodies](https://github.com/tokio-rs/topcoat/blob/main/docs/request_response.md) — JSON, forms, custom extractors and responses.
 - [Cookies](https://github.com/tokio-rs/topcoat/blob/main/docs/cookies.md) — read and write the request cookie jar, with signed, encrypted, and prefixed cookies.

@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use topcoat::{
     Result,
-    context::{Cx, app_state},
+    context::{Cx, app_context},
     router::{Router, page},
     view::view,
 };
@@ -14,16 +14,16 @@ async fn main() {
     topcoat::start(
         Router::new()
             .discover()
-            .app_state(PageViews(AtomicU64::new(0))),
+            .app_context(PageViews(AtomicU64::new(0))),
     )
     .await
     .unwrap();
 }
 
-// app_state::<T>(cx) borrows the value registered with Router::app_state.
+// app_context::<T>(cx) borrows the value registered with Router::app_context.
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
-    let views = app_state::<PageViews>(cx);
+    let views = app_context::<PageViews>(cx);
     let current = views.0.fetch_add(1, Ordering::Relaxed) + 1;
 
     view! {

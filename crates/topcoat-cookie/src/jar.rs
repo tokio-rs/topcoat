@@ -2,7 +2,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use cookie::{Cookie, CookieJar as RawCookieJar};
 use http::{HeaderValue, header, request::Parts};
-use topcoat_core::runtime::context::{Cx, request_state};
+use topcoat_core::runtime::context::{Cx, request_context};
 
 use crate::Cookies;
 
@@ -27,11 +27,11 @@ impl CookieJar {
     /// Builds a jar from the request's `Cookie` header(s), seeding each parsed
     /// cookie as an original (so it does not count towards the response delta).
     ///
-    /// Reads the request headers from the [`Parts`] registered in request state
-    /// by the router.
+    /// Reads the request headers from the [`Parts`] registered in request
+    /// context by the router.
     pub(crate) fn from_request(cx: &Cx) -> Self {
         let mut jar = RawCookieJar::new();
-        let parts = request_state::<Parts>(cx);
+        let parts = request_context::<Parts>(cx);
         for value in parts.headers.get_all(header::COOKIE) {
             let Ok(raw) = value.to_str() else { continue };
             for cookie in Cookie::split_parse_encoded(raw.to_owned()).flatten() {

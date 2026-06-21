@@ -17,7 +17,7 @@ use prefix::Conform;
 
 pub use cookie::{Cookie, Expiration, Key, SameSite, time};
 
-use topcoat_core::runtime::context::{Cx, app_state};
+use topcoat_core::runtime::context::{Cx, app_context};
 
 /// A request-scoped cookie jar.
 ///
@@ -246,25 +246,25 @@ pub fn cookies(cx: &Cx) -> &CookieJar {
 }
 
 /// Returns the root jar wrapped in a [`SignedJar`], using the [`Key`]
-/// registered as app state.
+/// registered as app context.
 ///
 /// # Panics
 ///
-/// Panics if no [`Key`] was registered with `Router::app_state`.
+/// Panics if no [`Key`] was registered with `Router::app_context`.
 #[must_use]
 pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
-    cookies(cx).signed(app_state::<Key>(cx))
+    cookies(cx).signed(app_context::<Key>(cx))
 }
 
 /// Returns the root jar wrapped in a [`PrivateJar`], using the [`Key`]
-/// registered as app state.
+/// registered as app context.
 ///
 /// # Panics
 ///
-/// Panics if no [`Key`] was registered with `Router::app_state`.
+/// Panics if no [`Key`] was registered with `Router::app_context`.
 #[must_use]
 pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
-    cookies(cx).private(app_state::<Key>(cx))
+    cookies(cx).private(app_context::<Key>(cx))
 }
 
 /// Appends the request's pending cookie changes to `headers` as `Set-Cookie`
@@ -288,7 +288,7 @@ mod tests {
     use std::sync::Arc;
 
     use http::{HeaderMap, Request, header, request::Parts};
-    use topcoat_core::runtime::context::State;
+    use topcoat_core::runtime::context::ContextMap;
 
     use super::*;
 
@@ -302,12 +302,12 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        let mut request_state = State::new();
-        request_state.register::<Parts>(parts);
-        Cx::new(Arc::new(State::new()), request_state)
+        let mut request_context = ContextMap::new();
+        request_context.register::<Parts>(parts);
+        Cx::new(Arc::new(ContextMap::new()), request_context)
     }
 
-    /// Like [`cx_with`], but also registers `key` as app state so the
+    /// Like [`cx_with`], but also registers `key` as app context so the
     /// `signed_cookies`/`private_cookies` helpers can find it.
     fn cx_with_key(cookie_headers: &[&str], key: Key) -> Cx {
         let mut builder = Request::builder();
@@ -316,11 +316,11 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        let mut request_state = State::new();
-        request_state.register::<Parts>(parts);
-        let mut app_state = State::new();
-        app_state.register::<Key>(key);
-        Cx::new(Arc::new(app_state), request_state)
+        let mut request_context = ContextMap::new();
+        request_context.register::<Parts>(parts);
+        let mut app_context = ContextMap::new();
+        app_context.register::<Key>(key);
+        Cx::new(Arc::new(app_context), request_context)
     }
 
     /// The `Set-Cookie` header values the request would emit.
@@ -565,7 +565,7 @@ mod tests {
     }
 
     #[test]
-    fn signed_cookies_helper_uses_app_state_key() {
+    fn signed_cookies_helper_uses_app_context_key() {
         let key = Key::generate();
 
         let writer = cx_with_key(&[], key.clone());

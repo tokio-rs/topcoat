@@ -65,14 +65,14 @@ Write composable request functions instead. Each function adds one small piece o
 
 ```rust
 use topcoat::{
-    context::{app_state, memoize, Cx},
+    context::{app_context, memoize, Cx},
     router::{headers, FallbackExt, UnauthorizedError},
     Result,
 };
 
 /// Returns the application database handle.
 fn db(cx: &Cx) -> Db {
-    app_state::<Db>(cx).clone()
+    app_context::<Db>(cx).clone()
 }
 
 /// Fetches a user by ID, deduplicated for the duration of the request.

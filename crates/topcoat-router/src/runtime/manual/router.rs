@@ -4,7 +4,7 @@ use axum::{
     response::Html,
     routing::{MethodFilter, get, on},
 };
-use topcoat_core::runtime::context::State;
+use topcoat_core::runtime::context::ContextMap;
 
 use crate::runtime::{CxBody, Layout, Page, Route, finalize, not_found, result_into_response};
 
@@ -30,7 +30,7 @@ use crate::runtime::{CxBody, Layout, Page, Route, finalize, not_found, result_in
 ///         .page(home)
 ///         .page(about)
 ///         .route(api_health)
-///         .app_state(Database::connect())
+///         .app_context(Database::connect())
 /// }
 /// ```
 ///
@@ -40,7 +40,7 @@ use crate::runtime::{CxBody, Layout, Page, Route, finalize, not_found, result_in
 /// pub fn router() -> Router {
 ///     Router::new()
 ///         .discover()
-///         .app_state(Database::connect())
+///         .app_context(Database::connect())
 /// }
 /// ```
 #[derive(Default)]
@@ -56,15 +56,15 @@ pub struct Router {
     #[cfg(feature = "runtime")]
     procedures: Vec<crate::runtime::ErasedProcedure>,
 
-    state: State,
+    context: ContextMap,
 }
 
 impl Router {
     /// Creates an empty router with no pages or layouts.
     pub fn new() -> Self {
-        let mut state = State::new();
-        // Register `()` so APIs generic over an app state type can default to `S = ()`.
-        state.register(());
+        let mut context = ContextMap::new();
+        // Register `()` so APIs generic over an app context type can default to `S = ()`.
+        context.register(());
         Self {
             routes: Vec::new(),
             pages: Vec::new(),
@@ -75,7 +75,7 @@ impl Router {
             shards: topcoat_runtime::runtime::Shards::new(),
             #[cfg(feature = "runtime")]
             procedures: Vec::new(),
-            state,
+            context,
         }
     }
 
@@ -215,17 +215,17 @@ impl Router {
 
     /// Registers a unique value that is accessible to every request sent to
     /// this router by its type `T`. The top-level
-    /// [`app_state`](topcoat_core::runtime::context::app_state) function can be used to
+    /// [`app_context`](topcoat_core::runtime::context::app_context) function can be used to
     /// retrieve a reference to this value via a request context.
     ///
     /// # Panics
     ///
-    /// Panics if a state value has already been registered for the same type.
+    /// Panics if a value has already been registered for the same type.
     ///
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use topcoat::context::{Cx, app_state};
+    /// use topcoat::context::{Cx, app_context};
     /// use topcoat::router::Router;
     ///
     /// struct Database { /* ... */ }
@@ -233,19 +233,19 @@ impl Router {
     /// pub fn router() -> Router {
     ///     Router::new()
     ///         .page(user_profile)
-    ///         .app_state(Database::connect())
+    ///         .app_context(Database::connect())
     /// }
     ///
     /// async fn fetch_user(cx: &Cx, id: u64) -> User {
-    ///     let db: &Database = app_state(cx);
+    ///     let db: &Database = app_context(cx);
     ///     db.fetch_user(id).await;
     /// }
     /// ```
-    pub fn app_state<T>(mut self, value: T) -> Self
+    pub fn app_context<T>(mut self, value: T) -> Self
     where
         T: Any + Send + Sync,
     {
-        self.state.register(value);
+        self.context.register(value);
         self
     }
 }
@@ -255,9 +255,9 @@ impl Router {
 /// path are nested from innermost (most specific) to outermost.
 impl From<Router> for axum::Router {
     fn from(value: Router) -> Self {
-        let mut axum_router = axum::Router::<Arc<State>>::new();
+        let mut axum_router = axum::Router::<Arc<ContextMap>>::new();
         #[allow(unused_mut)]
-        let mut state = value.state;
+        let mut context = value.context;
 
         for page in value.pages {
             let path = page.path();
@@ -320,7 +320,7 @@ impl From<Router> for axum::Router {
                     }
                 }));
 
-            state.register(asset_resolver);
+            context.register(asset_resolver);
         }
 
         #[cfg(feature = "runtime")]
@@ -375,6 +375,6 @@ impl From<Router> for axum::Router {
             axum::response::IntoResponse::into_response(not_found())
         });
 
-        axum_router.with_state(Arc::new(state))
+        axum_router.with_state(Arc::new(context))
     }
 }

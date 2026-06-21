@@ -174,9 +174,9 @@ let session = jar.get("session"); // None if missing or it fails to decrypt
 
 Signing and private encryption operate on the cookie value (and, for private, the name) only — they compose freely with prefixes and attribute defaults in any order.
 
-## Keys from app state
+## Keys from app context
 
-In a real app you generate the `Key` once at startup and share it across requests. Register it as [app state](app_state.md):
+In a real app you generate the `Key` once at startup and share it across requests. Register it as [app context](app_context.md):
 
 ```rust
 use topcoat::{
@@ -187,7 +187,7 @@ use topcoat::{
 pub fn router() -> Router {
     Router::new()
         .discover()
-        .app_state(Key::generate())
+        .app_context(Key::generate())
 }
 ```
 

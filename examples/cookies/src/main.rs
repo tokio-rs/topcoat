@@ -10,9 +10,9 @@ use topcoat::{
 #[tokio::main]
 async fn main() {
     // The Key signs cookies so the client can't forge the counter. Generate it
-    // once at startup and share it across requests as app state. A real app
+    // once at startup and share it across requests as app context. A real app
     // would load a persisted key instead of generating a fresh one each boot.
-    topcoat::start(Router::new().discover().app_state(Key::generate()))
+    topcoat::start(Router::new().discover().app_context(Key::generate()))
         .await
         .unwrap();
 }

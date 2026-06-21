@@ -1,6 +1,6 @@
 use axum::extract::RawPathParams;
 use http::request::Parts;
-use topcoat_core::runtime::context::{Cx, app_state, request_state};
+use topcoat_core::runtime::context::{Cx, app_context, request_context};
 
 /// Returns the [`Parts`] of the current request.
 ///
@@ -21,7 +21,7 @@ use topcoat_core::runtime::context::{Cx, app_state, request_state};
 #[inline]
 #[must_use]
 pub fn parts(cx: &Cx) -> &Parts {
-    request_state(cx)
+    request_context(cx)
 }
 
 /// Returns the HTTP [`Method`] of the current request.
@@ -147,7 +147,7 @@ pub fn extensions(cx: &Cx) -> &http::Extensions {
 #[must_use]
 #[doc(hidden)]
 pub fn raw_path_params(cx: &Cx) -> &RawPathParams {
-    request_state::<RawPathParams>(cx)
+    request_context::<RawPathParams>(cx)
 }
 
 /// Runs an [`axum`] extractor against the current request.
@@ -184,5 +184,5 @@ where
     T: axum::extract::FromRequestParts<S>,
     S: Send + Sync + 'static,
 {
-    T::from_request_parts(&mut parts(cx).clone(), app_state::<S>(cx)).await
+    T::from_request_parts(&mut parts(cx).clone(), app_context::<S>(cx)).await
 }

@@ -6,12 +6,11 @@
 //! possible:
 //!
 //! - [`WatchAbort`] wraps a future and watches a shared [`AbortStore`].
-//! - Any code running inside that future calls [`abort`] to stash a value in
-//!   the store and stop making progress.
-//! - The wrapping [`WatchAbort`] then resolves to [`MaybeAborted::Aborted`]
-//!   carrying that value, dropping the rest of the wrapped future. If no abort
-//!   happens, it resolves to [`MaybeAborted::Completed`] with the future's
-//!   normal output.
+//! - Any code running inside that future calls [`abort`] to stash a value in the store and stop
+//!   making progress.
+//! - The wrapping [`WatchAbort`] then resolves to [`MaybeAborted::Aborted`] carrying that value,
+//!   dropping the rest of the wrapped future. If no abort happens, it resolves to
+//!   [`MaybeAborted::Completed`] with the future's normal output.
 //!
 //! The value travels as a type-erased `Box<dyn Any>`, so the watcher recovers
 //! the concrete type with [`downcast`](std::any::Any::downcast).

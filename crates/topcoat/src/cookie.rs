@@ -210,10 +210,10 @@
 //! the name) only — they compose freely with prefixes and attribute defaults in
 //! any order.
 //!
-//! ## Keys from app state
+//! ## Keys from app context
 //!
 //! In a real app you generate the [`Key`] once at startup and share it across
-//! requests. Register it as [app state](crate::context::app_state):
+//! requests. Register it as [app context](crate::context::app_context):
 //!
 //! ```rust,ignore
 //! use topcoat::{
@@ -224,7 +224,7 @@
 //! pub fn router() -> Router {
 //!     Router::new()
 //!         .discover()
-//!         .app_state(Key::generate())
+//!         .app_context(Key::generate())
 //! }
 //! ```
 //!

@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use topcoat::{
     Result,
-    context::{Cx, app_state},
+    context::{Cx, app_context},
     router::{Json, Router, Slot, layout, page, route},
     view::view,
 };
@@ -49,7 +49,7 @@ struct Marker(&'static str);
 
 #[page("/state")]
 async fn state_page(cx: &Cx) -> Result {
-    let marker = app_state::<Marker>(cx);
+    let marker = app_context::<Marker>(cx);
     view! { <p>(marker.0)</p> }
 }
 
@@ -62,7 +62,7 @@ fn test_router() -> Router {
         .page(state_page)
         .route(health)
         .route(echo)
-        .app_state(Marker("hello-from-state"))
+        .app_context(Marker("hello-from-state"))
 }
 
 async fn spawn_server(router: Router) -> SocketAddr {
@@ -144,7 +144,7 @@ async fn api_route_round_trips_json_body() {
 }
 
 #[tokio::test]
-async fn page_can_read_registered_app_state() {
+async fn page_can_read_registered_app_context() {
     let addr = spawn_server(test_router()).await;
     let resp = reqwest::get(url(addr, "/state")).await.unwrap();
 

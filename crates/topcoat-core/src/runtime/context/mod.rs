@@ -1,10 +1,10 @@
 mod abort;
+mod context_map;
 mod memoize;
-mod state;
 
 pub use abort::*;
+pub use context_map::*;
 pub use memoize::*;
-pub use state::*;
 
 use std::sync::{
     Arc,
@@ -24,18 +24,18 @@ impl CxId {
 #[derive(Debug)]
 pub struct Cx {
     id: CxId,
-    app_state: Arc<State>,
-    request_state: State,
+    app_context: Arc<ContextMap>,
+    request_context: ContextMap,
     cache: MemoizeCache,
     abort_store: AbortStore,
 }
 
 impl Cx {
-    pub fn new(app_state: Arc<State>, request_state: State) -> Self {
+    pub fn new(app_context: Arc<ContextMap>, request_context: ContextMap) -> Self {
         Self {
             id: CxId::new(),
-            app_state,
-            request_state,
+            app_context,
+            request_context,
             cache: MemoizeCache::new(),
             abort_store: AbortStore::new(),
         }
@@ -43,7 +43,7 @@ impl Cx {
 
     #[inline]
     pub fn empty() -> Self {
-        Self::new(Arc::new(State::new()), State::new())
+        Self::new(Arc::new(ContextMap::new()), ContextMap::new())
     }
 
     #[inline]
@@ -66,6 +66,6 @@ impl Cx {
 
 impl Default for Cx {
     fn default() -> Self {
-        Cx::new(Arc::new(State::default()), State::default())
+        Cx::new(Arc::new(ContextMap::default()), ContextMap::default())
     }
 }
