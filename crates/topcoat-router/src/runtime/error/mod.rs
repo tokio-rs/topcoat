@@ -1,6 +1,7 @@
 mod bad_request;
 mod forbidden;
 mod internal_server;
+mod method_not_allowed;
 mod not_found;
 mod redirect;
 mod unauthorized;
@@ -8,6 +9,7 @@ mod unauthorized;
 pub use bad_request::*;
 pub use forbidden::*;
 pub use internal_server::*;
+pub use method_not_allowed::*;
 pub use not_found::*;
 pub use redirect::*;
 pub use unauthorized::*;
@@ -39,6 +41,7 @@ fn error_into_response(error: Error) -> Response {
     let error = try_downcast!(error as BadRequestError);
     let error = try_downcast!(error as InternalServerError);
     let error = try_downcast!(error as NotFoundError);
+    let error = try_downcast!(error as MethodNotAllowedError);
     let error = try_downcast!(error as RedirectError);
     let error = try_downcast!(error as UnauthorizedError);
 
