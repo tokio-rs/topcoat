@@ -122,3 +122,118 @@ impl Endpoint {
             .chain(self.other.keys())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── RouteIndex ──
+
+    #[test]
+    fn route_index_wraps_and_unwraps() {
+        let index = RouteIndex::new(7);
+        assert_eq!(index.get(), Some(7));
+        assert!(!index.is_none());
+    }
+
+    #[test]
+    fn route_index_zero_is_a_real_index() {
+        // Index 0 must be distinguishable from "none".
+        let index = RouteIndex::new(0);
+        assert_eq!(index.get(), Some(0));
+        assert!(!index.is_none());
+    }
+
+    #[test]
+    fn route_index_none_is_absent() {
+        assert_eq!(RouteIndex::NONE.get(), None);
+        assert!(RouteIndex::NONE.is_none());
+        assert_eq!(RouteIndex::default(), RouteIndex::NONE);
+    }
+
+    // ── Endpoint: standard methods ──
+
+    #[test]
+    fn empty_endpoint_has_no_routes() {
+        let endpoint = Endpoint::default();
+        assert_eq!(endpoint.get(&Method::GET), None);
+        assert_eq!(endpoint.get(&Method::POST), None);
+        assert_eq!(endpoint.methods().count(), 0);
+    }
+
+    #[test]
+    fn inserts_and_reads_back_standard_methods() {
+        let mut endpoint = Endpoint::default();
+        endpoint.insert(Method::GET, 0);
+        endpoint.insert(Method::POST, 1);
+        endpoint.insert(Method::DELETE, 2);
+
+        assert_eq!(endpoint.get(&Method::GET), Some(0));
+        assert_eq!(endpoint.get(&Method::POST), Some(1));
+        assert_eq!(endpoint.get(&Method::DELETE), Some(2));
+        // A method that was never registered is still absent.
+        assert_eq!(endpoint.get(&Method::PUT), None);
+    }
+
+    #[test]
+    fn insert_overwrites_the_same_method() {
+        let mut endpoint = Endpoint::default();
+        endpoint.insert(Method::GET, 0);
+        endpoint.insert(Method::GET, 5);
+        assert_eq!(endpoint.get(&Method::GET), Some(5));
+    }
+
+    // ── Endpoint: extension methods ──
+
+    #[test]
+    fn inserts_and_reads_back_extension_methods() {
+        let purge = Method::from_bytes(b"PURGE").unwrap();
+        let mut endpoint = Endpoint::default();
+        endpoint.insert(purge.clone(), 3);
+
+        assert_eq!(endpoint.get(&purge), Some(3));
+        assert_eq!(endpoint.get(&Method::GET), None);
+    }
+
+    // ── Endpoint: HEAD aliasing ──
+
+    #[test]
+    fn alias_points_head_at_get() {
+        let mut endpoint = Endpoint::default();
+        endpoint.insert(Method::GET, 4);
+        endpoint.alias_head_to_get();
+        assert_eq!(endpoint.get(&Method::HEAD), Some(4));
+    }
+
+    #[test]
+    fn alias_does_not_override_explicit_head() {
+        let mut endpoint = Endpoint::default();
+        endpoint.insert(Method::GET, 4);
+        endpoint.insert(Method::HEAD, 9);
+        endpoint.alias_head_to_get();
+        assert_eq!(endpoint.get(&Method::HEAD), Some(9));
+    }
+
+    #[test]
+    fn alias_without_get_leaves_head_absent() {
+        let mut endpoint = Endpoint::default();
+        endpoint.alias_head_to_get();
+        assert_eq!(endpoint.get(&Method::HEAD), None);
+    }
+
+    // ── Endpoint: methods iterator ──
+
+    #[test]
+    fn methods_lists_standard_then_extension() {
+        let purge = Method::from_bytes(b"PURGE").unwrap();
+        let mut endpoint = Endpoint::default();
+        endpoint.insert(Method::POST, 1);
+        endpoint.insert(Method::GET, 0);
+        endpoint.insert(purge.clone(), 2);
+
+        let methods: Vec<&Method> = endpoint.methods().collect();
+        // Standard methods come first, in `STANDARD_METHODS` order, regardless of
+        // insertion order; extension methods follow.
+        assert_eq!(methods, vec![&Method::GET, &Method::POST, &purge]);
+    }
+}

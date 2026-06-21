@@ -287,243 +287,193 @@ impl From<ModuleRouterBuilder> for RouterBuilder {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
+    use std::pin::Pin;
+
+    use topcoat_core::runtime::{context::Cx, error::Result};
+    use topcoat_view::runtime::View;
 
     use super::*;
+    use crate::runtime::{Body, ModulePageFn};
 
-    fn router(root: &'static str) -> ModuleRouterBuilder {
-        ModuleRouterBuilder::new(root)
+    /// A `ModulePageFn` whose render function is never invoked; used to exercise
+    /// registration and path computation without running a page.
+    fn page_at(module_path: &'static str) -> ModulePageFn {
+        fn render<'cx>(
+            _cx: &'cx Cx,
+            _body: Body,
+        ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>> {
+            Box::pin(async { unreachable!("test render function is never called") })
+        }
+        ModulePageFn::new(module_path, render)
     }
 
-    fn seg(
-        module_path: &'static str,
-        kind: Option<SegmentKind>,
-        rename: Option<&'static str>,
-    ) -> Segment {
-        Segment::new(module_path, kind, rename.map(Cow::Borrowed))
+    fn builder() -> ModuleRouterBuilder {
+        ModuleRouterBuilder::new("app")
     }
 
-    // ── module_path_to_path: basic static routes ─────────────────────
+    // ── relative_module_path ──
 
     #[test]
-    fn root_page() {
-        let r = router("my_crate::app");
-        assert_eq!(r.module_path_to_path("my_crate::app").to_string(), "");
+    fn relative_path_of_root_is_empty() {
+        assert_eq!(builder().relative_module_path("app"), "");
     }
 
     #[test]
-    fn simple_page() {
-        let r = router("my_crate::app");
+    fn relative_path_strips_root_prefix() {
+        assert_eq!(builder().relative_module_path("app::users"), "users");
         assert_eq!(
-            r.module_path_to_path("my_crate::app::about").to_string(),
-            "/about"
+            builder().relative_module_path("app::users::id"),
+            "users::id"
         );
     }
 
     #[test]
-    fn nested_page() {
-        let r = router("my_crate::app");
-        assert_eq!(
-            r.module_path_to_path("my_crate::app::settings::profile")
-                .to_string(),
-            "/settings/profile"
-        );
+    #[should_panic(expected = "module path must be under module router's root")]
+    fn relative_path_outside_root_panics() {
+        builder().relative_module_path("other::thing");
     }
 
     #[test]
-    fn nested_mod() {
-        let r = router("my_crate::app");
-        assert_eq!(
-            r.module_path_to_path("my_crate::app::settings").to_string(),
-            "/settings"
-        );
+    #[should_panic(expected = "module path must be under module router's root")]
+    fn relative_path_requires_module_boundary() {
+        // `application` shares the `app` prefix but is not a submodule of it.
+        builder().relative_module_path("application");
     }
 
-    // ── module_path_to_path: kebab-case conversion ───────────────────
+    // ── module_path_to_path ──
+
+    fn path_of(module_path: &'static str) -> String {
+        builder().module_path_to_path(module_path).to_string()
+    }
+
+    #[test]
+    fn root_maps_to_empty_path() {
+        assert_eq!(path_of("app"), "");
+    }
 
     #[test]
     fn static_segment_is_kebab_cased() {
-        let r = router("my_crate::app");
+        assert_eq!(path_of("app::about"), "/about");
+        assert_eq!(path_of("app::blog_posts"), "/blog-posts");
+    }
+
+    #[test]
+    fn nested_static_segments() {
+        assert_eq!(path_of("app::settings::profile"), "/settings/profile");
         assert_eq!(
-            r.module_path_to_path("my_crate::app::my_page").to_string(),
-            "/my-page"
+            path_of("app::user_settings::email_address"),
+            "/user-settings/email-address"
         );
     }
 
     #[test]
-    fn nested_static_segments_are_kebab_cased() {
-        let r = router("my_crate::app");
-        assert_eq!(
-            r.module_path_to_path("my_crate::app::user_settings::change_password")
-                .to_string(),
-            "/user-settings/change-password"
-        );
+    fn underscore_module_is_a_group() {
+        let path = builder().module_path_to_path("app::_marketing::pricing");
+        // The group segment is recorded in the path but stripped from the URL.
+        assert_eq!(path.to_string(), "/(_marketing)/pricing");
+        assert_eq!(path.to_matchit_path(), "/pricing");
     }
 
-    // ── module_path_to_path: group segments (underscore prefix) ──────
+    // ── module_path_to_path with segment overrides ──
 
-    #[test]
-    fn group_segment() {
-        let r = router("my_crate::app");
-        assert_eq!(
-            r.module_path_to_path("my_crate::app::_group::contact")
-                .to_string(),
-            "/(_group)/contact"
-        );
+    fn builder_with(segment: Segment) -> ModuleRouterBuilder {
+        builder().segment(segment)
     }
 
     #[test]
-    fn group_mod() {
-        let r = router("my_crate::app");
-        assert_eq!(
-            r.module_path_to_path("my_crate::app::_group").to_string(),
-            "/(_group)"
-        );
-    }
-
-    #[test]
-    fn nested_groups() {
-        let r = router("my_crate::app");
-        assert_eq!(
-            r.module_path_to_path("my_crate::app::_auth::_admin::dashboard")
-                .to_string(),
-            "/(_auth)/(_admin)/dashboard"
-        );
-    }
-
-    // ── module_path_to_path: segment overrides ───────────────────────
-
-    #[test]
-    fn override_static_to_param() {
-        let r = router("my_crate::app").segment(seg(
-            "my_crate::app::user_id",
+    fn override_kind_param() {
+        let builder = builder_with(Segment::new(
+            "app::users::id",
             Some(SegmentKind::Param),
             None,
         ));
         assert_eq!(
-            r.module_path_to_path("my_crate::app::user_id").to_string(),
-            "/{user_id}"
+            builder.module_path_to_path("app::users::id").to_string(),
+            "/users/{id}"
         );
     }
 
     #[test]
-    fn override_static_to_catch_all() {
-        let r = router("my_crate::app").segment(seg(
-            "my_crate::app::rest",
+    fn override_kind_catch_all() {
+        let builder = builder_with(Segment::new(
+            "app::files::rest",
             Some(SegmentKind::CatchAll),
             None,
         ));
         assert_eq!(
-            r.module_path_to_path("my_crate::app::rest").to_string(),
-            "/{*rest}"
+            builder.module_path_to_path("app::files::rest").to_string(),
+            "/files/{*rest}"
         );
     }
 
     #[test]
-    fn override_group_to_static() {
-        let r = router("my_crate::app").segment(seg(
-            "my_crate::app::_internal",
+    fn override_kind_group_strips_from_url() {
+        let builder = builder_with(Segment::new(
+            "app::marketing",
+            Some(SegmentKind::Group),
+            None,
+        ));
+        let path = builder.module_path_to_path("app::marketing::pricing");
+        assert_eq!(path.to_string(), "/(marketing)/pricing");
+        assert_eq!(path.to_matchit_path(), "/pricing");
+    }
+
+    #[test]
+    fn override_kind_static_promotes_group_module() {
+        // A `_`-prefixed module forced back to a static URL segment.
+        let builder = builder_with(Segment::new(
+            "app::_group",
             Some(SegmentKind::Static),
             None,
         ));
-        // Overridden to static, so kebab-case is applied to the "_internal" name.
         assert_eq!(
-            r.module_path_to_path("my_crate::app::_internal::page")
-                .to_string(),
-            "/internal/page"
+            builder.module_path_to_path("app::_group").to_string(),
+            "/group"
         );
     }
 
     #[test]
-    fn rename_segment() {
-        let r =
-            router("my_crate::app").segment(seg("my_crate::app::blog_post", None, Some("posts")));
+    fn override_rename_is_used_verbatim() {
+        // A rename is used as-is, without kebab-casing.
+        let builder = builder_with(Segment::new("app::blog_post", None, Some("articles".into())));
         assert_eq!(
-            r.module_path_to_path("my_crate::app::blog_post")
-                .to_string(),
-            "/posts"
+            builder.module_path_to_path("app::blog_post").to_string(),
+            "/articles"
         );
     }
 
     #[test]
-    fn rename_and_kind_override() {
-        let r = router("my_crate::app").segment(seg(
-            "my_crate::app::slug",
-            Some(SegmentKind::Param),
-            Some("id"),
-        ));
+    fn override_applies_at_intermediate_segment() {
+        let builder = builder_with(Segment::new("app::users", Some(SegmentKind::Param), None));
         assert_eq!(
-            r.module_path_to_path("my_crate::app::slug").to_string(),
-            "/{id}"
+            builder
+                .module_path_to_path("app::users::posts")
+                .to_string(),
+            "/{users}/posts"
         );
     }
 
+    // ── segment registration ──
+
     #[test]
-    fn param_in_nested_path() {
-        let r = router("my_crate::app").segment(seg(
-            "my_crate::app::users::id",
-            Some(SegmentKind::Param),
-            None,
-        ));
-        assert_eq!(
-            r.module_path_to_path("my_crate::app::users::id")
-                .to_string(),
-            "/users/{id}"
-        );
-        assert_eq!(
-            r.module_path_to_path("my_crate::app::users::id::settings")
-                .to_string(),
-            "/users/{id}/settings"
-        );
+    #[should_panic(expected = "must be called before registering any resource")]
+    fn segment_after_resource_panics() {
+        builder()
+            .page(page_at("app::home"))
+            .segment(Segment::new("app::users", Some(SegmentKind::Param), None));
+    }
+
+    // ── resource registration and conversion ──
+
+    #[test]
+    fn fresh_builder_converts_to_empty_router_builder() {
+        let inner = RouterBuilder::from(builder());
+        assert!(inner.is_empty());
     }
 
     #[test]
-    fn catch_all_nested() {
-        let r = router("my_crate::app").segment(seg(
-            "my_crate::app::docs::path",
-            Some(SegmentKind::CatchAll),
-            None,
-        ));
-        assert_eq!(
-            r.module_path_to_path("my_crate::app::docs::path")
-                .to_string(),
-            "/docs/{*path}"
-        );
-    }
-
-    // ── module_path_to_path: multiple segment overrides ──────────────
-
-    #[test]
-    fn multiple_segments() {
-        let r = router("my_crate::app")
-            .segment(seg(
-                "my_crate::app::users::id",
-                Some(SegmentKind::Param),
-                None,
-            ))
-            .segment(seg(
-                "my_crate::app::users::id::posts::post_id",
-                Some(SegmentKind::Param),
-                None,
-            ));
-        assert_eq!(
-            r.module_path_to_path("my_crate::app::users::id::posts::post_id")
-                .to_string(),
-            "/users/{id}/posts/{post_id}"
-        );
-    }
-
-    // ── segment ordering assertion ───────────────────────────────────
-
-    #[test]
-    #[should_panic(expected = "`segment` must be called before registering any resource")]
-    fn segment_after_page_panics() {
-        let r = router("my_crate::app");
-        // Register a page first, then try to add a segment.
-        let page = ModulePageFn::new("my_crate::app::about", |_, _| {
-            unimplemented!();
-        });
-        r.page(page)
-            .segment(seg("my_crate::app::users", Some(SegmentKind::Param), None));
+    fn registering_a_page_is_observable_after_conversion() {
+        let inner = RouterBuilder::from(builder().page(page_at("app::about")));
+        assert!(!inner.is_empty());
     }
 }

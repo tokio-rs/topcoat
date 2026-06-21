@@ -310,6 +310,11 @@ impl RouterBuilder {
     }
 
     /// Finalizes the registered routes, pages, and layouts into a [`Router`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if two routes resolve to the same path and HTTP method, since the
+    /// router would have no way to choose between them.
     pub fn build(self) -> Router {
         let RouterBuilder {
             mut routes,
@@ -332,13 +337,17 @@ impl RouterBuilder {
         }
 
         // Group routes that share a path into a single endpoint first, since
-        // matchit rejects inserting the same path twice.
+        // matchit rejects inserting the same path twice. Two routes that resolve
+        // to the same path *and* method are ambiguous, so reject them here.
         let mut grouped: HashMap<Cow<'static, str>, Endpoint> = HashMap::new();
         for (index, route) in routes.iter().enumerate() {
-            grouped
-                .entry(route.path().to_matchit_path())
-                .or_default()
-                .insert(route.method(), index);
+            let path = route.path().to_matchit_path();
+            let method = route.method();
+            let endpoint = grouped.entry(path.clone()).or_default();
+            if endpoint.get(&method).is_some() {
+                panic!("duplicate route registered for `{method} {path}`");
+            }
+            endpoint.insert(method, index);
         }
 
         let mut endpoints = matchit::Router::new();
@@ -361,5 +370,333 @@ impl RouterBuilder {
 impl Default for RouterBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::pin::Pin;
+
+    use bytes::Bytes;
+    use http::header::{HeaderName, HeaderValue};
+    use topcoat_core::runtime::error::Result;
+    use topcoat_view::runtime::{View, ViewParts};
+
+    use super::*;
+    use crate::runtime::{
+        IntoResponse, LayerFuture, LayoutFn, PageFn, Path, RouteFuture, Slot, to_bytes,
+    };
+
+    const TRACE: HeaderName = HeaderName::from_static("x-trace");
+
+    /// A `Route` that replies with a fixed body, used to observe which route a
+    /// request was dispatched to.
+    struct TestRoute {
+        method: Method,
+        path: &'static str,
+        body: &'static str,
+    }
+
+    impl TestRoute {
+        fn new(method: Method, path: &'static str, body: &'static str) -> Self {
+            Self { method, path, body }
+        }
+    }
+
+    impl Route for TestRoute {
+        fn method(&self) -> Method {
+            self.method.clone()
+        }
+
+        fn path(&self) -> Cow<'static, Path> {
+            Cow::Borrowed(Path::new(self.path))
+        }
+
+        fn handle<'cx>(&'cx self, _cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
+            let body = self.body;
+            Box::pin(async move { body.into_response() })
+        }
+    }
+
+    /// A `Layer` that appends its label to the `x-trace` response header, so a
+    /// test can observe which layers ran and in what order. Because each layer
+    /// appends *after* `next` returns, the innermost layer's label appears first.
+    struct TraceLayer {
+        path: &'static str,
+        label: &'static str,
+    }
+
+    impl TraceLayer {
+        fn new(path: &'static str, label: &'static str) -> Self {
+            Self { path, label }
+        }
+    }
+
+    impl Layer for TraceLayer {
+        fn path(&self) -> Cow<'static, Path> {
+            Cow::Borrowed(Path::new(self.path))
+        }
+
+        fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+            let label = self.label;
+            Box::pin(async move {
+                let mut response = next.run(cx, body).await?;
+                let trace = match response.headers().get(&TRACE).and_then(|v| v.to_str().ok()) {
+                    Some(existing) => format!("{existing},{label}"),
+                    None => label.to_owned(),
+                };
+                response
+                    .headers_mut()
+                    .insert(TRACE, HeaderValue::from_str(&trace).unwrap());
+                Ok(response)
+            })
+        }
+    }
+
+    /// A page render function producing the static text "PAGE".
+    fn page_render<'cx>(
+        _cx: &'cx Cx,
+        _body: Body,
+    ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>> {
+        Box::pin(async {
+            let mut parts = ViewParts::new();
+            parts.push("PAGE");
+            Ok(View::new(parts))
+        })
+    }
+
+    /// Builds a layout render function that wraps its slot in `name(...)`.
+    macro_rules! wrapping_layout {
+        ($name:literal) => {
+            |_cx: &Cx, slot: Slot<'_>| {
+                Box::pin(async move {
+                    let inner = slot.await?;
+                    let mut parts = ViewParts::new();
+                    parts.push(concat!($name, "("));
+                    parts.push(inner);
+                    parts.push(")");
+                    Ok(View::new(parts))
+                }) as Pin<Box<dyn Future<Output = Result<View>> + Send>>
+            }
+        };
+    }
+
+    fn path(s: &'static str) -> Cow<'static, Path> {
+        Cow::Borrowed(Path::new(s))
+    }
+
+    /// Drives the router with a request and collects the response, reading the
+    /// body fully into memory.
+    fn call(router: &Router, method: Method, uri: &str) -> Response<Bytes> {
+        let request = Request::builder()
+            .method(method)
+            .uri(uri)
+            .body(Body::empty())
+            .unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let (parts, body) = router.handle(request).await.into_parts();
+            let bytes = to_bytes(body, usize::MAX).await.unwrap();
+            Response::from_parts(parts, bytes)
+        })
+    }
+
+    fn body_str(response: &Response<Bytes>) -> &str {
+        std::str::from_utf8(response.body()).unwrap()
+    }
+
+    fn trace(response: &Response<Bytes>) -> &str {
+        response.headers().get(&TRACE).unwrap().to_str().unwrap()
+    }
+
+    // ── RouterBuilder ──
+
+    #[test]
+    fn builder_starts_empty() {
+        assert!(RouterBuilder::new().is_empty());
+    }
+
+    #[test]
+    fn builder_is_not_empty_after_registering_a_route() {
+        let builder = RouterBuilder::new().route(TestRoute::new(Method::GET, "/", "home"));
+        assert!(!builder.is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate context entry")]
+    fn app_context_rejects_duplicate_type() {
+        RouterBuilder::new().app_context(1u32).app_context(2u32);
+    }
+
+    // ── dispatch ──
+
+    #[test]
+    fn unmatched_path_is_not_found() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/users", "users"))
+            .build();
+        let response = call(&router, Method::GET, "/missing");
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn dispatches_by_method() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/users", "list"))
+            .route(TestRoute::new(Method::POST, "/users", "create"))
+            .build();
+        assert_eq!(body_str(&call(&router, Method::GET, "/users")), "list");
+        assert_eq!(body_str(&call(&router, Method::POST, "/users")), "create");
+    }
+
+    #[test]
+    fn matched_path_wrong_method_is_405_with_allow_header() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/users", "list"))
+            .build();
+        let response = call(&router, Method::DELETE, "/users");
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+
+        let allow = response
+            .headers()
+            .get(http::header::ALLOW)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        // The GET route also answers HEAD after the build-time alias.
+        assert!(allow.contains("GET"), "allow header was {allow:?}");
+        assert!(allow.contains("HEAD"), "allow header was {allow:?}");
+    }
+
+    #[test]
+    fn head_reuses_the_get_handler() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/users", "list"))
+            .build();
+        let response = call(&router, Method::HEAD, "/users");
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(body_str(&response), "list");
+    }
+
+    #[test]
+    fn explicit_head_route_overrides_the_get_alias() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/users", "list"))
+            .route(TestRoute::new(Method::HEAD, "/users", "head"))
+            .build();
+        assert_eq!(body_str(&call(&router, Method::HEAD, "/users")), "head");
+    }
+
+    // ── layers ──
+
+    #[test]
+    fn layer_wraps_only_matching_paths() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/admin/users", "admin"))
+            .route(TestRoute::new(Method::GET, "/public", "public"))
+            .layer(TraceLayer::new("/admin", "admin"))
+            .build();
+
+        // The route under /admin is wrapped by the /admin layer.
+        assert_eq!(trace(&call(&router, Method::GET, "/admin/users")), "admin");
+        // The route outside /admin is not.
+        let public = call(&router, Method::GET, "/public");
+        assert!(public.headers().get(&TRACE).is_none());
+    }
+
+    #[test]
+    fn layers_at_different_paths_nest_outermost_first() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/admin/users", "admin"))
+            .layer(TraceLayer::new("/", "root"))
+            .layer(TraceLayer::new("/admin", "admin"))
+            .build();
+
+        // The least-specific layer (root) is outermost, so it appends last,
+        // leaving the more-specific "admin" first in the trace.
+        assert_eq!(
+            trace(&call(&router, Method::GET, "/admin/users")),
+            "admin,root"
+        );
+    }
+
+    #[test]
+    fn layers_sharing_a_path_run_most_recently_registered_first() {
+        let router = RouterBuilder::new()
+            .route(TestRoute::new(Method::GET, "/", "home"))
+            .layer(TraceLayer::new("/", "a"))
+            .layer(TraceLayer::new("/", "b"))
+            .build();
+
+        // `b` is registered last, so it is outermost and appends last.
+        assert_eq!(trace(&call(&router, Method::GET, "/")), "a,b");
+    }
+
+    // ── pages and layouts ──
+
+    #[test]
+    fn page_is_served_at_its_path() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(path("/about"), page_render))
+            .build();
+        let response = call(&router, Method::GET, "/about");
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(body_str(&response), "PAGE");
+        assert_eq!(
+            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+    }
+
+    #[test]
+    fn matching_layouts_nest_from_least_to_most_specific() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(path("/settings/profile"), page_render))
+            .layout(LayoutFn::new(path("/"), wrapping_layout!("root")))
+            .layout(LayoutFn::new(
+                path("/settings"),
+                wrapping_layout!("settings"),
+            ))
+            .build();
+
+        let response = call(&router, Method::GET, "/settings/profile");
+        assert_eq!(body_str(&response), "root(settings(PAGE))");
+    }
+
+    #[test]
+    fn layout_only_wraps_pages_under_its_prefix() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(path("/about"), page_render))
+            .layout(LayoutFn::new(
+                path("/settings"),
+                wrapping_layout!("settings"),
+            ))
+            .build();
+
+        // The /settings layout does not apply to /about.
+        assert_eq!(body_str(&call(&router, Method::GET, "/about")), "PAGE");
+    }
+
+    // ── method_not_allowed helper ──
+
+    #[test]
+    fn method_not_allowed_lists_supported_methods() {
+        let mut endpoint = Endpoint::default();
+        endpoint.insert(Method::GET, 0);
+        endpoint.insert(Method::POST, 1);
+
+        let response = method_not_allowed(&endpoint);
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+
+        let allow = response
+            .headers()
+            .get(http::header::ALLOW)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(allow.contains("GET"), "allow header was {allow:?}");
+        assert!(allow.contains("POST"), "allow header was {allow:?}");
     }
 }
