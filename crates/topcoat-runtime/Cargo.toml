@@ -6,10 +6,14 @@ edition = "2024"
 [features]
 discover = ["dep:inventory"]
 parsing = []
+router = [
+	"dep:topcoat-router",
+]
 
 [dependencies]
 topcoat-asset.workspace = true
 topcoat-core.workspace = true
+topcoat-router = { workspace = true, optional = true }
 topcoat-view.workspace = true
 
 inventory = { workspace = true, optional = true }

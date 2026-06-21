@@ -1,12 +1,14 @@
 use topcoat::{
     Result,
-    router::{Router, page},
+    router::{Router, RouterBuilderDiscoverExt, page},
     view::{component, view},
 };
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::new().discover()).await.unwrap();
+    topcoat::start(Router::builder().discover().build())
+        .await
+        .unwrap();
 }
 
 #[page("/")]

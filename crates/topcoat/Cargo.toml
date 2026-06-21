@@ -19,6 +19,13 @@ asset = [
 cookie = [
 	"dep:topcoat-cookie",
 ]
+discover = [
+	"dep:inventory",
+	"topcoat-router-macro?/discover",
+	"topcoat-router?/discover",
+	"topcoat-runtime?/discover",
+	"topcoat-view?/discover",
+]
 multipart = [
 	"router",
 	"topcoat-router/multipart",
@@ -29,12 +36,11 @@ router = [
 	"view",
 	"topcoat-asset?/router",
 	"topcoat-cookie?/router",
+	"topcoat-runtime?/router",
 ]
 runtime = [
 	"dep:topcoat-runtime",
 	"dep:topcoat-runtime-macro",
-	"topcoat-router/runtime",
-	"topcoat-router-macro/runtime",
 ]
 tailwind = [
 	"dep:topcoat-tailwind",
@@ -43,14 +49,6 @@ view = [
 	"dep:topcoat-view",
 	"dep:topcoat-view-macro",
 	"topcoat-asset?/view",
-]
-
-discover = [
-	"dep:inventory",
-	"topcoat-router-macro?/discover",
-	"topcoat-router/discover",
-	"topcoat-runtime/discover",
-	"topcoat-view/discover",
 ]
 
 [dependencies]

@@ -9,6 +9,7 @@ proc-macro = true
 [dependencies]
 topcoat-runtime = { workspace = true, features = ["parsing"] }
 
+quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
 [lints]

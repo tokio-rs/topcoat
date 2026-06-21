@@ -6,7 +6,6 @@ edition = "2024"
 [features]
 discover = [
 	"dep:inventory",
-	"topcoat-runtime/discover",
 ]
 multipart = [
 	"dep:futures-util",
@@ -18,13 +17,9 @@ parsing = [
 	"dep:syn",
 	"topcoat-core/parsing",
 ]
-runtime = [
-	"dep:topcoat-runtime",
-]
 
 [dependencies]
 topcoat-core.workspace = true
-topcoat-runtime = { workspace = true, optional = true }
 topcoat-view.workspace = true
 
 axum.workspace = true

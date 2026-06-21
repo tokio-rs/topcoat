@@ -851,12 +851,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "http-range-header"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9171a2ea8a68358193d15dd5d70c1c10a2afc3e7e4c5bc92bc9f025cebd7359c"
-
-[[package]]
 name = "httparse"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2310,7 +2304,7 @@ version = "0.1.0"
 dependencies = [
  "http",
  "memchr",
- "pin-project-lite",
+ "mime_guess",
  "reqwest",
  "serde",
  "sha2 0.11.0",
@@ -2318,9 +2312,8 @@ dependencies = [
  "tokio",
  "toml",
  "topcoat-core",
+ "topcoat-router",
  "topcoat-view",
- "tower-http",
- "tower-service",
 ]
 
 [[package]]
@@ -2351,7 +2344,9 @@ dependencies = [
  "http",
  "serde",
  "serde_json",
+ "tokio",
  "topcoat-core",
+ "topcoat-router",
 ]
 
 [[package]]
@@ -2418,10 +2413,7 @@ dependencies = [
  "syn",
  "thiserror",
  "tokio",
- "topcoat-asset",
- "topcoat-cookie",
  "topcoat-core",
- "topcoat-runtime",
  "topcoat-view",
  "tower",
  "uuid",
@@ -2449,6 +2441,7 @@ dependencies = [
  "syn",
  "topcoat-asset",
  "topcoat-core",
+ "topcoat-router",
  "topcoat-view",
  "uuid",
 ]
@@ -2457,6 +2450,7 @@ dependencies = [
 name = "topcoat-runtime-macro"
 version = "0.1.0"
 dependencies = [
+ "quote",
  "syn",
  "topcoat-runtime",
 ]
@@ -2518,19 +2512,10 @@ checksum = "68d6fdd9f81c2819c9a8b0e0cd91660e7746a8e6ea2ba7c6b2b057985f6bcb51"
 dependencies = [
  "bitflags 2.11.0",
  "bytes",
- "futures-core",
  "futures-util",
  "http",
  "http-body",
- "http-body-util",
- "http-range-header",
- "httpdate",
- "mime",
- "mime_guess",
- "percent-encoding",
  "pin-project-lite",
- "tokio",
- "tokio-util",
  "tower",
  "tower-layer",
  "tower-service",
