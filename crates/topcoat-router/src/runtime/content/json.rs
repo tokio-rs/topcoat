@@ -162,6 +162,22 @@ fn json_content_type(content_type: Option<&str>) -> bool {
             .is_some_and(|subtype| subtype.ends_with("+json"))
 }
 
+fn json_deserialization_error(error: serde_path_to_error::Error<serde_json::Error>) -> Error {
+    let description = match error.inner().classify() {
+        serde_json::error::Category::Data => {
+            format!("invalid JSON value: {}", error.inner())
+        }
+        serde_json::error::Category::Syntax | serde_json::error::Category::Eof => {
+            format!("invalid JSON syntax: {}", error.inner())
+        }
+        serde_json::error::Category::Io => {
+            format!("failed to read JSON body: {}", error.inner())
+        }
+    };
+
+    bad_request_at(error.path(), description).into()
+}
+
 #[cfg(test)]
 mod tests {
     use http::{Request, header::CONTENT_TYPE};
@@ -302,20 +318,4 @@ mod tests {
         assert!(!json_content_type(Some("application/xml")));
         assert!(!json_content_type(Some("text/json")));
     }
-}
-
-fn json_deserialization_error(error: serde_path_to_error::Error<serde_json::Error>) -> Error {
-    let description = match error.inner().classify() {
-        serde_json::error::Category::Data => {
-            format!("invalid JSON value: {}", error.inner())
-        }
-        serde_json::error::Category::Syntax | serde_json::error::Category::Eof => {
-            format!("invalid JSON syntax: {}", error.inner())
-        }
-        serde_json::error::Category::Io => {
-            format!("failed to read JSON body: {}", error.inner())
-        }
-    };
-
-    bad_request_at(error.path(), description).into()
 }
