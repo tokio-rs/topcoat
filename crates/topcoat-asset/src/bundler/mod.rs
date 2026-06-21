@@ -130,6 +130,12 @@ impl Bundler {
                 (false, _) => format!("{stem}.{short_hash}"),
             };
 
+            let content_type = options.content_type().map(str::to_owned).unwrap_or_else(|| {
+                mime_guess::from_path(&file)
+                    .first_or_octet_stream()
+                    .to_string()
+            });
+
             let id = asset.id();
             let dst = out_dir.join(&file);
             let unchanged = existing
@@ -146,7 +152,12 @@ impl Bundler {
             }
 
             kept_files.insert(file.clone());
-            entries.push(ManifestEntry { id, file, hash });
+            entries.push(ManifestEntry {
+                id,
+                file,
+                hash,
+                content_type,
+            });
         }
 
         for entry in existing.values() {

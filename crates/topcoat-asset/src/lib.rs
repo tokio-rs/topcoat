@@ -20,11 +20,11 @@ mod bundler;
 #[cfg(feature = "bundler")]
 pub use bundler::*;
 
-#[cfg(feature = "tower")]
-mod tower;
+#[cfg(feature = "router")]
+mod router;
 
-#[cfg(feature = "tower")]
-pub use tower::*;
+#[cfg(feature = "router")]
+pub use router::*;
 
 #[cfg(feature = "view")]
 mod view;

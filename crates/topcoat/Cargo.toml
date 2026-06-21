@@ -15,7 +15,6 @@ default = [
 
 asset = [
 	"dep:topcoat-asset",
-	"topcoat-router/asset",
 ]
 cookie = [
 	"dep:topcoat-cookie",
@@ -30,6 +29,7 @@ router = [
 	"dep:topcoat-router",
 	"dep:topcoat-router-macro",
 	"view",
+	"topcoat-asset?/router",
 ]
 runtime = [
 	"dep:topcoat-runtime",
@@ -43,7 +43,7 @@ tailwind = [
 view = [
 	"dep:topcoat-view",
 	"dep:topcoat-view-macro",
-	"topcoat-asset/view",
+	"topcoat-asset?/view",
 ]
 
 discover = [

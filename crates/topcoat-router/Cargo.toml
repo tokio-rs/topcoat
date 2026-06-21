@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-asset = [
-	"dep:topcoat-asset",
-]
 cookie = [
 	"dep:topcoat-cookie",
 ]
@@ -29,7 +26,6 @@ runtime = [
 ]
 
 [dependencies]
-topcoat-asset = { workspace = true, optional = true, features = ["view"] }
 topcoat-cookie = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-runtime = { workspace = true, optional = true }
