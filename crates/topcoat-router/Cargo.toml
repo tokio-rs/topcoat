@@ -22,7 +22,6 @@ parsing = [
 topcoat-core.workspace = true
 topcoat-view.workspace = true
 
-axum.workspace = true
 bytes.workspace = true
 form_urlencoded.workspace = true
 futures-core.workspace = true
