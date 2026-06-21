@@ -53,11 +53,23 @@ impl Router {
         };
         let path_params = RawPathParams::from_pairs(matched.params.iter());
 
+        // Select the layers whose path is a prefix of the route's, ordered
+        // least- to most-specific so the outermost layer runs first.
+        let route = &*self.routes[index];
+        let route_path = route.path();
+        let mut layers: Vec<&dyn Layer> = self
+            .layers
+            .iter()
+            .map(|layer| &**layer)
+            .filter(|layer| route_path.starts_with(&layer.path()))
+            .collect();
+        layers.sort_by_key(|layer| layer.path().len());
+
         let mut cx = Cx::new(self.app_context.clone(), ContextMap::new());
         cx.insert(path_params);
         cx.insert(parts);
 
-        let next = Next::new(&self.layers, &*self.routes[index]);
+        let next = Next::new(&layers, route);
         let response = respond(next.run(&mut cx, body).await);
         finalize(&cx, response)
     }
@@ -176,12 +188,23 @@ impl RouterBuilder {
         self
     }
 
-    /// Registers a [`Layer`] that wraps every matched route.
+    /// Registers a [`Layer`] that wraps every matched route whose path begins
+    /// with the layer's path, like a layout.
     ///
-    /// Layers nest like an onion: the most recently registered layer is the
-    /// outermost and runs first.
+    /// When several layers match a route they nest from least-specific
+    /// (outermost) to most-specific (innermost).
     pub fn layer(mut self, layer: impl Layer) -> Self {
         self.layers.push(Box::new(layer));
+        self
+    }
+
+    /// Registers every layer annotated with `#[layer]` and collected at link
+    /// time.
+    #[cfg(feature = "discover")]
+    pub fn discover_layers(mut self) -> Self {
+        for layer in inventory::iter::<crate::runtime::LayerFn>().cloned() {
+            self = self.layer(layer);
+        }
         self
     }
 

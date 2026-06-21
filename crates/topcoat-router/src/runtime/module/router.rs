@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use heck::ToKebabCase;
 
 use crate::runtime::{
-    ModuleLayoutFn, ModulePageFn, ModuleRouteFn, PathBuf, PathSegment, RouterBuilder, Segment,
-    SegmentKind, Segments,
+    ModuleLayerFn, ModuleLayoutFn, ModulePageFn, ModuleRouteFn, PathBuf, PathSegment,
+    RouterBuilder, Segment, SegmentKind, Segments,
 };
 
 /// The module-based router builder, created by the `module_router!` macro.
@@ -164,6 +164,14 @@ impl ModuleRouterBuilder {
         self
     }
 
+    /// Registers a [`ModuleLayerFn`], computing its path prefix from the module path.
+    pub fn layer(mut self, layer: ModuleLayerFn) -> Self {
+        let module_path = layer.module_path();
+        let layer = layer.into_layer(Cow::Owned(self.module_path_to_path(module_path)));
+        self.inner = self.inner.layer(layer);
+        self
+    }
+
     /// Discovers and registers all segments, pages, layouts, and routes
     /// collected at link time.
     ///
@@ -182,6 +190,9 @@ impl ModuleRouterBuilder {
         }
         for route in inventory::iter::<ModuleRouteFn>().cloned() {
             self = self.route(route);
+        }
+        for layer in inventory::iter::<ModuleLayerFn>().cloned() {
+            self = self.layer(layer);
         }
         self
     }

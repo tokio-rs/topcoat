@@ -12,6 +12,7 @@ impl RouterBuilderDiscoverExt for RouterBuilder {
         self = self.discover_routes();
         self = self.discover_pages();
         self = self.discover_layouts();
+        self = self.discover_layers();
         self
     }
 }

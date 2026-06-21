@@ -145,6 +145,49 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
+/// Declares a layer that wraps the routes nested under its path.
+///
+/// A layer wraps every matched route whose URL begins with the layer's URL (the same prefix rule as
+/// [`#[layout]`](macro@layout)), so a layer at `/admin` wraps only routes under `/admin`, while a
+/// layer at `/` wraps everything. The layer's URL is the path string given to the attribute
+/// (`#[layer("/admin")]`); when omitted, it is derived from the function's enclosing module path,
+/// kebab-cased — provided the function is reachable from a
+/// [`module_router!`](../router/macro.module_router.html). When several layers match a route, they
+/// nest from least specific (outermost) to most specific (innermost).
+///
+/// # Handler signature
+///
+/// The function is `async` and takes [`cx: &mut Cx`](../context/struct.Cx.html), the request
+/// [`body: Body`](../router/struct.Body.html), and a [`next: Next<'_>`](../router/struct.Next.html),
+/// returning `Result<T>` where `T` implements [`IntoResponse`](../router/trait.IntoResponse.html).
+/// Call [`next.run(cx, body)`](../router/struct.Next.html#method.run) to invoke the inner layers and
+/// ultimately the route.
+///
+/// # Examples
+///
+/// ```ignore
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{Body, Next, Response, layer},
+/// };
+///
+/// #[layer("/")]
+/// async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+///     let start = std::time::Instant::now();
+///     let response = next.run(cx, body).await?;
+///     println!("handled in {:?}", start.elapsed());
+///     Ok(response)
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn layer(attr: TokenStream, item: TokenStream) -> TokenStream {
+    match topcoat_router::ast::layer::Layer::parse(attr.into(), item.into()) {
+        Ok(value) => quote! { #value }.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
+
 /// Customizes how a module contributes to module-router URLs.
 ///
 /// `segment!(...)` is placed at the top of a module to override the default kebab-cased module
