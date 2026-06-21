@@ -233,8 +233,14 @@ pub trait Cookies {
     }
 }
 
+/// Request-context storage for the lazily built cookie jar.
+///
+/// The cookie router layer inserts one cell per request. The first call to
+/// [`cookies`] parses the incoming `Cookie` headers into a [`CookieJar`] and
+/// stores it here; response finalization reads the same cell to emit pending
+/// `Set-Cookie` headers only if the jar was actually touched.
 #[derive(Debug, Default)]
-pub(crate) struct CookieJarCell {
+pub struct CookieJarCell {
     jar: OnceLock<CookieJar>,
 }
 
