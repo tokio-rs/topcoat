@@ -173,7 +173,7 @@ async fn health() -> Result<&'static str> {
 }
 ```
 
-The macro calls `IntoResponse::into_response` on the successful value. Many common response shapes work through Axum's response support, including strings, status codes, byte buffers, and `(headers, body)` tuples.
+The macro calls `IntoResponse::into_response` on the successful value. Topcoat implements `IntoResponse` for common response shapes, including strings, status codes, byte buffers, `Body`, `Response`, `(StatusCode, value)`, `(headers, value)`, `Json<T>`, `Form<T>`, and `Html<T>`.
 
 For JSON, return `Json<T>`:
 
@@ -231,11 +231,10 @@ async fn stream(body: Body) -> Result<&'static str> {
 Implement `FromRequest` when a handler needs request-specific parsing that is not covered by `Json<T>` or `Form<T>`.
 
 ```rust
-use axum::body::to_bytes;
 use serde::de::DeserializeOwned;
 use topcoat::{
     context::Cx,
-    router::{Body, FromRequest, bad_request, headers},
+    router::{Body, FromRequest, bad_request, headers, to_bytes},
     Result,
 };
 
@@ -300,5 +299,3 @@ async fn report() -> Result<Csv> {
     Ok(Csv("name,total\nAda,42\n".to_string()))
 }
 ```
-
-If your type already implements `axum::response::IntoResponse`, Topcoat can use that automatically through its blanket `IntoResponse` implementation.

@@ -31,6 +31,7 @@ Available request helpers:
 - `uri(cx)` returns the request URI.
 - `version(cx)` returns the HTTP version.
 - `headers(cx)` returns the request headers.
+- `content_type(cx)` returns the request `Content-Type` as `Option<&str>`.
 - `extensions(cx)` returns request extensions.
 
 Use `parts(cx)` when you need several fields at once:
@@ -44,7 +45,7 @@ fn cache_key(cx: &Cx) -> String {
 }
 ```
 
-Use `extensions(cx)` for typed request values inserted by lower-level Axum middleware:
+Use `extensions(cx)` for typed request values attached by a lower-level request layer or service integration:
 
 ```rust
 use topcoat::{context::Cx, router::extensions};
@@ -110,25 +111,11 @@ fn db(cx: &Cx) -> &Database {
 
 Values are keyed by Rust type. Asking for a type that was not registered panics, so these helpers are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or `current_tenant(cx)`.
 
-## Extractor escape hatch
+## Request body parsing
 
-Prefer Topcoat's dedicated helpers when they exist. If you need to interoperate with an Axum extractor that implements `FromRequestParts`, use `router::extract`.
+Handlers can receive one request body parameter in addition to `cx: &Cx`. The parameter can be any type that implements `FromRequest`, including Topcoat's built-in `Json<T>`, `Form<T>`, `Multipart` (with the `multipart` feature), `Body`, `Bytes`, and `String` extractors.
 
-```rust
-use axum::extract::Query;
-use serde::Deserialize;
-use topcoat::{context::Cx, router::extract};
-
-#[derive(Deserialize)]
-struct Pagination {
-    page: usize,
-}
-
-async fn page_number(cx: &Cx) -> Option<usize> {
-    let Query(pagination): Query<Pagination> = extract::<_, ()>(cx).await.ok()?;
-    Some(pagination.page)
-}
-```
+See [Request and response bodies](./request_response.md) for the built-in extractors and the `FromRequest` trait for custom parsing.
 
 ## Composing helpers
 

@@ -43,7 +43,7 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 
 ### Request context and state
 
-- [`docs/context.md`](docs/context.md) — The request context `Cx`: router request helpers, path/query helpers, state accessors, and the Axum extractor escape hatch.
+- [`docs/context.md`](docs/context.md) — The request context `Cx`: router request helpers, path/query helpers, state accessors, and request body parsing.
 - [`docs/app_context.md`](docs/app_context.md) — App context: registering long-lived values with `.app_context(value)` and reading them with `app_context::<T>(cx)`.
 - [`docs/memoization.md`](docs/memoization.md) — `#[memoize]` for per-request caching of function results keyed by arguments.
 - [`docs/functions_not_middlewares.md`](docs/functions_not_middlewares.md) — The framework's philosophy: prefer composable `cx: &Cx` functions over middleware/extractors for auth and request-scoped data.

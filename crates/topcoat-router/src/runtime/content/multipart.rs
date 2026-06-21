@@ -156,8 +156,8 @@ fn multipart_error(error: multer::Error) -> Error {
     }
 }
 
-/// Classifies a `multer` error as a client-side (`400`) error, mirroring the
-/// status codes that `axum` reports for the same conditions.
+/// Classifies a `multer` error as a client-side (`400`) error when the request
+/// body or multipart headers are malformed.
 fn is_client_error(error: &multer::Error) -> bool {
     match error {
         multer::Error::UnknownField { .. }

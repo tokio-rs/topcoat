@@ -32,6 +32,8 @@
 //! - [`uri(cx)`](crate::router::uri) returns the request URI.
 //! - [`version(cx)`](crate::router::version) returns the HTTP version.
 //! - [`headers(cx)`](crate::router::headers) returns the request headers.
+//! - [`content_type(cx)`](crate::router::content_type) returns the request `Content-Type` as
+//!   `Option<&str>`.
 //! - [`extensions(cx)`](crate::router::extensions) returns request extensions.
 //!
 //! Use [`parts(cx)`](crate::router::parts) when you need several fields at once:
@@ -45,8 +47,8 @@
 //! }
 //! ```
 //!
-//! Use [`extensions(cx)`](crate::router::extensions) for typed request values inserted by
-//! lower-level Axum middleware:
+//! Use [`extensions(cx)`](crate::router::extensions) for typed request values attached by a
+//! lower-level request layer or service integration:
 //!
 //! ```rust
 //! use topcoat::{context::Cx, router::extensions};
@@ -115,26 +117,13 @@
 //! helpers are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or
 //! `current_tenant(cx)`.
 //!
-//! ## Extractor escape hatch
+//! ## Request body parsing
 //!
-//! Prefer Topcoat's dedicated helpers when they exist. If you need to interoperate with an Axum
-//! extractor that implements `FromRequestParts`, use [`router::extract`](crate::router::extract).
-//!
-//! ```rust
-//! use axum::extract::Query;
-//! use serde::Deserialize;
-//! use topcoat::{context::Cx, router::extract};
-//!
-//! #[derive(Deserialize)]
-//! struct Pagination {
-//!     page: usize,
-//! }
-//!
-//! async fn page_number(cx: &Cx) -> Option<usize> {
-//!     let Query(pagination): Query<Pagination> = extract::<_, ()>(cx).await.ok()?;
-//!     Some(pagination.page)
-//! }
-//! ```
+//! Handlers can receive one request body parameter in addition to `cx: &`[`Cx`]. The parameter can
+//! be any type that implements [`FromRequest`](crate::router::FromRequest), including Topcoat's
+//! built-in [`Json<T>`](crate::router::Json), [`Form<T>`](crate::router::Form), optional
+//! `Multipart`, [`Body`](crate::router::Body), [`Bytes`](crate::router::Bytes), and `String`
+//! extractors.
 //!
 //! ## Composing helpers
 //!

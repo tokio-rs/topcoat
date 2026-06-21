@@ -71,10 +71,15 @@ topcoat asset bundle
 At runtime, load the asset bundle on the router:
 
 ```rust
-use topcoat::asset::AssetBundle;
+use topcoat::{
+    asset::{AssetBundle, RouterBuilderAssetExt},
+    router::{Router, RouterBuilderDiscoverExt},
+};
 
-let router = app::router()
-    .assets(AssetBundle::load_dir("target/assets").unwrap());
+let router = Router::builder()
+    .discover()
+    .assets(AssetBundle::load_dir("target/assets").unwrap())
+    .build();
 ```
 
 ## Build flow

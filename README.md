@@ -4,16 +4,20 @@
 
 A batteries-included Rust web framework for server-rendered apps.
 
-Topcoat sits on top of Axum and turns it into a productive full-stack toolkit: HTML-first templates, file-system-shaped routing, per-request memoization, and a built-in asset pipeline with optional Tailwind support — all designed so you can stay in Rust.
+Topcoat is a productive full-stack toolkit for server-rendered Rust apps: HTML-first templates, file-system-shaped routing, per-request memoization, and a built-in asset pipeline with optional Tailwind support — all designed so you can stay in Rust.
 
 See the [Getting started guide](https://github.com/tokio-rs/topcoat/blob/main/docs/getting_started.md) to set up a new project.
 
 ```rust,ignore
-use topcoat::{Result, router::{Router, page}, view::{component, view}};
+use topcoat::{
+    Result,
+    router::{Router, RouterBuilderDiscoverExt, page},
+    view::{component, view},
+};
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::new().discover()).await.unwrap();
+    topcoat::start(Router::builder().discover().build()).await.unwrap();
 }
 
 #[page("/")]

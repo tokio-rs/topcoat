@@ -593,19 +593,19 @@ mod tests {
     }
 
     #[test]
-    fn path_to_axum_strips_groups() {
+    fn path_to_matchit_strips_groups() {
         let path = Path::new("/(auth)/dashboard/{id}");
         assert_eq!(path.to_matchit_path(), "/dashboard/{id}");
     }
 
     #[test]
-    fn path_to_axum_empty() {
+    fn path_to_matchit_empty() {
         let path = Path::new("");
         assert_eq!(path.to_matchit_path(), "/");
     }
 
     #[test]
-    fn path_to_axum_group_only_is_root() {
+    fn path_to_matchit_group_only_is_root() {
         // A page inside a route group that should serve `/`.
         assert_eq!(Path::new("/(marketing)").to_matchit_path(), "/");
         // Nested groups collapse the same way.
@@ -613,7 +613,7 @@ mod tests {
     }
 
     #[test]
-    fn path_to_axum_no_groups() {
+    fn path_to_matchit_no_groups() {
         let path = Path::new("/users/{id}");
         assert_eq!(path.to_matchit_path(), "/users/{id}");
     }

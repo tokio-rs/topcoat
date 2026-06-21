@@ -31,7 +31,7 @@ struct PostId(uuid::Uuid);
 use topcoat::{
     context::Cx,
     Result,
-    router::{FallbackExt, page, path_param},
+    router::{RouterErrorExt, page, path_param},
     view::view,
 };
 

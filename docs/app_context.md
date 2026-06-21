@@ -9,13 +9,14 @@ App context is keyed by Rust type. Each type can be registered at most once, and
 Build the router and chain `.app_context(value)` for every value you want to share:
 
 ```rust
-use topcoat::router::Router;
+use topcoat::router::{Router, RouterBuilderDiscoverExt};
 
 pub fn router() -> Router {
-    Router::new()
+    Router::builder()
         .discover()
         .app_context(Database::connect())
         .app_context(HttpClient::new())
+        .build()
 }
 ```
 
@@ -25,9 +26,10 @@ The value is stored under its concrete type. Registering two values of the same 
 struct PrimaryDb(Database);
 struct ReplicaDb(Database);
 
-Router::new()
+Router::builder()
     .app_context(PrimaryDb(Database::connect_primary()))
-    .app_context(ReplicaDb(Database::connect_replica()));
+    .app_context(ReplicaDb(Database::connect_replica()))
+    .build();
 ```
 
 ## Reading values
