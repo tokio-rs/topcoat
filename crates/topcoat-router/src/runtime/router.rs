@@ -292,10 +292,6 @@ impl RouterBuilder {
     }
 
     /// Finalizes the registered routes, pages, and layouts into a [`Router`].
-    ///
-    /// Each [`PageFn`] is matched against the registered [`LayoutFn`]s by path
-    /// prefix and wired into a [`PageWithLayouts`], which is registered as a
-    /// `GET` route alongside the explicit routes.
     pub fn build(self) -> Router {
         let RouterBuilder {
             mut routes,
