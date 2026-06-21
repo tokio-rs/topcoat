@@ -245,7 +245,7 @@ pub struct CookieJarCell {
 }
 
 impl CookieJarCell {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
