@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use http::{HeaderValue, Method, StatusCode};
@@ -243,7 +243,7 @@ impl RouterBuilder {
     /// Panics if two discovered layers share the same path.
     #[cfg(feature = "discover")]
     pub fn discover_layers(mut self) -> Self {
-        let mut seen: HashSet<Cow<'static, crate::runtime::Path>> = HashSet::new();
+        let mut seen = std::collections::HashSet::<Cow<'static, crate::runtime::Path>>::new();
         for layer in inventory::iter::<crate::runtime::LayerFn>().cloned() {
             let path = layer.path();
             if !seen.insert(path.clone()) {
