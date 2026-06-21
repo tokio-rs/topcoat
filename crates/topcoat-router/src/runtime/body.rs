@@ -11,12 +11,6 @@ use http_body_util::{BodyExt, BodyStream, Empty, Full, Limited};
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// The HTTP body type used for both requests and responses.
-///
-/// On the request side it carries the incoming stream; on the response side it
-/// holds the bytes (or stream) a handler produced. Construct one from common
-/// in-memory types via [`From`] (`String`, `&'static str`, `Vec<u8>`,
-/// [`Bytes`]), an empty body with [`Body::empty`], or wrap any other
-/// [`http_body::Body`] with [`Body::new`].
 #[must_use]
 pub struct Body(UnsyncBoxBody<Bytes, BoxError>);
 
