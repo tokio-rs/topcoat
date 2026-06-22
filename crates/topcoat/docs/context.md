@@ -31,7 +31,7 @@ Available request helpers:
 - [`uri(cx)`](crate::router::uri) returns the request URI.
 - [`version(cx)`](crate::router::version) returns the HTTP version.
 - [`headers(cx)`](crate::router::headers) returns the request headers.
-- [`content_type(cx)`](crate::router::content_type) returns the request `Content-Type` as `Option<&str>`.
+- [`content_type(cx)`](crate::router::content_type) returns the request `Content-Type`.
 - [`extensions(cx)`](crate::router::extensions) returns request extensions.
 
 Use [`parts(cx)`](crate::router::parts) when you need several fields at once:
@@ -111,9 +111,9 @@ fn db(cx: &Cx) -> &Database {
 
 Values are keyed by Rust type. Asking for a type that was not registered panics, so these helpers are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or `current_tenant(cx)`.
 
-## Request body parsing
+## Memoization
 
-Handlers can receive one request body parameter in addition to `cx: &`[`Cx`]. See [`FromRequest`](crate::router::FromRequest) for custom parsing and the built-in extractors.
+[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. See its documentation for the details.
 
 ## Composing helpers
 
