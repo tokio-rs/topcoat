@@ -66,8 +66,8 @@ bytes = "1"
 clap = "4.6.0"
 console = "0.16"
 const-serialize = "0.7"
-dialoguer = { version = "0.12", default-features = false }
 cookie = "0.18"
+dialoguer = { version = "0.12", default-features = false }
 form_urlencoded = "1"
 futures-core = "0.3"
 futures-util = "0.3"

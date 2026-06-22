@@ -20,11 +20,11 @@ mod remove;
 mod state;
 mod workspace;
 
-pub use add::{AddOptions, AddOutcome, AddedComponent, add};
-pub use init::{InitOptions, Initialized, InstalledThemeInfo, init};
-pub use list::{ComponentStatus, InstallStatus, RegistryListing, list};
-pub use package::Package;
-pub use remove::{Removed, remove};
+pub use add::*;
+pub use init::*;
+pub use list::*;
+pub use package::*;
+pub use remove::*;
 
 /// A callback the caller supplies to answer a yes/no question, e.g. whether to
 /// pull a component from a non-default registry, or replace a file provided by
