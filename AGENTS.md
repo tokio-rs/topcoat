@@ -32,7 +32,6 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 
 - [`crates/topcoat/docs/router.md`](crates/topcoat/docs/router.md) — The `Router` primitive: registering `#[page]`, `#[layout]`, and `#[route]` items manually or via `.discover()`, and how layouts nest by path prefix.
 - [`crates/topcoat-router/docs/module_router.md`](crates/topcoat-router/docs/module_router.md) — `module_router!`, which derives routes from the module tree (kebab-cased segments, `segment!` overrides, `_`-prefixed groups).
-- [`docs/path_and_query_params.md`](docs/path_and_query_params.md) — `#[path_param]` and `#[query_params]` for reading typed values out of the URL via `T::of(cx)`.
 
 ### Views and components
 

@@ -146,7 +146,6 @@ view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 **Working with requests**
 - [Request context (`Cx`)](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/context.md) — the value pages, layouts, and components read from.
 - [App context](https://github.com/tokio-rs/topcoat/blob/main/docs/app_context.md) — share long-lived values across requests, keyed by type.
-- [Path and query params](https://github.com/tokio-rs/topcoat/blob/main/docs/path_and_query_params.md) — typed `T::of(cx)` accessors.
 - [Cookies](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/cookies.md) — read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
 
 **Patterns**

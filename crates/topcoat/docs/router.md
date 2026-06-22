@@ -82,6 +82,39 @@ async fn user() -> Result<Json<User>> {
 
 Returning a bare value only works if its type implements [`IntoResponse`]; a plain `Result<User>` is not serialized as JSON unless `User` itself does so. Implement [`IntoResponse`] for a domain type when it should control its own status, headers, or body.
 
+## Path and query parameters
+
+Handlers read typed values out of the URL with two attributes. Each generates an `of(cx)` accessor whose result is parsed once and memoized for the rest of the request:
+
+- [`#[path_param]`](path_param) — a typed view of a single path segment, like the `{post_id}` in `/posts/{post_id}`.
+- [`#[query_params]`](query_params) — a typed view of the request's query string, deserialized into a struct.
+
+```rust,ignore
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{page, path_param, query_params},
+    view::view,
+};
+
+#[path_param]
+struct PostId(uuid::Uuid);
+
+#[query_params]
+struct PostQuery {
+    preview: Option<bool>,
+}
+
+#[page("/posts/{post_id}")]
+async fn post(cx: &Cx) -> Result {
+    let post_id = PostId::of(cx).unwrap();
+    let query = PostQuery::of(cx).unwrap();
+    view! { /* ... */ }
+}
+```
+
+See [`#[path_param]`](path_param) and [`#[query_params]`](query_params) for how parameters pair with the URL (module router versus explicit paths), the exact return types, and their requirements.
+
 ## Pages
 
 A page is an async function annotated with [`#[page]`](page) and an explicit path:
