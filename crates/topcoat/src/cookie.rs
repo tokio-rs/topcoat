@@ -1,14 +1,26 @@
 //! # Cookies
 //!
 //! Topcoat reads and writes cookies through a request-scoped **cookie jar**.
-//! Call `cookies(cx)` from any handler to get the jar, read incoming cookies,
-//! and queue changes. Anything you add or remove during the request is
-//! serialized into `Set-Cookie` response headers automatically once the handler
-//! returns. You don't need to touch headers yourself.
+//! Install cookie support on your router with `.cookies()`, then call
+//! `cookies(cx)` from any handler to get the jar, read incoming cookies, and
+//! queue changes. Anything you add or remove during the request is serialized
+//! into `Set-Cookie` response headers automatically once the handler returns.
+//! You don't need to touch headers yourself.
 //!
 //! Cookies are part of the default feature set, and everything below is
 //! re-exported from `topcoat::cookie`. Topcoat builds on the `cookie` crate: a
 //! cookie is a [`Cookie`], and signing and encryption use its [`Key`].
+//!
+//! ```rust,ignore
+//! use topcoat::{
+//!     cookie::RouterBuilderCookieExt,
+//!     router::Router,
+//! };
+//!
+//! let router = Router::builder()
+//!     .cookies()
+//!     .build();
+//! ```
 //!
 //! ## Reading and writing
 //!
@@ -210,21 +222,23 @@
 //! the name) only — they compose freely with prefixes and attribute defaults in
 //! any order.
 //!
-//! ## Keys from app state
+//! ## Keys from app context
 //!
 //! In a real app you generate the [`Key`] once at startup and share it across
-//! requests. Register it as [app state](crate::context::app_state):
+//! requests. Register it as [app context](crate::context::app_context):
 //!
 //! ```rust,ignore
 //! use topcoat::{
-//!     cookie::Key,
-//!     router::Router,
+//!     cookie::{Key, RouterBuilderCookieExt},
+//!     router::{Router, RouterBuilderDiscoverExt},
 //! };
 //!
 //! pub fn router() -> Router {
-//!     Router::new()
+//!     Router::builder()
 //!         .discover()
-//!         .app_state(Key::generate())
+//!         .cookies()
+//!         .app_context(Key::generate())
+//!         .build()
 //! }
 //! ```
 //!

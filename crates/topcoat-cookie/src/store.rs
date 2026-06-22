@@ -250,10 +250,10 @@ mod tests {
 
     use http::{HeaderMap, Request, header, request::Parts};
     use serde::{Deserialize, Serialize};
-    use topcoat_core::runtime::context::{Cx, State};
+    use topcoat_core::runtime::context::{ContextMap, Cx};
 
     use super::*;
-    use crate::{Key, cookies, write_cookies};
+    use crate::{CookieJarCell, Key, cookies, write_cookies};
 
     #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
     struct Cart {
@@ -455,9 +455,10 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        let mut request_state = State::new();
-        request_state.register::<Parts>(parts);
-        Cx::new(Arc::new(State::new()), request_state)
+        let mut request_context = ContextMap::new();
+        request_context.insert::<Parts>(parts);
+        request_context.insert(CookieJarCell::new());
+        Cx::new(Arc::new(ContextMap::new()), request_context)
     }
 
     /// The leading `name=value` pair of the request's first `Set-Cookie` value.

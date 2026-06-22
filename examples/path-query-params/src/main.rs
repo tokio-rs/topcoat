@@ -1,13 +1,18 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Router, RouterErrorExt, Slot, layout, page, path_param, query_params},
+    router::{
+        Router, RouterBuilderDiscoverExt, RouterErrorExt, Slot, layout, page, path_param,
+        query_params,
+    },
     view::view,
 };
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::new().discover()).await.unwrap();
+    topcoat::start(Router::builder().discover().build())
+        .await
+        .unwrap();
 }
 
 // --- Layout -----------------------------------------------------------------

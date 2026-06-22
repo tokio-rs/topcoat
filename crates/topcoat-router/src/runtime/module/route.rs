@@ -2,16 +2,16 @@ use std::borrow::Cow;
 
 use http::Method;
 
-use crate::runtime::{Path, Route, RouteHandlerFn};
+use crate::runtime::{Path, RouteFn, RouteHandlerFn};
 
 /// A route discovered by the module router, produced by the `#[route]` macro.
 ///
 /// Holds the module path (for deriving the URL path from the module tree)
-/// and the render function. The module router converts each `ModuleRoute` into
-/// a [`Route`] once the URL path has been computed.
+/// and the render function. The module router converts each `ModuleRouteFn`
+/// into a [`RouteFn`] once the URL path has been computed.
 #[doc(hidden)]
 #[derive(Debug, Clone)]
-pub struct ModuleRoute {
+pub struct ModuleRouteFn {
     /// The HTTP method triggering this route.
     method: Method,
     /// Module path where `#[route]` was declared, used to derive the URL path.
@@ -20,7 +20,7 @@ pub struct ModuleRoute {
     pub(super) render: RouteHandlerFn,
 }
 
-impl ModuleRoute {
+impl ModuleRouteFn {
     /// Creates a new module route. Called by the expanded `#[route]` macro.
     pub const fn new(method: Method, module_path: &'static str, render: RouteHandlerFn) -> Self {
         Self {
@@ -30,9 +30,9 @@ impl ModuleRoute {
         }
     }
 
-    /// Converts into a [`Route`] with the given resolved URL path.
-    pub fn into_route(self, path: Cow<'static, Path>) -> Route {
-        Route::new(self.method, path, self.render)
+    /// Converts into a [`RouteFn`] with the given resolved URL path.
+    pub fn into_route(self, path: Cow<'static, Path>) -> RouteFn {
+        RouteFn::new(self.method, path, self.render)
     }
 
     /// Returns the module path used to derive the URL.
@@ -42,4 +42,4 @@ impl ModuleRoute {
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModuleRoute);
+inventory::collect!(ModuleRouteFn);

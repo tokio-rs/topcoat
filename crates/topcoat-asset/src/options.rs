@@ -27,6 +27,9 @@ pub struct AssetOptions {
     /// [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's
     /// actual hash differs. Recommended for remote assets.
     pub checksum: Option<Cow<'static, str>>,
+    /// Override the `Content-Type` the asset is served with. When unset, the
+    /// bundler guesses it from the bundled file's extension.
+    pub content_type: Option<Cow<'static, str>>,
 }
 
 impl AssetOptions {
@@ -35,6 +38,7 @@ impl AssetOptions {
         rename: None,
         extension: None,
         checksum: None,
+        content_type: None,
     };
 
     /// Returns the configured [`rename`](Self::rename) value, if any.
@@ -52,16 +56,23 @@ impl AssetOptions {
         self.checksum.as_deref()
     }
 
+    /// Returns the configured [`content_type`](Self::content_type) value, if any.
+    pub fn content_type(&self) -> Option<&str> {
+        self.content_type.as_deref()
+    }
+
     pub(crate) const fn encode_into(&self, w: &mut ConstWriter<'_>) {
         w.write_str_opt(cow_as_str(&self.rename));
         w.write_str_opt(cow_as_str(&self.extension));
         w.write_str_opt(cow_as_str(&self.checksum));
+        w.write_str_opt(cow_as_str(&self.content_type));
     }
 
     pub(crate) const fn hash_into(&self, mut h: u64) -> u64 {
         h = hash_opt_str(h, cow_as_str(&self.rename));
         h = hash_opt_str(h, cow_as_str(&self.extension));
         h = hash_opt_str(h, cow_as_str(&self.checksum));
+        h = hash_opt_str(h, cow_as_str(&self.content_type));
         h
     }
 
@@ -70,6 +81,7 @@ impl AssetOptions {
             rename: r.read_str_opt()?.map(|s| Cow::Owned(s.to_owned())),
             extension: r.read_str_opt()?.map(|s| Cow::Owned(s.to_owned())),
             checksum: r.read_str_opt()?.map(|s| Cow::Owned(s.to_owned())),
+            content_type: r.read_str_opt()?.map(|s| Cow::Owned(s.to_owned())),
         })
     }
 }

@@ -4,16 +4,20 @@
 
 A batteries-included Rust web framework for server-rendered apps.
 
-Topcoat sits on top of Axum and turns it into a productive full-stack toolkit: HTML-first templates, file-system-shaped routing, per-request memoization, and a built-in asset pipeline with optional Tailwind support — all designed so you can stay in Rust.
+Topcoat is a productive full-stack toolkit for server-rendered Rust apps: HTML-first templates, file-system-shaped routing, per-request memoization, and a built-in asset pipeline with optional Tailwind support — all designed so you can stay in Rust.
 
 See the [Getting started guide](https://github.com/tokio-rs/topcoat/blob/main/docs/getting_started.md) to set up a new project.
 
 ```rust,ignore
-use topcoat::{Result, router::{Router, page}, view::{component, view}};
+use topcoat::{
+    Result,
+    router::{Router, RouterBuilderDiscoverExt, page},
+    view::{component, view},
+};
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::new().discover()).await.unwrap();
+    topcoat::start(Router::builder().discover().build()).await.unwrap();
 }
 
 #[page("/")]
@@ -81,7 +85,7 @@ Authentication, tenant lookup, feature flags, locale detection — anything requ
 
 ```rust,ignore
 fn db(cx: &Cx) -> &Database {
-    app_state(cx)
+    app_context(cx)
 }
 
 #[memoize]
@@ -141,7 +145,7 @@ view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 
 **Working with requests**
 - [Request context (`Cx`)](https://github.com/tokio-rs/topcoat/blob/main/docs/context.md) — the value pages, layouts, and components read from.
-- [App state](https://github.com/tokio-rs/topcoat/blob/main/docs/app_state.md) — share long-lived values across requests, keyed by type.
+- [App context](https://github.com/tokio-rs/topcoat/blob/main/docs/app_context.md) — share long-lived values across requests, keyed by type.
 - [Path and query params](https://github.com/tokio-rs/topcoat/blob/main/docs/path_and_query_params.md) — typed `T::of(cx)` accessors.
 - [Request and response bodies](https://github.com/tokio-rs/topcoat/blob/main/docs/request_response.md) — JSON, forms, custom extractors and responses.
 - [Cookies](https://github.com/tokio-rs/topcoat/blob/main/docs/cookies.md) — read and write the request cookie jar, with signed, encrypted, and prefixed cookies.

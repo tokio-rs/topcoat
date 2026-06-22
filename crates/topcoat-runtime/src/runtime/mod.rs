@@ -1,12 +1,16 @@
 mod bind_attribute;
 mod event_handler;
 mod expr;
+#[cfg(feature = "router")]
+mod procedure;
 mod signal;
 mod surrogate;
 
 pub use bind_attribute::*;
 pub use event_handler::*;
 pub use expr::*;
+#[cfg(feature = "router")]
+pub use procedure::*;
 pub use signal::*;
 pub use surrogate::*;
 

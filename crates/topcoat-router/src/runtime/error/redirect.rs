@@ -1,4 +1,8 @@
-use crate::runtime::Response;
+use http::header::LOCATION;
+use http::{HeaderValue, StatusCode};
+use topcoat_core::runtime::error::Result;
+
+use crate::runtime::{IntoResponse, Response};
 
 /// Builds a temporary (HTTP 307) redirect to `uri`.
 ///
@@ -17,7 +21,7 @@ use crate::runtime::Response;
 /// }
 /// ```
 pub fn redirect(uri: &str) -> RedirectError {
-    RedirectError::new(axum::response::Redirect::temporary(uri))
+    RedirectError::new(StatusCode::TEMPORARY_REDIRECT, uri)
 }
 
 /// Builds a permanent (HTTP 308) redirect to `uri`.
@@ -38,7 +42,7 @@ pub fn redirect(uri: &str) -> RedirectError {
 /// }
 /// ```
 pub fn redirect_permanent(uri: &str) -> RedirectError {
-    RedirectError::new(axum::response::Redirect::permanent(uri))
+    RedirectError::new(StatusCode::PERMANENT_REDIRECT, uri)
 }
 
 /// A redirect response carried as the `Err` variant of a handler `Result`.
@@ -47,12 +51,21 @@ pub fn redirect_permanent(uri: &str) -> RedirectError {
 /// from an `Option` / `Result` via [`crate::RouterErrorExt`].
 #[derive(Debug)]
 pub struct RedirectError {
-    inner: axum::response::Redirect,
+    status: StatusCode,
+    location: HeaderValue,
 }
 
 impl RedirectError {
-    fn new(inner: axum::response::Redirect) -> Self {
-        Self { inner }
+    /// Builds a redirect with the given status code and target `uri`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `uri` is not a valid `Location` header value.
+    fn new(status: StatusCode, uri: &str) -> Self {
+        Self {
+            status,
+            location: HeaderValue::try_from(uri).expect("redirect uri is not a valid header value"),
+        }
     }
 }
 
@@ -64,8 +77,8 @@ impl std::fmt::Display for RedirectError {
 
 impl std::error::Error for RedirectError {}
 
-impl axum::response::IntoResponse for RedirectError {
-    fn into_response(self) -> Response {
-        self.inner.into_response()
+impl IntoResponse for RedirectError {
+    fn into_response(self) -> Result<Response> {
+        (self.status, ([(LOCATION, self.location)], ())).into_response()
     }
 }

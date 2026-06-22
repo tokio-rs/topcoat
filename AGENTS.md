@@ -1,6 +1,6 @@
 # Agent instructions
 
-Before making code changes, ensure you have read `./STYLE.md`.
+Before making code or documentation changes, ensure you have read `./STYLE.md`.
 
 ## Project structure
 
@@ -8,7 +8,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable e
 
 `crates/topcoat` is the user-facing **facade** crate. It re-exports everything through feature-gated modules. Application code depends on this crate only; everything below is an implementation detail reached through it.
 
-- `topcoat-core` (+ `macro/`) — foundations shared by the other crates: the `Error`/`Result` types and the request context (`Cx`, `app_state`, `request_state`). Its macro crate provides `#[memoize]`.
+- `topcoat-core` (+ `macro/`) — foundations shared by the other crates: the `Error`/`Result` types and the request context (`Cx`, `app_context`, `request_context`). Its macro crate provides `#[memoize]`.
 - `topcoat-view` (+ `macro/`) — the `view!` and `attributes!` macros, the `#[component]` macro, and the runtime `View`/`Attributes` types.
 - `topcoat-router` (+ `macro/`) — `Router`, the `#[page]`/`#[layout]`/`#[route]` macros, `module_router!`, and `#[path_param]`/`#[query_params]`.
 - `topcoat-runtime` (+ `macro/`) — the client-side interactive runtime (signals, event handlers, bind attributes, the `expr!` macro) and the injected browser script.
@@ -43,8 +43,8 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 
 ### Request context and state
 
-- [`docs/context.md`](docs/context.md) — The request context `Cx`: router request helpers, path/query helpers, state accessors, and the Axum extractor escape hatch.
-- [`docs/app_state.md`](docs/app_state.md) — App state: registering long-lived values with `.app_state(value)` and reading them with `app_state::<T>(cx)`.
+- [`docs/context.md`](docs/context.md) — The request context `Cx`: router request helpers, path/query helpers, state accessors, and request body parsing.
+- [`docs/app_context.md`](docs/app_context.md) — App context: registering long-lived values with `.app_context(value)` and reading them with `app_context::<T>(cx)`.
 - [`docs/memoization.md`](docs/memoization.md) — `#[memoize]` for per-request caching of function results keyed by arguments.
 - [`docs/functions_not_middlewares.md`](docs/functions_not_middlewares.md) — The framework's philosophy: prefer composable `cx: &Cx` functions over middleware/extractors for auth and request-scoped data.
 - [`docs/cookies.md`](docs/cookies.md) — Cookies: the request-scoped jar (`cookies(cx)`), the `cookie!` macro, attribute defaults, name prefixes, signed/private cookies, and typed `CookieStore<T>`.
@@ -57,3 +57,7 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 ### Tooling
 
 - [`docs/source_formatting.md`](docs/source_formatting.md) — `topcoat fmt`, which formats Topcoat macro bodies (like `view!`) alongside `rustfmt`, plus editor integration.
+
+## Safety
+
+This project only uses safe code. Unsafe is not allowed.

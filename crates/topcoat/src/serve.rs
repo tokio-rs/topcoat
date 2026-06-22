@@ -2,30 +2,29 @@ use std::{env, io};
 
 use tokio::net::TcpListener;
 
-/// Serve a Topcoat/Axum router, notifying the topcoat dev server once the
+use crate::router::{Router, internal_serve};
+
+/// Serve a Topcoat router, notifying the topcoat dev server once the
 /// application is ready to accept connections.
 ///
-/// This is a thin wrapper around [`axum::serve`] that calls
-/// [`crate::dev::notify_ready`] before entering the accept loop.
-pub async fn serve(
-    listener: TcpListener,
-    app: impl Into<axum::Router>,
-) -> Result<(), std::io::Error> {
+/// This calls [`crate::dev::notify_ready`] before handing the listener off to
+/// the router's accept loop.
+pub async fn serve(listener: TcpListener, router: Router) -> Result<(), io::Error> {
     let addr = listener.local_addr().ok();
     crate::dev::notify_ready(addr).await;
-    axum::serve(listener, app.into()).await
+    internal_serve(listener, router).await
 }
 
-/// Start a Topcoat/Axum router on the configured host and port.
+/// Start a Topcoat router on the configured host and port.
 ///
 /// The listener binds to the `HOST` and `PORT` environment variables,
 /// or `127.0.0.1` and `3000` when unset.
-pub async fn start(app: impl Into<axum::Router>) -> Result<(), io::Error> {
+pub async fn start(router: Router) -> Result<(), io::Error> {
     let host = host_from_env()?;
     let port = port_from_env()?;
     let listener = TcpListener::bind((host.as_str(), port)).await?;
 
-    serve(listener, app).await
+    serve(listener, router).await
 }
 
 fn host_from_env() -> Result<String, io::Error> {

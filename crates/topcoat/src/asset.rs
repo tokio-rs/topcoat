@@ -48,26 +48,27 @@
 //!
 //! ## Loading the bundle
 //!
-//! The router must load the generated asset bundle. Use [`AssetBundle::load`] for
-//! the default bundle location:
+//! Load the generated asset bundle while building the router, before `.build()`.
+//! Use [`AssetBundle::load`] for the default bundle location:
 //!
 //! ```rust,ignore
-//! use topcoat::asset::AssetBundle;
+//! use topcoat::{
+//!     asset::{AssetBundle, RouterBuilderAssetExt},
+//!     router::{Router, RouterBuilderDiscoverExt},
+//! };
 //!
-//! mod app;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!     let router = app::router().assets(AssetBundle::load().unwrap());
-//!
-//!     topcoat::start(router).await.unwrap();
+//! pub fn router() -> Router {
+//!     Router::builder()
+//!         .discover()
+//!         .assets(AssetBundle::load().unwrap())
+//!         .build()
 //! }
 //! ```
 //!
 //! Use [`AssetBundle::load_dir`] when you write the bundle to
 //! a custom location.
 //!
-//! [`Router::assets`](crate::router::Router::assets) does two things:
+//! [`RouterBuilderAssetExt::assets`] does two things:
 //!
 //! - mounts the bundle at `/_topcoat/assets`
 //! - installs the view resolver that turns [`Asset`] values into URLs
@@ -122,7 +123,10 @@
 //! ```
 //!
 //! ```rust,ignore
-//! let router = app::router().assets(AssetBundle::load_dir("dist/assets").unwrap());
+//! let router = Router::builder()
+//!     .discover()
+//!     .assets(AssetBundle::load_dir("dist/assets").unwrap())
+//!     .build();
 //! ```
 //!
 //! When `--out` is not in one of the auto-detected locations, use [`AssetBundle::load_dir`] to

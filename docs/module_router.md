@@ -1,19 +1,19 @@
 # Module-based routing
 
-The `module_router!` macro derives routes from your Rust module structure. No manual route registration, no path strings scattered across files — your module tree *is* your route table.
+The `module_router!` macro derives routes from your Rust module structure. The module tree becomes the route table: page, layout, layer, and route handlers can omit explicit path strings and let their enclosing module decide the URL.
 
 ## Setup
 
-Call `module_router!()` from the root module of your route tree. This module becomes the root `/` path.
+Call `module_router!()` from the root module of your route tree. This module becomes the root `/` path. The macro returns a `RouterBuilder`, so call `.build()` once you have added anything else the builder needs.
 
 ```rust
 // src/app/mod.rs
 pub fn router() -> topcoat::router::Router {
-    topcoat::router::module_router!()
+    topcoat::router::module_router!().build()
 }
 ```
 
-Every `#[page]`, `#[layout]`, and `#[route]` in modules under `app` is automatically discovered and registered.
+Every module-derived `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` under `app` is discovered and registered.
 
 ## How modules map to routes
 
@@ -27,9 +27,9 @@ Each module's path relative to the root module determines its URL. Module names 
 | `app::settings` | `/settings` |
 | `app::settings::profile` | `/settings/profile` |
 
-## Pages, layouts, and API routes
+## Pages, layouts, layers, and API routes
 
-A `#[page]` defines a route handler. A `#[layout]` wraps all pages in the same module and its submodules.
+A `#[page]` defines a page handler. A `#[layout]` wraps all pages in the same module and its submodules.
 
 ```rust
 // src/app/mod.rs — layout at "/" wraps all pages
@@ -64,11 +64,29 @@ async fn health() -> Result<&'static str> {
 }
 ```
 
+Layers use the same module-derived path as layouts, but wrap request handling instead of rendered view output:
+
+```rust
+// src/app/api/mod.rs — wraps routes under /api
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{Body, Next, Response, layer},
+};
+
+#[layer]
+async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+    let response = next.run(cx, body).await?;
+    println!("API response: {}", response.status());
+    Ok(response)
+}
+```
+
 Pages and routes can also read request bodies, and routes can return structured responses. See [Request and response bodies](./request_response.md).
 
 ## Path overrides
 
-Module-derived paths and explicit paths can be mixed in the same route tree. `#[page]`, `#[layout]`, and `#[route]` all register into the same router in the end. If an attribute includes an explicit path, that path is used instead of the module-derived path for that item:
+Module-derived paths and explicit paths can be mixed in the same route tree. `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` all register into the same builder in the end. If an attribute includes an explicit path, that path is used instead of the module-derived path for that item:
 
 ```rust
 #[page("/")]
@@ -79,6 +97,11 @@ async fn home() -> Result {
 #[layout("/admin")]
 async fn admin_layout(slot: Slot<'_>) -> Result {
     view! { <main>(slot.await?)</main> }
+}
+
+#[layer("/admin")]
+async fn admin_layer(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+    next.run(cx, body).await
 }
 
 #[route(GET "/api/health")]
@@ -99,21 +122,21 @@ topcoat::router::segment!(rename = "articles");
 
 ## Groups
 
-Modules prefixed with `_` are **groups**. They organize code and can hold shared layouts, but they don't add a path segment to the URL.
+Modules prefixed with `_` are **groups**. They organize code and can hold shared layouts or layers, but they do not add a path segment to the served URL.
 
-```
+```text
 app/
-  mod.rs              # layout at /
+  mod.rs               # layout at /
   _marketing/
-    mod.rs            # layout wrapping marketing pages (no route segment)
-    pricing.rs        # /pricing
-    features.rs       # /features
+    mod.rs             # layout wrapping marketing pages (no URL segment)
+    pricing.rs         # /pricing
+    features.rs        # /features
   _docs/
-    mod.rs            # layout wrapping docs pages (no route segment)
+    mod.rs             # layout wrapping docs pages (no URL segment)
     getting_started.rs # /getting-started
 ```
 
-Both `pricing` and `getting_started` are top-level routes, but they can have different layouts via their respective group `mod.rs` files.
+Both `pricing` and `getting_started` are top-level routes, but they can have different layouts through their respective group `mod.rs` files.
 
 You can also turn a regular module into a group with `segment!(kind = Group)`:
 
@@ -131,15 +154,15 @@ topcoat::router::segment!(kind = Static);
 // Module now reachable as `/group`.
 ```
 
-The `_`-prefix can also act as a naming convention for route-specific utilities. For example, a `_components` module for shared UI fragments:
+The `_` prefix can also act as a naming convention for route-specific utilities. For example, a `_components` module for shared UI fragments:
 
-```
+```text
 app/
   mod.rs
   _components/
-    mod.rs            # exports shared components, no route
+    mod.rs             # exports shared components, no route
     header.rs
     footer.rs
-  about.rs            # /about — can use app::_components::header
-  contact.rs          # /contact
+  about.rs             # /about — can use app::_components::header
+  contact.rs           # /contact
 ```

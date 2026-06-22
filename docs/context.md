@@ -31,6 +31,7 @@ Available request helpers:
 - `uri(cx)` returns the request URI.
 - `version(cx)` returns the HTTP version.
 - `headers(cx)` returns the request headers.
+- `content_type(cx)` returns the request `Content-Type` as `Option<&str>`.
 - `extensions(cx)` returns request extensions.
 
 Use `parts(cx)` when you need several fields at once:
@@ -44,7 +45,7 @@ fn cache_key(cx: &Cx) -> String {
 }
 ```
 
-Use `extensions(cx)` for typed request values inserted by lower-level Axum middleware:
+Use `extensions(cx)` for typed request values attached by a lower-level request layer or service integration:
 
 ```rust
 use topcoat::{context::Cx, router::extensions};
@@ -91,44 +92,28 @@ async fn post(cx: &Cx) -> Result {
 
 See [Path and query params](./path_and_query_params.md) for the exact return types and parsing rules.
 
-## App and request state helpers
+## App and request context helpers
 
-The `topcoat::context` module exposes typed state accessors:
+The `topcoat::context` module exposes typed context accessors:
 
-- `app_state::<T>(cx)` reads state registered on the router with `.app_state(value)`.
-- `request_state::<T>(cx)` reads typed state attached to the current request.
+- `app_context::<T>(cx)` reads values registered on the router with `.app_context(value)`.
+- `request_context::<T>(cx)` reads typed values attached to the current request.
 
 ```rust
-use topcoat::context::{Cx, app_state};
+use topcoat::context::{Cx, app_context};
 
 struct Database;
 
 fn db(cx: &Cx) -> &Database {
-    app_state::<Database>(cx)
+    app_context::<Database>(cx)
 }
 ```
 
-State is keyed by Rust type. Asking for a type that was not registered panics, so these helpers are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or `current_tenant(cx)`.
+Values are keyed by Rust type. Asking for a type that was not registered panics, so these helpers are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or `current_tenant(cx)`.
 
-## Extractor escape hatch
+## Request body parsing
 
-Prefer Topcoat's dedicated helpers when they exist. If you need to interoperate with an Axum extractor that implements `FromRequestParts`, use `router::extract`.
-
-```rust
-use axum::extract::Query;
-use serde::Deserialize;
-use topcoat::{context::Cx, router::extract};
-
-#[derive(Deserialize)]
-struct Pagination {
-    page: usize,
-}
-
-async fn page_number(cx: &Cx) -> Option<usize> {
-    let Query(pagination): Query<Pagination> = extract::<_, ()>(cx).await.ok()?;
-    Some(pagination.page)
-}
-```
+Handlers can receive one request body parameter in addition to `cx: &Cx`. See [Request and response bodies](./request_response.md) for the built-in extractors and the `FromRequest` trait for custom parsing.
 
 ## Composing helpers
 

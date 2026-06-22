@@ -703,8 +703,6 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// - `#[into]` makes the generated setter accept `impl Into<T>` instead of `T`, so `.label("Save")`
 ///   works for a `String` field.
 ///
-/// Both attributes can be combined on the same field.
-///
 /// ## Typestate
 ///
 /// The builder tracks each required property in a type parameter that flips to [`Set`] when the

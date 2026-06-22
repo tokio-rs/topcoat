@@ -32,6 +32,8 @@
 //! - [`uri(cx)`](crate::router::uri) returns the request URI.
 //! - [`version(cx)`](crate::router::version) returns the HTTP version.
 //! - [`headers(cx)`](crate::router::headers) returns the request headers.
+//! - [`content_type(cx)`](crate::router::content_type) returns the request `Content-Type` as
+//!   `Option<&str>`.
 //! - [`extensions(cx)`](crate::router::extensions) returns request extensions.
 //!
 //! Use [`parts(cx)`](crate::router::parts) when you need several fields at once:
@@ -45,8 +47,8 @@
 //! }
 //! ```
 //!
-//! Use [`extensions(cx)`](crate::router::extensions) for typed request values inserted by
-//! lower-level Axum middleware:
+//! Use [`extensions(cx)`](crate::router::extensions) for typed request values attached by a
+//! lower-level request layer or service integration:
 //!
 //! ```rust
 //! use topcoat::{context::Cx, router::extensions};
@@ -92,48 +94,36 @@
 //! }
 //! ```
 //!
-//! ## App and request state helpers
+//! See [`path_param`](crate::router::path_param) and
+//! [`query_params`](crate::router::query_params) for the exact return types and parsing rules.
 //!
-//! This module exposes typed state accessors:
+//! ## App and request context helpers
 //!
-//! - [`app_state::<T>(cx)`](app_state) reads state registered on the router with
-//!   `.app_state(value)`.
-//! - [`request_state::<T>(cx)`](request_state) reads typed state attached to the current request.
+//! This module exposes typed context accessors:
+//!
+//! - [`app_context::<T>(cx)`](app_context) reads values registered on the router with
+//!   `.app_context(value)`.
+//! - [`request_context::<T>(cx)`](request_context) reads typed values attached to the current
+//!   request.
 //!
 //! ```rust
-//! use topcoat::context::{Cx, app_state};
+//! use topcoat::context::{Cx, app_context};
 //! #
 //! # struct Database;
 //!
 //! fn db(cx: &Cx) -> &Database {
-//!     app_state::<Database>(cx)
+//!     app_context::<Database>(cx)
 //! }
 //! ```
 //!
-//! State is keyed by Rust type. Asking for a type that was not registered panics, so these helpers
-//! are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or
+//! Values are keyed by Rust type. Asking for a type that was not registered panics, so these
+//! helpers are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or
 //! `current_tenant(cx)`.
 //!
-//! ## Extractor escape hatch
+//! ## Request body parsing
 //!
-//! Prefer Topcoat's dedicated helpers when they exist. If you need to interoperate with an Axum
-//! extractor that implements `FromRequestParts`, use [`router::extract`](crate::router::extract).
-//!
-//! ```rust
-//! use axum::extract::Query;
-//! use serde::Deserialize;
-//! use topcoat::{context::Cx, router::extract};
-//!
-//! #[derive(Deserialize)]
-//! struct Pagination {
-//!     page: usize,
-//! }
-//!
-//! async fn page_number(cx: &Cx) -> Option<usize> {
-//!     let Query(pagination): Query<Pagination> = extract::<_, ()>(cx).await.ok()?;
-//!     Some(pagination.page)
-//! }
-//! ```
+//! Handlers can receive one request body parameter in addition to `cx: &`[`Cx`]. See
+//! [`FromRequest`](crate::router::FromRequest) for custom parsing and the built-in extractors.
 //!
 //! ## Composing helpers
 //!

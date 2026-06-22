@@ -17,10 +17,10 @@ async fn main() {
 // With the "discover" feature enabled (default), this can instead be:
 //
 // fn router() -> Router {
-//     Router::new().discover()
+//     Router::builder().discover().build()
 // }
 fn router() -> Router {
-    Router::new()
+    Router::builder()
         .layout(root_layout)
         .layout(docs_layout)
         .page(home)
@@ -28,6 +28,7 @@ fn router() -> Router {
         .page(docs)
         .page(install)
         .route(health)
+        .build()
 }
 
 // --- Layouts ----------------------------------------------------------------

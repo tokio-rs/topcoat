@@ -1,11 +1,15 @@
-use std::{hash::Hash, marker::PhantomData, pin::Pin};
+use std::{borrow::Cow, hash::Hash, marker::PhantomData, pin::Pin};
 
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
 use topcoat_core::runtime::{context::Cx, error::Result};
-use topcoat_runtime::runtime::Surrogated;
+use topcoat_router::runtime::{
+    Body, Method, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder,
+};
 
-use crate::runtime::{Body, Response};
+use crate::runtime::Surrogated;
+
+const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/procedures";
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -87,16 +91,83 @@ impl<A, R> From<Procedure<A, R>> for ErasedProcedure {
     }
 }
 
+impl<A, R> From<&Procedure<A, R>> for ErasedProcedure {
+    fn from(value: &Procedure<A, R>) -> Self {
+        Self::new(value)
+    }
+}
+
 #[cfg(feature = "discover")]
 inventory::collect!(ErasedProcedure);
 
+/// A [`Route`] that handles calls to one server procedure.
+#[derive(Debug, Clone)]
+pub struct ProcedureRoute {
+    path: PathBuf,
+    procedure: ErasedProcedure,
+}
+
+impl ProcedureRoute {
+    /// Builds the route that serves `procedure`.
+    pub fn new(procedure: impl Into<ErasedProcedure>) -> Self {
+        let procedure = procedure.into();
+        Self {
+            path: Path::new(&format!(
+                "{PROCEDURE_ROUTE_PREFIX}/{}",
+                procedure.id().as_str()
+            ))
+            .to_owned(),
+            procedure,
+        }
+    }
+}
+
+impl Route for ProcedureRoute {
+    fn method(&self) -> Method {
+        Method::POST
+    }
+
+    fn path(&self) -> Cow<'static, Path> {
+        Cow::Owned(self.path.clone())
+    }
+
+    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
+        Box::pin(async move { self.procedure.handle(cx, body).await })
+    }
+}
+
+/// Registers server procedures on a [`RouterBuilder`].
+pub trait RouterBuilderProcedureExt {
+    /// Mounts a procedure route at `/_topcoat/procedures/{id}`.
+    fn procedure(self, procedure: impl Into<ErasedProcedure>) -> Self;
+
+    /// Registers every procedure annotated with `#[procedure]` and collected at
+    /// link time.
+    #[cfg(feature = "discover")]
+    fn discover_procedures(self) -> Self;
+}
+
+impl RouterBuilderProcedureExt for RouterBuilder {
+    fn procedure(self, procedure: impl Into<ErasedProcedure>) -> Self {
+        self.route(ProcedureRoute::new(procedure))
+    }
+
+    #[cfg(feature = "discover")]
+    fn discover_procedures(mut self) -> Self {
+        for procedure in inventory::iter::<ErasedProcedure>().cloned() {
+            self = self.procedure(procedure);
+        }
+        self
+    }
+}
+
 #[derive(Debug, RefCast)]
 #[repr(transparent)]
-pub struct ProcedureSurrogate<A, R>(crate::runtime::Procedure<A, R>);
+pub struct ProcedureSurrogate<A, R>(Procedure<A, R>);
 
 impl<A, R> ProcedureSurrogate<A, R> {
     #[inline]
-    pub(crate) const fn new(v: crate::runtime::Procedure<A, R>) -> Self {
+    pub(crate) const fn new(v: Procedure<A, R>) -> Self {
         Self(v)
     }
 }
@@ -111,9 +182,9 @@ where
     }
 }
 
-topcoat_runtime::impl_surrogate!({A, R} crate::runtime::Procedure<A, R>, ProcedureSurrogate<A, R>);
-topcoat_runtime::impl_surrogate_ref!({A, R} crate::runtime::Procedure<A, R>, ProcedureSurrogate<A, R>);
-topcoat_runtime::impl_surrogate_mut!({A, R} crate::runtime::Procedure<A, R>, ProcedureSurrogate<A, R>);
+crate::impl_surrogate!({A, R} Procedure<A, R>, ProcedureSurrogate<A, R>);
+crate::impl_surrogate_ref!({A, R} Procedure<A, R>, ProcedureSurrogate<A, R>);
+crate::impl_surrogate_mut!({A, R} Procedure<A, R>, ProcedureSurrogate<A, R>);
 
 impl<A, R> Serialize for ProcedureSurrogate<A, R> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>

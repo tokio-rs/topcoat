@@ -65,14 +65,14 @@ Write composable request functions instead. Each function adds one small piece o
 
 ```rust
 use topcoat::{
-    context::{app_state, memoize, Cx},
-    router::{headers, FallbackExt, UnauthorizedError},
+    context::{app_context, memoize, Cx},
+    router::{headers, RouterErrorExt, UnauthorizedError},
     Result,
 };
 
 /// Returns the application database handle.
 fn db(cx: &Cx) -> Db {
-    app_state::<Db>(cx).clone()
+    app_context::<Db>(cx).clone()
 }
 
 /// Fetches a user by ID, deduplicated for the duration of the request.
@@ -140,7 +140,7 @@ Use several focused helpers instead of one large auth function:
 That keeps each function reusable. Public UI can call `fetch_current_user(cx)` and render a signed-out state. Private UI can call `require_auth(cx).await?` and fail closed. Admin UI can build on the same pattern:
 
 ```rust
-use topcoat::{context::Cx, router::FallbackExt, Result};
+use topcoat::{context::Cx, router::RouterErrorExt, Result};
 
 /// Returns the current user if they have admin permissions.
 async fn require_admin(cx: &Cx) -> Result<&User> {
@@ -149,4 +149,4 @@ async fn require_admin(cx: &Cx) -> Result<&User> {
 }
 ```
 
-The same style applies beyond auth: feature flags, tenant lookup, locale detection, experiments, settings, and URL-derived data all fit naturally as `cx` functions. Reach for middleware for true cross-cutting transport concerns such as compression, tracing, or low-level request normalization. Reach for `cx` functions when application code needs to ask for request-scoped data.
+The same style applies beyond auth: feature flags, tenant lookup, locale detection, experiments, settings, and URL-derived data all fit naturally as `cx` functions. Reach for a router layer for true cross-cutting transport concerns such as compression, tracing, or low-level request normalization. Reach for `cx` functions when application code needs to ask for request-scoped data.

@@ -3,13 +3,22 @@ name = "topcoat-cookie"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+router = [
+	"dep:topcoat-router",
+]
+
 [dependencies]
+topcoat-router = { workspace = true, optional = true }
 topcoat-core.workspace = true
 
 cookie = { workspace = true, features = ["secure", "percent-encode"] }
 http.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
 workspace = true

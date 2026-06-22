@@ -84,8 +84,8 @@ impl ToTokens for Procedure {
 
         quote! {
             #[allow(non_upper_case_globals)]
-            const #ident: &::topcoat::router::Procedure::<(#(#arg_tys,)*), #return_ty> = &::topcoat::router::Procedure::new(
-                ::topcoat::router::ProcedureId::new(#id),
+            const #ident: &::topcoat::runtime::Procedure::<(#(#arg_tys,)*), #return_ty> = &::topcoat::runtime::Procedure::new(
+                ::topcoat::runtime::ProcedureId::new(#id),
                 |cx, body| {
                     #item
                     Box::pin(async {
@@ -101,7 +101,7 @@ impl ToTokens for Procedure {
         .to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { ::topcoat::internal::inventory::submit! { ::topcoat::router::ErasedProcedure::new(#ident) } }.to_tokens(tokens);
+            quote! { ::topcoat::internal::inventory::submit! { ::topcoat::runtime::ErasedProcedure::new(#ident) } }.to_tokens(tokens);
         }
     }
 }

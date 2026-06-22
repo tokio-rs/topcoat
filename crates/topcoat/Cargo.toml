@@ -15,12 +15,16 @@ default = [
 
 asset = [
 	"dep:topcoat-asset",
-	"topcoat-router/asset",
 ]
 cookie = [
 	"dep:topcoat-cookie",
-	"router",
-	"topcoat-router/cookie",
+]
+discover = [
+	"dep:inventory",
+	"topcoat-router-macro?/discover",
+	"topcoat-router?/discover",
+	"topcoat-runtime?/discover",
+	"topcoat-view?/discover",
 ]
 multipart = [
 	"router",
@@ -30,12 +34,13 @@ router = [
 	"dep:topcoat-router",
 	"dep:topcoat-router-macro",
 	"view",
+	"topcoat-asset?/router",
+	"topcoat-cookie?/router",
+	"topcoat-runtime?/router",
 ]
 runtime = [
 	"dep:topcoat-runtime",
 	"dep:topcoat-runtime-macro",
-	"topcoat-router/runtime",
-	"topcoat-router-macro/runtime",
 ]
 tailwind = [
 	"dep:topcoat-tailwind",
@@ -43,15 +48,7 @@ tailwind = [
 view = [
 	"dep:topcoat-view",
 	"dep:topcoat-view-macro",
-	"topcoat-asset/view",
-]
-
-discover = [
-	"dep:inventory",
-	"topcoat-router-macro?/discover",
-	"topcoat-router/discover",
-	"topcoat-runtime/discover",
-	"topcoat-view/discover",
+	"topcoat-asset?/view",
 ]
 
 # Declares this crate as a topcoat-ui component registry: `topcoat ui` reads the
@@ -70,7 +67,7 @@ topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }
 topcoat-runtime-macro = { workspace = true, optional = true }
 topcoat-tailwind = { workspace = true, optional = true }
-topcoat-view = { workspace = true, optional = true, features = ["axum"] }
+topcoat-view = { workspace = true, optional = true }
 topcoat-view-macro = { workspace = true, optional = true }
 
 axum.workspace = true
@@ -78,7 +75,7 @@ futures-util.workspace = true
 inventory = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_urlencoded.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["net"] }
 tokio-tungstenite.workspace = true
 
 [dev-dependencies]

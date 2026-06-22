@@ -1,6 +1,7 @@
 mod bad_request;
 mod forbidden;
 mod internal_server;
+mod method_not_allowed;
 mod not_found;
 mod redirect;
 mod unauthorized;
@@ -8,33 +9,30 @@ mod unauthorized;
 pub use bad_request::*;
 pub use forbidden::*;
 pub use internal_server::*;
+pub use method_not_allowed::*;
 pub use not_found::*;
 pub use redirect::*;
 pub use unauthorized::*;
 
-use crate::runtime::{IntoResponse, Response};
+use http::StatusCode;
+
+use crate::runtime::{Body, IntoResponse, Response};
 use topcoat_core::runtime::error::{Error, Result};
 
-/// Turns a Result into a response.
-///
-/// The IntoResponse trait unfortunately cannot be implemented on [`Result`] because it would clash
-/// with the axum implementation.
-pub(crate) fn result_into_response<T: IntoResponse>(result: Result<T>) -> Response {
-    match result {
-        Ok(value) => value.into_response().unwrap_or_else(error_into_response),
-        Err(error) => error_into_response(error),
-    }
+/// Renders any [`IntoResponse`] value into a [`Response`], falling back to the
+/// error's response if conversion fails. This is the terminal conversion the
+/// router applies to a handler's return value.
+pub(crate) fn respond(value: impl IntoResponse) -> Response {
+    value.into_response().unwrap_or_else(error_into_response)
 }
 
-/// Turns an Error into a response.
-///
-/// The IntoResponse trait unfortunately cannot be implemented on [`Error`] because it would clash
-/// with the axum implementation.
-pub(crate) fn error_into_response(error: Error) -> Response {
+/// Maps the framework's error types onto their HTTP status codes, falling back
+/// to a 500 for anything else.
+fn error_into_response(error: Error) -> Response {
     macro_rules! try_downcast {
         ($ident:ident as $ty:ty) => {
             match $ident.downcast::<$ty>() {
-                Ok(error) => return axum::response::IntoResponse::into_response(error),
+                Ok(error) => return into_response_or_500(error),
                 Err(error) => error,
             }
         };
@@ -43,10 +41,41 @@ pub(crate) fn error_into_response(error: Error) -> Response {
     let error = try_downcast!(error as BadRequestError);
     let error = try_downcast!(error as InternalServerError);
     let error = try_downcast!(error as NotFoundError);
+    let error = try_downcast!(error as MethodNotAllowedError);
     let error = try_downcast!(error as RedirectError);
     let error = try_downcast!(error as UnauthorizedError);
 
-    axum::response::IntoResponse::into_response(internal_server_error(error))
+    into_response_or_500(internal_server_error(error))
+}
+
+/// Renders an error response, falling back to a bare 500 (none of the error
+/// types' responses can actually fail to build).
+fn into_response_or_500(value: impl IntoResponse) -> Response {
+    value.into_response().unwrap_or_else(|_| {
+        let mut response = Response::new(Body::from("internal server error"));
+        *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+        response
+    })
+}
+
+/// Renders the contained value, or the framework error response on `Err`.
+impl<T> IntoResponse for Result<T>
+where
+    T: IntoResponse,
+{
+    fn into_response(self) -> Result<Response> {
+        match self {
+            Ok(value) => value.into_response(),
+            Err(error) => Ok(error_into_response(error)),
+        }
+    }
+}
+
+/// Renders an error by mapping it onto its HTTP status code.
+impl IntoResponse for Error {
+    fn into_response(self) -> Result<Response> {
+        Ok(error_into_response(self))
+    }
 }
 
 /// Converts an absent or failed value into a router error response.

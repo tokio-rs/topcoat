@@ -1,17 +1,18 @@
 use topcoat::{
     Result,
-    asset::AssetBundle,
-    router::{Router, page, procedure},
-    runtime::Event,
+    asset::{AssetBundle, RouterBuilderAssetExt},
+    router::{Router, RouterBuilderDiscoverExt, page},
+    runtime::{Event, procedure},
     view::view,
 };
 
 #[tokio::main]
 async fn main() {
     topcoat::start(
-        Router::new()
+        Router::builder()
             .assets(AssetBundle::load().unwrap())
-            .discover(),
+            .discover()
+            .build(),
     )
     .await
     .unwrap();

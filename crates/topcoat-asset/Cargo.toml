@@ -4,16 +4,17 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["tower"]
+default = []
 
 bundler = [
+	"dep:mime_guess",
 	"dep:reqwest",
 	"dep:tokio",
 ]
-tower = [
-	"dep:pin-project-lite",
-	"dep:tower-http",
-	"dep:tower-service",
+router = [
+	"view",
+	"dep:topcoat-router",
+	"dep:tokio",
 ]
 view = [
 	"dep:topcoat-core",
@@ -22,19 +23,18 @@ view = [
 
 [dependencies]
 topcoat-core = { workspace = true, optional = true }
+topcoat-router = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
 
 http.workspace = true
 memchr.workspace = true
-pin-project-lite = { workspace = true, optional = true }
+mime_guess = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 sha2.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, optional = true, features = ["fs", "rt"] }
 toml.workspace = true
-tower-http = { workspace = true, optional = true, features = ["fs"] }
-tower-service = { workspace = true, optional = true }
 
 [lints]
 workspace = true

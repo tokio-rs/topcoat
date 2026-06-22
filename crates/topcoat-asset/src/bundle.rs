@@ -11,6 +11,7 @@ use crate::{Asset, MANIFEST_NAME, Manifest};
 #[derive(Debug, Clone)]
 pub struct BundledAsset {
     path: PathBuf,
+    content_type: String,
 }
 
 impl BundledAsset {
@@ -24,6 +25,12 @@ impl BundledAsset {
         self.path
             .file_name()
             .expect("asset file path must have a name")
+    }
+
+    /// `Content-Type` the asset is served with, resolved when the bundle was
+    /// built.
+    pub fn content_type(&self) -> &str {
+        &self.content_type
     }
 }
 
@@ -127,6 +134,7 @@ impl AssetBundle {
                     entry.id,
                     BundledAsset {
                         path: dir.join(entry.file),
+                        content_type: entry.content_type,
                     },
                 )
             })

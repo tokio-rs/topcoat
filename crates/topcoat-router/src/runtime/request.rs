@@ -1,57 +1,43 @@
-use std::sync::Arc;
+use topcoat_core::runtime::{context::Cx, error::Result};
 
-use axum::extract::{FromRequestParts, RawPathParams};
-use topcoat_core::runtime::{
-    context::{Cx, State},
-    error::Result,
-};
+use crate::runtime::{Body, error::bad_request, to_bytes};
 
-use crate::runtime::error::{BadRequestError, bad_request};
-
-pub use axum::body::to_bytes;
+/// Byte-buffer types re-exported for use as request body extractors and as
+/// response bodies.
 pub use bytes::{Bytes, BytesMut};
 
-pub type Body = axum::body::Body;
+/// An incoming HTTP request, carrying a [`Body`] by default.
+pub type Request<T = Body> = http::Request<T>;
 
-pub(crate) struct CxBody {
-    pub(crate) cx: Cx,
-    pub(crate) body: Body,
-}
-
-impl axum::extract::FromRequest<Arc<State>> for CxBody {
-    type Rejection = BadRequestError;
-
-    async fn from_request(
-        req: axum::extract::Request,
-        state: &Arc<State>,
-    ) -> Result<Self, Self::Rejection> {
-        let app_state = state.clone();
-        let (mut parts, body) = req.into_parts();
-        let body = Body::from(body);
-
-        let mut request_state = State::new();
-        request_state.register(
-            RawPathParams::from_request_parts(&mut parts, state)
-                .await
-                .map_err(|error| bad_request(error.to_string()))?,
-        );
-        request_state.register(parts);
-
-        let cx = Cx::new(app_state, request_state);
-        Ok(Self { cx, body })
-    }
-}
-
+/// A type that can be built from an incoming request.
+///
+/// A page or route handler may take a single `FromRequest` value as its request
+/// body parameter, optionally alongside `cx: &Cx`. The built-in extractors —
+/// [`Json`](crate::runtime::Json), [`Form`](crate::runtime::Form), [`Bytes`],
+/// [`String`], [`Body`], and more — all implement this trait; implement it
+/// yourself for request-specific parsing the built-ins don't cover.
+///
+/// Because the body is a stream that can only be read once, a handler may have
+/// at most one `FromRequest` parameter. This is the request-side counterpart of
+/// [`IntoResponse`](crate::runtime::IntoResponse).
 pub trait FromRequest: Sized {
+    /// Builds `Self` from the request context and body.
+    ///
+    /// Returns an error (typically [`bad_request`]) when the request cannot be
+    /// parsed into `Self`; the error is converted into the response sent to the
+    /// client.
     fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> + Send;
 }
 
+/// Yields the request body unchanged, leaving it unbuffered for the handler to
+/// read or forward itself.
 impl FromRequest for Body {
     async fn from_request(_cx: &Cx, body: Body) -> Result<Self> {
         Ok(body)
     }
 }
 
+/// Buffers the entire request body into memory.
 impl FromRequest for Bytes {
     async fn from_request(_cx: &Cx, body: Body) -> Result<Self> {
         to_bytes(body, usize::MAX)
@@ -60,6 +46,7 @@ impl FromRequest for Bytes {
     }
 }
 
+/// Buffers the entire request body into a mutable buffer.
 impl FromRequest for BytesMut {
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
         let bytes = Bytes::from_request(cx, body).await?;
@@ -67,6 +54,8 @@ impl FromRequest for BytesMut {
     }
 }
 
+/// Buffers the request body and decodes it as UTF-8, rejecting a non-UTF-8 body
+/// with `400 Bad Request`.
 impl FromRequest for String {
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
         let bytes = Bytes::from_request(cx, body).await?;
@@ -83,9 +72,16 @@ impl FromRequest for String {
 /// example, a missing body) while still surfacing an error for values that are
 /// present but malformed.
 pub trait OptionalFromRequest: Sized {
+    /// Builds `Some(Self)` from the request, or `None` when the request carries
+    /// no value for this extractor.
+    ///
+    /// Returns an error only when a value is present but malformed.
     fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Option<Self>>> + Send;
 }
 
+/// Makes any [`OptionalFromRequest`] extractor optional, yielding `None` when
+/// the request carries no value of that kind while still surfacing an error for
+/// a value that is present but malformed.
 impl<T> FromRequest for Option<T>
 where
     T: OptionalFromRequest,

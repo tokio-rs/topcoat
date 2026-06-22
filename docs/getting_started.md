@@ -23,13 +23,13 @@ Replace `src/main.rs` with:
 ```rust
 use topcoat::{
     Result,
-    router::{Router, page},
+    router::{Router, RouterBuilderDiscoverExt, page},
     view::{component, view},
 };
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::new().discover()).await.unwrap();
+    topcoat::start(Router::builder().discover().build()).await.unwrap();
 }
 
 #[page("/")]
@@ -59,7 +59,7 @@ async fn hello(name: &str) -> Result {
 A few things are happening here:
 
 - `topcoat::start` binds to `HOST` and `PORT` from the environment, defaulting to `127.0.0.1:3000`.
-- `Router::new().discover()` collects every `#[page]`, `#[layout]`, and `#[route]` in the binary — `home` is registered automatically.
+- `Router::builder().discover().build()` collects every `#[page]`, `#[layout]`, `#[route]`, and `#[layer]` in the binary, then finalizes the router — `home` is registered automatically.
 - `topcoat::dev::script()` injects the dev-server live-reload script in debug builds and renders to nothing in release builds.
 - The `hello` component is invoked from `view!` with function-call syntax.
 
@@ -97,5 +97,5 @@ HOST=0.0.0.0 PORT=8080 topcoat dev
 
 - [The `view!` macro](view.md) — templating syntax and control flow.
 - [Router](router.md) and [Module-based routing](module_router.md) — how pages, layouts, and API routes are wired up.
-- [Request context (`Cx`)](cx.md) — the value pages and components read from.
+- [Request context (`Cx`)](context.md) — the value pages and components read from.
 - [Assets](assets.md) — declare static files in Rust and serve them with content-hashed URLs.

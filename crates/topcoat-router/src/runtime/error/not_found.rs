@@ -1,6 +1,7 @@
 use http::StatusCode;
+use topcoat_core::runtime::error::Result;
 
-use crate::runtime::Response;
+use crate::runtime::{IntoResponse, Response};
 
 /// Builds a not-found (HTTP 404) response.
 ///
@@ -45,8 +46,8 @@ impl std::fmt::Display for NotFoundError {
 
 impl std::error::Error for NotFoundError {}
 
-impl axum::response::IntoResponse for NotFoundError {
-    fn into_response(self) -> Response {
+impl IntoResponse for NotFoundError {
+    fn into_response(self) -> Result<Response> {
         (StatusCode::NOT_FOUND, "not found").into_response()
     }
 }

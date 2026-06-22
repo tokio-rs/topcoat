@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
@@ -14,8 +16,7 @@ use crate::ast::{
     view::{ExprKind, Nodes, ViewWriter, WriteView},
 };
 
-/// A user-defined component invocation, written as
-/// `path(name: value, ..., child_node child_node ...)`.
+/// A component invocation, written as `path(name: value, ..., child_node child_node ...)`.
 ///
 /// Named arguments come first, separated by `,`. Any child nodes appear after
 /// the last named argument (separated from it by `,`) and run together without
@@ -121,8 +122,15 @@ impl Parse for Component {
                 }
 
                 let mut named_args = Vec::new();
+                let mut existing = HashSet::new();
                 while !content.is_empty() && peek_named_arg(&content) {
                     let ident: Ident = content.parse()?;
+                    if !existing.insert(ident.to_string()) {
+                        return Err(syn::Error::new_spanned(
+                            &ident,
+                            format!("duplicate key `{}`", &ident),
+                        ));
+                    }
                     let colon: Token![:] = content.parse()?;
                     let value: NamedArgValue = content.parse()?;
                     named_args.push(NamedArg {
