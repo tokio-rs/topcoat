@@ -14,7 +14,7 @@ topcoat = { version = "0.1", features = ["tailwind"] }
 
 Add a `build.rs` next to `Cargo.toml`:
 
-```rust
+```rust,ignore
 fn main() {
     topcoat::tailwind::BuildConfig::new().render().unwrap();
 }
@@ -22,7 +22,7 @@ fn main() {
 
 Then link the generated stylesheet from your layout:
 
-```rust
+```rust,ignore
 use topcoat::{
     Result,
     router::{Slot, layout},
@@ -48,7 +48,7 @@ async fn layout(slot: Slot<'_>) -> Result {
 
 `tailwind::stylesheet!()` expands to:
 
-```rust
+```rust,ignore
 topcoat::asset::asset!(concat!(env!("OUT_DIR"), "/tailwind.css"))
 ```
 
@@ -60,7 +60,7 @@ topcoat asset bundle
 
 At runtime, load the asset bundle on the router:
 
-```rust
+```rust,ignore
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     router::{Router, RouterBuilderDiscoverExt},
@@ -109,7 +109,7 @@ So Tailwind scans from your crate's `src` directory. This works with classes in 
 
 If your templates, components, or shared UI live somewhere else, change the working directory:
 
-```rust
+```rust,ignore
 fn main() {
     topcoat::tailwind::BuildConfig::new()
         .cwd(".")
@@ -124,7 +124,7 @@ For more precise control, use a custom input CSS file and Tailwind's own source 
 
 The generated input is enough for default Tailwind output. Use `input(...)` when you need custom CSS, theme values, plugins supported by the standalone CLI, or Tailwind source directives:
 
-```rust
+```rust,ignore
 fn main() {
     topcoat::tailwind::BuildConfig::new()
         .input("src/styles/app.css")
@@ -160,7 +160,7 @@ The input file is registered with Cargo as `rerun-if-changed`, so changing it re
 
 For example:
 
-```rust
+```rust,ignore
 fn main() {
     topcoat::tailwind::BuildConfig::new()
         .version("4.3.0")
@@ -183,7 +183,7 @@ $OUT_DIR/tailwind.css
 
 If you change `output(...)`, link the same file with `asset!` instead of `tailwind::stylesheet!()`:
 
-```rust
+```rust,ignore
 use topcoat::asset::asset;
 
 view! {
@@ -196,7 +196,7 @@ view! {
 
 Keep the build script and the linked asset path in sync:
 
-```rust
+```rust,ignore
 fn main() {
     let out_dir = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
 

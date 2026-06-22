@@ -32,7 +32,7 @@ The formatter parses Rust source, finds macro invocations it knows how to format
 
 In normal Topcoat code, this primarily means `view!`:
 
-```rust
+```rust,ignore
 fn page() -> topcoat::Result {
     view! {
         <main>
