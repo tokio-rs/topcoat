@@ -67,6 +67,12 @@ pub fn remove(
             module::undeclare(&package.resolve(&components_dir), file_name)?;
         }
 
+        // Drop the registry entry once its last component is gone, so the state
+        // file doesn't keep an empty `[registries.<name>.components]` section.
+        if registry.components.is_empty() {
+            state.registries.remove(&registry_name);
+        }
+
         removed.push(Removed {
             name: component,
             file: installed.file,
