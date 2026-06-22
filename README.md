@@ -150,7 +150,7 @@ view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 - [Cookies](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/cookies.md) — read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
 
 **Patterns**
-- [Functions, not middlewares](https://github.com/tokio-rs/topcoat/blob/main/docs/functions_not_middlewares.md) — the recommended way to model auth and other request-scoped concerns.
+- [Functions, not middlewares](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/functions_not_middlewares.md) — the recommended way to model auth and other request-scoped concerns.
 - [Memoization](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-core/macro/docs/memoization.md) — `#[memoize]` for per-request caching and fan-out dedup.
 
 **Project infrastructure**

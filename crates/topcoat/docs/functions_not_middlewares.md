@@ -10,7 +10,7 @@ These functions can be called from anywhere in the component tree without coupli
 
 Middleware often pushes authentication away from the code that needs the authenticated user. The middleware authenticates the request and stores the user somewhere ambient, while the page assumes the middleware has already run.
 
-```rust
+```rust,ignore
 async fn auth_middleware(request: &mut Request) {
     let user = authenticate(request).await;
     request.extensions.insert(user);
@@ -32,7 +32,7 @@ That can work, but it makes the page depend on configuration that lives somewher
 
 Extractors avoid that hidden setup by putting the auth requirement in the handler signature:
 
-```rust
+```rust,ignore
 async fn account_page(Auth(user): Auth) -> Html {
     render_account(user)
 }
@@ -40,7 +40,7 @@ async fn account_page(Auth(user): Auth) -> Html {
 
 This is more robust than middleware because the auth requirement is visible. The tradeoff is that every component below the page now needs to receive the user explicitly:
 
-```rust
+```rust,ignore
 async fn account_page(Auth(user): Auth) -> Html {
     render(
         account_sidebar(user.clone()),
@@ -63,7 +63,7 @@ That is fine for local data flow, but current-user state is usually ambient to t
 
 Write composable request functions instead. Each function adds one small piece of logic, accepts `&Cx`, and can be called from any page, layout, or component.
 
-```rust
+```rust,ignore
 use topcoat::{
     context::{app_context, memoize, Cx},
     router::{headers, RouterErrorExt, UnauthorizedError},
@@ -103,7 +103,7 @@ async fn require_auth(cx: &Cx) -> Result<&User, UnauthorizedError> {
 
 Now the component that needs authentication declares it by calling `require_auth(cx)`:
 
-```rust
+```rust,ignore
 use topcoat::{
     context::Cx,
     view::{component, view},
@@ -139,7 +139,7 @@ Use several focused helpers instead of one large auth function:
 
 That keeps each function reusable. Public UI can call `fetch_current_user(cx)` and render a signed-out state. Private UI can call `require_auth(cx).await?` and fail closed. Admin UI can build on the same pattern:
 
-```rust
+```rust,ignore
 use topcoat::{context::Cx, router::RouterErrorExt, Result};
 
 /// Returns the current user if they have admin permissions.
