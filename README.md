@@ -6,7 +6,7 @@ A batteries-included Rust web framework for server-rendered apps.
 
 Topcoat is a productive full-stack toolkit for server-rendered Rust apps: HTML-first templates, file-system-shaped routing, per-request memoization, and a built-in asset pipeline with optional Tailwind support — all designed so you can stay in Rust.
 
-See the [Getting started guide](https://github.com/tokio-rs/topcoat/blob/main/docs/getting_started.md) to set up a new project.
+See the [Getting started guide](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md) to set up a new project.
 
 ```rust,ignore
 use topcoat::{
@@ -132,7 +132,7 @@ view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 ## Learn Topcoat
 
 **Start here**
-- [Getting started](https://github.com/tokio-rs/topcoat/blob/main/docs/getting_started.md) — create a new project, install the CLI, run the dev server.
+- [Getting started](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md) — create a new project, install the CLI, run the dev server.
 
 **Rendering**
 - [The `view!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/view.md) — templating syntax, control flow, conditional attributes.
@@ -145,7 +145,7 @@ view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 
 **Working with requests**
 - [Request context (`Cx`)](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/context.md) — the value pages, layouts, and components read from.
-- [App context](https://github.com/tokio-rs/topcoat/blob/main/docs/app_context.md) — share long-lived values across requests, keyed by type.
+- [App context](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/app_context.md) — share long-lived values across requests, keyed by type.
 - [Cookies](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/cookies.md) — read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
 
 **Patterns**

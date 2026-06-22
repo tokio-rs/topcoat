@@ -1,9 +1,3 @@
-//! Runtime types used by generated views and components.
-//!
-//! Most applications use this module through Topcoat's view and component
-//! macros. The public traits are available for custom values that need to be
-//! accepted in node, element-name, or attribute positions.
-
 mod attribute;
 mod component;
 mod element;

@@ -26,7 +26,7 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 
 ### Getting started
 
-- [`docs/getting_started.md`](docs/getting_started.md) — Creating a new project, installing the `topcoat` CLI, and running the dev server.
+- [`crates/topcoat/docs/getting_started.md`](crates/topcoat/docs/getting_started.md) — Creating a new project, installing the `topcoat` CLI, and running the dev server.
 
 ### Routing
 
@@ -42,7 +42,7 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 ### Request context and state
 
 - [`crates/topcoat/docs/context.md`](crates/topcoat/docs/context.md) — The request context `Cx`: router request helpers, path/query helpers, state accessors, and request body parsing.
-- [`docs/app_context.md`](docs/app_context.md) — App context: registering long-lived values with `.app_context(value)` and reading them with `app_context::<T>(cx)`.
+- [`crates/topcoat/docs/app_context.md`](crates/topcoat/docs/app_context.md) — App context: registering long-lived values with `.app_context(value)` and reading them with `app_context::<T>(cx)`.
 - [`crates/topcoat-core/macro/docs/memoization.md`](crates/topcoat-core/macro/docs/memoization.md) — `#[memoize]` for per-request caching of function results keyed by arguments.
 - [`crates/topcoat/docs/functions_not_middlewares.md`](crates/topcoat/docs/functions_not_middlewares.md) — The framework's philosophy: prefer composable `cx: &Cx` functions over middleware/extractors for auth and request-scoped data.
 - [`crates/topcoat/docs/cookies.md`](crates/topcoat/docs/cookies.md) — Cookies: the request-scoped jar (`cookies(cx)`), the `cookie!` macro, attribute defaults, name prefixes, signed/private cookies, and typed `CookieStore<T>`.
