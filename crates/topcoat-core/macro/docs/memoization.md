@@ -1,10 +1,8 @@
-# Memoization
-
 The `#[memoize]` attribute caches the result of a function for the duration of a single request, keyed by its arguments. Call the same function twice with the same arguments inside one request and the body runs only once — the second call returns the cached value.
 
 This is the per-request equivalent of memoization in libraries like React's `cache`: it's not a global cache and it's not persisted across requests. Each new request starts with an empty cache.
 
-## Setup
+# Setup
 
 Annotate any function that takes a `cx: &Cx` parameter:
 
@@ -21,7 +19,7 @@ That's it. Calling `get_user(cx, 42).await` from anywhere in the request — a p
 
 Top-level `Option<T>` and `Result<T, E>` return types are borrowed ergonomically: the macro calls `.as_ref()` on the cached value and returns `Option<&T>` or `Result<&T, &E>` instead of `&Option<T>` or `&Result<T, E>`.
 
-## Sync and async
+# Sync and async
 
 `#[memoize]` works on both synchronous and `async` functions. Pick whichever matches your work; the macro handles the rest.
 
@@ -39,7 +37,7 @@ async fn fetch_post(cx: &Cx, slug: &str) -> Post {
 
 For async functions, concurrent callers with the same arguments share a single in-flight future. If two parts of your page render in parallel and both call `fetch_post(cx, "hello")`, the database is queried once and both callers await the same result.
 
-## What gets cached
+# What gets cached
 
 Every argument except `cx` is part of the cache key. Two calls hit the same cache entry if and only if every non-`cx` argument is equal.
 
@@ -57,7 +55,7 @@ add(cx, 1, 3); // prints "computing", returns 4 (different args)
 
 Each `#[memoize]` function has its own independent cache slot, so two functions with the same argument types don't collide.
 
-## Borrowed and owned arguments
+# Borrowed and owned arguments
 
 Arguments can be passed by value or by reference. Borrowed arguments avoid cloning on cache hits; on a miss the value is cloned once into the cache.
 
@@ -71,7 +69,7 @@ let record = lookup(cx, "alice").await?; // computes; stores "alice".to_owned() 
 let record = lookup(cx, "alice").await?; // cache hit, no allocation
 ```
 
-## Requirements
+# Requirements
 
 The macro enforces these at compile time:
 
@@ -83,7 +81,7 @@ The macro enforces these at compile time:
 
 Most everyday types — `i32`, `String`, `&str`, `Uuid`, your own `#[derive(Hash, Eq, PartialEq, Clone)]` structs — satisfy these out of the box.
 
-## When to reach for it
+# When to reach for it
 
 Use `#[memoize]` when the same data may be requested multiple times during a single request and recomputing it is wasteful. Common cases:
 
@@ -92,7 +90,7 @@ Use `#[memoize]` when the same data may be requested multiple times during a sin
 
 It is *not* a substitute for a long-lived cache (Redis, an LRU, etc.). Cross-request caching is a separate concern and should be layered behind your data access functions.
 
-## Example: shared user lookup
+# Example: shared user lookup
 
 ```rust,ignore
 use topcoat::{

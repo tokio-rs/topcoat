@@ -1,8 +1,6 @@
-# Tailwind
-
 Topcoat's Tailwind integration is a thin Rust wrapper around the standalone Tailwind CSS CLI. It does not run Node, PostCSS, or a Vite-style asset pipeline. Instead, a Cargo build script runs Tailwind, writes a CSS file into `OUT_DIR`, and the normal Topcoat asset bundler serves that CSS file with a content-hashed URL.
 
-## Setup
+# Setup
 
 Enable the `tailwind` feature for both your runtime dependency and your build dependency:
 
@@ -74,7 +72,7 @@ let router = Router::builder()
     .build();
 ```
 
-## Build flow
+# Build flow
 
 `BuildConfig::render()` is intended to run from `build.rs`. It requires Cargo's `OUT_DIR` and `CARGO_MANIFEST_DIR` environment variables.
 
@@ -97,7 +95,7 @@ The default build does this:
 
 The default Tailwind CLI version is pinned by Topcoat to `4.3.0`. The downloaded binary is cached inside Cargo's build output directory as `tailwindcss-<version>`.
 
-## Class scanning
+# Class scanning
 
 Topcoat does not inspect `view!` macros or extract class names itself. Class detection is delegated to the Tailwind CLI.
 
@@ -122,7 +120,7 @@ fn main() {
 
 For more precise control, use a custom input CSS file and Tailwind's own source configuration features from that file.
 
-## Custom input CSS
+# Custom input CSS
 
 The generated input is enough for default Tailwind output. Use `input(...)` when you need custom CSS, theme values, plugins supported by the standalone CLI, or Tailwind source directives:
 
@@ -147,7 +145,7 @@ Example input:
 
 The input file is registered with Cargo as `rerun-if-changed`, so changing it reruns the build script.
 
-## Configuration
+# Configuration
 
 `BuildConfig` exposes the options that Topcoat passes to the CLI:
 
@@ -175,7 +173,7 @@ fn main() {
 }
 ```
 
-## Custom output paths
+# Custom output paths
 
 The convenience macro `tailwind::stylesheet!()` assumes the default output path:
 
@@ -209,7 +207,7 @@ fn main() {
 }
 ```
 
-## Rebuild behavior
+# Rebuild behavior
 
 `BuildConfig::render()` prints Cargo directives for:
 
@@ -218,7 +216,7 @@ fn main() {
 
 With the default `cwd`, any change under `src` reruns the build script and regenerates Tailwind output. `topcoat dev` also watches source directories, rebuilds the Rust binary, rebundles assets, and restarts the app after a successful build.
 
-## Supported platforms
+# Supported platforms
 
 Topcoat downloads the Tailwind CLI asset that matches the host platform. The currently supported targets are:
 

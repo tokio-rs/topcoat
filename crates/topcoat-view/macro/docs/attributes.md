@@ -1,5 +1,3 @@
-# The [`attributes!`] macro
-
 The [`attributes!`] macro builds a [`topcoat::view::Attributes`] value from Topcoat's attribute syntax.
 
 Use it when attributes need to be passed around, assembled outside a [`view!`] call, changed at runtime, or forwarded through components.
@@ -18,7 +16,7 @@ view! {
 }
 ```
 
-## Syntax
+# Syntax
 
 The body of [`attributes!`] has the same syntax as attributes inside an element in [`view!`].
 
@@ -58,7 +56,7 @@ let attrs = attributes! {
 
 [`attributes!`] produces attributes, not child nodes. Control-flow bodies inside the macro therefore emit attributes in the same way they do inside a [`view!`] element's opening tag.
 
-## Runtime Attributes
+# Runtime Attributes
 
 The generated value is [`topcoat::view::Attributes`]. It is a runtime collection of attributes with unique keys.
 
@@ -78,7 +76,7 @@ assert!(attrs.contains_key("class"));
 
 Because [`Attributes`] is map-like, each key appears at most once. Inserting the same key again replaces the previous value. Do not rely on render order for attributes.
 
-## Inserting Attributes Into Elements
+# Inserting Attributes Into Elements
 
 Insert an [`Attributes`] value into an element by using it as a parenthesized attribute fragment:
 
@@ -101,7 +99,7 @@ Any type that implements [`AttributeViewParts`] can be used in the same position
 
 Inserting an [`Attributes`] value consumes it. Clone the value first if the same attribute collection needs to be inserted into more than one element.
 
-## Passing Attributes To Components
+# Passing Attributes To Components
 
 Components can accept [`Attributes`] as a normal argument. This is useful for forwarding caller-controlled attributes to the component's root element.
 

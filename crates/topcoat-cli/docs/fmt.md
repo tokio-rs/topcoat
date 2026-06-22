@@ -1,8 +1,6 @@
-# Source code formatting
-
 Topcoat includes a source formatter for macro bodies in Rust files. It is intended to run alongside normal Rust formatting: `rustfmt` formats Rust syntax, while `topcoat fmt` formats the syntax inside Topcoat-aware macro invocations.
 
-## CLI
+# CLI
 
 Run the formatter with:
 
@@ -28,7 +26,7 @@ topcoat fmt --stdin < src/main.rs > /tmp/main.rs
 
 In stdin mode, the formatted source is written to stdout instead of updating files on disk.
 
-## What It Formats
+# What It Formats
 
 The formatter parses Rust source, finds macro invocations it knows how to format, and replaces only those macro bodies. The surrounding Rust code is left as-is.
 
@@ -46,9 +44,9 @@ fn page() -> topcoat::Result {
 
 The formatter is macro-aware rather than token-only, so the same command is also the place for other supported Topcoat macro syntax as formatting support grows. Unknown macros are ignored.
 
-## Editor integration
+# Editor integration
 
-### Neovim
+## Neovim
 
 This Neovim config uses `conform.nvim` and enables `topcoat fmt` for Rust buffers only when a `Topcoat.toml` marker exists in the project root.
 

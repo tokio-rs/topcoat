@@ -1,8 +1,6 @@
-# Module-based routing
-
 The `module_router!` macro derives routes from your Rust module structure. The module tree becomes the route table: page, layout, layer, and route handlers can omit explicit path strings and let their enclosing module decide the URL.
 
-## Setup
+# Setup
 
 Call `module_router!()` from the root module of your route tree. This module becomes the root `/` path. The macro returns a `RouterBuilder`, so call `.build()` once you have added anything else the builder needs.
 
@@ -15,7 +13,7 @@ pub fn router() -> topcoat::router::Router {
 
 Every module-derived `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` under `app` is discovered and registered.
 
-## How modules map to routes
+# How modules map to routes
 
 Each module's path relative to the root module determines its URL. Module names are converted to **kebab-case** (`user_settings` becomes `user-settings`).
 
@@ -27,7 +25,7 @@ Each module's path relative to the root module determines its URL. Module names 
 | `app::settings` | `/settings` |
 | `app::settings::profile` | `/settings/profile` |
 
-## Pages, layouts, layers, and API routes
+# Pages, layouts, layers, and API routes
 
 A `#[page]` defines a page handler. A `#[layout]` wraps all pages in the same module and its submodules.
 
@@ -82,7 +80,7 @@ async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 ```
 
-## Path overrides
+# Path overrides
 
 Module-derived paths and explicit paths can be mixed in the same route tree. `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` all register into the same builder in the end. If an attribute includes an explicit path, that path is used instead of the module-derived path for that item:
 
@@ -108,7 +106,7 @@ async fn health() -> Result<&'static str> {
 }
 ```
 
-## Renaming a static segment
+# Renaming a static segment
 
 `segment!(rename = "name")` overrides the URL with the given literal (used as-is, no kebab-casing).
 
@@ -118,7 +116,7 @@ topcoat::router::segment!(rename = "articles");
 // Route: /articles instead of /blog-post
 ```
 
-## Groups
+# Groups
 
 Modules prefixed with `_` are **groups**. They organize code and can hold shared layouts or layers, but they do not add a path segment to the served URL.
 

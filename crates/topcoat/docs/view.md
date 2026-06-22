@@ -1,5 +1,3 @@
-# Views, components, and attributes
-
 This module provides Topcoat's HTML templating primitives:
 
 - [`view!`] — the HTML-like templating macro.

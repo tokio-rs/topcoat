@@ -1,12 +1,10 @@
-# Functions, not middlewares
-
 Developers coming from other frameworks may be used to guarding API routes with middlewares or extractors, for example to reject invalid requests or unauthenticated users. In Topcoat, prefer short, composable functions that take `cx: &Cx` and perform validation or data fetching directly.
 
 These functions can be called from anywhere in the component tree without coupling unrelated components together. For data fetching and other expensive work, use `#[memoize]` to deduplicate repeated calls to the same logic within a request.
 
-## What not to do
+# What not to do
 
-### Middleware
+## Middleware
 
 Middleware often pushes authentication away from the code that needs the authenticated user. The middleware authenticates the request and stores the user somewhere ambient, while the page assumes the middleware has already run.
 
@@ -28,7 +26,7 @@ async fn account_page(request: &Request) -> Html {
 
 That can work, but it makes the page depend on configuration that lives somewhere else. If the middleware is missing or ordered incorrectly, the handler can panic. If a protected route is added without the middleware, it can accidentally expose data.
 
-### Extractors
+## Extractors
 
 Extractors avoid that hidden setup by putting the auth requirement in the handler signature:
 
@@ -59,7 +57,7 @@ async fn user_avatar(user: User) -> Html {
 
 That is fine for local data flow, but current-user state is usually ambient to the request. Passing it through every layout and component couples unrelated code just so a deeply nested component can ask a simple question.
 
-## What to do in Topcoat
+# What to do in Topcoat
 
 Write composable request functions instead. Each function adds one small piece of logic, accepts `&Cx`, and can be called from any page, layout, or component.
 
@@ -128,7 +126,7 @@ async fn user_avatar(cx: &Cx) -> Result {
 
 Because `fetch_user` is memoized, the database lookup runs at most once for the same user ID during a request. A layout can call `fetch_current_user(cx)` to render the nav, a page can call `require_auth(cx)` to protect private content, and a nested component can call `require_auth(cx)` again to render an avatar. The calls stay decoupled, while the expensive work is deduplicated.
 
-### Shape the functions by meaning
+## Shape the functions by meaning
 
 Use several focused helpers instead of one large auth function:
 

@@ -1,12 +1,10 @@
-# Router
-
 [`Router`] is the finalized routing table that dispatches incoming requests. Build one with [`Router::builder`], register pages, layouts, layers, and API routes, call [`build`](RouterBuilder::build), then pass it to [`start`](crate::start).
 
 For most apps, the recommended way to define routes is the [`module_router!`] macro. It derives the routing table from your module tree instead of defining each URL path by hand. This guide describes the [`Router`] builder it sits on top of — manual registration and auto-discovery.
 
 You can register handlers in two ways: **manually** (explicit paths, full control) or with **auto-discovery** (the `discover` feature collects annotated items automatically).
 
-## Paths
+# Paths
 
 Explicit route paths use Topcoat's [`Path`] syntax:
 
@@ -17,7 +15,7 @@ Explicit route paths use Topcoat's [`Path`] syntax:
 
 The root path is `/`. Non-root paths must start with `/` and may not contain empty segments.
 
-## API routes
+# API routes
 
 An API route is an async function annotated with [`#[route]`](route) and an explicit HTTP method and path:
 
@@ -32,7 +30,7 @@ async fn health() -> Result<&'static str> {
 
 Route handlers can also read request bodies and return structured responses, the same way for explicit and module-router paths — see [Request and response bodies](#request-and-response-bodies).
 
-## Request and response bodies
+# Request and response bodies
 
 A page or route handler can take the request context as `cx: &`[`Cx`](crate::context::Cx) and, alongside it, a single request body parameter. That parameter can be any type that implements [`FromRequest`]. API routes additionally return `Result<T>` where `T:` [`IntoResponse`].
 
@@ -51,7 +49,7 @@ async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User
 
 The context and the body parameter are both optional and may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once. Pages use the same [`FromRequest`] parsing, but return a rendered view rather than an [`IntoResponse`] value.
 
-### Reading the request body
+## Reading the request body
 
 Each extractor is a [`FromRequest`] type; see its own documentation for the exact content types, parsing rules, and examples.
 
@@ -69,7 +67,7 @@ Wrap [`Json`], [`Form`], or `Multipart` in [`Option`] to make the body optional:
 
 When none of the built-in extractors fit, implement [`FromRequest`] for your own type to parse the request however you need.
 
-### Returning a response
+## Returning a response
 
 A route returns `Result<T>` where `T:` [`IntoResponse`]. Topcoat implements [`IntoResponse`] for common shapes — strings, status codes, byte buffers, [`Body`], [`Response`], and tuples like `(StatusCode, value)` and `(headers, value)` — as well as the wrappers [`Json<T>`](Json), [`Form<T>`](Form), and [`Html<T>`](Html).
 
@@ -82,7 +80,7 @@ async fn user() -> Result<Json<User>> {
 
 Returning a bare value only works if its type implements [`IntoResponse`]; a plain `Result<User>` is not serialized as JSON unless `User` itself does so. Implement [`IntoResponse`] for a domain type when it should control its own status, headers, or body.
 
-## Path and query parameters
+# Path and query parameters
 
 Handlers read typed values out of the URL with two attributes. Each generates an `of(cx)` accessor whose result is parsed once and memoized for the rest of the request:
 
@@ -115,7 +113,7 @@ async fn post(cx: &Cx) -> Result {
 
 See [`#[path_param]`](path_param) and [`#[query_params]`](query_params) for how parameters pair with the URL (module router versus explicit paths), the exact return types, and their requirements.
 
-## Pages
+# Pages
 
 A page is an async function annotated with [`#[page]`](page) and an explicit path:
 
@@ -147,7 +145,7 @@ async fn docs_page() -> Result {
 }
 ```
 
-## Layouts
+# Layouts
 
 A layout wraps pages. It receives a [`Slot`] — a future that resolves to the inner page or layout. Annotate it with [`#[layout]`](layout) and an explicit path:
 
@@ -177,7 +175,7 @@ async fn root_layout(slot: Slot<'_>) -> Result {
 
 A layout applies to every page whose path starts with the layout's path. A layout at `/` wraps all pages. A layout at `/settings` wraps `/settings`, `/settings/profile`, `/settings/billing`, and so on.
 
-### Nested layouts
+## Nested layouts
 
 When multiple layouts match a page, they nest from least specific (outermost) to most specific (innermost):
 
@@ -205,7 +203,7 @@ async fn profile() -> Result {
 
 A request to `/settings/profile` renders: `root_layout` > `settings_layout` > `profile`.
 
-## Layers
+# Layers
 
 A layer wraps matched routes under its path prefix. It receives a mutable request context, the request body, and [`Next`], which represents the remaining layers and the route handler.
 
@@ -227,7 +225,7 @@ async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
 
 Layer path matching follows the same prefix rule as layouts. A layer at `/` wraps everything, while a layer at `/admin` wraps only routes under `/admin`. Layers at different paths nest from least specific (outermost) to most specific (innermost). If you manually register multiple layers at the same path, the most recently registered layer runs first.
 
-## Manual registration
+# Manual registration
 
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
 
@@ -249,7 +247,7 @@ pub fn router() -> Router {
 
 Layout-to-page matching is based on path prefixes, not registration order. Layer order is also path-based except when multiple explicitly registered layers share the same path; among those, the last registered layer is outermost and runs first.
 
-## Auto-discovery with `discover()`
+# Auto-discovery with `discover()`
 
 With the `discover` feature enabled, every [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](route) is collected at link time. Instead of listing each item by hand, call [`discover`](RouterBuilderDiscoverExt::discover) on the builder:
 
@@ -263,7 +261,7 @@ pub fn router() -> Router {
 
 This finds annotated items across your crate and dependencies. Discovered layers must have unique paths because link-time collection order is not stable; if you need to stack several layers on one path, register them explicitly with `.layer(...)`.
 
-## Serving
+# Serving
 
 Use [`start`](crate::start) to run a finalized router:
 
@@ -277,7 +275,7 @@ async fn main() {
 
 [`start`](crate::start) binds to `HOST` and `PORT`, defaulting to `127.0.0.1:3000`. Use [`serve`](crate::serve) when you want to bind the `TcpListener` yourself.
 
-## Example: full manual setup
+# Example: full manual setup
 
 ```rust,ignore
 use topcoat::{
@@ -354,7 +352,7 @@ pub fn router() -> Router {
 }
 ```
 
-## Example: same app with `discover()`
+# Example: same app with `discover()`
 
 ```rust,ignore
 use topcoat::router::{Router, RouterBuilderDiscoverExt};

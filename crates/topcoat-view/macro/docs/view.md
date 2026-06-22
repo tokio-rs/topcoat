@@ -1,5 +1,3 @@
-# The [`view!`] macro
-
 The [`view!`] macro is Topcoat's HTML templating syntax. It tries to be unsurprising by staying close to real HTML instead of inventing a Rust-shaped HTML dialect.
 
 That means:
@@ -36,7 +34,7 @@ view! {
 }
 ```
 
-## Rust Expressions
+# Rust Expressions
 
 Use parentheses to interpolate a Rust expression into markup.
 
@@ -77,11 +75,11 @@ view! {
 }
 ```
 
-## Control Flow
+# Control Flow
 
 Control flow in [`view!`] is Rust control flow with markup bodies. The macro lowers these constructs into ordinary Rust statements that append to the view being built.
 
-### `if`
+## `if`
 
 Use `if`, `else if`, and `else` to choose which markup is emitted.
 
@@ -111,7 +109,7 @@ view! {
 }
 ```
 
-### `for`
+## `for`
 
 Use `for pat in expr { ... }` to render the body once for each item.
 
@@ -139,7 +137,7 @@ view! {
 }
 ```
 
-### `match`
+## `match`
 
 Use `match` to choose markup from patterns. Match arms can also use guards.
 
@@ -183,7 +181,7 @@ view! {
 
 For multiple conditional attributes, put the `if`, `for`, or `match` at the level where it can emit the attributes you need.
 
-### `let`
+## `let`
 
 Use `let pat = expr;` to bind values for later nodes in the same body.
 
@@ -212,7 +210,7 @@ view! {
 }
 ```
 
-## Components
+# Components
 
 Components are called inside [`view!`] with function-call syntax. Named arguments use `name: value`, and child nodes can be passed after the named arguments:
 
@@ -233,7 +231,7 @@ All component parameters are named parameters, except `child`, which can be pass
 
 See the [`component`] macro guide in [component.md](component.md) for defining components and passing child content.
 
-## Conditional Attributes
+# Conditional Attributes
 
 Expression attributes can remove themselves from the rendered markup.
 
@@ -271,7 +269,7 @@ view! {
 
 For reusable runtime attribute collections, use the [`attributes!`] macro. The [attributes guide](attributes.md) covers the same attribute syntax and the [`topcoat::view::Attributes`] value that can be passed around and inserted into an element as an attribute fragment.
 
-## Custom Values In Markup
+# Custom Values In Markup
 
 The macro accepts dynamic Rust values by routing them through small runtime traits. Implement the trait for the position where your type should be accepted:
 

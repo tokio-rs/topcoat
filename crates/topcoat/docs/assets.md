@@ -1,8 +1,6 @@
-# Assets
-
 Topcoat assets are declared from Rust code with [`asset!`](asset). The macro returns a small [`Asset`] ID and embeds the declaration into the compiled binary. After building your application, Topcoat can scan the binary, copy or download every declared file into an asset bundle directory, and serve those bundled files from the router.
 
-## Declaring assets
+# Declaring assets
 
 Use [`asset!`](asset) anywhere in your app:
 
@@ -43,7 +41,7 @@ When an [`Asset`] appears inside [`view!`](crate::view::view), Topcoat renders i
 
 The hash in the filename is based on the file contents, so URLs are safe to cache aggressively.
 
-## Loading the bundle
+# Loading the bundle
 
 Load the generated asset bundle while building the router, before `.build()`. Use [`AssetBundle::load`] for the default bundle location:
 
@@ -70,7 +68,7 @@ Use [`AssetBundle::load_dir`] when you write the bundle to a custom location.
 
 If a page renders an [`Asset`] that is not present in the loaded bundle, rendering panics. Treat that as a build/deploy mismatch: the binary and asset bundle must come from the same build.
 
-## Bundling
+# Bundling
 
 During development, `topcoat dev` builds the app and bundles assets after each successful build:
 
@@ -122,7 +120,7 @@ let router = Router::builder()
 
 When `--out` is not in one of the auto-detected locations, use [`AssetBundle::load_dir`] to point at it explicitly.
 
-## Path resolution
+# Path resolution
 
 The first argument to [`asset!`](asset) is a string literal path or an `http(s)` URL. Local paths are resolved by the bundler:
 
@@ -136,7 +134,7 @@ The first argument to [`asset!`](asset) is a string literal path or an `http(s)`
 
 Use `./` or `../` when the asset should move with the module. Use a bare relative path when the asset is part of a crate-level assets directory.
 
-## Output options
+# Output options
 
 [`asset!`](asset) accepts optional named arguments that affect the bundled filename:
 
@@ -160,7 +158,7 @@ Available options:
 
 Use `checksum` for remote assets when you want deployments to fail if the remote file changes unexpectedly.
 
-## Direct bundle access
+# Direct bundle access
 
 Most Topcoat apps only need to render [`Asset`] values in [`view!`](crate::view::view). If you need the filesystem path for another purpose, load the bundle and look up the asset ID:
 

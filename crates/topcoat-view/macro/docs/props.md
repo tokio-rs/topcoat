@@ -1,5 +1,3 @@
-# The `Props` derive
-
 Derives a typestate builder for a props struct.
 
 For a struct `ButtonProps`, the derive generates a `ButtonPropsBuilder` whose `build()` method only becomes available once every required property has been set. Forgetting a property is a compile error, not a runtime panic.
@@ -22,12 +20,12 @@ let props = ButtonProps::builder()
     .build();
 ```
 
-## Field Attributes
+# Field Attributes
 
 - `#[default]` makes a property optional. If it is not set, the field is filled with [`Default::default()`]. The field's type must implement [`Default`].
 - `#[into]` makes the generated setter accept `impl Into<T>` instead of `T`, so `.label("Save")` works for a `String` field.
 
-## Typestate
+# Typestate
 
 The builder tracks each required property in a type parameter that flips to [`Set`] when the property's setter is called. `build()` requires every marker to implement [`IsSet`], so this fails to compile:
 
@@ -38,7 +36,7 @@ let props = ButtonProps::builder().label("Save").build();
 
 Setters can be called more than once; later calls replace the earlier value.
 
-## Generics
+# Generics
 
 Generic structs are supported. The struct's generics, bounds, and `where` clauses carry over to the builder:
 
@@ -51,7 +49,7 @@ struct ListProps<T: Clone> {
 }
 ```
 
-## The `Props` Trait
+# The `Props` Trait
 
 The derive also implements the [`Props`] trait, whose associated `Builder` type names the builder in its initial state. The generated `builder()` function is available both as an inherent function and through the trait.
 

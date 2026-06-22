@@ -1,10 +1,8 @@
-# Request context (`Cx`)
-
 [`Cx`] is Topcoat's request context. Pages, layouts, components, and routes can take it as an optional parameter when they need request-scoped information.
 
 Add `cx: &Cx` to the function signature when needed; leave it out when the function does not need request context. Topcoat passes it automatically when the parameter is present.
 
-## Router request helpers
+# Router request helpers
 
 The [`router`](crate::router) module exposes small functions for reading HTTP request data from `cx`.
 
@@ -57,7 +55,7 @@ fn request_id(cx: &Cx) -> Option<&str> {
 }
 ```
 
-## Path and query helpers
+# Path and query helpers
 
 Path and query parameter macros generate `of(cx)` helpers. They parse lazily and memoize the parsed value for the request.
 
@@ -92,7 +90,7 @@ async fn post(cx: &Cx) -> Result {
 
 See [`path_param`](crate::router::path_param) and [`query_params`](crate::router::query_params) for the exact return types and parsing rules.
 
-## App and request context helpers
+# App and request context helpers
 
 This module exposes typed context accessors:
 
@@ -111,11 +109,11 @@ fn db(cx: &Cx) -> &Database {
 
 Values are keyed by Rust type. Asking for a type that was not registered panics, so these helpers are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or `current_tenant(cx)`.
 
-## Memoization
+# Memoization
 
 [`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. See its documentation for the details.
 
-## Composing helpers
+# Composing helpers
 
 Any helper can accept `cx: &`[`Cx`], call other helpers, and return a domain-specific result:
 

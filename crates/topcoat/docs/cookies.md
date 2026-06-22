@@ -1,5 +1,3 @@
-# Cookies
-
 Topcoat reads and writes cookies through a request-scoped **cookie jar**. Install cookie support on your router with `.cookies()`, then call `cookies(cx)` from any handler to get the jar, read incoming cookies, and queue changes. Anything you add or remove during the request is serialized into `Set-Cookie` response headers automatically once the handler returns. You don't need to touch headers yourself.
 
 Cookies are part of the default feature set, and everything below is re-exported from `topcoat::cookie`. Topcoat builds on the `cookie` crate: a cookie is a [`Cookie`], and signing and encryption use its [`Key`].
@@ -15,7 +13,7 @@ let router = Router::builder()
     .build();
 ```
 
-## Reading and writing
+# Reading and writing
 
 `cookies(cx)` returns the request's root jar. The incoming `Cookie` header is parsed on first access and memoized for the rest of the request, so repeated calls are cheap and see the same pending changes. Bring the [`Cookies`] trait into scope for the `get`, `add`, and `remove` methods.
 
@@ -58,7 +56,7 @@ jar.remove(Cookie::build(("session", "")).path("/").build());
 jar.add(("theme", "dark"));
 ```
 
-## Building cookies with `cookie!`
+# Building cookies with `cookie!`
 
 For cookies with several attributes, the [`cookie!`] macro is more compact than the builder. It mirrors the `Set-Cookie` header: the `name = value` pair first, then any number of `;`-separated attributes.
 
@@ -77,7 +75,7 @@ let session: Cookie = cookie! {
 };
 ```
 
-## Default and override attributes
+# Default and override attributes
 
 Rather than repeat the same attributes on every cookie, layer them onto the jar with the [`Cookies`] combinators. Each one wraps the jar and applies an attribute to cookies added through it, in the style of [`Iterator`] adapters. Every attribute comes in two flavors:
 
@@ -125,7 +123,7 @@ For anything the named combinators don't cover, [`map`](Cookies::map) is the esc
 let jar = cookies(cx).map(|cookie| cookie.set_partitioned(true));
 ```
 
-## Name prefixes
+# Name prefixes
 
 [RFC 6265bis] cookie name prefixes ask the browser to enforce extra constraints based on the cookie's name. Topcoat applies the prefix *and* its required attributes for you, and strips the prefix back off on read so your code keeps using the bare name.
 
@@ -148,7 +146,7 @@ As with attributes, each prefix has a `default_*` form that fills the required a
 
 [RFC 6265bis]: https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#name-cookie-name-prefixes
 
-## Signed cookies
+# Signed cookies
 
 A **signed** cookie is tamper-proof but still readable by the client — useful when the value isn't secret but must not be forged (a user id, a feature flag). Signing wraps the jar with a [`Key`]; reads return `None` when a cookie is missing or its signature doesn't verify.
 
@@ -164,7 +162,7 @@ jar.add(cookie!("user_id" = "42"));
 let user_id = jar.get("user_id");
 ```
 
-## Private cookies
+# Private cookies
 
 A **private** cookie is encrypted with AES-256-GCM, so its value is both tamper-proof *and* unreadable by the client. Use it for anything sensitive. The cookie's name is bound into the ciphertext, so the name must match on write and read — which it does automatically, however you compose this layer.
 
@@ -181,7 +179,7 @@ let session = jar.get("session"); // None if missing or it fails to decrypt
 
 Signing and private encryption operate on the cookie value (and, for private, the name) only — they compose freely with prefixes and attribute defaults in any order.
 
-## Keys from app context
+# Keys from app context
 
 In a real app you generate the [`Key`] once at startup and share it across requests. Register it as [app context](crate::context::app_context):
 
@@ -219,7 +217,7 @@ async fn login(cx: &Cx) -> Result<&'static str> {
 
 Both functions panic if no [`Key`] was registered — a startup-time bug, not a runtime one. Generate the key once and persist it; regenerating it on every boot invalidates every signed and encrypted cookie already in the wild.
 
-## Typed cookie stores
+# Typed cookie stores
 
 The jar API works in terms of individual [`Cookie`] values. When you want to keep a *structured* value in a cookie — a cart, a preferences object, a visit counter — a [`CookieStore<T>`](CookieStore) wraps the read/serialize/write cycle so you work with your own type instead of strings. The value is stored as JSON, and `T` only needs `Serialize` and `DeserializeOwned`.
 
@@ -250,7 +248,7 @@ async fn add_item(cx: &Cx) -> Result<String> {
 }
 ```
 
-### Reading the incoming value
+## Reading the incoming value
 
 [`cookie_store`] returns an [`UnparsedCookieStore`]. Reading the incoming cookie is a separate, fallible step, because a cookie can be absent or present-but-malformed (for example after you change `T`'s shape). The `parse*` methods mirror [`Option`]/[`Result`]'s `unwrap*` family and let you choose how to handle those cases:
 
@@ -266,7 +264,7 @@ Once parsed, you hold a [`CookieStore<T>`](CookieStore) whose value is known, so
 - [`read`](CookieStore::read) borrows the value; [`get`](CookieStore::get) clones it (when `T: Clone`).
 - [`set(value)`](CookieStore::set) replaces the value and [`update(f)`](CookieStore::update) mutates it in place. Both return the store so calls can be chained.
 
-### Nothing is written until `commit`
+## Nothing is written until `commit`
 
 Reads and mutations touch only the in-memory value. **No `Set-Cookie` is queued until you call [`commit`](CookieStore::commit)**, which serializes the value, writes it through the jar, and hands the value back:
 
@@ -295,7 +293,7 @@ cookie_store::<Cart, _>(private_cookies(cx), "cart").remove();
 
 The removal goes through the jar, so the `Path`/`Domain` and prefix attributes the cookie was written with are reapplied — the browser matches the removal against the original and clears it.
 
-### A helper per store
+## A helper per store
 
 As with the jar combinators, the idiomatic pattern is to wrap each store in a small helper so its name and backing jar stay consistent everywhere it's used:
 
