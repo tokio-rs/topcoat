@@ -3,8 +3,6 @@ mod init;
 mod list;
 mod remove;
 
-use std::path::PathBuf;
-
 use clap::{Args, Subcommand};
 
 #[derive(Args)]
@@ -36,12 +34,13 @@ impl UiCommand {
     }
 }
 
-/// The `--package` selector shared by the `ui` subcommands: the cargo crate to
-/// operate on, whose root holds `components.toml`.
+/// The `--package` selector shared by the `ui` subcommands: the cargo package
+/// to operate on, whose root holds `components.toml`.
 #[derive(Args)]
 struct PackageArg {
-    /// Cargo crate to operate on; its root holds `components.toml`
-    /// (defaults to the crate containing the current directory)
-    #[arg(short, long)]
-    package: Option<PathBuf>,
+    /// Package to operate on, by name (like `cargo -p`); its root holds
+    /// `components.toml` (defaults to the package containing the current
+    /// directory)
+    #[arg(short, long, value_name = "SPEC")]
+    package: Option<String>,
 }
