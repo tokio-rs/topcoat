@@ -164,14 +164,14 @@ pub struct Theme<'a> {
 }
 
 impl Theme<'_> {
-    /// The name used to select the theme, e.g. `nova`.
+    /// The name used to select the theme, e.g. `neutral`.
     pub fn name(&self) -> &str {
         self.name
     }
 
     /// The file name written into the user's project. Every theme installs to
     /// the same `styles.css` (it becomes the project's Tailwind input), rather
-    /// than carrying its registry source name (e.g. `nova.css`) into the project.
+    /// than carrying its registry source name (e.g. `neutral.css`) into the project.
     pub fn file_name(&self) -> &str {
         "styles.css"
     }

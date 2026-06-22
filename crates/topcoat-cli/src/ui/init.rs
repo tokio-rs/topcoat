@@ -11,7 +11,8 @@ pub(super) struct InitCommand {
     /// Base directory for component install output (defaults to `src/components`)
     #[arg(short, long)]
     components_dir: Option<PathBuf>,
-    /// Theme to install; when omitted, you are prompted to choose one
+    /// Theme to install; when omitted, the sole theme is used, or you are
+    /// prompted to choose when several are available
     #[arg(short, long)]
     theme: Option<String>,
     #[command(flatten)]

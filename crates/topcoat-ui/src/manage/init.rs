@@ -11,14 +11,15 @@ use super::workspace::Workspace;
 pub struct InitOptions {
     /// Base directory for component install output (default `src/components`).
     pub components_dir: Option<PathBuf>,
-    /// The theme to install by name. When `None`, the user is asked to choose
-    /// one; a theme is always installed, never skipped.
+    /// The theme to install by name. When `None`, the sole registered theme is
+    /// installed, or the user is asked to choose when several are offered; a
+    /// theme is always installed, never skipped.
     pub theme: Option<String>,
 }
 
 /// The theme installed by [`init`].
 pub struct InstalledThemeInfo {
-    /// The theme's name, e.g. `nova`.
+    /// The theme's name, e.g. `neutral`.
     pub name: String,
     /// The registry crate it came from.
     pub registry: String,
@@ -104,7 +105,8 @@ struct ThemePlan {
 /// Resolves the package's theme without writing anything. A theme is mandatory,
 /// so this either produces a plan or fails: the default registry must be
 /// reachable and offer at least one theme, and an explicitly named theme must
-/// exist. When no theme was named, `choose` picks one from those offered.
+/// exist. When no theme was named, the sole offered theme is taken, or `choose`
+/// picks one when the registry offers several.
 fn plan_theme(
     package: &Package,
     requested: Option<&str>,
@@ -133,6 +135,9 @@ fn plan_theme(
                 names.join(", ")
             ));
         }
+        // With a single theme on offer there is nothing to choose, so install it
+        // without prompting; the picker only appears once the registry ships more.
+        None if names.len() == 1 => names[0].clone(),
         None => choose(&names)?,
     };
 
