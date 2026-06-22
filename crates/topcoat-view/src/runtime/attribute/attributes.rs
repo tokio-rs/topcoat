@@ -4,27 +4,10 @@ use crate::runtime::{Attribute, AttributeValueViewParts, AttributeViewParts, Vie
 
 /// A runtime collection of HTML attributes with unique keys.
 ///
-/// Prefer constructing `Attributes` with the [`attributes!`](macro.attributes.html)
-/// macro. The macro accepts the same attribute syntax as an element inside
-/// `view!`, including dynamic values, dynamic names, event handlers, and
-/// attribute-level control flow.
-///
-/// ```rust,ignore
-/// use topcoat::view::{attributes, view};
-///
-/// let attrs = attributes! {
-///     class="button"
-///     type="submit"
-///     aria-label="Save changes"
-/// };
-///
-/// view! {
-///     <button (attrs)>"Save"</button>
-/// }
-/// ```
-///
 /// `Attributes` is map-like: each key appears at most once, and inserting the
 /// same key again replaces the previous value. Do not rely on render order.
+/// Prefer constructing `Attributes` with the [`attributes!`](macro.attributes.html)
+/// macro.
 #[derive(Debug, Default, Clone)]
 pub struct Attributes {
     map: HashMap<String, ViewPart>,
@@ -92,10 +75,6 @@ impl Attributes {
 
     /// Inserts every `(key, value)` entry from `iter`, replacing any keys
     /// already present.
-    ///
-    /// This backs spreading attributes into a collection, such as the `(attrs)`
-    /// spread inside the [`attributes!`](macro.attributes.html) macro. Any
-    /// iterator of key/value pairs works, including another [`Attributes`].
     #[inline]
     pub fn extend(&mut self, iter: impl IntoIterator<Item = (String, ViewPart)>) {
         self.map.extend(iter);

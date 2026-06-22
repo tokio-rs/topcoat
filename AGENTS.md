@@ -37,9 +37,9 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 
 ### Views and components
 
-- [`docs/view.md`](docs/view.md) — The `view!` macro: HTML-like templating syntax, expression interpolation, control flow (`if`/`for`/`match`/`let`), components, and conditional attributes.
-- [`docs/component.md`](docs/component.md) — The `#[component]` macro: defining components, props, child content, generics, and the `cx` parameter.
-- [`docs/attributes.md`](docs/attributes.md) — The `attributes!` macro and the runtime `Attributes` value for building/forwarding attribute collections.
+- [`crates/topcoat-view/macro/docs/view.md`](crates/topcoat-view/macro/docs/view.md) — The `view!` macro: HTML-like templating syntax, expression interpolation, control flow (`if`/`for`/`match`/`let`), components, and conditional attributes.
+- [`crates/topcoat-view/macro/docs/component.md`](crates/topcoat-view/macro/docs/component.md) — The `#[component]` macro: defining components, props, child content, generics, and the `cx` parameter.
+- [`crates/topcoat-view/macro/docs/attributes.md`](crates/topcoat-view/macro/docs/attributes.md) — The `attributes!` macro and the runtime `Attributes` value for building/forwarding attribute collections.
 
 ### Request context and state
 

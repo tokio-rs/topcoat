@@ -133,8 +133,8 @@ view! {
 
 Since the value is ordinary Rust data, you can build it in helper functions, add or replace attributes before rendering, and pass it through several layers before inserting it into an element.
 
-[`AttributeViewParts`]: https://docs.rs/topcoat/latest/topcoat/view/trait.AttributeViewParts.html
-[`Attributes`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Attributes.html
-[`attributes!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html
-[`topcoat::view::Attributes`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Attributes.html
-[`view!`]: https://docs.rs/topcoat/latest/topcoat/view/macro.view.html
+[`AttributeViewParts`]: trait.AttributeViewParts.html
+[`Attributes`]: struct.Attributes.html
+[`attributes!`]: macro.attributes.html
+[`topcoat::view::Attributes`]: struct.Attributes.html
+[`view!`]: macro.view.html

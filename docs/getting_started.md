@@ -95,7 +95,7 @@ HOST=0.0.0.0 PORT=8080 topcoat dev
 
 ## Where to next
 
-- [The `view!` macro](view.md) — templating syntax and control flow.
+- [The `view!` macro](../crates/topcoat-view/macro/docs/view.md) — templating syntax and control flow.
 - [Router](router.md) and [Module-based routing](module_router.md) — how pages, layouts, and API routes are wired up.
 - [Request context (`Cx`)](context.md) — the value pages and components read from.
 - [Assets](assets.md) — declare static files in Rust and serve them with content-hashed URLs.

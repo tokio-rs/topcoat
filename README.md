@@ -135,9 +135,9 @@ view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 - [Getting started](https://github.com/tokio-rs/topcoat/blob/main/docs/getting_started.md) — create a new project, install the CLI, run the dev server.
 
 **Rendering**
-- [The `view!` macro](https://github.com/tokio-rs/topcoat/blob/main/docs/view.md) — templating syntax, control flow, conditional attributes.
-- [The `component` macro](https://github.com/tokio-rs/topcoat/blob/main/docs/component.md) — async functions as components, with child content.
-- [The `attributes!` macro](https://github.com/tokio-rs/topcoat/blob/main/docs/attributes.md) — reusable runtime attribute fragments.
+- [The `view!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/view.md) — templating syntax, control flow, conditional attributes.
+- [The `component` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/component.md) — async functions as components, with child content.
+- [The `attributes!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/attributes.md) — reusable runtime attribute fragments.
 
 **Routing**
 - [Router](https://github.com/tokio-rs/topcoat/blob/main/docs/router.md) — pages, layouts, and API routes; manual and auto-discovered.
