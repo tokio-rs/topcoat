@@ -3,12 +3,6 @@ name = "topcoat-ui"
 version = "0.1.0"
 edition = "2024"
 
-# Declares this crate as a topcoat-ui component registry: `topcoat ui` reads the
-# `registry.toml` (and component sources) under this directory, relative to the
-# crate root. A crate is usable as a registry only if it carries this key.
-[package.metadata.topcoat-ui]
-registry = "src/topcoat"
-
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

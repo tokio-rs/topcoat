@@ -112,9 +112,9 @@ fn plan_theme(
 ) -> Result<ThemePlan, String> {
     let registry_crate = DEFAULT_REGISTRY_CRATE;
     let workspace = Workspace::load(package)?;
-    let dir = workspace.registry_dir(registry_crate).map_err(|error| {
-        format!("cannot install a theme: {error} (the package must depend on `topcoat` with the `ui` feature)")
-    })?;
+    let dir = workspace
+        .registry_dir(registry_crate)
+        .map_err(|error| format!("cannot install a theme: {error}"))?;
     let registry = Registry::load(dir)
         .map_err(|error| format!("failed to load registry `{registry_crate}`: {error}"))?;
 

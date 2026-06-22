@@ -40,13 +40,6 @@ runtime = [
 tailwind = [
 	"dep:topcoat-tailwind",
 ]
-# Pulls in the `topcoat-ui` crate so its built-in component registry reaches the
-# project transitively, letting `topcoat ui add` use it without depending on
-# `topcoat-ui` directly. Off by default so apps that don't use `topcoat ui` never
-# compile its management code.
-ui = [
-	"dep:topcoat-ui",
-]
 view = [
 	"dep:topcoat-view",
 	"dep:topcoat-view-macro",
@@ -61,6 +54,12 @@ discover = [
 	"topcoat-view/discover",
 ]
 
+# Declares this crate as a topcoat-ui component registry: `topcoat ui` reads the
+# `registry.toml` (and component sources) under this directory, relative to the
+# crate root. A crate is usable as a registry only if it carries this key.
+[package.metadata.topcoat-ui]
+registry = "src/ui"
+
 [dependencies]
 topcoat-asset = { workspace = true, optional = true }
 topcoat-cookie = { workspace = true, optional = true }
@@ -71,7 +70,6 @@ topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }
 topcoat-runtime-macro = { workspace = true, optional = true }
 topcoat-tailwind = { workspace = true, optional = true }
-topcoat-ui = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true, features = ["axum"] }
 topcoat-view-macro = { workspace = true, optional = true }
 

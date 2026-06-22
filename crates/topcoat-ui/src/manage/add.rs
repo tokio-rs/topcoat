@@ -297,9 +297,9 @@ fn resolve_root_registry(
         return Ok(name.to_string());
     }
 
-    // Prefer the default registry whenever it offers the component. It may not be
-    // reachable at all (e.g. the package does not depend on `topcoat`), in which
-    // case fall through to the package's other registries.
+    // Prefer the default registry whenever it offers the component. It may not
+    // offer it (or, for a project that does not depend on `topcoat`, not load at
+    // all), in which case fall through to the package's other registries.
     let default = DEFAULT_REGISTRY_CRATE;
     let offers_default = match load_registry(registries, workspace, default) {
         Ok(registry) => registry.get(component).is_some(),

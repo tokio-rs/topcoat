@@ -8,6 +8,7 @@ use topcoat::{
 /// Mirrors the `variant` options of the shadcn/ui button. [`Default`] is
 /// `ButtonVariant::Default`, matching shadcn's `defaultVariants`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum ButtonVariant {
     /// The primary, filled button.
     #[default]
@@ -29,6 +30,7 @@ pub enum ButtonVariant {
 /// Mirrors the `size` options of the shadcn/ui button. [`Default`] is
 /// `ButtonSize::Default`, matching shadcn's `defaultVariants`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum ButtonSize {
     /// The standard button height.
     #[default]

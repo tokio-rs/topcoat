@@ -4,18 +4,15 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use crate::DEFAULT_REGISTRY_CRATE;
-
 use super::package::Package;
 
 /// The cargo dependency graph of a package, used to resolve registries.
 ///
 /// A registry is a crate, referenced by name. To be used as a registry a crate
 /// must (a) be reachable in the package's dependency graph and (b) be a *direct*
-/// dependency declared in the package's `Cargo.toml`. The sole exception is the
-/// built-in [`DEFAULT_REGISTRY_CRATE`], which is accepted whenever it is
-/// reachable, since it arrives transitively through the `topcoat` crate rather
-/// than being depended on directly.
+/// dependency declared in the package's `Cargo.toml`. The built-in `topcoat`
+/// registry is no exception: every Topcoat project depends on `topcoat` directly,
+/// so it satisfies these rules like any other registry.
 pub(super) struct Workspace {
     /// Every resolved package, indexed by crate name.
     packages: HashMap<String, MetadataPackage>,
@@ -98,7 +95,7 @@ impl Workspace {
             )
         })?;
 
-        if crate_name != DEFAULT_REGISTRY_CRATE && !self.direct_deps.contains(crate_name) {
+        if !self.direct_deps.contains(crate_name) {
             return Err(format!(
                 "registry crate `{crate_name}` must be a direct dependency in Cargo.toml"
             ));
@@ -118,15 +115,15 @@ impl Workspace {
         Ok(crate_root.join(registry))
     }
 
-    /// The crate names of every registry the package may add from: the built-in
-    /// default plus any direct dependency that declares a registry, sorted.
+    /// The crate names of every registry the package may add from: every direct
+    /// dependency that declares a registry (including the default `topcoat`
+    /// crate), sorted.
     pub(super) fn available_registries(&self) -> Vec<String> {
         let mut names: Vec<String> = self
             .packages
             .values()
             .filter(|package| {
-                (package.name == DEFAULT_REGISTRY_CRATE || self.direct_deps.contains(&package.name))
-                    && registry_subdir(package).is_some()
+                self.direct_deps.contains(&package.name) && registry_subdir(package).is_some()
             })
             .map(|package| package.name.clone())
             .collect();

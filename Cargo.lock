@@ -2284,7 +2284,6 @@ dependencies = [
  "topcoat-runtime",
  "topcoat-runtime-macro",
  "topcoat-tailwind",
- "topcoat-ui",
  "topcoat-view",
  "topcoat-view-macro",
 ]
