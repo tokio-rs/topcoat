@@ -1,3 +1,5 @@
+# Functions, not middlewares
+
 Developers coming from other frameworks may be used to guarding API routes with middlewares or extractors, for example to reject invalid requests or unauthenticated users. In Topcoat, prefer short, composable functions that take `cx: &Cx` and perform validation or data fetching directly.
 
 These functions can be called from anywhere in the component tree without coupling unrelated components together. For data fetching and other expensive work, use `#[memoize]` to deduplicate repeated calls to the same logic within a request.
