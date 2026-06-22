@@ -1,8 +1,8 @@
-pub mod form;
-pub mod html;
-pub mod json;
+mod form;
+mod html;
+mod json;
 #[cfg(feature = "multipart")]
-pub mod multipart;
+mod multipart;
 
 pub use form::*;
 pub use html::*;
