@@ -30,8 +30,8 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 
 ### Routing
 
-- [`docs/router.md`](docs/router.md) — The `Router` primitive: registering `#[page]`, `#[layout]`, and `#[route]` items manually or via `.discover()`, and how layouts nest by path prefix.
-- [`docs/module_router.md`](docs/module_router.md) — `module_router!`, which derives routes from the module tree (kebab-cased segments, `segment!` overrides, `_`-prefixed groups).
+- [`crates/topcoat/docs/router.md`](crates/topcoat/docs/router.md) — The `Router` primitive: registering `#[page]`, `#[layout]`, and `#[route]` items manually or via `.discover()`, and how layouts nest by path prefix.
+- [`crates/topcoat-router/docs/module_router.md`](crates/topcoat-router/docs/module_router.md) — `module_router!`, which derives routes from the module tree (kebab-cased segments, `segment!` overrides, `_`-prefixed groups).
 - [`docs/path_and_query_params.md`](docs/path_and_query_params.md) — `#[path_param]` and `#[query_params]` for reading typed values out of the URL via `T::of(cx)`.
 - [`docs/request_response.md`](docs/request_response.md) — Request body extractors (`Json`, `Form`, `Multipart`, raw bodies) and response conversion (`IntoResponse`), including custom `FromRequest`/`IntoResponse`.
 
@@ -43,20 +43,20 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 
 ### Request context and state
 
-- [`docs/context.md`](docs/context.md) — The request context `Cx`: router request helpers, path/query helpers, state accessors, and request body parsing.
+- [`crates/topcoat/docs/context.md`](crates/topcoat/docs/context.md) — The request context `Cx`: router request helpers, path/query helpers, state accessors, and request body parsing.
 - [`docs/app_context.md`](docs/app_context.md) — App context: registering long-lived values with `.app_context(value)` and reading them with `app_context::<T>(cx)`.
-- [`docs/memoization.md`](docs/memoization.md) — `#[memoize]` for per-request caching of function results keyed by arguments.
+- [`crates/topcoat-core/macro/docs/memoization.md`](crates/topcoat-core/macro/docs/memoization.md) — `#[memoize]` for per-request caching of function results keyed by arguments.
 - [`docs/functions_not_middlewares.md`](docs/functions_not_middlewares.md) — The framework's philosophy: prefer composable `cx: &Cx` functions over middleware/extractors for auth and request-scoped data.
-- [`docs/cookies.md`](docs/cookies.md) — Cookies: the request-scoped jar (`cookies(cx)`), the `cookie!` macro, attribute defaults, name prefixes, signed/private cookies, and typed `CookieStore<T>`.
+- [`crates/topcoat/docs/cookies.md`](crates/topcoat/docs/cookies.md) — Cookies: the request-scoped jar (`cookies(cx)`), the `cookie!` macro, attribute defaults, name prefixes, signed/private cookies, and typed `CookieStore<T>`.
 
 ### Assets and styling
 
-- [`docs/assets.md`](docs/assets.md) — Declaring static files with `asset!`, content-hashed URLs, and loading the asset bundle on the router.
-- [`docs/tailwind.md`](docs/tailwind.md) — The Tailwind integration: a build-script wrapper around the standalone Tailwind CLI served as a Topcoat asset.
+- [`crates/topcoat/docs/assets.md`](crates/topcoat/docs/assets.md) — Declaring static files with `asset!`, content-hashed URLs, and loading the asset bundle on the router.
+- [`crates/topcoat/docs/tailwind.md`](crates/topcoat/docs/tailwind.md) — The Tailwind integration: a build-script wrapper around the standalone Tailwind CLI served as a Topcoat asset.
 
 ### Tooling
 
-- [`docs/source_formatting.md`](docs/source_formatting.md) — `topcoat fmt`, which formats Topcoat macro bodies (like `view!`) alongside `rustfmt`, plus editor integration.
+- [`crates/topcoat-cli/docs/fmt.md`](crates/topcoat-cli/docs/fmt.md) — `topcoat fmt`, which formats Topcoat macro bodies (like `view!`) alongside `rustfmt`, plus editor integration.
 
 ## Safety
 

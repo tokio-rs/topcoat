@@ -6,7 +6,7 @@ The `module_router!` macro derives routes from your Rust module structure. The m
 
 Call `module_router!()` from the root module of your route tree. This module becomes the root `/` path. The macro returns a `RouterBuilder`, so call `.build()` once you have added anything else the builder needs.
 
-```rust
+```rust,ignore
 // src/app/mod.rs
 pub fn router() -> topcoat::router::Router {
     topcoat::router::module_router!().build()
@@ -31,7 +31,7 @@ Each module's path relative to the root module determines its URL. Module names 
 
 A `#[page]` defines a page handler. A `#[layout]` wraps all pages in the same module and its submodules.
 
-```rust
+```rust,ignore
 // src/app/mod.rs — layout at "/" wraps all pages
 #[layout]
 async fn root_layout(slot: Slot<'_>) -> Result {
@@ -46,7 +46,7 @@ async fn home() -> Result {
 }
 ```
 
-```rust
+```rust,ignore
 // src/app/about.rs — page at "/about"
 #[page]
 async fn about() -> Result {
@@ -56,7 +56,7 @@ async fn about() -> Result {
 
 API routes use `#[route]` with an explicit HTTP method. Like pages and layouts, method-only routes derive their URL from the module path:
 
-```rust
+```rust,ignore
 // src/app/api/health.rs — GET /api/health
 #[route(GET)]
 async fn health() -> Result<&'static str> {
@@ -66,7 +66,7 @@ async fn health() -> Result<&'static str> {
 
 Layers use the same module-derived path as layouts, but wrap request handling instead of rendered view output:
 
-```rust
+```rust,ignore
 // src/app/api/mod.rs — wraps routes under /api
 use topcoat::{
     Result,
@@ -82,13 +82,13 @@ async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 ```
 
-Pages and routes can also read request bodies, and routes can return structured responses. See [Request and response bodies](./request_response.md).
+Pages and routes can also read request bodies, and routes can return structured responses. See [Request and response bodies](../../../docs/request_response.md).
 
 ## Path overrides
 
 Module-derived paths and explicit paths can be mixed in the same route tree. `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` all register into the same builder in the end. If an attribute includes an explicit path, that path is used instead of the module-derived path for that item:
 
-```rust
+```rust,ignore
 #[page("/")]
 async fn home() -> Result {
     view! { <h1>"Home"</h1> }
@@ -114,7 +114,7 @@ async fn health() -> Result<&'static str> {
 
 `segment!(rename = "name")` overrides the URL with the given literal (used as-is, no kebab-casing).
 
-```rust
+```rust,ignore
 // src/app/blog_post.rs
 topcoat::router::segment!(rename = "articles");
 // Route: /articles instead of /blog-post
@@ -140,7 +140,7 @@ Both `pricing` and `getting_started` are top-level routes, but they can have dif
 
 You can also turn a regular module into a group with `segment!(kind = Group)`:
 
-```rust
+```rust,ignore
 // src/app/marketing/mod.rs
 topcoat::router::segment!(kind = Group);
 // `marketing` now contributes no URL segment.
@@ -148,7 +148,7 @@ topcoat::router::segment!(kind = Group);
 
 Or turn a group module into a regular static path segment:
 
-```rust
+```rust,ignore
 // src/app/_group/mod.rs
 topcoat::router::segment!(kind = Static);
 // Module now reachable as `/group`.

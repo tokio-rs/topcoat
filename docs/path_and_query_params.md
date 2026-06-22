@@ -131,7 +131,7 @@ struct Filters {
 
 Both attributes parse lazily and memoize the parsed value in the request context. Calling `PostId::of(cx)` ten times across a layout, a page, and a few components costs one `FromStr::from_str` call — the rest are cache hits. The same goes for `PageQuery::of(cx)`.
 
-This is the same machinery as [`#[memoize]`](./memoization.md), so the parsed type must satisfy its requirements (`Send + Sync + 'static`).
+This is the same machinery as [`#[memoize]`](../crates/topcoat-core/macro/docs/memoization.md), so the parsed type must satisfy its requirements (`Send + Sync + 'static`).
 
 ## Requirements
 

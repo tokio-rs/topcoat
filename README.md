@@ -140,21 +140,21 @@ view! { <link rel="stylesheet" href=(tailwind::stylesheet!())> }
 - [The `attributes!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/attributes.md) — reusable runtime attribute fragments.
 
 **Routing**
-- [Router](https://github.com/tokio-rs/topcoat/blob/main/docs/router.md) — pages, layouts, and API routes; manual and auto-discovered.
-- [Module-based routing](https://github.com/tokio-rs/topcoat/blob/main/docs/module_router.md) — derive the route table from your module tree.
+- [Router](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/router.md) — pages, layouts, and API routes; manual and auto-discovered.
+- [Module-based routing](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-router/docs/module_router.md) — derive the route table from your module tree.
 
 **Working with requests**
-- [Request context (`Cx`)](https://github.com/tokio-rs/topcoat/blob/main/docs/context.md) — the value pages, layouts, and components read from.
+- [Request context (`Cx`)](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/context.md) — the value pages, layouts, and components read from.
 - [App context](https://github.com/tokio-rs/topcoat/blob/main/docs/app_context.md) — share long-lived values across requests, keyed by type.
 - [Path and query params](https://github.com/tokio-rs/topcoat/blob/main/docs/path_and_query_params.md) — typed `T::of(cx)` accessors.
 - [Request and response bodies](https://github.com/tokio-rs/topcoat/blob/main/docs/request_response.md) — JSON, forms, custom extractors and responses.
-- [Cookies](https://github.com/tokio-rs/topcoat/blob/main/docs/cookies.md) — read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
+- [Cookies](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/cookies.md) — read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
 
 **Patterns**
 - [Functions, not middlewares](https://github.com/tokio-rs/topcoat/blob/main/docs/functions_not_middlewares.md) — the recommended way to model auth and other request-scoped concerns.
-- [Memoization](https://github.com/tokio-rs/topcoat/blob/main/docs/memoization.md) — `#[memoize]` for per-request caching and fan-out dedup.
+- [Memoization](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-core/macro/docs/memoization.md) — `#[memoize]` for per-request caching and fan-out dedup.
 
 **Project infrastructure**
-- [Assets](https://github.com/tokio-rs/topcoat/blob/main/docs/assets.md) — declare assets in Rust, serve them with content-hashed URLs.
-- [Tailwind](https://github.com/tokio-rs/topcoat/blob/main/docs/tailwind.md) — Tailwind CSS without Node, wired into the asset pipeline.
-- [Source code formatting](https://github.com/tokio-rs/topcoat/blob/main/docs/source_formatting.md) — `topcoat fmt` for macro bodies.
+- [Assets](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/assets.md) — declare assets in Rust, serve them with content-hashed URLs.
+- [Tailwind](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/tailwind.md) — Tailwind CSS without Node, wired into the asset pipeline.
+- [Source code formatting](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-cli/docs/fmt.md) — `topcoat fmt` for macro bodies.

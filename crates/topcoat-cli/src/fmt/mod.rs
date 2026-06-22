@@ -1,3 +1,5 @@
+#![doc = include_str!("../../docs/fmt.md")]
+
 mod error;
 
 use std::{collections::BTreeSet, io::Read, path::PathBuf, time::Instant};

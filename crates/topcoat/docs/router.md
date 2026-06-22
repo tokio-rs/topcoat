@@ -1,12 +1,14 @@
 # Router
 
-`topcoat::router::Router` is the finalized routing table that dispatches incoming requests. Build one with `Router::builder()`, register pages, layouts, layers, and API routes, call `.build()`, then pass it to `topcoat::start`.
+[`Router`] is the finalized routing table that dispatches incoming requests. Build one with [`Router::builder`], register pages, layouts, layers, and API routes, call [`build`](RouterBuilder::build), then pass it to [`start`](crate::start).
 
-You can register handlers in two ways: **manually** (explicit paths, full control) or with **auto-discovery** (the `discover` feature collects annotated items automatically). The [module router](./module_router.md) builds on top of the same builder and derives paths from your module tree.
+For most apps, the recommended way to define routes is the [`module_router!`] macro. It derives the routing table from your module tree instead of defining each URL path by hand. This guide describes the [`Router`] builder it sits on top of — manual registration and auto-discovery.
+
+You can register handlers in two ways: **manually** (explicit paths, full control) or with **auto-discovery** (the `discover` feature collects annotated items automatically).
 
 ## Paths
 
-Explicit route paths use Topcoat's path syntax:
+Explicit route paths use Topcoat's [`Path`] syntax:
 
 - `/users` for static segments.
 - `/users/{id}` for dynamic parameters.
@@ -17,9 +19,9 @@ The root path is `/`. Non-root paths must start with `/` and may not contain emp
 
 ## Pages
 
-A page is an async function annotated with `#[page]` and an explicit path:
+A page is an async function annotated with [`#[page]`](page) and an explicit path:
 
-```rust
+```rust,ignore
 use topcoat::{Result, router::page, view::view};
 
 #[page("/")]
@@ -35,7 +37,7 @@ async fn about() -> Result {
 
 Dynamic and wildcard paths work the same way:
 
-```rust
+```rust,ignore
 #[page("/users/{id}")]
 async fn user_profile() -> Result {
     view! { <h1>"User profile"</h1> }
@@ -49,9 +51,9 @@ async fn docs_page() -> Result {
 
 ## Layouts
 
-A layout wraps pages. It receives a `Slot` — a future that resolves to the inner page or layout. Annotate it with `#[layout]` and an explicit path:
+A layout wraps pages. It receives a [`Slot`] — a future that resolves to the inner page or layout. Annotate it with [`#[layout]`](layout) and an explicit path:
 
-```rust
+```rust,ignore
 use topcoat::{
     Result,
     router::{Slot, layout},
@@ -81,7 +83,7 @@ A layout applies to every page whose path starts with the layout's path. A layou
 
 When multiple layouts match a page, they nest from least specific (outermost) to most specific (innermost):
 
-```rust
+```rust,ignore
 #[layout("/")]
 async fn root_layout(slot: Slot<'_>) -> Result {
     view! { <html><body>(slot.await?)</body></html> }
@@ -107,9 +109,9 @@ A request to `/settings/profile` renders: `root_layout` > `settings_layout` > `p
 
 ## Layers
 
-A layer wraps matched routes under its path prefix. It receives a mutable request context, the request body, and `Next`, which represents the remaining layers and the route handler.
+A layer wraps matched routes under its path prefix. It receives a mutable request context, the request body, and [`Next`], which represents the remaining layers and the route handler.
 
-```rust
+```rust,ignore
 use topcoat::{
     Result,
     context::Cx,
@@ -129,9 +131,9 @@ Layer path matching follows the same prefix rule as layouts. A layer at `/` wrap
 
 ## API routes
 
-An API route is an async function annotated with `#[route]` and an explicit HTTP method and path:
+An API route is an async function annotated with [`#[route]`](route) and an explicit HTTP method and path:
 
-```rust
+```rust,ignore
 use topcoat::{Result, router::route};
 
 #[route(GET "/api/health")]
@@ -140,13 +142,13 @@ async fn health() -> Result<&'static str> {
 }
 ```
 
-Route functions can also read request bodies and return structured responses. That works the same way for explicit router paths and module-router paths; see [Request and response bodies](./request_response.md).
+Route functions can also read request bodies and return structured responses. That works the same way for explicit router paths and module-router paths; see [`FromRequest`](FromRequest) and [`IntoResponse`](IntoResponse).
 
 ## Manual registration
 
-Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling `.build()`:
+Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
 
-```rust
+```rust,ignore
 use topcoat::router::Router;
 
 pub fn router() -> Router {
@@ -166,9 +168,9 @@ Layout-to-page matching is based on path prefixes, not registration order. Layer
 
 ## Auto-discovery with `discover()`
 
-With the `discover` feature enabled, every `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` is collected at link time. Instead of listing each item by hand, call `.discover()` on the builder:
+With the `discover` feature enabled, every [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](route) is collected at link time. Instead of listing each item by hand, call [`discover`](RouterBuilderDiscoverExt::discover) on the builder:
 
-```rust
+```rust,ignore
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
 
 pub fn router() -> Router {
@@ -180,9 +182,9 @@ This finds annotated items across your crate and dependencies. Discovered layers
 
 ## Serving
 
-Use `topcoat::start` to run a finalized router:
+Use [`start`](crate::start) to run a finalized router:
 
-```rust
+```rust,ignore
 #[tokio::main]
 async fn main() {
     let router = my_app::router();
@@ -190,11 +192,11 @@ async fn main() {
 }
 ```
 
-`topcoat::start` binds to `HOST` and `PORT`, defaulting to `127.0.0.1:3000`. Use `topcoat::serve(listener, router)` when you want to bind the `TcpListener` yourself.
+[`start`](crate::start) binds to `HOST` and `PORT`, defaulting to `127.0.0.1:3000`. Use [`serve`](crate::serve) when you want to bind the `TcpListener` yourself.
 
 ## Example: full manual setup
 
-```rust
+```rust,ignore
 use topcoat::{
     Result,
     context::Cx,
@@ -259,7 +261,7 @@ pub fn router() -> Router {
 
 ## Example: same app with `discover()`
 
-```rust
+```rust,ignore
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
 
 // The page, layout, layer, and route definitions are identical. Only the
@@ -269,4 +271,4 @@ pub fn router() -> Router {
 }
 ```
 
-All `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` items from the example above are picked up automatically.
+All [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](route) items from the example above are picked up automatically.

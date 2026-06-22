@@ -1,12 +1,12 @@
 # Request context (`Cx`)
 
-`Cx` is Topcoat's request context. Pages, layouts, components, and routes can take it as an optional parameter when they need request-scoped information.
+[`Cx`] is Topcoat's request context. Pages, layouts, components, and routes can take it as an optional parameter when they need request-scoped information.
 
 Add `cx: &Cx` to the function signature when needed; leave it out when the function does not need request context. Topcoat passes it automatically when the parameter is present.
 
 ## Router request helpers
 
-The `topcoat::router` module exposes small functions for reading HTTP request data from `cx`.
+The [`router`](crate::router) module exposes small functions for reading HTTP request data from `cx`.
 
 ```rust
 use topcoat::{
@@ -26,15 +26,15 @@ fn request_summary(cx: &Cx) -> String {
 
 Available request helpers:
 
-- `parts(cx)` returns the current request's `http::request::Parts`.
-- `method(cx)` returns the HTTP method.
-- `uri(cx)` returns the request URI.
-- `version(cx)` returns the HTTP version.
-- `headers(cx)` returns the request headers.
-- `content_type(cx)` returns the request `Content-Type` as `Option<&str>`.
-- `extensions(cx)` returns request extensions.
+- [`parts(cx)`](crate::router::parts) returns the current request's `http::request::Parts`.
+- [`method(cx)`](crate::router::method) returns the HTTP method.
+- [`uri(cx)`](crate::router::uri) returns the request URI.
+- [`version(cx)`](crate::router::version) returns the HTTP version.
+- [`headers(cx)`](crate::router::headers) returns the request headers.
+- [`content_type(cx)`](crate::router::content_type) returns the request `Content-Type` as `Option<&str>`.
+- [`extensions(cx)`](crate::router::extensions) returns request extensions.
 
-Use `parts(cx)` when you need several fields at once:
+Use [`parts(cx)`](crate::router::parts) when you need several fields at once:
 
 ```rust
 use topcoat::{context::Cx, router::parts};
@@ -45,7 +45,7 @@ fn cache_key(cx: &Cx) -> String {
 }
 ```
 
-Use `extensions(cx)` for typed request values attached by a lower-level request layer or service integration:
+Use [`extensions(cx)`](crate::router::extensions) for typed request values attached by a lower-level request layer or service integration:
 
 ```rust
 use topcoat::{context::Cx, router::extensions};
@@ -90,19 +90,19 @@ async fn post(cx: &Cx) -> Result {
 }
 ```
 
-See [Path and query params](./path_and_query_params.md) for the exact return types and parsing rules.
+See [`path_param`](crate::router::path_param) and [`query_params`](crate::router::query_params) for the exact return types and parsing rules.
 
 ## App and request context helpers
 
-The `topcoat::context` module exposes typed context accessors:
+This module exposes typed context accessors:
 
-- `app_context::<T>(cx)` reads values registered on the router with `.app_context(value)`.
-- `request_context::<T>(cx)` reads typed values attached to the current request.
+- [`app_context::<T>(cx)`](app_context) reads values registered on the router with `.app_context(value)`.
+- [`request_context::<T>(cx)`](request_context) reads typed values attached to the current request.
 
 ```rust
 use topcoat::context::{Cx, app_context};
-
-struct Database;
+#
+# struct Database;
 
 fn db(cx: &Cx) -> &Database {
     app_context::<Database>(cx)
@@ -113,11 +113,11 @@ Values are keyed by Rust type. Asking for a type that was not registered panics,
 
 ## Request body parsing
 
-Handlers can receive one request body parameter in addition to `cx: &Cx`. See [Request and response bodies](./request_response.md) for the built-in extractors and the `FromRequest` trait for custom parsing.
+Handlers can receive one request body parameter in addition to `cx: &`[`Cx`]. See [`FromRequest`](crate::router::FromRequest) for custom parsing and the built-in extractors.
 
 ## Composing helpers
 
-Any helper can accept `cx: &Cx`, call other helpers, and return a domain-specific result:
+Any helper can accept `cx: &`[`Cx`], call other helpers, and return a domain-specific result:
 
 ```rust
 use topcoat::{

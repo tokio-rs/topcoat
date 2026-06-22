@@ -1,13 +1,10 @@
 # Assets
 
-Topcoat assets are declared from Rust code with `asset!(...)`. The macro returns
-a small `Asset` ID and embeds the declaration into the compiled binary. After building
-your application, Topcoat can scan the binary, copy or download every declared file into an
-asset bundle directory, and serve those bundled files from the router.
+Topcoat assets are declared from Rust code with [`asset!`](asset). The macro returns a small [`Asset`] ID and embeds the declaration into the compiled binary. After building your application, Topcoat can scan the binary, copy or download every declared file into an asset bundle directory, and serve those bundled files from the router.
 
 ## Declaring assets
 
-Use `topcoat::asset::asset` anywhere in your app:
+Use [`asset!`](asset) anywhere in your app:
 
 ```rust
 use topcoat::{
@@ -38,20 +35,17 @@ view! {
 }
 ```
 
-When an `Asset` appears inside `view!`, Topcoat renders it as the URL of the
-bundled file. For example, an image might render as:
+When an [`Asset`] appears inside [`view!`](crate::view::view), Topcoat renders it as the URL of the bundled file. For example, an image might render as:
 
 ```html
 <img src="/_topcoat/assets/ferris-1a2b3c4d.png">
 ```
 
-The hash in the filename is based on the file contents, so URLs are safe to cache
-aggressively.
+The hash in the filename is based on the file contents, so URLs are safe to cache aggressively.
 
 ## Loading the bundle
 
-Load the generated asset bundle while building the router, before `.build()`.
-Use `AssetBundle::load()` for the default bundle location:
+Load the generated asset bundle while building the router, before `.build()`. Use [`AssetBundle::load`] for the default bundle location:
 
 ```rust,ignore
 use topcoat::{
@@ -67,22 +61,18 @@ pub fn router() -> Router {
 }
 ```
 
-Use `AssetBundle::load_dir("path/to/assets")` when you write the bundle to
-a custom location.
+Use [`AssetBundle::load_dir`] when you write the bundle to a custom location.
 
-`RouterBuilderAssetExt::assets(...)` does two things:
+[`RouterBuilderAssetExt::assets`] does two things:
 
 - mounts the bundle at `/_topcoat/assets`
-- installs the view resolver that turns `Asset` values into URLs
+- installs the view resolver that turns [`Asset`] values into URLs
 
-If a page renders an `Asset` that is not present in the loaded bundle, rendering
-panics. Treat that as a build/deploy mismatch: the binary and asset bundle must
-come from the same build.
+If a page renders an [`Asset`] that is not present in the loaded bundle, rendering panics. Treat that as a build/deploy mismatch: the binary and asset bundle must come from the same build.
 
 ## Bundling
 
-During development, `topcoat dev` builds the app and bundles assets after each
-successful build:
+During development, `topcoat dev` builds the app and bundles assets after each successful build:
 
 ```sh
 topcoat dev
@@ -117,8 +107,7 @@ topcoat asset bundle --bin my-app
 topcoat asset bundle --package my-package
 ```
 
-To write the bundle somewhere else, pass `--out` and load the same directory at
-runtime:
+To write the bundle somewhere else, pass `--out` and load the same directory at runtime:
 
 ```sh
 topcoat asset bundle --out dist/assets
@@ -131,13 +120,11 @@ let router = Router::builder()
     .build();
 ```
 
-When `--out` is not in one of the auto-detected locations, use `load_dir` to
-point at it explicitly.
+When `--out` is not in one of the auto-detected locations, use [`AssetBundle::load_dir`] to point at it explicitly.
 
 ## Path resolution
 
-The first argument to `asset!` is a string literal path or an `http(s)` URL.
-Local paths are resolved by the bundler:
+The first argument to [`asset!`](asset) is a string literal path or an `http(s)` URL. Local paths are resolved by the bundler:
 
 | Asset path | Resolution |
 |---|---|
@@ -147,12 +134,11 @@ Local paths are resolved by the bundler:
 | `asset!("/opt/app/logo.png")` | absolute path, used as-is |
 | `asset!("https://example.com/logo.png")` | downloaded and cached by the bundler |
 
-Use `./` or `../` when the asset should move with the module. Use a bare
-relative path when the asset is part of a crate-level assets directory.
+Use `./` or `../` when the asset should move with the module. Use a bare relative path when the asset is part of a crate-level assets directory.
 
 ## Output options
 
-`asset!` accepts optional named arguments that affect the bundled filename:
+[`asset!`](asset) accepts optional named arguments that affect the bundled filename:
 
 ```rust
 use topcoat::asset::{Asset, asset};
@@ -172,13 +158,11 @@ Available options:
 | `extension: "ext"` | overrides the output extension, without the leading dot |
 | `checksum: "<sha256-hex>"` | requires the raw source file to match the SHA-256 hash |
 
-Use `checksum` for remote assets when you want deployments to fail if the remote
-file changes unexpectedly.
+Use `checksum` for remote assets when you want deployments to fail if the remote file changes unexpectedly.
 
 ## Direct bundle access
 
-Most Topcoat apps only need to render `Asset` values in `view!`. If you need the
-filesystem path for another purpose, load the bundle and look up the asset ID:
+Most Topcoat apps only need to render [`Asset`] values in [`view!`](crate::view::view). If you need the filesystem path for another purpose, load the bundle and look up the asset ID:
 
 ```rust,no_run
 use topcoat::asset::{Asset, AssetBundle, asset};
