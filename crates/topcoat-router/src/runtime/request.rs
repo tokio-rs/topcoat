@@ -20,6 +20,50 @@ pub type Request<T = Body> = http::Request<T>;
 /// Because the body is a stream that can only be read once, a handler may have
 /// at most one `FromRequest` parameter. This is the request-side counterpart of
 /// [`IntoResponse`](crate::runtime::IntoResponse).
+///
+/// # Examples
+///
+/// Implement it to parse a request in a way the built-ins don't cover — here,
+/// JSON whose body is verified against an `x-signature` header before it is
+/// deserialized:
+///
+/// ```rust,ignore
+/// use serde::de::DeserializeOwned;
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{Body, FromRequest, bad_request, headers, route, to_bytes},
+/// };
+///
+/// struct SignedJson<T>(T);
+///
+/// impl<T> FromRequest for SignedJson<T>
+/// where
+///     T: DeserializeOwned,
+/// {
+///     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
+///         let signature = headers(cx)
+///             .get("x-signature")
+///             .and_then(|value| value.to_str().ok())
+///             .ok_or_else(|| bad_request("missing x-signature header"))?;
+///
+///         let bytes = to_bytes(body, usize::MAX)
+///             .await
+///             .map_err(|error| bad_request(format!("failed to read body: {error}")))?;
+///
+///         verify_signature(signature, &bytes)?;
+///
+///         Ok(Self(serde_json::from_slice(&bytes)?))
+///     }
+/// }
+///
+/// // Once implemented, use it like the built-in extractors:
+/// #[route(POST "/api/signed")]
+/// async fn signed(SignedJson(input): SignedJson<CreateUser>) -> Result<&'static str> {
+///     let _ = input;
+///     Ok("ok")
+/// }
+/// ```
 pub trait FromRequest: Sized {
     /// Builds `Self` from the request context and body.
     ///

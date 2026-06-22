@@ -15,6 +15,17 @@ use crate::runtime::{
 
 /// `multipart/form-data` request extractor, commonly used for file uploads.
 ///
+/// Available behind the `multipart` feature. Iterate the request's parts with
+/// [`next_field`](Multipart::next_field); each [`Field`] exposes its metadata
+/// ([`name`](Field::name), [`file_name`](Field::file_name),
+/// [`content_type`](Field::content_type), [`headers`](Field::headers)) and its
+/// data ([`bytes`](Field::bytes), [`text`](Field::text),
+/// [`chunk`](Field::chunk)). A [`Field`] also implements [`Stream`], so its
+/// chunks can be consumed with the usual stream combinators.
+///
+/// Wrap it in [`Option`] to make the body optional: the extractor yields
+/// [`None`] when the request carries no `multipart/form-data` body.
+///
 /// # Examples
 ///
 /// ```rust,ignore

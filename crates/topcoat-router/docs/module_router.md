@@ -82,8 +82,6 @@ async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 ```
 
-Pages and routes can also read request bodies, and routes can return structured responses. See [Request and response bodies](../../../docs/request_response.md).
-
 ## Path overrides
 
 Module-derived paths and explicit paths can be mixed in the same route tree. `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` all register into the same builder in the end. If an attribute includes an explicit path, that path is used instead of the module-derived path for that item:

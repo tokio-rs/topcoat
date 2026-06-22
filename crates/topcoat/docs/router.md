@@ -17,6 +17,71 @@ Explicit route paths use Topcoat's [`Path`] syntax:
 
 The root path is `/`. Non-root paths must start with `/` and may not contain empty segments.
 
+## API routes
+
+An API route is an async function annotated with [`#[route]`](route) and an explicit HTTP method and path:
+
+```rust,ignore
+use topcoat::{Result, router::route};
+
+#[route(GET "/api/health")]
+async fn health() -> Result<&'static str> {
+    Ok("ok")
+}
+```
+
+Route handlers can also read request bodies and return structured responses, the same way for explicit and module-router paths — see [Request and response bodies](#request-and-response-bodies).
+
+## Request and response bodies
+
+A page or route handler can take the request context as `cx: &`[`Cx`](crate::context::Cx) and, alongside it, a single request body parameter. That parameter can be any type that implements [`FromRequest`]. API routes additionally return `Result<T>` where `T:` [`IntoResponse`].
+
+```rust,ignore
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{Json, route},
+};
+
+#[route(POST "/api/users")]
+async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User>> {
+    // ...
+}
+```
+
+The context and the body parameter are both optional and may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once. Pages use the same [`FromRequest`] parsing, but return a rendered view rather than an [`IntoResponse`] value.
+
+### Reading the request body
+
+Each extractor is a [`FromRequest`] type; see its own documentation for the exact content types, parsing rules, and examples.
+
+| Extractor | Body |
+|---|---|
+| [`Json<T>`](Json) | JSON (`application/json`), deserialized into `T`. |
+| [`Form<T>`](Form) | URL-encoded form data; reads the query string for `GET`/`HEAD`. |
+| [`RawForm`] | The raw bytes of a URL-encoded body, without deserializing. |
+| `Multipart` | `multipart/form-data`, for file uploads (behind the `multipart` feature). |
+| [`Body`] | The raw, unbuffered body stream. |
+| [`Bytes`] / [`BytesMut`] | The fully buffered body. |
+| [`String`] | The fully buffered body decoded as UTF-8. |
+
+Wrap [`Json`], [`Form`], or `Multipart` in [`Option`] to make the body optional: the extractor yields [`None`] when the request carries no body of that kind, and still reports an error when a body is present but malformed. Implement [`OptionalFromRequest`] to give a custom extractor the same behavior.
+
+When none of the built-in extractors fit, implement [`FromRequest`] for your own type to parse the request however you need.
+
+### Returning a response
+
+A route returns `Result<T>` where `T:` [`IntoResponse`]. Topcoat implements [`IntoResponse`] for common shapes — strings, status codes, byte buffers, [`Body`], [`Response`], and tuples like `(StatusCode, value)` and `(headers, value)` — as well as the wrappers [`Json<T>`](Json), [`Form<T>`](Form), and [`Html<T>`](Html).
+
+```rust,ignore
+#[route(GET "/api/user")]
+async fn user() -> Result<Json<User>> {
+    Ok(Json(User { /* ... */ }))
+}
+```
+
+Returning a bare value only works if its type implements [`IntoResponse`]; a plain `Result<User>` is not serialized as JSON unless `User` itself does so. Implement [`IntoResponse`] for a domain type when it should control its own status, headers, or body.
+
 ## Pages
 
 A page is an async function annotated with [`#[page]`](page) and an explicit path:
@@ -129,21 +194,6 @@ async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
 
 Layer path matching follows the same prefix rule as layouts. A layer at `/` wraps everything, while a layer at `/admin` wraps only routes under `/admin`. Layers at different paths nest from least specific (outermost) to most specific (innermost). If you manually register multiple layers at the same path, the most recently registered layer runs first.
 
-## API routes
-
-An API route is an async function annotated with [`#[route]`](route) and an explicit HTTP method and path:
-
-```rust,ignore
-use topcoat::{Result, router::route};
-
-#[route(GET "/api/health")]
-async fn health() -> Result<&'static str> {
-    Ok("ok")
-}
-```
-
-Route functions can also read request bodies and return structured responses. That works the same way for explicit router paths and module-router paths; see [`FromRequest`](FromRequest) and [`IntoResponse`](IntoResponse).
-
 ## Manual registration
 
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
@@ -200,9 +250,14 @@ async fn main() {
 use topcoat::{
     Result,
     context::Cx,
-    router::{Body, Next, Response, Router, Slot, layer, layout, page, route},
+    router::{Body, Json, Next, Response, Router, Slot, layer, layout, page, route},
     view::view,
 };
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct NewUser {
+    name: String,
+}
 
 #[layout("/")]
 async fn root_layout(slot: Slot<'_>) -> Result {
@@ -247,6 +302,12 @@ async fn health() -> Result<&'static str> {
     Ok("ok")
 }
 
+// Reads a JSON request body and echoes it back as a JSON response.
+#[route(POST "/api/users")]
+async fn create_user(Json(user): Json<NewUser>) -> Result<Json<NewUser>> {
+    Ok(Json(user))
+}
+
 pub fn router() -> Router {
     Router::builder()
         .layout(root_layout)
@@ -255,6 +316,7 @@ pub fn router() -> Router {
         .page(users_list)
         .page(user_profile)
         .route(health)
+        .route(create_user)
         .build()
 }
 ```

@@ -28,6 +28,33 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// the status line, and every other element is applied with
 /// [`IntoResponseParts`]. For example `(StatusCode::CREATED, headers, body)`
 /// builds a `201` response carrying `headers` and `body`.
+///
+/// # Examples
+///
+/// Implement it for a domain type that should control its own status, headers,
+/// or body:
+///
+/// ```rust,ignore
+/// use topcoat::{
+///     Result,
+///     router::{Body, IntoResponse, Response, route},
+/// };
+///
+/// struct Csv(String);
+///
+/// impl IntoResponse for Csv {
+///     fn into_response(self) -> Result<Response> {
+///         Ok(Response::builder()
+///             .header("Content-Type", "text/csv; charset=utf-8")
+///             .body(Body::from(self.0))?)
+///     }
+/// }
+///
+/// #[route(GET "/api/report.csv")]
+/// async fn report() -> Result<Csv> {
+///     Ok(Csv("name,total\nAda,42\n".to_string()))
+/// }
+/// ```
 pub trait IntoResponse {
     fn into_response(self) -> Result<Response>;
 }
