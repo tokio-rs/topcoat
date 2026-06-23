@@ -1676,8 +1676,6 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
- "serde",
- "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -2295,7 +2293,6 @@ dependencies = [
  "axum",
  "futures-util",
  "inventory",
- "reqwest",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -2396,6 +2393,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn",
+ "tokio",
  "topcoat",
  "topcoat-core",
 ]
@@ -2531,6 +2529,7 @@ version = "0.1.0"
 dependencies = [
  "quote",
  "syn",
+ "tokio",
  "topcoat",
  "topcoat-view",
 ]
