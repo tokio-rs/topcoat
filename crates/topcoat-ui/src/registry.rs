@@ -208,44 +208,18 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// An error loading a registry or one of its components.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("failed to read {path:?}")]
     Read {
         path: PathBuf,
+        #[source]
         source: std::io::Error,
     },
-    Parse(toml::de::Error),
-    UnsupportedVersion {
-        found: u32,
-        supported: u32,
-    },
-}
-
-impl From<toml::de::Error> for Error {
-    fn from(error: toml::de::Error) -> Self {
-        Self::Parse(error)
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Read { path, .. } => write!(f, "failed to read {path:?}"),
-            Self::Parse(_) => write!(f, "failed to parse registry manifest"),
-            Self::UnsupportedVersion { found, supported } => write!(
-                f,
-                "registry manifest has format version {found}, but this build supports up to {supported}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Read { source, .. } => Some(source),
-            Self::Parse(error) => Some(error),
-            Self::UnsupportedVersion { .. } => None,
-        }
-    }
+    #[error("failed to parse registry manifest")]
+    Parse(#[from] toml::de::Error),
+    #[error(
+        "registry manifest has format version {found}, but this build supports up to {supported}"
+    )]
+    UnsupportedVersion { found: u32, supported: u32 },
 }
