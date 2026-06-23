@@ -3,12 +3,11 @@ mod error;
 
 use std::{
     collections::{HashMap, HashSet},
-    io,
+    fs, io,
     path::{Path, PathBuf},
 };
 
 use sha2::{Digest, Sha256};
-use tokio::fs;
 
 use crate::{
     AssetError, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset, Source,
@@ -29,21 +28,21 @@ pub struct Bundler {
 }
 
 impl Bundler {
-    /// Create a bundler with a default `reqwest` client configured with
+    /// Create a bundler with a default [`ureq::Agent`] configured with
     /// this crate's user agent.
     pub fn new(cache_dir: impl Into<PathBuf>) -> Self {
-        let client = reqwest::Client::builder()
+        let agent = ureq::Agent::config_builder()
             .user_agent(concat!("topcoat-asset/", env!("CARGO_PKG_VERSION")))
             .build()
-            .expect("failed to build default reqwest client");
-        Self::with_client(cache_dir, client)
+            .into();
+        Self::with_agent(cache_dir, agent)
     }
 
-    /// Like [`Bundler::new`], but with a caller-supplied `reqwest::Client`
+    /// Like [`Bundler::new`], but with a caller-supplied [`ureq::Agent`]
     /// (for custom timeouts, proxies, auth, etc.).
-    pub fn with_client(cache_dir: impl Into<PathBuf>, client: reqwest::Client) -> Self {
+    pub fn with_agent(cache_dir: impl Into<PathBuf>, agent: ureq::Agent) -> Self {
         Self {
-            cache: Cache::new(cache_dir.into(), client),
+            cache: Cache::new(cache_dir.into(), agent),
         }
     }
 
@@ -54,14 +53,16 @@ impl Bundler {
     /// were present in the old manifest but are no longer referenced by the
     /// new one are removed. Remote (http/https) assets are downloaded into
     /// the bundler's cache directory and then treated like local files.
-    pub async fn bundle(&self, binary: &[u8], out_dir: impl AsRef<Path>) -> BundleResult {
+    ///
+    /// This blocks on filesystem and network I/O; call it from a blocking
+    /// context (e.g. [`tokio::task::spawn_blocking`]) when running inside an
+    /// async runtime.
+    pub fn bundle(&self, binary: &[u8], out_dir: impl AsRef<Path>) -> BundleResult {
         let out_dir = out_dir.as_ref();
-        fs::create_dir_all(out_dir)
-            .await
-            .map_err(|source| AssetError::ManifestIo {
-                path: out_dir.to_path_buf(),
-                source,
-            })?;
+        fs::create_dir_all(out_dir).map_err(|source| AssetError::ManifestIo {
+            path: out_dir.to_path_buf(),
+            source,
+        })?;
 
         let manifest_path = out_dir.join(MANIFEST_NAME);
         let existing: HashMap<_, _> = match Manifest::load(&manifest_path) {
@@ -88,9 +89,9 @@ impl Bundler {
             let source = asset.source();
             let src = match &source {
                 Source::Path(p) => p.clone(),
-                Source::Url(uri) => self.cache.fetch(uri).await?,
+                Source::Url(uri) => self.cache.fetch(uri)?,
             };
-            let bytes = fs::read(&src).await.map_err(|source| AssetError::AssetIo {
+            let bytes = fs::read(&src).map_err(|source| AssetError::AssetIo {
                 asset: asset.clone(),
                 source,
             })?;
@@ -146,12 +147,10 @@ impl Bundler {
                 .is_some_and(|prev| prev.hash == hash && prev.file == file);
 
             if !unchanged || !dst.exists() {
-                fs::write(&dst, &bytes)
-                    .await
-                    .map_err(|source| AssetError::AssetIo {
-                        asset: asset.clone(),
-                        source,
-                    })?;
+                fs::write(&dst, &bytes).map_err(|source| AssetError::AssetIo {
+                    asset: asset.clone(),
+                    source,
+                })?;
             }
 
             kept_files.insert(file.clone());
@@ -166,7 +165,7 @@ impl Bundler {
         for entry in existing.values() {
             if !kept_files.contains(&entry.file) {
                 let path = out_dir.join(&entry.file);
-                match fs::remove_file(&path).await {
+                match fs::remove_file(&path) {
                     Ok(()) => {}
                     Err(e) if e.kind() == io::ErrorKind::NotFound => {}
                     Err(source) => return Err(AssetError::ManifestIo { path, source }.into()),

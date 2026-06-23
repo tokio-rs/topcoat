@@ -21,6 +21,6 @@ pub enum BundleError {
     Download {
         uri: Uri,
         #[source]
-        source: reqwest::Error,
+        source: Box<ureq::Error>,
     },
 }

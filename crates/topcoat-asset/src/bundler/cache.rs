@@ -1,74 +1,61 @@
-use std::path::PathBuf;
+use std::{fs, io, path::PathBuf};
 
 use http::Uri;
 use sha2::{Digest, Sha256};
-use tokio::fs;
 
 use super::error::BundleError;
 
 pub struct Cache {
     dir: PathBuf,
-    client: reqwest::Client,
+    agent: ureq::Agent,
 }
 
 impl Cache {
-    pub fn new(dir: PathBuf, client: reqwest::Client) -> Self {
-        Self { dir, client }
+    pub fn new(dir: PathBuf, agent: ureq::Agent) -> Self {
+        Self { dir, agent }
     }
 
     /// Return the local path of `uri`'s cached contents, downloading first if needed.
-    pub async fn fetch(&self, uri: &Uri) -> Result<PathBuf, BundleError> {
+    ///
+    /// Performs a blocking HTTP request when the asset isn't already cached.
+    pub fn fetch(&self, uri: &Uri) -> Result<PathBuf, BundleError> {
         let path = self.cached_path(uri);
-        let exists = fs::try_exists(&path)
-            .await
-            .map_err(|source| BundleError::CacheIo {
-                path: path.clone(),
-                source,
-            })?;
-        if exists {
+        if path.exists() {
             return Ok(path);
         }
 
-        fs::create_dir_all(&self.dir)
-            .await
-            .map_err(|source| BundleError::CacheIo {
-                path: self.dir.clone(),
-                source,
-            })?;
+        fs::create_dir_all(&self.dir).map_err(|source| BundleError::CacheIo {
+            path: self.dir.clone(),
+            source,
+        })?;
 
-        let response = self
-            .client
+        let mut body = self
+            .agent
             .get(uri.to_string())
-            .send()
-            .await
-            .and_then(|r| r.error_for_status())
+            .call()
             .map_err(|source| BundleError::Download {
                 uri: uri.clone(),
-                source,
-            })?;
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|source| BundleError::Download {
-                uri: uri.clone(),
-                source,
-            })?;
+                source: Box::new(source),
+            })?
+            .into_body();
+        let mut reader = body.as_reader();
 
-        // Write to a sibling tempfile then rename so a partial download can't be mistaken for a
+        // Stream to a sibling tempfile then rename so a partial download can't be mistaken for a
         // hit.
         let tmp = path.with_extension("download");
-        fs::write(&tmp, &bytes)
-            .await
-            .map_err(|source| BundleError::CacheIo {
-                path: tmp.clone(),
-                source,
-            })?;
-        fs::rename(&tmp, &path)
-            .await
-            .map_err(|source| BundleError::CacheIo {
-                path: path.clone(),
-                source,
-            })?;
+        let mut file = fs::File::create(&tmp).map_err(|source| BundleError::CacheIo {
+            path: tmp.clone(),
+            source,
+        })?;
+        io::copy(&mut reader, &mut file).map_err(|source| BundleError::CacheIo {
+            path: tmp.clone(),
+            source,
+        })?;
+        drop(file);
+        fs::rename(&tmp, &path).map_err(|source| BundleError::CacheIo {
+            path: path.clone(),
+            source,
+        })?;
 
         Ok(path)
     }

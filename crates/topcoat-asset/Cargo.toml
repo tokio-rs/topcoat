@@ -8,8 +8,7 @@ default = []
 
 bundler = [
 	"dep:mime_guess",
-	"dep:reqwest",
-	"dep:tokio",
+	"dep:ureq",
 ]
 router = [
 	"view",
@@ -29,12 +28,12 @@ topcoat-view = { workspace = true, optional = true }
 http.workspace = true
 memchr.workspace = true
 mime_guess = { workspace = true, optional = true }
-reqwest = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 sha2.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, optional = true, features = ["fs", "rt"] }
 toml.workspace = true
+ureq = { workspace = true, optional = true }
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["asset"] }

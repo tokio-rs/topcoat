@@ -90,7 +90,6 @@ prettyplease = "0.2"
 proc-macro2 = "1.0.106"
 quote = "1.0.45"
 ref-cast = "1.0"
-reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 serde = "1"
 serde_json = "1"
 serde_path_to_error = "0.1"
