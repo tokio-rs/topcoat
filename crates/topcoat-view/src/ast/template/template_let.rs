@@ -40,7 +40,8 @@ impl Parse for TemplateLet {
 
 impl ParseOption for TemplateLet {
     fn peek(input: ParseStream) -> bool {
-        input.peek(Token![let])
+        // `let=` is an attribute named `let`, not the start of a binding.
+        input.peek(Token![let]) && !input.peek2(Token![=])
     }
 }
 
@@ -77,5 +78,22 @@ mod tests {
     #[test]
     fn requires_trailing_semicolon() {
         assert!(syn::parse_str::<TemplateLet>("let x = 1").is_err());
+    }
+
+    /// Evaluates a `peek` against `source`, draining the remaining tokens so the
+    /// surrounding `parse_str` doesn't error on the unconsumed input.
+    fn peeks(peek: fn(ParseStream) -> bool, source: &str) -> bool {
+        let parser = move |input: ParseStream| -> syn::Result<bool> {
+            let peeked = peek(input);
+            input.parse::<proc_macro2::TokenStream>()?;
+            Ok(peeked)
+        };
+        syn::parse::Parser::parse_str(parser, source).unwrap()
+    }
+
+    #[test]
+    fn let_equals_is_an_attribute_not_a_binding() {
+        assert!(peeks(TemplateLet::peek, "let x = 1;"));
+        assert!(!peeks(TemplateLet::peek, r#"let="x""#));
     }
 }

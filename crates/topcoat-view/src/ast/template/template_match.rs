@@ -59,7 +59,8 @@ impl<B: Parse> Parse for TemplateMatch<B> {
 
 impl<B: Parse> ParseOption for TemplateMatch<B> {
     fn peek(input: ParseStream) -> bool {
-        input.peek(Token![match])
+        // `match=` is an attribute named `match`, not the start of a match.
+        input.peek(Token![match]) && !input.peek2(Token![=])
     }
 }
 
@@ -259,5 +260,22 @@ mod tests {
         let Node::Block(_) = &*m.arms[0].body else {
             panic!("expected block body");
         };
+    }
+
+    /// Evaluates a `peek` against `source`, draining the remaining tokens so the
+    /// surrounding `parse_str` doesn't error on the unconsumed input.
+    fn peeks(peek: fn(ParseStream) -> bool, source: &str) -> bool {
+        let parser = move |input: ParseStream| -> syn::Result<bool> {
+            let peeked = peek(input);
+            input.parse::<proc_macro2::TokenStream>()?;
+            Ok(peeked)
+        };
+        syn::parse::Parser::parse_str(parser, source).unwrap()
+    }
+
+    #[test]
+    fn match_equals_is_an_attribute_not_a_match() {
+        assert!(peeks(TemplateMatch::<Node>::peek, "match v { _ => \"x\" }"));
+        assert!(!peeks(TemplateMatch::<Node>::peek, r#"match="x""#));
     }
 }

@@ -54,7 +54,8 @@ impl<T: Parse> Parse for TemplateIf<T> {
 
 impl<T: Parse> ParseOption for TemplateIf<T> {
     fn peek(input: ParseStream) -> bool {
-        input.peek(Token![if])
+        // `if=` is an attribute named `if`, not the start of a conditional.
+        input.peek(Token![if]) && !input.peek2(Token![=])
     }
 }
 
@@ -204,5 +205,22 @@ mod tests {
             panic!("expected else branch");
         };
         assert!(then_branch.children.is_empty());
+    }
+
+    /// Evaluates a `peek` against `source`, draining the remaining tokens so the
+    /// surrounding `parse_str` doesn't error on the unconsumed input.
+    fn peeks(peek: fn(ParseStream) -> bool, source: &str) -> bool {
+        let parser = move |input: ParseStream| -> syn::Result<bool> {
+            let peeked = peek(input);
+            input.parse::<proc_macro2::TokenStream>()?;
+            Ok(peeked)
+        };
+        syn::parse::Parser::parse_str(parser, source).unwrap()
+    }
+
+    #[test]
+    fn if_equals_is_an_attribute_not_a_conditional() {
+        assert!(peeks(TemplateIf::<Nodes>::peek, "if cond {}"));
+        assert!(!peeks(TemplateIf::<Nodes>::peek, r#"if="x""#));
     }
 }

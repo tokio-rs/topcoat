@@ -52,7 +52,8 @@ impl<T: Parse> Parse for TemplateForLoop<T> {
 
 impl<T: Parse> ParseOption for TemplateForLoop<T> {
     fn peek(input: ParseStream) -> bool {
-        input.peek(Token![for])
+        // `for=` is an attribute named `for`, not the start of a loop.
+        input.peek(Token![for]) && !input.peek2(Token![=])
     }
 }
 
@@ -102,7 +103,8 @@ impl Parse for TemplateContinue {
 
 impl ParseOption for TemplateContinue {
     fn peek(input: ParseStream) -> bool {
-        input.peek(Token![continue])
+        // `continue=` is an attribute named `continue`, not a statement.
+        input.peek(Token![continue]) && !input.peek2(Token![=])
     }
 }
 
@@ -150,7 +152,8 @@ impl Parse for TemplateBreak {
 
 impl ParseOption for TemplateBreak {
     fn peek(input: ParseStream) -> bool {
-        input.peek(Token![break])
+        // `break=` is an attribute named `break`, not a statement.
+        input.peek(Token![break]) && !input.peek2(Token![=])
     }
 }
 
@@ -221,5 +224,30 @@ mod tests {
     fn continue_and_break_require_trailing_semicolon() {
         assert!(syn::parse_str::<TemplateContinue>("continue").is_err());
         assert!(syn::parse_str::<TemplateBreak>("break").is_err());
+    }
+
+    /// Evaluates a `peek` against `source`, draining the remaining tokens so the
+    /// surrounding `parse_str` doesn't error on the unconsumed input.
+    fn peeks(peek: fn(ParseStream) -> bool, source: &str) -> bool {
+        let parser = move |input: ParseStream| -> syn::Result<bool> {
+            let peeked = peek(input);
+            input.parse::<proc_macro2::TokenStream>()?;
+            Ok(peeked)
+        };
+        syn::parse::Parser::parse_str(parser, source).unwrap()
+    }
+
+    #[test]
+    fn for_equals_is_an_attribute_not_a_loop() {
+        assert!(peeks(TemplateForLoop::<Nodes>::peek, "for x in xs {}"));
+        assert!(!peeks(TemplateForLoop::<Nodes>::peek, r#"for="email""#));
+    }
+
+    #[test]
+    fn continue_and_break_equals_are_attributes() {
+        assert!(peeks(TemplateContinue::peek, "continue;"));
+        assert!(!peeks(TemplateContinue::peek, r#"continue="x""#));
+        assert!(peeks(TemplateBreak::peek, "break;"));
+        assert!(!peeks(TemplateBreak::peek, r#"break="x""#));
     }
 }
