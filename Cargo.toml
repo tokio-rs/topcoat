@@ -38,7 +38,7 @@ unsafe_code = "deny"
 debug = 1
 
 [profile.dev.package."*"]
-debug = 2
+debug = false
 
 [workspace.dependencies]
 # Topcoat crates

@@ -32,6 +32,9 @@ multipart = [
 router = [
 	"dep:topcoat-router",
 	"dep:topcoat-router-macro",
+	"dep:futures-util",
+	"dep:tokio",
+	"dep:tokio-tungstenite",
 	"view",
 	"topcoat-asset?/router",
 	"topcoat-cookie?/router",
@@ -69,12 +72,12 @@ topcoat-tailwind = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
 topcoat-view-macro = { workspace = true, optional = true }
 
-futures-util.workspace = true
+futures-util = { workspace = true, optional = true }
 inventory = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_urlencoded.workspace = true
-tokio = { workspace = true, features = ["net"] }
-tokio-tungstenite.workspace = true
+tokio = { workspace = true, optional = true, features = ["net"] }
+tokio-tungstenite = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
