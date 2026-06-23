@@ -52,3 +52,13 @@ impl AttributeKeyViewParts for &String {
         self.as_str().into_view_parts(parts);
     }
 }
+
+impl<'a, 'b, T: ?Sized> AttributeKeyViewParts for &'a &'b T
+where
+    &'b T: AttributeKeyViewParts,
+{
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        (*self).into_view_parts(parts)
+    }
+}

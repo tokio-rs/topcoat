@@ -136,6 +136,21 @@ impl AttributeValueViewParts for &bool {
     }
 }
 
+impl<'a, 'b, T: ?Sized> AttributeValueViewParts for &'a &'b T
+where
+    &'b T: AttributeValueViewParts,
+{
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        (**self).attribute_present()
+    }
+
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        (*self).into_view_parts(parts)
+    }
+}
+
 impl<T> AttributeValueViewParts for Option<T>
 where
     T: AttributeValueViewParts,

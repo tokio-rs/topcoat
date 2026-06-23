@@ -91,3 +91,13 @@ where
         }
     }
 }
+
+impl<'a, 'b, T: ?Sized> AttributeViewParts for &'a &'b T
+where
+    &'b T: AttributeViewParts,
+{
+    #[inline]
+    fn into_view_parts(self, parts: &mut ViewParts) {
+        (*self).into_view_parts(parts)
+    }
+}
