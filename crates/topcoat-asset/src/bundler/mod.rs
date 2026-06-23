@@ -92,7 +92,7 @@ impl Bundler {
                 Source::Url(uri) => self.cache.fetch(uri)?,
             };
             let bytes = fs::read(&src).map_err(|source| AssetError::AssetIo {
-                asset: asset.clone(),
+                asset: Box::new(asset.clone()),
                 source,
             })?;
             let digest = Sha256::digest(&bytes);
@@ -105,7 +105,7 @@ impl Bundler {
                 && expected != hash
             {
                 return Err(AssetError::ChecksumMismatch {
-                    asset: asset.clone(),
+                    asset: Box::new(asset.clone()),
                     expected: expected.to_owned(),
                     actual: hash,
                 }
@@ -148,7 +148,7 @@ impl Bundler {
 
             if !unchanged || !dst.exists() {
                 fs::write(&dst, &bytes).map_err(|source| AssetError::AssetIo {
-                    asset: asset.clone(),
+                    asset: Box::new(asset.clone()),
                     source,
                 })?;
             }

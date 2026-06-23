@@ -9,7 +9,7 @@ pub type Result = core::result::Result<(), AssetError>;
 pub enum AssetError {
     #[error("io error for asset at {}: {source}", asset.source())]
     AssetIo {
-        asset: RawAsset,
+        asset: Box<RawAsset>,
         #[source]
         source: io::Error,
     },
@@ -24,7 +24,7 @@ pub enum AssetError {
         asset.source()
     )]
     ChecksumMismatch {
-        asset: RawAsset,
+        asset: Box<RawAsset>,
         expected: String,
         actual: String,
     },
