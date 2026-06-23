@@ -5,10 +5,9 @@ edition = "2024"
 
 [features]
 default = ["build"]
-build = ["dep:thiserror", "dep:ureq"]
+build = ["dep:ureq"]
 
 [dependencies]
-thiserror = { workspace = true, optional = true }
 ureq = { workspace = true, optional = true }
 
 [dev-dependencies]
