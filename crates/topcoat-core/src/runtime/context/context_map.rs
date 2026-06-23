@@ -26,6 +26,10 @@ use crate::runtime::context::Cx;
 /// # Examples
 ///
 /// ```rust
+/// # struct User;
+/// # impl Database {
+/// #     async fn fetch_user(&self, id: u64) -> User { User }
+/// # }
 /// use topcoat::context::{Cx, app_context};
 ///
 /// struct Database {/* ... */}

@@ -17,7 +17,8 @@
 //!
 //! ```rust
 //! # use std::boxed::Box;
-//! # use topcoat_core::context::{AbortStore, WatchAbort, MaybeAborted};
+//! # use topcoat_core::runtime::abort::{AbortStore, WatchAbort, MaybeAborted, abort};
+//! # async fn example() {
 //! let store = AbortStore::new();
 //! let outcome = WatchAbort::new(&store, async {
 //!     abort(&store, Box::new(42i32)).await;
@@ -31,6 +32,7 @@
 //!         assert_eq!(*value.downcast::<i32>().unwrap(), 42);
 //!     }
 //! }
+//! # }
 //! ```
 
 use std::{
@@ -62,15 +64,14 @@ pub enum MaybeAborted<T> {
 /// It holds the value handed over by an abort until the watching [`WatchAbort`]
 /// takes it out. Aborting the same store more than once before it is observed is
 /// a bug and panics.
+#[derive(Default)]
 pub struct AbortStore {
     inner: Mutex<Option<Box<dyn Any + Send + Sync>>>,
 }
 
 impl AbortStore {
-    pub(crate) fn new() -> Self {
-        Self {
-            inner: Mutex::new(None),
-        }
+    pub fn new() -> Self {
+        Default::default()
     }
 
     fn abort(&self, value: Box<dyn Any + Send + Sync>) {
