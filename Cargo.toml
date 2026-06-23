@@ -40,6 +40,12 @@ debug = 1
 [profile.dev.package."*"]
 debug = false
 
+[profile.test]
+debug = 1
+
+[profile.test.package."*"]
+debug = false
+
 [workspace.dependencies]
 # Topcoat crates
 topcoat = { path = "crates/topcoat" }
