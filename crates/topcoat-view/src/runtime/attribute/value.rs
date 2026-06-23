@@ -140,7 +140,7 @@ impl AttributeValueViewParts for &bool {
     }
 }
 
-impl<'a, 'b, T: ?Sized> AttributeValueViewParts for &'a &'b T
+impl<'b, T: ?Sized> AttributeValueViewParts for &&'b T
 where
     &'b T: AttributeValueViewParts,
 {

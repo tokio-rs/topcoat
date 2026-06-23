@@ -90,7 +90,7 @@ impl NodeViewParts for &String {
     }
 }
 
-impl<'a, 'b, T: ?Sized> NodeViewParts for &'a &'b T
+impl<'b, T: ?Sized> NodeViewParts for &&'b T
 where
     &'b T: NodeViewParts,
 {

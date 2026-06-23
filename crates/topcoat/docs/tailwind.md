@@ -15,6 +15,7 @@ topcoat = { version = "0.1", features = ["tailwind"] }
 Add a `build.rs` next to `Cargo.toml`:
 
 ```rust,no_run
+# #[allow(clippy::needless_doctest_main)]
 fn main() {
     topcoat::tailwind::BuildConfig::new().render().unwrap();
 }
@@ -110,6 +111,7 @@ So Tailwind scans from your crate's `src` directory. This works with classes in 
 If your templates, components, or shared UI live somewhere else, change the working directory:
 
 ```rust,no_run
+# #[allow(clippy::needless_doctest_main)]
 fn main() {
     topcoat::tailwind::BuildConfig::new()
         .cwd(".")
@@ -125,6 +127,7 @@ For more precise control, use a custom input CSS file and Tailwind's own source 
 The generated input is enough for default Tailwind output. Use `input(...)` when you need custom CSS, theme values, plugins supported by the standalone CLI, or Tailwind source directives:
 
 ```rust,no_run
+# #[allow(clippy::needless_doctest_main)]
 fn main() {
     topcoat::tailwind::BuildConfig::new()
         .input("src/styles/app.css")
@@ -161,6 +164,7 @@ The input file is registered with Cargo as `rerun-if-changed`, so changing it re
 For example:
 
 ```rust,no_run
+# #[allow(clippy::needless_doctest_main)]
 fn main() {
     topcoat::tailwind::BuildConfig::new()
         .version("4.3.0")
@@ -197,6 +201,7 @@ view! {
 Keep the build script and the linked asset path in sync:
 
 ```rust,no_run
+# #[allow(clippy::needless_doctest_main)]
 fn main() {
     let out_dir = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
 

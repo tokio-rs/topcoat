@@ -57,7 +57,7 @@ impl ElementNameViewParts for &String {
     }
 }
 
-impl<'a, 'b, T: ?Sized> ElementNameViewParts for &'a &'b T
+impl<'b, T: ?Sized> ElementNameViewParts for &&'b T
 where
     &'b T: ElementNameViewParts,
 {

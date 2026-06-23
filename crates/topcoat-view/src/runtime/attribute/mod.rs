@@ -96,7 +96,7 @@ where
     }
 }
 
-impl<'a, 'b, T: ?Sized> AttributeViewParts for &'a &'b T
+impl<'b, T: ?Sized> AttributeViewParts for &&'b T
 where
     &'b T: AttributeViewParts,
 {

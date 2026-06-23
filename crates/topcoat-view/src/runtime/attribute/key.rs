@@ -57,7 +57,7 @@ impl AttributeKeyViewParts for &String {
     }
 }
 
-impl<'a, 'b, T: ?Sized> AttributeKeyViewParts for &'a &'b T
+impl<'b, T: ?Sized> AttributeKeyViewParts for &&'b T
 where
     &'b T: AttributeKeyViewParts,
 {
