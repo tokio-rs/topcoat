@@ -9,7 +9,7 @@ Enable the `tailwind` feature for both your runtime dependency and your build de
 topcoat = { version = "0.1", features = ["tailwind"] }
 
 [build-dependencies]
-topcoat = { version = "0.1", features = ["tailwind"] }
+topcoat = { version = "0.1", no-default-features = true, features = ["tailwind"] }
 ```
 
 Add a `build.rs` next to `Cargo.toml`:
