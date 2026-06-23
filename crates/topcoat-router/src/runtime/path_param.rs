@@ -31,8 +31,8 @@ pub trait PathParam {
 /// The return type depends on the param struct's inner type:
 ///
 /// - **`&str`** — returns the param struct directly, borrowing the raw segment.
-/// - **Any other type** — returns `Result<&T, &<Inner as FromStr>::Err>`, parsed
-///   via [`FromStr`](core::str::FromStr) and memoized per request.
+/// - **Any other type** — returns `Result<&T, &<Inner as FromStr>::Err>`, parsed via
+///   [`FromStr`](core::str::FromStr) and memoized per request.
 ///
 /// See [`#[path_param]`](attr.path_param.html) for declaring the struct and
 /// pairing it with the route's URL.

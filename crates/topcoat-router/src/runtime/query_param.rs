@@ -12,10 +12,7 @@ pub trait QueryParams: Sized {
     /// Call [`query_params::<T>(cx)`](query_params) instead — this method is
     /// sealed behind [`QueryParamsSealed`] and cannot be invoked directly.
     #[doc(hidden)]
-    fn query_params(
-        cx: &Cx,
-        _: QueryParamsSealed,
-    ) -> Result<&Self, &serde_urlencoded::de::Error>;
+    fn query_params(cx: &Cx, _: QueryParamsSealed) -> Result<&Self, &serde_urlencoded::de::Error>;
 }
 
 /// Parses the request's query string into a typed
