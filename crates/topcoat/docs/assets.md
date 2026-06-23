@@ -24,13 +24,17 @@ async fn about_page() -> Result {
 
 You can also call the macro inline:
 
-```rust,ignore
+```rust
+# use topcoat::{asset::asset, view::view};
+# #[topcoat::view::component]
+# async fn example() -> topcoat::Result {
 view! {
     <script
         type="module"
         src=(asset!("https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"))
     ></script>
 }
+# }
 ```
 
 When an [`Asset`] appears inside [`view!`](crate::view::view), Topcoat renders it as the URL of the bundled file. For example, an image might render as:
@@ -45,7 +49,7 @@ The hash in the filename is based on the file contents, so URLs are safe to cach
 
 Load the generated asset bundle while building the router, before `.build()`. Use [`AssetBundle::load`] for the default bundle location:
 
-```rust,ignore
+```rust,no_run
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     router::{Router, RouterBuilderDiscoverExt},
@@ -111,7 +115,8 @@ To write the bundle somewhere else, pass `--out` and load the same directory at 
 topcoat asset bundle --out dist/assets
 ```
 
-```rust,ignore
+```rust,no_run
+# use topcoat::{asset::{AssetBundle, RouterBuilderAssetExt}, router::{Router, RouterBuilderDiscoverExt}};
 let router = Router::builder()
     .discover()
     .assets(AssetBundle::load_dir("dist/assets").unwrap())

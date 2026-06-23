@@ -155,7 +155,7 @@ async fn docs_page() -> Result {
 
 A layout wraps pages. It receives a [`Slot`] — a future that resolves to the inner page or layout. Annotate it with [`#[layout]`](layout) and an explicit path:
 
-```rust,ignore
+```rust
 use topcoat::{
     Result,
     router::{Slot, layout},
@@ -185,7 +185,8 @@ A layout applies to every page whose path starts with the layout's path. A layou
 
 When multiple layouts match a page, they nest from least specific (outermost) to most specific (innermost):
 
-```rust,ignore
+```rust
+# use topcoat::{Result, router::{Slot, layout, page}, view::view};
 #[layout("/")]
 async fn root_layout(slot: Slot<'_>) -> Result {
     view! { <html><body>(slot.await?)</body></html> }
@@ -213,7 +214,7 @@ A request to `/settings/profile` renders: `root_layout` > `settings_layout` > `p
 
 A layer wraps matched routes under its path prefix. It receives a mutable request context, the request body, and [`Next`], which represents the remaining layers and the route handler.
 
-```rust,ignore
+```rust
 use topcoat::{
     Result,
     context::Cx,
@@ -235,7 +236,15 @@ Layer path matching follows the same prefix rule as layouts. A layer at `/` wrap
 
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
 
-```rust,ignore
+```rust
+# use topcoat::{Result, context::Cx, router::{Body, Next, Response, Slot, layer, layout, page, route}, view::view};
+# #[layout("/")] async fn root_layout(slot: Slot<'_>) -> Result { view! { (slot.await?) } }
+# #[layout("/settings")] async fn settings_layout(slot: Slot<'_>) -> Result { view! { (slot.await?) } }
+# #[layer("/")] async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
+# #[page("/")] async fn home() -> Result { view! { <h1>"Home"</h1> } }
+# #[page("/about")] async fn about() -> Result { view! { <h1>"About"</h1> } }
+# #[page("/settings/profile")] async fn profile() -> Result { view! { <h1>"Profile"</h1> } }
+# #[route(GET "/api/health")] async fn health() -> Result<&'static str> { Ok("ok") }
 use topcoat::router::Router;
 
 pub fn router() -> Router {
@@ -257,7 +266,7 @@ Layout-to-page matching is based on path prefixes, not registration order. Layer
 
 With the `discover` feature enabled, every [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](route) is collected at link time. Instead of listing each item by hand, call [`discover`](RouterBuilderDiscoverExt::discover) on the builder:
 
-```rust,ignore
+```rust
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
 
 pub fn router() -> Router {
@@ -271,7 +280,11 @@ This finds annotated items across your crate and dependencies. Discovered layers
 
 Use [`start`](crate::start) to run a finalized router:
 
-```rust,ignore
+```rust,no_run
+# mod my_app {
+#     use topcoat::router::{Router, RouterBuilderDiscoverExt};
+#     pub fn router() -> Router { Router::builder().discover().build() }
+# }
 #[tokio::main]
 async fn main() {
     let router = my_app::router();
@@ -283,7 +296,7 @@ async fn main() {
 
 # Example: full manual setup
 
-```rust,ignore
+```rust
 use topcoat::{
     Result,
     context::Cx,
@@ -360,7 +373,7 @@ pub fn router() -> Router {
 
 # Example: same app with `discover()`
 
-```rust,ignore
+```rust
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
 
 // The page, layout, layer, and route definitions are identical. Only the
