@@ -47,9 +47,10 @@ impl ToTokens for QueryParams {
             #[serde(crate = "::topcoat::internal::serde")]
             #item
 
-            impl #ident {
-                fn of<'__cx>(
+            impl ::topcoat::router::QueryParams for #ident {
+                fn query_params<'__cx>(
                     cx: &'__cx ::topcoat::context::Cx,
+                    _: ::topcoat::router::QueryParamsSealed,
                 ) -> ::core::result::Result<&'__cx Self, &'__cx ::topcoat::internal::serde_urlencoded::de::Error> {
                     #[::topcoat::context::memoize]
                     fn parse(cx: &::topcoat::context::Cx) -> ::core::result::Result<#ident, ::topcoat::internal::serde_urlencoded::de::Error> {

@@ -87,10 +87,10 @@ Returning a bare value only works if its type implements [`IntoResponse`]; a pla
 
 # Path and query parameters
 
-Handlers read typed values out of the URL with two attributes. Each generates an `of(cx)` accessor whose result is parsed once and memoized for the rest of the request:
+Handlers read typed values out of the URL with two attributes. Each declares a struct you read with a free function whose result is parsed once and memoized for the rest of the request:
 
-- [`#[path_param]`](path_param) — a typed view of a single path segment, like the `{post_id}` in `/posts/{post_id}`.
-- [`#[query_params]`](query_params) — a typed view of the request's query string, deserialized into a struct.
+- [`#[path_param]`](macro@path_param), read with [`path_param::<T>(cx)`](fn@path_param) — a typed view of a single path segment, like the `{post_id}` in `/posts/{post_id}`.
+- [`#[query_params]`](macro@query_params), read with [`query_params::<T>(cx)`](fn@query_params) — a typed view of the request's query string, deserialized into a struct.
 
 ```rust
 use topcoat::{
@@ -110,13 +110,13 @@ struct PostQuery {
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
-    let post_id = PostId::of(cx).unwrap();
-    let query = PostQuery::of(cx).unwrap();
+    let post_id = path_param::<PostId>(cx).unwrap();
+    let query = query_params::<PostQuery>(cx).unwrap();
     view! { /* ... */ }
 }
 ```
 
-See [`#[path_param]`](path_param) and [`#[query_params]`](query_params) for how parameters pair with the URL (module router versus explicit paths), the exact return types, and their requirements.
+See [`#[path_param]`](macro@path_param) and [`#[query_params]`](macro@query_params) for how parameters pair with the URL (module router versus explicit paths), the exact return types, and their requirements.
 
 # Pages
 

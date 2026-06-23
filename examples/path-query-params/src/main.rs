@@ -61,7 +61,7 @@ struct PostsQuery {
 
 #[page("/posts")]
 async fn posts(cx: &Cx) -> Result {
-    let query = PostsQuery::of(cx).ok_or_bad_request("invalid query string")?;
+    let query = query_params::<PostsQuery>(cx).ok_or_bad_request("invalid query string")?;
 
     view! {
         <h1>"Posts"</h1>
@@ -79,7 +79,7 @@ struct PostId(u32);
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
-    let post_id = PostId::of(cx).ok_or_bad_request("post_id must be a number")?;
+    let post_id = path_param::<PostId>(cx).ok_or_bad_request("post_id must be a number")?;
 
     view! {
         <h1>"Post " (post_id.to_string())</h1>

@@ -19,6 +19,8 @@ syn = { workspace = true, features = ["full"] }
 topcoat = { workspace = true, features = ["router"] }
 serde = { workspace = true, features = ["derive"] }
 uuid = { workspace = true }
+http.workspace = true
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
 workspace = true

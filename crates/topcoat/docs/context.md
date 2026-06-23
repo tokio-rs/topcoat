@@ -57,7 +57,7 @@ fn request_id(cx: &Cx) -> Option<&str> {
 
 # Path and query helpers
 
-Path and query parameter macros generate `of(cx)` helpers. They parse lazily and memoize the parsed value for the request.
+Path and query parameter macros declare typed structs that you read with the [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params) functions. They parse lazily and memoize the parsed value for the request.
 
 ```rust
 use topcoat::{
@@ -77,8 +77,8 @@ struct PostQuery {
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
-    let post_id = PostId::of(cx).unwrap();
-    let query = PostQuery::of(cx).unwrap();
+    let post_id = path_param::<PostId>(cx).unwrap();
+    let query = query_params::<PostQuery>(cx).unwrap();
 
     view! {
         <article data-preview=(query.preview.unwrap_or(false))>
@@ -88,7 +88,7 @@ async fn post(cx: &Cx) -> Result {
 }
 ```
 
-See [`path_param`](crate::router::path_param) and [`query_params`](crate::router::query_params) for the exact return types and parsing rules.
+See [`#[path_param]`](macro@crate::router::path_param) and [`#[query_params]`](macro@crate::router::query_params) for declaring the structs, and [`path_param`](fn@crate::router::path_param) and [`query_params`](fn@crate::router::query_params) for the exact return types and parsing rules.
 
 # App and request context helpers
 

@@ -1,8 +1,8 @@
 Declares a typed view of the request's query string.
 
-Apply this attribute to a struct with named fields. The macro derives [`serde::Deserialize`] on the struct and generates an `of(cx: &Cx)` associated function that parses the query string of whichever request `cx` belongs to, using [`serde_urlencoded`].
+Apply this attribute to a struct with named fields. The macro derives [`serde::Deserialize`] on the struct so it can be read with the [`query_params::<T>(cx)`](fn.query_params.html) function, which parses the query string of whichever request `cx` belongs to using [`serde_urlencoded`].
 
-The same struct can be used from any handler — it is not tied to a particular route. `of` returns `Result<&Self, &serde_urlencoded::de::Error>`, and parsing is memoized per request so repeated calls within one handler share the same parse result.
+The same struct can be used from any handler — it is not tied to a particular route. [`query_params`](fn.query_params.html) returns `Result<&T, &serde_urlencoded::de::Error>`, and parsing is memoized per request so repeated calls within one handler share the same parse result.
 
 # Examples
 
@@ -22,7 +22,7 @@ struct PageQuery {
 #[page]
 async fn posts(cx: &Cx) -> Result {
     // For `/posts?page=2`, this yields `Some(2)`.
-    let q = PageQuery::of(cx).unwrap();
+    let q = query_params::<PageQuery>(cx).unwrap();
     view! {
         <div>
             "currently on page: " (q.page)

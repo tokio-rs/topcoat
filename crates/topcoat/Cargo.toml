@@ -79,6 +79,7 @@ tokio-tungstenite.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
 uuid = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints]
 workspace = true

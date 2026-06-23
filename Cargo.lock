@@ -2444,9 +2444,11 @@ dependencies = [
 name = "topcoat-router-macro"
 version = "0.1.0"
 dependencies = [
+ "http",
  "quote",
  "serde",
  "syn",
+ "tokio",
  "topcoat",
  "topcoat-router",
  "uuid",

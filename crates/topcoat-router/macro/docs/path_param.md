@@ -7,14 +7,14 @@ Apply this attribute to a tuple struct with a single unnamed field. The struct n
 `#[path_param]` only declares how to read a parameter — it does not by itself decide which URL segment carries that parameter. How the param gets into the URL depends on which router you use:
 
 - **Module router** ([`module_router!`](../router/macro.module_router.html)) — the macro also emits a [`segment!`](macro@segment)`(kind = Param, rename = "...")` for the enclosing module. The module's URL segment is replaced by the parameter, so a `PostId` defined anywhere in module `app::posts::id` turns that module into `{post_id}` in the URL.
-- **Regular [`Router`](../router/struct.Router.html)** — the page's path string is the source of truth. Include a matching parameter name in the [`#[page("...")]`](macro@page) path; the snake-cased struct name must equal the `{...}` placeholder for `of` to find the value. The [`segment!`](macro@segment) emitted by the macro is inert for this router.
+- **Regular [`Router`](../router/struct.Router.html)** — the page's path string is the source of truth. Include a matching parameter name in the [`#[page("...")]`](macro@page) path; the snake-cased struct name must equal the `{...}` placeholder for [`path_param`](fn.path_param.html) to find the value. The [`segment!`](macro@segment) emitted by the macro is inert for this router.
 
 # Reading the parameter
 
-The macro generates an `of(cx: &Cx)` associated function whose return type depends on the inner type:
+Read the parameter with the [`path_param::<T>(cx)`](fn.path_param.html) function. Its return type depends on the inner type:
 
-- **`&str`** — returns `&Self` directly with the borrowed segment value.
-- **Any other type** — returns `Result<&Self, &<T as FromStr>::Err>`, parsed via [`FromStr`](core::str::FromStr). Parsing is memoized per request, so repeated calls within a handler do not re-parse.
+- **`&str`** — returns the param struct directly, borrowing the segment value.
+- **Any other type** — returns `Result<&T, &<Inner as FromStr>::Err>`, parsed via [`FromStr`](core::str::FromStr). Parsing is memoized per request, so repeated calls within a handler do not re-parse.
 
 A [`Deref`](core::ops::Deref) impl to the inner type is also generated.
 
@@ -36,7 +36,7 @@ struct PostId(uuid::Uuid);
 
 #[page]
 async fn post_page(cx: &Cx) -> Result {
-    let post_id = PostId::of(cx).ok_or_redirect("/invalid-id")?;
+    let post_id = path_param::<PostId>(cx).ok_or_redirect("/invalid-id")?;
     view! { "showing post with id: " (post_id.to_string()) }
 }
 ```
@@ -51,7 +51,7 @@ struct PostId(uuid::Uuid);
 
 #[page("/posts/{post_id}")]
 async fn post_page(cx: &Cx) -> Result {
-    let post_id = PostId::of(cx).ok_or_redirect("/invalid-id")?;
+    let post_id = path_param::<PostId>(cx).ok_or_redirect("/invalid-id")?;
     view! { "showing post with id: " (post_id.to_string()) }
 }
 ```
@@ -66,7 +66,7 @@ struct Slug<'a>(&'a str);
 
 #[page]
 async fn show(cx: &Cx) -> Result {
-    let slug = Slug::of(cx); // `&Slug<'_>`
+    let slug = path_param::<Slug>(cx); // `Slug<'_>`
     view! { "slug: " (&**slug) }
 }
 ```

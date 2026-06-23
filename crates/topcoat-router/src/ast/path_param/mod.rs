@@ -78,46 +78,55 @@ impl ToTokens for PathParam {
             path.qself.is_none() && path.path.is_ident("str")
         }
 
-        let of_fn = if is_str_ref(inner_ty) {
-            let lifetime = item
-                .generics
-                .lifetimes()
-                .next()
-                .map(|param| &param.lifetime);
-            quote! {
-                fn of(cx: & #lifetime ::topcoat::context::Cx) -> Self {
-                    for (key, value) in ::topcoat::router::raw_path_params(cx) {
-                        if key == #name_string {
-                            return #ident(value);
-                        }
-                    }
-                    panic!("path parameter \"{}\" was not found in request path", #name_string);
-                }
-            }
-        } else {
-            quote! {
-                fn of<'__cx>(
-                    cx: &'__cx ::topcoat::context::Cx,
-                ) -> ::core::result::Result<&'__cx #ident, &'__cx <#inner_ty as ::core::str::FromStr>::Err> {
-                    #[::topcoat::context::memoize]
-                    fn parse(cx: &::topcoat::context::Cx) -> ::core::result::Result<#ident, <#inner_ty as ::core::str::FromStr>::Err> {
+        let (output_ty, path_param_fn) = if is_str_ref(inner_ty) {
+            (
+                quote! { #ident<'__cx> },
+                quote! {
+                    fn path_param(
+                        cx: &::topcoat::context::Cx,
+                        _: ::topcoat::router::PathParamSealed,
+                    ) -> Self::Output<'_> {
                         for (key, value) in ::topcoat::router::raw_path_params(cx) {
                             if key == #name_string {
-                                return ::core::str::FromStr::from_str(value).map(#ident);
+                                return #ident(value);
                             }
                         }
                         panic!("path parameter \"{}\" was not found in request path", #name_string);
                     }
-                    parse(cx)
-                }
-            }
+                },
+            )
+        } else {
+            (
+                quote! {
+                    ::core::result::Result<&'__cx #ident #ty_generics, &'__cx <#inner_ty as ::core::str::FromStr>::Err>
+                },
+                quote! {
+                    fn path_param(
+                        cx: &::topcoat::context::Cx,
+                        _: ::topcoat::router::PathParamSealed,
+                    ) -> Self::Output<'_> {
+                        #[::topcoat::context::memoize]
+                        fn parse(cx: &::topcoat::context::Cx) -> ::core::result::Result<#ident #ty_generics, <#inner_ty as ::core::str::FromStr>::Err> {
+                            for (key, value) in ::topcoat::router::raw_path_params(cx) {
+                                if key == #name_string {
+                                    return ::core::str::FromStr::from_str(value).map(#ident);
+                                }
+                            }
+                            panic!("path parameter \"{}\" was not found in request path", #name_string);
+                        }
+                        parse(cx)
+                    }
+                },
+            )
         };
 
         quote! {
             #item
 
-            impl #impl_generics #ident #ty_generics #where_clause {
-                #of_fn
+            impl #impl_generics ::topcoat::router::PathParam for #ident #ty_generics #where_clause {
+                type Output<'__cx> = #output_ty;
+
+                #path_param_fn
             }
 
             impl #impl_generics ::core::ops::Deref for #ident #ty_generics #where_clause {
