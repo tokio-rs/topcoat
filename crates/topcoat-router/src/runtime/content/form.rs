@@ -28,11 +28,11 @@ use crate::runtime::{
 /// # Examples
 ///
 /// ```rust
+/// use serde::{Deserialize, Serialize};
 /// use topcoat::{
 ///     Result,
 ///     router::{Form, Json, route},
 /// };
-/// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Deserialize, Serialize)]
 /// struct Search {

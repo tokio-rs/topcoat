@@ -27,11 +27,11 @@ use crate::runtime::{
 /// # Examples
 ///
 /// ```rust
+/// use serde::{Deserialize, Serialize};
 /// use topcoat::{
 ///     Result,
 ///     router::{Json, route},
 /// };
-/// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Deserialize)]
 /// struct CreateUser {
@@ -46,7 +46,10 @@ use crate::runtime::{
 ///
 /// #[route(POST "/api/users")]
 /// async fn create_user(Json(input): Json<CreateUser>) -> Result<Json<User>> {
-///     Ok(Json(User { id: 1, name: input.name }))
+///     Ok(Json(User {
+///         id: 1,
+///         name: input.name,
+///     }))
 /// }
 /// ```
 #[derive(Debug, Clone, Copy, Default)]

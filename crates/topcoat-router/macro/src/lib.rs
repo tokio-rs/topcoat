@@ -82,7 +82,11 @@ pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::{Result, router::{Slot, layout}, view::view};
+/// use topcoat::{
+///     Result,
+///     router::{Slot, layout},
+///     view::view,
+/// };
 ///
 /// #[layout("/")]
 /// async fn root_layout(slot: Slot<'_>) -> Result {
@@ -133,10 +137,15 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// use serde::{Deserialize, Serialize};
-/// use topcoat::{Result, router::{Json, route}};
+/// use topcoat::{
+///     Result,
+///     router::{Json, route},
+/// };
 ///
 /// #[derive(Deserialize, Serialize)]
-/// struct CreateUser { name: String }
+/// struct CreateUser {
+///     name: String,
+/// }
 ///
 /// #[route(POST "/api/users")]
 /// async fn create_user(Json(input): Json<CreateUser>) -> Result<Json<CreateUser>> {

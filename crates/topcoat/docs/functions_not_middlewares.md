@@ -10,7 +10,14 @@ These functions can be called from anywhere in the component tree without coupli
 
 Middleware often pushes authentication away from the code that needs the authenticated user. The middleware authenticates the request and stores the user somewhere ambient, while the page assumes the middleware has already run.
 
-```rust,ignore
+```rust
+# struct Request { extensions: Extensions }
+# struct Extensions;
+# impl Extensions { fn insert<T>(&mut self, _v: T) {} fn get<T>(&self) -> Option<&T> { None } }
+# struct Html;
+# struct User;
+# async fn authenticate(_: &Request) -> User { User }
+# fn render_account(_: &User) -> Html { Html }
 async fn auth_middleware(request: &mut Request) {
     let user = authenticate(request).await;
     request.extensions.insert(user);
@@ -32,7 +39,11 @@ That can work, but it makes the page depend on configuration that lives somewher
 
 Extractors avoid that hidden setup by putting the auth requirement in the handler signature:
 
-```rust,ignore
+```rust
+# struct Auth(User);
+# struct User;
+# struct Html;
+# fn render_account(_: User) -> Html { Html }
 async fn account_page(Auth(user): Auth) -> Html {
     render_account(user)
 }
@@ -40,16 +51,22 @@ async fn account_page(Auth(user): Auth) -> Html {
 
 This is more robust than middleware because the auth requirement is visible. The tradeoff is that every component below the page now needs to receive the user explicitly:
 
-```rust,ignore
+```rust
+# struct Auth(User);
+# #[derive(Clone)] struct User { avatar_url: u8 }
+# struct Html;
+# fn render(_: Html, _: Html) -> Html { Html }
+# async fn account_settings(_: User) -> Html { Html }
+# fn render_image(_: u8) -> Html { Html }
 async fn account_page(Auth(user): Auth) -> Html {
     render(
-        account_sidebar(user.clone()),
-        account_settings(user.clone()),
+        account_sidebar(user.clone()).await,
+        account_settings(user.clone()).await,
     )
 }
 
 async fn account_sidebar(user: User) -> Html {
-    user_avatar(user)
+    user_avatar(user).await
 }
 
 async fn user_avatar(user: User) -> Html {
@@ -63,13 +80,19 @@ That is fine for local data flow, but current-user state is usually ambient to t
 
 Write composable request functions instead. Each function adds one small piece of logic, accepts `&Cx`, and can be called from any page, layout, or component.
 
-```rust,ignore
+```rust
 use topcoat::{
     context::{app_context, memoize, Cx},
     router::{headers, RouterErrorExt, UnauthorizedError},
     Result,
 };
 
+# #[derive(Clone)] struct Db;
+# struct User;
+# struct FetchBuilder;
+# impl User { fn fetch_by_id(_: &str) -> FetchBuilder { FetchBuilder } }
+# impl FetchBuilder { async fn exec(self, _: Db) -> Option<User> { None } }
+#
 /// Returns the application database handle.
 fn db(cx: &Cx) -> Db {
     app_context::<Db>(cx).clone()
@@ -85,6 +108,7 @@ async fn fetch_user(cx: &Cx, user_id: &str) -> Option<User> {
 fn session_cookie(cx: &Cx) -> Option<&str> {
     let headers = headers(cx);
     // ... extract session cookie from HTTP headers
+    None
 }
 
 /// Resolves the current user from the session, if one exists.
@@ -103,13 +127,17 @@ async fn require_auth(cx: &Cx) -> Result<&User, UnauthorizedError> {
 
 Now the component that needs authentication declares it by calling `require_auth(cx)`:
 
-```rust,ignore
+```rust
 use topcoat::{
     context::Cx,
     view::{component, view},
     Result,
 };
 
+# use topcoat::router::UnauthorizedError;
+# struct User { avatar_url: &'static str, name: &'static str }
+# async fn require_auth(_: &Cx) -> Result<&User, UnauthorizedError> { Err(topcoat::router::unauthorized()) }
+#
 /// Renders the current user's avatar and requires authentication wherever it is used.
 #[component]
 async fn user_avatar(cx: &Cx) -> Result {
@@ -139,9 +167,14 @@ Use several focused helpers instead of one large auth function:
 
 That keeps each function reusable. Public UI can call `fetch_current_user(cx)` and render a signed-out state. Private UI can call `require_auth(cx).await?` and fail closed. Admin UI can build on the same pattern:
 
-```rust,ignore
+```rust
 use topcoat::{context::Cx, router::RouterErrorExt, Result};
 
+# use topcoat::router::UnauthorizedError;
+# struct User;
+# impl User { fn is_admin(&self) -> bool { false } }
+# async fn require_auth(_: &Cx) -> Result<&User, UnauthorizedError> { Err(topcoat::router::unauthorized()) }
+#
 /// Returns the current user if they have admin permissions.
 async fn require_admin(cx: &Cx) -> Result<&User> {
     let user = require_auth(cx).await?;

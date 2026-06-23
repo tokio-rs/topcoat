@@ -59,7 +59,7 @@ fn request_id(cx: &Cx) -> Option<&str> {
 
 Path and query parameter macros generate `of(cx)` helpers. They parse lazily and memoize the parsed value for the request.
 
-```rust,ignore
+```rust
 use topcoat::{
     Result,
     context::Cx,

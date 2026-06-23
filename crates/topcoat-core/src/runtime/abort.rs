@@ -15,7 +15,9 @@
 //! The value travels as a type-erased `Box<dyn Any>`, so the watcher recovers
 //! the concrete type with [`downcast`](std::any::Any::downcast).
 //!
-//! ```ignore
+//! ```rust
+//! # use std::boxed::Box;
+//! # use topcoat_core::context::{AbortStore, WatchAbort, MaybeAborted};
 //! let store = AbortStore::new();
 //! let outcome = WatchAbort::new(&store, async {
 //!     abort(&store, Box::new(42i32)).await;

@@ -23,9 +23,7 @@ use crate::runtime::{
 /// # async fn example() -> topcoat::Result<()> {
 /// use topcoat::router::{Router, RouterBuilderDiscoverExt};
 ///
-/// let router = Router::builder()
-///     .discover()
-///     .build();
+/// let router = Router::builder().discover().build();
 ///
 /// topcoat::start(router).await?;
 /// # Ok(())
@@ -300,7 +298,7 @@ impl RouterBuilder {
     /// use topcoat::context::{Cx, app_context};
     /// use topcoat::router::Router;
     ///
-    /// struct Database { /* ... */ }
+    /// struct Database {/* ... */}
     /// # impl Database {
     /// #     fn connect() -> Self { Self {} }
     /// #     async fn fetch_user(&self, _id: u64) -> User { User }

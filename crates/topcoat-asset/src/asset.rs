@@ -241,8 +241,8 @@ fn normalize(path: &Path) -> PathBuf {
 ///
 /// # Examples
 ///
-/// ```ignore
-/// use topcoat_asset::{asset, Asset};
+/// ```rust
+/// use topcoat_asset::{Asset, asset};
 ///
 /// // Anchored to the crate root.
 /// const LOGO: Asset = asset!("assets/logo.png");
@@ -254,7 +254,7 @@ fn normalize(path: &Path) -> PathBuf {
 /// const FONT: Asset = asset!(
 ///     "https://example.com/font.woff2",
 ///     rename: "primary",
-///     checksum: "e3b0c44298fc1c149afbf4c8996fb924…",
+///     checksum: "e3b0c44298fc1c149afbf4c8996fb924",
 /// );
 /// ```
 #[macro_export]

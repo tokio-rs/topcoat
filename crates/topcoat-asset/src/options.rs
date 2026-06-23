@@ -110,14 +110,14 @@ const fn hash_opt_str(h: u64, s: Option<&str>) -> u64 {
 /// `name` (which expects a const string in scope of the same name).
 /// Omitted fields stay `None`.
 ///
-/// ```ignore
-/// use topcoat_asset::{asset_options, AssetOptions};
+/// ```rust
+/// use topcoat_asset::{AssetOptions, asset_options};
 ///
 /// const OPTS: AssetOptions = asset_options!(rename: "primary", extension: "woff2");
 /// ```
 #[macro_export]
 macro_rules! asset_options {
-    ($($field:ident $(: $expr:expr)?),*) => {{
+    ($($field:ident $(: $expr:expr)?),* $(,)?) => {{
         #[allow(clippy::needless_update)]
         $crate::AssetOptions {
             $($field: ::core::option::Option::Some(::std::borrow::Cow::Borrowed($($expr)?)),)*

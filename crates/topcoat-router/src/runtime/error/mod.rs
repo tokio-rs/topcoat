@@ -91,8 +91,8 @@ impl IntoResponse for Error {
 /// ```rust
 /// # struct User;
 /// # async fn lookup(_cx: &Cx, _id: u64) -> Option<User> { None }
-/// use topcoat::context::Cx;
 /// use topcoat::Result;
+/// use topcoat::context::Cx;
 /// use topcoat::router::RouterErrorExt;
 ///
 /// async fn fetch_user(cx: &Cx, id: u64) -> Result<User> {

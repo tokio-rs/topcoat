@@ -155,7 +155,7 @@ const BASE: &str = "group/button inline-flex shrink-0 items-center justify-cente
 /// Use it to give button styling to an element that is not a `<button>`, such
 /// as a link styled as a button:
 ///
-/// ```rust,ignore
+/// ```rust
 /// view! {
 ///     <a href="/login" class=(button_variants(ButtonVariant::Outline, ButtonSize::Default))>
 ///         "Sign in"
@@ -174,7 +174,7 @@ pub fn button_variants(variant: ButtonVariant, size: ButtonSize) -> String {
 /// forwarded to the underlying `<button>`. Child nodes become the button's
 /// content.
 ///
-/// ```rust,ignore
+/// ```rust
 /// view! {
 ///     button(
 ///         variant: ButtonVariant::Destructive,

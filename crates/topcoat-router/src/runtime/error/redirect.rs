@@ -11,8 +11,8 @@ use crate::runtime::{IntoResponse, Response};
 /// ```rust
 /// # struct User;
 /// # async fn lookup(_cx: &Cx, _id: u64) -> Option<User> { None }
-/// use topcoat::context::Cx;
 /// use topcoat::Result;
+/// use topcoat::context::Cx;
 /// use topcoat::router::redirect;
 ///
 /// async fn fetch_user(cx: &Cx, id: u64) -> Result<User> {
@@ -34,8 +34,8 @@ pub fn redirect(uri: &str) -> RedirectError {
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::context::Cx;
 /// use topcoat::Result;
+/// use topcoat::context::Cx;
 /// use topcoat::router::{page, redirect_permanent};
 ///
 /// #[page]

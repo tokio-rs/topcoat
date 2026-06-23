@@ -79,7 +79,11 @@ impl ToTokens for PathParam {
         }
 
         let of_fn = if is_str_ref(inner_ty) {
-            let lifetime = item.generics.lifetimes().next().map(|param| &param.lifetime);
+            let lifetime = item
+                .generics
+                .lifetimes()
+                .next()
+                .map(|param| &param.lifetime);
             quote! {
                 fn of(cx: & #lifetime ::topcoat::context::Cx) -> Self {
                     for (key, value) in ::topcoat::router::raw_path_params(cx) {

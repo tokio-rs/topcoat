@@ -25,10 +25,10 @@ use crate::runtime::context::Cx;
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::context::{Cx, app_context};
 ///
-/// struct Database { /* ... */ }
+/// struct Database {/* ... */}
 ///
 /// async fn load_user(cx: &Cx, id: u64) -> User {
 ///     let db: &Database = app_context(cx);
@@ -62,7 +62,7 @@ where
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::context::{Cx, request_context};
 ///
 /// struct RequestId(String);

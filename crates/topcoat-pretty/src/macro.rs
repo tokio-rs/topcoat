@@ -19,7 +19,7 @@ use crate::{BreakMode, Delim, PrettyPrint, Printer};
 ///
 /// The formatter uses this type with [`pretty_print_macro_str`] to reformat macro contents:
 ///
-/// ```rust,ignore
+/// ```rust
 /// // Parse and reformat a macro invocation based on its delimiter
 /// let result = pretty_print_macro_str::<Macro<topcoat_view::ast::view::View>>(
 ///     "{ <html><body>"format"</body></html> }",

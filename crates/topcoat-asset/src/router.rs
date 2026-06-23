@@ -100,7 +100,8 @@ pub trait RouterBuilderAssetExt {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// # #[topcoat::router::page("/")] async fn about() -> topcoat::Result { topcoat::view::view! {} }
     /// use topcoat::asset::{AssetBundle, RouterBuilderAssetExt};
     /// use topcoat::router::Router;
     ///
