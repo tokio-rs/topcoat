@@ -1,16 +1,26 @@
 Declares a typed view of the request's query string.
 
-Apply this attribute to a struct with named fields. The macro derives [`serde::Deserialize`] on the struct so it can be read with the [`query_params::<T>(cx)`](fn.query_params.html) function, which parses the query string of whichever request `cx` belongs to using [`serde_urlencoded`].
+Apply `#[query_params]` to a struct with named fields. The macro derives [`serde::Deserialize`], so each field maps to a key in the query string. Read the values with [`query_params::<T>(cx)`](fn.query_params.html) from any handler.
 
-The same struct can be used from any handler — it is not tied to a particular route. [`query_params`](fn.query_params.html) returns `Result<&T, &serde_urlencoded::de::Error>`, and parsing is memoized per request so repeated calls within one handler share the same parse result.
+```rust
+# use topcoat::router::query_params;
+#[query_params]
+struct PageQuery {
+    page: Option<u32>,
+}
+```
 
-# Examples
+# Reading the value
+
+[`query_params::<T>(cx)`](fn.query_params.html) parses the current request's query string with [`serde_urlencoded`] and returns `Result<&T, &serde_urlencoded::de::Error>`. Unlike a path parameter, the struct is not tied to a route — any handler can read it. Parsing runs at most once per request; the result is then memoized.
+
+# Example
 
 ```rust
 use topcoat::{
     context::Cx,
     Result,
-    router::{page, query_params},
+    router::{RouterErrorExt, page, query_params},
     view::view,
 };
 
@@ -19,10 +29,10 @@ struct PageQuery {
     page: Option<u32>,
 }
 
-#[page]
+#[page("/posts")]
 async fn posts(cx: &Cx) -> Result {
     // For `/posts?page=2`, this yields `Some(2)`.
-    let q = query_params::<PageQuery>(cx).unwrap();
+    let q = query_params::<PageQuery>(cx).ok_or_bad_request("invalid query string")?;
     view! {
         <div>
             "currently on page: " (q.page)
@@ -33,5 +43,5 @@ async fn posts(cx: &Cx) -> Result {
 
 # Requirements
 
-- The struct's fields must be deserializable by `serde_urlencoded` (use `Option<T>` for optional parameters, since `serde_urlencoded` does not apply `#[serde(default)]` automatically).
-- The struct must be `Send + Sync + 'static` to be memoized across the request.
+- Use `Option<T>` for optional keys. `serde_urlencoded` does not apply `#[serde(default)]`, so a missing key on a non-`Option` field is a parse error.
+- The struct must be `Send + Sync + 'static`, since it is memoized for the request.

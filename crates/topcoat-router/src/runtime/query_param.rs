@@ -15,35 +15,9 @@ pub trait QueryParams: Sized {
     fn query_params(cx: &Cx, _: QueryParamsSealed) -> Result<&Self, &serde_urlencoded::de::Error>;
 }
 
-/// Parses the request's query string into a typed
-/// [`#[query_params]`](attr.query_params.html) struct.
+/// Parses the request's query string into a typed struct.
 ///
-/// Returns `Result<&T, &serde_urlencoded::de::Error>`; the struct is
-/// deserialized once and memoized for the rest of the request, so repeated calls
-/// within one handler share the same parse result.
-///
-/// See [`#[query_params]`](attr.query_params.html) for declaring the struct.
-///
-/// # Examples
-///
-/// ```rust
-/// # use topcoat::{context::Cx, Result, router::{page, query_params}, view::view};
-/// #[query_params]
-/// struct PageQuery {
-///     page: Option<u32>,
-/// }
-///
-/// #[page]
-/// async fn posts(cx: &Cx) -> Result {
-///     // For `/posts?page=2`, this yields `Some(2)`.
-///     let q = query_params::<PageQuery>(cx).unwrap();
-///     view! {
-///         <div>
-///             "currently on page: " (q.page)
-///         </div>
-///     }
-/// }
-/// ```
+/// See [`#[query_params]`](attr.query_params.html) for details.
 #[inline]
 pub fn query_params<T: QueryParams>(cx: &Cx) -> Result<&T, &serde_urlencoded::de::Error> {
     T::query_params(cx, QueryParamsSealed::new())

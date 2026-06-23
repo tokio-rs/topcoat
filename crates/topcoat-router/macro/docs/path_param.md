@@ -1,24 +1,50 @@
-Declares a typed view of a path parameter.
+Declares a typed path parameter.
 
-Apply this attribute to a tuple struct with a single unnamed field. The struct name, snake-cased, becomes the parameter's name; the inner type defines how the raw string is parsed.
+Apply `#[path_param]` to a tuple struct with a single field. The struct sets up three things:
 
-# Pairing with the route's URL
+- **Name** — the struct name, snake-cased, is the parameter's name (`PostId` → `post_id`).
+- **Parsing** — the inner type decides how the raw URL segment is parsed.
+- **Access** — read the value with [`path_param::<PostId>(cx)`](fn.path_param.html) from any handler.
 
-`#[path_param]` only declares how to read a parameter — it does not by itself decide which URL segment carries that parameter. How the param gets into the URL depends on which router you use:
+```rust
+# use topcoat::router::path_param;
+#[path_param]
+struct PostId(uuid::Uuid);
+```
 
-- **Module router** ([`module_router!`](../router/macro.module_router.html)) — the macro also emits a [`segment!`](macro@segment)`(kind = Param, rename = "...")` for the enclosing module. The module's URL segment is replaced by the parameter, so a `PostId` defined anywhere in module `app::posts::id` turns that module into `{post_id}` in the URL.
-- **Regular [`Router`](../router/struct.Router.html)** — the page's path string is the source of truth. Include a matching parameter name in the [`#[page("...")]`](macro@page) path; the snake-cased struct name must equal the `{...}` placeholder for [`path_param`](fn.path_param.html) to find the value. The [`segment!`](macro@segment) emitted by the macro is inert for this router.
+# Reading the value
 
-# Reading the parameter
+[`path_param::<T>(cx)`](fn.path_param.html) returns the parameter. The return type follows the inner type:
 
-Read the parameter with the [`path_param::<T>(cx)`](fn.path_param.html) function. Its return type depends on the inner type:
+- **`&str`** — returns the struct directly, borrowing the raw segment (no parsing).
+- **Anything else** — returns `Result<&T, &<Inner as FromStr>::Err>`, parsed with [`FromStr`](core::str::FromStr).
 
-- **`&str`** — returns the param struct directly, borrowing the segment value.
-- **Any other type** — returns `Result<&T, &<Inner as FromStr>::Err>`, parsed via [`FromStr`](core::str::FromStr). Parsing is memoized per request, so repeated calls within a handler do not re-parse.
+Parsing runs at most once per request; the result is then memoized. The struct also [`Deref`](core::ops::Deref)s to its inner type, so you can use the value as if it were that type.
 
-A [`Deref`](core::ops::Deref) impl to the inner type is also generated.
+# Matching the URL segment
+
+The parameter's name has to line up with a `{name}` segment in the route's URL. How that segment gets there depends on how the route is registered:
+
+- **Explicit path** — write the placeholder yourself, so `PostId` must appear as `{post_id}`:
+  `#[page("/posts/{post_id}")]`.
+- **[`module_router!`](../router/macro.module_router.html)** — defining a `#[path_param]` inside a module turns that module's own segment into the parameter, so there is no placeholder to write. A `PostId` in `src/app/posts/id/mod.rs` makes the `id` module render as `{post_id}`.
 
 # Examples
+
+## Explicit path
+
+```rust
+# use topcoat::{context::Cx, Result, router::{RouterErrorExt, page, path_param}, view::view};
+// The placeholder `{post_id}` matches the snake-cased struct name `PostId`.
+#[path_param]
+struct PostId(uuid::Uuid);
+
+#[page("/posts/{post_id}")]
+async fn post_page(cx: &Cx) -> Result {
+    let post_id = path_param::<PostId>(cx).ok_or_redirect("/invalid-id")?;
+    view! { "showing post with id: " (post_id.to_string()) }
+}
+```
 
 ## Module router
 
@@ -41,30 +67,15 @@ async fn post_page(cx: &Cx) -> Result {
 }
 ```
 
-## Regular router
-
-```rust
-# use topcoat::{context::Cx, Result, router::{RouterErrorExt, page, path_param}, view::view};
-// The placeholder `{post_id}` matches the snake-cased struct name `PostId`.
-#[path_param]
-struct PostId(uuid::Uuid);
-
-#[page("/posts/{post_id}")]
-async fn post_page(cx: &Cx) -> Result {
-    let post_id = path_param::<PostId>(cx).ok_or_redirect("/invalid-id")?;
-    view! { "showing post with id: " (post_id.to_string()) }
-}
-```
-
-## Borrowed `&str` inner type
+## Borrowed `&str`
 
 ```rust
 # use topcoat::{context::Cx, Result, router::{page, path_param}, view::view};
-// No parsing — the raw segment value is exposed directly.
+// A `&str` inner type skips parsing and borrows the raw segment.
 #[path_param]
 struct Slug<'a>(&'a str);
 
-#[page]
+#[page("/posts/{slug}")]
 async fn show(cx: &Cx) -> Result {
     let slug = path_param::<Slug>(cx); // `Slug<'_>`
     view! { "slug: " (&**slug) }
@@ -73,5 +84,5 @@ async fn show(cx: &Cx) -> Result {
 
 # Requirements
 
-- The item must be a tuple struct with exactly one unnamed field.
-- For non-`&str` inner types, the inner type must implement [`FromStr`](core::str::FromStr) and meet the requirements of [`#[memoize]`](macro@memoize) (the parsed `Result` must be `Send + Sync + 'static`).
+- The struct must be a tuple struct with exactly one field.
+- A non-`&str` inner type must implement [`FromStr`](core::str::FromStr), and its parsed `Result` must be `Send + Sync + 'static` so it can be [memoized](macro@memoize) for the request.

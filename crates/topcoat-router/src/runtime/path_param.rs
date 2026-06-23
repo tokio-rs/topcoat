@@ -25,31 +25,9 @@ pub trait PathParam {
     fn path_param(cx: &Cx, _: PathParamSealed) -> Self::Output<'_>;
 }
 
-/// Reads a typed [`#[path_param]`](attr.path_param.html) value out of the
-/// matched route's path.
+/// Reads a typed path parameter from the matched route's path.
 ///
-/// The return type depends on the param struct's inner type:
-///
-/// - **`&str`** — returns the param struct directly, borrowing the raw segment.
-/// - **Any other type** — returns `Result<&T, &<Inner as FromStr>::Err>`, parsed via
-///   [`FromStr`](core::str::FromStr) and memoized per request.
-///
-/// See [`#[path_param]`](attr.path_param.html) for declaring the struct and
-/// pairing it with the route's URL.
-///
-/// # Examples
-///
-/// ```rust
-/// # use topcoat::{context::Cx, Result, router::{RouterErrorExt, page, path_param}, view::view};
-/// #[path_param]
-/// struct PostId(uuid::Uuid);
-///
-/// #[page("/posts/{post_id}")]
-/// async fn post_page(cx: &Cx) -> Result {
-///     let post_id = path_param::<PostId>(cx).ok_or_redirect("/invalid-id")?;
-///     view! { "showing post with id: " (post_id.to_string()) }
-/// }
-/// ```
+/// See [`#[path_param]`](attr.path_param.html) for details.
 #[inline]
 #[must_use]
 pub fn path_param<T: PathParam>(cx: &Cx) -> T::Output<'_> {

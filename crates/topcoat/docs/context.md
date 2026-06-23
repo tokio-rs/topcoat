@@ -57,13 +57,13 @@ fn request_id(cx: &Cx) -> Option<&str> {
 
 # Path and query helpers
 
-Path and query parameter macros declare typed structs that you read with the [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params) functions. They parse lazily and memoize the parsed value for the request.
+The attribute macros [`#[path_param]`](macro@crate::router::path_param) and [`#[query_params]`](macro@crate::router::query_params) declare typed structs that you read with the [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params) functions. They parse lazily and memoize the parsed value for the request.
 
 ```rust
 use topcoat::{
     Result,
     context::Cx,
-    router::{page, path_param, query_params},
+    router::{RouterErrorExt, page, path_param, query_params},
     view::view,
 };
 
@@ -77,8 +77,8 @@ struct PostQuery {
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
-    let post_id = path_param::<PostId>(cx).unwrap();
-    let query = query_params::<PostQuery>(cx).unwrap();
+    let post_id = path_param::<PostId>(cx).ok_or_bad_request("invalid post id")?;
+    let query = query_params::<PostQuery>(cx).ok_or_bad_request("invalid query string")?;
 
     view! {
         <article data-preview=(query.preview.unwrap_or(false))>
@@ -88,7 +88,7 @@ async fn post(cx: &Cx) -> Result {
 }
 ```
 
-See [`#[path_param]`](macro@crate::router::path_param) and [`#[query_params]`](macro@crate::router::query_params) for declaring the structs, and [`path_param`](fn@crate::router::path_param) and [`query_params`](fn@crate::router::query_params) for the exact return types and parsing rules.
+This means your params are available anywhere you have access to a `cx`. See the attribute macro's documentation for more details.
 
 # App and request context helpers
 

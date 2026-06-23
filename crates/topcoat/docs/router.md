@@ -87,16 +87,18 @@ Returning a bare value only works if its type implements [`IntoResponse`]; a pla
 
 # Path and query parameters
 
-Handlers read typed values out of the URL with two attributes. Each declares a struct you read with a free function whose result is parsed once and memoized for the rest of the request:
+Two attribute macros declare typed structs for reading values out of a request. You declare a struct, then read it with a free function from any handler that has a `cx`:
 
-- [`#[path_param]`](macro@path_param), read with [`path_param::<T>(cx)`](fn@path_param) — a typed view of a single path segment, like the `{post_id}` in `/posts/{post_id}`.
-- [`#[query_params]`](macro@query_params), read with [`query_params::<T>(cx)`](fn@query_params) — a typed view of the request's query string, deserialized into a struct.
+- [`#[path_param]`](macro@path_param) — one dynamic path segment (like the `{post_id}` in `/posts/{post_id}`), read with [`path_param::<T>(cx)`](fn@path_param).
+- [`#[query_params]`](macro@query_params) — the request's query string deserialized into a struct, read with [`query_params::<T>(cx)`](fn@query_params).
+
+Both parse lazily and memoize the result for the rest of the request.
 
 ```rust
 use topcoat::{
     Result,
     context::Cx,
-    router::{page, path_param, query_params},
+    router::{RouterErrorExt, page, path_param, query_params},
     view::view,
 };
 
@@ -110,13 +112,13 @@ struct PostQuery {
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
-    let post_id = path_param::<PostId>(cx).unwrap();
-    let query = query_params::<PostQuery>(cx).unwrap();
+    let post_id = path_param::<PostId>(cx).ok_or_bad_request("invalid post id")?;
+    let query = query_params::<PostQuery>(cx).ok_or_bad_request("invalid query string")?;
     view! { /* ... */ }
 }
 ```
 
-See [`#[path_param]`](macro@path_param) and [`#[query_params]`](macro@query_params) for how parameters pair with the URL (module router versus explicit paths), the exact return types, and their requirements.
+See [`#[path_param]`](macro@path_param) and [`#[query_params]`](macro@query_params) for details.
 
 # Pages
 
