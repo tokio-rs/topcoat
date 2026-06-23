@@ -10,7 +10,10 @@ use crate::runtime::{IntoResponse, Response};
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
+/// # use topcoat::Error;
+/// # struct Dashboard;
+/// # async fn fetch_dashboard(_cx: &Cx) -> Result<Dashboard, Error> { Ok(Dashboard) }
 /// use topcoat::context::Cx;
 /// use topcoat::Result;
 /// use topcoat::router::internal_server_error;

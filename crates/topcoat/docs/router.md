@@ -19,7 +19,7 @@ The root path is `/`. Non-root paths must start with `/` and may not contain emp
 
 An API route is an async function annotated with [`#[route]`](route) and an explicit HTTP method and path:
 
-```rust,ignore
+```rust
 use topcoat::{Result, router::route};
 
 #[route(GET "/api/health")]
@@ -34,7 +34,9 @@ Route handlers can also read request bodies and return structured responses, the
 
 A page or route handler can take the request context as `cx: &`[`Cx`](crate::context::Cx) and, alongside it, a single request body parameter. That parameter can be any type that implements [`FromRequest`]. API routes additionally return `Result<T>` where `T:` [`IntoResponse`].
 
-```rust,ignore
+```rust
+# #[derive(serde::Deserialize)] struct CreateUser { name: String }
+# #[derive(serde::Serialize)] struct User { name: String }
 use topcoat::{
     Result,
     context::Cx,
@@ -44,6 +46,7 @@ use topcoat::{
 #[route(POST "/api/users")]
 async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User>> {
     // ...
+#     Ok(Json(User { name: input.name }))
 }
 ```
 
@@ -71,7 +74,9 @@ When none of the built-in extractors fit, implement [`FromRequest`] for your own
 
 A route returns `Result<T>` where `T:` [`IntoResponse`]. Topcoat implements [`IntoResponse`] for common shapes — strings, status codes, byte buffers, [`Body`], [`Response`], and tuples like `(StatusCode, value)` and `(headers, value)` — as well as the wrappers [`Json<T>`](Json), [`Form<T>`](Form), and [`Html<T>`](Html).
 
-```rust,ignore
+```rust
+# use topcoat::{Result, router::{Json, route}};
+# #[derive(serde::Serialize)] struct User {}
 #[route(GET "/api/user")]
 async fn user() -> Result<Json<User>> {
     Ok(Json(User { /* ... */ }))
@@ -87,7 +92,7 @@ Handlers read typed values out of the URL with two attributes. Each generates an
 - [`#[path_param]`](path_param) — a typed view of a single path segment, like the `{post_id}` in `/posts/{post_id}`.
 - [`#[query_params]`](query_params) — a typed view of the request's query string, deserialized into a struct.
 
-```rust,ignore
+```rust
 use topcoat::{
     Result,
     context::Cx,
@@ -117,7 +122,7 @@ See [`#[path_param]`](path_param) and [`#[query_params]`](query_params) for how 
 
 A page is an async function annotated with [`#[page]`](page) and an explicit path:
 
-```rust,ignore
+```rust
 use topcoat::{Result, router::page, view::view};
 
 #[page("/")]
@@ -133,7 +138,8 @@ async fn about() -> Result {
 
 Dynamic and wildcard paths work the same way:
 
-```rust,ignore
+```rust
+# use topcoat::{Result, router::page, view::view};
 #[page("/users/{id}")]
 async fn user_profile() -> Result {
     view! { <h1>"User profile"</h1> }

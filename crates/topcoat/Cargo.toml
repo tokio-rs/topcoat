@@ -82,6 +82,7 @@ tokio-tungstenite.workspace = true
 reqwest = { workspace = true, features = ["json"] }
 serde_json.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

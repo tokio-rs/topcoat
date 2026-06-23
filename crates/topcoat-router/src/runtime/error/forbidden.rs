@@ -10,7 +10,11 @@ use crate::runtime::{IntoResponse, Response};
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
+/// # use topcoat::view::View;
+/// # struct User;
+/// # impl User { fn is_admin(&self) -> bool { true } }
+/// # fn render_admin(_cx: &Cx) -> View { View::default() }
 /// use topcoat::context::Cx;
 /// use topcoat::Result;
 /// use topcoat::router::forbidden;

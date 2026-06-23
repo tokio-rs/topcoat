@@ -7,7 +7,9 @@ use crate::runtime::{IntoResponse, Response};
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
+/// # struct User;
+/// # async fn lookup(_cx: &Cx, _id: u64) -> Option<User> { None }
 /// use topcoat::context::Cx;
 /// use topcoat::Result;
 /// use topcoat::router::not_found;

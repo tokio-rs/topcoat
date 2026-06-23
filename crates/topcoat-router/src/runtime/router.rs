@@ -19,7 +19,8 @@ use crate::runtime::{
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
+/// # async fn example() -> topcoat::Result<()> {
 /// use topcoat::router::{Router, RouterBuilderDiscoverExt};
 ///
 /// let router = Router::builder()
@@ -27,6 +28,8 @@ use crate::runtime::{
 ///     .build();
 ///
 /// topcoat::start(router).await?;
+/// # Ok(())
+/// # }
 /// ```
 pub struct Router {
     /// The registered routes, indexed by the values stored in `endpoints`.
@@ -124,7 +127,9 @@ fn layers_for(path: &Path, layers: &[Box<dyn Layer>]) -> Vec<usize> {
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
+/// # struct AppConfig;
+/// # impl AppConfig { fn load() -> Self { Self } }
 /// use topcoat::{
 ///     asset::{AssetBundle, RouterBuilderAssetExt},
 ///     cookie::RouterBuilderCookieExt,
@@ -287,11 +292,19 @@ impl RouterBuilder {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// # use topcoat::{Result, router::route};
+    /// # struct User;
+    /// # #[route(GET "/users")]
+    /// # async fn get_user() -> Result<&'static str> { Ok("ok") }
     /// use topcoat::context::{Cx, app_context};
     /// use topcoat::router::Router;
     ///
     /// struct Database { /* ... */ }
+    /// # impl Database {
+    /// #     fn connect() -> Self { Self {} }
+    /// #     async fn fetch_user(&self, _id: u64) -> User { User }
+    /// # }
     ///
     /// pub fn router() -> Router {
     ///     Router::builder()
@@ -302,7 +315,7 @@ impl RouterBuilder {
     ///
     /// async fn fetch_user(cx: &Cx, id: u64) -> User {
     ///     let db: &Database = app_context(cx);
-    ///     db.fetch_user(id).await;
+    ///     db.fetch_user(id).await
     /// }
     /// ```
     pub fn app_context<T>(mut self, value: T) -> Self

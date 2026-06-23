@@ -27,7 +27,7 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use std::borrow::Cow;
 /// use topcoat::context::Cx;
 /// use topcoat::router::{Body, Layer, LayerFuture, Next, Path};

@@ -6,7 +6,12 @@ This is the per-request equivalent of memoization in libraries like React's `cac
 
 Annotate any function that takes a `cx: &Cx` parameter:
 
-```rust,ignore
+```rust
+# fn main() {}
+# struct User;
+# mod db {
+#     pub async fn load_user(_id: i64) -> super::User { super::User }
+# }
 use topcoat::context::{Cx, memoize};
 
 #[memoize]
@@ -23,7 +28,15 @@ Top-level `Option<T>` and `Result<T, E>` return types are borrowed ergonomically
 
 `#[memoize]` works on both synchronous and `async` functions. Pick whichever matches your work; the macro handles the rest.
 
-```rust,ignore
+```rust
+# fn main() {}
+# use topcoat::context::{Cx, memoize};
+# #[derive(serde::Deserialize)]
+# struct Config;
+# struct Post;
+# mod db {
+#     pub async fn load_post(_slug: &str) -> super::Post { super::Post }
+# }
 #[memoize]
 fn parse_config(cx: &Cx, raw: &str) -> Config {
     serde_json::from_str(raw).unwrap()
@@ -41,16 +54,19 @@ For async functions, concurrent callers with the same arguments share a single i
 
 Every argument except `cx` is part of the cache key. Two calls hit the same cache entry if and only if every non-`cx` argument is equal.
 
-```rust,ignore
+```rust
+# use topcoat::context::{Cx, memoize};
 #[memoize]
 fn add(cx: &Cx, x: i32, y: i32) -> i32 {
     println!("computing");
     x + y
 }
 
+# fn example(cx: &Cx) {
 add(cx, 1, 2); // prints "computing", returns 3
 add(cx, 1, 2); // returns 3 from cache
 add(cx, 1, 3); // prints "computing", returns 4 (different args)
+# }
 ```
 
 Each `#[memoize]` function has its own independent cache slot, so two functions with the same argument types don't collide.
@@ -59,14 +75,25 @@ Each `#[memoize]` function has its own independent cache slot, so two functions 
 
 Arguments can be passed by value or by reference. Borrowed arguments avoid cloning on cache hits; on a miss the value is cloned once into the cache.
 
-```rust,ignore
+```rust
+# fn main() {}
+# use topcoat::context::{Cx, memoize};
+# struct Record;
+# struct Error;
+# mod db {
+#     pub async fn find(_name: &str) -> Result<super::Record, super::Error> { Ok(super::Record) }
+# }
 #[memoize]
 async fn lookup(cx: &Cx, name: &str) -> Result<Record, Error> {
     db::find(name).await
 }
 
+# async fn example(cx: &Cx) -> Result<(), &Error> {
 let record = lookup(cx, "alice").await?; // computes; stores "alice".to_owned() as the key
 let record = lookup(cx, "alice").await?; // cache hit, no allocation
+# let _ = record;
+# Ok(())
+# }
 ```
 
 # Requirements
@@ -92,7 +119,12 @@ It is *not* a substitute for a long-lived cache (Redis, an LRU, etc.). Cross-req
 
 # Example: shared user lookup
 
-```rust,ignore
+```rust
+# fn main() {}
+# struct User { name: String }
+# mod auth {
+#     pub async fn resolve(_cx: &topcoat::context::Cx) -> Option<super::User> { None }
+# }
 use topcoat::{
     context::{Cx, memoize},
     Result,
@@ -110,10 +142,12 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
     let user = current_user(cx).await; // computes once
     view! {
         <header>
-            (match user {
-                Some(u) => view! { "Hello, " (u.name.clone()) },
-                None => view! { <a href="/login">"Sign in"</a> },
-            })
+            match user {
+                Some(u) => {
+                    "Hello, " (u.name.clone())
+                },
+                None => <a href="/login">"Sign in"</a>,
+            }
         </header>
         (slot.await?)
     }

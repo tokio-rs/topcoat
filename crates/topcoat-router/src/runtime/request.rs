@@ -27,7 +27,10 @@ pub type Request<T = Body> = http::Request<T>;
 /// JSON whose body is verified against an `x-signature` header before it is
 /// deserialized:
 ///
-/// ```rust,ignore
+/// ```rust
+/// # #[derive(serde::Deserialize)]
+/// # struct CreateUser { name: String }
+/// # fn verify_signature(_signature: &str, _bytes: &[u8]) -> topcoat::Result<()> { Ok(()) }
 /// use serde::de::DeserializeOwned;
 /// use topcoat::{
 ///     Result,

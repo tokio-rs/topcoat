@@ -34,7 +34,7 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// Implement it for a domain type that should control its own status, headers,
 /// or body:
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::{
 ///     Result,
 ///     router::{Body, IntoResponse, Response, route},

@@ -2312,6 +2312,7 @@ dependencies = [
  "topcoat-tailwind",
  "topcoat-view",
  "topcoat-view-macro",
+ "uuid",
 ]
 
 [[package]]
@@ -2392,6 +2393,8 @@ name = "topcoat-core-macro"
 version = "0.1.0"
 dependencies = [
  "quote",
+ "serde",
+ "serde_json",
  "syn",
  "topcoat",
  "topcoat-core",

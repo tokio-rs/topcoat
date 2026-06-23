@@ -10,11 +10,11 @@ use crate::runtime::{IntoResponse, Response};
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::Result;
 /// use topcoat::router::bad_request;
 ///
-/// async fn update_user(name: String) -> Result {
+/// async fn update_user(name: String) -> Result<()> {
 ///     if name.trim().is_empty() {
 ///         return Err(bad_request("name cannot be empty").into());
 ///     }

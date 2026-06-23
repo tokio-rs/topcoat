@@ -11,9 +11,8 @@ use crate::runtime::{Body, IntoResponse, Response};
 ///
 /// # Examples
 ///
-/// ```rust,ignore
-/// use topcoat::Method;
-/// use topcoat::router::method_not_allowed;
+/// ```rust
+/// use topcoat::router::{Method, method_not_allowed};
 ///
 /// let error = method_not_allowed([Method::GET, Method::POST]);
 /// ```

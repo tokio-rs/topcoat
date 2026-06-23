@@ -8,7 +8,9 @@ use crate::runtime::{IntoResponse, Response};
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
+/// # struct User;
+/// # async fn lookup(_cx: &Cx, _id: u64) -> Option<User> { None }
 /// use topcoat::context::Cx;
 /// use topcoat::Result;
 /// use topcoat::router::redirect;
@@ -31,7 +33,7 @@ pub fn redirect(uri: &str) -> RedirectError {
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::context::Cx;
 /// use topcoat::Result;
 /// use topcoat::router::{page, redirect_permanent};

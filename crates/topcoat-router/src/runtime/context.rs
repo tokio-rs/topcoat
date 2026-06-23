@@ -11,7 +11,7 @@ use crate::runtime::RawPathParams;
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::{context::Cx, router::parts};
 ///
 /// async fn log_request(cx: &Cx) {
@@ -31,7 +31,7 @@ pub fn parts(cx: &Cx) -> &Parts {
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::{context::Cx, router::method};
 ///
 /// async fn is_post(cx: &Cx) -> bool {
@@ -50,7 +50,7 @@ pub fn method(cx: &Cx) -> &http::Method {
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::{context::Cx, router::uri};
 ///
 /// async fn current_path(cx: &Cx) -> &str {
@@ -69,7 +69,7 @@ pub fn uri(cx: &Cx) -> &http::Uri {
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::{context::Cx, router::version};
 ///
 /// async fn is_http2(cx: &Cx) -> bool {
@@ -88,7 +88,7 @@ pub fn version(cx: &Cx) -> &http::Version {
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::{context::Cx, router::headers};
 ///
 /// async fn user_agent(cx: &Cx) -> Option<&str> {
@@ -106,7 +106,7 @@ pub fn headers(cx: &Cx) -> &http::HeaderMap {
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::{context::Cx, router::content_type};
 ///
 /// async fn is_json(cx: &Cx) -> bool {
@@ -128,7 +128,7 @@ pub fn content_type(cx: &Cx) -> Option<&str> {
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::{context::Cx, router::extensions};
 ///
 /// struct RequestId(String);

@@ -26,7 +26,7 @@ use crate::runtime::{
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use topcoat::{
 ///     Result,
 ///     router::{Json, route},
