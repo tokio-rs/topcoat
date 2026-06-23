@@ -2507,11 +2507,8 @@ name = "topcoat-view"
 version = "0.1.0"
 dependencies = [
  "heck",
- "inventory",
  "proc-macro2",
  "quote",
- "serde",
- "serde_json",
  "syn",
  "topcoat",
  "topcoat-core",

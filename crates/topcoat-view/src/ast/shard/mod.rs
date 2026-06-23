@@ -68,13 +68,14 @@ impl ToTokens for Shard {
         }
         .to_tokens(tokens);
 
-        if cfg!(feature = "discover") {
-            quote! {
-                ::topcoat::internal::inventory::submit! {
-                    &#ident as &'static dyn ::topcoat::runtime::DynShard
-                }
-            }
-            .to_tokens(tokens);
-        }
+        // TODO
+        // if cfg!(feature = "discover") {
+        //     quote! {
+        //         ::topcoat::internal::inventory::submit! {
+        //             &#ident as &'static dyn ::topcoat::runtime::DynShard
+        //         }
+        //     }
+        //     .to_tokens(tokens);
+        // }
     }
 }

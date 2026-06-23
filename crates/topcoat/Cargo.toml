@@ -24,7 +24,6 @@ discover = [
 	"topcoat-router-macro?/discover",
 	"topcoat-router?/discover",
 	"topcoat-runtime?/discover",
-	"topcoat-view?/discover",
 ]
 multipart = [
 	"router",
