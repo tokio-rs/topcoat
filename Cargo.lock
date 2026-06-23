@@ -2327,6 +2327,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "toml",
+ "topcoat",
  "topcoat-core",
  "topcoat-router",
  "topcoat-view",
@@ -2348,6 +2349,7 @@ dependencies = [
  "serde_json",
  "syn",
  "tokio",
+ "topcoat",
  "topcoat-asset",
  "topcoat-pretty",
  "topcoat-ui",
@@ -2363,6 +2365,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "topcoat",
  "topcoat-core",
  "topcoat-router",
 ]
@@ -2381,6 +2384,7 @@ dependencies = [
  "quote",
  "syn",
  "tokio",
+ "topcoat",
 ]
 
 [[package]]
@@ -2389,6 +2393,7 @@ version = "0.1.0"
 dependencies = [
  "quote",
  "syn",
+ "topcoat",
  "topcoat-core",
 ]
 
@@ -2400,6 +2405,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+ "topcoat",
 ]
 
 [[package]]
@@ -2430,6 +2436,7 @@ dependencies = [
  "syn",
  "thiserror",
  "tokio",
+ "topcoat",
  "topcoat-core",
  "topcoat-view",
  "tower",
@@ -2442,6 +2449,7 @@ version = "0.1.0"
 dependencies = [
  "quote",
  "syn",
+ "topcoat",
  "topcoat-router",
 ]
 
@@ -2456,6 +2464,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn",
+ "topcoat",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-router",
@@ -2469,6 +2478,7 @@ version = "0.1.0"
 dependencies = [
  "quote",
  "syn",
+ "topcoat",
  "topcoat-runtime",
 ]
 
@@ -2477,6 +2487,7 @@ name = "topcoat-tailwind"
 version = "0.1.0"
 dependencies = [
  "thiserror",
+ "topcoat",
  "ureq",
 ]
 
@@ -2489,6 +2500,7 @@ dependencies = [
  "sha2 0.11.0",
  "thiserror",
  "toml",
+ "topcoat",
 ]
 
 [[package]]
@@ -2502,6 +2514,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn",
+ "topcoat",
  "topcoat-core",
  "topcoat-pretty",
  "uuid",
@@ -2513,6 +2526,7 @@ version = "0.1.0"
 dependencies = [
  "quote",
  "syn",
+ "topcoat",
  "topcoat-view",
 ]
 

@@ -15,5 +15,8 @@ topcoat-router = { workspace = true, features = ["parsing"] }
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
+[dev-dependencies]
+topcoat = { workspace = true, features = ["router"] }
+
 [lints]
 workspace = true

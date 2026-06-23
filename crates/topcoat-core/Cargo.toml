@@ -23,6 +23,7 @@ syn = { workspace = true, optional = true, features = ["full"] }
 tokio = { workspace = true, features = ["rt", "sync"] }
 
 [dev-dependencies]
+topcoat.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]

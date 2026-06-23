@@ -24,6 +24,7 @@ serde_json.workspace = true
 uuid = { workspace = true, features = ["v4", "serde"] }
 
 [dev-dependencies]
+topcoat = { workspace = true, features = ["view"] }
 topcoat-pretty.workspace = true
 
 [lints]

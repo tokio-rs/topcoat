@@ -36,5 +36,8 @@ thiserror.workspace = true
 tokio = { workspace = true, optional = true, features = ["fs", "rt"] }
 toml.workspace = true
 
+[dev-dependencies]
+topcoat = { workspace = true, features = ["asset"] }
+
 [lints]
 workspace = true

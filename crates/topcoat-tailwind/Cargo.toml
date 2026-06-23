@@ -11,5 +11,8 @@ build = ["dep:thiserror", "dep:ureq"]
 thiserror = { workspace = true, optional = true }
 ureq = { workspace = true, optional = true }
 
+[dev-dependencies]
+topcoat = { workspace = true, features = ["tailwind"] }
+
 [lints]
 workspace = true

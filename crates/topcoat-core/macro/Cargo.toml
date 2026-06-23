@@ -12,5 +12,8 @@ topcoat-core = { workspace = true, features = ["parsing"] }
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
+[dev-dependencies]
+topcoat.workspace = true
+
 [lints]
 workspace = true
