@@ -19,7 +19,7 @@ use crate::{Cookie, Cookies};
 ///
 /// Obtain one by reading the incoming cookie through [`cookie_store`]:
 ///
-/// ```rust,ignore
+/// ```rust
 /// use serde::{Deserialize, Serialize};
 /// use topcoat::{
 ///     Result,
@@ -94,11 +94,24 @@ where
     ///
     /// Like every mutation, this is not persisted until [`commit`](Self::commit).
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// # use serde::{Deserialize, Serialize};
+    /// # use topcoat::{
+    /// #     Result,
+    /// #     context::Cx,
+    /// #     cookie::{cookie_store, private_cookies},
+    /// # };
+    /// # #[derive(Default, Serialize, Deserialize)]
+    /// # struct Cart {
+    /// #     items: Vec<String>,
+    /// # }
+    /// # fn example(cx: &Cx) -> Result<(), topcoat::Error> {
     /// let cart = cookie_store::<Cart, _>(private_cookies(cx), "cart")
     ///     .parse_or_default()
     ///     .update(|cart| cart.items.push("widget".to_owned()))
     ///     .commit()?;
+    /// #     Ok(())
+    /// # }
     /// ```
     pub fn update<F>(mut self, f: F) -> Self
     where
@@ -169,10 +182,23 @@ where
     /// contents. The value is not written until the returned store is
     /// [`commit`](CookieStore::commit)ted.
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// # use serde::{Deserialize, Serialize};
+    /// # use topcoat::{
+    /// #     Result,
+    /// #     context::Cx,
+    /// #     cookie::{cookie_store, private_cookies},
+    /// # };
+    /// # #[derive(Default, Serialize, Deserialize)]
+    /// # struct Cart {
+    /// #     items: Vec<String>,
+    /// # }
+    /// # fn example(cx: &Cx) -> Result<(), topcoat::Error> {
     /// cookie_store::<Cart, _>(private_cookies(cx), "cart")
     ///     .set(Cart::default())
     ///     .commit()?;
+    /// #     Ok(())
+    /// # }
     /// ```
     pub fn set(self, value: T) -> CookieStore<T, J> {
         CookieStore::new(self.jar, self.key, value)
@@ -233,8 +259,21 @@ where
 /// `jar` is any [`Cookies`] jar, so signing, encryption, prefixes, and default
 /// attributes compose through it. Specify the stored type as `T`:
 ///
-/// ```rust,ignore
+/// ```rust
+/// # use serde::{Deserialize, Serialize};
+/// # use topcoat::{
+/// #     Result,
+/// #     context::Cx,
+/// #     cookie::{cookie_store, private_cookies},
+/// # };
+/// # #[derive(Default, Serialize, Deserialize)]
+/// # struct Cart {
+/// #     items: Vec<String>,
+/// # }
+/// # fn example(cx: &Cx) -> Result<(), topcoat::Error> {
 /// let cart = cookie_store::<Cart, _>(private_cookies(cx), "cart").parse_or_default();
+/// #     Ok(())
+/// # }
 /// ```
 pub fn cookie_store<T, J>(jar: J, key: impl Into<Cow<'static, str>>) -> UnparsedCookieStore<T, J>
 where
