@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-discover = ["dep:inventory"]
 parsing = ["proc-macro2/span-locations", "topcoat-core/parsing", "dep:heck"]
 pretty = ["parsing", "dep:topcoat-pretty"]
 
@@ -13,14 +12,11 @@ topcoat-core.workspace = true
 topcoat-pretty = { workspace = true, optional = true }
 
 heck = { workspace = true, optional = true }
-inventory = { workspace = true, optional = true }
 proc-macro2.workspace = true
 quote.workspace = true
 syn = { workspace = true, features = ["full", "extra-traits", "visit-mut"] }
 
 # TODO: Feature flag?
-serde.workspace = true
-serde_json.workspace = true
 uuid = { workspace = true, features = ["v4", "serde"] }
 
 [dev-dependencies]

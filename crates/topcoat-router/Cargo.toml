@@ -44,9 +44,7 @@ serde_json.workspace = true
 serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
 syn = { workspace = true, optional = true, features = ["full"] }
-thiserror.workspace = true
 tokio = { workspace = true, features = ["net", "rt"] }
-tower.workspace = true
 uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]

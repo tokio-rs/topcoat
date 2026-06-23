@@ -70,7 +70,6 @@ topcoat-tailwind = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
 topcoat-view-macro = { workspace = true, optional = true }
 
-axum.workspace = true
 futures-util.workspace = true
 inventory = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
