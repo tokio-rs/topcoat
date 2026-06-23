@@ -2,7 +2,9 @@ The [`attributes!`] macro builds a [`topcoat::view::Attributes`] value from Topc
 
 Use it when attributes need to be passed around, assembled outside a [`view!`] call, changed at runtime, or forwarded through components.
 
-```rust,ignore
+```rust
+# #[topcoat::view::component]
+# async fn example() -> topcoat::Result {
 use topcoat::view::{attributes, view};
 
 let attrs = attributes! {
@@ -14,6 +16,7 @@ let attrs = attributes! {
 view! {
     <button (attrs)>"Save"</button>
 }
+# }
 ```
 
 # Syntax
@@ -22,8 +25,10 @@ The body of [`attributes!`] has the same syntax as attributes inside an element 
 
 That includes literal attributes, expression values, dynamic names, binding attributes, event handlers, and attribute-level control flow:
 
-```rust,ignore
-use topcoat::view::attributes;
+```rust
+# #[topcoat::view::component]
+# async fn example() -> topcoat::Result {
+use topcoat::view::{attributes, view};
 
 let id = "submit";
 let extra = [
@@ -52,6 +57,8 @@ let attrs = attributes! {
         _ => aria-label="Button",
     }
 };
+# view! { <button (attrs)></button> }
+# }
 ```
 
 [`attributes!`] produces attributes, not child nodes. Control-flow bodies inside the macro therefore emit attributes in the same way they do inside a [`view!`] element's opening tag.
@@ -60,7 +67,7 @@ let attrs = attributes! {
 
 The generated value is [`topcoat::view::Attributes`]. It is a runtime collection of attributes with unique keys.
 
-```rust,ignore
+```rust
 use topcoat::view::attributes;
 
 let mut attrs = attributes! {
@@ -80,7 +87,9 @@ Because [`Attributes`] is map-like, each key appears at most once. Inserting the
 
 Insert an [`Attributes`] value into an element by using it as a parenthesized attribute fragment:
 
-```rust,ignore
+```rust
+# #[topcoat::view::component]
+# async fn example() -> topcoat::Result {
 use topcoat::view::{attributes, view};
 
 let attrs = attributes! {
@@ -93,6 +102,7 @@ view! {
         <h2>"Summary"</h2>
     </article>
 }
+# }
 ```
 
 Any type that implements [`AttributeViewParts`] can be used in the same position. [`Attributes`] implements that trait, so it works as a complete reusable attribute fragment.
@@ -103,7 +113,7 @@ Inserting an [`Attributes`] value consumes it. Clone the value first if the same
 
 Components can accept [`Attributes`] as a normal argument. This is useful for forwarding caller-controlled attributes to the component's root element.
 
-```rust,ignore
+```rust
 use topcoat::{
     Result,
     view::{Attributes, View, attributes, component, view},
@@ -118,6 +128,8 @@ async fn panel(attrs: Attributes, child: View) -> Result {
     }
 }
 
+# #[topcoat::view::component]
+# async fn example() -> Result {
 view! {
     panel(
         attrs: attributes! {
@@ -127,6 +139,7 @@ view! {
         <p>"Account settings"</p>
     )
 }
+# }
 ```
 
 Since the value is ordinary Rust data, you can build it in helper functions, add or replace attributes before rendering, and pass it through several layers before inserting it into an element.

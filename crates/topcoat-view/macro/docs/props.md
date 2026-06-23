@@ -2,9 +2,9 @@ Derives a typestate builder for a props struct.
 
 For a struct `ButtonProps`, the derive generates a `ButtonPropsBuilder` whose `build()` method only becomes available once every required property has been set. Forgetting a property is a compile error, not a runtime panic.
 
-```rust,ignore
-use topcoat::view::Props;
-
+```rust
+# use topcoat::view::Props;
+# enum ButtonKind { Primary }
 #[derive(Props)]
 struct ButtonProps {
     #[into]
@@ -29,7 +29,17 @@ let props = ButtonProps::builder()
 
 The builder tracks each required property in a type parameter that flips to [`Set`] when the property's setter is called. `build()` requires every marker to implement [`IsSet`], so this fails to compile:
 
-```rust,ignore
+```rust,compile_fail
+# use topcoat::view::Props;
+# enum ButtonKind { Primary }
+# #[derive(Props)]
+# struct ButtonProps {
+#     #[into]
+#     label: String,
+#     kind: ButtonKind,
+#     #[default]
+#     disabled: bool,
+# }
 // error: missing required property `kind`
 let props = ButtonProps::builder().label("Save").build();
 ```
@@ -40,7 +50,8 @@ Setters can be called more than once; later calls replace the earlier value.
 
 Generic structs are supported. The struct's generics, bounds, and `where` clauses carry over to the builder:
 
-```rust,ignore
+```rust
+# use topcoat::view::Props;
 #[derive(Props)]
 struct ListProps<T: Clone> {
     items: Vec<T>,

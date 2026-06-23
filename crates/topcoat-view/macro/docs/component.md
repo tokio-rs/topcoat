@@ -1,6 +1,6 @@
 Components are async functions annotated with [`#[component]`][`component`]. They return a [`View`] through the usual Topcoat [`Result`] type, and can take typed parameters like any other Rust function.
 
-```rust,ignore
+```rust
 use topcoat::{
     Result,
     view::{component, view},
@@ -20,7 +20,12 @@ async fn badge(label: &str, tone: &str) -> Result {
 
 Call components inside [`view!`] with function-call syntax. Named arguments use `name: value`:
 
-```rust,ignore
+```rust
+# use topcoat::{Result, view::*};
+# #[component]
+# async fn badge(label: &str, tone: &str) -> Result { view! { <span>(label)(tone)</span> } }
+# #[component]
+# async fn example() -> Result {
 view! {
     <header>
         badge(
@@ -29,6 +34,7 @@ view! {
         )
     </header>
 }
+# }
 ```
 
 All component parameters are named parameters, except `child`, which can be passed unnamed in the last position. After the named arguments, unnamed child nodes are written like normal [`view!`] content; multiple child nodes do not need commas between them.
@@ -37,7 +43,7 @@ All component parameters are named parameters, except `child`, which can be pass
 
 If a component accepts a parameter named `child` with type [`View`], any extra view nodes in the call are collected and passed as that child view.
 
-```rust,ignore
+```rust
 use topcoat::{
     Result,
     view::{View, component, view},
@@ -55,6 +61,10 @@ async fn panel(title: &str, child: View) -> Result {
     }
 }
 
+# #[component]
+# async fn badge(label: &str, tone: &str) -> Result { view! { <span>(label)(tone)</span> } }
+# #[component]
+# async fn example() -> Result {
 view! {
     panel(
         title: "Profile",
@@ -65,6 +75,7 @@ view! {
         )
     )
 }
+# }
 ```
 
 Conceptually, those trailing child nodes are the same thing as a `child` parameter whose value is a [`view! { ... }`][`view!`] containing those nodes.
@@ -78,10 +89,14 @@ Parameters can use the same attributes as [`Props`] fields:
 - `#[default]` makes the parameter optional; when not passed, it gets `Default::default()`.
 - `#[into]` lets callers pass anything that converts via `Into`.
 
-```rust,ignore
+```rust
+# use topcoat::{Result, view::{component, view}};
+# #[derive(Default)]
+# struct Tone;
 #[component]
 async fn badge(#[into] label: String, #[default] tone: Tone) -> Result {
     // ...
+#     view! { <span>(label)</span> }
 }
 ```
 
@@ -89,7 +104,8 @@ async fn badge(#[into] label: String, #[default] tone: Tone) -> Result {
 
 Components can be generic; the function's generics carry over to the props struct. Because component futures must be `Send`, type parameters stored in props need a `Send` bound (and `Sync` when the view borrows them):
 
-```rust,ignore
+```rust
+# use topcoat::{Result, view::{component, view}};
 #[component]
 async fn count<T: Send + Sync>(items: Vec<T>) -> Result {
     view! { <span>(items.len())</span> }
@@ -98,7 +114,8 @@ async fn count<T: Send + Sync>(items: Vec<T>) -> Result {
 
 `impl Trait` parameters work too. Each occurrence is lifted into a generic type parameter on the props struct, keeping its bounds and adding `Send`:
 
-```rust,ignore
+```rust
+# use topcoat::{Result, view::{component, view}};
 #[component]
 async fn shout(label: impl Into<String>) -> Result {
     view! { <b>(label.into().to_uppercase())</b> }
@@ -109,7 +126,7 @@ async fn shout(label: impl Into<String>) -> Result {
 
 Components can ask for the current request context by declaring a `cx` parameter that borrows [`Cx`]:
 
-```rust,ignore
+```rust
 use topcoat::{
     Result,
     context::Cx,

@@ -5,10 +5,14 @@ use crate::runtime::{Unescaped, View, ViewPart, ViewParts};
 /// When this trait is implemented on a type, it can be used in the node position of an element
 /// in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
-/// ```rust,ignore
+/// ```rust
+/// # use topcoat::view::view;
+/// # async fn example() -> topcoat::Result {
+/// # let my_value = "value";
 /// view! {
 ///     <div>(my_value)</div>
 /// }
+/// # }
 /// ```
 pub trait NodeViewParts {
     /// Appends this value to `parts`.
