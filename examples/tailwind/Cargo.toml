@@ -8,7 +8,8 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 topcoat = { workspace = true, features = ["tailwind"] }
 
 [build-dependencies]
-topcoat-tailwind = { workspace = true, features = ["build"] }
+# We cannot use `workspace = true` with `default-features = false`.
+topcoat = { path = "../../crates/topcoat/", default-features = false, features = ["tailwind"] }
 
 [lints]
 workspace = true
