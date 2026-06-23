@@ -1,8 +1,8 @@
-[`Router`] is the finalized routing table that dispatches incoming requests. Build one with [`Router::builder`], register pages, layouts, layers, and API routes, call [`build`](RouterBuilder::build), then pass it to [`start`](crate::start).
+A [`Router`] handles incoming requests. Build one with [`Router::builder`], register pages, layouts, layers, and API routes, call [`build`](RouterBuilder::build), then pass it to [`start`](crate::start).
 
-For most apps, the recommended way to define routes is the [`module_router!`] macro. It derives the routing table from your module tree instead of defining each URL path by hand. This guide describes the [`Router`] builder it sits on top of — manual registration and auto-discovery.
+For most apps, the recommended way to define routes is the [`module_router!`] macro. It derives the routing table from your module tree instead of defining each URL path by hand.
 
-You can register handlers in two ways: **manually** (explicit paths, full control) or with **auto-discovery** (the `discover` feature collects annotated items automatically).
+You can register handlers in two ways: **manually** or with **auto-discovery** (the `discover` feature collects annotated items automatically).
 
 # Paths
 
