@@ -17,6 +17,8 @@ syn = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["router"] }
+serde = { workspace = true, features = ["derive"] }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

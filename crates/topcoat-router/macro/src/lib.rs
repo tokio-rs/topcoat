@@ -25,7 +25,8 @@ use quote::quote;
 ///
 /// Explicit path:
 ///
-/// ```ignore
+/// ```rust
+/// # use topcoat::{Result, router::page, view::view};
 /// #[page("/users/{id}")]
 /// async fn user_profile() -> Result {
 ///     view! { <h1>"User profile"</h1> }
@@ -34,7 +35,8 @@ use quote::quote;
 ///
 /// Module-derived path (in `src/app/about.rs` under `module_router!()`, this serves `/about`):
 ///
-/// ```ignore
+/// ```rust
+/// # use topcoat::{Result, router::page, view::view};
 /// #[page]
 /// async fn about() -> Result {
 ///     view! { <h1>"About"</h1> }
@@ -43,7 +45,11 @@ use quote::quote;
 ///
 /// Reading a request body:
 ///
-/// ```ignore
+/// ```rust
+/// # use topcoat::{Result, router::{Form, page}, view::view};
+/// # use serde::Deserialize;
+/// # #[derive(Deserialize)]
+/// # struct Search { q: String }
 /// #[page("/contact")]
 /// async fn contact(Form(input): Form<Search>) -> Result {
 ///     view! { <main>"searching for " (input.q)</main> }
@@ -75,7 +81,7 @@ pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```rust
 /// use topcoat::{Result, router::{Slot, layout}, view::view};
 ///
 /// #[layout("/")]
@@ -125,7 +131,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```rust
 /// use serde::{Deserialize, Serialize};
 /// use topcoat::{Result, router::{Json, route}};
 ///
@@ -166,7 +172,7 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```rust
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
@@ -210,17 +216,17 @@ pub fn layer(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```rust
 /// // src/app/blog_post.rs — module URL becomes `/articles` instead of `/blog-post`.
 /// topcoat::router::segment!(rename = "articles");
 /// ```
 ///
-/// ```ignore
+/// ```rust
 /// // src/app/marketing/mod.rs — `marketing` contributes no URL segment.
 /// topcoat::router::segment!(kind = Group);
 /// ```
 ///
-/// ```ignore
+/// ```rust
 /// // src/app/_group/mod.rs — `_group` is reachable as `/group`.
 /// topcoat::router::segment!(kind = Static);
 /// ```

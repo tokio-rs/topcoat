@@ -2448,9 +2448,11 @@ name = "topcoat-router-macro"
 version = "0.1.0"
 dependencies = [
  "quote",
+ "serde",
  "syn",
  "topcoat",
  "topcoat-router",
+ "uuid",
 ]
 
 [[package]]

@@ -22,7 +22,7 @@ A [`Deref`](core::ops::Deref) impl to the inner type is also generated.
 
 ## Module router
 
-```ignore
+```rust
 // src/app/posts/id/mod.rs — the `id` module becomes `{post_id}` in the URL.
 use topcoat::{
     context::Cx,
@@ -43,7 +43,8 @@ async fn post_page(cx: &Cx) -> Result {
 
 ## Regular router
 
-```ignore
+```rust
+# use topcoat::{context::Cx, Result, router::{RouterErrorExt, page, path_param}, view::view};
 // The placeholder `{post_id}` matches the snake-cased struct name `PostId`.
 #[path_param]
 struct PostId(uuid::Uuid);
@@ -57,7 +58,8 @@ async fn post_page(cx: &Cx) -> Result {
 
 ## Borrowed `&str` inner type
 
-```ignore
+```rust
+# use topcoat::{context::Cx, Result, router::{page, path_param}, view::view};
 // No parsing — the raw segment value is exposed directly.
 #[path_param]
 struct Slug<'a>(&'a str);

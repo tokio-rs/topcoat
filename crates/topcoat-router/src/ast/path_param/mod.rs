@@ -79,8 +79,9 @@ impl ToTokens for PathParam {
         }
 
         let of_fn = if is_str_ref(inner_ty) {
+            let lifetime = item.generics.lifetimes().next().map(|param| &param.lifetime);
             quote! {
-                fn of(cx: &::topcoat::context::Cx) -> &ident {
+                fn of(cx: & #lifetime ::topcoat::context::Cx) -> Self {
                     for (key, value) in ::topcoat::router::raw_path_params(cx) {
                         if key == #name_string {
                             return #ident(value);
@@ -115,7 +116,7 @@ impl ToTokens for PathParam {
                 #of_fn
             }
 
-            impl ::core::ops::Deref for #ident {
+            impl #impl_generics ::core::ops::Deref for #ident #ty_generics #where_clause {
                 type Target = #inner_ty;
 
                 fn deref(&self) -> &Self::Target {

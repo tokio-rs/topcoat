@@ -6,7 +6,7 @@ The same struct can be used from any handler — it is not tied to a particular 
 
 # Examples
 
-```ignore
+```rust
 use topcoat::{
     context::Cx,
     Result,
