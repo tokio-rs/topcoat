@@ -23,7 +23,7 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// When several layers match a route they nest from least-specific (outermost)
 /// to most-specific (innermost), like layouts.
 ///
-/// Register layers with [`RouterBuilder::layer`](crate::RouterBuilder::layer).
+/// Register layers with [`RouterBuilder::layer`](crate::runtime::RouterBuilder::layer).
 ///
 /// # Examples
 ///
@@ -64,8 +64,8 @@ pub type LayerHandlerFn = for<'a> fn(cx: &'a mut Cx, body: Body, next: Next<'a>)
 ///
 /// Created either manually via `#[layer("/path")]` or by the module router
 /// (which derives the path from the module tree). Registered into a
-/// [`RouterBuilder`](crate::RouterBuilder) with
-/// [`layer`](crate::RouterBuilder::layer).
+/// [`RouterBuilder`](crate::runtime::RouterBuilder) with
+/// [`layer`](crate::runtime::RouterBuilder::layer).
 #[derive(Debug, Clone)]
 pub struct LayerFn {
     /// The URL path prefix whose routes this layer wraps.

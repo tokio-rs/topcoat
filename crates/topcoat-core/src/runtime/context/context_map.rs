@@ -1,6 +1,6 @@
 //! Type-keyed values made available through the request context.
 //!
-//! [`ContextMap`] is a type-keyed map of values, looked up by their [`TypeId`].
+//! [`ContextMap`] is a type-keyed map of values, looked up by their [`TypeId`](std::any::TypeId).
 //! Each [`Cx`] carries two of them:
 //!
 //! - **App context** is registered once at startup and shared across every request handled by the
@@ -16,7 +16,7 @@ use crate::runtime::context::Cx;
 /// Returns a reference to the app context value of type `T` registered on the
 /// router.
 ///
-/// The lookup is keyed by `T`'s [`TypeId`], so each type may have at most one
+/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may have at most one
 /// registered value.
 ///
 /// # Panics
@@ -55,7 +55,7 @@ where
 /// Returns a reference to the request context value of type `T` registered on
 /// the current request's [`Cx`].
 ///
-/// The lookup is keyed by `T`'s [`TypeId`], so each type may have at most one
+/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may have at most one
 /// registered value per request. Request context lives only for the duration of
 /// the request that owns it; once the request completes, every value is
 /// dropped.
@@ -91,7 +91,7 @@ where
 
 /// A type-keyed container of values.
 ///
-/// Each registered value is stored under its [`TypeId`], so a given type can
+/// Each registered value is stored under its [`TypeId`](std::any::TypeId), so a given type can
 /// only be registered once per `ContextMap`. Used by [`Cx`] to hold both the
 /// router-wide app context and the per-request request context; values are
 /// retrieved within a request via [`app_context`] or [`request_context`].

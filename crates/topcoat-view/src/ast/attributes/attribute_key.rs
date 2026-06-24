@@ -17,7 +17,7 @@ use crate::ast::{
 };
 
 /// The name part of a single `name=value` attribute on an
-/// [`Element`](super::Element) or [`Component`](super::Component). Either an
+/// [`Element`](crate::ast::view::Element) or [`Component`](crate::ast::view::Component). Either an
 /// HTML identifier (`data-foo`, `aria-label`) or a parenthesized Rust
 /// expression that resolves to the attribute name at runtime.
 pub enum AttributeKey {

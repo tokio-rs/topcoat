@@ -50,7 +50,7 @@ pub fn redirect_permanent(uri: &str) -> RedirectError {
 /// A redirect response carried as the `Err` variant of a handler `Result`.
 ///
 /// Construct one with [`redirect`] or [`redirect_permanent`], or derive one
-/// from an `Option` / `Result` via [`crate::RouterErrorExt`].
+/// from an `Option` / `Result` via [`RouterErrorExt`](crate::runtime::RouterErrorExt).
 #[derive(Debug)]
 pub struct RedirectError {
     status: StatusCode,

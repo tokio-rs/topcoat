@@ -13,7 +13,7 @@
 //!   [`MaybeAborted::Completed`] with the future's normal output.
 //!
 //! The value travels as a type-erased `Box<dyn Any>`, so the watcher recovers
-//! the concrete type with [`downcast`](std::any::Any::downcast).
+//! the concrete type with [`downcast`](Box::downcast).
 //!
 //! ```rust
 //! # use std::boxed::Box;
@@ -54,7 +54,7 @@ pub enum MaybeAborted<T> {
     Completed(T),
     /// The wrapped future was aborted, carrying the type-erased value passed to
     /// [`abort`]. Recover the original type with
-    /// [`downcast`](std::any::Any::downcast).
+    /// [`downcast`](Box::downcast).
     Aborted(Box<dyn Any>),
 }
 

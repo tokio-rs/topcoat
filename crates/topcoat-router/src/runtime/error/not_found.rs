@@ -28,7 +28,7 @@ pub fn not_found() -> NotFoundError {
 /// A not-found response carried as the `Err` variant of a handler `Result`.
 ///
 /// Construct one with [`not_found`], or derive one from an `Option` /
-/// `Result` via [`crate::RouterErrorExt`].
+/// `Result` via [`RouterErrorExt`](crate::runtime::RouterErrorExt).
 #[derive(Debug)]
 pub struct NotFoundError {
     _priv: (),

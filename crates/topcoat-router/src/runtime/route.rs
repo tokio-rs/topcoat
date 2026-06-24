@@ -11,8 +11,8 @@ pub type RouteFuture<'cx> = Pin<Box<dyn Future<Output = Result<Response>> + Send
 
 /// A single routable endpoint: an HTTP method, a URL path, and a handler.
 ///
-/// This is the core primitive a [`Router`](crate::Router) dispatches to.
-/// Register any `Route` with [`Router::route`](crate::Router::route).
+/// This is the core primitive a [`Router`](crate::runtime::Router) dispatches to.
+/// Register any `Route` with [`RouterBuilder::route`](crate::runtime::RouterBuilder::route).
 pub trait Route: Send + Sync + 'static {
     /// The HTTP method this route responds to.
     fn method(&self) -> Method;
@@ -31,7 +31,7 @@ pub type RouteHandlerFn = for<'cx> fn(cx: &'cx Cx, body: Body) -> RouteFuture<'c
 ///
 /// Created either manually via `#[route(GET "/path")]` or by the module router
 /// (which derives the path from the module tree). Registered into a
-/// [`Router`](crate::Router).
+/// [`Router`](crate::runtime::Router).
 #[derive(Debug, Clone)]
 pub struct RouteFn {
     /// The HTTP method this route responds to.

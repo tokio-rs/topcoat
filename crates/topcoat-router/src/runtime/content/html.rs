@@ -11,7 +11,7 @@ use crate::runtime::{
 /// As a response, wrap any value convertible into a [`Body`] (such as a
 /// `String`) to reply with `Content-Type: text/html`. Rendered pages are
 /// wrapped in `Html` automatically; use it directly from a
-/// [`route`](macro@crate::route) that returns markup by hand.
+/// [`route`](../topcoat_router_macro/attr.route.html) that returns markup by hand.
 ///
 /// As a request extractor, `Html<String>` requires a `Content-Type: text/html`
 /// header and yields the body as text.
