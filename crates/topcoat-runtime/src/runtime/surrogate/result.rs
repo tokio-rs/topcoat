@@ -49,22 +49,22 @@ where
     T: Surrogated,
     E: std::fmt::Debug,
 {
-    #[inline]
     /// Returns the contained `Ok` value.
     ///
     /// # Panics
     ///
     /// Panics if the result is `Err`.
+    #[inline]
     pub fn unwrap(self) -> T::Surrogate {
         self.0.unwrap().into_surrogate()
     }
 
-    #[inline]
     /// Returns the contained `Ok` value, panicking with `msg` if `Err`.
     ///
     /// # Panics
     ///
     /// Panics with `msg` if the result is `Err`.
+    #[inline]
     pub fn expect(self, msg: &StrSurrogate) -> T::Surrogate {
         self.0.expect(&msg.0).into_surrogate()
     }

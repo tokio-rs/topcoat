@@ -20,21 +20,20 @@ pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");
 
 /// Macro helpers to shorten the generated source code.
 #[doc(hidden)]
-#[allow(clippy::inline_always)]
 pub mod internal {
     use topcoat_view::runtime::{NodeViewParts, Unescaped, ViewParts};
 
-    #[inline(always)]
+    #[inline]
     pub fn __js(parts: &mut ViewParts, js: &str) {
         parts.push(js.to_owned());
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn __js_unescaped(parts: &mut ViewParts, s: &str) {
         Unescaped::new_unchecked(s).into_view_parts(parts);
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn __surrogate(parts: &mut ViewParts, value: &(impl serde::Serialize + ?Sized)) {
         Unescaped::new_unchecked("cx.hydrate(").into_view_parts(parts);
         let json = serde_json::to_string(value).expect("failed to serialize surrogate value");
