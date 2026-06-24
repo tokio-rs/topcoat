@@ -81,6 +81,11 @@ impl ErasedProcedure {
         self.id
     }
 
+    /// Dispatches the procedure call, awaiting its handler future.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any error returned by the underlying procedure handler.
     #[inline]
     pub async fn handle(&self, cx: &Cx, body: Body) -> Result<Response> {
         (self.handle)(cx, body).await
@@ -184,6 +189,12 @@ where
     A: Surrogated,
     R: Surrogated,
 {
+    /// Invokes the procedure from the client side.
+    ///
+    /// # Panics
+    ///
+    /// Always panics; procedures can only be invoked from the client runtime.
+    #[allow(clippy::unused_async)]
     pub async fn call(&self, _args: A::Surrogate) -> R::Surrogate {
         panic!("procedures cannot be executed on the server");
     }

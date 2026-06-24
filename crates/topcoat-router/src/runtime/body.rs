@@ -138,6 +138,10 @@ impl futures_core::Stream for BodyDataStream {
 /// Collects an entire [`Body`] into [`Bytes`], failing if it exceeds `limit`.
 ///
 /// Pass [`usize::MAX`] to read the body without enforcing a limit.
+///
+/// # Errors
+///
+/// Returns an error if reading the body fails or if it exceeds `limit` bytes.
 pub async fn to_bytes(body: Body, limit: usize) -> Result<Bytes, BoxError> {
     if limit == usize::MAX {
         Ok(body.collect().await?.to_bytes())

@@ -60,6 +60,7 @@ impl StrSurrogate {
 
     #[inline]
     #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn len(&self) -> F64Surrogate {
         F64Surrogate::new(self.0.len() as f64)
     }

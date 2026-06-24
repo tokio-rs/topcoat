@@ -103,9 +103,10 @@ impl ModuleRouterBuilder {
             // unless this is overridden by the user.
             let kind = match segment.and_then(|segment| segment.kind()) {
                 Some(kind) => *kind,
-                None => match component.starts_with("_") {
-                    true => SegmentKind::Group,
-                    false => SegmentKind::Static,
+                None => if component.starts_with('_') {
+                    SegmentKind::Group
+                } else {
+                    SegmentKind::Static
                 },
             };
             // Static segments are converted to kebab-case, other modules names are left as is.
@@ -219,12 +220,11 @@ impl ModuleRouterBuilder {
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
         for layout in inventory::iter::<ModuleLayoutFn>().cloned() {
-            if !seen.insert(self.module_path_to_path(layout.module_path())) {
-                panic!(
-                    "multiple discovered layouts registered for the same path \"{}\"",
-                    self.module_path_to_path(layout.module_path())
-                );
-            }
+            assert!(
+                seen.insert(self.module_path_to_path(layout.module_path())),
+                "multiple discovered layouts registered for the same path \"{}\"",
+                self.module_path_to_path(layout.module_path())
+            );
             self = self.layout(layout);
         }
         self
@@ -259,12 +259,11 @@ impl ModuleRouterBuilder {
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
         for layer in inventory::iter::<ModuleLayerFn>().cloned() {
-            if !seen.insert(self.module_path_to_path(layer.module_path())) {
-                panic!(
-                    "multiple discovered layers registered for the same path \"{}\"",
-                    self.module_path_to_path(layer.module_path())
-                );
-            }
+            assert!(
+                seen.insert(self.module_path_to_path(layer.module_path())),
+                "multiple discovered layers registered for the same path \"{}\"",
+                self.module_path_to_path(layer.module_path())
+            );
             self = self.layer(layer);
         }
         self

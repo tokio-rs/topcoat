@@ -53,6 +53,13 @@ impl PathParam {
         Self(attr, item)
     }
 
+    /// Parses a `path_param` attribute and item from token streams.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either token stream fails to parse as a
+    /// [`PathParamAttr`] or [`PathParamItem`], or if the item is not a tuple
+    /// struct with exactly one unnamed field.
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
         Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
     }
@@ -60,12 +67,6 @@ impl PathParam {
 
 impl ToTokens for PathParam {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let item = &self.1.item;
-        let ident = &item.ident;
-        let inner_ty = &self.1.inner_ty;
-        let name_string = ident.to_string().to_snake_case();
-        let (impl_generics, ty_generics, where_clause) = item.generics.split_for_impl();
-
         fn is_str_ref(ty: &Type) -> bool {
             let Type::Reference(reference) = ty else {
                 return false;
@@ -78,6 +79,12 @@ impl ToTokens for PathParam {
             };
             path.qself.is_none() && path.path.is_ident("str")
         }
+
+        let item = &self.1.item;
+        let ident = &item.ident;
+        let inner_ty = &self.1.inner_ty;
+        let name_string = ident.to_string().to_snake_case();
+        let (impl_generics, ty_generics, where_clause) = item.generics.split_for_impl();
 
         let (output_ty, path_param_fn) = if is_str_ref(inner_ty) {
             (

@@ -105,13 +105,13 @@ mod tests {
 
     #[test]
     fn parses_expression_value() {
-        let attr = parse(r#"href=(url)"#);
+        let attr = parse(r"href=(url)");
         assert!(matches!(attr.value, AttributeValue::Expr(_)));
     }
 
     #[test]
     fn parses_expression_key_and_value() {
-        let attr = parse(r#"(name)=(value)"#);
+        let attr = parse(r"(name)=(value)");
         assert!(matches!(attr.key, AttributeKey::Expr(_)));
         assert!(matches!(attr.value, AttributeValue::Expr(_)));
     }

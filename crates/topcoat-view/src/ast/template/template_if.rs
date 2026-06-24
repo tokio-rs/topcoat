@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn parses_empty_branches() {
-        let if_ = parse(r#"if c {} else {}"#);
+        let if_ = parse(r"if c {} else {}");
         assert!(if_.then_branch.children.is_empty());
         let Some(TemplateElse::Else { then_branch, .. }) = if_.else_branch else {
             panic!("expected else branch");

@@ -13,15 +13,12 @@ pub(super) struct CleanArgs {
 }
 
 pub(super) async fn run(args: CleanArgs) {
-    let target_dir = match crate::cargo::target_dir().await {
-        Some(path) => path,
-        None => {
-            eprintln!(
-                "{}",
-                style("could not derive cargo target directory; pass --out").red()
-            );
-            std::process::exit(1);
-        }
+    let Some(target_dir) = crate::cargo::target_dir().await else {
+        eprintln!(
+            "{}",
+            style("could not derive cargo target directory; pass --out").red()
+        );
+        std::process::exit(1);
     };
 
     let out_dir = args.out.unwrap_or_else(|| target_dir.join(OUT_SUBDIR));

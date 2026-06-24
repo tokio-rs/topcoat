@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
@@ -35,6 +33,12 @@ impl Procedure {
         Self(attr, item)
     }
 
+    /// Parses a procedure from its attribute and item token streams.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either token stream fails to parse as a procedure
+    /// attribute or function item.
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
         Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
     }
@@ -48,9 +52,9 @@ impl ToTokens for Procedure {
         let mut args = Vec::new();
         let mut args_with_cx = Vec::new();
         let mut arg_index = 0;
-        for arg in item.sig.inputs.iter() {
+        for arg in &item.sig.inputs {
             match arg {
-                FnArg::Typed(PatType { pat, .. }) => match pat.deref() {
+                FnArg::Typed(PatType { pat, .. }) => match &**pat {
                     Pat::Ident(PatIdent { ident, .. }) if ident == "cx" => {
                         args_with_cx.push(ident.clone());
                     }
@@ -60,7 +64,7 @@ impl ToTokens for Procedure {
                         arg_index += 1;
                     }
                 },
-                _ => unreachable!("procedures cannot have `self` receiver"),
+                FnArg::Receiver(_) => unreachable!("procedures cannot have `self` receiver"),
             }
         }
 
@@ -69,11 +73,11 @@ impl ToTokens for Procedure {
             .inputs
             .iter()
             .filter_map(|arg| match arg {
-                FnArg::Typed(PatType { pat, ty, .. }) => match pat.deref() {
+                FnArg::Typed(PatType { pat, ty, .. }) => match &**pat {
                     Pat::Ident(PatIdent { ident, .. }) if ident == "cx" => None,
                     _ => Some(ty),
                 },
-                _ => None,
+                FnArg::Receiver(_) => None,
             })
             .collect::<Vec<_>>();
         let ReturnType::Type(_, return_ty) = &item.sig.output else {

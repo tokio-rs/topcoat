@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn parses_simple_for_loop() {
-        let loop_ = parse(r#"for x in xs { (x) }"#);
+        let loop_ = parse(r"for x in xs { (x) }");
         assert_eq!(loop_.pat.to_token_stream().to_string(), "x");
         assert_eq!(loop_.expr.to_token_stream().to_string(), "xs");
         assert_eq!(loop_.body.children.len(), 1);
@@ -190,13 +190,13 @@ mod tests {
 
     #[test]
     fn parses_tuple_pattern() {
-        let loop_ = parse(r#"for (k, v) in pairs { (k) }"#);
+        let loop_ = parse(r"for (k, v) in pairs { (k) }");
         assert_eq!(loop_.pat.to_token_stream().to_string(), "(k , v)");
     }
 
     #[test]
     fn parses_empty_body() {
-        let loop_ = parse(r#"for x in xs {}"#);
+        let loop_ = parse(r"for x in xs {}");
         assert!(loop_.body.children.is_empty());
     }
 
@@ -204,7 +204,7 @@ mod tests {
     fn parses_method_call_iterable() {
         // `parse_without_eager_brace` lets the `{` start the body rather than
         // being eaten by the expression.
-        let loop_ = parse(r#"for x in items.iter() { (x) }"#);
+        let loop_ = parse(r"for x in items.iter() { (x) }");
         assert_eq!(loop_.expr.to_token_stream().to_string(), "items . iter ()");
     }
 

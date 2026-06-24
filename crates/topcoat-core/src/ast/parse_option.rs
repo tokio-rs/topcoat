@@ -47,6 +47,11 @@ pub trait ParseOption: Parse + Sized {
     /// Otherwise, it returns `Ok(None)`.
     ///
     /// This method has a default implementation that uses `peek` and `Parse::parse`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error from `Parse::parse` if `peek` returned `true` but the
+    /// input could not be parsed as `Self`.
     fn parse_option(input: ParseStream) -> syn::Result<Option<Self>> {
         Self::peek(input).then(|| input.parse()).transpose()
     }

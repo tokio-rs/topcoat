@@ -37,7 +37,7 @@ impl<'a> Formatter<'a> {
             '"' => self.buf.push_str("&quot;"),
             '\'' => self.buf.push_str("&#x27;"),
             _ => self.write_char_unescaped(c),
-        };
+        }
     }
 
     /// Writes a single character without escaping. Use for trusted content only.
@@ -107,7 +107,7 @@ where
 {
     #[inline]
     fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        (*self).fmt_html(cx, f)
+        (*self).fmt_html(cx, f);
     }
 
     #[inline]
@@ -119,7 +119,7 @@ where
 impl FmtHtml for str {
     #[inline]
     fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
-        f.write_str(self)
+        f.write_str(self);
     }
 
     #[inline]
@@ -131,7 +131,7 @@ impl FmtHtml for str {
 impl FmtHtml for String {
     #[inline]
     fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
-        f.write_str(self)
+        f.write_str(self);
     }
 
     #[inline]

@@ -153,9 +153,8 @@ impl<'a> TokenBuffer<'a> {
 
     pub fn push_back(&mut self, token: Token<'a>) {
         match &token {
-            Token::Text(_) => {}
+            Token::Text(_) | Token::ForceBreak => {}
             Token::Break(_) => self.last_break = Some(self.tokens.next_index()),
-            Token::ForceBreak => {}
             Token::Begin(_) => self.begin_stack.push(self.tokens.next_index()),
             Token::End => {
                 self.begin_stack.pop();

@@ -137,19 +137,19 @@ mod tests {
     fn dispatches_each_variant() {
         assert!(matches!(parse(r#"foo="bar""#), AttributeNode::Attribute(_)));
         assert!(matches!(
-            parse(r#":foo=(bar)"#),
+            parse(r":foo=(bar)"),
             AttributeNode::BindAttribute(_),
         ));
         assert!(matches!(
-            parse(r#":foo=$(bar)"#),
+            parse(r":foo=$(bar)"),
             AttributeNode::BindAttribute(_),
         ));
         assert!(matches!(
-            parse(r#"@foo=(bar)"#),
+            parse(r"@foo=(bar)"),
             AttributeNode::EventHandler(_),
         ));
         assert!(matches!(
-            parse(r#"@foo=$(bar)"#),
+            parse(r"@foo=$(bar)"),
             AttributeNode::EventHandler(_),
         ));
         assert!(matches!(
@@ -175,9 +175,8 @@ mod tests {
 
     #[test]
     fn unrecognized_token_is_rejected() {
-        let err = match syn::parse_str::<AttributeNode>("#") {
-            Ok(_) => panic!("expected parse error"),
-            Err(err) => err,
+        let Err(err) = syn::parse_str::<AttributeNode>("#") else {
+            panic!("expected parse error");
         };
         assert!(err.to_string().contains("expected attribute node"));
     }

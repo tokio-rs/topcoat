@@ -36,6 +36,11 @@ impl<T> SignalSurrogate<T>
 where
     T: Surrogated,
 {
+    /// Writes a new value to the signal.
+    ///
+    /// # Panics
+    ///
+    /// Always panics; signal writes can only occur in client-side expressions.
     pub fn set(&self, _v: T::Surrogate) {
         panic!("expressions in which a signal is written to cannot be run server-side");
     }

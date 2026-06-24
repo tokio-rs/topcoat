@@ -206,12 +206,12 @@ impl FmtHtml for ViewPart {
             Self::UnescapedStaticStr(inner) => inner.fmt_html(cx, f),
             Self::BoxDyn(inner) => FmtHtml::fmt_html(inner, cx, f),
             Self::BoxSlice(inner) => {
-                for part in inner.iter() {
+                for part in inner {
                     part.fmt_html(cx, f);
                 }
             }
             Self::Vec(inner) => {
-                for part in inner.iter() {
+                for part in inner {
                     part.fmt_html(cx, f);
                 }
             }
@@ -242,8 +242,8 @@ impl FmtHtml for ViewPart {
             Self::UnescapedString(inner) => inner.len(),
             Self::UnescapedStaticStr(inner) => inner.len(),
             Self::BoxDyn(inner) => FmtHtml::size_hint(inner),
-            Self::BoxSlice(inner) => inner.iter().map(|part| part.size_hint()).sum(),
-            Self::Vec(inner) => inner.iter().map(|part| part.size_hint()).sum(),
+            Self::BoxSlice(inner) => inner.iter().map(FmtHtml::size_hint).sum(),
+            Self::Vec(inner) => inner.iter().map(FmtHtml::size_hint).sum(),
         }
     }
 }
@@ -319,7 +319,7 @@ impl ViewParts {
             self.items.push(first);
             self.items.push(part);
         } else if self.items.is_empty() {
-            self.first = Some(part)
+            self.first = Some(part);
         } else {
             self.items.push(part);
         }

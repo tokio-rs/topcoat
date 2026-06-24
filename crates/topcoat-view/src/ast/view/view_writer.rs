@@ -55,7 +55,7 @@ impl ViewWriter {
 
     pub fn write_expr(&mut self, kind: ExprKind, tokens: TokenStream) {
         self.flush();
-        self.chunks.push(Chunk::Expr { kind, tokens })
+        self.chunks.push(Chunk::Expr { kind, tokens });
     }
 
     pub fn let_binding(&mut self, pat: &Pat, expr: &Expr) {
@@ -350,7 +350,7 @@ mod tests {
     fn for_loop_wraps_body_in_for_in_expr() {
         let mut writer = ViewWriter::new();
         writer.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.write_str_unescaped("x")
+            body.write_str_unescaped("x");
         });
         let out = rendered(writer);
         assert!(out.contains("for x in xs"));
@@ -402,8 +402,7 @@ mod tests {
             writer.write_expr(kind, quote! { v });
             assert!(
                 rendered(writer).contains(expected),
-                "expected helper `{expected}` for kind `{}`",
-                expected,
+                "expected helper `{expected}` for kind `{expected}`",
             );
         }
     }

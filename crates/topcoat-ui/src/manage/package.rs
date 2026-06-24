@@ -15,13 +15,17 @@ impl Package {
     /// `cargo -p`), its manifest directory is used; otherwise the cargo crate
     /// root containing the current directory is used, falling back to the
     /// current directory itself when it is not inside a crate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `cargo metadata` fails or the named package is not
+    /// found in the workspace, or if the resolved root cannot be canonicalized.
     pub fn locate(package: Option<String>) -> Result<Self, String> {
-        let root = match package {
-            Some(name) => package_root(&name)?,
-            None => {
-                let start = PathBuf::from(".");
-                crate_root(&start).unwrap_or(start)
-            }
+        let root = if let Some(name) = package {
+            package_root(&name)?
+        } else {
+            let start = PathBuf::from(".");
+            crate_root(&start).unwrap_or(start)
         };
         let root = std::fs::canonicalize(&root).map_err(|error| {
             format!(

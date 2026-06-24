@@ -11,7 +11,7 @@ use ref_cast::{RefCastCustom, ref_cast_custom};
 /// A `Path` consists of `/`-separated segments, where each segment is one of:
 /// - **Static** — a literal string (e.g. `users`)
 /// - **Param** — a dynamic parameter in braces (e.g. `{id}`)
-/// - **CatchAll** — a wildcard tail in braces with `*` (e.g. `{*rest}`)
+/// - **`CatchAll`** — a wildcard tail in braces with `*` (e.g. `{*rest}`)
 /// - **Group** — a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to a
 ///   `matchit` path
 ///
@@ -61,6 +61,11 @@ impl Path {
     /// The root path `"/"` is normalized to an empty inner representation. Every
     /// other path must be a sequence of `/`-prefixed, non-empty segments, each a
     /// valid [`PathSegment`]. Returns [`PathError`] if `s` is malformed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PathError`] if `s` is not a valid path: it must be empty, be
+    /// the root `"/"`, or be a sequence of `/`-prefixed valid segments.
     #[allow(clippy::should_implement_trait)]
     pub const fn from_str(s: &str) -> Result<&Self, PathError> {
         let s = match s.as_bytes() {
@@ -126,7 +131,7 @@ impl Path {
         // The path was validated on construction, so its segments need no
         // re-validation here.
         self.inner
-            .split("/")
+            .split('/')
             .skip(1)
             .map(PathSegment::new_unchecked)
     }
@@ -255,7 +260,7 @@ pub enum PathError {
 
 impl PathError {
     /// A human-readable description of the error.
-    const fn message(&self) -> &'static str {
+    const fn message(self) -> &'static str {
         match self {
             Self::MissingLeadingSlash => "invalid path: must be empty or start with `/`",
             Self::EmptySegment => "invalid path: empty segment",
@@ -303,7 +308,7 @@ impl PathBuf {
     /// Creates a new empty `PathBuf`.
     #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        PathBuf::default()
     }
 }
 
@@ -393,6 +398,10 @@ impl<'a> PathSegment<'a> {
     /// Returns [`PathError`] if `s` is not a well-formed segment: an empty string,
     /// a `{…}`/`(…)` segment missing its closing bracket, a static segment that
     /// contains a bracket, or a name that is not a valid identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PathError`] if `s` is not a well-formed segment.
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &'a str) -> Result<Self, PathError> {
         // Validate first, then extract the variant from the now-known-valid input.

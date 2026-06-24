@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn parses_runtime_named_arg() {
-        let component = parse(r#"button(label: $(ok))"#);
+        let component = parse(r"button(label: $(ok))");
         assert_eq!(component.named_args.len(), 1);
         assert!(matches!(
             component.named_args[0].value,
@@ -278,13 +278,13 @@ mod tests {
 
     #[test]
     fn parses_path_qualified_child_component() {
-        let component = parse(r#"button(prop1: 5, foo::checkbox())"#);
+        let component = parse(r"button(prop1: 5, foo::checkbox())");
         assert_eq!(component.named_args.len(), 1);
         assert_eq!(component.children.len(), 1);
     }
 
     #[test]
     fn named_arg_after_child_is_rejected() {
-        assert!(parse_err(r#"button(<div></div> prop1: 5)"#).contains("expected view node"),);
+        assert!(parse_err(r"button(<div></div> prop1: 5)").contains("expected view node"),);
     }
 }

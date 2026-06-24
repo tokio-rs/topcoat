@@ -46,6 +46,11 @@ impl<S> Shard<S> {
         self.id
     }
 
+    /// Renders the shard by invoking its render function.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any error produced by the render function.
     pub async fn render(&self, cx: &Cx, signals: S) -> Result<View, Error> {
         (self.render)(cx, signals).await
     }
@@ -90,7 +95,7 @@ pub struct Shards {
 impl Shards {
     #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        Shards::default()
     }
 
     pub fn register(&mut self, shard: &'static dyn DynShard) {
@@ -130,6 +135,8 @@ impl Eq for DynShardPtr {}
 
 impl Hash for DynShardPtr {
     fn hash<H: Hasher>(&self, h: &mut H) {
-        (self.0 as *const dyn DynShard).cast::<()>().hash(h);
+        std::ptr::from_ref::<dyn DynShard>(self.0)
+            .cast::<()>()
+            .hash(h);
     }
 }

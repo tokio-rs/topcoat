@@ -129,6 +129,10 @@ where
     /// This is the only method that writes anything: until it is called, the
     /// store's value lives only in memory. Returns an error if the value cannot
     /// be serialized.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if serializing `T` to JSON fails.
     pub fn commit(self) -> Result<T, serde_json::Error> {
         let serialized = serde_json::to_string(&self.value)?;
         self.jar.add(Cookie::new(self.key, serialized));
@@ -217,6 +221,11 @@ where
     ///
     /// Returns `Ok(None)` when the cookie is absent, and `Err` when it is
     /// present but cannot be deserialized.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the cookie is present but its value cannot be
+    /// deserialized into `T`.
     pub fn parse(self) -> Result<Option<CookieStore<T, J>>, serde_json::Error> {
         match self.jar.get(&self.key) {
             Some(cookie) => {

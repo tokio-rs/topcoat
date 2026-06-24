@@ -20,6 +20,7 @@ pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");
 
 /// Macro helpers to shorten the generated source code.
 #[doc(hidden)]
+#[allow(clippy::inline_always)]
 pub mod internal {
     use topcoat_view::runtime::{NodeViewParts, Unescaped, ViewParts};
 

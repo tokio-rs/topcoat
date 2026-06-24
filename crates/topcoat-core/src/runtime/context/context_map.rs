@@ -116,9 +116,7 @@ impl ContextMap {
     where
         T: Any + Send + Sync,
     {
-        if self.entries.insert::<T>(value).is_some() {
-            panic!("duplicate context entry for type `{:?}`", type_name::<T>())
-        }
+        assert!(self.entries.insert::<T>(value).is_none(), "duplicate context entry for type `{:?}`", type_name::<T>());
     }
 
     /// Returns a reference to the registered value of type `T`, or `None` if

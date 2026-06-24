@@ -41,6 +41,13 @@ impl Page {
         Self(attr, item)
     }
 
+    /// Parses a page attribute and item from token streams.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either token stream fails to parse as a
+    /// [`PageAttr`] or [`PageItem`], or if the item is not a valid page
+    /// handler.
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
         Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
     }
@@ -74,15 +81,16 @@ impl ToTokens for Page {
             }
         };
 
-        match attr.path.as_ref() {
-            Some(path) => quote! {
+        if let Some(path) = attr.path.as_ref() {
+            quote! {
                 #[allow(non_upper_case_globals)]
                 const #ident: ::topcoat::router::PageFn = ::topcoat::router::PageFn::new(
                     ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
                     #render,
                 );
-            },
-            None => quote! {
+            }
+        } else {
+            quote! {
                 #[allow(non_upper_case_globals)]
                 const #ident: ::topcoat::router::ModulePageFn = ::topcoat::router::ModulePageFn::new(module_path!(), #render);
             }

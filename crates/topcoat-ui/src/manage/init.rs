@@ -45,6 +45,13 @@ pub struct Initialized {
 /// theme is recorded in the install state. The theme is named by
 /// [`InitOptions::theme`], or chosen via `choose` when none is given. Errors if
 /// the package is already initialized rather than clobbering its state.
+///
+/// # Errors
+///
+/// Returns an error if the package is already initialized, the default
+/// registry cannot be loaded or offers no themes, a named theme is unknown,
+/// a theme selection prompt is declined, or writing the stylesheet or install
+/// state fails.
 pub fn init(
     package: &Package,
     options: InitOptions,

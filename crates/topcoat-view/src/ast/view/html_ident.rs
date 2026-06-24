@@ -52,6 +52,11 @@ impl HtmlIdent {
     /// Parses an [`HtmlIdent`] that only allows `-` as a separator. Used for
     /// HTML element names, where `:` and `.` would tear apart adjacent
     /// attribute syntax like `:value` or `class.active`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input does not begin with a valid identifier, or
+    /// if a `-` separator is not adjacent to the surrounding identifier segments.
     pub fn parse_dash_only(input: ParseStream) -> syn::Result<Self> {
         Self::parse_inner(input, false)
     }

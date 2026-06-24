@@ -101,7 +101,7 @@ pub(crate) struct Segments {
 impl Segments {
     /// Creates an empty registry.
     pub fn new() -> Self {
-        Default::default()
+        Segments::default()
     }
 
     /// Registers a segment for a module path. Panics on duplicates.

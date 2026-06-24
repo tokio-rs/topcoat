@@ -28,7 +28,7 @@ async fn home() -> Result {
                 topcoat::runtime::script()
             </head>
             <body>
-                signal input = "".to_owned();
+                signal input = String::new();
 
                 <input
                     :value=$(input.get())
@@ -49,7 +49,8 @@ async fn home() -> Result {
 }
 
 #[procedure]
+#[allow(clippy::unused_async)]
 pub async fn print_on_server(input: String) -> Result<String> {
-    println!("{}", input);
+    println!("{input}");
     Ok(format!("message received: {input}"))
 }

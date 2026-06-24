@@ -84,7 +84,7 @@ impl FmtCommand {
                         start.elapsed()
                     ))
                     .green()
-                )
+                );
             }
             Ok(())
         }
@@ -93,7 +93,7 @@ impl FmtCommand {
         match result {
             Ok(()) => {}
             Err(error) => {
-                eprintln!("{}", style(error).red())
+                eprintln!("{}", style(error).red());
             }
         }
     }
@@ -102,10 +102,10 @@ impl FmtCommand {
 fn format_file(path: &PathBuf, registry: &Registry) -> Result<bool, error::Error> {
     let input = std::fs::read_to_string(path)?;
     let output = pretty_print_str(registry, &input)?;
-    if output != input {
+    if output == input {
+        Ok(false)
+    } else {
         std::fs::write(path, output)?;
         Ok(true)
-    } else {
-        Ok(false)
     }
 }

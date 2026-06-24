@@ -138,10 +138,10 @@ impl<B: Parse> Parse for TemplateMatchArm<B> {
             fat_arrow_token: input.parse()?,
             body: Box::new(input.parse()?),
             comma: {
-                if !input.is_empty() {
-                    Some(input.parse()?)
-                } else {
+                if input.is_empty() {
                     input.parse()?
+                } else {
+                    Some(input.parse()?)
                 }
             },
         })
@@ -243,8 +243,8 @@ mod tests {
         // preserved in the resulting pattern.
         let m = parse(r#"match v { | A | B => "ab", _ => "x", }"#);
         let rendered = m.arms[0].pat.to_token_stream().to_string();
-        assert!(rendered.contains("A"));
-        assert!(rendered.contains("B"));
+        assert!(rendered.contains('A'));
+        assert!(rendered.contains('B'));
         assert!(rendered.contains('|'));
     }
 

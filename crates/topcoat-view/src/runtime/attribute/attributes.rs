@@ -23,7 +23,7 @@ impl Attributes {
     #[inline]
     #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        Attributes::default()
     }
 
     /// Creates an empty attribute collection with space for at least `capacity`

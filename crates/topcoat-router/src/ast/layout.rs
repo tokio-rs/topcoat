@@ -70,6 +70,13 @@ impl Layout {
         Self(attr, item)
     }
 
+    /// Parses a layout attribute and item from token streams.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either token stream fails to parse as a
+    /// [`LayoutAttr`] or [`LayoutItem`], or if the item is not a valid layout
+    /// function.
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
         Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
     }
@@ -93,15 +100,16 @@ impl ToTokens for Layout {
             }
         };
 
-        match attr.path.as_ref() {
-            Some(path) => quote! {
+        if let Some(path) = attr.path.as_ref() {
+            quote! {
                 #[allow(non_upper_case_globals)]
                 const #ident: ::topcoat::router::LayoutFn = ::topcoat::router::LayoutFn::new(
                     ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
                     #render,
                 );
-            },
-            None => quote! {
+            }
+        } else {
+            quote! {
                 #[allow(non_upper_case_globals)]
                 const #ident: ::topcoat::router::ModuleLayoutFn = ::topcoat::router::ModuleLayoutFn::new(module_path!(), #render);
             }

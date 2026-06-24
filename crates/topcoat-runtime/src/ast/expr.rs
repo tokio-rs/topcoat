@@ -43,6 +43,12 @@ impl Parse for Expr {
 }
 
 impl Expr {
+    /// Lowers the parsed expression into a token stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any sub-expression is not a supported shape, or if a
+    /// local binding cannot be resolved.
     pub fn expr_to_tokens(&self) -> syn::Result<TokenStream> {
         let mut rust = TokenStream::new();
         let mut js = String::new();
@@ -59,7 +65,11 @@ impl Expr {
         // ahead of the returned expression.
         let externals = names.externals();
 
-        if !externals.is_empty() {
+        if externals.is_empty() {
+            Ok(quote! {
+                ::topcoat::runtime::Expr::new(#rust, ::topcoat::view::ViewPart::from(#js))
+            })
+        } else {
             let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
             let rust_external_values = externals.iter().map(|binding| {
                 let ident = &binding.original_ident;
@@ -97,10 +107,6 @@ impl Expr {
                 __js(&mut __parts, #js_tail);
                 ::topcoat::runtime::Expr::new(__rust, ::topcoat::view::ViewPart::from(__parts))
             }})
-        } else {
-            Ok(quote! {
-                ::topcoat::runtime::Expr::new(#rust, ::topcoat::view::ViewPart::from(#js))
-            })
         }
     }
 

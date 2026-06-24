@@ -23,7 +23,7 @@ impl WriteView for AttributeValue {
     fn write(&self, writer: &mut ViewWriter) {
         match self {
             Self::Expr(inner) => {
-                writer.write_expr(ExprKind::AttributeValue, inner.expr.to_token_stream())
+                writer.write_expr(ExprKind::AttributeValue, inner.expr.to_token_stream());
             }
             Self::LitStr(inner) => writer.write_str(&inner.value()),
         }

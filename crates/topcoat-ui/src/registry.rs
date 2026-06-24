@@ -65,6 +65,11 @@ pub struct Registry {
 impl Registry {
     /// Loads a registry by reading and parsing the `registry.toml` in `dir` (a
     /// registry crate's declared registry directory).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the manifest cannot be read or parsed, or if it
+    /// declares a format version newer than [`MANIFEST_VERSION`].
     pub fn load(dir: PathBuf) -> Result<Self, Error> {
         let manifest_path = dir.join(MANIFEST_FILE);
         let raw = std::fs::read_to_string(&manifest_path).map_err(|source| Error::Read {
@@ -134,6 +139,10 @@ impl Component<'_> {
 
     /// Computes the component's content hash by reading and hashing its source
     /// (see [`content_hash`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the component's source file cannot be read.
     pub fn hash(&self) -> Result<String, Error> {
         Ok(content_hash(&self.read_source()?))
     }
@@ -148,6 +157,10 @@ impl Component<'_> {
     }
 
     /// Reads the component's Rust source from the registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source file cannot be read.
     pub fn read_source(&self) -> Result<String, Error> {
         let path = self.dir.join(&self.entry.source);
         std::fs::read_to_string(&path).map_err(|source| Error::Read { path, source })
@@ -179,17 +192,25 @@ impl Theme<'_> {
     /// the same `styles.css` (it becomes the project's Tailwind input), rather
     /// than carrying its registry source name (e.g. `neutral.css`) into the project.
     #[must_use]
-    pub fn file_name(&self) -> &str {
+    pub fn file_name(&self) -> &'static str {
         "styles.css"
     }
 
     /// Computes the theme's content hash by reading and hashing its source (see
     /// [`content_hash`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the theme's source file cannot be read.
     pub fn hash(&self) -> Result<String, Error> {
         Ok(content_hash(&self.read_source()?))
     }
 
     /// Reads the theme's CSS source from the registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source file cannot be read.
     pub fn read_source(&self) -> Result<String, Error> {
         let path = self.dir.join(&self.entry.source);
         std::fs::read_to_string(&path).map_err(|source| Error::Read { path, source })

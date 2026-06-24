@@ -40,6 +40,12 @@ pub enum InstallStatus {
 /// With `selected`, only that registry is listed. Failures to load an individual
 /// registry are reported per registry (in `outcome`) rather than failing the
 /// whole listing.
+///
+/// # Errors
+///
+/// Returns an error if the install state or workspace cannot be loaded, or if
+/// `selected` names a registry that is neither a dependency nor tracked in the
+/// install state.
 pub fn list(package: &Package, selected: Option<&str>) -> Result<Vec<RegistryListing>, String> {
     let state = InstallState::load(package)?;
     let workspace = Workspace::load(package)?;

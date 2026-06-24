@@ -34,6 +34,11 @@ pub struct AssetRoute {
 
 impl AssetRoute {
     /// Builds the route that serves `asset`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the asset's filename is not valid UTF-8, or if its
+    /// `Content-Type` cannot be converted into a [`HeaderValue`].
     #[must_use]
     pub fn new(asset: &BundledAsset) -> Self {
         let name = asset.name().to_str().expect("asset had non-UTF8 name");
@@ -63,19 +68,16 @@ impl Route for AssetRoute {
 
     fn handle<'cx>(&'cx self, _cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
         Box::pin(async move {
-            let response = match tokio::fs::read(&self.file).await {
-                Ok(bytes) => {
-                    let mut response = Response::new(Body::from(bytes));
-                    let headers = response.headers_mut();
-                    headers.insert(CONTENT_TYPE, self.content_type.clone());
-                    headers.insert(CACHE_CONTROL, CACHE_CONTROL_VALUE);
-                    response
-                }
-                Err(_) => {
-                    let mut response = Response::new(Body::empty());
-                    *response.status_mut() = StatusCode::NOT_FOUND;
-                    response
-                }
+            let response = if let Ok(bytes) = tokio::fs::read(&self.file).await {
+                let mut response = Response::new(Body::from(bytes));
+                let headers = response.headers_mut();
+                headers.insert(CONTENT_TYPE, self.content_type.clone());
+                headers.insert(CACHE_CONTROL, CACHE_CONTROL_VALUE);
+                response
+            } else {
+                let mut response = Response::new(Body::empty());
+                *response.status_mut() = StatusCode::NOT_FOUND;
+                response
             };
             Ok(response)
         })

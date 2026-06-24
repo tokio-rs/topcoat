@@ -54,7 +54,7 @@ impl DevCommand {
                     eprintln!(
                         "  {}",
                         style(format!("failed to watch {}: {e}", dir.display())).yellow()
-                    )
+                    );
                 });
         }
 

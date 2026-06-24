@@ -85,6 +85,11 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Pushes a text token onto the buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `string.len()` does not fit in an `isize`.
     pub fn scan_text(&mut self, string: Cow<'static, str>, mode: TextMode) {
         self.tokens.push_len(string.len().try_into().unwrap());
         let token = Token::Text(TextToken::new(string, mode));

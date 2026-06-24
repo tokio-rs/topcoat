@@ -26,8 +26,10 @@ impl<'a> ConstWriter<'a> {
         self.write_bytes(&v.to_le_bytes());
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     pub const fn write_str(&mut self, s: &str) {
-        self.write_u16_le(s.len() as u16);
+        let len = s.len() as u16;
+        self.write_u16_le(len);
         self.write_bytes(s.as_bytes());
     }
 
@@ -96,6 +98,10 @@ impl<'a> ConstReader<'a> {
         }
     }
 
+    /// Reads an optional string, encoding three states: `None` when the buffer
+    /// is exhausted, `Some(None)` for an absent string, and `Some(Some(_))` for
+    /// a present string.
+    #[allow(clippy::option_option)]
     pub const fn read_str_opt(&mut self) -> Option<Option<&'a str>> {
         let Some(tag) = self.read_bytes(1) else {
             return None;

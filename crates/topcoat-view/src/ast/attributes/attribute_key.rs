@@ -30,7 +30,7 @@ impl WriteView for AttributeKey {
         match self {
             Self::Ident(inner) => writer.write_str_unescaped(&inner.to_string()),
             Self::Expr(inner) => {
-                writer.write_expr(ExprKind::AttributeKey, inner.expr.to_token_stream())
+                writer.write_expr(ExprKind::AttributeKey, inner.expr.to_token_stream());
             }
         }
     }

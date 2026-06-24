@@ -18,6 +18,12 @@ pub struct Manifest {
 
 impl Manifest {
     /// Read and parse a manifest, rejecting unsupported versions.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`io::ErrorKind::InvalidData`] if the file is not valid TOML or
+    /// if its `version` field does not equal [`MANIFEST_VERSION`], and
+    /// propagates any I/O error from reading `path`.
     pub fn load(path: impl AsRef<Path>) -> io::Result<Self> {
         let toml_str = fs::read_to_string(path)?;
         let manifest: Manifest =
@@ -37,6 +43,11 @@ impl Manifest {
     }
 
     /// Serialize the manifest to TOML and write it to `path`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization to TOML fails or if writing the file
+    /// fails.
     pub fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
         let toml_str = toml::to_string_pretty(self).map_err(io::Error::other)?;
         fs::write(path, toml_str)

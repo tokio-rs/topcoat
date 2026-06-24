@@ -9,6 +9,10 @@ use crate::router::{Router, internal_serve};
 ///
 /// This calls [`crate::dev::notify_ready`] before handing the listener off to
 /// the router's accept loop.
+///
+/// # Errors
+///
+/// Returns `Err` if accepting or handling a connection on `listener` fails.
 pub async fn serve(listener: TcpListener, router: Router) -> Result<(), io::Error> {
     let addr = listener.local_addr().ok();
     crate::dev::notify_ready(addr).await;
@@ -19,6 +23,11 @@ pub async fn serve(listener: TcpListener, router: Router) -> Result<(), io::Erro
 ///
 /// The listener binds to the `HOST` and `PORT` environment variables,
 /// or `127.0.0.1` and `3000` when unset.
+///
+/// # Errors
+///
+/// Returns `Err` if `HOST`/`PORT` are invalid, if binding the TCP listener
+/// fails, or if serving the router fails (see [`serve`]).
 pub async fn start(router: Router) -> Result<(), io::Error> {
     let host = host_from_env()?;
     let port = port_from_env()?;

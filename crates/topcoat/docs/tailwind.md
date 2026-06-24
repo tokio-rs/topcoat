@@ -1,4 +1,4 @@
-Topcoat's Tailwind integration is a thin Rust wrapper around the standalone Tailwind CSS CLI. It does not run Node, PostCSS, or a Vite-style asset pipeline. Instead, a Cargo build script runs Tailwind, writes a CSS file into `OUT_DIR`, and the normal Topcoat asset bundler serves that CSS file with a content-hashed URL.
+Topcoat's Tailwind integration is a thin Rust wrapper around the standalone Tailwind CSS CLI. It does not run Node, `PostCSS`, or a Vite-style asset pipeline. Instead, a Cargo build script runs Tailwind, writes a CSS file into `OUT_DIR`, and the normal Topcoat asset bundler serves that CSS file with a content-hashed URL.
 
 # Setup
 

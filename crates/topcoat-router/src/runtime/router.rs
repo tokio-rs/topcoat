@@ -65,23 +65,20 @@ impl Router {
         // An unmatched path (404) has no precomputed stack, so its layers are
         // selected from the request path on this cold path.
         let not_found_layers: Vec<usize>;
-        let (layers, terminal, path_params) = match self.endpoints.at(parts.uri.path()) {
-            Ok(matched) => {
-                let path_params = RawPathParams::from_pairs(matched.params.iter());
-                let terminal = match matched.value.get(&parts.method) {
-                    Some(index) => Terminal::Route(&*self.routes[index]),
-                    None => Terminal::MethodNotAllowed(matched.value),
-                };
-                (matched.value.layers(), terminal, path_params)
-            }
-            Err(_) => {
-                not_found_layers = layers_for(request_path(&parts.uri), &self.layers);
-                (
-                    not_found_layers.as_slice(),
-                    Terminal::NotFound,
-                    RawPathParams::default(),
-                )
-            }
+        let (layers, terminal, path_params) = if let Ok(matched) = self.endpoints.at(parts.uri.path()) {
+            let path_params = RawPathParams::from_pairs(matched.params.iter());
+            let terminal = match matched.value.get(&parts.method) {
+                Some(index) => Terminal::Route(&*self.routes[index]),
+                None => Terminal::MethodNotAllowed(matched.value),
+            };
+            (matched.value.layers(), terminal, path_params)
+        } else {
+            not_found_layers = layers_for(request_path(&parts.uri), &self.layers);
+            (
+                not_found_layers.as_slice(),
+                Terminal::NotFound,
+                RawPathParams::default(),
+            )
         };
 
         let mut cx = Cx::new(self.app_context.clone(), ContextMap::new());
@@ -236,12 +233,11 @@ impl RouterBuilder {
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::<Cow<'static, crate::runtime::Path>>::new();
         for layout in inventory::iter::<LayoutFn>().cloned() {
-            if !seen.insert(layout.path()) {
-                panic!(
-                    "multiple discovered layouts registered for the same path \"{}\"",
-                    layout.path()
-                );
-            }
+            assert!(
+                seen.insert(layout.path()),
+                "multiple discovered layouts registered for the same path \"{}\"",
+                layout.path()
+            );
             self = self.layout(layout);
         }
         self
@@ -279,12 +275,11 @@ impl RouterBuilder {
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::<Cow<'static, crate::runtime::Path>>::new();
         for layer in inventory::iter::<crate::runtime::LayerFn>().cloned() {
-            if !seen.insert(layer.path()) {
-                panic!(
-                    "multiple discovered layers registered for the same path \"{}\"",
-                    layer.path()
-                );
-            }
+            assert!(
+                seen.insert(layer.path()),
+                "multiple discovered layers registered for the same path \"{}\"",
+                layer.path()
+            );
             self = self.layer(layer);
         }
         self
@@ -377,9 +372,10 @@ impl RouterBuilder {
             let path = route_path.to_matchit_path();
             let method = route.method();
             let endpoint = grouped.entry(path.clone()).or_default();
-            if endpoint.get(&method).is_some() {
-                panic!("duplicate route registered for `{method} {path}`");
-            }
+            assert!(
+                endpoint.get(&method).is_none(),
+                "duplicate route registered for `{method} {path}`"
+            );
             endpoint.insert(method, index);
             paths.entry(path).or_insert(route_path);
         }
@@ -461,16 +457,16 @@ mod tests {
     // A handful of plain handler functions, since `Route`/`Layer` are backed by
     // `fn` pointers and cannot capture state.
 
-    fn say_route<'cx>(_cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
+    fn say_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { "route".into_response() })
     }
 
-    fn say_posted<'cx>(_cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
+    fn say_posted(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { "posted".into_response() })
     }
 
     /// Echoes the captured path params as `key=value` pairs joined by `&`.
-    fn echo_params<'cx>(cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
+    fn echo_params(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
             let params: &RawPathParams = request_context(cx);
             params
@@ -485,7 +481,7 @@ mod tests {
     /// Reads a registered app-context greeting and returns it as the body.
     struct Greeting(&'static str);
 
-    fn say_greeting<'cx>(cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
+    fn say_greeting(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { app_context::<Greeting>(cx).0.into_response() })
     }
 
@@ -516,7 +512,7 @@ mod tests {
         View::new(parts)
     }
 
-    fn render_page<'cx>(_cx: &'cx Cx, _body: Body) -> ViewFuture<'cx> {
+    fn render_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
         Box::pin(async move { Ok(view("page")) })
     }
 

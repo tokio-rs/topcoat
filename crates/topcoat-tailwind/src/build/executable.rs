@@ -27,6 +27,12 @@ fn asset_name() -> Result<&'static str> {
 ///
 /// If `dest` already exists it's left untouched. On Unix the file is made
 /// executable.
+///
+/// # Errors
+///
+/// Returns `Err` if the host platform is unsupported, if the download request
+/// or body read fails, or if creating, writing, chmod-ing, or renaming the
+/// destination file fails.
 pub fn download(version: &str, dest: impl AsRef<Path>) -> Result<PathBuf> {
     let dest = dest.as_ref().to_path_buf();
     if dest.exists() {

@@ -102,6 +102,6 @@ where
 {
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
-        (*self).into_view_parts(parts)
+        (*self).into_view_parts(parts);
     }
 }

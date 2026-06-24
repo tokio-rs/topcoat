@@ -51,7 +51,7 @@ pub struct BadRequestError {
 
 impl BadRequestError {
     fn new(path: Option<String>, description: String) -> Self {
-        Self { description, path }
+        Self { path, description }
     }
 
     /// Returns the path into the request where the error was encountered.

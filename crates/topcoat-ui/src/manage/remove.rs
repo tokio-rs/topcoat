@@ -21,6 +21,20 @@ pub struct Removed {
 /// anything is deleted: with `registry` it is removed from that registry,
 /// otherwise from the sole registry it is installed from (an error if it is
 /// installed from several). The state is saved once, after all removals.
+///
+/// # Errors
+///
+/// Returns an error if the install state cannot be loaded, a component's
+/// registry cannot be resolved (unknown name, ambiguous across registries),
+/// a file deletion fails for a reason other than the file already being gone,
+/// a module declaration cannot be updated, or the state cannot be saved.
+///
+/// # Panics
+///
+/// Panics if a registry resolved during the up-front resolution phase is no
+/// longer present in the install state when its component is deleted. This is
+/// an internal invariant: resolution inserts the target pair, so the registry
+/// must still be tracked.
 pub fn remove(
     package: &Package,
     components: &[String],

@@ -84,7 +84,7 @@ impl WriteView for ElementName {
             Self::Ident(inner) => writer.write_str_unescaped(&inner.to_string()),
             Self::LitStr(inner) => writer.write_str_unescaped(&inner.value()),
             Self::Expr(inner) => {
-                writer.write_expr(ExprKind::ElementName, inner.expr.to_token_stream())
+                writer.write_expr(ExprKind::ElementName, inner.expr.to_token_stream());
             }
         }
     }

@@ -30,7 +30,7 @@ impl Parse for Segment {
 
         // Check for duplicates.
         let mut keys = HashSet::new();
-        for attr in attrs.iter() {
+        for attr in &attrs {
             if !keys.insert(attr.keyword()) {
                 return Err(syn::Error::new(
                     attr.span(),
@@ -110,14 +110,14 @@ impl SegmentAttr {
     fn as_kind(&self) -> Option<&Ident> {
         match self {
             Self::Kind { value, .. } => Some(value),
-            _ => None,
+            Self::Rename { .. } => None,
         }
     }
 
     fn as_rename(&self) -> Option<&LitStr> {
         match self {
             Self::Rename { value, .. } => Some(value),
-            _ => None,
+            Self::Kind { .. } => None,
         }
     }
 }

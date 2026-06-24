@@ -154,8 +154,7 @@ impl RawAsset {
                 let source = anchor_source_file(&self.manifest_dir, &self.source_file);
                 source
                     .parent()
-                    .map(Path::to_path_buf)
-                    .unwrap_or_else(|| PathBuf::from(&self.manifest_dir))
+                    .map_or_else(|| PathBuf::from(&self.manifest_dir), Path::to_path_buf)
             }
             _ => PathBuf::from(&self.manifest_dir),
         };

@@ -56,6 +56,12 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// }
 /// ```
 pub trait IntoResponse {
+    /// Converts `self` into an HTTP [`Response`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the response cannot be assembled (for example, a
+    /// header value is invalid).
     fn into_response(self) -> Result<Response>;
 }
 
@@ -66,6 +72,12 @@ pub trait IntoResponse {
 /// body element of an [`IntoResponse`] tuple to attach headers or extensions to
 /// the response.
 pub trait IntoResponseParts {
+    /// Applies `self` to the response `parts`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a part cannot be applied (for example, a header
+    /// value is invalid).
     fn into_response_parts(self, parts: &mut Parts) -> Result<()>;
 }
 

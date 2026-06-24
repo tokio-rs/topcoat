@@ -60,14 +60,21 @@ impl RawPathParams {
                 .collect(),
         )
     }
+
+    /// Iterates over each `(name, value)` pair as string slices.
+    pub fn iter(&self) -> RawPathParamsIter<'_> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
 }
+
+pub type RawPathParamsIter<'params> = std::iter::Map<
+    std::slice::Iter<'params, (Arc<str>, Box<str>)>,
+    fn(&'params (Arc<str>, Box<str>)) -> (&'params str, &'params str),
+>;
 
 impl<'params> IntoIterator for &'params RawPathParams {
     type Item = (&'params str, &'params str);
-    type IntoIter = std::iter::Map<
-        std::slice::Iter<'params, (Arc<str>, Box<str>)>,
-        fn(&'params (Arc<str>, Box<str>)) -> (&'params str, &'params str),
-    >;
+    type IntoIter = RawPathParamsIter<'params>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter().map(|(key, value)| (&**key, &**value))

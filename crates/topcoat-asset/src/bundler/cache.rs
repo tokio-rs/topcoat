@@ -1,10 +1,9 @@
-use std::{fs, io, path::PathBuf};
+use std::{fs, fmt::Write as _, io, path::PathBuf};
 
 use http::Uri;
 use sha2::{Digest, Sha256};
 
 use super::error::BundleError;
-
 pub struct Cache {
     dir: PathBuf,
     agent: ureq::Agent,
@@ -62,7 +61,10 @@ impl Cache {
 
     fn cached_path(&self, uri: &Uri) -> PathBuf {
         let digest = Sha256::digest(uri.to_string().as_bytes());
-        let hex: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
+        let mut hex = String::with_capacity(digest.len() * 2);
+        for b in &digest {
+            let _ = write!(hex, "{b:02x}");
+        }
         let key = &hex[..32];
         let name = match uri_extension(uri) {
             Some(ext) => format!("{key}.{ext}"),

@@ -80,44 +80,48 @@ impl BuildConfig {
 
     /// Download the CLI if needed and run it. Returns the path to the
     /// generated CSS file.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if `OUT_DIR` or `CARGO_MANIFEST_DIR` is unset, if the CLI
+    /// cannot be downloaded or executed, or if the Tailwind CLI exits with a
+    /// non-zero status.
     pub fn render(self) -> Result<PathBuf> {
         let out_dir = PathBuf::from(env::var_os("OUT_DIR").ok_or(BuildError::NoOutDir)?);
 
         let cli = out_dir.join(format!("tailwindcss-{}", self.version));
         executable::download(&self.version, &cli)?;
 
-        let input = match self.input {
-            Some(path) => path,
-            None => {
-                let path = out_dir.join("tailwind-input.css");
-                // Only write if contents would change; otherwise the file's
-                // mtime advances every build and the `rerun-if-changed` below
-                // forces the build script to run again next time.
-                let needs_write = match fs::read(&path) {
-                    Ok(existing) => existing != DEFAULT_INPUT_CSS.as_bytes(),
-                    Err(_) => true,
-                };
-                if needs_write {
-                    fs::write(&path, DEFAULT_INPUT_CSS).map_err(|source| BuildError::Io {
-                        path: path.clone(),
-                        source,
-                    })?;
-                }
-                path
+        let input = if let Some(path) = self.input {
+            path
+        } else {
+            let path = out_dir.join("tailwind-input.css");
+            // Only write if contents would change; otherwise the file's
+            // mtime advances every build and the `rerun-if-changed` below
+            // forces the build script to run again next time.
+            let needs_write = match fs::read(&path) {
+                Ok(existing) => existing != DEFAULT_INPUT_CSS.as_bytes(),
+                Err(_) => true,
+            };
+            if needs_write {
+                fs::write(&path, DEFAULT_INPUT_CSS).map_err(|source| BuildError::Io {
+                    path: path.clone(),
+                    source,
+                })?;
             }
+            path
         };
 
         let output = self
             .output
             .unwrap_or_else(|| out_dir.join(DEFAULT_OUTPUT_NAME));
 
-        let cwd = match self.cwd {
-            Some(path) => path,
-            None => {
-                let manifest_dir =
-                    env::var_os("CARGO_MANIFEST_DIR").ok_or(BuildError::NoManifestDir)?;
-                PathBuf::from(manifest_dir).join("src")
-            }
+        let cwd = if let Some(path) = self.cwd {
+            path
+        } else {
+            let manifest_dir =
+                env::var_os("CARGO_MANIFEST_DIR").ok_or(BuildError::NoManifestDir)?;
+            PathBuf::from(manifest_dir).join("src")
         };
 
         println!("cargo:rerun-if-changed={}", input.display());

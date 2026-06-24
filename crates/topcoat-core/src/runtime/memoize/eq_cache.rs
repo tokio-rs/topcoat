@@ -32,7 +32,7 @@ pub struct MemoizeEqCache {
 impl MemoizeEqCache {
     #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        MemoizeEqCache::default()
     }
 
     /// Returns a stable reference to the cell associated with `(Marker, key)`, creating a default
@@ -88,6 +88,13 @@ impl MemoizeEqCache {
     ///
     /// Only observes entries written by the synchronous [`memoize`](Self::memoize); the async
     /// variant stores its cells as `OnceCell<V>` and is not visible here.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned, or if a stored cell cannot be
+    /// downcast back to `OnceLock<V>` (which indicates a marker/type mismatch
+    /// between the caller and the function that originally memoized the value).
+    #[allow(clippy::needless_pass_by_value)]
     pub fn get<K, V, F>(&self, marker: F, key: K) -> Option<&V>
     where
         K: Copy,

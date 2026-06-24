@@ -12,6 +12,10 @@ use crate::runtime::{Router, RouterService};
 /// accepts connections in a loop, serving each on its own task, until the
 /// listener errors. Applications typically use the facade's `serve`/`start`
 /// helpers, which layer dev-server readiness notification on top of this.
+///
+/// # Errors
+///
+/// Returns an I/O error if accepting a connection fails.
 pub async fn internal_serve(listener: TcpListener, router: Router) -> io::Result<()> {
     let service = RouterService::new(router);
 

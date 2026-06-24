@@ -19,7 +19,7 @@ use crate::ast::component::{ComponentAttr, ComponentItem};
 
 /// A parsed `#[component] async fn ...`. Expands into:
 ///
-/// - a props struct named after the function in PascalCase plus `Props` (`button` becomes
+/// - a props struct named after the function in `PascalCase` plus `Props` (`button` becomes
 ///   `ButtonProps`), deriving [`Props`] so it gets a typestate builder. `#[default]` and `#[into]`
 ///   on function parameters are forwarded to the corresponding props fields. `impl Trait` parameter
 ///   types are lifted into generic type parameters of the props struct.
@@ -39,6 +39,12 @@ impl Component {
         Self { _attr: attr, item }
     }
 
+    /// Parses a `#[component]` attribute and function item from token streams.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either token stream fails to parse as a
+    /// [`ComponentAttr`] or [`ComponentItem`].
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
         Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
     }
@@ -86,7 +92,7 @@ impl ToTokens for Component {
             params: Vec::new(),
         };
 
-        for input in self.item.item().sig.inputs.iter() {
+        for input in &self.item.item().sig.inputs {
             let FnArg::Typed(pat_type) = input else {
                 unreachable!("validated in Parse");
             };
@@ -165,7 +171,7 @@ impl ToTokens for Component {
 /// `__Label: Into<String>`), since `impl Trait` cannot appear in the
 /// generated props struct's field types.
 struct ImplTraitParamVisitor {
-    /// The PascalCase name of the parameter currently being visited.
+    /// The `PascalCase` name of the parameter currently being visited.
     prefix: String,
     /// How many `impl Trait` occurrences the current parameter contained.
     count: usize,

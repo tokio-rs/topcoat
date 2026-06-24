@@ -24,7 +24,7 @@ pub(super) async fn run(args: ListArgs) {
     for asset in topcoat_asset::RawAsset::find_in_binary(&bytes) {
         match asset.source() {
             topcoat_asset::Source::Path(p) => {
-                println!("{}", p.to_str().unwrap_or("<non-utf8 file path>"))
+                println!("{}", p.to_str().unwrap_or("<non-utf8 file path>"));
             }
             topcoat_asset::Source::Url(uri) => println!("{uri}"),
         }

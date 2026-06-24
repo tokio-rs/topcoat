@@ -140,7 +140,7 @@ impl AttributeValueViewParts for &bool {
 
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
-        (*self).into_view_parts(parts)
+        (*self).into_view_parts(parts);
     }
 }
 
@@ -155,7 +155,7 @@ where
 
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
-        (*self).into_view_parts(parts)
+        (*self).into_view_parts(parts);
     }
 }
 
@@ -179,8 +179,7 @@ where
 impl AttributeValueViewParts for ViewPart {
     fn attribute_present(&self) -> bool {
         match self {
-            Self::Empty => false,
-            Self::Bool(false) => false,
+            Self::Empty | Self::Bool(false) => false,
             Self::BoxSlice(inner) if inner.is_empty() => false,
             Self::Vec(inner) if inner.is_empty() => false,
             _ => true,

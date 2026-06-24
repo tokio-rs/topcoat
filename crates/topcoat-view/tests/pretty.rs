@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::path::Path;
 
 use topcoat_pretty::{Registry, pretty_print_str};
@@ -13,17 +14,17 @@ fn diff(expected: &str, actual: &str) -> String {
         let act = actual_lines.get(i).copied();
         match (exp, act) {
             (Some(e), Some(a)) if e == a => {
-                output.push_str(&format!("   {e}\n"));
+                let _ = writeln!(output, "   {e}");
             }
             (Some(e), Some(a)) => {
-                output.push_str(&format!("  -{e}\n"));
-                output.push_str(&format!("  +{a}\n"));
+                let _ = writeln!(output, "  -{e}");
+                let _ = writeln!(output, "  +{a}");
             }
             (Some(e), None) => {
-                output.push_str(&format!("  -{e}\n"));
+                let _ = writeln!(output, "  -{e}");
             }
             (None, Some(a)) => {
-                output.push_str(&format!("  +{a}\n"));
+                let _ = writeln!(output, "  +{a}");
             }
             (None, None) => {}
         }
@@ -45,12 +46,11 @@ fn assert_format(input: &str, expected: &str) {
             errors.first().unwrap()
         );
     });
-    if result != expected {
-        panic!(
-            "\nformatted output does not match expected\n\n--- diff (expected vs actual) ---\n{}",
-            diff(expected, &result),
-        );
-    }
+    assert!(
+        result == expected,
+        "\nformatted output does not match expected\n\n--- diff (expected vs actual) ---\n{}",
+        diff(expected, &result),
+    );
 }
 
 fn assert_format_idempotent(input: &str, expected: &str) {

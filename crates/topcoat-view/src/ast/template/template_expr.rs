@@ -41,7 +41,7 @@ impl ParseOption for TemplateExpr {
 
 impl ToTokens for TemplateExpr {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.expr.to_tokens(tokens)
+        self.expr.to_tokens(tokens);
     }
 }
 

@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Expr as SynExpr, ExprCall, Token, punctuated::Punctuated};
@@ -15,7 +13,7 @@ impl Expr {
     ) -> syn::Result<()> {
         let args = &call.args;
         // Special case for enum construction
-        if let SynExpr::Path(path) = call.func.deref()
+        if let SynExpr::Path(path) = &*call.func
             && path.qself.is_none()
             && path.path.leading_colon.is_none()
             && path.path.segments.len() == 1

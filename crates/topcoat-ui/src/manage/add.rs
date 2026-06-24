@@ -73,6 +73,20 @@ struct PlannedRemoval {
 /// and only commits the writes once everything resolves. Interactive decisions
 /// (pulling from a non-default registry, or replacing a file owned by another
 /// registry) are delegated to `confirm`.
+///
+/// # Errors
+///
+/// Returns an error if the install state or workspace cannot be loaded, a
+/// requested component or its registry cannot be resolved, a confirmation
+/// prompt is declined, an existing file would be overwritten without
+/// `overwrite`, or any file write, module declaration, or state save fails.
+///
+/// # Panics
+///
+/// Panics if a registry found to conflict with a new component is no longer
+/// present in the install state when its old component is removed. This is an
+/// internal invariant: the conflict was discovered by iterating the state, so
+/// the registry must still be tracked.
 pub fn add(
     package: &Package,
     options: &AddOptions,

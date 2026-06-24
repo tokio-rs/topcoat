@@ -24,6 +24,7 @@ impl AttributeWriter {
     }
 
     /// Records a single `__attrs.insert(key, value);` call.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn insert(&mut self, key: TokenStream, value: TokenStream) {
         self.chunks.push(Chunk::Insert {
             tokens: quote! { __attrs.insert(#key, #value); },
@@ -87,9 +88,10 @@ impl AttributeWriter {
             let mut output = TokenStream::new();
             for chunk in chunks {
                 match chunk {
-                    Chunk::Insert { tokens, .. } => tokens.to_tokens(&mut output),
+                    Chunk::Insert { tokens, .. } | Chunk::Statement { tokens } => {
+                        tokens.to_tokens(&mut output);
+                    }
                     Chunk::Let { pat, expr } => quote! { let #pat = #expr; }.to_tokens(&mut output),
-                    Chunk::Statement { tokens } => tokens.to_tokens(&mut output),
                     Chunk::For { pat, expr, body } => {
                         let body = build_parts(&body.chunks);
                         quote! {
@@ -182,8 +184,7 @@ impl Chunk {
     fn capacity(&self) -> usize {
         match self {
             Chunk::Insert { capacity, .. } => *capacity,
-            Chunk::Let { .. } | Chunk::Statement { .. } => 0,
-            Chunk::For { .. } => 0,
+            Chunk::Let { .. } | Chunk::Statement { .. } | Chunk::For { .. } => 0,
             Chunk::If {
                 then_branch,
                 else_branch,

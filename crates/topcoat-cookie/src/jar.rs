@@ -44,7 +44,9 @@ impl CookieJar {
     }
 
     fn lock(&self) -> MutexGuard<'_, RawCookieJar> {
-        self.jar.lock().unwrap_or_else(|poison| poison.into_inner())
+        self.jar
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// Renders the jar's pending changes as `Set-Cookie` header values.

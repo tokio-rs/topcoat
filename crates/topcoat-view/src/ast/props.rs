@@ -41,10 +41,28 @@ struct PropsField {
 }
 
 impl Props {
+    /// Parses a `#[derive(Props)]` input from a token stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the token stream fails to parse as a [`DeriveInput`],
+    /// or if the parsed input is not a struct with named fields.
     pub fn parse(item: TokenStream) -> syn::Result<Self> {
         Self::new(syn::parse2(item)?)
     }
 
+    /// Builds a [`Props`] from a parsed derive input.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `input` is not a struct with named fields, or if a
+    /// field is named `build` (which would clash with the generated `build()`
+    /// method).
+    ///
+    /// # Panics
+    ///
+    /// Panics if a named field is missing its identifier. `syn` guarantees that
+    /// named fields always have identifiers, so this never occurs in practice.
     pub fn new(input: DeriveInput) -> syn::Result<Self> {
         let Data::Struct(data) = input.data else {
             return Err(syn::Error::new_spanned(
@@ -214,37 +232,36 @@ impl ToTokens for Props {
                 (quote!(#ty), quote!(#field_ident))
             };
 
-            match &field.state {
-                // Required field: setting it flips its marker to `Set`, so the
-                // builder has to be rebuilt under the new type.
-                Some(state) => {
-                    let ret_ty = builder_ty(&|_, other| {
-                        if other == state {
-                            quote!(::topcoat::view::Set)
-                        } else {
-                            other.to_token_stream()
-                        }
-                    });
-                    let other_idents = field_idents.iter().filter(|other| **other != field_ident);
-                    quote! {
-                        #doc
-                        #vis fn #field_ident(self, #field_ident: #param_ty) -> #ret_ty {
-                            #builder_ident {
-                                #field_ident: ::core::option::Option::Some(#value),
-                                #(#other_idents: self.#other_idents,)*
-                                #phantom_init
-                            }
+            // Required field: setting it flips its marker to `Set`, so the
+            // builder has to be rebuilt under the new type.
+            if let Some(state) = &field.state {
+                let ret_ty = builder_ty(&|_, other| {
+                    if other == state {
+                        quote!(::topcoat::view::Set)
+                    } else {
+                        other.to_token_stream()
+                    }
+                });
+                let other_idents = field_idents.iter().filter(|other| **other != field_ident);
+                quote! {
+                    #doc
+                    #vis fn #field_ident(self, #field_ident: #param_ty) -> #ret_ty {
+                        #builder_ident {
+                            #field_ident: ::core::option::Option::Some(#value),
+                            #(#other_idents: self.#other_idents,)*
+                            #phantom_init
                         }
                     }
                 }
+            } else {
                 // `#[default]` field: setting it does not change the typestate.
-                None => quote! {
+                quote! {
                     #doc
                     #vis fn #field_ident(mut self, #field_ident: #param_ty) -> Self {
                         self.#field_ident = ::core::option::Option::Some(#value);
                         self
                     }
-                },
+                }
             }
         });
 

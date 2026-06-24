@@ -36,7 +36,7 @@ impl ToTokens for TemplateOrRuntimeExpr {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::Template(inner) => {
-                quote! { ::topcoat::runtime::Expr::from(#inner) }.to_tokens(tokens)
+                quote! { ::topcoat::runtime::Expr::from(#inner) }.to_tokens(tokens);
             }
             Self::Runtime(inner) => inner.to_tokens(tokens),
         }

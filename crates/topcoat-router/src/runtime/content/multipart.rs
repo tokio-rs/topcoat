@@ -82,6 +82,12 @@ impl OptionalFromRequest for Multipart {
 
 impl Multipart {
     /// Yields the next [`Field`] if available.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading the next field from the multipart stream
+    /// fails; malformed requests are classified as `400 Bad Request` and other
+    /// failures as `500 Internal Server Error`.
     pub async fn next_field(&mut self) -> Result<Option<Field<'_>>> {
         let field = self.inner.next_field().await.map_err(multipart_error)?;
 
@@ -118,7 +124,7 @@ impl Field<'_> {
     /// The `Content-Type` of the field, if present.
     #[must_use]
     pub fn content_type(&self) -> Option<&str> {
-        self.inner.content_type().map(|mime| mime.as_ref())
+        self.inner.content_type().map(std::convert::AsRef::as_ref)
     }
 
     /// The headers of the field as a [`HeaderMap`].
@@ -128,11 +134,23 @@ impl Field<'_> {
     }
 
     /// Reads the full data of the field into [`Bytes`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading the field data fails; malformed requests are
+    /// classified as `400 Bad Request` and other failures as `500 Internal
+    /// Server Error`.
     pub async fn bytes(self) -> Result<Bytes> {
         self.inner.bytes().await.map_err(multipart_error)
     }
 
     /// Reads the full data of the field as text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading the field text fails; malformed requests are
+    /// classified as `400 Bad Request` and other failures as `500 Internal
+    /// Server Error`.
     pub async fn text(self) -> Result<String> {
         self.inner.text().await.map_err(multipart_error)
     }
@@ -140,6 +158,12 @@ impl Field<'_> {
     /// Streams a chunk of the field data, returning [`None`] once exhausted.
     ///
     /// This does the same thing as the [`Stream`] implementation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading the next chunk fails; malformed requests are
+    /// classified as `400 Bad Request` and other failures as `500 Internal
+    /// Server Error`.
     pub async fn chunk(&mut self) -> Result<Option<Bytes>> {
         self.inner.chunk().await.map_err(multipart_error)
     }
@@ -268,7 +292,7 @@ mod tests {
             upload
                 .headers()
                 .get(CONTENT_TYPE)
-                .map(|value| value.as_bytes()),
+                .map(http::HeaderValue::as_bytes),
             Some(b"text/plain".as_slice())
         );
         assert_eq!(

@@ -167,7 +167,7 @@ mod tests {
             response
                 .headers()
                 .get(CONTENT_TYPE)
-                .map(|value| value.as_bytes()),
+                .map(http::HeaderValue::as_bytes),
             Some(b"text/html; charset=utf-8".as_slice())
         );
 

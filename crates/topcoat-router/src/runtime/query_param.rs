@@ -18,6 +18,11 @@ pub trait QueryParams: Sized {
 /// Parses the request's query string into a typed struct.
 ///
 /// See [`#[query_params]`](attr.query_params.html) for details.
+///
+/// # Errors
+///
+/// Returns a reference to the deserialization error if the query string cannot
+/// be parsed into `T`.
 #[inline]
 pub fn query_params<T: QueryParams>(cx: &Cx) -> Result<&T, &serde_urlencoded::de::Error> {
     T::query_params(cx, QueryParamsSealed::new())

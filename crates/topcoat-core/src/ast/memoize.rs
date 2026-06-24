@@ -18,6 +18,16 @@ pub struct MemoizeItem {
     item: ItemFn,
 }
 
+fn is_option_or_result(ty: &Type) -> bool {
+    let Type::Path(path) = ty else {
+        return false;
+    };
+    path.path
+        .segments
+        .last()
+        .is_some_and(|segment| segment.ident == "Option" || segment.ident == "Result")
+}
+
 impl Parse for MemoizeItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let item: ItemFn = input.parse()?;
@@ -57,6 +67,12 @@ impl Memoize {
         Self(attr, item)
     }
 
+    /// Parses the attribute and item streams into a [`Memoize`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either stream fails to parse as a valid memoize
+    /// attribute or memoized function item.
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
         Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
     }
@@ -117,16 +133,6 @@ impl ToTokens for Memoize {
                 borrowed_keys.push(quote! { &#ident });
             }
             key_idents.push(ident);
-        }
-
-        fn is_option_or_result(ty: &Type) -> bool {
-            let Type::Path(path) = ty else {
-                return false;
-            };
-            path.path
-                .segments
-                .last()
-                .is_some_and(|segment| segment.ident == "Option" || segment.ident == "Result")
         }
 
         let return_ty = match &sig.output {

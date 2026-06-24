@@ -33,5 +33,9 @@ uuid = { workspace = true, features = ["v4", "serde"] }
 topcoat = { workspace = true, features = ["view"] }
 topcoat-pretty.workspace = true
 
+[[test]]
+name = "pretty"
+required-features = ["pretty"]
+
 [lints]
 workspace = true

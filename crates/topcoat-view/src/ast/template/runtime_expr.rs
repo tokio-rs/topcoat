@@ -46,7 +46,7 @@ impl ToTokens for RuntimeExpr {
         quote! {
             ::topcoat::runtime::expr! { #expr }
         }
-        .to_tokens(tokens)
+        .to_tokens(tokens);
     }
 }
 

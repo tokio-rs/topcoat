@@ -3,6 +3,7 @@ mod error;
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Write as _,
     fs, io,
     path::{Path, PathBuf},
 };
@@ -57,6 +58,13 @@ impl Bundler {
     /// This blocks on filesystem and network I/O; call it from a blocking
     /// context (e.g. [`tokio::task::spawn_blocking`]) when running inside an
     /// async runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`BundleError`] for any I/O failure while creating or
+    /// reading `out_dir` and its manifest, downloading a remote asset, or
+    /// reading/writing a bundled file; and for a checksum mismatch between a
+    /// declared asset and its configured `checksum`.
     pub fn bundle(&self, binary: &[u8], out_dir: impl AsRef<Path>) -> BundleResult {
         let out_dir = out_dir.as_ref();
         fs::create_dir_all(out_dir).map_err(|source| AssetError::ManifestIo {
@@ -96,10 +104,10 @@ impl Bundler {
                 source,
             })?;
             let digest = Sha256::digest(&bytes);
-            let hash = digest
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<String>();
+            let mut hash = String::with_capacity(digest.len() * 2);
+            for b in &digest {
+                let _ = write!(hash, "{b:02x}");
+            }
 
             if let Some(expected) = asset.options().checksum()
                 && expected != hash
@@ -131,14 +139,14 @@ impl Bundler {
                 (false, _) => format!("{stem}.{short_hash}"),
             };
 
-            let content_type = options
-                .content_type()
-                .map(str::to_owned)
-                .unwrap_or_else(|| {
+            let content_type = options.content_type().map_or_else(
+                || {
                     mime_guess::from_path(&file)
                         .first_or_octet_stream()
                         .to_string()
-                });
+                },
+                str::to_owned,
+            );
 
             let id = asset.id();
             let dst = out_dir.join(&file);

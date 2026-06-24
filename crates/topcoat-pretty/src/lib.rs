@@ -28,6 +28,15 @@ struct Replace {
     replacement: String,
 }
 
+/// Pretty-prints the Topcoat macro invocations in `input`.
+///
+/// Returns the source with each macro body replaced by its formatted form, or
+/// the collection of errors encountered while parsing or formatting them.
+///
+/// # Errors
+///
+/// Returns `Err` with the accumulated `syn::Error`s if parsing `input` or any
+/// macro body fails, or if a registered pretty-printer returns an error.
 pub fn pretty_print_str(registry: &Registry, input: &str) -> Result<String, Vec<syn::Error>> {
     let mut output = String::new();
 

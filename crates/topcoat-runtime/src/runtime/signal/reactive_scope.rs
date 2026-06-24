@@ -32,6 +32,12 @@ pub struct ReactiveScope {
 }
 
 impl ReactiveScope {
+    /// Constructs a new reactive scope, recording the tracked signals and
+    /// rendering its placeholder shard.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any error produced while rendering the shard.
     #[inline]
     pub async fn new<S>(cx: &Cx, signals: S, shard: Shard<S>) -> Result<Self, Error>
     where

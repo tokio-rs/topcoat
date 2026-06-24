@@ -105,21 +105,48 @@ pub trait RouterErrorExt {
     type T;
 
     /// Returns `Ok(value)` if present, otherwise a temporary redirect to `uri`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`RedirectError`] performing a temporary redirect to `uri`
+    /// when the value is absent.
     fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError>;
 
     /// Returns `Ok(value)` if present, otherwise a permanent redirect to `uri`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`RedirectError`] performing a permanent redirect to `uri`
+    /// when the value is absent.
     fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError>;
 
     /// Returns `Ok(value)` if present, otherwise a not-found response.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`NotFoundError`] when the value is absent.
     fn ok_or_not_found(self) -> Result<Self::T, NotFoundError>;
 
     /// Returns `Ok(value)` if present, otherwise an unauthorized response.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`UnauthorizedError`] when the value is absent.
     fn ok_or_unauthorized(self) -> Result<Self::T, UnauthorizedError>;
 
     /// Returns `Ok(value)` if present, otherwise a forbidden response.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ForbiddenError`] when the value is absent.
     fn ok_or_forbidden(self) -> Result<Self::T, ForbiddenError>;
 
     /// Returns `Ok(value)` if present, otherwise a bad-request response.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`BadRequestError`] carrying `description` when the value is
+    /// absent.
     fn ok_or_bad_request(self, description: impl Into<String>) -> Result<Self::T, BadRequestError>;
 }
 
