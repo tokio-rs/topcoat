@@ -11,6 +11,7 @@ pub struct ReactiveScopeId(Uuid);
 
 impl ReactiveScopeId {
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }

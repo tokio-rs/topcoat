@@ -40,6 +40,7 @@ impl HtmlIdent {
     /// The source span covering the identifier. Falls back to the first
     /// segment's span when the underlying [`Span::join`] is unavailable (i.e.
     /// on stable Rust outside of `proc_macro2`'s fallback mode).
+    #[must_use]
     pub fn span(&self) -> Span {
         let first = self.first.span();
         match self.rest.last() {
@@ -103,6 +104,7 @@ impl HtmlIdent {
 }
 
 impl HtmlIdentSeparator {
+    #[must_use]
     pub fn span(&self) -> Span {
         match self {
             Self::Dash(token) => token.span(),

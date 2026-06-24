@@ -16,11 +16,13 @@ pub struct BundledAsset {
 
 impl BundledAsset {
     /// Absolute path to the bundled file on disk.
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
 
     /// Bundled filename (typically `stem-<short-hash>.ext`).
+    #[must_use]
     pub fn name(&self) -> &OsStr {
         self.path
             .file_name()
@@ -29,6 +31,7 @@ impl BundledAsset {
 
     /// `Content-Type` the asset is served with, resolved when the bundle was
     /// built.
+    #[must_use]
     pub fn content_type(&self) -> &str {
         &self.content_type
     }
@@ -47,6 +50,7 @@ pub struct AssetBundle {
 
 impl AssetBundle {
     /// Bundle with no assets and no directory; useful as a placeholder.
+    #[must_use]
     pub fn empty() -> Self {
         Default::default()
     }
@@ -147,11 +151,13 @@ impl AssetBundle {
     }
 
     /// Directory the bundle was loaded from.
+    #[must_use]
     pub fn dir(&self) -> &Path {
         &self.dir
     }
 
     /// Look up the bundled file for an [`Asset`] ID.
+    #[must_use]
     pub fn get(&self, id: Asset) -> Option<&BundledAsset> {
         self.bundled_assets.get(&id)
     }

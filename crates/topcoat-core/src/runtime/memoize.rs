@@ -11,6 +11,7 @@ pub struct MemoizeCache {
 
 impl MemoizeCache {
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Default::default()
     }

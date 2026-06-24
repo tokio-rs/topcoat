@@ -55,11 +55,13 @@ impl BadRequestError {
     }
 
     /// Returns the path into the request where the error was encountered.
+    #[must_use]
     pub fn path(&self) -> Option<&str> {
         self.path.as_deref()
     }
 
     /// Returns the client-safe description of what was wrong with the request.
+    #[must_use]
     pub fn description(&self) -> &str {
         &self.description
     }

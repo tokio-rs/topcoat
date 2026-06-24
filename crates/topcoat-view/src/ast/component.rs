@@ -34,6 +34,7 @@ pub struct Component {
 }
 
 impl Component {
+    #[must_use]
     pub fn new(attr: ComponentAttr, item: ComponentItem) -> Self {
         Self { _attr: attr, item }
     }

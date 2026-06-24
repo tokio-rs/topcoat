@@ -21,6 +21,7 @@ use crate::runtime::{IntoResponse, Response};
 ///     Ok(user)
 /// }
 /// ```
+#[must_use]
 pub fn not_found() -> NotFoundError {
     NotFoundError::new()
 }

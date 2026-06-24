@@ -29,11 +29,13 @@ impl Default for BuildConfig {
 }
 
 impl BuildConfig {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Pin the Tailwind CLI release (without the leading `v`).
+    #[must_use]
     pub fn version(mut self, version: impl Into<String>) -> Self {
         self.version = version.into();
         self
@@ -41,6 +43,7 @@ impl BuildConfig {
 
     /// Input CSS file. Defaults to a generated `input.css` in `OUT_DIR` that
     /// just contains `@import "tailwindcss";`.
+    #[must_use]
     pub fn input(mut self, path: impl Into<PathBuf>) -> Self {
         self.input = Some(path.into());
         self
@@ -48,24 +51,28 @@ impl BuildConfig {
 
     /// Output CSS file. Defaults to `$OUT_DIR/tailwind.css`, which can be
     /// loaded from source via `asset!(concat!(env!("OUT_DIR"), "/tailwind.css"))`.
+    #[must_use]
     pub fn output(mut self, path: impl Into<PathBuf>) -> Self {
         self.output = Some(path.into());
         self
     }
 
     /// Pass `--cwd` to the Tailwind CLI. Defaults to `$CARGO_MANIFEST_DIR/src`.
+    #[must_use]
     pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
         self.cwd = Some(cwd.into());
         self
     }
 
     /// Pass `--optimize` to the Tailwind CLI. Defaults to `false`.
+    #[must_use]
     pub fn optimize(mut self, optimize: bool) -> Self {
         self.optimize = optimize;
         self
     }
 
     /// Pass `--minify` to the Tailwind CLI. Defaults to `true`.
+    #[must_use]
     pub fn minify(mut self, minify: bool) -> Self {
         self.minify = minify;
         self

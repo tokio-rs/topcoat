@@ -102,6 +102,7 @@ pub struct ContextMap {
 
 impl ContextMap {
     /// Creates an empty `ContextMap`.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

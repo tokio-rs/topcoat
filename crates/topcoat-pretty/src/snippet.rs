@@ -12,28 +12,34 @@ pub struct MacroSnippet {
 }
 
 impl MacroSnippet {
+    #[must_use]
     pub fn collect_from_file(file: &syn::File) -> Vec<Self> {
         let mut visitor = Visitor::default();
         visitor.visit_file(file);
         visitor.snippets
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn source_text(&self) -> &str {
         &self.source_text
     }
 
+    #[must_use]
     pub fn span(&self) -> Span {
         self.span
     }
 
+    #[must_use]
     pub fn initial_space(&self) -> isize {
         self.initial_space
     }
 
+    #[must_use]
     pub fn initial_indent(&self) -> isize {
         self.initial_indent
     }

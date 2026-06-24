@@ -26,11 +26,13 @@ impl ModulePageFn {
     }
 
     /// Converts into a [`PageFn`] with the given resolved URL path.
+    #[must_use]
     pub fn into_page(self, path: Cow<'static, Path>) -> PageFn {
         PageFn::new(path, self.render)
     }
 
     /// Returns the module path used to derive the URL.
+    #[must_use]
     pub fn module_path(&self) -> &'static str {
         self.module_path
     }
@@ -63,11 +65,13 @@ impl ModuleLayoutFn {
     }
 
     /// Converts into a [`LayoutFn`] with the given resolved URL path.
+    #[must_use]
     pub fn into_layout(self, path: Cow<'static, Path>) -> LayoutFn {
         LayoutFn::new(path, self.render)
     }
 
     /// Returns the module path used to derive the URL.
+    #[must_use]
     pub fn module_path(&self) -> &'static str {
         self.module_path
     }

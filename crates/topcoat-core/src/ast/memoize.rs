@@ -52,6 +52,7 @@ impl Parse for MemoizeItem {
 pub struct Memoize(MemoizeAttr, MemoizeItem);
 
 impl Memoize {
+    #[must_use]
     pub fn new(attr: MemoizeAttr, item: MemoizeItem) -> Self {
         Self(attr, item)
     }

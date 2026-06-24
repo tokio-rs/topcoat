@@ -8,6 +8,7 @@ use topcoat_runtime::runtime::RouterBuilderProcedureExt;
 
 #[cfg(feature = "discover")]
 pub trait RouterBuilderDiscoverExt {
+    #[must_use]
     fn discover(self) -> Self;
 }
 

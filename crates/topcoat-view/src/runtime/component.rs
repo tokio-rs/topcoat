@@ -5,6 +5,7 @@ use crate::runtime::{Props, View};
 pub trait Component {
     type Props: Props;
 
+    #[must_use]
     fn props_builder() -> <Self::Props as Props>::Builder {
         Self::Props::builder()
     }

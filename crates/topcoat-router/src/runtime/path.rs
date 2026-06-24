@@ -48,6 +48,7 @@ impl Path {
     ///
     /// Panics if `s` is not a well-formed path; see [`PathError`] for the
     /// conditions that are rejected.
+    #[must_use]
     pub const fn new(s: &str) -> &Self {
         match Self::from_str(s) {
             Ok(path) => path,
@@ -98,6 +99,7 @@ impl Path {
     /// path string (for example one obtained from another `Path`); passing
     /// anything else yields a `Path` that misbehaves when its segments are read.
     #[ref_cast_custom]
+    #[must_use]
     pub const fn new_unchecked(s: &str) -> &Self;
 
     /// Returns an iterator over the [`PathSegment`]s of this path.
@@ -152,6 +154,7 @@ impl Path {
     /// let group_root = Path::new("/(marketing)");
     /// assert_eq!(group_root.to_matchit_path(), "/");
     /// ```
+    #[must_use]
     pub fn to_matchit_path(&self) -> Cow<'static, str> {
         if self.inner.is_empty() {
             return Cow::Borrowed("/");
@@ -187,6 +190,7 @@ impl Path {
     /// assert!(path.starts_with(Path::new("/users/{id}")));
     /// assert!(!path.starts_with(Path::new("/posts/{id}")));
     /// ```
+    #[must_use]
     pub fn starts_with(&self, other: &Path) -> bool {
         if self.inner.len() < other.inner.len() {
             return false;
@@ -198,6 +202,7 @@ impl Path {
     ///
     /// This length is in bytes, not [`char`]s or graphemes. In other words,
     /// it might not be what a human considers the length of the string.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
@@ -296,6 +301,7 @@ pub struct PathBuf {
 
 impl PathBuf {
     /// Creates a new empty `PathBuf`.
+    #[must_use]
     pub fn new() -> Self {
         Default::default()
     }
@@ -374,6 +380,7 @@ impl<'a> PathSegment<'a> {
     ///
     /// Panics if `s` is not a well-formed segment; see [`PathError`] for the
     /// conditions that are rejected.
+    #[must_use]
     pub fn new(s: &'a str) -> Self {
         match Self::from_str(s) {
             Ok(segment) => segment,
@@ -401,6 +408,7 @@ impl<'a> PathSegment<'a> {
     /// (for example one produced by [`Path::segments`]). A malformed input is
     /// parsed on a best-effort basis and yields a nonsensical segment rather than
     /// an error.
+    #[must_use]
     pub fn new_unchecked(s: &'a str) -> Self {
         if let Some(inner) = s.strip_prefix('{') {
             let inner = inner.strip_suffix('}').unwrap_or(inner);
@@ -448,6 +456,7 @@ impl<'a> PathSegment<'a> {
     }
 
     /// Returns the inner string if this is a [`Static`](PathSegment::Static) segment.
+    #[must_use]
     pub fn as_static(&self) -> Option<&&'a str> {
         if let Self::Static(v) = self {
             Some(v)
@@ -457,6 +466,7 @@ impl<'a> PathSegment<'a> {
     }
 
     /// Returns the inner string if this is a [`Group`](PathSegment::Group) segment.
+    #[must_use]
     pub fn as_group(&self) -> Option<&&'a str> {
         if let Self::Group(v) = self {
             Some(v)
@@ -466,6 +476,7 @@ impl<'a> PathSegment<'a> {
     }
 
     /// Returns the inner string if this is a [`Param`](PathSegment::Param) segment.
+    #[must_use]
     pub fn as_param(&self) -> Option<&&'a str> {
         if let Self::Param(v) = self {
             Some(v)
@@ -475,6 +486,7 @@ impl<'a> PathSegment<'a> {
     }
 
     /// Returns the inner string if this is a [`CatchAll`](PathSegment::CatchAll) segment.
+    #[must_use]
     pub fn as_catch_all(&self) -> Option<&&'a str> {
         if let Self::CatchAll(v) = self {
             Some(v)
@@ -694,7 +706,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "unexpected bracket")]
     fn new_panics_on_invalid() {
-        Path::new("/foo{bar}");
+        let _ = Path::new("/foo{bar}");
     }
 
     // ── PathBuf ──
@@ -787,67 +799,67 @@ mod tests {
     #[test]
     #[should_panic(expected = "missing closing `}`")]
     fn param_missing_close() {
-        PathSegment::new("{id");
+        let _ = PathSegment::new("{id");
     }
 
     #[test]
     #[should_panic(expected = "missing closing `)`")]
     fn group_missing_close() {
-        PathSegment::new("(auth");
+        let _ = PathSegment::new("(auth");
     }
 
     #[test]
     #[should_panic(expected = "empty segment")]
     fn empty_segment() {
-        PathSegment::new("");
+        let _ = PathSegment::new("");
     }
 
     #[test]
     #[should_panic(expected = "unexpected bracket")]
     fn static_with_braces() {
-        PathSegment::new("foo{bar}");
+        let _ = PathSegment::new("foo{bar}");
     }
 
     #[test]
     #[should_panic(expected = "name must not be empty")]
     fn param_empty_name() {
-        PathSegment::new("{}");
+        let _ = PathSegment::new("{}");
     }
 
     #[test]
     #[should_panic(expected = "name must not be empty")]
     fn group_empty_name() {
-        PathSegment::new("()");
+        let _ = PathSegment::new("()");
     }
 
     #[test]
     #[should_panic(expected = "name must not be empty")]
     fn catch_all_empty_name() {
-        PathSegment::new("{*}");
+        let _ = PathSegment::new("{*}");
     }
 
     #[test]
     #[should_panic(expected = "must start with a letter or underscore")]
     fn param_invalid_start() {
-        PathSegment::new("{0id}");
+        let _ = PathSegment::new("{0id}");
     }
 
     #[test]
     #[should_panic(expected = "contains an invalid character")]
     fn param_invalid_char() {
-        PathSegment::new("{id-name}");
+        let _ = PathSegment::new("{id-name}");
     }
 
     #[test]
     #[should_panic(expected = "must start with a letter or underscore")]
     fn group_invalid_start() {
-        PathSegment::new("(0auth)");
+        let _ = PathSegment::new("(0auth)");
     }
 
     #[test]
     #[should_panic(expected = "contains an invalid character")]
     fn group_invalid_char() {
-        PathSegment::new("(my-group)");
+        let _ = PathSegment::new("(my-group)");
     }
 
     #[test]

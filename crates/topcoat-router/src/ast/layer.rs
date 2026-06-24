@@ -32,6 +32,7 @@ impl Parse for LayerItem {
 pub struct Layer(LayerAttr, LayerItem);
 
 impl Layer {
+    #[must_use]
     pub fn new(attr: LayerAttr, item: LayerItem) -> Self {
         Self(attr, item)
     }

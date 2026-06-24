@@ -39,6 +39,7 @@ broken_intra_doc_links = "deny"
 
 [workspace.lints.clippy]
 mod_module_files = "deny"
+pedantic = { level = "warn", priority = -1 }
 
 [profile.dev]
 debug = 1

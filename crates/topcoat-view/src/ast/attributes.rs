@@ -33,6 +33,7 @@ pub struct Attributes {
 
 impl Attributes {
     /// Returns `true` if `self` has no attributes.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }

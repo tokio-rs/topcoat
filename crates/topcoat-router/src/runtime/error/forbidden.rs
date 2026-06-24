@@ -26,6 +26,7 @@ use crate::runtime::{IntoResponse, Response};
 ///     Ok(render_admin(cx))
 /// }
 /// ```
+#[must_use]
 pub fn forbidden() -> ForbiddenError {
     ForbiddenError::new()
 }

@@ -36,6 +36,7 @@ impl Parse for PageItem {
 pub struct Page(PageAttr, PageItem);
 
 impl Page {
+    #[must_use]
     pub fn new(attr: PageAttr, item: PageItem) -> Self {
         Self(attr, item)
     }

@@ -34,6 +34,7 @@ macro_rules! impl_cmp_op {
     ($method:ident, $op:tt) => {
         impl BoolSurrogate {
             #[inline]
+            #[must_use]
             pub fn $method(&self, rhs: &BoolSurrogate) -> BoolSurrogate {
                 BoolSurrogate::new(self.0 $op rhs.0)
             }

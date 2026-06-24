@@ -28,6 +28,7 @@ pub enum ElementName {
 impl ElementName {
     /// The tag name as a string when it is statically known. Returns `None` for
     /// expression-valued names, which can only be resolved at runtime.
+    #[must_use]
     pub fn string_name(&self) -> Option<String> {
         match self {
             Self::Ident(inner) => Some(inner.to_string()),
@@ -37,6 +38,7 @@ impl ElementName {
     }
 
     /// The source span covering the name.
+    #[must_use]
     pub fn span(&self) -> Span {
         match self {
             Self::Ident(inner) => inner.span(),
@@ -49,6 +51,7 @@ impl ElementName {
     /// `img`, `input`, …) — those that take no closing tag and no children.
     /// Only matches identifier names; string and expression names always
     /// return `false`.
+    #[must_use]
     pub fn is_void_element(&self) -> bool {
         const VOID_ELEMENTS: &[&str] = &[
             "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source",
@@ -66,6 +69,7 @@ impl ElementName {
 
     /// Returns the underlying expression if this name was written as
     /// `(expr)`, otherwise `None`.
+    #[must_use]
     pub fn expr(&self) -> Option<&Expr> {
         match self {
             Self::Expr(inner) => Some(&inner.expr),

@@ -21,6 +21,7 @@ pub struct Shard {
 }
 
 impl Shard {
+    #[must_use]
     pub fn new(attr: ShardAttr, item: ShardItem) -> Self {
         Self { _attr: attr, item }
     }

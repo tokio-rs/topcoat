@@ -47,46 +47,55 @@ impl_cmp_op!(le, <=);
 
 impl StrSurrogate {
     #[inline]
+    #[must_use]
     pub fn to_owned(&self) -> StringSurrogate {
         StringSurrogate::new(self.0.to_owned())
     }
 
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> BoolSurrogate {
         BoolSurrogate::new(self.0.is_empty())
     }
 
     #[inline]
+    #[must_use]
     pub fn len(&self) -> F64Surrogate {
         F64Surrogate::new(self.0.len() as f64)
     }
 
     #[inline]
+    #[must_use]
     pub fn trim(&self) -> &StrSurrogate {
         StrSurrogate::ref_cast(self.0.trim())
     }
 
     #[inline]
+    #[must_use]
     pub fn trim_start(&self) -> &StrSurrogate {
         StrSurrogate::ref_cast(self.0.trim_start())
     }
 
     #[inline]
+    #[must_use]
     pub fn trim_end(&self) -> &StrSurrogate {
         StrSurrogate::ref_cast(self.0.trim_end())
     }
 
     #[inline]
+    #[must_use]
     pub fn starts_with(&self, other: &StrSurrogate) -> BoolSurrogate {
         BoolSurrogate::new(self.0.starts_with(&other.0))
     }
 
     #[inline]
+    #[must_use]
     pub fn ends_with(&self, other: &StrSurrogate) -> BoolSurrogate {
         BoolSurrogate::new(self.0.ends_with(&other.0))
     }
 
     #[inline]
+    #[must_use]
     pub fn contains(&self, other: &StrSurrogate) -> BoolSurrogate {
         BoolSurrogate::new(self.0.contains(&other.0))
     }

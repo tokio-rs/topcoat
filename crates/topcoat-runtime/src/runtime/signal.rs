@@ -18,6 +18,7 @@ pub struct SignalId(Uuid);
 
 impl SignalId {
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }

@@ -25,6 +25,7 @@ pub struct Cx {
 
 impl Cx {
     /// Creates a `Cx` from the given app and request context maps.
+    #[must_use]
     pub fn new(app_context: Arc<ContextMap>, request_context: ContextMap) -> Self {
         Self {
             id: CxId::new(),
@@ -37,6 +38,7 @@ impl Cx {
 
     /// Creates a `Cx` with empty app and request contexts.
     #[inline]
+    #[must_use]
     pub fn empty() -> Self {
         Self::new(Arc::new(ContextMap::new()), ContextMap::new())
     }

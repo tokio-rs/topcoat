@@ -91,6 +91,7 @@ impl Registry {
     }
 
     /// Looks up a component by its registry name.
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<Component<'_>> {
         self.components
             .get_key_value(name)
@@ -107,6 +108,7 @@ impl Registry {
     }
 
     /// Looks up a theme by its registry name.
+    #[must_use]
     pub fn theme(&self, name: &str) -> Option<Theme<'_>> {
         self.themes.get_key_value(name).map(|(name, entry)| Theme {
             name,
@@ -125,6 +127,7 @@ pub struct Component<'a> {
 
 impl Component<'_> {
     /// The name used to add the component, e.g. `button`.
+    #[must_use]
     pub fn name(&self) -> &str {
         self.name
     }
@@ -136,6 +139,7 @@ impl Component<'_> {
     }
 
     /// The file name written into the user's components directory.
+    #[must_use]
     pub fn file_name(&self) -> &str {
         Path::new(&self.entry.source)
             .file_name()
@@ -150,6 +154,7 @@ impl Component<'_> {
     }
 
     /// The other components this component depends on.
+    #[must_use]
     pub fn dependencies(&self) -> &[Dependency] {
         &self.entry.dependencies
     }
@@ -165,6 +170,7 @@ pub struct Theme<'a> {
 
 impl Theme<'_> {
     /// The name used to select the theme, e.g. `neutral`.
+    #[must_use]
     pub fn name(&self) -> &str {
         self.name
     }
@@ -172,6 +178,7 @@ impl Theme<'_> {
     /// The file name written into the user's project. Every theme installs to
     /// the same `styles.css` (it becomes the project's Tailwind input), rather
     /// than carrying its registry source name (e.g. `neutral.css`) into the project.
+    #[must_use]
     pub fn file_name(&self) -> &str {
         "styles.css"
     }
@@ -194,6 +201,7 @@ impl Theme<'_> {
 /// value, so a project can tell its installed component apart from an updated
 /// one by comparing the hash it recorded against a fresh hash of the registry's
 /// current source.
+#[must_use]
 pub fn content_hash(source: &str) -> String {
     format!("sha256:{}", hex(Sha256::digest(source.as_bytes()).as_ref()))
 }

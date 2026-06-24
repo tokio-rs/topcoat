@@ -45,6 +45,7 @@ pub struct Router {
 
 impl Router {
     /// Creates an empty [`RouterBuilder`].
+    #[must_use]
     pub fn builder() -> RouterBuilder {
         RouterBuilder::new()
     }
@@ -153,6 +154,7 @@ pub struct RouterBuilder {
 
 impl RouterBuilder {
     /// Creates an empty builder with no routes registered.
+    #[must_use]
     pub fn new() -> Self {
         let mut context = ContextMap::new();
         // Register `()` so APIs generic over an app context type can default to `S = ()`.
@@ -167,12 +169,14 @@ impl RouterBuilder {
     }
 
     /// Returns `true` if no routes, pages, or layouts have been registered.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.routes.is_empty() && self.pages.is_empty() && self.layouts.is_empty()
     }
 
     /// Registers a [`Route`], an HTTP handler bound to a specific method and
     /// path.
+    #[must_use]
     pub fn route(mut self, route: impl Route) -> Self {
         self.routes.push(Box::new(route));
         self
@@ -181,6 +185,7 @@ impl RouterBuilder {
     /// Registers every route annotated with `#[route]` and collected at link
     /// time.
     #[cfg(feature = "discover")]
+    #[must_use]
     pub fn discover_routes(mut self) -> Self {
         for route in inventory::iter::<crate::runtime::RouteFn>().cloned() {
             self = self.route(route);
@@ -190,6 +195,7 @@ impl RouterBuilder {
 
     /// Registers a [`PageFn`]. Order doesn't matter — layout matching is based
     /// on path prefixes, not registration order.
+    #[must_use]
     pub fn page(mut self, page: PageFn) -> Self {
         self.pages.push(page);
         self
@@ -198,6 +204,7 @@ impl RouterBuilder {
     /// Registers every [`PageFn`] annotated with `#[page]` and collected at
     /// link time.
     #[cfg(feature = "discover")]
+    #[must_use]
     pub fn discover_pages(mut self) -> Self {
         for page in inventory::iter::<PageFn>().cloned() {
             self = self.page(page);
@@ -207,6 +214,7 @@ impl RouterBuilder {
 
     /// Registers a [`LayoutFn`]. A layout applies to every page whose path
     /// starts with the layout's path prefix.
+    #[must_use]
     pub fn layout(mut self, layout: LayoutFn) -> Self {
         self.layouts.push(layout);
         self
@@ -224,6 +232,7 @@ impl RouterBuilder {
     ///
     /// Panics if two discovered layouts share the same path.
     #[cfg(feature = "discover")]
+    #[must_use]
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::<Cow<'static, crate::runtime::Path>>::new();
         for layout in inventory::iter::<LayoutFn>().cloned() {
@@ -246,6 +255,7 @@ impl RouterBuilder {
     /// may share the same path; among those, the most recently registered runs
     /// first (outermost), so `.layer(a).layer(b)` runs `b` around `a` when both
     /// sit at the same path.
+    #[must_use]
     pub fn layer(mut self, layer: impl Layer) -> Self {
         self.layers.push(Box::new(layer));
         self
@@ -265,6 +275,7 @@ impl RouterBuilder {
     ///
     /// Panics if two discovered layers share the same path.
     #[cfg(feature = "discover")]
+    #[must_use]
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::<Cow<'static, crate::runtime::Path>>::new();
         for layer in inventory::iter::<crate::runtime::LayerFn>().cloned() {
@@ -316,6 +327,7 @@ impl RouterBuilder {
     ///     db.fetch_user(id).await
     /// }
     /// ```
+    #[must_use]
     pub fn app_context<T>(mut self, value: T) -> Self
     where
         T: Any + Send + Sync,
@@ -330,6 +342,7 @@ impl RouterBuilder {
     ///
     /// Panics if two routes resolve to the same path and HTTP method, since the
     /// router would have no way to choose between them.
+    #[must_use]
     pub fn build(self) -> Router {
         let RouterBuilder {
             mut routes,
@@ -613,7 +626,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "duplicate route")]
     fn duplicate_method_and_path_panics_on_build() {
-        RouterBuilder::new()
+        let _ = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/x"), say_route))
             .route(RouteFn::new(Method::GET, path("/x"), say_route))
             .build();
@@ -622,7 +635,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "duplicate context entry")]
     fn duplicate_app_context_type_panics() {
-        RouterBuilder::new()
+        let _ = RouterBuilder::new()
             .app_context(Greeting("a"))
             .app_context(Greeting("b"));
     }

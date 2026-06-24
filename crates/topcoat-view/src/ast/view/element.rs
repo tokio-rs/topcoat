@@ -31,6 +31,7 @@ pub enum Element {
 
 impl Element {
     /// The element's tag name.
+    #[must_use]
     pub fn name(&self) -> &ElementName {
         match self {
             Self::Normal { opening_tag, .. } => &opening_tag.name,
@@ -39,6 +40,7 @@ impl Element {
     }
 
     /// The attributes on the opening tag.
+    #[must_use]
     pub fn attributes(&self) -> &Attributes {
         match self {
             Self::Normal { opening_tag, .. } => &opening_tag.attributes,
@@ -47,6 +49,7 @@ impl Element {
     }
 
     /// The element's children. Always empty for void elements.
+    #[must_use]
     pub fn children(&self) -> &[Node] {
         match self {
             Self::Normal { children, .. } => children,

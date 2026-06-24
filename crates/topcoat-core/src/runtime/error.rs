@@ -25,6 +25,7 @@ impl Error {
 
     /// Downcast this error object by reference.
     #[inline]
+    #[must_use]
     pub fn downcast_ref<E>(&self) -> Option<&E>
     where
         E: Display + Debug + Send + Sync + 'static,

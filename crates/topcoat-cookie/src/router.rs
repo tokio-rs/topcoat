@@ -12,6 +12,7 @@ pub struct CookieLayer;
 
 impl CookieLayer {
     /// Creates a cookie layer.
+    #[must_use]
     pub const fn new() -> Self {
         Self
     }
@@ -44,6 +45,7 @@ pub trait RouterBuilderCookieExt {
     /// The layer stores the request's cookie jar in request context, parses the
     /// incoming `Cookie` headers on first access, and appends pending changes as
     /// `Set-Cookie` headers before the response is sent.
+    #[must_use]
     fn cookies(self) -> Self;
 }
 

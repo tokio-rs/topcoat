@@ -14,10 +14,12 @@ use crate::runtime::{EncodedSignals, Signals};
 pub struct ShardId(&'static str);
 
 impl ShardId {
+    #[must_use]
     pub const fn new(inner: &'static str) -> Self {
         Self(inner)
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.0
     }
@@ -39,6 +41,7 @@ impl<S> Shard<S> {
         Self { id, render }
     }
 
+    #[must_use]
     pub fn id(&self) -> ShardId {
         self.id
     }
@@ -85,6 +88,7 @@ pub struct Shards {
 }
 
 impl Shards {
+    #[must_use]
     pub fn new() -> Self {
         Default::default()
     }
@@ -94,6 +98,7 @@ impl Shards {
     }
 
     /// Returns `true` if no shard has been registered.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.shards.is_empty()
     }

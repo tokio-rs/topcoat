@@ -28,6 +28,7 @@ impl Parse for QueryParamsItem {
 pub struct QueryParams(QueryParamsAttr, QueryParamsItem);
 
 impl QueryParams {
+    #[must_use]
     pub fn new(attr: QueryParamsAttr, item: QueryParamsItem) -> Self {
         Self(attr, item)
     }

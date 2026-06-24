@@ -65,6 +65,7 @@ impl Parse for LayoutItem {
 pub struct Layout(LayoutAttr, LayoutItem);
 
 impl Layout {
+    #[must_use]
     pub fn new(attr: LayoutAttr, item: LayoutItem) -> Self {
         Self(attr, item)
     }

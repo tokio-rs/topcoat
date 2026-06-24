@@ -34,6 +34,7 @@ pub struct AssetRoute {
 
 impl AssetRoute {
     /// Builds the route that serves `asset`.
+    #[must_use]
     pub fn new(asset: &BundledAsset) -> Self {
         let name = asset.name().to_str().expect("asset had non-UTF8 name");
         let content_type = HeaderValue::from_str(asset.content_type()).unwrap_or_else(|_| {
@@ -112,6 +113,7 @@ pub trait RouterBuilderAssetExt {
     ///         .build()
     /// }
     /// ```
+    #[must_use]
     fn assets(self, bundle: AssetBundle) -> Self;
 }
 

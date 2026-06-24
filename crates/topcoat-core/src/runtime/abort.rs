@@ -70,6 +70,7 @@ pub struct AbortStore {
 }
 
 impl AbortStore {
+    #[must_use]
     pub fn new() -> Self {
         Default::default()
     }

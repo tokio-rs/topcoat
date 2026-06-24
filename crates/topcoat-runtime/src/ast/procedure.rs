@@ -30,6 +30,7 @@ impl Parse for ProcedureItem {
 pub struct Procedure(ProcedureAttr, ProcedureItem);
 
 impl Procedure {
+    #[must_use]
     pub fn new(attr: ProcedureAttr, item: ProcedureItem) -> Self {
         Self(attr, item)
     }

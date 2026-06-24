@@ -26,11 +26,13 @@ impl ModuleLayerFn {
     }
 
     /// Converts into a [`LayerFn`] with the given resolved URL path.
+    #[must_use]
     pub fn into_layer(self, path: Cow<'static, Path>) -> LayerFn {
         LayerFn::new(path, self.render)
     }
 
     /// Returns the module path used to derive the URL.
+    #[must_use]
     pub fn module_path(&self) -> &'static str {
         self.module_path
     }

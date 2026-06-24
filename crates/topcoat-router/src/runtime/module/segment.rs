@@ -52,6 +52,7 @@ pub struct Segment {
 
 impl Segment {
     /// Creates a new segment. Called by the expanded `segment!` macro.
+    #[must_use]
     pub const fn new(
         module_path: &'static str,
         kind: Option<SegmentKind>,
@@ -65,16 +66,19 @@ impl Segment {
     }
 
     /// Returns the module path that declared this segment.
+    #[must_use]
     pub fn module_path(&self) -> &'static str {
         self.module_path
     }
 
     /// Returns the overridden [`SegmentKind`], if any.
+    #[must_use]
     pub fn kind(&self) -> Option<&SegmentKind> {
         self.kind.as_ref()
     }
 
     /// Returns the overridden URL name, if any.
+    #[must_use]
     pub fn rename(&self) -> Option<&str> {
         self.rename.as_deref()
     }

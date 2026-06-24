@@ -29,6 +29,7 @@ impl View {
     /// This is usually called by generated `view!` code after collecting the
     /// nodes and attributes for a fragment.
     #[inline]
+    #[must_use]
     pub fn new(parts: ViewParts) -> Self {
         Self {
             part: parts.into(),
@@ -38,6 +39,7 @@ impl View {
 
     /// Returns a `View` that renders to an empty string.
     #[inline]
+    #[must_use]
     pub fn empty() -> Self {
         Self::default()
     }
@@ -146,6 +148,7 @@ pub enum ViewPart {
 impl ViewPart {
     /// Returns an empty view part.
     #[inline]
+    #[must_use]
     pub fn empty() -> Self {
         Self::Empty
     }
@@ -303,6 +306,7 @@ pub struct ViewParts {
 impl ViewParts {
     /// Creates an empty view-parts builder.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

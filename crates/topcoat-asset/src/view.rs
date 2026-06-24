@@ -17,6 +17,7 @@ pub struct AssetResolver {
 
 impl AssetResolver {
     /// Build a resolver from a callback.
+    #[must_use]
     pub fn new(resolve_fn: Box<ResolveAssetFn>) -> Self {
         Self { resolve_fn }
     }

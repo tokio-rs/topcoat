@@ -84,6 +84,7 @@ where
     /// Replaces the in-memory value, returning the store so calls can be chained.
     ///
     /// Like every mutation, this is not persisted until [`commit`](Self::commit).
+    #[must_use]
     pub fn set(mut self, value: T) -> Self {
         self.value = value;
         self
@@ -113,6 +114,7 @@ where
     /// #     Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn update<F>(mut self, f: F) -> Self
     where
         F: FnOnce(&mut T),

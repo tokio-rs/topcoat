@@ -36,6 +36,7 @@ impl ModuleRouterBuilder {
     ///
     /// The `root_module_path` is the `module_path!()` of the module calling
     /// `module_router!`.
+    #[must_use]
     pub fn new(root_module_path: &'static str) -> Self {
         Self {
             root_module_path,
@@ -64,6 +65,7 @@ impl ModuleRouterBuilder {
     ///
     /// Panics if any pages or layouts have already been registered, since
     /// segment overrides affect path computation and must come first.
+    #[must_use]
     pub fn segment(mut self, segment: Segment) -> Self {
         assert!(
             self.inner.is_empty(),
@@ -133,6 +135,7 @@ impl ModuleRouterBuilder {
     /// # Panics
     ///
     /// Panics if a page has already been registered for the same path.
+    #[must_use]
     pub fn page(mut self, page: ModulePageFn) -> Self {
         let module_path = page.module_path();
         let page = page.into_page(Cow::Owned(self.module_path_to_path(module_path)));
@@ -145,6 +148,7 @@ impl ModuleRouterBuilder {
     /// # Panics
     ///
     /// Panics if a layout has already been registered for the same path.
+    #[must_use]
     pub fn layout(mut self, layout: ModuleLayoutFn) -> Self {
         let module_path = layout.module_path();
         let layout = layout.into_layout(Cow::Owned(self.module_path_to_path(module_path)));
@@ -157,6 +161,7 @@ impl ModuleRouterBuilder {
     /// # Panics
     ///
     /// Panics if a route has already been registered for the same path.
+    #[must_use]
     pub fn route(mut self, route: ModuleRouteFn) -> Self {
         let module_path = route.module_path();
         let route = route.into_route(Cow::Owned(self.module_path_to_path(module_path)));
@@ -165,6 +170,7 @@ impl ModuleRouterBuilder {
     }
 
     /// Registers a [`ModuleLayerFn`], computing its path prefix from the module path.
+    #[must_use]
     pub fn layer(mut self, layer: ModuleLayerFn) -> Self {
         let module_path = layer.module_path();
         let layer = layer.into_layer(Cow::Owned(self.module_path_to_path(module_path)));
@@ -178,6 +184,7 @@ impl ModuleRouterBuilder {
     /// Segments must be registered before any pages or layouts, since they
     /// affect path computation.
     #[cfg(feature = "discover")]
+    #[must_use]
     pub fn discover_segments(mut self) -> Self {
         for segment in inventory::iter::<Segment>().cloned() {
             self = self.segment(segment);
@@ -188,6 +195,7 @@ impl ModuleRouterBuilder {
     /// Registers every [`ModulePageFn`] annotated with `#[page]` and collected
     /// at link time, deriving each path from the module tree.
     #[cfg(feature = "discover")]
+    #[must_use]
     pub fn discover_pages(mut self) -> Self {
         for page in inventory::iter::<ModulePageFn>().cloned() {
             self = self.page(page);
@@ -207,6 +215,7 @@ impl ModuleRouterBuilder {
     ///
     /// Panics if two discovered layouts resolve to the same path.
     #[cfg(feature = "discover")]
+    #[must_use]
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
         for layout in inventory::iter::<ModuleLayoutFn>().cloned() {
@@ -224,6 +233,7 @@ impl ModuleRouterBuilder {
     /// Registers every [`ModuleRouteFn`] annotated with `#[route]` and collected
     /// at link time, deriving each path from the module tree.
     #[cfg(feature = "discover")]
+    #[must_use]
     pub fn discover_routes(mut self) -> Self {
         for route in inventory::iter::<ModuleRouteFn>().cloned() {
             self = self.route(route);
@@ -245,6 +255,7 @@ impl ModuleRouterBuilder {
     ///
     /// Panics if two discovered layers resolve to the same path.
     #[cfg(feature = "discover")]
+    #[must_use]
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
         for layer in inventory::iter::<ModuleLayerFn>().cloned() {
@@ -270,6 +281,7 @@ impl ModuleRouterBuilder {
     /// Panics if two discovered layers resolve to the same path; see
     /// [`discover_layers`](Self::discover_layers).
     #[cfg(feature = "discover")]
+    #[must_use]
     pub fn discover(self) -> Self {
         self.discover_segments()
             .discover_pages()
@@ -456,7 +468,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "must be called before registering any resource")]
     fn segment_after_resource_panics() {
-        builder().page(page_at("app::home")).segment(Segment::new(
+        let _ = builder().page(page_at("app::home")).segment(Segment::new(
             "app::users",
             Some(SegmentKind::Param),
             None,

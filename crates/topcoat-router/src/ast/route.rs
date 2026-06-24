@@ -48,6 +48,7 @@ impl Parse for RouteItem {
 pub struct Route(RouteAttr, RouteItem);
 
 impl Route {
+    #[must_use]
     pub fn new(attr: RouteAttr, item: RouteItem) -> Self {
         Self(attr, item)
     }

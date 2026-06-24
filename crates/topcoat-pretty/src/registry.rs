@@ -12,6 +12,7 @@ pub struct Registry {
 }
 
 impl Registry {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -55,6 +56,7 @@ impl Registry {
         self
     }
 
+    #[must_use]
     pub fn pretty_print_macro(&self, snippet: &MacroSnippet) -> Option<syn::Result<String>> {
         self.macro_fns
             .get(snippet.name())

@@ -42,21 +42,25 @@ impl AssetOptions {
     };
 
     /// Returns the configured [`rename`](Self::rename) value, if any.
+    #[must_use]
     pub fn rename(&self) -> Option<&str> {
         self.rename.as_deref()
     }
 
     /// Returns the configured [`extension`](Self::extension) value, if any.
+    #[must_use]
     pub fn extension(&self) -> Option<&str> {
         self.extension.as_deref()
     }
 
     /// Returns the configured [`checksum`](Self::checksum) value, if any.
+    #[must_use]
     pub fn checksum(&self) -> Option<&str> {
         self.checksum.as_deref()
     }
 
     /// Returns the configured [`content_type`](Self::content_type) value, if any.
+    #[must_use]
     pub fn content_type(&self) -> Option<&str> {
         self.content_type.as_deref()
     }

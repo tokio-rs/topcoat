@@ -21,6 +21,7 @@ impl Attributes {
     /// macro when writing attributes directly. Use this constructor when the
     /// collection must be populated incrementally.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Default::default()
     }
@@ -34,6 +35,7 @@ impl Attributes {
     /// generated code or manual builders that already know how many attributes
     /// they will insert.
     #[inline]
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             map: HashMap::with_capacity(capacity),
@@ -82,6 +84,7 @@ impl Attributes {
 
     /// Returns an iterator over attribute keys and rendered values.
     #[inline]
+    #[must_use]
     pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
         self.into_iter()
     }

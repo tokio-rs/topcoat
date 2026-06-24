@@ -30,6 +30,7 @@ pub struct MemoizeEqCache {
 }
 
 impl MemoizeEqCache {
+    #[must_use]
     pub fn new() -> Self {
         Default::default()
     }

@@ -59,6 +59,7 @@ impl<'a> Printer<'a> {
         }
     }
 
+    #[must_use]
     pub fn registry(&self) -> &'a Registry {
         self.registry
     }
@@ -105,6 +106,7 @@ impl<'a> Printer<'a> {
         self.scan_indent += indent;
     }
 
+    #[must_use]
     pub fn current_indent(&self) -> isize {
         self.scan_indent
     }

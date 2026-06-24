@@ -35,6 +35,7 @@ impl PageFn {
     }
 
     /// Returns the URL path this page handles.
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -85,6 +86,7 @@ impl LayoutFn {
     }
 
     /// Returns the path prefix this layout applies to.
+    #[must_use]
     pub fn path(&self) -> Cow<'static, Path> {
         self.path.clone()
     }
@@ -114,6 +116,7 @@ impl PageWithLayouts {
     ///
     /// `layouts` must be ordered from least- to most-specific (ascending path
     /// length); they are applied from the innermost (most specific) outward.
+    #[must_use]
     pub fn new(page: PageFn, layouts: Vec<LayoutFn>) -> Self {
         Self { page, layouts }
     }

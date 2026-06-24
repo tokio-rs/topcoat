@@ -22,6 +22,7 @@ use crate::runtime::{IntoResponse, Response};
 ///     Ok(user)
 /// }
 /// ```
+#[must_use]
 pub fn redirect(uri: &str) -> RedirectError {
     RedirectError::new(StatusCode::TEMPORARY_REDIRECT, uri)
 }
@@ -43,6 +44,7 @@ pub fn redirect(uri: &str) -> RedirectError {
 ///     Err(redirect_permanent("/profile").into())
 /// }
 /// ```
+#[must_use]
 pub fn redirect_permanent(uri: &str) -> RedirectError {
     RedirectError::new(StatusCode::PERMANENT_REDIRECT, uri)
 }

@@ -48,6 +48,7 @@ impl Parse for PathParamItem {
 pub struct PathParam(PathParamAttr, PathParamItem);
 
 impl PathParam {
+    #[must_use]
     pub fn new(attr: PathParamAttr, item: PathParamItem) -> Self {
         Self(attr, item)
     }

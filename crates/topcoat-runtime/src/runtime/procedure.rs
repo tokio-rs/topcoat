@@ -17,11 +17,13 @@ pub struct ProcedureId(&'static str);
 
 impl ProcedureId {
     #[inline]
+    #[must_use]
     pub const fn new(inner: &'static str) -> Self {
         Self(inner)
     }
 
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.0
     }
@@ -51,6 +53,7 @@ impl<A, R> Procedure<A, R> {
     }
 
     #[inline]
+    #[must_use]
     pub fn id(&self) -> ProcedureId {
         self.id
     }
@@ -64,6 +67,7 @@ pub struct ErasedProcedure {
 
 impl ErasedProcedure {
     #[inline]
+    #[must_use]
     pub const fn new<A, R>(procedure: &Procedure<A, R>) -> Self {
         Self {
             id: procedure.id,
@@ -72,6 +76,7 @@ impl ErasedProcedure {
     }
 
     #[inline]
+    #[must_use]
     pub fn id(&self) -> ProcedureId {
         self.id
     }
@@ -139,11 +144,13 @@ impl Route for ProcedureRoute {
 /// Registers server procedures on a [`RouterBuilder`].
 pub trait RouterBuilderProcedureExt {
     /// Mounts a procedure route at `/_topcoat/procedures/{id}`.
+    #[must_use]
     fn procedure(self, procedure: impl Into<ErasedProcedure>) -> Self;
 
     /// Registers every procedure annotated with `#[procedure]` and collected at
     /// link time.
     #[cfg(feature = "discover")]
+    #[must_use]
     fn discover_procedures(self) -> Self;
 }
 

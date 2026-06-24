@@ -26,6 +26,7 @@ impl Asset {
     ///
     /// Prefer calling [`asset!`](crate::asset) directly; this is exposed
     /// for tooling and tests that need to reconstruct an ID from its parts.
+    #[must_use]
     pub const fn new(
         crate_name: &str,
         source_file: &str,
@@ -60,6 +61,7 @@ pub struct RawAsset {
 pub const ENCODED_ASSET_SIZE: usize = 2048;
 
 impl RawAsset {
+    #[must_use]
     pub const fn encode(
         id: Asset,
         path: &str,
@@ -80,6 +82,7 @@ impl RawAsset {
         out
     }
 
+    #[must_use]
     pub fn decode(buffer: &[u8]) -> Option<Self> {
         let mut r = ConstReader::new(buffer);
         r.skip(asset_prefix().len())?;
@@ -93,11 +96,13 @@ impl RawAsset {
         })
     }
 
+    #[must_use]
     pub fn options(&self) -> &AssetOptions {
         &self.options
     }
 
     /// Recover every embedded asset declaration from a compiled binary.
+    #[must_use]
     pub fn find_in_binary(binary: &[u8]) -> Vec<Self> {
         let prefix = asset_prefix();
         let finder = memmem::Finder::new(&prefix);
@@ -107,15 +112,18 @@ impl RawAsset {
             .collect()
     }
 
+    #[must_use]
     pub fn id(&self) -> Asset {
         self.id
     }
 
+    #[must_use]
     pub fn path(&self) -> &str {
         &self.path
     }
 
     /// Classify the asset as a filesystem path or an http(s) URL.
+    #[must_use]
     pub fn source(&self) -> Source {
         if let Ok(uri) = self.path.parse::<Uri>()
             && matches!(uri.scheme_str(), Some("http" | "https"))
@@ -125,6 +133,7 @@ impl RawAsset {
         Source::Path(self.resolved_path())
     }
 
+    #[must_use]
     pub fn crate_name(&self) -> &str {
         &self.crate_name
     }
