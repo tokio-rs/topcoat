@@ -1,4 +1,4 @@
-#![doc = include_str!("../../docs/fmt.md")]
+#![doc = include_str!("../docs/fmt.md")]
 
 mod error;
 

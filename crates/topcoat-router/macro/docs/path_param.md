@@ -27,7 +27,7 @@ The parameter's name has to line up with a `{name}` segment in the route's URL. 
 
 - **Explicit path** — write the placeholder yourself, so `PostId` must appear as `{post_id}`:
   `#[page("/posts/{post_id}")]`.
-- **[`module_router!`](../router/macro.module_router.html)** — defining a `#[path_param]` inside a module turns that module's own segment into the parameter, so there is no placeholder to write. A `PostId` in `src/app/posts/id/mod.rs` makes the `id` module render as `{post_id}`.
+- **[`module_router!`](../router/macro.module_router.html)** — defining a `#[path_param]` inside a module turns that module's own segment into the parameter, so there is no placeholder to write. A `PostId` in `src/app/posts/id.rs` makes the `id` module render as `{post_id}`.
 
 # Examples
 
@@ -49,7 +49,7 @@ async fn post_page(cx: &Cx) -> Result {
 ## Module router
 
 ```rust
-// src/app/posts/id/mod.rs — the `id` module becomes `{post_id}` in the URL.
+// src/app/posts/id.rs — the `id` module becomes `{post_id}` in the URL.
 use topcoat::{
     context::Cx,
     Result,

@@ -63,18 +63,18 @@ Use the `topcoat fmt` CLI command to automatically format `view!` snippets acros
 Topcoat can optionally infer your route tree from your app's module structure (without a build step):
 
 ```text
-src/app/
-├── mod.rs              → /            (and the root <html> layout)
-├── about.rs            → /about
-├── _marketing/
-│   ├── mod.rs                         (layout, no URL segment)
-│   └── pricing.rs      → /pricing
-├── posts/
-│   ├── mod.rs          → /posts
-│   └── id/
-│       └── mod.rs      → /posts/{post_id}
-└── api/
-    └── health.rs       → GET /api/health
+src/
+├── app.rs              → /            (and the root <html> layout)
+└── app/
+    ├── about.rs        → /about
+    ├── _marketing.rs                  (layout, no URL segment)
+    ├── _marketing/
+    │   └── pricing.rs  → /pricing
+    ├── posts.rs        → /posts
+    ├── posts/
+    │   └── id.rs       → /posts/{post_id}
+    └── api/
+        └── health.rs   → GET /api/health
 ```
 
 ### Asset bundling

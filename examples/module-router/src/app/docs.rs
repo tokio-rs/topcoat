@@ -22,6 +22,6 @@ async fn docs_layout(slot: Slot<'_>) -> Result {
 async fn docs_index() -> Result {
     view! {
         <h1>"docs"</h1>
-        <p>"src/app/docs/mod.rs -> /docs"</p>
+        <p>"src/app/docs.rs -> /docs"</p>
     }
 }

@@ -41,12 +41,12 @@ async fn root_layout(slot: Slot<'_>) -> Result {
     }
 }
 
-// A page in app/mod.rs renders at /.
+// A page in app.rs renders at /.
 #[page]
 async fn home() -> Result {
     view! {
         <h1>"home"</h1>
-        <p>"src/app/mod.rs -> /"</p>
+        <p>"src/app.rs -> /"</p>
     }
 }
 
@@ -58,7 +58,7 @@ mod about {
     async fn about() -> Result {
         view! {
             <h1>"about"</h1>
-            <p>"src/app/mod.rs (mod about) -> /about"</p>
+            <p>"src/app.rs (mod about) -> /about"</p>
         }
     }
 }

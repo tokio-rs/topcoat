@@ -8,10 +8,13 @@ declared in the file.
 
 ## Barrel files
 
-`mod.rs`/`lib.rs` files declare all submodules and then re-export each with a
+A module's barrel file declares all submodules and then re-exports each with a
 glob (`pub use submodule::*;`) rather than re-exporting individual items. The
 exception is third-party items, which are re-exported by name for convenience
 (e.g. `pub use http::Method;`).
+
+Name a module's file after the module itself, placed alongside its directory
+(`foo.rs` next to `foo/`), rather than using `foo/mod.rs`.
 
 ```rust
 mod content;

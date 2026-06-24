@@ -10,7 +10,7 @@ pub use route::*;
 pub use router::*;
 pub use segment::*;
 
-#[doc = include_str!("../../../docs/module_router.md")]
+#[doc = include_str!("../../docs/module_router.md")]
 #[cfg(feature = "discover")]
 #[macro_export]
 macro_rules! module_router {

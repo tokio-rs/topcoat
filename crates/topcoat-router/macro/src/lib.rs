@@ -231,12 +231,12 @@ pub fn layer(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// ```rust
-/// // src/app/marketing/mod.rs — `marketing` contributes no URL segment.
+/// // src/app/marketing.rs — `marketing` contributes no URL segment.
 /// topcoat::router::segment!(kind = Group);
 /// ```
 ///
 /// ```rust
-/// // src/app/_group/mod.rs — `_group` is reachable as `/group`.
+/// // src/app/_group.rs — `_group` is reachable as `/group`.
 /// topcoat::router::segment!(kind = Static);
 /// ```
 #[proc_macro]

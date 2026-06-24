@@ -16,7 +16,7 @@ use std::{borrow::Cow, collections::HashMap};
 /// # Examples
 ///
 /// ```rust
-/// // In a module-router module (e.g. src/app/users/id/mod.rs):
+/// // In a module-router module (e.g. src/app/users/id.rs):
 /// topcoat::router::segment!(kind = Param);
 /// // This module now maps to /users/{id}
 ///

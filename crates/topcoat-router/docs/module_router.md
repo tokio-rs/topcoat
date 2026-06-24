@@ -5,7 +5,7 @@ The `module_router!` macro derives routes from your Rust module structure. The m
 Call `module_router!()` from the root module of your route tree. This module becomes the root `/` path. The macro returns a `RouterBuilder`, so call `.build()` once you have added anything else the builder needs.
 
 ```rust
-// src/app/mod.rs
+// src/app.rs
 pub fn router() -> topcoat::router::Router {
     topcoat::router::module_router!().build()
 }
@@ -31,7 +31,7 @@ A `#[page]` defines a page handler. A `#[layout]` wraps all pages in the same mo
 
 ```rust
 # use topcoat::{Result, router::{Slot, layout, page}, view::view};
-// src/app/mod.rs — layout at "/" wraps all pages
+// src/app.rs — layout at "/" wraps all pages
 #[layout]
 async fn root_layout(slot: Slot<'_>) -> Result {
     view! {
@@ -68,7 +68,7 @@ async fn health() -> Result<&'static str> {
 Layers use the same module-derived path as layouts, but wrap request handling instead of rendered view output:
 
 ```rust
-// src/app/api/mod.rs — wraps routes under /api
+// src/app/api.rs — wraps routes under /api
 use topcoat::{
     Result,
     context::Cx,
@@ -130,23 +130,23 @@ topcoat::router::segment!(rename = "articles");
 Modules prefixed with `_` are **groups**. They organize code and can hold shared layouts or layers, but they do not add a path segment to the served URL.
 
 ```text
+app.rs                 # layout at /
 app/
-  mod.rs               # layout at /
+  _marketing.rs        # layout wrapping marketing pages (no URL segment)
   _marketing/
-    mod.rs             # layout wrapping marketing pages (no URL segment)
     pricing.rs         # /pricing
     features.rs        # /features
+  _docs.rs             # layout wrapping docs pages (no URL segment)
   _docs/
-    mod.rs             # layout wrapping docs pages (no URL segment)
     getting_started.rs # /getting-started
 ```
 
-Both `pricing` and `getting_started` are top-level routes, but they can have different layouts through their respective group `mod.rs` files.
+Both `pricing` and `getting_started` are top-level routes, but they can have different layouts through their respective group module files.
 
 You can also turn a regular module into a group with `segment!(kind = Group)`:
 
 ```rust
-// src/app/marketing/mod.rs
+// src/app/marketing.rs
 topcoat::router::segment!(kind = Group);
 // `marketing` now contributes no URL segment.
 ```
@@ -154,7 +154,7 @@ topcoat::router::segment!(kind = Group);
 Or turn a group module into a regular static path segment:
 
 ```rust
-// src/app/_group/mod.rs
+// src/app/_group.rs
 topcoat::router::segment!(kind = Static);
 // Module now reachable as `/group`.
 ```
@@ -162,10 +162,10 @@ topcoat::router::segment!(kind = Static);
 The `_` prefix can also act as a naming convention for route-specific utilities. For example, a `_components` module for shared UI fragments:
 
 ```text
+app.rs
 app/
-  mod.rs
+  _components.rs       # exports shared components, no route
   _components/
-    mod.rs             # exports shared components, no route
     header.rs
     footer.rs
   about.rs             # /about — can use app::_components::header
