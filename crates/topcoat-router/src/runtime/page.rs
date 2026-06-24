@@ -18,7 +18,7 @@ pub type PageRenderFn = for<'cx> fn(
 ///
 /// Created either manually via `#[page("/path")]` or by the module router
 /// (which derives the path from the module tree). Registered into a
-/// [`RouterBuilder`](crate::RouterBuilder) alongside [`LayoutFn`]s, which wrap
+/// [`RouterBuilder`](crate::runtime::RouterBuilder) alongside [`LayoutFn`]s, which wrap
 /// it when their path is a prefix of the page's.
 #[derive(Debug, Clone)]
 pub struct PageFn {

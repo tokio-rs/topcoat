@@ -8,7 +8,7 @@ use crate::ast::{
 };
 
 /// A sequence of sibling [`AttributeNode`]s — the attribute-position counterpart
-/// of [`Nodes`](super::Nodes). Used as the body of attribute-position template
+/// of [`Nodes`](crate::ast::view::Nodes). Used as the body of attribute-position template
 /// constructs (`if`/`for`/`match` inside an opening tag's attribute list).
 pub struct AttributeNodes(Vec<AttributeNode>);
 

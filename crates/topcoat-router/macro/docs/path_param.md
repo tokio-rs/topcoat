@@ -85,4 +85,4 @@ async fn show(cx: &Cx) -> Result {
 # Requirements
 
 - The struct must be a tuple struct with exactly one field.
-- A non-`&str` inner type must implement [`FromStr`](core::str::FromStr), and its parsed `Result` must be `Send + Sync + 'static` so it can be [memoized](macro@memoize) for the request.
+- A non-`&str` inner type must implement [`FromStr`](core::str::FromStr), and its parsed `Result` must be `Send + Sync + 'static` so it can be [memoized](../topcoat_core_macro/attr.memoize.html) for the request.
