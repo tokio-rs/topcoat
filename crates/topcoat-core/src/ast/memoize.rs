@@ -18,16 +18,6 @@ pub struct MemoizeItem {
     item: ItemFn,
 }
 
-fn is_option_or_result(ty: &Type) -> bool {
-    let Type::Path(path) = ty else {
-        return false;
-    };
-    path.path
-        .segments
-        .last()
-        .is_some_and(|segment| segment.ident == "Option" || segment.ident == "Result")
-}
-
 impl Parse for MemoizeItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let item: ItemFn = input.parse()?;
@@ -189,4 +179,14 @@ impl ToTokens for Memoize {
         }
         .to_tokens(tokens);
     }
+}
+
+fn is_option_or_result(ty: &Type) -> bool {
+    let Type::Path(path) = ty else {
+        return false;
+    };
+    path.path
+        .segments
+        .last()
+        .is_some_and(|segment| segment.ident == "Option" || segment.ident == "Result")
 }
