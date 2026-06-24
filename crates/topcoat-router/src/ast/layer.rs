@@ -56,6 +56,7 @@ impl ToTokens for Layer {
 
         let render = quote! {
             |cx, body, next| {
+                #[allow(clippy::unused_async)]
                 #item
                 Box::pin(async move {
                     ::topcoat::router::IntoResponse::into_response(#ident(cx, body, next).await?)

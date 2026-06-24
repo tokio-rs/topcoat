@@ -95,6 +95,7 @@ impl ToTokens for Layout {
 
         let render = quote! {
             |cx, slot| {
+                #[allow(clippy::unused_async)]
                 #item
                 Box::pin(#ident(cx, #(#args),*))
             }

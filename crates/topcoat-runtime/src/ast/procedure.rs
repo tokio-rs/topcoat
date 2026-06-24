@@ -92,6 +92,7 @@ impl ToTokens for Procedure {
             const #ident: &::topcoat::runtime::Procedure::<(#(#arg_tys,)*), #return_ty> = &::topcoat::runtime::Procedure::new(
                 ::topcoat::runtime::ProcedureId::new(#id),
                 |cx, body| {
+                    #[allow(clippy::unused_async)]
                     #item
                     Box::pin(async {
                         type Surrogate = <(#(#arg_tys,)*) as ::topcoat::runtime::Surrogated>::Surrogate;

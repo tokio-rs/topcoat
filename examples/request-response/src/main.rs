@@ -24,7 +24,6 @@ struct User {
 
 // Json<T> parses an application/json request body and serializes the response.
 #[route(POST "/api/users")]
-#[allow(clippy::unused_async)]
 async fn create_user(Json(user): Json<User>) -> Result<Json<User>> {
     Ok(Json(user))
 }
@@ -45,7 +44,6 @@ struct SearchResult {
 
 // For GET and HEAD requests, Form<T> reads URL-encoded values from the query string.
 #[route(GET "/api/search")]
-#[allow(clippy::unused_async)]
 async fn search(Form(input): Form<Search>) -> Result<Json<SearchResult>> {
     Ok(Json(SearchResult {
         query: input.q,
@@ -57,14 +55,12 @@ async fn search(Form(input): Form<Search>) -> Result<Json<SearchResult>> {
 
 // For other methods, Form<T> reads and writes application/x-www-form-urlencoded bodies.
 #[route(POST "/api/form-echo")]
-#[allow(clippy::unused_async)]
 async fn form_echo(Form(input): Form<Search>) -> Result<Form<Search>> {
     Ok(Form(input))
 }
 
 // RawForm yields the urlencoded bytes without deserializing them.
 #[route(POST "/api/raw-form")]
-#[allow(clippy::unused_async)]
 async fn raw_form(RawForm(bytes): RawForm) -> Result<String> {
     Ok(format!("received {} bytes of form data", bytes.len()))
 }
@@ -93,7 +89,6 @@ async fn files(mut multipart: Multipart) -> Result<String> {
 // Option<Json<T>> is None when the request carries no JSON body, and still
 // errors when a malformed body is present.
 #[route(POST "/api/maybe-user")]
-#[allow(clippy::unused_async)]
 async fn maybe_user(user: Option<Json<User>>) -> Result<String> {
     match user {
         Some(Json(user)) => Ok(format!("got user {}", user.name)),
@@ -105,7 +100,6 @@ async fn maybe_user(user: Option<Json<User>>) -> Result<String> {
 
 // Bytes buffers the whole request body for the handler.
 #[route(POST "/api/bytes")]
-#[allow(clippy::unused_async)]
 async fn read_bytes(body: Bytes) -> Result<String> {
     Ok(format!("received {} bytes", body.len()))
 }
@@ -134,7 +128,6 @@ impl IntoResponse for Csv {
 
 // Returning a custom IntoResponse type lets the handler choose headers and body.
 #[route(GET "/api/report.csv")]
-#[allow(clippy::unused_async)]
 async fn report() -> Result<Csv> {
     Ok(Csv("name,total\nAda,42\nGrace,64\n".to_string()))
 }
@@ -167,7 +160,6 @@ where
 }
 
 #[route(POST "/api/signed")]
-#[allow(clippy::unused_async)]
 async fn signed(SignedJson(user): SignedJson<User>) -> Result<Json<User>> {
     Ok(Json(user))
 }

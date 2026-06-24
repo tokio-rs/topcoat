@@ -49,7 +49,6 @@ async fn home() -> Result {
 }
 
 #[procedure]
-#[allow(clippy::unused_async)]
 pub async fn print_on_server(input: String) -> Result<String> {
     println!("{input}");
     Ok(format!("message received: {input}"))

@@ -108,7 +108,6 @@ async fn install() -> Result {
 
 // Routes are for API requests. This one returns plain text.
 #[route(GET "/api/health")]
-#[allow(clippy::unused_async)]
 async fn health() -> Result<&'static str> {
     Ok("ok")
 }

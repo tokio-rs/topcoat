@@ -73,6 +73,7 @@ impl ToTokens for Page {
 
         let render = quote! {
             |cx, body| {
+                #[allow(clippy::unused_async)]
                 #item
                 Box::pin(async move {
                     #parse_request

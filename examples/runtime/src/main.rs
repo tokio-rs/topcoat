@@ -21,7 +21,6 @@ async fn main() {
 }
 
 #[page]
-#[allow(clippy::unused_async)]
 async fn home() -> Result {
     Err(redirect("/counter").into())
 }
