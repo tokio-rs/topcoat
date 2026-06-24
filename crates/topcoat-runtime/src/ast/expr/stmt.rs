@@ -59,7 +59,7 @@ impl Expr {
             }
             Stmt::Macro(stmt_macro) => Self::stmt_macro(stmt_macro, rust, js, names)?,
             other @ Stmt::Item(_) => {
-                return Err(syn::Error::new_spanned(other, "unsupported statement"))
+                return Err(syn::Error::new_spanned(other, "unsupported statement"));
             }
         }
         Ok(())

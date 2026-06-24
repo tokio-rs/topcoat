@@ -65,21 +65,22 @@ impl Router {
         // An unmatched path (404) has no precomputed stack, so its layers are
         // selected from the request path on this cold path.
         let not_found_layers: Vec<usize>;
-        let (layers, terminal, path_params) = if let Ok(matched) = self.endpoints.at(parts.uri.path()) {
-            let path_params = RawPathParams::from_pairs(matched.params.iter());
-            let terminal = match matched.value.get(&parts.method) {
-                Some(index) => Terminal::Route(&*self.routes[index]),
-                None => Terminal::MethodNotAllowed(matched.value),
+        let (layers, terminal, path_params) =
+            if let Ok(matched) = self.endpoints.at(parts.uri.path()) {
+                let path_params = RawPathParams::from_pairs(matched.params.iter());
+                let terminal = match matched.value.get(&parts.method) {
+                    Some(index) => Terminal::Route(&*self.routes[index]),
+                    None => Terminal::MethodNotAllowed(matched.value),
+                };
+                (matched.value.layers(), terminal, path_params)
+            } else {
+                not_found_layers = layers_for(request_path(&parts.uri), &self.layers);
+                (
+                    not_found_layers.as_slice(),
+                    Terminal::NotFound,
+                    RawPathParams::default(),
+                )
             };
-            (matched.value.layers(), terminal, path_params)
-        } else {
-            not_found_layers = layers_for(request_path(&parts.uri), &self.layers);
-            (
-                not_found_layers.as_slice(),
-                Terminal::NotFound,
-                RawPathParams::default(),
-            )
-        };
 
         let mut cx = Cx::new(self.app_context.clone(), ContextMap::new());
         cx.insert(path_params);

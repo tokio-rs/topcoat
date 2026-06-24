@@ -103,11 +103,13 @@ impl ModuleRouterBuilder {
             // unless this is overridden by the user.
             let kind = match segment.and_then(|segment| segment.kind()) {
                 Some(kind) => *kind,
-                None => if component.starts_with('_') {
-                    SegmentKind::Group
-                } else {
-                    SegmentKind::Static
-                },
+                None => {
+                    if component.starts_with('_') {
+                        SegmentKind::Group
+                    } else {
+                        SegmentKind::Static
+                    }
+                }
             };
             // Static segments are converted to kebab-case, other modules names are left as is.
             // This can also be overridden by the user.

@@ -1,9 +1,10 @@
-use std::{fs, fmt::Write as _, io, path::PathBuf};
+use std::{fmt::Write as _, fs, io, path::PathBuf};
 
 use http::Uri;
 use sha2::{Digest, Sha256};
 
 use super::error::BundleError;
+
 pub struct Cache {
     dir: PathBuf,
     agent: ureq::Agent,

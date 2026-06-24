@@ -77,7 +77,10 @@ impl AbortStore {
 
     fn abort(&self, value: Box<dyn Any + Send + Sync>) {
         let old = self.inner.lock().unwrap().replace(value);
-        assert!(old.is_none(), "aborted request context that was already aborted");
+        assert!(
+            old.is_none(),
+            "aborted request context that was already aborted"
+        );
     }
 
     fn take(&self) -> Option<Box<dyn Any + Send + Sync>> {

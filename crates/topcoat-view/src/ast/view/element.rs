@@ -72,9 +72,8 @@ impl WriteView for Element {
                     std::sync::atomic::AtomicU32::new(0);
                 let name_expr = opening_tag.name.expr();
                 let increment = AUTO_INCREMENT.fetch_add(1, Ordering::Relaxed);
-                let name_ident = name_expr.map(|_| {
-                    Ident::new(&format!("__element_name_{increment}"), Span::call_site())
-                });
+                let name_ident = name_expr
+                    .map(|_| Ident::new(&format!("__element_name_{increment}"), Span::call_site()));
 
                 writer.write_str_unescaped("<");
                 match (name_ident.as_ref(), name_expr) {
