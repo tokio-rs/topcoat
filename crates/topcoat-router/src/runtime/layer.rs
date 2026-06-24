@@ -112,7 +112,7 @@ pub(crate) enum Terminal<'a> {
 }
 
 /// The continuation of a [`Layer`] chain: the remaining layers followed by the
-/// chain's [`Terminal`] handler.
+/// chain's terminal handler.
 ///
 /// Passed as the `next` argument to [`Layer::handle`]. Call [`run`](Self::run)
 /// to invoke the next layer, or the terminal once the layers are exhausted.

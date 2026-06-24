@@ -1,6 +1,6 @@
 //! Package-side management of installed components.
 //!
-//! Where [`crate::registry`] models a registry of available components, this
+//! Where the `registry` module models a registry of available components, this
 //! module manages a *package's* relationship to those registries: which
 //! components it has installed, from which registry, and at which hash. It
 //! backs the `topcoat ui` CLI commands but holds no terminal or presentation

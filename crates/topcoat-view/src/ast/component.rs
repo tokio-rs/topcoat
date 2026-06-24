@@ -22,8 +22,7 @@ use crate::ast::component::{ComponentAttr, ComponentItem};
 /// - a props struct named after the function in PascalCase plus `Props` (`button` becomes
 ///   `ButtonProps`), deriving [`Props`] so it gets a typestate builder. `#[default]` and `#[into]`
 ///   on function parameters are forwarded to the corresponding props fields. `impl Trait` parameter
-///   types are lifted into generic type parameters of the props struct (see
-///   [`ImplTraitParamVisitor`]).
+///   types are lifted into generic type parameters of the props struct.
 /// - a zero-sized marker struct named after the function that implements
 ///   [`topcoat::view::Component`] with a `render` method calling the original function body.
 ///
