@@ -44,7 +44,7 @@ impl Component {
     /// # Errors
     ///
     /// Returns an error if either token stream fails to parse as a
-    /// [`ComponentAttr`] or [`ComponentItem`].
+    /// `ComponentAttr` or `ComponentItem`.
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
         Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
     }
