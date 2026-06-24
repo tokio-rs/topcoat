@@ -115,9 +115,7 @@ where
     /// Deserializes JSON bytes into `Json<T>`.
     ///
     /// Unlike the [`FromRequest`] extractor, this does not inspect any
-    /// `Content-Type`; it parses `bytes` directly. Returns a bad-request error
-    /// when the bytes are not valid JSON or do not match `T`, including any
-    /// trailing data after the JSON value.
+    /// `Content-Type`; it parses `bytes` directly.
     ///
     /// # Errors
     ///

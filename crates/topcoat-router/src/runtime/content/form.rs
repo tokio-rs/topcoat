@@ -106,9 +106,7 @@ where
     /// Deserializes URL-encoded form bytes into `Form<T>`.
     ///
     /// Unlike the [`FromRequest`] extractor, this does not inspect the request
-    /// method or `Content-Type`; it parses `bytes` directly. Returns a
-    /// bad-request error, including the offending field path, when the bytes do
-    /// not match `T`.
+    /// method or `Content-Type`; it parses `bytes` directly.
     ///
     /// # Errors
     ///

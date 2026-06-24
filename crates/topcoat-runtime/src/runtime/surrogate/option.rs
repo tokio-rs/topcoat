@@ -40,22 +40,22 @@ where
         Self(Some(v.into_real()))
     }
 
-    #[inline]
     /// Returns the contained value.
     ///
     /// # Panics
     ///
     /// Panics if the option is `None`.
+    #[inline]
     pub fn unwrap(self) -> T::Surrogate {
         self.0.unwrap().into_surrogate()
     }
 
-    #[inline]
     /// Returns the contained value, panicking with `msg` if `None`.
     ///
     /// # Panics
     ///
     /// Panics with `msg` if the option is `None`.
+    #[inline]
     pub fn expect(self, msg: &StrSurrogate) -> T::Surrogate {
         self.0.expect(&msg.0).into_surrogate()
     }

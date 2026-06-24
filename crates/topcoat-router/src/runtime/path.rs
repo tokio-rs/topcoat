@@ -9,10 +9,10 @@ use ref_cast::{RefCastCustom, ref_cast_custom};
 /// A borrowed route path, similar to [`std::path::Path`] but for URL paths.
 ///
 /// A `Path` consists of `/`-separated segments, where each segment is one of:
-/// - **Static** — a literal string (e.g. `users`)
-/// - **Param** — a dynamic parameter in braces (e.g. `{id}`)
+/// - **`Static`** — a literal string (e.g. `users`)
+/// - **`Param`** — a dynamic parameter in braces (e.g. `{id}`)
 /// - **`CatchAll`** — a wildcard tail in braces with `*` (e.g. `{*rest}`)
-/// - **Group** — a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to a
+/// - **`Group`** — a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to a
 ///   `matchit` path
 ///
 /// The root path `"/"` is normalized to an empty inner string. Use [`Path::new`] to
