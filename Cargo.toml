@@ -34,6 +34,9 @@ members = [
 [workspace.lints.rust]
 unsafe_code = "deny"
 
+[workspace.lints.clippy]
+mod_module_files = "deny"
+
 [profile.dev]
 debug = 1
 
