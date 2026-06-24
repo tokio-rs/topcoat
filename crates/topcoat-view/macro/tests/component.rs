@@ -134,7 +134,7 @@ async fn component_can_take_cx_param() {
 }
 
 #[component]
-async fn shout(label: impl Into<String>) -> Result {
+async fn shout(label: impl Into<String> + Send) -> Result {
     let label: String = label.into();
     view! { <b>(label.to_uppercase())</b> }
 }

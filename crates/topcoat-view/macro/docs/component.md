@@ -114,7 +114,7 @@ async fn count<T: Send + Sync>(items: Vec<T>) -> Result {
 ```rust
 # use topcoat::{Result, view::{component, view}};
 #[component]
-async fn shout(label: impl Into<String>) -> Result {
+async fn shout(label: impl Into<String> + Send) -> Result {
     view! { <b>(label.into().to_uppercase())</b> }
 }
 ```

@@ -162,12 +162,8 @@ impl ToTokens for Component {
 
 /// Replaces every `impl Trait` in a parameter type with a fresh generic type
 /// parameter named after the parameter (`label: impl Into<String>` becomes
-/// `__Label: Into<String> + Send`), since `impl Trait` cannot appear in the
-/// generated props struct's field types. `Send` is added because
-/// [`topcoat::view::Component`] futures must be `Send`, so a non-`Send` prop
-/// could never satisfy the trait anyway.
-///
-/// [`topcoat::view::Component`]: trait.Component.html
+/// `__Label: Into<String>`), since `impl Trait` cannot appear in the
+/// generated props struct's field types.
 struct ImplTraitParamVisitor {
     /// The PascalCase name of the parameter currently being visited.
     prefix: String,
@@ -191,8 +187,7 @@ impl VisitMut for ImplTraitParamVisitor {
                 format_ident!("__{}{}", self.prefix, self.count, span = impl_trait.span())
             };
             let bounds = &impl_trait.bounds;
-            self.params
-                .push(parse_quote! { #ident: #bounds + ::core::marker::Send });
+            self.params.push(parse_quote! { #ident: #bounds });
             *ty = parse_quote! { #ident };
         }
     }
