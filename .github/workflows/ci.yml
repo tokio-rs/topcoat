@@ -37,6 +37,15 @@ jobs:
       - run: rustup update stable && rustup default stable
       - run: cargo fmt --all -- --check
 
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update stable && rustup default stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --workspace --no-deps --locked
+
   features:
     name: features
     runs-on: ubuntu-latest
