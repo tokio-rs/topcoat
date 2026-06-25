@@ -114,6 +114,11 @@ fixture_test!(component_empty);
 fixture_test!(component_with_child);
 fixture_test!(component_with_children);
 
+// ── Explicit context ────────────────────────────────────────────────────────
+
+fixture_test!(explicit_cx);
+fixture_test!(explicit_cx_multiline);
+
 // ── Let bindings ────────────────────────────────────────────────────────────
 
 fixture_test!(let_binding);
