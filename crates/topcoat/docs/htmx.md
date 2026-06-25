@@ -16,20 +16,28 @@ When htmx makes a request it sends a set of [request headers](https://htmx.org/r
 use topcoat::{
     Result,
     context::Cx,
-    htmx::{hx_request, hx_target},
-    router::route,
+    htmx::hx_request,
+    router::{Slot, layout},
     view::view,
 };
 
-#[route(GET "/items")]
-async fn items(cx: &Cx) -> Result {
-    // Serve just the list fragment to htmx, or the full page otherwise.
+#[layout]
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
+    // htmx swaps the page content into the existing document, so the shell —
+    // the <nav> and the <html> wrapper — is already on the page. Return just
+    // the slot and leave it untouched. A full navigation renders everything.
     if hx_request(cx) {
-        return view! { <ul id="items"> /* … */ </ul> };
+        return slot.await;
     }
 
-    let _ = hx_target(cx); // the id of the element being updated, if any
-    view! { <html> /* … full page … */ </html> }
+    view! {
+        <html>
+            <body>
+                <nav> /* persistent navigation */ </nav>
+                <main>(slot.await?)</main>
+            </body>
+        </html>
+    }
 }
 ```
 
