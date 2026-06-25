@@ -87,6 +87,7 @@ impl ToTokens for Shard {
         };
 
         let impl_ident = format_ident!("__topcoat_shard_impl_{}", ident);
+        let erased_ident = format_ident!("__TOPCOAT_SHARD_ERASED_{}", ident);
         let id = Uuid::new_v4().to_string();
 
         quote! {
@@ -114,24 +115,41 @@ impl ToTokens for Shard {
         }
         .to_tokens(tokens);
 
+        // The erased shard is built once in a `const` so it can be used from
+        // both the `From` impl (for manual `router.shard(#ident)` registration)
+        // and the discovery submission (which expands to a `static`, requiring a
+        // const initializer). The marker the component face expands to is a unit
+        // struct, so `#ident` is a value usable just like `router.page(...)`.
+        quote! {
+            #[doc(hidden)]
+            #[allow(non_upper_case_globals)]
+            const #erased_ident: ::topcoat::runtime::ErasedShard =
+                ::topcoat::runtime::ErasedShard::new(
+                    ::topcoat::runtime::ShardId::new(#id),
+                    |cx, body| ::std::boxed::Box::pin(async move {
+                        type __Surrogate =
+                            <(#(#value_tys,)*) as ::topcoat::runtime::Surrogated>::Surrogate;
+                        let ::topcoat::router::Json(__args) =
+                            <::topcoat::router::Json<__Surrogate> as ::topcoat::router::FromRequest>
+                                ::from_request(cx, body).await?;
+                        let (#(#value_idents,)*) =
+                            ::topcoat::runtime::Surrogate::into_real(__args);
+                        let __view = #impl_ident(#(#call_args),*).await?;
+                        ::topcoat::Result::Ok(__view)
+                    }),
+                );
+
+            impl ::core::convert::From<#ident> for ::topcoat::runtime::ErasedShard {
+                fn from(_: #ident) -> Self {
+                    #erased_ident
+                }
+            }
+        }
+        .to_tokens(tokens);
+
         if cfg!(feature = "discover") {
             quote! {
-                ::topcoat::internal::inventory::submit! {
-                    ::topcoat::runtime::ErasedShard::new(
-                        ::topcoat::runtime::ShardId::new(#id),
-                        |cx, body| ::std::boxed::Box::pin(async move {
-                            type __Surrogate =
-                                <(#(#value_tys,)*) as ::topcoat::runtime::Surrogated>::Surrogate;
-                            let ::topcoat::router::Json(__args) =
-                                <::topcoat::router::Json<__Surrogate> as ::topcoat::router::FromRequest>
-                                    ::from_request(cx, body).await?;
-                            let (#(#value_idents,)*) =
-                                ::topcoat::runtime::Surrogate::into_real(__args);
-                            let __view = #impl_ident(#(#call_args),*).await?;
-                            ::topcoat::Result::Ok(__view)
-                        }),
-                    )
-                }
+                ::topcoat::internal::inventory::submit! { #erased_ident }
             }
             .to_tokens(tokens);
         }
