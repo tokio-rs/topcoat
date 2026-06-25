@@ -64,8 +64,7 @@ pub const HX_RESELECT: HeaderName = HeaderName::from_static("hx-reselect");
 
 /// `HX-Trigger-After-Settle` — triggers client-side events after the settle
 /// step.
-pub const HX_TRIGGER_AFTER_SETTLE: HeaderName =
-    HeaderName::from_static("hx-trigger-after-settle");
+pub const HX_TRIGGER_AFTER_SETTLE: HeaderName = HeaderName::from_static("hx-trigger-after-settle");
 
 /// `HX-Trigger-After-Swap` — triggers client-side events after the swap step.
 pub const HX_TRIGGER_AFTER_SWAP: HeaderName = HeaderName::from_static("hx-trigger-after-swap");

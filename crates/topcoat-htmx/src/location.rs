@@ -132,7 +132,9 @@ impl From<String> for HxLocation {
 
 impl IntoResponseParts for HxLocation {
     fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
-        parts.headers.insert(header::HX_LOCATION, self.header_value()?);
+        parts
+            .headers
+            .insert(header::HX_LOCATION, self.header_value()?);
         Ok(())
     }
 }
@@ -184,7 +186,9 @@ mod tests {
 
     fn header_value(location: HxLocation) -> String {
         let mut parts = http::Response::new(()).into_parts().0;
-        location.into_response_parts(&Cx::empty(), &mut parts).unwrap();
+        location
+            .into_response_parts(&Cx::empty(), &mut parts)
+            .unwrap();
         parts
             .headers
             .get(header::HX_LOCATION)
@@ -201,7 +205,11 @@ mod tests {
 
     #[test]
     fn options_serialize_as_json_with_path() {
-        let value = header_value(HxLocation::new("/home").target("#main").swap(SwapOption::InnerHtml));
+        let value = header_value(
+            HxLocation::new("/home")
+                .target("#main")
+                .swap(SwapOption::InnerHtml),
+        );
         let json: Value = serde_json::from_str(&value).unwrap();
         assert_eq!(json["path"], "/home");
         assert_eq!(json["target"], "#main");

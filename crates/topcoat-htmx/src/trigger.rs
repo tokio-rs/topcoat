@@ -88,9 +88,8 @@ impl TriggerTiming {
 /// let simple = HxResponseTrigger::receive(["refresh", "close-modal"]);
 ///
 /// // JSON form, fired after the swap step.
-/// let detailed = HxResponseTrigger::after_swap([
-///     HxEvent::with_data("show-toast", "Saved!").unwrap(),
-/// ]);
+/// let detailed =
+///     HxResponseTrigger::after_swap([HxEvent::with_data("show-toast", "Saved!").unwrap()]);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HxResponseTrigger {
@@ -102,7 +101,10 @@ pub struct HxResponseTrigger {
 
 impl HxResponseTrigger {
     /// Triggers `events` with the given `timing`.
-    pub fn new(timing: TriggerTiming, events: impl IntoIterator<Item = impl Into<HxEvent>>) -> Self {
+    pub fn new(
+        timing: TriggerTiming,
+        events: impl IntoIterator<Item = impl Into<HxEvent>>,
+    ) -> Self {
         Self {
             timing,
             events: events.into_iter().map(Into::into).collect(),
@@ -161,8 +163,16 @@ mod tests {
     fn header_value(trigger: HxResponseTrigger) -> (HeaderName, String) {
         let name = trigger.timing.header();
         let mut parts = http::Response::new(()).into_parts().0;
-        trigger.into_response_parts(&Cx::empty(), &mut parts).unwrap();
-        let value = parts.headers.get(&name).unwrap().to_str().unwrap().to_owned();
+        trigger
+            .into_response_parts(&Cx::empty(), &mut parts)
+            .unwrap();
+        let value = parts
+            .headers
+            .get(&name)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
         (name, value)
     }
 

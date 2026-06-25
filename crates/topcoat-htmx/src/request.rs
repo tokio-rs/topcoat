@@ -137,7 +137,10 @@ mod tests {
 
     #[test]
     fn boolean_headers_require_true() {
-        let cx = cx_with(&[(&header::HX_REQUEST, "true"), (&header::HX_BOOSTED, "false")]);
+        let cx = cx_with(&[
+            (&header::HX_REQUEST, "true"),
+            (&header::HX_BOOSTED, "false"),
+        ]);
         assert!(hx_request(&cx));
         assert!(!hx_boosted(&cx));
         assert!(!hx_history_restore_request(&cx));

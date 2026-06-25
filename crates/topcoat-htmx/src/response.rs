@@ -176,27 +176,39 @@ mod tests {
     }
 
     fn header_value(parts: &Parts, name: &http::HeaderName) -> String {
-        parts.headers.get(name).unwrap().to_str().unwrap().to_owned()
+        parts
+            .headers
+            .get(name)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned()
     }
 
     #[test]
     fn push_url_sets_header() {
         let mut parts = parts();
-        HxPushUrl::from("/new").into_response_parts(&Cx::empty(), &mut parts).unwrap();
+        HxPushUrl::from("/new")
+            .into_response_parts(&Cx::empty(), &mut parts)
+            .unwrap();
         assert_eq!(header_value(&parts, &header::HX_PUSH_URL), "/new");
     }
 
     #[test]
     fn push_url_prevent_is_false() {
         let mut parts = parts();
-        HxPushUrl::prevent().into_response_parts(&Cx::empty(), &mut parts).unwrap();
+        HxPushUrl::prevent()
+            .into_response_parts(&Cx::empty(), &mut parts)
+            .unwrap();
         assert_eq!(header_value(&parts, &header::HX_PUSH_URL), "false");
     }
 
     #[test]
     fn refresh_serializes_bool() {
         let mut parts = parts();
-        HxRefresh(true).into_response_parts(&Cx::empty(), &mut parts).unwrap();
+        HxRefresh(true)
+            .into_response_parts(&Cx::empty(), &mut parts)
+            .unwrap();
         assert_eq!(header_value(&parts, &header::HX_REFRESH), "true");
     }
 
