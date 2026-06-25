@@ -23,13 +23,13 @@ use topcoat::{
 
 #[layout]
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
-    // htmx swaps the page content into the existing document, so the shell —
-    // the <nav> and the <html> wrapper — is already on the page. Return just
-    // the slot and leave it untouched. A full navigation renders everything.
+    // HTMX only swaps out the target element, so we do not need to return
+    // the full layout shell. Just the page's content are enough.
     if hx_request(cx) {
         return slot.await;
     }
 
+    // Non-HTMX requests require a full page render including the layout shell.
     view! {
         <html>
             <body>
