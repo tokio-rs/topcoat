@@ -11,8 +11,8 @@ export type CommentMarker =
 	| {
 			kind: "scope-start";
 			id: ReactiveScopeId;
-			track: SignalId[];
 			path: string;
+			exprs: string[];
 	  }
 	| { kind: "scope-end"; id: ReactiveScopeId };
 
@@ -20,8 +20,9 @@ const SIGNAL_RE = /^\s*::topcoat::signal\(([\s\S]*)\)\s*$/;
 const EXPR_START_RE = /^\s*::topcoat::expr::start\("([^"]*)"\)\s*$/;
 const EXPR_END_RE = /^\s*::topcoat::expr::end\s*$/;
 const SCOPE_START_RE =
-	/^\s*::topcoat::scope::start\(("[^"]+"), (\[[^\]]*\]), ("[^"]*")\)\s*$/;
+	/^\s*::topcoat::scope::start\(("[^"]+"), ("[^"]*"), (\[[\s\S]*\])\)\s*$/;
 const SCOPE_END_RE = /^\s*::topcoat::scope::end\(("[^"]+")\)\s*$/;
+const QUOTED_RE = /"([^"]*)"/g;
 
 export function parseComment(node: Comment): CommentMarker | null {
 	const text = node.data;
@@ -61,11 +62,18 @@ export function parseComment(node: Comment): CommentMarker | null {
 
 	const start = SCOPE_START_RE.exec(text);
 	if (start) {
+		const exprs: string[] = [];
+		QUOTED_RE.lastIndex = 0;
+		let m: RegExpExecArray | null = QUOTED_RE.exec(start[3] ?? "");
+		while (m !== null) {
+			exprs.push(decodeHtml(m[1] ?? ""));
+			m = QUOTED_RE.exec(start[3] ?? "");
+		}
 		return {
 			kind: "scope-start",
 			id: JSON.parse(start[1] ?? "") as ReactiveScopeId,
-			track: JSON.parse(start[2] ?? "") as SignalId[],
-			path: JSON.parse(start[3] ?? "") as string,
+			path: JSON.parse(start[2] ?? "") as string,
+			exprs,
 		};
 	}
 

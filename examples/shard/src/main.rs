@@ -38,14 +38,14 @@ async fn home() -> Result {
 }
 
 #[component]
-async fn combobox(cx: &Cx) -> Result {
+async fn combobox() -> Result {
     view! {
         signal input = String::new();
 
         <div>
             <input
                 :value=$(input.get())
-                @change=$(|e: Event| input.set(e.target.value))
+                @input=$(|e: Event| input.set(e.target.value))
             >
 
             combobox_content(input: $(input.get()))

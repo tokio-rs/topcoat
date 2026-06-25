@@ -41,6 +41,11 @@ pub struct ErasedShard {
 
 impl ErasedShard {
     #[must_use]
+    pub const fn new(id: ShardId, render: ShardRenderFn) -> Self {
+        Self { id, render }
+    }
+
+    #[must_use]
     pub fn id(&self) -> ShardId {
         self.id
     }

@@ -5,8 +5,7 @@ pub use attr::*;
 pub use item::*;
 
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
-use syn::parse_quote;
+use quote::{ToTokens, format_ident, quote};
 use uuid::Uuid;
 
 use crate::ast::shard::{ShardAttr, ShardItem};
@@ -39,46 +38,102 @@ impl ToTokens for Shard {
         let item = self.item.item();
         let vis = &item.vis;
         let ident = &item.sig.ident;
-        let args = item.sig.inputs.iter().map(|input| match input {
-            syn::FnArg::Typed(pat_type) => {
-                let mut pat_type = pat_type.clone();
-                if let syn::Pat::Ident(ident) = &*pat_type.pat
-                    && ident.ident == "cx"
-                {
-                    return pat_type;
-                }
+        let inputs = &item.sig.inputs;
+        let output = &item.sig.output;
+        let block = &item.block;
 
-                let ty = &pat_type.ty;
-                pat_type.ty = parse_quote!(::topcoat::runtime::Expr<#ty>);
-                pat_type
+        // Split the inputs into the optional `cx` parameter and the value
+        // parameters that become shard arguments.
+        let mut has_cx = false;
+        let mut value_idents = Vec::new();
+        let mut value_tys = Vec::new();
+        for input in inputs {
+            let syn::FnArg::Typed(pat_type) = input else {
+                unreachable!("validated by ShardItem")
+            };
+            if let syn::Pat::Ident(pat_ident) = &*pat_type.pat
+                && pat_ident.ident == "cx"
+            {
+                has_cx = true;
+                continue;
             }
-            syn::FnArg::Receiver(_) => unreachable!(),
-        });
+            let syn::Pat::Ident(pat_ident) = &*pat_type.pat else {
+                unreachable!("validated by ShardItem")
+            };
+            value_idents.push(pat_ident.ident.clone());
+            value_tys.push((*pat_type.ty).clone());
+        }
 
+        // The JavaScript source for each value parameter is bound to a fresh
+        // ident in the component face so it can be collected into the scope.
+        let js_idents: Vec<_> = value_idents
+            .iter()
+            .map(|id| format_ident!("__topcoat_js_{}", id))
+            .collect();
+
+        // Arguments forwarded to the hidden implementation: `cx` (when present)
+        // followed by the value parameters.
+        let call_args = has_cx
+            .then(|| quote!(cx))
+            .into_iter()
+            .chain(value_idents.iter().map(|id| quote!(#id)));
+        let call_args: Vec<_> = call_args.collect();
+
+        // The component face takes each value parameter as an `Expr<T>`.
+        let cx_param = has_cx.then(|| quote!(cx: &::topcoat::context::Cx,));
+        let component_params = quote! {
+            #cx_param
+            #(#value_idents: ::topcoat::runtime::Expr<#value_tys>,)*
+        };
+
+        let impl_ident = format_ident!("__topcoat_shard_impl_{}", ident);
         let id = Uuid::new_v4().to_string();
 
         quote! {
+            // The user's real body. Shared by the component's initial render and
+            // the server endpoint that re-renders the shard.
+            #[doc(hidden)]
+            async fn #impl_ident(#inputs) #output #block
+
+            // Component face: renders the shard inline, splitting each `Expr<T>`
+            // into its evaluated value (for the initial server render) and its
+            // JavaScript source (tracked by the browser).
             #[::topcoat::view::component]
-            #vis async fn #ident(#(#args,)*) -> ::topcoat::Result<::topcoat::view::View> {
-                let reactive_scope = ::topcoat::runtime::ReactiveScope::new(
+            #vis async fn #ident(#component_params) -> ::topcoat::Result<::topcoat::view::View> {
+                #(
+                    let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
+                )*
+                let __placeholder = #impl_ident(#(#call_args),*).await?;
+                let __scope = ::topcoat::runtime::ReactiveScope::new(
                     ::topcoat::runtime::ShardId::new(#id),
-                    ::std::vec::Vec::new(),
-                    ::topcoat::view::view! {}?,
+                    ::std::vec![#(#js_idents),*],
+                    __placeholder,
                 );
-                ::topcoat::view::view! {
-                    (reactive_scope)
-                }
+                ::topcoat::view::view! { (__scope) }
             }
         }
         .to_tokens(tokens);
 
-        // TODO
-        // if cfg!(feature = "discover") {
-        //     quote! {
-        //         ::topcoat::internal::inventory::submit! {
-        //         }
-        //     }
-        //     .to_tokens(tokens);
-        // }
+        if cfg!(feature = "discover") {
+            quote! {
+                ::topcoat::internal::inventory::submit! {
+                    ::topcoat::runtime::ErasedShard::new(
+                        ::topcoat::runtime::ShardId::new(#id),
+                        |cx, body| ::std::boxed::Box::pin(async move {
+                            type __Surrogate =
+                                <(#(#value_tys,)*) as ::topcoat::runtime::Surrogated>::Surrogate;
+                            let ::topcoat::router::Json(__args) =
+                                <::topcoat::router::Json<__Surrogate> as ::topcoat::router::FromRequest>
+                                    ::from_request(cx, body).await?;
+                            let (#(#value_idents,)*) =
+                                ::topcoat::runtime::Surrogate::into_real(__args);
+                            let __view = #impl_ident(#(#call_args),*).await?;
+                            ::topcoat::Result::Ok(__view)
+                        }),
+                    )
+                }
+            }
+            .to_tokens(tokens);
+        }
     }
 }

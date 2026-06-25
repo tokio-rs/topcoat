@@ -7,9 +7,12 @@ import {
 } from "@maverick-js/signals";
 
 import type { ReactiveScopeId } from "./comment";
+import type { Context } from "./context";
 import type { Runtime } from "./runtime";
 import { scan } from "./scan";
 import type { SignalId } from "./signal";
+
+type Compute = (cx: Context) => unknown;
 
 /**
  * A region of the DOM that owns disposable reactive resources (effects and
@@ -67,6 +70,12 @@ export class Scope {
 export class ReactiveScope extends Scope {
 	contentScope: Scope;
 	endNode: Comment | null = null;
+	/**
+	 * One compiled function per shard parameter, in declaration order. Each
+	 * returns the parameter's current (surrogate) value; reading it inside an
+	 * effect subscribes to whatever signals it touches.
+	 */
+	private readonly computes: Compute[];
 	private abortController: AbortController | null = null;
 	private flushPending = false;
 
@@ -74,12 +83,15 @@ export class ReactiveScope extends Scope {
 		parent: Scope,
 		runtime: Runtime,
 		readonly scopeId: ReactiveScopeId,
-		readonly track: SignalId[],
 		readonly path: string,
+		exprs: string[],
 		readonly startNode: Comment,
 	) {
 		super(parent, runtime);
 		this.contentScope = new Scope(this, runtime);
+		this.computes = exprs.map(
+			(js) => new Function("cx", `return ${js};`) as Compute,
+		);
 	}
 
 	attachEnd(end: Comment): void {
@@ -92,10 +104,14 @@ export class ReactiveScope extends Scope {
 	 * subscription and does not fetch.
 	 */
 	startWatching(): void {
+		const { context } = this.runtime;
 		let first = true;
 		this.run(() => {
 			effect(() => {
-				for (const id of this.track) this.runtime.registry.read(id);
+				// Evaluating each parameter inside the effect subscribes to the
+				// signals it reads, so the scope re-fetches when any of them
+				// change. The first run is just the initial subscription.
+				for (const compute of this.computes) compute(context);
 				if (first) {
 					first = false;
 					return;
@@ -122,19 +138,21 @@ export class ReactiveScope extends Scope {
 		const ac = new AbortController();
 		this.abortController = ac;
 
-		const params = untrack(() =>
-			this.track.map((id) => ({
-				id,
-				value: (
-					this.runtime.registry.get(id)?.() as { dehydrate: () => unknown }
-				).dehydrate(),
-			})),
+		const { context } = this.runtime;
+		const args = untrack(() =>
+			this.computes.map((compute) =>
+				(compute(context) as { dehydrate: () => unknown }).dehydrate(),
+			),
 		);
-		const url = `${this.path}?signals=${encodeURIComponent(JSON.stringify(params))}`;
 
 		let html: string;
 		try {
-			const res = await fetch(url, { signal: ac.signal });
+			const res = await fetch(this.path, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(args),
+				signal: ac.signal,
+			});
 			html = await res.text();
 		} catch (e) {
 			if ((e as Error).name === "AbortError") return;
