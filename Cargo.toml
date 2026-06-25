@@ -23,6 +23,7 @@ members = [
     "examples/context",
     "examples/cookies",
     "examples/hello-world",
+    "examples/htmx",
     "examples/manual-router",
     "examples/module-router",
     "examples/path-query-params",

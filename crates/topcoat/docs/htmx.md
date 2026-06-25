@@ -1,6 +1,6 @@
 [htmx](https://htmx.org) lets you drive page updates from HTML attributes, exchanging small fragments of markup over a handful of `HX-*` HTTP headers. Topcoat integrates with htmx the same way it handles the rest of a request: **accessor functions** read the request headers from a `cx: &Cx`, and **responders** that implement [`IntoResponseParts`] set the response headers.
 
-Everything below is re-exported from `topcoat::htmx` and gated behind the `htmx` feature. There are no extractors, guards, or middleware — htmx is just more functions of `cx`.
+Everything below is re-exported from `topcoat::htmx` and gated behind the `htmx` feature.
 
 ```toml
 # Cargo.toml
