@@ -1745,6 +1745,7 @@ dependencies = [
  "topcoat-cookie",
  "topcoat-core",
  "topcoat-core-macro",
+ "topcoat-htmx",
  "topcoat-router",
  "topcoat-router-macro",
  "topcoat-runtime",
@@ -1838,6 +1839,19 @@ dependencies = [
  "tokio",
  "topcoat",
  "topcoat-core",
+]
+
+[[package]]
+name = "topcoat-htmx"
+version = "0.1.0"
+dependencies = [
+ "http",
+ "serde",
+ "serde_json",
+ "tokio",
+ "topcoat",
+ "topcoat-core",
+ "topcoat-router",
 ]
 
 [[package]]

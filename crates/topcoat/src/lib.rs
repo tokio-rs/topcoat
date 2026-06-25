@@ -25,6 +25,9 @@ pub mod cookie;
 
 pub mod context;
 
+#[cfg(feature = "htmx")]
+pub mod htmx;
+
 #[cfg(feature = "router")]
 pub mod router;
 

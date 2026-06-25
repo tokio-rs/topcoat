@@ -1,0 +1,19 @@
+[package]
+name = "topcoat-htmx"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+topcoat-core.workspace = true
+topcoat-router.workspace = true
+
+http.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+
+[dev-dependencies]
+topcoat = { workspace = true, features = ["htmx", "router"] }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true
