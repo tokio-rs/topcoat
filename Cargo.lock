@@ -1477,6 +1477,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "shard"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "shell-words"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

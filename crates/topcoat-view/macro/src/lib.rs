@@ -32,11 +32,3 @@ pub fn props(item: TokenStream) -> TokenStream {
         Err(error) => error.to_compile_error().into(),
     }
 }
-
-#[proc_macro_attribute]
-pub fn shard(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match topcoat_view::ast::shard::Shard::parse(attr.into(), item.into()) {
-        Ok(value) => quote! { #value }.into(),
-        Err(error) => error.to_compile_error().into(),
-    }
-}

@@ -16,15 +16,13 @@ const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/procedures";
 pub struct ProcedureId(&'static str);
 
 impl ProcedureId {
-    #[inline]
     #[must_use]
     pub const fn new(inner: &'static str) -> Self {
         Self(inner)
     }
 
-    #[inline]
     #[must_use]
-    pub fn as_str(&self) -> &str {
+    fn as_str(&self) -> &str {
         self.0
     }
 }
@@ -52,7 +50,6 @@ impl<A, R> Procedure<A, R> {
         }
     }
 
-    #[inline]
     #[must_use]
     pub fn id(&self) -> ProcedureId {
         self.id
@@ -66,7 +63,6 @@ pub struct ErasedProcedure {
 }
 
 impl ErasedProcedure {
-    #[inline]
     #[must_use]
     pub const fn new<A, R>(procedure: &Procedure<A, R>) -> Self {
         Self {
@@ -75,7 +71,6 @@ impl ErasedProcedure {
         }
     }
 
-    #[inline]
     #[must_use]
     pub fn id(&self) -> ProcedureId {
         self.id
@@ -148,12 +143,11 @@ impl Route for ProcedureRoute {
 
 /// Registers server procedures on a [`RouterBuilder`].
 pub trait RouterBuilderProcedureExt {
-    /// Mounts a procedure route at `/_topcoat/procedures/{id}`.
+    /// Mounts a procedure route.
     #[must_use]
     fn procedure(self, procedure: impl Into<ErasedProcedure>) -> Self;
 
-    /// Registers every procedure annotated with `#[procedure]` and collected at
-    /// link time.
+    /// Registers every procedure linked into the binary.
     #[cfg(feature = "discover")]
     #[must_use]
     fn discover_procedures(self) -> Self;
@@ -178,7 +172,6 @@ impl RouterBuilderProcedureExt for RouterBuilder {
 pub struct ProcedureSurrogate<A, R>(Procedure<A, R>);
 
 impl<A, R> ProcedureSurrogate<A, R> {
-    #[inline]
     pub(crate) const fn new(v: Procedure<A, R>) -> Self {
         Self(v)
     }

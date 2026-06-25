@@ -6,6 +6,11 @@ edition = "2024"
 [lib]
 proc-macro = true
 
+[features]
+discover = [
+	"topcoat-runtime/discover"
+]
+
 [dependencies]
 topcoat-runtime = { workspace = true, features = ["parsing"] }
 

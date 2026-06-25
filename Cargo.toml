@@ -28,6 +28,7 @@ members = [
     "examples/procedure",
     "examples/request-response",
     "examples/runtime",
+    "examples/shard",
     "examples/tailwind",
 ]
 

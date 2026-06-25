@@ -3,7 +3,7 @@ use topcoat_core::runtime::{context::Cx, error::Error};
 use topcoat_view::runtime::{NodeViewParts, Unescaped, View, ViewParts};
 use uuid::Uuid;
 
-use crate::runtime::{Shard, SignalId, Signals};
+use crate::runtime::{ShardRoute, SignalId, Signals};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
@@ -31,26 +31,26 @@ pub struct ReactiveScope {
     placeholder: View,
 }
 
-impl ReactiveScope {
-    /// Constructs a new reactive scope, recording the tracked signals and
-    /// rendering its placeholder shard.
-    ///
-    /// # Errors
-    ///
-    /// Propagates any error produced while rendering the shard.
-    #[inline]
-    pub async fn new<S>(cx: &Cx, signals: S, shard: Shard<S>) -> Result<Self, Error>
-    where
-        S: Signals,
-    {
-        Ok(Self {
-            id: ReactiveScopeId::new(),
-            track: signals.ids().collect(),
-            path: "/_topcoat/shards/".to_owned() + shard.id().as_str(),
-            placeholder: shard.render(cx, signals).await?,
-        })
-    }
-}
+// impl ReactiveScope {
+//     /// Constructs a new reactive scope, recording the tracked signals and
+//     /// rendering its placeholder shard.
+//     ///
+//     /// # Errors
+//     ///
+//     /// Propagates any error produced while rendering the shard.
+//     #[inline]
+//     pub async fn new<S>(cx: &Cx, signals: S, shard: ShardRoute<S>) -> Result<Self, Error>
+//     where
+//         S: Signals,
+//     {
+//         Ok(Self {
+//             id: ReactiveScopeId::new(),
+//             track: signals.ids().collect(),
+//             path: "/_topcoat/shards/".to_owned() + shard.id().as_str(),
+//             placeholder: shard.render(cx, signals).await?,
+//         })
+//     }
+// }
 
 impl NodeViewParts for ReactiveScope {
     fn into_view_parts(self, parts: &mut ViewParts) {
