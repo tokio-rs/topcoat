@@ -56,7 +56,7 @@ impl<T> IntoResponse for Html<T>
 where
     T: Into<Body>,
 {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
         (
             [(
                 CONTENT_TYPE,
@@ -64,7 +64,7 @@ where
             )],
             self.0.into(),
         )
-            .into_response()
+            .into_response(cx)
     }
 }
 
@@ -160,7 +160,7 @@ mod tests {
     #[tokio::test]
     async fn into_response_sets_html_content_type() {
         let response = Html("<h1>hi</h1>")
-            .into_response()
+            .into_response(&Cx::empty())
             .expect("response builds");
 
         assert_eq!(

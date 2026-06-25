@@ -119,7 +119,7 @@ async fn upload(body: Body) -> Result<String> {
 struct Csv(String);
 
 impl IntoResponse for Csv {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(Response::builder()
             .header("Content-Type", "text/csv; charset=utf-8")
             .body(Body::from(self.0))?)

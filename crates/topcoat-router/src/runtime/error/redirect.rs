@@ -1,6 +1,6 @@
 use http::header::LOCATION;
 use http::{HeaderValue, StatusCode};
-use topcoat_core::runtime::error::Result;
+use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{IntoResponse, Response};
 
@@ -82,7 +82,7 @@ impl std::fmt::Display for RedirectError {
 impl std::error::Error for RedirectError {}
 
 impl IntoResponse for RedirectError {
-    fn into_response(self) -> Result<Response> {
-        (self.status, ([(LOCATION, self.location)], ())).into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self.status, ([(LOCATION, self.location)], ())).into_response(cx)
     }
 }

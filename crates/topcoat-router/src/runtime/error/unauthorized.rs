@@ -1,5 +1,5 @@
 use http::StatusCode;
-use topcoat_core::runtime::error::Result;
+use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{IntoResponse, Response};
 
@@ -52,7 +52,7 @@ impl std::fmt::Display for UnauthorizedError {
 impl std::error::Error for UnauthorizedError {}
 
 impl IntoResponse for UnauthorizedError {
-    fn into_response(self) -> Result<Response> {
-        (StatusCode::UNAUTHORIZED, "unauthorized").into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (StatusCode::UNAUTHORIZED, "unauthorized").into_response(cx)
     }
 }

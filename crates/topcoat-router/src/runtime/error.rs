@@ -17,22 +17,25 @@ pub use unauthorized::*;
 use http::StatusCode;
 
 use crate::runtime::{Body, IntoResponse, Response};
+use topcoat_core::runtime::context::Cx;
 use topcoat_core::runtime::error::{Error, Result};
 
 /// Renders any [`IntoResponse`] value into a [`Response`], falling back to the
 /// error's response if conversion fails. This is the terminal conversion the
 /// router applies to a handler's return value.
-pub(crate) fn respond(value: impl IntoResponse) -> Response {
-    value.into_response().unwrap_or_else(error_into_response)
+pub(crate) fn respond(cx: &Cx, value: impl IntoResponse) -> Response {
+    value
+        .into_response(cx)
+        .unwrap_or_else(|error| error_into_response(cx, error))
 }
 
 /// Maps the framework's error types onto their HTTP status codes, falling back
 /// to a 500 for anything else.
-fn error_into_response(error: Error) -> Response {
+fn error_into_response(cx: &Cx, error: Error) -> Response {
     macro_rules! try_downcast {
         ($ident:ident as $ty:ty) => {
             match $ident.downcast::<$ty>() {
-                Ok(error) => return into_response_or_500(error),
+                Ok(error) => return into_response_or_500(cx, error),
                 Err(error) => error,
             }
         };
@@ -45,13 +48,13 @@ fn error_into_response(error: Error) -> Response {
     let error = try_downcast!(error as RedirectError);
     let error = try_downcast!(error as UnauthorizedError);
 
-    into_response_or_500(internal_server_error(error))
+    into_response_or_500(cx, internal_server_error(error))
 }
 
 /// Renders an error response, falling back to a bare 500 (none of the error
 /// types' responses can actually fail to build).
-fn into_response_or_500(value: impl IntoResponse) -> Response {
-    value.into_response().unwrap_or_else(|_| {
+fn into_response_or_500(cx: &Cx, value: impl IntoResponse) -> Response {
+    value.into_response(cx).unwrap_or_else(|_| {
         let mut response = Response::new(Body::from("internal server error"));
         *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
         response
@@ -63,18 +66,18 @@ impl<T> IntoResponse for Result<T>
 where
     T: IntoResponse,
 {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
         match self {
-            Ok(value) => value.into_response(),
-            Err(error) => Ok(error_into_response(error)),
+            Ok(value) => value.into_response(cx),
+            Err(error) => Ok(error_into_response(cx, error)),
         }
     }
 }
 
 /// Renders an error by mapping it onto its HTTP status code.
 impl IntoResponse for Error {
-    fn into_response(self) -> Result<Response> {
-        Ok(error_into_response(self))
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        Ok(error_into_response(cx, self))
     }
 }
 

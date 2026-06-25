@@ -5,9 +5,11 @@ use bytes::{Bytes, BytesMut};
 use http::header::{CONTENT_TYPE, HeaderName, HeaderValue};
 use http::response::Parts;
 use http::{Extensions, HeaderMap, StatusCode};
+use topcoat_core::runtime::context::Cx;
 use topcoat_core::runtime::error::{Error, Result};
+use topcoat_view::runtime::View;
 
-use crate::runtime::{Body, BoxError};
+use crate::runtime::{Body, BoxError, Html};
 
 pub type Response<T = Body> = http::Response<T>;
 
@@ -16,11 +18,9 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 
 /// Converts a value into an HTTP [`Response`].
 ///
-/// Handlers return any type that implements this trait, including the common
-/// in-memory types (`&str`, `String`, `Vec<u8>`, [`Bytes`]), a bare
-/// [`StatusCode`], a [`Response`] itself, and the framework's own wrappers
-/// ([`Html`](crate::runtime::Html), [`Json`](crate::runtime::Json),
-/// [`Form`](crate::runtime::Form)).
+/// Route handlers return any type that implements this trait.
+/// The conversion receives the request [`Cx`], so a response can depend on
+/// request-scoped state.
 ///
 /// A response can also be assembled from a tuple. The last element is converted
 /// with `IntoResponse` and becomes the body, while the earlier elements modify
@@ -37,13 +37,14 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// ```rust
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     router::{Body, IntoResponse, Response, route},
 /// };
 ///
 /// struct Csv(String);
 ///
 /// impl IntoResponse for Csv {
-///     fn into_response(self) -> Result<Response> {
+///     fn into_response(self, _cx: &Cx) -> Result<Response> {
 ///         Ok(Response::builder()
 ///             .header("Content-Type", "text/csv; charset=utf-8")
 ///             .body(Body::from(self.0))?)
@@ -56,13 +57,14 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// }
 /// ```
 pub trait IntoResponse {
-    /// Converts `self` into an HTTP [`Response`].
+    /// Converts `self` into an HTTP [`Response`], using the request [`Cx`] for any
+    /// request-scoped data.
     ///
     /// # Errors
     ///
     /// Returns an error if the response cannot be assembled (for example, a
     /// header value is invalid).
-    fn into_response(self) -> Result<Response>;
+    fn into_response(self, cx: &Cx) -> Result<Response>;
 }
 
 /// Modifies a [`Response`]'s [`Parts`] without supplying a body.
@@ -70,15 +72,17 @@ pub trait IntoResponse {
 /// Types that implement this trait — header arrays, [`HeaderMap`],
 /// [`Extensions`], and their [`Option`] wrappers — can appear before the final
 /// body element of an [`IntoResponse`] tuple to attach headers or extensions to
-/// the response.
+/// the response. The conversion receives the request [`Cx`] so a part can
+/// depend on request-scoped state.
 pub trait IntoResponseParts {
-    /// Applies `self` to the response `parts`.
+    /// Applies `self` to the response `parts`, using the request [`Cx`] for any
+    /// request-scoped data.
     ///
     /// # Errors
     ///
     /// Returns an error if a part cannot be applied (for example, a header
     /// value is invalid).
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()>;
+    fn into_response_parts(self, cx: &Cx, parts: &mut Parts) -> Result<()>;
 }
 
 /// Builds a response carrying `body` with the given `Content-Type`.
@@ -100,123 +104,129 @@ fn merge_parts(parts: &mut Parts, from: Parts) {
 // ── Leaf IntoResponse impls ──
 
 impl IntoResponse for Infallible {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         match self {}
     }
 }
 
 impl IntoResponse for () {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(Response::new(Body::empty()))
     }
 }
 
 impl IntoResponse for StatusCode {
-    fn into_response(self) -> Result<Response> {
-        (self, ()).into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self, ()).into_response(cx)
     }
 }
 
 impl IntoResponse for &'static str {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(content_response(TEXT_PLAIN, Body::from(self)))
     }
 }
 
 impl IntoResponse for String {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(content_response(TEXT_PLAIN, Body::from(self)))
     }
 }
 
 impl IntoResponse for Box<str> {
-    fn into_response(self) -> Result<Response> {
-        String::from(self).into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        String::from(self).into_response(cx)
     }
 }
 
 impl IntoResponse for Cow<'static, str> {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
         match self {
-            Cow::Borrowed(value) => value.into_response(),
-            Cow::Owned(value) => value.into_response(),
+            Cow::Borrowed(value) => value.into_response(cx),
+            Cow::Owned(value) => value.into_response(cx),
         }
     }
 }
 
 impl IntoResponse for &'static [u8] {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(content_response(APPLICATION_OCTET_STREAM, Body::from(self)))
     }
 }
 
 impl<const N: usize> IntoResponse for &'static [u8; N] {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
         let bytes: &'static [u8] = self;
-        bytes.into_response()
+        bytes.into_response(cx)
     }
 }
 
 impl<const N: usize> IntoResponse for [u8; N] {
-    fn into_response(self) -> Result<Response> {
-        self.to_vec().into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        self.to_vec().into_response(cx)
     }
 }
 
 impl IntoResponse for Vec<u8> {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(content_response(APPLICATION_OCTET_STREAM, Body::from(self)))
     }
 }
 
 impl IntoResponse for Box<[u8]> {
-    fn into_response(self) -> Result<Response> {
-        Vec::from(self).into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        Vec::from(self).into_response(cx)
     }
 }
 
 impl IntoResponse for Cow<'static, [u8]> {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
         match self {
-            Cow::Borrowed(value) => value.into_response(),
-            Cow::Owned(value) => value.into_response(),
+            Cow::Borrowed(value) => value.into_response(cx),
+            Cow::Owned(value) => value.into_response(cx),
         }
     }
 }
 
 impl IntoResponse for Bytes {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(content_response(APPLICATION_OCTET_STREAM, Body::from(self)))
     }
 }
 
 impl IntoResponse for BytesMut {
-    fn into_response(self) -> Result<Response> {
-        self.freeze().into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        self.freeze().into_response(cx)
     }
 }
 
 impl IntoResponse for Body {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(Response::new(self))
     }
 }
 
 impl IntoResponse for HeaderMap {
-    fn into_response(self) -> Result<Response> {
-        (self, ()).into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self, ()).into_response(cx)
     }
 }
 
 impl IntoResponse for Extensions {
-    fn into_response(self) -> Result<Response> {
-        (self, ()).into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self, ()).into_response(cx)
     }
 }
 
 impl IntoResponse for Parts {
-    fn into_response(self) -> Result<Response> {
-        (self, ()).into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self, ()).into_response(cx)
+    }
+}
+
+impl IntoResponse for View {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        Html(self.render(cx)).into_response(cx)
     }
 }
 
@@ -228,8 +238,8 @@ where
     V: TryInto<HeaderValue>,
     V::Error: std::error::Error + Send + Sync + 'static,
 {
-    fn into_response(self) -> Result<Response> {
-        (self, ()).into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self, ()).into_response(cx)
     }
 }
 
@@ -240,7 +250,7 @@ where
     B: http_body::Body<Data = Bytes> + Send + 'static,
     B::Error: Into<BoxError>,
 {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         let (parts, body) = self.into_parts();
         Ok(Response::from_parts(parts, Body::new(body)))
     }
@@ -249,7 +259,7 @@ where
 // ── IntoResponseParts impls ──
 
 impl IntoResponseParts for () {
-    fn into_response_parts(self, _parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, _parts: &mut Parts) -> Result<()> {
         Ok(())
     }
 }
@@ -258,23 +268,23 @@ impl<T> IntoResponseParts for Option<T>
 where
     T: IntoResponseParts,
 {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, cx: &Cx, parts: &mut Parts) -> Result<()> {
         if let Some(value) = self {
-            value.into_response_parts(parts)?;
+            value.into_response_parts(cx, parts)?;
         }
         Ok(())
     }
 }
 
 impl IntoResponseParts for HeaderMap {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts.headers.extend(self);
         Ok(())
     }
 }
 
 impl IntoResponseParts for Extensions {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts.extensions.extend(self);
         Ok(())
     }
@@ -289,7 +299,7 @@ where
     V: TryInto<HeaderValue>,
     V::Error: std::error::Error + Send + Sync + 'static,
 {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         for (name, value) in self {
             let name = name.try_into().map_err(Error::from)?;
             let value = value.try_into().map_err(Error::from)?;
@@ -315,10 +325,10 @@ macro_rules! impl_into_response_tuples {
             R: IntoResponse,
             $($ty: IntoResponseParts,)*
         {
-            fn into_response(self) -> Result<Response> {
+            fn into_response(self, cx: &Cx) -> Result<Response> {
                 let ($($ty,)* r,) = self;
-                let (mut parts, body) = r.into_response()?.into_parts();
-                $( $ty.into_response_parts(&mut parts)?; )*
+                let (mut parts, body) = r.into_response(cx)?.into_parts();
+                $( $ty.into_response_parts(cx, &mut parts)?; )*
                 Ok(Response::from_parts(parts, body))
             }
         }
@@ -329,11 +339,11 @@ macro_rules! impl_into_response_tuples {
             R: IntoResponse,
             $($ty: IntoResponseParts,)*
         {
-            fn into_response(self) -> Result<Response> {
+            fn into_response(self, cx: &Cx) -> Result<Response> {
                 let (status, $($ty,)* r,) = self;
-                let (mut parts, body) = r.into_response()?.into_parts();
+                let (mut parts, body) = r.into_response(cx)?.into_parts();
                 parts.status = status;
-                $( $ty.into_response_parts(&mut parts)?; )*
+                $( $ty.into_response_parts(cx, &mut parts)?; )*
                 Ok(Response::from_parts(parts, body))
             }
         }
@@ -344,11 +354,11 @@ macro_rules! impl_into_response_tuples {
             R: IntoResponse,
             $($ty: IntoResponseParts,)*
         {
-            fn into_response(self) -> Result<Response> {
+            fn into_response(self, cx: &Cx) -> Result<Response> {
                 let (template, $($ty,)* r,) = self;
-                let (mut parts, body) = r.into_response()?.into_parts();
+                let (mut parts, body) = r.into_response(cx)?.into_parts();
                 merge_parts(&mut parts, template);
-                $( $ty.into_response_parts(&mut parts)?; )*
+                $( $ty.into_response_parts(cx, &mut parts)?; )*
                 Ok(Response::from_parts(parts, body))
             }
         }
@@ -359,12 +369,12 @@ macro_rules! impl_into_response_tuples {
             R: IntoResponse,
             $($ty: IntoResponseParts,)*
         {
-            fn into_response(self) -> Result<Response> {
+            fn into_response(self, cx: &Cx) -> Result<Response> {
                 let (template, $($ty,)* r,) = self;
                 let (template, ()) = template.into_parts();
-                let (mut parts, body) = r.into_response()?.into_parts();
+                let (mut parts, body) = r.into_response(cx)?.into_parts();
                 merge_parts(&mut parts, template);
-                $( $ty.into_response_parts(&mut parts)?; )*
+                $( $ty.into_response_parts(cx, &mut parts)?; )*
                 Ok(Response::from_parts(parts, body))
             }
         }
@@ -409,7 +419,8 @@ mod tests {
 
     /// Renders a value into a response and reads the body fully into memory.
     fn run(value: impl IntoResponse) -> (Parts, Bytes) {
-        let (parts, body) = value.into_response().unwrap().into_parts();
+        let cx = Cx::empty();
+        let (parts, body) = value.into_response(&cx).unwrap().into_parts();
         let bytes = block_on(to_bytes(body, usize::MAX)).unwrap();
         (parts, bytes)
     }
@@ -526,7 +537,8 @@ mod tests {
     #[test]
     fn invalid_header_name_is_an_error() {
         // A space is not allowed in a header name.
-        assert!([("inva lid", "1")].into_response().is_err());
+        let cx = Cx::empty();
+        assert!([("inva lid", "1")].into_response(&cx).is_err());
     }
 
     // ── tuples ──

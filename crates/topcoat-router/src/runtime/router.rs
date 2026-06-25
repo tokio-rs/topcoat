@@ -87,7 +87,8 @@ impl Router {
         cx.insert(parts);
 
         let next = Next::new(&self.layers, layers, terminal);
-        respond(next.run(&mut cx, body).await)
+        let response = next.run(&mut cx, body).await;
+        respond(&cx, response)
     }
 }
 
@@ -458,12 +459,12 @@ mod tests {
     // A handful of plain handler functions, since `Route`/`Layer` are backed by
     // `fn` pointers and cannot capture state.
 
-    fn say_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "route".into_response() })
+    fn say_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { "route".into_response(cx) })
     }
 
-    fn say_posted(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "posted".into_response() })
+    fn say_posted(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { "posted".into_response(cx) })
     }
 
     /// Echoes the captured path params as `key=value` pairs joined by `&`.
@@ -475,7 +476,7 @@ mod tests {
                 .map(|(key, value)| format!("{key}={value}"))
                 .collect::<Vec<_>>()
                 .join("&")
-                .into_response()
+                .into_response(cx)
         })
     }
 
@@ -483,7 +484,7 @@ mod tests {
     struct Greeting(&'static str);
 
     fn say_greeting(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { app_context::<Greeting>(cx).0.into_response() })
+        Box::pin(async move { app_context::<Greeting>(cx).0.into_response(cx) })
     }
 
     // Layers that record their label in a shared trace before continuing, so a

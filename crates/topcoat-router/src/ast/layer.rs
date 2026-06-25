@@ -59,7 +59,7 @@ impl ToTokens for Layer {
                 #[allow(clippy::unused_async)]
                 #item
                 Box::pin(async move {
-                    ::topcoat::router::IntoResponse::into_response(#ident(cx, body, next).await?)
+                    ::topcoat::router::IntoResponse::into_response(#ident(cx, body, next).await?, cx)
                 })
             }
         };

@@ -6,7 +6,7 @@ use topcoat_core::runtime::{
 };
 
 use topcoat_router::runtime::{
-    Body, Html, IntoResponse, Method, Path, PathBuf, Route, RouteFuture, RouterBuilder,
+    Body, IntoResponse, Method, Path, PathBuf, Route, RouteFuture, RouterBuilder,
 };
 use topcoat_view::runtime::View;
 
@@ -95,7 +95,7 @@ impl Route for ShardRoute {
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
         Box::pin(async move {
             let view = (self.shard.render)(cx, body).await?;
-            Html(view.render(cx)).into_response()
+            view.into_response(cx)
         })
     }
 }

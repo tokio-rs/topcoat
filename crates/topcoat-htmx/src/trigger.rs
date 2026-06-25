@@ -3,7 +3,7 @@ use http::header::HeaderName;
 use http::response::Parts;
 use serde::Serialize;
 use serde_json::{Map, Value};
-use topcoat_core::runtime::error::Result;
+use topcoat_core::runtime::{context::Cx, error::Result};
 use topcoat_router::runtime::IntoResponseParts;
 
 use crate::header;
@@ -147,7 +147,7 @@ impl HxResponseTrigger {
 }
 
 impl IntoResponseParts for HxResponseTrigger {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         let name = self.timing.header();
         parts.headers.insert(name, self.header_value()?);
         Ok(())
@@ -161,7 +161,7 @@ mod tests {
     fn header_value(trigger: HxResponseTrigger) -> (HeaderName, String) {
         let name = trigger.timing.header();
         let mut parts = http::Response::new(()).into_parts().0;
-        trigger.into_response_parts(&mut parts).unwrap();
+        trigger.into_response_parts(&Cx::empty(), &mut parts).unwrap();
         let value = parts.headers.get(&name).unwrap().to_str().unwrap().to_owned();
         (name, value)
     }

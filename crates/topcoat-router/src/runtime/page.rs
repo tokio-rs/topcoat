@@ -5,7 +5,7 @@ use http::Method;
 use topcoat_core::runtime::{context::Cx, error::Result};
 use topcoat_view::runtime::View;
 
-use crate::runtime::{Body, Html, IntoResponse, Path, Route, RouteFuture};
+use crate::runtime::{Body, IntoResponse, Path, Route, RouteFuture};
 
 /// The async render function backing a [`PageFn`].
 pub type PageRenderFn = for<'cx> fn(
@@ -138,7 +138,7 @@ impl Route for PageWithLayouts {
                 render = layout.render(cx, render);
             }
             let view = render.await?;
-            Html(view.render(cx)).into_response()
+            view.into_response(cx)
         })
     }
 }

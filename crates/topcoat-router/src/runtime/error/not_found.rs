@@ -1,5 +1,5 @@
 use http::StatusCode;
-use topcoat_core::runtime::error::Result;
+use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{IntoResponse, Response};
 
@@ -50,7 +50,7 @@ impl std::fmt::Display for NotFoundError {
 impl std::error::Error for NotFoundError {}
 
 impl IntoResponse for NotFoundError {
-    fn into_response(self) -> Result<Response> {
-        (StatusCode::NOT_FOUND, "not found").into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (StatusCode::NOT_FOUND, "not found").into_response(cx)
     }
 }

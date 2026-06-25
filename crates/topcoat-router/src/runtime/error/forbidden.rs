@@ -1,5 +1,5 @@
 use http::StatusCode;
-use topcoat_core::runtime::error::Result;
+use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{IntoResponse, Response};
 
@@ -55,7 +55,7 @@ impl std::fmt::Display for ForbiddenError {
 impl std::error::Error for ForbiddenError {}
 
 impl IntoResponse for ForbiddenError {
-    fn into_response(self) -> Result<Response> {
-        (StatusCode::FORBIDDEN, "forbidden").into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (StatusCode::FORBIDDEN, "forbidden").into_response(cx)
     }
 }

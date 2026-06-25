@@ -89,7 +89,7 @@ impl ToTokens for Route {
                 #item
                 Box::pin(async move {
                     #parse_request
-                    ::topcoat::router::IntoResponse::into_response(#ident(cx, #(#args),*).await?)
+                    ::topcoat::router::IntoResponse::into_response(#ident(cx, #(#args),*).await?, cx)
                 })
             }
         };

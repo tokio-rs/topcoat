@@ -1,5 +1,5 @@
 use http::{HeaderValue, Method, StatusCode};
-use topcoat_core::runtime::error::Result;
+use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{Body, IntoResponse, Response};
 
@@ -50,7 +50,7 @@ impl std::fmt::Display for MethodNotAllowedError {
 impl std::error::Error for MethodNotAllowedError {}
 
 impl IntoResponse for MethodNotAllowedError {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> Result<Response> {
         let mut response = Response::new(Body::empty());
         *response.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
         if let Ok(allow) = HeaderValue::from_str(&self.allow) {

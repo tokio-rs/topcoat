@@ -1,5 +1,5 @@
 use http::StatusCode;
-use topcoat_core::runtime::error::Result;
+use topcoat_core::runtime::{context::Cx, error::Result};
 
 use crate::runtime::{IntoResponse, Response};
 
@@ -79,7 +79,7 @@ impl std::fmt::Display for BadRequestError {
 impl std::error::Error for BadRequestError {}
 
 impl IntoResponse for BadRequestError {
-    fn into_response(self) -> Result<Response> {
-        (StatusCode::BAD_REQUEST, self.to_string()).into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (StatusCode::BAD_REQUEST, self.to_string()).into_response(cx)
     }
 }

@@ -138,12 +138,12 @@ impl<T> IntoResponse for Json<T>
 where
     T: Serialize,
 {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
         (
             [(CONTENT_TYPE, HeaderValue::from_static("application/json"))],
             serde_json::to_vec(&self.0)?,
         )
-            .into_response()
+            .into_response(cx)
     }
 }
 
@@ -295,7 +295,7 @@ mod tests {
     #[tokio::test]
     async fn into_response_serializes_json_with_content_type() {
         let response = Json(json!({ "a": 1 }))
-            .into_response()
+            .into_response(&Cx::empty())
             .expect("serialization succeeds");
 
         assert_eq!(

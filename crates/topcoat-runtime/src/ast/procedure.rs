@@ -99,7 +99,7 @@ impl ToTokens for Procedure {
                         let ::topcoat::router::Json(args) = <::topcoat::router::Json<Surrogate> as topcoat::router::FromRequest>::from_request(cx, body).await?;
                         let (#(#args,)*) = ::topcoat::runtime::Surrogate::into_real(args);
                         let response = ::topcoat::runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
-                        ::topcoat::router::IntoResponse::into_response(::topcoat::router::Json(response))
+                        ::topcoat::router::IntoResponse::into_response(::topcoat::router::Json(response), cx)
                     })
                 },
             );

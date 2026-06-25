@@ -1,6 +1,6 @@
 use http::HeaderValue;
 use http::response::Parts;
-use topcoat_core::runtime::error::Result;
+use topcoat_core::runtime::{context::Cx, error::Result};
 use topcoat_router::runtime::IntoResponseParts;
 
 use crate::SwapOption;
@@ -29,7 +29,7 @@ impl<T: Into<String>> From<T> for HxPushUrl {
 }
 
 impl IntoResponseParts for HxPushUrl {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts
             .headers
             .insert(header::HX_PUSH_URL, HeaderValue::from_str(&self.0)?);
@@ -60,7 +60,7 @@ impl<T: Into<String>> From<T> for HxReplaceUrl {
 }
 
 impl IntoResponseParts for HxReplaceUrl {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts
             .headers
             .insert(header::HX_REPLACE_URL, HeaderValue::from_str(&self.0)?);
@@ -80,7 +80,7 @@ impl<T: Into<String>> From<T> for HxRedirect {
 }
 
 impl IntoResponseParts for HxRedirect {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts
             .headers
             .insert(header::HX_REDIRECT, HeaderValue::from_str(&self.0)?);
@@ -100,7 +100,7 @@ impl From<bool> for HxRefresh {
 }
 
 impl IntoResponseParts for HxRefresh {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         let value = if self.0 { "true" } else { "false" };
         parts
             .headers
@@ -121,7 +121,7 @@ impl From<SwapOption> for HxReswap {
 }
 
 impl IntoResponseParts for HxReswap {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts.headers.insert(header::HX_RESWAP, self.0.into());
         Ok(())
     }
@@ -139,7 +139,7 @@ impl<T: Into<String>> From<T> for HxRetarget {
 }
 
 impl IntoResponseParts for HxRetarget {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts
             .headers
             .insert(header::HX_RETARGET, HeaderValue::from_str(&self.0)?);
@@ -159,7 +159,7 @@ impl<T: Into<String>> From<T> for HxReselect {
 }
 
 impl IntoResponseParts for HxReselect {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts
             .headers
             .insert(header::HX_RESELECT, HeaderValue::from_str(&self.0)?);
@@ -182,21 +182,21 @@ mod tests {
     #[test]
     fn push_url_sets_header() {
         let mut parts = parts();
-        HxPushUrl::from("/new").into_response_parts(&mut parts).unwrap();
+        HxPushUrl::from("/new").into_response_parts(&Cx::empty(), &mut parts).unwrap();
         assert_eq!(header_value(&parts, &header::HX_PUSH_URL), "/new");
     }
 
     #[test]
     fn push_url_prevent_is_false() {
         let mut parts = parts();
-        HxPushUrl::prevent().into_response_parts(&mut parts).unwrap();
+        HxPushUrl::prevent().into_response_parts(&Cx::empty(), &mut parts).unwrap();
         assert_eq!(header_value(&parts, &header::HX_PUSH_URL), "false");
     }
 
     #[test]
     fn refresh_serializes_bool() {
         let mut parts = parts();
-        HxRefresh(true).into_response_parts(&mut parts).unwrap();
+        HxRefresh(true).into_response_parts(&Cx::empty(), &mut parts).unwrap();
         assert_eq!(header_value(&parts, &header::HX_REFRESH), "true");
     }
 
@@ -204,7 +204,7 @@ mod tests {
     fn reswap_uses_swap_option_string() {
         let mut parts = parts();
         HxReswap(SwapOption::BeforeEnd)
-            .into_response_parts(&mut parts)
+            .into_response_parts(&Cx::empty(), &mut parts)
             .unwrap();
         assert_eq!(header_value(&parts, &header::HX_RESWAP), "beforeend");
     }
@@ -213,10 +213,10 @@ mod tests {
     fn retarget_and_reselect_carry_selectors() {
         let mut parts = parts();
         HxRetarget::from("#main")
-            .into_response_parts(&mut parts)
+            .into_response_parts(&Cx::empty(), &mut parts)
             .unwrap();
         HxReselect::from(".item")
-            .into_response_parts(&mut parts)
+            .into_response_parts(&Cx::empty(), &mut parts)
             .unwrap();
         assert_eq!(header_value(&parts, &header::HX_RETARGET), "#main");
         assert_eq!(header_value(&parts, &header::HX_RESELECT), ".item");

@@ -2,7 +2,7 @@ use http::HeaderValue;
 use http::response::Parts;
 use serde::Serialize;
 use serde_json::Value;
-use topcoat_core::runtime::error::Result;
+use topcoat_core::runtime::{context::Cx, error::Result};
 use topcoat_router::runtime::IntoResponseParts;
 
 use crate::SwapOption;
@@ -131,7 +131,7 @@ impl From<String> for HxLocation {
 }
 
 impl IntoResponseParts for HxLocation {
-    fn into_response_parts(self, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts.headers.insert(header::HX_LOCATION, self.header_value()?);
         Ok(())
     }
@@ -184,7 +184,7 @@ mod tests {
 
     fn header_value(location: HxLocation) -> String {
         let mut parts = http::Response::new(()).into_parts().0;
-        location.into_response_parts(&mut parts).unwrap();
+        location.into_response_parts(&Cx::empty(), &mut parts).unwrap();
         parts
             .headers
             .get(header::HX_LOCATION)

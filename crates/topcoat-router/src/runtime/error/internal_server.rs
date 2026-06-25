@@ -1,5 +1,8 @@
 use http::StatusCode;
-use topcoat_core::runtime::error::{Error, Result};
+use topcoat_core::runtime::{
+    context::Cx,
+    error::{Error, Result},
+};
 
 use crate::runtime::{IntoResponse, Response};
 
@@ -57,7 +60,7 @@ impl std::fmt::Display for InternalServerError {
 impl std::error::Error for InternalServerError {}
 
 impl IntoResponse for InternalServerError {
-    fn into_response(self) -> Result<Response> {
-        (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response()
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response(cx)
     }
 }

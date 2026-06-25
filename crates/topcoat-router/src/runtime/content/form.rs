@@ -129,7 +129,7 @@ impl<T> IntoResponse for Form<T>
 where
     T: Serialize,
 {
-    fn into_response(self) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
         (
             [(
                 CONTENT_TYPE,
@@ -137,7 +137,7 @@ where
             )],
             serde_urlencoded::to_string(&self.0)?,
         )
-            .into_response()
+            .into_response(cx)
     }
 }
 
@@ -336,7 +336,7 @@ mod tests {
             ("a".to_owned(), "1".to_owned()),
             ("b".to_owned(), "two".to_owned()),
         ])
-        .into_response()
+        .into_response(&Cx::empty())
         .expect("serialization succeeds");
 
         assert_eq!(
