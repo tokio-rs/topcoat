@@ -126,27 +126,54 @@ impl ToTokens for Component {
         );
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-        let phantom_args = generics.params.iter().filter_map(|param| match param {
-            GenericParam::Lifetime(param) => {
-                let lifetime = &param.lifetime;
-                Some(quote! { &#lifetime () })
-            }
-            GenericParam::Type(param) => {
-                let ident = &param.ident;
-                Some(quote! { #ident })
-            }
-            GenericParam::Const(_) => None,
-        });
+        let phantom_args = generics
+            .params
+            .iter()
+            .filter_map(|param| match param {
+                GenericParam::Lifetime(param) => {
+                    let lifetime = &param.lifetime;
+                    Some(quote! { &#lifetime () })
+                }
+                GenericParam::Type(param) => {
+                    let ident = &param.ident;
+                    Some(quote! { #ident })
+                }
+                GenericParam::Const(_) => None,
+            })
+            .collect::<Vec<_>>();
+
+        // A lifetime or type parameter must appear in the body, so generic
+        // markers carry a `PhantomData` field. Markers with no such parameters
+        // are emitted as unit structs, which makes the marker's bare name a
+        // value (`combobox_content`) rather than a tuple-struct constructor —
+        // letting callers pass it directly, e.g. `router.shard(combobox_content)`.
+        let (marker_body, default_value) = if phantom_args.is_empty() {
+            (quote! { #where_clause; }, quote! { Self })
+        } else {
+            (
+                quote! {
+                    (
+                        #vis ::core::marker::PhantomData<(#(#phantom_args,)*)>,
+                    ) #where_clause;
+                },
+                quote! { Self(::core::marker::PhantomData) },
+            )
+        };
 
         quote_spanned! {ident.span()=>
             #[allow(non_camel_case_types)]
-            #vis struct #ident #impl_generics (
-                #vis ::core::marker::PhantomData<(#(#phantom_args,)*)>,
-            ) #where_clause;
+            #vis struct #ident #impl_generics #marker_body
         }
         .to_tokens(tokens);
 
         quote! {
+            impl #impl_generics ::core::default::Default for #ident #ty_generics #where_clause {
+                #[inline]
+                fn default() -> Self {
+                    #default_value
+                }
+            }
+
             impl #impl_generics ::topcoat::view::Component for #ident #ty_generics #where_clause {
                 type Props = #props_ident #ty_generics;
 

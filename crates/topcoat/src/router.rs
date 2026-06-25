@@ -3,9 +3,6 @@
 pub use topcoat_router::runtime::*;
 pub use topcoat_router_macro::*;
 
-#[cfg(all(feature = "discover", feature = "runtime"))]
-use topcoat_runtime::runtime::RouterBuilderProcedureExt;
-
 #[cfg(feature = "discover")]
 pub trait RouterBuilderDiscoverExt {
     #[must_use]
@@ -21,7 +18,9 @@ impl RouterBuilderDiscoverExt for RouterBuilder {
         self = self.discover_layers();
         #[cfg(feature = "runtime")]
         {
+            use topcoat_runtime::runtime::{RouterBuilderProcedureExt, RouterBuilderShardExt};
             self = self.discover_procedures();
+            self = self.discover_shards();
         }
         self
     }

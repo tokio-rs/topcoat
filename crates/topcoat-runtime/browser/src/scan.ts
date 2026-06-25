@@ -101,8 +101,8 @@ function processMarker(
 				current,
 				current.runtime,
 				marker.id,
-				marker.track,
 				marker.path,
+				marker.exprs,
 				node,
 			);
 			stack.push(reactive.contentScope);

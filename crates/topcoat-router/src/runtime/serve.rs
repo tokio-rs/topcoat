@@ -25,11 +25,14 @@ pub async fn internal_serve(listener: TcpListener, router: Router) -> io::Result
         let service = service.clone();
 
         tokio::spawn(async move {
-            if let Err(error) = auto::Builder::new(TokioExecutor::new())
+            if let Err(_error) = auto::Builder::new(TokioExecutor::new())
                 .serve_connection(io, service)
                 .await
             {
-                eprintln!("error serving connection: {error}");
+                // TODO: Surface real connection errors without the noise. Most
+                // are benign (e.g. the client aborting an in-flight shard
+                // request), so for now they are dropped. See how axum demotes
+                // these to a `trace`-level log.
             }
         });
     }

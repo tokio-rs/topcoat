@@ -3,6 +3,10 @@ mod event_handler;
 mod expr;
 #[cfg(feature = "router")]
 mod procedure;
+#[cfg(feature = "router")]
+mod reactive_scope;
+#[cfg(feature = "router")]
+mod shard;
 mod signal;
 mod surrogate;
 
@@ -11,6 +15,10 @@ pub use event_handler::*;
 pub use expr::*;
 #[cfg(feature = "router")]
 pub use procedure::*;
+#[cfg(feature = "router")]
+pub use reactive_scope::*;
+#[cfg(feature = "router")]
+pub use shard::*;
 pub use signal::*;
 pub use surrogate::*;
 
