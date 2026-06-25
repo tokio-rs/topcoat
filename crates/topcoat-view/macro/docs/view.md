@@ -387,6 +387,19 @@ view! {
 
 For reusable runtime attribute collections, use the [`attributes!`] macro. It has the same attribute syntax as the [`view!`] macro but generates an [`topcoat::view::Attributes`] value that can be passed around and inserted into an element as an attribute fragment.
 
+# Rendering Outside A Component
+
+Inside a [`component`], `#[page]`, or `#[layout]`, the request context is in scope implicitly, so `view!` can render components and reactive markup with no ceremony. In a plain function you need to pass it at the start of the `view!` macro explicitely:
+
+```rust
+# use topcoat::{Result, context::Cx, view::*};
+# #[component]
+# async fn greeting(name: &str) -> Result { view! { <h1>(name)</h1> } }
+async fn render(cx: &Cx) -> Result {
+    view! { cx, greeting(name: "World") }
+}
+```
+
 # Custom Values In Markup
 
 The macro accepts dynamic Rust values by routing them through small runtime traits. Implement the trait for the position where your type should be accepted:
