@@ -1,4 +1,6 @@
-[htmx](https://htmx.org) lets you drive page updates from HTML attributes, exchanging small fragments of markup over a handful of `HX-*` HTTP headers. Topcoat integrates with htmx the same way it handles the rest of a request: **accessor functions** read the request headers from a `cx: &Cx`, and **responders** that implement [`IntoResponseParts`] set the response headers.
+[htmx](https://htmx.org) is a small client-side library that lets HTML drive its own updates. Attributes like `hx-get` and `hx-post` make any element issue an HTTP request on an event — a click, a submit, an input — and swap the returned HTML fragment into the page, without a full reload and without writing JavaScript. The server just answers with the markup for the piece of the page that changed.
+
+The browser and server coordinate this through a set of `HX-*` HTTP headers: the request carries headers describing what triggered it and where the response is headed, and the response can carry headers telling htmx how to apply the result. Topcoat helps you work with those request and response headers.
 
 Everything below is re-exported from `topcoat::htmx` and gated behind the `htmx` feature.
 
@@ -7,6 +9,34 @@ Everything below is re-exported from `topcoat::htmx` and gated behind the `htmx`
 [dependencies]
 topcoat = { version = "0.1", features = ["htmx"] }
 ```
+
+# Loading the htmx script
+
+htmx is a client-side script the browser must load before any `hx-*` attribute does anything. You can point a `<script>` straight at a CDN, or vendor it as a Topcoat asset so it is self-hosted:
+
+```rust
+use topcoat::{
+    Result,
+    asset::asset,
+    router::{Slot, layout},
+    view::view,
+};
+
+#[layout]
+async fn root(slot: Slot<'_>) -> Result {
+    view! {
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <script src=(asset!("https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"))></script>
+            </head>
+            <body>(slot.await?)</body>
+        </html>
+    }
+}
+```
+
+See the [assets guide](crate::asset) for loading the asset bundle on your router.
 
 # Reading request headers
 
