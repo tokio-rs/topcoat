@@ -23,7 +23,7 @@ async fn main() {
 #[layout("/")]
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
     // For client-side navigations we don't need to return the full HTML shell again.
-    // HTMX automatically swaps out just the body.
+    // htmx automatically swaps out just the body.
     if hx_request(cx) {
         return slot.await;
     }

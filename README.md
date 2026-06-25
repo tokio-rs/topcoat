@@ -119,5 +119,8 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 
 **Project infrastructure**
 - [Assets](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/assets.md) — declare assets in Rust, serve them with content-hashed URLs.
-- [Tailwind](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/tailwind.md) — Tailwind CSS without Node, wired into the asset pipeline.
 - [Source code formatting](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-cli/docs/fmt.md) — `topcoat fmt` for macro bodies.
+
+**Third-party integrations**
+- [Tailwind](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/tailwind.md) — Tailwind CSS without Node, wired into the asset pipeline.
+- [htmx](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/htmx.md) — drive partial HTML swaps from the server with request/response header helpers.
