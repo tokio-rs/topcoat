@@ -1,3 +1,5 @@
+[Tailwind CSS](https://tailwindcss.com) is a utility-first CSS framework: instead of writing custom stylesheets, you compose small single-purpose classes (like `flex`, `pt-4`, or `text-center`) directly in your markup, and Tailwind generates only the CSS for the classes you actually use.
+
 Topcoat's Tailwind integration is a thin Rust wrapper around the standalone Tailwind CSS CLI. It does not run Node, `PostCSS`, or a Vite-style asset pipeline. Instead, a Cargo build script runs Tailwind, writes a CSS file into `OUT_DIR`, and the normal Topcoat asset bundler serves that CSS file with a content-hashed URL.
 
 # Setup
