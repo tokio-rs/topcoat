@@ -10,7 +10,7 @@ use topcoat_router::runtime::{
 };
 use topcoat_view::runtime::View;
 
-const SHARD_ROUTE_PREFIX: &str = "/_topcoat/shards";
+pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/shards";
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct ShardId(&'static str);

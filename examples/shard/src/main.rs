@@ -1,9 +1,12 @@
+use std::time::Duration;
+
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
+    context::Cx,
     router::{Router, RouterBuilderDiscoverExt, page},
-    runtime::{Event, procedure},
-    view::view,
+    runtime::{Event, shard},
+    view::{component, view},
 };
 
 #[tokio::main]
@@ -28,28 +31,82 @@ async fn home() -> Result {
                 topcoat::runtime::script()
             </head>
             <body>
-                signal input = String::new();
-
-                <input
-                    :value=$(input.get())
-                    @change=$(|e: Event| input.set(e.target.value))
-                >
-
-                <button
-                    @click=$(async |_e| {
-                        let server_response = print_on_server(input.get()).await;
-                        input.set(server_response);
-                    })
-                >
-                    "Print on server"
-                </button>
+                combobox()
             </body>
         </html>
     }
 }
 
-#[procedure]
-pub async fn print_on_server(input: String) -> Result<String> {
-    println!("{input}");
-    Ok(format!("message received: {input}"))
+#[component]
+async fn combobox(cx: &Cx) -> Result {
+    view! {
+        signal input = String::new();
+
+        <div>
+            <input
+                :value=$(input.get())
+                @change=$(|e: Event| input.set(e.target.value))
+            >
+
+            combobox_content(input: $(input.get()))
+        </div>
+    }
 }
+
+#[shard]
+async fn combobox_content(cx: &Cx, input: String) -> Result {
+    let results = search_fruit(cx, &input).await;
+    view! {
+        <div>
+            <b>"results:"</b>
+            for item in results {
+                <div>(item)</div>
+            }
+        </div>
+    }
+}
+
+// Example data lookup that can only be done on the server:
+async fn search_fruit(_cx: &Cx, input: &str) -> Vec<&'static str> {
+    tokio::time::sleep(Duration::from_secs_f32(0.5)).await;
+    let needle = input.to_lowercase();
+    FRUIT.into_iter().filter(|s| s.contains(&needle)).collect()
+}
+
+const FRUIT: [&str; 35] = [
+    "apple",
+    "apricot",
+    "banana",
+    "blackberry",
+    "blueberry",
+    "cherry",
+    "coconut",
+    "cranberry",
+    "date",
+    "dragonfruit",
+    "elderberry",
+    "fig",
+    "grape",
+    "grapefruit",
+    "guava",
+    "honeydew",
+    "kiwi",
+    "lemon",
+    "lime",
+    "lychee",
+    "mango",
+    "nectarine",
+    "orange",
+    "papaya",
+    "passionfruit",
+    "peach",
+    "pear",
+    "persimmon",
+    "pineapple",
+    "plum",
+    "pomegranate",
+    "raspberry",
+    "strawberry",
+    "tangerine",
+    "watermelon",
+];
