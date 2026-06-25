@@ -50,6 +50,13 @@ impl ErasedShard {
         self.id
     }
 
+    /// Renders the shard for an endpoint request, deserializing its arguments
+    /// from `body`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any error returned by the shard's render function, such as a
+    /// failure to deserialize the request body.
     #[inline]
     pub async fn render(&self, cx: &Cx, body: Body) -> Result<View> {
         (self.render)(cx, body).await
