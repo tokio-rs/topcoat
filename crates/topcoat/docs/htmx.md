@@ -47,11 +47,9 @@ The rest return the header as `Option<&str>`, borrowed straight from the request
 - [`hx_trigger`] — the `id` of the triggering element.
 - [`hx_trigger_name`] — the `name` of the triggering element.
 
-These reads are plain header lookups, so they are not memoized: borrowing the value is cheaper than the owned copy a cache would hold. Reach for [`memoize`](crate::context::memoize) on the *function that uses* the header (a user lookup, a feature-flag check) rather than on the header read itself.
-
 # Setting response headers
 
-htmx also reads a set of [response headers](https://htmx.org/reference/#response_headers) to redirect the browser, retarget the swap, refresh the page, or fire client-side events. Each one is a responder type implementing [`IntoResponseParts`], so you place it before the body in a handler's response tuple — exactly like a header array or [`StatusCode`].
+htmx also reads a set of [response headers](https://htmx.org/reference/#response_headers) to redirect the browser, retarget the swap, refresh the page, or fire client-side events. Each one is a responder type implementing [`IntoResponseParts`], so you place it before the body in a handler's response tuple — exactly like a header array or a `StatusCode`.
 
 ```rust
 use topcoat::{
