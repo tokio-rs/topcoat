@@ -1,4 +1,11 @@
-use crate::{Style, Subset};
+//! Generated metadata for every font family in the vendored Fontsource
+//! catalog.
+//!
+//! Each family is a [`Family`] constant named after its id in
+//! `SCREAMING_SNAKE_CASE` (e.g. [`ROBOTO`], [`JETBRAINS_MONO`]). Iterate the
+//! whole catalog through [`ALL`], or look a family up by id with [`by_id`].
+
+use crate::Style;
 
 /// Static metadata describing a single font family in the Fontsource catalog.
 ///
@@ -7,7 +14,7 @@ use crate::{Style, Subset};
 /// the full list is available as [`families::ALL`](crate::families::ALL).
 /// The values mirror the fields of the Fontsource [`/v1/fonts`](https://api.fontsource.org/v1/fonts) endpoint.
 #[derive(Debug, Clone, Copy)]
-pub struct Family {
+pub struct FontsourceFamily {
     /// Fontsource id, used to build CDN URLs (e.g. `"roboto"`).
     pub id: &'static str,
     /// Human-readable family name (e.g. `"Roboto"`).
@@ -32,7 +39,7 @@ pub struct Family {
     pub provider: &'static str,
 }
 
-impl Family {
+impl FontsourceFamily {
     /// Whether the family offers the given weight.
     #[must_use]
     pub fn has_weight(&self, weight: u16) -> bool {
@@ -50,4 +57,13 @@ impl Family {
     pub fn has_subset(&self, subset: Subset) -> bool {
         self.subsets.contains(&subset)
     }
+
+    /// Look up a family by its Fontsource [`id`](Family::id), e.g.
+    /// `"roboto"`. Returns `None` if no such family is in the vendored catalog.
+    #[must_use]
+    pub fn by_id(id: &str) -> Option<&'static FontsourceFamily> {
+        ALL.binary_search_by(|f| f.id.cmp(id)).ok().map(|i| ALL[i])
+    }
 }
+
+include!(concat!(env!("OUT_DIR"), "/fontsource.rs"));

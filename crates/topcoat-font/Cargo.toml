@@ -3,6 +3,9 @@ name = "topcoat-font"
 version = "0.1.0"
 edition = "2024"
 
+[dependencies]
+topcoat-asset.workspace = true
+
 [build-dependencies]
 heck.workspace = true
 serde = { workspace = true, features = ["derive"] }

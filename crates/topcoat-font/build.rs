@@ -1,13 +1,3 @@
-//! Generates the font catalog from the vendored Fontsource `/v1/fonts`
-//! response (`fonts.json`).
-//!
-//! Two files are written into `OUT_DIR`:
-//!
-//! - `subset.rs` — the [`Subset`] enum, one variant per distinct subset across
-//!   the whole catalog, with `as_str`/`from_id` conversions.
-//! - `families.rs` — one `Family` constant per family plus the `ALL`
-//!   slice.
-
 use std::{
     collections::{BTreeSet, HashSet},
     env,

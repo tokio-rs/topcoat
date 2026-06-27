@@ -1,9 +1,11 @@
-pub mod families;
-
-mod family;
+mod face;
+mod font;
 mod style;
-mod subset;
+mod unicode_range;
+mod weight;
 
-pub use family::*;
+pub use face::*;
+pub use font::*;
 pub use style::*;
-pub use subset::*;
+pub use unicode_range::*;
+pub use weight::*;
