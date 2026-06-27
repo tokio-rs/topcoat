@@ -1,3 +1,9 @@
 pub enum FontSource {
-    Url(),
+    Url {
+        url: &'static str,
+        format: Option<FontFormat>,
+    },
+    Local {
+        name: &'static str,
+    },
 }

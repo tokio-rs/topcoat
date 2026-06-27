@@ -1,0 +1,80 @@
+//! Font file formats for the `format()` hint on a CSS `@font-face` `src`
+//! descriptor.
+
+/// A font file format, as named by the `format()` hint of a CSS `@font-face`
+/// `src` descriptor.
+///
+/// Displays as the CSS format keyword used inside `format(...)` (`woff2`,
+/// `opentype`, `embedded-opentype`, ...).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FontFormat {
+    /// OpenType Collection (`.otc`, `.ttc`), CSS `collection`.
+    Collection,
+    /// Embedded OpenType (`.eot`), CSS `embedded-opentype`.
+    EmbeddedOpenType,
+    /// OpenType (`.otf`, `.ttf`), CSS `opentype`.
+    OpenType,
+    /// SVG Font (`.svg`, `.svgz`), CSS `svg`.
+    ///
+    /// SVG fonts are deprecated and unsupported by most modern browsers.
+    Svg,
+    /// TrueType (`.ttf`), CSS `truetype`.
+    TrueType,
+    /// WOFF 1.0 (`.woff`), CSS `woff`.
+    Woff,
+    /// WOFF 2.0 (`.woff2`), CSS `woff2`.
+    Woff2,
+}
+
+impl FontFormat {
+    /// The CSS format keyword for this format, as written inside `format(...)`.
+    #[must_use]
+    pub const fn keyword(self) -> &'static str {
+        match self {
+            Self::Collection => "collection",
+            Self::EmbeddedOpenType => "embedded-opentype",
+            Self::OpenType => "opentype",
+            Self::Svg => "svg",
+            Self::TrueType => "truetype",
+            Self::Woff => "woff",
+            Self::Woff2 => "woff2",
+        }
+    }
+
+    /// The human-readable name of this format.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Collection => "OpenType Collection",
+            Self::EmbeddedOpenType => "Embedded OpenType",
+            Self::OpenType => "OpenType",
+            Self::Svg => "SVG Font",
+            Self::TrueType => "TrueType",
+            Self::Woff => "WOFF 1.0",
+            Self::Woff2 => "WOFF 2.0",
+        }
+    }
+
+    /// The file extensions associated with this format, without a leading dot.
+    ///
+    /// Some extensions are shared across formats (`ttf` is valid for both
+    /// [`OpenType`](Self::OpenType) and [`TrueType`](Self::TrueType)).
+    #[must_use]
+    pub const fn extensions(self) -> &'static [&'static str] {
+        match self {
+            Self::Collection => &["otc", "ttc"],
+            Self::EmbeddedOpenType => &["eot"],
+            Self::OpenType => &["otf", "ttf"],
+            Self::Svg => &["svg", "svgz"],
+            Self::TrueType => &["ttf"],
+            Self::Woff => &["woff"],
+            Self::Woff2 => &["woff2"],
+        }
+    }
+}
+
+impl std::fmt::Display for FontFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.keyword())
+    }
+}
