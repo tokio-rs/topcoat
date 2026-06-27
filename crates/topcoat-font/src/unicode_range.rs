@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnicodeCodePoint(u32);
 
@@ -71,5 +73,40 @@ impl std::fmt::Display for UnicodeRange {
             let end = self.end.0;
             write!(f, "U+{start:04X}-{end:04X}")
         }
+    }
+}
+
+/// A set of [`UnicodeRange`]s, the value of a CSS `unicode-range` descriptor.
+///
+/// Displays as the comma-separated list CSS expects, e.g.
+/// `U+0000-00FF, U+0131, U+0152-0153`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UnicodeRanges(&'static [UnicodeRange]);
+
+impl UnicodeRanges {
+    /// Wrap a slice of ranges.
+    #[must_use]
+    pub const fn new(ranges: &'static [UnicodeRange]) -> Self {
+        Self(ranges)
+    }
+}
+
+impl std::fmt::Display for UnicodeRanges {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, range) in self.0.iter().enumerate() {
+            if i > 0 {
+                f.write_str(", ")?;
+            }
+            range.fmt(f)?;
+        }
+        Ok(())
+    }
+}
+
+impl Deref for UnicodeRanges {
+    type Target = [UnicodeRange];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
