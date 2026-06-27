@@ -1,11 +1,11 @@
 mod face;
 mod font;
 mod style;
-mod unicode_range;
+mod unicode;
 mod weight;
 
 pub use face::*;
 pub use font::*;
 pub use style::*;
-pub use unicode_range::*;
+pub use unicode::*;
 pub use weight::*;
