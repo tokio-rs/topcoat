@@ -1,13 +1,11 @@
-use std::borrow::Cow;
-
 use topcoat_asset::Asset;
 
-use crate::UnicodeRange;
+use crate::{FontStyle, FontWeightRange, UnicodeRanges};
 
 pub struct FontFace {
-    font_family: Cow<'static, str>,
+    font_family: &'static str,
     src: Asset,
-    weight: Option<FontWeight>,
+    weight: Option<FontWeightRange>,
     style: Option<FontStyle>,
-    unicode_range: Option<UnicodeRange>,
+    unicode_range: Option<UnicodeRanges>,
 }

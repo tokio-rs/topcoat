@@ -1,0 +1,15 @@
+[package]
+name = "topcoat-font-fontsource"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+topcoat-font.workspace = true
+
+[build-dependencies]
+heck.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+
+[lints]
+workspace = true

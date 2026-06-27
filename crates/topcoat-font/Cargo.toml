@@ -3,13 +3,17 @@ name = "topcoat-font"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
-topcoat-asset.workspace = true
+[features]
+asset = [
+	"dep:topcoat-asset",
+]
+router = [
+	"dep:topcoat-router",
+]
 
-[build-dependencies]
-heck.workspace = true
-serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
+[dependencies]
+topcoat-asset = { workspace = true, optional = true }
+topcoat-router = { workspace = true, optional = true }
 
 [lints]
 workspace = true

@@ -1854,10 +1854,18 @@ dependencies = [
 name = "topcoat-font"
 version = "0.1.0"
 dependencies = [
+ "topcoat-asset",
+ "topcoat-router",
+]
+
+[[package]]
+name = "topcoat-font-fontsource"
+version = "0.1.0"
+dependencies = [
  "heck",
  "serde",
  "serde_json",
- "topcoat-asset",
+ "topcoat-font",
 ]
 
 [[package]]
