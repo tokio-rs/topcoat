@@ -25,6 +25,9 @@ pub mod cookie;
 
 pub mod context;
 
+#[cfg(feature = "font")]
+pub mod font;
+
 #[cfg(feature = "htmx")]
 pub mod htmx;
 

@@ -1753,6 +1753,7 @@ dependencies = [
  "topcoat-cookie",
  "topcoat-core",
  "topcoat-core-macro",
+ "topcoat-font",
  "topcoat-htmx",
  "topcoat-router",
  "topcoat-router-macro",
@@ -1847,6 +1848,15 @@ dependencies = [
  "tokio",
  "topcoat",
  "topcoat-core",
+]
+
+[[package]]
+name = "topcoat-font"
+version = "0.1.0"
+dependencies = [
+ "heck",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -26,6 +26,9 @@ discover = [
 	"topcoat-runtime?/discover",
 	"topcoat-runtime-macro?/discover",
 ]
+font = [
+	"dep:topcoat-font",
+]
 htmx = [
 	"dep:topcoat-htmx",
 ]
@@ -68,6 +71,7 @@ topcoat-asset = { workspace = true, optional = true }
 topcoat-cookie = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-core-macro.workspace = true
+topcoat-font = { workspace = true, optional = true }
 topcoat-htmx = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
