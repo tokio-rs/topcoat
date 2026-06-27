@@ -88,6 +88,17 @@ impl UnicodeRange {
         Self { start, end }
     }
 
+    /// Create an inclusive range from two raw code point values.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either value is greater than `U+10FFFF`, or if `end` is
+    /// before `start`.
+    #[must_use]
+    pub const fn from_u32(start: u32, end: u32) -> Self {
+        Self::new(UnicodeCodePoint::new(start), UnicodeCodePoint::new(end))
+    }
+
     /// The first code point in the range.
     #[must_use]
     pub const fn start(&self) -> UnicodeCodePoint {
@@ -204,6 +215,20 @@ mod tests {
     #[should_panic = "empty"]
     fn range_panics_when_end_precedes_start() {
         let _ = UnicodeRange::new(cp(0x5A), cp(0x41));
+    }
+
+    #[test]
+    fn range_from_u32_matches_new() {
+        assert_eq!(
+            UnicodeRange::from_u32(0x41, 0x5A),
+            UnicodeRange::new(cp(0x41), cp(0x5A)),
+        );
+    }
+
+    #[test]
+    #[should_panic = "exceeds"]
+    fn range_from_u32_panics_on_out_of_range() {
+        let _ = UnicodeRange::from_u32(0x00, 0x11_0000);
     }
 
     #[test]
