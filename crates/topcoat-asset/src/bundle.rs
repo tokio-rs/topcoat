@@ -5,6 +5,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use topcoat_core::runtime::context::{Cx, app_context};
+
 use crate::{Asset, MANIFEST_NAME, Manifest};
 
 /// A single entry inside an [`AssetBundle`].
@@ -182,5 +184,30 @@ impl AssetBundle {
     /// Iterate over every bundled asset in arbitrary order.
     pub fn assets(&self) -> impl Iterator<Item = &BundledAsset> {
         self.bundled_assets.values()
+    }
+}
+
+/// Returns the [`AssetBundle`] registered as app context for this context.
+///
+/// # Panics
+///
+/// Panics if no [`AssetBundle`] was registered.
+#[must_use]
+pub fn asset_bundle(cx: &Cx) -> &AssetBundle {
+    app_context(cx)
+}
+
+/// Resolves an [`Asset`] ID to its [`BundledAsset`] in the context's
+/// [`AssetBundle`].
+///
+/// # Panics
+///
+/// Panics if no [`AssetBundle`] was registered, or if the bundle does
+/// not contain the given asset.
+#[must_use]
+pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
+    match asset_bundle(cx).get(asset) {
+        Some(asset) => asset,
+        None => panic!("failed to resolve asset {asset:?} in app context's asset bundle"),
     }
 }

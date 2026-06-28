@@ -1,36 +1,33 @@
 use topcoat_core::runtime::context::{Cx, app_context};
 use topcoat_view::runtime::{AttributeValueViewParts, DynViewPart, FmtHtml, Formatter, ViewParts};
 
-use crate::Asset;
+use crate::{Asset, BundledAsset, bundled_asset};
 
-/// User-provided callback that turns an [`Asset`] into rendered output
-/// (typically a URL or bundled path) when an [`Asset`] is used as a view part.
-pub type ResolveAssetFn = dyn Fn(&Cx, Asset, &mut Formatter<'_>) + Send + Sync;
+pub type ResolveAssetRouteFn = dyn Fn(&BundledAsset, &mut dyn std::fmt::Write) + Send + Sync;
 
-/// App-context hook that lets [`Asset`] be rendered directly inside a view.
-///
-/// Install one into the app context before rendering any view that
-/// contains an [`Asset`] fragment; without it, formatting will panic.
-pub struct AssetResolver {
-    resolve_fn: Box<ResolveAssetFn>,
+/// Function registered with the app context that formats the URL at which a bundled asset is
+/// hosted by the router into a `dyn Write`.
+pub struct AssetRouteResolver {
+    resolve_fn: Box<ResolveAssetRouteFn>,
 }
 
-impl AssetResolver {
+impl AssetRouteResolver {
     /// Build a resolver from a callback.
     #[must_use]
-    pub fn new(resolve_fn: Box<ResolveAssetFn>) -> Self {
+    pub fn new(resolve_fn: Box<ResolveAssetRouteFn>) -> Self {
         Self { resolve_fn }
     }
 
     /// Invoke the underlying callback.
-    pub fn resolve(&self, cx: &Cx, asset: Asset, f: &mut Formatter<'_>) {
-        (self.resolve_fn)(cx, asset, f);
+    pub fn resolve(&self, bundled_asset: &BundledAsset, write: &mut dyn std::fmt::Write) {
+        (self.resolve_fn)(bundled_asset, write);
     }
 }
 
 impl FmtHtml for Asset {
     fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        app_context::<AssetResolver>(cx).resolve(cx, *self, f);
+        let bundled_asset = bundled_asset(cx, *self);
+        app_context::<AssetRouteResolver>(cx).resolve(bundled_asset, f);
     }
 }
 

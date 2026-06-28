@@ -6,7 +6,7 @@ use http::{HeaderValue, Method, StatusCode};
 use topcoat_core::runtime::context::Cx;
 use topcoat_router::runtime::{Body, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder};
 
-use crate::{AssetBundle, AssetResolver, BundledAsset};
+use crate::{AssetBundle, AssetRouteResolver, BundledAsset};
 
 /// URL prefix every bundled asset is served under.
 const ASSET_ROUTE_PREFIX: &str = "/_topcoat/assets";
@@ -89,17 +89,13 @@ impl Route for AssetRoute {
 /// Implemented for [`RouterBuilder`] so it is in scope wherever a router is
 /// being built, enabling the [`assets`](Self::assets) method.
 pub trait RouterBuilderAssetExt {
-    /// Mounts every file in `bundle` as a [`Route`] and installs the
-    /// [`AssetResolver`] that turns [`Asset`](crate::Asset) values rendered in a
-    /// [`View`](topcoat_view::runtime::View) into their bundled URLs.
+    /// Sets the router's asset bundle.
     ///
-    /// Without it, rendering a page that references an `Asset` panics.
-    ///
-    /// Load the bundle produced by `topcoat dev` or `topcoat asset bundle` with
-    /// [`AssetBundle::load`] for the default location, or
-    /// [`AssetBundle::load_dir`] for a custom one. The binary and the asset
-    /// bundle must come from the same build: if a page renders an `Asset` that
-    /// isn't present in the loaded bundle, rendering panics.
+    /// This hosts each asset in `bundle` as an HTTP route in the router.
+    /// It also registers the asset bundle with the app context, allowing access through
+    /// [`asset_bundle`] and [`bundled_asset`].
+    /// Additionally, [`Asset`] handles used as attribute values in the `view!` macro
+    /// get rendered as the URL path the asset is hosted at.
     ///
     /// # Examples
     ///
@@ -125,15 +121,18 @@ impl RouterBuilderAssetExt for RouterBuilder {
             self = self.route(AssetRoute::new(asset));
         }
 
-        let resolver = AssetResolver::new(Box::new(move |_cx, asset, f| match bundle.get(asset) {
-            Some(asset) => {
-                f.write_str(ASSET_ROUTE_PREFIX);
-                f.write_str("/");
-                f.write_str(asset.name().to_str().expect("asset had non-UTF8 name"));
-            }
-            None => panic!("failed to resolve asset {asset:?} in router's asset bundle"),
-        }));
+        self = self.app_context(bundle);
+        self = self.app_context(AssetRouteResolver::new(Box::new(|bundled_asset, write| {
+            let _ = write.write_str(ASSET_ROUTE_PREFIX);
+            let _ = write.write_str("/");
+            let _ = write.write_str(
+                bundled_asset
+                    .name()
+                    .to_str()
+                    .expect("asset needs UTF-8 name"),
+            );
+        })));
 
-        self.app_context(resolver)
+        self
     }
 }
