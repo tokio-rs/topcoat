@@ -2,6 +2,8 @@ mod css;
 mod face;
 mod font;
 mod format;
+#[doc(hidden)]
+pub mod internal;
 #[cfg(feature = "router")]
 mod router;
 mod source;
