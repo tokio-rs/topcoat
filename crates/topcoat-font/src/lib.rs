@@ -1,3 +1,4 @@
+mod css;
 mod face;
 mod font;
 mod format;
@@ -7,6 +8,7 @@ mod tech;
 mod unicode;
 mod weight;
 
+pub(crate) use css::*;
 pub use face::*;
 pub use font::*;
 pub use format::*;

@@ -1,8 +1,8 @@
-use std::{fmt::Display, ops::Deref};
+use std::{fmt::Write, ops::Deref};
 
 use topcoat_core::runtime::context::Cx;
 
-use crate::{FontFormat, FontTech};
+use crate::{CssString, FontFormat, FontTech};
 
 pub enum FontSourceUrl {
     Str(&'static str),
@@ -11,9 +11,13 @@ pub enum FontSourceUrl {
 }
 
 impl FontSourceUrl {
-    pub fn fmt(&self, cx: &Cx, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    /// Writes the URL, escaped as the body of a CSS `<string>` (without the
+    /// surrounding quotes).
+    #[cfg_attr(not(feature = "asset"), expect(unused_variables))]
+    pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
+        let mut f = CssString(f);
         match self {
-            Self::Str(inner) => inner.fmt(f)?,
+            Self::Str(inner) => f.write_str(inner),
             #[cfg(feature = "asset")]
             Self::Asset(inner) => {
                 use topcoat_asset::{AssetRouteResolver, bundled_asset};
@@ -21,10 +25,9 @@ impl FontSourceUrl {
 
                 let resolver = app_context::<AssetRouteResolver>(cx);
                 let bundled_asset = bundled_asset(cx, *inner);
-                resolver.resolve(bundled_asset, f)?;
+                resolver.resolve(bundled_asset, &mut f)
             }
         }
-        Ok(())
     }
 
     /// Returns `true` if the font source url is [`Str`].
@@ -121,11 +124,11 @@ impl FontSource {
         Self::Local { name }
     }
 
-    pub fn fmt(&self, cx: &Cx, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         match self {
             Self::Url { url, format, tech } => {
                 f.write_str("url(\"")?;
-                url.fmt(cx, f)?;
+                url.fmt(cx, &mut *f)?;
                 f.write_str("\")")?;
                 if let Some(format) = format {
                     write!(f, " format({format})")?;
@@ -134,7 +137,11 @@ impl FontSource {
                     write!(f, " tech({tech})")?;
                 }
             }
-            Self::Local { name } => write!(f, "local({name:?})")?,
+            Self::Local { name } => {
+                f.write_str("local(\"")?;
+                CssString(f).write_str(name)?;
+                f.write_str("\")")?;
+            }
         }
         Ok(())
     }
@@ -165,7 +172,7 @@ impl FontSources {
         Self(sources)
     }
 
-    pub fn fmt(&self, cx: &Cx, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         for (index, source) in self.0.iter().enumerate() {
             if index > 0 {
                 f.write_str(", ")?;
