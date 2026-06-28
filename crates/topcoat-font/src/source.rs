@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Deref};
 
 use topcoat_core::runtime::context::Cx;
 
@@ -11,7 +11,7 @@ pub enum FontSourceUrl {
 }
 
 impl FontSourceUrl {
-    pub fn fmt_cx(&self, f: &mut std::fmt::Formatter<'_>, cx: &Cx) -> std::fmt::Result {
+    pub fn fmt(&self, f: &mut std::fmt::Formatter<'_>, cx: &Cx) -> std::fmt::Result {
         match self {
             Self::Str(inner) => inner.fmt(f)?,
             #[cfg(feature = "asset")]
@@ -106,11 +106,11 @@ impl FontSource {
         Self::Local { name }
     }
 
-    pub fn fmt_cx(&self, f: &mut std::fmt::Formatter<'_>, cx: &Cx) -> std::fmt::Result {
+    pub fn fmt(&self, f: &mut std::fmt::Formatter<'_>, cx: &Cx) -> std::fmt::Result {
         match self {
             Self::Url { url, format, tech } => {
                 f.write_str("url(\"")?;
-                url.fmt_cx(f, cx)?;
+                url.fmt(f, cx)?;
                 f.write_str("\")")?;
                 if let Some(format) = format {
                     write!(f, " format({format})")?;
@@ -138,5 +138,33 @@ impl FontSource {
     #[must_use]
     pub fn is_local(&self) -> bool {
         matches!(self, Self::Local { .. })
+    }
+}
+
+pub struct FontSources(&'static [FontSource]);
+
+impl FontSources {
+    #[must_use]
+    pub const fn new(sources: &'static [FontSource]) -> Self {
+        assert!(!sources.is_empty(), "font sources must not be empty");
+        Self(sources)
+    }
+
+    pub fn fmt(&self, f: &mut std::fmt::Formatter<'_>, cx: &Cx) -> std::fmt::Result {
+        for (index, source) in self.0.iter().enumerate() {
+            if index > 0 {
+                f.write_str(", ")?;
+            }
+            source.fmt(f, cx)?;
+        }
+        Ok(())
+    }
+}
+
+impl Deref for FontSources {
+    type Target = [FontSource];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
