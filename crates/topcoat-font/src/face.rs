@@ -1,6 +1,6 @@
 //! Font faces for building CSS `@font-face` rules.
 
-use std::fmt::Write;
+use std::{fmt::Write, ops::Deref};
 
 use topcoat_core::runtime::context::Cx;
 
@@ -81,6 +81,47 @@ impl FontFace {
     }
 }
 
+/// An ordered, non-empty list of [`FontFace`]s.
+///
+/// Renders as the faces' `@font-face` rules, separated by a space.
+pub struct FontFaces(&'static [FontFace]);
+
+impl FontFaces {
+    /// Wrap a slice of faces.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `faces` is empty.
+    #[must_use]
+    pub const fn new(faces: &'static [FontFace]) -> Self {
+        assert!(!faces.is_empty(), "font faces must not be empty");
+        Self(faces)
+    }
+
+    /// Writes the faces as space-separated CSS `@font-face` rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns any error produced while writing to `f`.
+    pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
+        for (index, face) in self.0.iter().enumerate() {
+            if index > 0 {
+                f.write_str(" ")?;
+            }
+            face.fmt(cx, &mut *f)?;
+        }
+        Ok(())
+    }
+}
+
+impl Deref for FontFaces {
+    type Target = [FontFace];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,6 +134,13 @@ mod tests {
         let cx = Cx::empty();
         let mut out = String::new();
         face.fmt(&cx, &mut out).unwrap();
+        out
+    }
+
+    fn render_all(faces: &FontFaces) -> String {
+        let cx = Cx::empty();
+        let mut out = String::new();
+        faces.fmt(&cx, &mut out).unwrap();
         out
     }
 
@@ -127,5 +175,35 @@ mod tests {
             render(&face),
             r#"@font-face { font-family: "My \"Font\""; src: local("Inter") }"#,
         );
+    }
+
+    #[test]
+    fn faces_render_space_separated() {
+        const FACES: FontFaces = FontFaces::new(&[
+            FontFace::new("Inter", SRC),
+            FontFace::new("Roboto", SRC),
+        ]);
+        assert_eq!(
+            render_all(&FACES),
+            concat!(
+                r#"@font-face { font-family: "Inter"; src: local("Inter") } "#,
+                r#"@font-face { font-family: "Roboto"; src: local("Inter") }"#,
+            ),
+        );
+    }
+
+    #[test]
+    fn single_face_renders_without_separator() {
+        const FACES: FontFaces = FontFaces::new(&[FontFace::new("Inter", SRC)]);
+        assert_eq!(
+            render_all(&FACES),
+            r#"@font-face { font-family: "Inter"; src: local("Inter") }"#,
+        );
+    }
+
+    #[test]
+    #[should_panic = "must not be empty"]
+    fn new_panics_on_empty_faces() {
+        let _ = FontFaces::new(&[]);
     }
 }
