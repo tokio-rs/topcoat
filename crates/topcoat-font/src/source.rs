@@ -11,7 +11,7 @@ pub enum FontSourceUrl {
 }
 
 impl FontSourceUrl {
-    pub fn fmt(&self, f: &mut std::fmt::Formatter<'_>, cx: &Cx) -> std::fmt::Result {
+    pub fn fmt(&self, cx: &Cx, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Str(inner) => inner.fmt(f)?,
             #[cfg(feature = "asset")]
@@ -21,7 +21,7 @@ impl FontSourceUrl {
 
                 let resolver = app_context::<AssetRouteResolver>(cx);
                 let bundled_asset = bundled_asset(cx, *inner);
-                resolver.resolve(bundled_asset, f);
+                resolver.resolve(bundled_asset, f)?;
             }
         }
         Ok(())
@@ -48,17 +48,32 @@ impl FontSourceUrl {
     ///
     /// [`Asset`]: FontSourceUrl::Asset
     #[must_use]
+    #[cfg(feature = "asset")]
     pub fn is_asset(&self) -> bool {
         matches!(self, Self::Asset(..))
     }
 
     #[must_use]
+    #[cfg(feature = "asset")]
     pub fn as_asset(&self) -> Option<&topcoat_asset::Asset> {
         if let Self::Asset(v) = self {
             Some(v)
         } else {
             None
         }
+    }
+}
+
+impl From<&'static str> for FontSourceUrl {
+    fn from(v: &'static str) -> Self {
+        Self::Str(v)
+    }
+}
+
+#[cfg(feature = "asset")]
+impl From<topcoat_asset::Asset> for FontSourceUrl {
+    fn from(v: topcoat_asset::Asset) -> Self {
+        Self::Asset(v)
     }
 }
 
@@ -106,11 +121,11 @@ impl FontSource {
         Self::Local { name }
     }
 
-    pub fn fmt(&self, f: &mut std::fmt::Formatter<'_>, cx: &Cx) -> std::fmt::Result {
+    pub fn fmt(&self, cx: &Cx, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Url { url, format, tech } => {
                 f.write_str("url(\"")?;
-                url.fmt(f, cx)?;
+                url.fmt(cx, f)?;
                 f.write_str("\")")?;
                 if let Some(format) = format {
                     write!(f, " format({format})")?;
@@ -150,12 +165,12 @@ impl FontSources {
         Self(sources)
     }
 
-    pub fn fmt(&self, f: &mut std::fmt::Formatter<'_>, cx: &Cx) -> std::fmt::Result {
+    pub fn fmt(&self, cx: &Cx, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (index, source) in self.0.iter().enumerate() {
             if index > 0 {
                 f.write_str(", ")?;
             }
-            source.fmt(f, cx)?;
+            source.fmt(cx, f)?;
         }
         Ok(())
     }

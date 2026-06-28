@@ -123,14 +123,15 @@ impl RouterBuilderAssetExt for RouterBuilder {
 
         self = self.app_context(bundle);
         self = self.app_context(AssetRouteResolver::new(Box::new(|bundled_asset, write| {
-            let _ = write.write_str(ASSET_ROUTE_PREFIX);
-            let _ = write.write_str("/");
-            let _ = write.write_str(
+            write.write_str(ASSET_ROUTE_PREFIX)?;
+            write.write_str("/")?;
+            write.write_str(
                 bundled_asset
                     .name()
                     .to_str()
                     .expect("asset needs UTF-8 name"),
-            );
+            )?;
+            Ok(())
         })));
 
         self
