@@ -3,6 +3,8 @@
 
 use std::ops::Deref;
 
+use topcoat_core::runtime::fnv1a;
+
 /// A Unicode code point: an integer in `U+0000..=U+10FFFF`.
 ///
 /// The upper bound is the Unicode code space, which is intentionally broader
@@ -26,6 +28,11 @@ impl UnicodeCodePoint {
             "unicode code point exceeds U+10FFFF"
         );
         Self(code_point)
+    }
+
+    /// Folds this code point into a running content hash.
+    pub(crate) const fn hash(self, h: u64) -> u64 {
+        fnv1a::hash_continue(h, &self.0.to_le_bytes())
     }
 }
 
@@ -110,6 +117,11 @@ impl UnicodeRange {
     pub const fn end(&self) -> UnicodeCodePoint {
         self.end
     }
+
+    /// Folds this range into a running content hash.
+    pub(crate) const fn hash(self, h: u64) -> u64 {
+        self.end.hash(self.start.hash(h))
+    }
 }
 
 impl std::fmt::Display for UnicodeRange {
@@ -136,6 +148,16 @@ impl UnicodeRanges {
     #[must_use]
     pub const fn new(ranges: &'static [UnicodeRange]) -> Self {
         Self(ranges)
+    }
+
+    /// Folds these ranges into a running content hash.
+    pub(crate) const fn hash(self, mut h: u64) -> u64 {
+        let mut i = 0;
+        while i < self.0.len() {
+            h = self.0[i].hash(h);
+            i += 1;
+        }
+        h
     }
 }
 

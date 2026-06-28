@@ -80,6 +80,11 @@ impl FontTech {
             }
         }
     }
+
+    /// Folds this technology into a running content hash.
+    pub(crate) const fn hash(self, h: u64) -> u64 {
+        topcoat_core::runtime::fnv1a::hash_continue(h, self.keyword().as_bytes())
+    }
 }
 
 impl std::fmt::Display for FontTech {

@@ -2,7 +2,7 @@
 
 use std::{fmt::Write, ops::Deref};
 
-use topcoat_core::runtime::context::Cx;
+use topcoat_core::runtime::{context::Cx, fnv1a};
 
 use crate::{CssString, FontSources, FontStyle, FontWeightRange, UnicodeRanges};
 
@@ -80,6 +80,24 @@ impl FontFace {
         f.write_str(" }")?;
         Ok(())
     }
+
+    /// Folds this face into a running content hash.
+    pub(crate) const fn hash(&self, h: u64) -> u64 {
+        let h = fnv1a::hash_continue(h, self.family.as_bytes());
+        let h = self.src.hash(h);
+        let h = match self.weight {
+            Some(weight) => weight.hash(fnv1a::hash_continue(h, &[1])),
+            None => fnv1a::hash_continue(h, &[0]),
+        };
+        let h = match self.style {
+            Some(style) => style.hash(fnv1a::hash_continue(h, &[1])),
+            None => fnv1a::hash_continue(h, &[0]),
+        };
+        match self.unicode_range {
+            Some(unicode_range) => unicode_range.hash(fnv1a::hash_continue(h, &[1])),
+            None => fnv1a::hash_continue(h, &[0]),
+        }
+    }
 }
 
 /// An ordered, non-empty list of [`FontFace`]s.
@@ -98,6 +116,16 @@ impl FontFaces {
     pub const fn new(faces: &'static [FontFace]) -> Self {
         assert!(!faces.is_empty(), "font faces must not be empty");
         Self(faces)
+    }
+
+    /// Folds these faces into a running content hash.
+    pub(crate) const fn hash(&self, mut h: u64) -> u64 {
+        let mut i = 0;
+        while i < self.0.len() {
+            h = self.0[i].hash(h);
+            i += 1;
+        }
+        h
     }
 
     /// Writes the faces as space-separated CSS `@font-face` rules.

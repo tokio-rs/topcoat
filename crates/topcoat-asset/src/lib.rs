@@ -2,7 +2,6 @@ mod asset;
 mod bundle;
 mod cursor;
 mod error;
-mod hash;
 mod manifest;
 mod options;
 mod resolver;

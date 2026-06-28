@@ -2,7 +2,7 @@
 
 use std::{fmt::Write, ops::Deref};
 
-use topcoat_core::runtime::context::Cx;
+use topcoat_core::runtime::{context::Cx, fnv1a};
 
 use crate::{CssString, FontFormat, FontTech};
 
@@ -83,6 +83,17 @@ impl FontSourceUrl {
         match self {
             Self::Asset(v) => Some(v),
             Self::Str(_) => None,
+        }
+    }
+
+    /// Folds this URL into a running content hash.
+    pub(crate) const fn hash(&self, h: u64) -> u64 {
+        match self {
+            Self::Str(inner) => fnv1a::hash_continue(fnv1a::hash_continue(h, b"s"), inner.as_bytes()),
+            #[cfg(feature = "asset")]
+            Self::Asset(inner) => {
+                fnv1a::hash_continue(fnv1a::hash_continue(h, b"a"), &inner.as_u64().to_le_bytes())
+            }
         }
     }
 }
@@ -208,6 +219,26 @@ impl FontSource {
     pub fn is_local(&self) -> bool {
         matches!(self, Self::Local { .. })
     }
+
+    /// Folds this source into a running content hash.
+    pub(crate) const fn hash(&self, h: u64) -> u64 {
+        match self {
+            Self::Url { url, format, tech } => {
+                let h = url.hash(fnv1a::hash_continue(h, b"u"));
+                let h = match format {
+                    Some(format) => format.hash(fnv1a::hash_continue(h, &[1])),
+                    None => fnv1a::hash_continue(h, &[0]),
+                };
+                match tech {
+                    Some(tech) => tech.hash(fnv1a::hash_continue(h, &[1])),
+                    None => fnv1a::hash_continue(h, &[0]),
+                }
+            }
+            Self::Local { name } => {
+                fnv1a::hash_continue(fnv1a::hash_continue(h, b"l"), name.as_bytes())
+            }
+        }
+    }
 }
 
 /// An ordered, non-empty list of [`FontSource`]s, the value of a CSS
@@ -229,6 +260,16 @@ impl FontSources {
     pub const fn new(sources: &'static [FontSource]) -> Self {
         assert!(!sources.is_empty(), "font sources must not be empty");
         Self(sources)
+    }
+
+    /// Folds these sources into a running content hash.
+    pub(crate) const fn hash(&self, mut h: u64) -> u64 {
+        let mut i = 0;
+        while i < self.0.len() {
+            h = self.0[i].hash(h);
+            i += 1;
+        }
+        h
     }
 
     /// Writes the sources as a comma-separated CSS `src` descriptor value.

@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 
-use crate::{
-    cursor::{ConstReader, ConstWriter},
-    hash,
-};
+use topcoat_core::runtime::fnv1a;
+
+use crate::cursor::{ConstReader, ConstWriter};
 
 /// Options that control how an asset is bundled.
 ///
@@ -100,10 +99,10 @@ const fn cow_as_str<'a>(c: Option<&'a Cow<'static, str>>) -> Option<&'a str> {
 
 const fn hash_opt_str(h: u64, s: Option<&str>) -> u64 {
     match s {
-        None => hash::fnv1a_continue(h, &[0]),
+        None => fnv1a::hash_continue(h, &[0]),
         Some(s) => {
-            let h = hash::fnv1a_continue(h, &[1]);
-            hash::fnv1a_continue(h, s.as_bytes())
+            let h = fnv1a::hash_continue(h, &[1]);
+            fnv1a::hash_continue(h, s.as_bytes())
         }
     }
 }

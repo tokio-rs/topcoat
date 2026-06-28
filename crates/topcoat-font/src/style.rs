@@ -1,6 +1,8 @@
 //! Font styles for building CSS `font-style` descriptors on `@font-face`
 //! rules.
 
+use topcoat_core::runtime::fnv1a;
+
 /// An oblique slant angle in degrees, in `-90.0..=90.0`.
 ///
 /// This is the angle a glyph is slanted from upright, as used by
@@ -27,6 +29,11 @@ impl ObliqueAngle {
             "oblique angle out of range -90deg..=90deg"
         );
         Self(degrees)
+    }
+
+    /// Folds this angle into a running content hash.
+    pub(crate) const fn hash(self, h: u64) -> u64 {
+        fnv1a::hash_continue(h, &self.0.to_bits().to_le_bytes())
     }
 }
 
@@ -116,6 +123,11 @@ impl ObliqueAngleRange {
     pub const fn end(&self) -> ObliqueAngle {
         self.end
     }
+
+    /// Folds this range into a running content hash.
+    pub(crate) const fn hash(self, h: u64) -> u64 {
+        self.end.hash(self.start.hash(h))
+    }
 }
 
 impl std::fmt::Display for ObliqueAngleRange {
@@ -176,6 +188,16 @@ impl FontStyle {
     #[must_use]
     pub const fn oblique_range(start: f32, end: f32) -> Self {
         Self::Oblique(Some(ObliqueAngleRange::from_degrees(start, end)))
+    }
+
+    /// Folds this style into a running content hash.
+    pub(crate) const fn hash(self, h: u64) -> u64 {
+        match self {
+            Self::Normal => fnv1a::hash_continue(h, b"n"),
+            Self::Italic => fnv1a::hash_continue(h, b"i"),
+            Self::Oblique(None) => fnv1a::hash_continue(h, b"o"),
+            Self::Oblique(Some(range)) => range.hash(fnv1a::hash_continue(h, b"oa")),
+        }
     }
 }
 
