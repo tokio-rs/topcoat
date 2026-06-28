@@ -81,6 +81,18 @@ impl<'a> Formatter<'a> {
     }
 }
 
+impl std::fmt::Write for Formatter<'_> {
+    fn write_char(&mut self, c: char) -> std::fmt::Result {
+        Formatter::write_char(self, c);
+        Ok(())
+    }
+
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        Formatter::write_str(self, s);
+        Ok(())
+    }
+}
+
 /// A value that can render itself into a [`Formatter`].
 ///
 /// Implement this for custom renderable types. Use the escaped formatter
