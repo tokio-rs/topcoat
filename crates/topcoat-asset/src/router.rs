@@ -23,7 +23,7 @@ const CACHE_CONTROL_VALUE: HeaderValue =
 /// `Cache-Control`.
 #[derive(Debug, Clone)]
 pub struct AssetRoute {
-    /// URL path the asset is served at, e.g. `/_topcoat/assets/logo-1a2b3c4d.png`.
+    /// URL path the asset is served at, e.g. `/_topcoat/assets/logo-1a2b3c4d5e6f7a8b.png`.
     path: PathBuf,
     /// Absolute path to the bundled file on disk.
     file: FsPathBuf,

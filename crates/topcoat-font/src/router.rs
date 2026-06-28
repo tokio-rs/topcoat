@@ -16,7 +16,12 @@ impl FontRoute {
     #[must_use]
     pub fn new(font: Font) -> Self {
         Self {
-            path: Path::new(&format!("{FONT_ROUTE_PREFIX}/{}.css", font.family())).to_owned(),
+            path: Path::new(&format!(
+                "{FONT_ROUTE_PREFIX}/{}-{:016x}.css",
+                font.family(),
+                font.hash()
+            ))
+            .to_owned(),
             font,
         }
     }

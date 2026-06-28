@@ -40,7 +40,7 @@ view! {
 When an [`Asset`] appears inside [`view!`](crate::view::view), Topcoat renders it as the URL of the bundled file. For example, an image might render as:
 
 ```html
-<img src="/_topcoat/assets/ferris-1a2b3c4d.png">
+<img src="/_topcoat/assets/ferris-1a2b3c4d5e6f7a8b.png">
 ```
 
 The hash in the filename is based on the file contents, so URLs are safe to cache aggressively.

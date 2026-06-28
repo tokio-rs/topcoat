@@ -247,8 +247,8 @@ fn normalize(path: &Path) -> PathBuf {
 ///   differs. Recommended for remote assets.
 ///
 /// Output filenames always include a short content hash so bundles stay
-/// cache-friendly: e.g. `logo-1a2b3c4d.png`, or `1a2b3c4d.png` if the
-/// stem is empty.
+/// cache-friendly: e.g. `logo-1a2b3c4d5e6f7a8b.png`, or
+/// `1a2b3c4d5e6f7a8b.png` if the stem is empty.
 ///
 /// # Returns
 ///

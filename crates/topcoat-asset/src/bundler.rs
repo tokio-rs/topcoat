@@ -120,7 +120,7 @@ impl Bundler {
                 .into());
             }
 
-            let short_hash = &hash[..8];
+            let short_hash = &hash[..16];
 
             let name = source.display_name();
             let name_path = Path::new(&name);
