@@ -1855,6 +1855,7 @@ name = "topcoat-font"
 version = "0.1.0"
 dependencies = [
  "topcoat-asset",
+ "topcoat-core",
  "topcoat-router",
 ]
 

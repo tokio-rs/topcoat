@@ -12,6 +12,7 @@ router = [
 ]
 
 [dependencies]
+topcoat-core.workspace = true
 topcoat-asset = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 

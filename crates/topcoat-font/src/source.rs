@@ -1,3 +1,7 @@
+use std::fmt::Display;
+
+use topcoat_core::runtime::context::Cx;
+
 use crate::{FontFormat, FontTech};
 
 pub enum FontSourceUrl {
@@ -7,6 +11,22 @@ pub enum FontSourceUrl {
 }
 
 impl FontSourceUrl {
+    pub fn fmt_cx(&self, f: &mut std::fmt::Formatter<'_>, cx: &Cx) -> std::fmt::Result {
+        match self {
+            Self::Str(inner) => inner.fmt(f)?,
+            #[cfg(feature = "asset")]
+            Self::Asset(inner) => {
+                use topcoat_asset::{AssetRouteResolver, bundled_asset};
+                use topcoat_core::runtime::context::app_context;
+
+                let resolver = app_context::<AssetRouteResolver>(cx);
+                let bundled_asset = bundled_asset(cx, *inner);
+                resolver.resolve(bundled_asset, f);
+            }
+        }
+        Ok(())
+    }
+
     /// Returns `true` if the font source url is [`Str`].
     ///
     /// [`Str`]: FontSourceUrl::Str
@@ -84,6 +104,24 @@ impl FontSource {
     #[must_use]
     pub const fn local(name: &'static str) -> Self {
         Self::Local { name }
+    }
+
+    pub fn fmt_cx(&self, f: &mut std::fmt::Formatter<'_>, cx: &Cx) -> std::fmt::Result {
+        match self {
+            Self::Url { url, format, tech } => {
+                f.write_str("url(\"")?;
+                url.fmt_cx(f, cx)?;
+                f.write_str("\")")?;
+                if let Some(format) = format {
+                    write!(f, " format({format})")?;
+                }
+                if let Some(tech) = tech {
+                    write!(f, " tech({tech})")?;
+                }
+            }
+            Self::Local { name } => write!(f, "local({name:?})")?,
+        }
+        Ok(())
     }
 
     /// Returns `true` if the font source is [`Url`].
