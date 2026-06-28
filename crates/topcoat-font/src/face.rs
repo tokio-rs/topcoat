@@ -186,8 +186,8 @@ impl Deref for FontFaces {
 /// # Examples
 ///
 /// ```rust
-/// use topcoat_font::{FontFace, font_face};
-///
+/// # use topcoat_font::{FontFace, font_face};
+/// #
 /// const INTER: FontFace = font_face! {
 ///     font-family: "Inter";
 ///     src: local("Inter"), url("/inter.woff2") format(Woff2);

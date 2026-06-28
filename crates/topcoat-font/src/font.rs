@@ -81,8 +81,8 @@ macro_rules! __register_font {
 /// # Examples
 ///
 /// ```rust
-/// use topcoat_font::{Font, font};
-///
+/// # use topcoat_font::{Font, font};
+/// #
 /// const INTER: Font = font! {
 ///     "Inter",
 ///     @font-face {
