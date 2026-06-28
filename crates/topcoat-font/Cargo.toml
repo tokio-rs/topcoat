@@ -7,6 +7,9 @@ edition = "2024"
 asset = [
 	"dep:topcoat-asset",
 ]
+discover = [
+	"dep:inventory"
+]
 router = [
 	"dep:topcoat-router",
 ]
@@ -15,6 +18,8 @@ router = [
 topcoat-core.workspace = true
 topcoat-asset = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
+
+inventory = { workspace = true, optional = true }
 
 [lints]
 workspace = true

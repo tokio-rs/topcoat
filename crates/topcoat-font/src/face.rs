@@ -11,6 +11,7 @@ use crate::{CssString, FontSources, FontStyle, FontWeightRange, UnicodeRanges};
 ///
 /// Renders as a complete `@font-face { ... }` block, with the optional
 /// descriptors omitted when unset.
+#[derive(Debug, Clone, PartialEq)]
 pub struct FontFace {
     family: &'static str,
     src: FontSources,
@@ -84,6 +85,7 @@ impl FontFace {
 /// An ordered, non-empty list of [`FontFace`]s.
 ///
 /// Renders as the faces' `@font-face` rules, separated by a space.
+#[derive(Debug, Clone, PartialEq)]
 pub struct FontFaces(&'static [FontFace]);
 
 impl FontFaces {
@@ -179,10 +181,8 @@ mod tests {
 
     #[test]
     fn faces_render_space_separated() {
-        const FACES: FontFaces = FontFaces::new(&[
-            FontFace::new("Inter", SRC),
-            FontFace::new("Roboto", SRC),
-        ]);
+        const FACES: FontFaces =
+            FontFaces::new(&[FontFace::new("Inter", SRC), FontFace::new("Roboto", SRC)]);
         assert_eq!(
             render_all(&FACES),
             concat!(

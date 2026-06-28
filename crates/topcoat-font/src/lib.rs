@@ -2,6 +2,8 @@ mod css;
 mod face;
 mod font;
 mod format;
+#[cfg(feature = "router")]
+mod router;
 mod source;
 mod style;
 mod tech;
@@ -12,6 +14,8 @@ pub(crate) use css::*;
 pub use face::*;
 pub use font::*;
 pub use format::*;
+#[cfg(feature = "router")]
+pub use router::*;
 pub use source::*;
 pub use style::*;
 pub use tech::*;

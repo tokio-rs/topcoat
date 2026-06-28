@@ -1854,6 +1854,7 @@ dependencies = [
 name = "topcoat-font"
 version = "0.1.0"
 dependencies = [
+ "inventory",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-router",

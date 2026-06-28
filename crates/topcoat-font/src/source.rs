@@ -12,6 +12,7 @@ use crate::{CssString, FontFormat, FontTech};
 /// A [`Str`](Self::Str) is written verbatim; an [`Asset`](Self::Asset) is
 /// resolved to its hosted router URL when formatted. Either is escaped as a CSS
 /// `<string>` so it is safe between the quotes of `url("...")`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FontSourceUrl {
     /// A URL written as-is, such as an absolute URL or an external host.
     Str(&'static str),
@@ -107,6 +108,7 @@ impl From<topcoat_asset::Asset> for FontSourceUrl {
 ///
 /// Renders as the corresponding CSS, e.g. `url("/font.woff2") format(woff2)` or
 /// `local("Helvetica Neue")`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FontSource {
     /// A downloadable font file, with optional format and technology hints.
     Url {
@@ -213,6 +215,7 @@ impl FontSource {
 ///
 /// Renders as the comma-separated list CSS expects, with the browser using the
 /// first source it supports. Order from most to least preferred.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FontSources(&'static [FontSource]);
 
 impl FontSources {
