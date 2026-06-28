@@ -1,4 +1,4 @@
-use std::{borrow::Cow, hash::Hash, pin::Pin};
+use std::{hash::Hash, pin::Pin};
 
 use topcoat_core::runtime::{
     context::Cx,
@@ -88,8 +88,8 @@ impl Route for ShardRoute {
         Method::POST
     }
 
-    fn path(&self) -> Cow<'static, Path> {
-        Cow::Owned(self.path.clone())
+    fn path(&self) -> &Path {
+        &self.path
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {

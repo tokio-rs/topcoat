@@ -251,7 +251,7 @@ impl Deref for FontSources {
     type Target = [FontSource];
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }
 

@@ -105,7 +105,7 @@ fn request_path(uri: &http::Uri) -> &Path {
 /// layers sharing a path the most recently registered ends up outermost.
 fn layers_for(path: &Path, layers: &[Box<dyn Layer>]) -> Vec<usize> {
     let mut indices: Vec<usize> = (0..layers.len())
-        .filter(|&i| path.starts_with(&layers[i].path()))
+        .filter(|&i| path.starts_with(layers[i].path()))
         .rev()
         .collect();
     indices.sort_by_key(|&i| layers[i].path().len());
@@ -233,10 +233,10 @@ impl RouterBuilder {
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_layouts(mut self) -> Self {
-        let mut seen = std::collections::HashSet::<Cow<'static, crate::runtime::Path>>::new();
+        let mut seen = std::collections::HashSet::<crate::runtime::PathBuf>::new();
         for layout in inventory::iter::<LayoutFn>().cloned() {
             assert!(
-                seen.insert(layout.path()),
+                seen.insert(layout.path().to_owned()),
                 "multiple discovered layouts registered for the same path \"{}\"",
                 layout.path()
             );
@@ -275,10 +275,10 @@ impl RouterBuilder {
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_layers(mut self) -> Self {
-        let mut seen = std::collections::HashSet::<Cow<'static, crate::runtime::Path>>::new();
+        let mut seen = std::collections::HashSet::<crate::runtime::PathBuf>::new();
         for layer in inventory::iter::<crate::runtime::LayerFn>().cloned() {
             assert!(
-                seen.insert(layer.path()),
+                seen.insert(layer.path().to_owned()),
                 "multiple discovered layers registered for the same path \"{}\"",
                 layer.path()
             );
@@ -354,7 +354,7 @@ impl RouterBuilder {
         for page in pages {
             let mut matching: Vec<LayoutFn> = layouts
                 .iter()
-                .filter(|layout| page.path().starts_with(&layout.path()))
+                .filter(|layout| page.path().starts_with(layout.path()))
                 .cloned()
                 .collect();
             matching.sort_by_key(|layout| layout.path().len());
@@ -371,15 +371,17 @@ impl RouterBuilder {
         let mut paths: HashMap<Cow<'static, str>, Cow<'static, Path>> = HashMap::new();
         for (index, route) in routes.iter().enumerate() {
             let route_path = route.path();
-            let path = route_path.to_matchit_path();
+            let matchit_path = route_path.to_matchit_path();
             let method = route.method();
-            let endpoint = grouped.entry(path.clone()).or_default();
+            let endpoint = grouped.entry(matchit_path.clone()).or_default();
             assert!(
                 endpoint.get(&method).is_none(),
-                "duplicate route registered for `{method} {path}`"
+                "duplicate route registered for `{method} {matchit_path}`"
             );
             endpoint.insert(method, index);
-            paths.entry(path).or_insert(route_path);
+            paths
+                .entry(matchit_path)
+                .or_insert(Cow::Owned(route_path.to_owned()));
         }
 
         // Precompute the layer stack wrapping each endpoint once, so dispatch
@@ -434,6 +436,10 @@ mod tests {
             .block_on(future)
     }
 
+    fn path(s: &'static str) -> Cow<'static, Path> {
+        Cow::Borrowed(Path::new(s))
+    }
+
     /// Builds a request with an empty body for the given method and path.
     fn request(method: Method, path: &str) -> Request {
         http::Request::builder()
@@ -449,11 +455,6 @@ mod tests {
         let (parts, body) = response.into_parts();
         let bytes = block_on(to_bytes(body, usize::MAX)).unwrap();
         (parts.status, parts.headers, bytes)
-    }
-
-    /// A `Cow<'static, Path>` from a path literal, for constructing routes.
-    fn path(s: &'static str) -> Cow<'static, Path> {
-        Cow::Borrowed(Path::new(s))
     }
 
     // A handful of plain handler functions, since `Route`/`Layer` are backed by
@@ -561,11 +562,11 @@ mod tests {
 
     /// A layer that only carries a path; its `handle` is never invoked by
     /// `layers_for`, which inspects paths alone.
-    struct PathLayer(Cow<'static, Path>);
+    struct PathLayer(&'static Path);
 
     impl Layer for PathLayer {
-        fn path(&self) -> Cow<'static, Path> {
-            self.0.clone()
+        fn path(&self) -> &Path {
+            self.0
         }
 
         fn handle<'a>(&'a self, _cx: &'a mut Cx, _body: Body, _next: Next<'a>) -> LayerFuture<'a> {
@@ -576,7 +577,7 @@ mod tests {
     fn path_layers(paths: &[&'static str]) -> Vec<Box<dyn Layer>> {
         paths
             .iter()
-            .map(|&p| Box::new(PathLayer(path(p))) as Box<dyn Layer>)
+            .map(|&p| Box::new(PathLayer(Path::new(p))) as Box<dyn Layer>)
             .collect()
     }
 

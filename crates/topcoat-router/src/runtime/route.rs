@@ -18,7 +18,7 @@ pub trait Route: Send + Sync + 'static {
     fn method(&self) -> Method;
 
     /// The URL path this route handles.
-    fn path(&self) -> Cow<'static, Path>;
+    fn path(&self) -> &Path;
 
     /// Handles a request, producing a response.
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx>;
@@ -58,8 +58,8 @@ impl Route for RouteFn {
         self.method.clone()
     }
 
-    fn path(&self) -> Cow<'static, Path> {
-        self.path.clone()
+    fn path(&self) -> &Path {
+        &self.path
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {

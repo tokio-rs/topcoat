@@ -35,8 +35,8 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// struct Timing;
 ///
 /// impl Layer for Timing {
-///     fn path(&self) -> Cow<'static, Path> {
-///         Cow::Borrowed(Path::new("/"))
+///     fn path(&self) -> &Path {
+///         Path::new("/")
 ///     }
 ///
 ///     fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -51,7 +51,7 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// ```
 pub trait Layer: Send + Sync + 'static {
     /// The URL path prefix whose routes this layer wraps.
-    fn path(&self) -> Cow<'static, Path>;
+    fn path(&self) -> &Path;
 
     /// Handles a request, calling `next` to continue down the chain.
     fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
@@ -82,8 +82,8 @@ impl LayerFn {
 }
 
 impl Layer for LayerFn {
-    fn path(&self) -> Cow<'static, Path> {
-        self.path.clone()
+    fn path(&self) -> &Path {
+        &self.path
     }
 
     fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {

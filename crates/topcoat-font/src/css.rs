@@ -43,7 +43,7 @@ mod tests {
 
     #[test]
     fn passes_through_non_ascii() {
-        assert_eq!(escape("Ã¥ Ã¤ Ã¶ æ¼¢å­"), "Ã¥ Ã¤ Ã¶ æ¼¢å­");
+        assert_eq!(escape("Ã¥ Ã¤ Ã¶ æ¼¢å\u{AD}"), "Ã¥ Ã¤ Ã¶ æ¼¢å\u{AD}");
     }
 
     #[test]

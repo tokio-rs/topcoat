@@ -120,7 +120,7 @@ impl Deref for FontFaces {
     type Target = [FontFace];
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }
 

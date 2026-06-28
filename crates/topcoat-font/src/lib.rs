@@ -10,7 +10,7 @@ mod tech;
 mod unicode;
 mod weight;
 
-pub(crate) use css::*;
+pub(crate) use css::CssString;
 pub use face::*;
 pub use font::*;
 pub use format::*;

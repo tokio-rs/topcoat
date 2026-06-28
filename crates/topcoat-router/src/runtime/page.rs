@@ -87,8 +87,8 @@ impl LayoutFn {
 
     /// Returns the path prefix this layout applies to.
     #[must_use]
-    pub fn path(&self) -> Cow<'static, Path> {
-        self.path.clone()
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     /// Renders the layout, embedding the given [`Slot`] as child content.
@@ -127,8 +127,8 @@ impl Route for PageWithLayouts {
         Method::GET
     }
 
-    fn path(&self) -> Cow<'static, Path> {
-        self.page.path.clone()
+    fn path(&self) -> &Path {
+        &self.page.path
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {

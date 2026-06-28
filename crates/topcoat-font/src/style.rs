@@ -59,7 +59,7 @@ impl TryFrom<f32> for ObliqueAngle {
     type Error = ObliqueAngleOutOfRangeError;
 
     fn try_from(value: f32) -> Result<Self, Self::Error> {
-        if !(value >= -90.0 && value <= 90.0) {
+        if !(-90.0..=90.0).contains(&value) {
             return Err(ObliqueAngleOutOfRangeError);
         }
         Ok(Self(value))
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn angle_converts_to_f32() {
-        assert_eq!(f32::from(ObliqueAngle::new(30.0)), 30.0);
+        assert!((f32::from(ObliqueAngle::new(30.0)) - 30.0).abs() < 0.001);
     }
 
     #[test]

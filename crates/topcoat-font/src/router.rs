@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use topcoat_core::runtime::context::Cx;
 use topcoat_router::runtime::{
     Body, IntoResponse, Method, Path, PathBuf, Route, RouteFuture, RouterBuilder,
@@ -29,8 +27,8 @@ impl Route for FontRoute {
         Method::GET
     }
 
-    fn path(&self) -> std::borrow::Cow<'static, Path> {
-        Cow::Owned(self.path.clone())
+    fn path(&self) -> &Path {
+        &self.path
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
@@ -59,7 +57,7 @@ impl RouterBuilderFontExt for RouterBuilder {
 
     fn discover_fonts(mut self) -> Self {
         for font in inventory::iter::<Font> {
-            self = self.font(font)
+            self = self.font(font.clone());
         }
         self
     }

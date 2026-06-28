@@ -74,7 +74,7 @@ impl TryFrom<u16> for FontWeight {
     type Error = FontWeightOutOfRangeError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
-        if value < 100 || value > 900 {
+        if !(100..=900).contains(&value) {
             return Err(FontWeightOutOfRangeError);
         }
         Ok(Self(value))

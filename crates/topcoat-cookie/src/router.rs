@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use topcoat_core::runtime::context::Cx;
 use topcoat_router::runtime::{Body, Layer, LayerFuture, Next, Path, RouterBuilder};
 
@@ -19,8 +17,8 @@ impl CookieLayer {
 }
 
 impl Layer for CookieLayer {
-    fn path(&self) -> Cow<'static, Path> {
-        Cow::Borrowed(Path::new("/"))
+    fn path(&self) -> &Path {
+        Path::new("/")
     }
 
     fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -57,8 +55,6 @@ impl RouterBuilderCookieExt for RouterBuilder {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-
     use http::{Method, Request, header};
     use topcoat_core::runtime::{context::Cx, error::Result};
     use topcoat_router::runtime::{Body, Path, Response, Route, RouteFuture, Router};
@@ -72,8 +68,8 @@ mod tests {
             Method::GET
         }
 
-        fn path(&self) -> Cow<'static, Path> {
-            Cow::Borrowed(Path::new("/"))
+        fn path(&self) -> &Path {
+            Path::new("/")
         }
 
         fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {

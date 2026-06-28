@@ -155,7 +155,7 @@ impl Deref for UnicodeRanges {
     type Target = [UnicodeRange];
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }
 
@@ -249,8 +249,10 @@ mod tests {
 
     #[test]
     fn ranges_deref_to_their_slice() {
-        const RANGES: UnicodeRanges =
-            UnicodeRanges::new(&[UnicodeRange::new(UnicodeCodePoint::new(0x00), UnicodeCodePoint::new(0xFF))]);
+        const RANGES: UnicodeRanges = UnicodeRanges::new(&[UnicodeRange::new(
+            UnicodeCodePoint::new(0x00),
+            UnicodeCodePoint::new(0xFF),
+        )]);
         assert_eq!(RANGES.len(), 1);
         assert_eq!(RANGES[0].start(), cp(0x00));
     }

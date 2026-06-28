@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::path::PathBuf as FsPathBuf;
 
 use http::header::{CACHE_CONTROL, CONTENT_TYPE};
@@ -62,8 +61,8 @@ impl Route for AssetRoute {
         Method::GET
     }
 
-    fn path(&self) -> Cow<'static, Path> {
-        Cow::Owned(self.path.clone())
+    fn path(&self) -> &Path {
+        &self.path
     }
 
     fn handle<'cx>(&'cx self, _cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
