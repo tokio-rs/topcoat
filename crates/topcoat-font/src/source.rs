@@ -57,10 +57,10 @@ impl FontSourceUrl {
     /// [`Str`]: FontSourceUrl::Str
     #[must_use]
     pub fn as_str(&self) -> Option<&'static str> {
-        if let Self::Str(v) = self {
-            Some(v)
-        } else {
-            None
+        match self {
+            Self::Str(v) => Some(v),
+            #[cfg(feature = "asset")]
+            Self::Asset(_) => None,
         }
     }
 
@@ -79,10 +79,9 @@ impl FontSourceUrl {
     #[must_use]
     #[cfg(feature = "asset")]
     pub fn as_asset(&self) -> Option<&topcoat_asset::Asset> {
-        if let Self::Asset(v) = self {
-            Some(v)
-        } else {
-            None
+        match self {
+            Self::Asset(v) => Some(v),
+            Self::Str(_) => None,
         }
     }
 }
