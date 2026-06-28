@@ -178,8 +178,9 @@ impl Deref for FontFaces {
 ///   `tech(Variations)`.
 /// - `font-weight: 400;` or `font-weight: 400 700;` — a single weight or an
 ///   inclusive range (space-separated, as in CSS).
-/// - `font-style: normal | italic | oblique | oblique 14 | oblique 20 40;` —
-///   oblique angles are bare degree numbers (CSS's `deg` suffix is dropped).
+/// - `font-style: normal | italic | oblique | oblique 14.0 | oblique 20.0 40.0;`
+///   — oblique angles are degree numbers written as float literals (CSS's `deg`
+///   suffix is dropped).
 /// - `unicode-range: 0x0-0xFF, 0x131, 0x152-0x153;` — comma-separated code
 ///   points or `start-end` ranges, written in hex (CSS's `U+` becomes `0x`).
 ///
@@ -258,13 +259,13 @@ macro_rules! font_face {
     (@build [$($fam:tt)*] [$($src:tt)*] [$($wt:tt)*] [$($st:tt)*] [$($ur:tt)*]
         { font - style : oblique $a:literal $b:literal } $($rest:tt)*) => {
         $crate::font_face!(@build [$($fam)*] [$($src)*] [$($wt)*]
-            [ .with_style($crate::FontStyle::oblique_range($a as f32, $b as f32)) ]
+            [ .with_style($crate::FontStyle::oblique_range($a, $b)) ]
             [$($ur)*] $($rest)*)
     };
     (@build [$($fam:tt)*] [$($src:tt)*] [$($wt:tt)*] [$($st:tt)*] [$($ur:tt)*]
         { font - style : oblique $a:literal } $($rest:tt)*) => {
         $crate::font_face!(@build [$($fam)*] [$($src)*] [$($wt)*]
-            [ .with_style($crate::FontStyle::oblique_angle($a as f32)) ]
+            [ .with_style($crate::FontStyle::oblique_angle($a)) ]
             [$($ur)*] $($rest)*)
     };
     (@build [$($fam:tt)*] [$($src:tt)*] [$($wt:tt)*] [$($st:tt)*] [$($ur:tt)*]
@@ -492,7 +493,7 @@ mod tests {
             font-family: "Inter";
             src: local("Inter");
             font-weight: 400 700;
-            font-style: oblique 14;
+            font-style: oblique 14.0;
         };
         assert_eq!(
             render(&FACE),
