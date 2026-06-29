@@ -1,6 +1,6 @@
 //! Font sources for building the `src` descriptor of a CSS `@font-face` rule.
 
-use std::{fmt::Write, ops::Deref};
+use std::{borrow::Cow, fmt::Write, ops::Deref};
 
 use topcoat_core::runtime::{context::Cx, fnv1a};
 
@@ -15,7 +15,7 @@ use crate::{CssString, FontFormat, FontTech};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FontSourceUrl {
     /// A URL written as-is, such as an absolute URL or an external host.
-    Str(&'static str),
+    Str(Cow<'static, str>),
     /// A bundled [`Asset`](topcoat_asset::Asset), resolved to its hosted URL.
     #[cfg(feature = "asset")]
     Asset(topcoat_asset::Asset),
@@ -57,7 +57,7 @@ impl FontSourceUrl {
     ///
     /// [`Str`]: FontSourceUrl::Str
     #[must_use]
-    pub fn as_str(&self) -> Option<&'static str> {
+    pub fn as_str(&self) -> Option<&str> {
         match self {
             Self::Str(v) => Some(v),
             #[cfg(feature = "asset")]
@@ -89,7 +89,13 @@ impl FontSourceUrl {
     /// Folds this URL into a running content hash.
     pub(crate) const fn hash(&self, h: u64) -> u64 {
         match self {
-            Self::Str(inner) => fnv1a::hash_continue(fnv1a::hash_continue(h, b"s"), inner.as_bytes()),
+            Self::Str(inner) => {
+                let bytes = match inner {
+                    Cow::Borrowed(s) => s.as_bytes(),
+                    Cow::Owned(s) => s.as_bytes(),
+                };
+                fnv1a::hash_continue(fnv1a::hash_continue(h, b"s"), bytes)
+            }
             #[cfg(feature = "asset")]
             Self::Asset(inner) => {
                 fnv1a::hash_continue(fnv1a::hash_continue(h, b"a"), &inner.as_u64().to_le_bytes())
@@ -100,6 +106,18 @@ impl FontSourceUrl {
 
 impl From<&'static str> for FontSourceUrl {
     fn from(v: &'static str) -> Self {
+        Self::Str(Cow::Borrowed(v))
+    }
+}
+
+impl From<String> for FontSourceUrl {
+    fn from(v: String) -> Self {
+        Self::Str(Cow::Owned(v))
+    }
+}
+
+impl From<Cow<'static, str>> for FontSourceUrl {
+    fn from(v: Cow<'static, str>) -> Self {
         Self::Str(v)
     }
 }
@@ -138,28 +156,46 @@ pub enum FontSource {
 }
 
 impl FontSource {
-    /// A downloadable source from a URL string, with optional `format()` and
-    /// `tech()` hints.
+    /// A downloadable source from a URL, with optional `format()` and `tech()`
+    /// hints.
+    ///
+    /// Use [`url_str`](Self::url_str) or [`url_asset`](Self::url_asset) in a
+    /// `const` context.
     #[must_use]
-    pub const fn url(
+    pub fn url(
+        url: impl Into<FontSourceUrl>,
+        format: Option<FontFormat>,
+        tech: Option<FontTech>,
+    ) -> Self {
+        Self::Url {
+            url: url.into(),
+            format,
+            tech,
+        }
+    }
+
+    /// A downloadable source from a URL string, with optional `format()` and
+    /// `tech()` hints, usable in a `const` context.
+    #[must_use]
+    pub const fn url_str(
         url: &'static str,
         format: Option<FontFormat>,
         tech: Option<FontTech>,
     ) -> Self {
         Self::Url {
-            url: FontSourceUrl::Str(url),
+            url: FontSourceUrl::Str(Cow::Borrowed(url)),
             format,
             tech,
         }
     }
 
     /// A downloadable source from a bundled [`Asset`](topcoat_asset::Asset),
-    /// with optional `format()` and `tech()` hints.
+    /// with optional `format()` and `tech()` hints, usable in a `const` context.
     ///
     /// The asset is resolved to its hosted router URL when formatted.
     #[cfg(feature = "asset")]
     #[must_use]
-    pub const fn asset(
+    pub const fn url_asset(
         url: topcoat_asset::Asset,
         format: Option<FontFormat>,
         tech: Option<FontTech>,
