@@ -54,6 +54,7 @@ pub struct ConstReader<'a> {
 }
 
 impl<'a> ConstReader<'a> {
+    #[must_use]
     pub const fn new(buf: &'a [u8]) -> Self {
         Self { buf, pos: 0 }
     }

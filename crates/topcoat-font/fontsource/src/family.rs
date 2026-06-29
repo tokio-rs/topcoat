@@ -3,18 +3,19 @@
 //!
 //! Each family is a [`Family`] constant named after its id in
 //! `SCREAMING_SNAKE_CASE` (e.g. [`ROBOTO`], [`JETBRAINS_MONO`]). Iterate the
-//! whole catalog through [`ALL`], or look a family up by id with [`by_id`].
+//! whole catalog through [`ALL`], or look a family up by id with
+//! [`Family::by_id`].
 
-use crate::Style;
+use crate::{Style, Subset};
 
 /// Static metadata describing a single font family in the Fontsource catalog.
 ///
-/// One [`Family`] constant is generated for every family in the
-/// vendored catalog (see the [`families`](crate::families) module), and
-/// the full list is available as [`families::ALL`](crate::families::ALL).
-/// The values mirror the fields of the Fontsource [`/v1/fonts`](https://api.fontsource.org/v1/fonts) endpoint.
+/// One [`Family`] constant is generated for every family in the vendored
+/// catalog, and the full list is available as [`ALL`]. The values mirror the
+/// fields of the Fontsource [`/v1/fonts`](https://api.fontsource.org/v1/fonts)
+/// endpoint.
 #[derive(Debug, Clone, Copy)]
-pub struct FontsourceFamily {
+pub struct Family {
     /// Fontsource id, used to build CDN URLs (e.g. `"roboto"`).
     pub id: &'static str,
     /// Human-readable family name (e.g. `"Roboto"`).
@@ -39,31 +40,53 @@ pub struct FontsourceFamily {
     pub provider: &'static str,
 }
 
-impl FontsourceFamily {
+impl Family {
     /// Whether the family offers the given weight.
     #[must_use]
-    pub fn has_weight(&self, weight: u16) -> bool {
-        self.weights.contains(&weight)
+    pub const fn has_weight(&self, weight: u16) -> bool {
+        let mut i = 0;
+        while i < self.weights.len() {
+            if self.weights[i] == weight {
+                return true;
+            }
+            i += 1;
+        }
+        false
     }
 
     /// Whether the family offers the given style.
     #[must_use]
-    pub fn has_style(&self, style: Style) -> bool {
-        self.styles.contains(&style)
+    pub const fn has_style(&self, style: Style) -> bool {
+        let mut i = 0;
+        while i < self.styles.len() {
+            if self.styles[i] as u16 == style as u16 {
+                return true;
+            }
+            i += 1;
+        }
+        false
     }
 
     /// Whether the family offers the given subset.
     #[must_use]
-    pub fn has_subset(&self, subset: Subset) -> bool {
-        self.subsets.contains(&subset)
+    pub const fn has_subset(&self, subset: Subset) -> bool {
+        let mut i = 0;
+        while i < self.subsets.len() {
+            if self.subsets[i] as u16 == subset as u16 {
+                return true;
+            }
+            i += 1;
+        }
+        false
     }
 
-    /// Look up a family by its Fontsource [`id`](Family::id), e.g.
-    /// `"roboto"`. Returns `None` if no such family is in the vendored catalog.
+    /// Look up a family by its Fontsource [`id`](Family::id), e.g. `"roboto"`.
+    ///
+    /// Returns `None` if no such family is in the vendored catalog.
     #[must_use]
-    pub fn by_id(id: &str) -> Option<&'static FontsourceFamily> {
+    pub fn by_id(id: &str) -> Option<&'static Family> {
         ALL.binary_search_by(|f| f.id.cmp(id)).ok().map(|i| ALL[i])
     }
 }
 
-include!(concat!(env!("OUT_DIR"), "/fontsource.rs"));
+include!(concat!(env!("OUT_DIR"), "/families.rs"));

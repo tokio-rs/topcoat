@@ -3,8 +3,16 @@ name = "topcoat-font-fontsource"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+asset = [
+	"dep:topcoat-asset",
+	"topcoat-font/asset",
+]
+
 [dependencies]
+topcoat-core.workspace = true
 topcoat-font.workspace = true
+topcoat-asset = { workspace = true, optional = true }
 
 [build-dependencies]
 heck.workspace = true

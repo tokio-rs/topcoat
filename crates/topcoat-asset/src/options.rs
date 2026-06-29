@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use topcoat_core::runtime::fnv1a;
 
-use crate::cursor::{ConstReader, ConstWriter};
+use crate::{ConstReader, ConstWriter};
 
 /// Options that control how an asset is bundled.
 ///

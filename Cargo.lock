@@ -1872,6 +1872,8 @@ dependencies = [
  "heck",
  "serde",
  "serde_json",
+ "topcoat-asset",
+ "topcoat-core",
  "topcoat-font",
 ]
 

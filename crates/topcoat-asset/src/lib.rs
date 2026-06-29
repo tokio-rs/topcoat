@@ -1,6 +1,5 @@
 mod asset;
 mod bundle;
-mod cursor;
 mod error;
 mod manifest;
 mod options;
@@ -14,6 +13,8 @@ pub use manifest::*;
 pub use options::*;
 pub use resolver::*;
 pub use source::*;
+
+pub use topcoat_core::runtime::cursor::{ConstReader, ConstWriter};
 
 #[cfg(feature = "bundler")]
 mod bundler;

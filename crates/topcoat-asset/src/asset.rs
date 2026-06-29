@@ -5,10 +5,7 @@ use memchr::memmem;
 use serde::{Deserialize, Serialize};
 use topcoat_core::runtime::fnv1a;
 
-use crate::{
-    AssetOptions, Source,
-    cursor::{ConstReader, ConstWriter},
-};
+use crate::{AssetOptions, ConstReader, ConstWriter, Source};
 
 /// Compact identifier for an asset declared via [`asset!`](crate::asset).
 ///
