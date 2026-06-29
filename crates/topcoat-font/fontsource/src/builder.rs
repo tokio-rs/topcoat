@@ -150,10 +150,14 @@ impl FontFaceBuilder {
     /// `&'static`; this only attaches the weight and style.
     #[must_use]
     pub const fn into_face(&self, src: FontSources) -> FontFace {
-        let (family, weight, style, _subset) = self.resolved();
-        FontFace::const_new(family.name, src)
+        let (family, weight, style, subset) = self.resolved();
+        let face = FontFace::const_new(family.name, src)
             .with_weight(FontWeightRange::from_u16(weight, weight))
-            .with_style(style.as_font_style())
+            .with_style(style.as_font_style());
+        match family.unicode_range(subset) {
+            Some(ranges) => face.with_unicode_range(ranges),
+            None => face,
+        }
     }
 }
 
@@ -226,6 +230,17 @@ mod tests {
         assert_eq!(
             url(builder),
             "https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/latin-700-italic.woff2",
+        );
+    }
+
+    #[test]
+    fn attaches_the_subset_unicode_range() {
+        let ranges = ROBOTO
+            .unicode_range(Subset::Latin)
+            .expect("roboto ships a latin range");
+        assert!(
+            ranges.to_string().starts_with("U+0000-00FF"),
+            "got {ranges}"
         );
     }
 

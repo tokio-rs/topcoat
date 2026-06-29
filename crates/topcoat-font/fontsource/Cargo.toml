@@ -8,16 +8,31 @@ asset = [
 	"dep:topcoat-asset",
 	"topcoat-font/asset",
 ]
+# Enables the `refresh` binary, which regenerates `fonts.json` from the
+# Fontsource API. Not needed to use the crate.
+refresh = [
+	"dep:serde",
+	"dep:serde_json",
+	"dep:ureq",
+]
 
 [dependencies]
 topcoat-core.workspace = true
 topcoat-font.workspace = true
 topcoat-asset = { workspace = true, optional = true }
 
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
+ureq = { workspace = true, optional = true }
+
 [build-dependencies]
 heck.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+
+[[bin]]
+name = "refresh"
+required-features = ["refresh"]
 
 [lints]
 workspace = true

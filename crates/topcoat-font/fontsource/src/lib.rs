@@ -92,14 +92,14 @@ macro_rules! fontsource_font_face {
 #[macro_export]
 macro_rules! __fontsource_url {
     ($family:expr, $weight:expr, $style:expr, $subset:expr) => {{
-        const __BUILDER: $crate::FontFaceBuilder = $crate::FontFaceBuilder::new()
+        const BUILDER: $crate::FontFaceBuilder = $crate::FontFaceBuilder::new()
             .family($family)
             .weight($weight)
             .style($style)
             .subset($subset);
-        const __LEN: usize = __BUILDER.url_len();
-        const __BYTES: [u8; __LEN] = __BUILDER.url_bytes::<__LEN>();
-        match ::core::str::from_utf8(&__BYTES) {
+        const LEN: usize = BUILDER.url_len();
+        const BYTES: [u8; LEN] = BUILDER.url_bytes::<LEN>();
+        match ::core::str::from_utf8(&BYTES) {
             ::core::result::Result::Ok(url) => url,
             ::core::result::Result::Err(_) => ::core::panic!("font url was not valid utf-8"),
         }

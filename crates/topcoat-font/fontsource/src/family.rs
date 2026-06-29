@@ -6,6 +6,8 @@
 //! whole catalog through [`ALL`], or look a family up by id with
 //! [`Family::by_id`].
 
+use topcoat_font::runtime::{UnicodeRange, UnicodeRanges};
+
 use crate::{Style, Subset};
 
 /// Static metadata describing a single font family in the Fontsource catalog.
@@ -38,6 +40,12 @@ pub struct Family {
     pub license: &'static str,
     /// Upstream source the family is mirrored from (e.g. `"google"`).
     pub provider: &'static str,
+    /// The `unicode-range` each named subset covers, paired with its [`Subset`].
+    ///
+    /// Numbered CJK subset blocks are omitted, so this can be shorter than
+    /// [`subsets`](Self::subsets); look a subset up with
+    /// [`unicode_range`](Self::unicode_range).
+    pub unicode_ranges: &'static [(Subset, UnicodeRanges)],
 }
 
 impl Family {
@@ -78,6 +86,23 @@ impl Family {
             i += 1;
         }
         false
+    }
+
+    /// The `unicode-range` this family ships for `subset`, if known.
+    ///
+    /// Returns `None` for subsets without vendored ranges — notably the
+    /// numbered CJK blocks — in which case a face for that subset is emitted
+    /// without a `unicode-range` descriptor.
+    #[must_use]
+    pub const fn unicode_range(&self, subset: Subset) -> Option<UnicodeRanges> {
+        let mut i = 0;
+        while i < self.unicode_ranges.len() {
+            if self.unicode_ranges[i].0 as u16 == subset as u16 {
+                return Some(self.unicode_ranges[i].1);
+            }
+            i += 1;
+        }
+        None
     }
 
     /// Look up a family by its Fontsource [`id`](Family::id), e.g. `"roboto"`.

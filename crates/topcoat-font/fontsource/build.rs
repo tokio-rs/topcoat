@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     env,
     fmt::Write as _,
     fs,
@@ -8,6 +8,14 @@ use std::{
 
 use heck::{ToPascalCase, ToShoutySnakeCase};
 use serde::Deserialize;
+
+/// The vendored catalog: an interned `ranges` table and the families that
+/// reference it by index.
+#[derive(Deserialize)]
+struct Catalog {
+    ranges: Vec<String>,
+    fonts: Vec<FamilyMetadata>,
+}
 
 #[derive(Deserialize)]
 struct FamilyMetadata {
@@ -23,19 +31,27 @@ struct FamilyMetadata {
     license: String,
     #[serde(rename = "type")]
     provider: String,
+    /// Maps each named subset to an index into [`Catalog::ranges`].
+    #[serde(rename = "unicodeRange", default)]
+    unicode_range: BTreeMap<String, usize>,
 }
 
 fn main() {
     println!("cargo::rerun-if-changed=fonts.json");
 
     let json = fs::read_to_string("fonts.json").expect("read fonts.json");
-    let mut families: Vec<FamilyMetadata> = serde_json::from_str(&json).expect("parse fonts.json");
+    let parsed: Catalog = serde_json::from_str(&json).expect("parse fonts.json");
+    let ranges = parsed.ranges;
+    let mut families = parsed.fonts;
     families.sort_by(|a, b| a.id.cmp(&b.id));
 
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR");
     fs::write(Path::new(&out_dir).join("subset.rs"), subsets(&families)).expect("write subset.rs");
-    fs::write(Path::new(&out_dir).join("families.rs"), catalog(&families))
-        .expect("write families.rs");
+    fs::write(
+        Path::new(&out_dir).join("families.rs"),
+        catalog(&families, &ranges),
+    )
+    .expect("write families.rs");
 }
 
 /// `PascalCase` enum variant for a subset id (`"latin-ext"` -> `LatinExt`).
@@ -109,8 +125,47 @@ fn subsets(families: &[FamilyMetadata]) -> String {
     out
 }
 
-fn catalog(families: &[FamilyMetadata]) -> String {
+/// Parses a single `unicode-range` token (`U+0041`, `U+0041-005A`, or a
+/// wildcard like `U+30??`) into an inclusive `(start, end)` code point pair.
+fn parse_range_token(token: &str) -> (u32, u32) {
+    let body = token
+        .trim()
+        .strip_prefix("U+")
+        .or_else(|| token.trim().strip_prefix("u+"))
+        .unwrap_or_else(|| panic!("unicode range token missing `U+`: {token:?}"));
+    if let Some((start, end)) = body.split_once('-') {
+        (parse_hex(start), parse_hex(end))
+    } else if body.contains('?') {
+        (parse_hex(&body.replace('?', "0")), parse_hex(&body.replace('?', "F")))
+    } else {
+        let cp = parse_hex(body);
+        (cp, cp)
+    }
+}
+
+fn parse_hex(s: &str) -> u32 {
+    u32::from_str_radix(s.trim(), 16).unwrap_or_else(|_| panic!("invalid unicode hex: {s:?}"))
+}
+
+/// Emits one `const UR{n}: UnicodeRanges` per distinct interned range spec.
+fn unicode_range_consts(ranges: &[String]) -> String {
     let mut out = String::new();
+    for (i, spec) in ranges.iter().enumerate() {
+        let entries = spec
+            .split(',')
+            .filter(|token| !token.trim().is_empty())
+            .map(parse_range_token)
+            .map(|(start, end)| format!("UnicodeRange::from_u32({start:#x}, {end:#x})"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        writeln!(out, "const UR{i}: UnicodeRanges = UnicodeRanges::new(&[{entries}]);").unwrap();
+    }
+    out
+}
+
+fn catalog(families: &[FamilyMetadata], ranges: &[String]) -> String {
+    let mut out = unicode_range_consts(ranges);
+    out.push('\n');
     let mut all = String::new();
     let mut seen = HashSet::new();
 
@@ -139,6 +194,12 @@ fn catalog(families: &[FamilyMetadata]) -> String {
             .map(|s| format!("Style::{}", style_variant(s)))
             .collect::<Vec<_>>()
             .join(", ");
+        let unicode_ranges = f
+            .unicode_range
+            .iter()
+            .map(|(subset, idx)| format!("(Subset::{}, UR{idx})", subset_variant(subset)))
+            .collect::<Vec<_>>()
+            .join(", ");
 
         writeln!(
             out,
@@ -162,6 +223,7 @@ fn catalog(families: &[FamilyMetadata]) -> String {
         writeln!(out, "    category: {:?},", f.category).unwrap();
         writeln!(out, "    license: {:?},", f.license).unwrap();
         writeln!(out, "    provider: {:?},", f.provider).unwrap();
+        writeln!(out, "    unicode_ranges: &[{unicode_ranges}],").unwrap();
         out.push_str("};\n\n");
 
         writeln!(all, "    &{ident},").unwrap();

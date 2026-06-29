@@ -1875,6 +1875,7 @@ dependencies = [
  "topcoat-asset",
  "topcoat-core",
  "topcoat-font",
+ "ureq",
 ]
 
 [[package]]
