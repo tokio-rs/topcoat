@@ -151,7 +151,7 @@ pub enum FontSource {
     /// A locally installed font, named by a `local()` entry.
     Local {
         /// The family name of the installed font.
-        name: &'static str,
+        name: Cow<'static, str>,
     },
 }
 
@@ -208,9 +208,20 @@ impl FontSource {
     }
 
     /// A source naming a font already installed on the system.
+    ///
+    /// Use [`local_str`](Self::local_str) in a `const` context.
     #[must_use]
-    pub const fn local(name: &'static str) -> Self {
-        Self::Local { name }
+    pub fn local(name: impl Into<Cow<'static, str>>) -> Self {
+        Self::Local { name: name.into() }
+    }
+
+    /// A source naming a font already installed on the system, usable in a
+    /// `const` context.
+    #[must_use]
+    pub const fn local_str(name: &'static str) -> Self {
+        Self::Local {
+            name: Cow::Borrowed(name),
+        }
     }
 
     /// Writes this source as a single CSS `src` entry.
@@ -271,7 +282,11 @@ impl FontSource {
                 }
             }
             Self::Local { name } => {
-                fnv1a::hash_continue(fnv1a::hash_continue(h, b"l"), name.as_bytes())
+                let bytes = match name {
+                    Cow::Borrowed(s) => s.as_bytes(),
+                    Cow::Owned(s) => s.as_bytes(),
+                };
+                fnv1a::hash_continue(fnv1a::hash_continue(h, b"l"), bytes)
             }
         }
     }

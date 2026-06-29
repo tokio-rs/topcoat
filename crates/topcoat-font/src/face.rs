@@ -390,43 +390,43 @@ macro_rules! font_face {
     // ----- `src` list -----
     (@srcs [$($acc:tt)*]) => { &[$($acc)*] };
     (@srcs [$($acc:tt)*] local($n:literal) $(, $($rest:tt)*)?) => {
-        $crate::font_face!(@srcs [$($acc)* $crate::FontSource::local($n),] $($($rest)*)?)
+        $crate::font_face!(@srcs [$($acc)* $crate::FontSource::local_str($n),] $($($rest)*)?)
     };
     (@srcs [$($acc:tt)*] url($u:literal) format($f:ident) tech($t:ident) $(, $($rest:tt)*)?) => {
         $crate::font_face!(@srcs
-            [$($acc)* $crate::FontSource::url($u, Some($crate::FontFormat::$f), Some($crate::FontTech::$t)),]
+            [$($acc)* $crate::FontSource::url_str($u, Some($crate::FontFormat::$f), Some($crate::FontTech::$t)),]
             $($($rest)*)?)
     };
     (@srcs [$($acc:tt)*] url($u:literal) format($f:ident) $(, $($rest:tt)*)?) => {
         $crate::font_face!(@srcs
-            [$($acc)* $crate::FontSource::url($u, Some($crate::FontFormat::$f), None),]
+            [$($acc)* $crate::FontSource::url_str($u, Some($crate::FontFormat::$f), None),]
             $($($rest)*)?)
     };
     (@srcs [$($acc:tt)*] url($u:literal) tech($t:ident) $(, $($rest:tt)*)?) => {
         $crate::font_face!(@srcs
-            [$($acc)* $crate::FontSource::url($u, None, Some($crate::FontTech::$t)),]
+            [$($acc)* $crate::FontSource::url_str($u, None, Some($crate::FontTech::$t)),]
             $($($rest)*)?)
     };
     (@srcs [$($acc:tt)*] url($u:literal) $(, $($rest:tt)*)?) => {
-        $crate::font_face!(@srcs [$($acc)* $crate::FontSource::url($u, None, None),] $($($rest)*)?)
+        $crate::font_face!(@srcs [$($acc)* $crate::FontSource::url_str($u, None, None),] $($($rest)*)?)
     };
     (@srcs [$($acc:tt)*] asset($a:expr) format($f:ident) tech($t:ident) $(, $($rest:tt)*)?) => {
         $crate::font_face!(@srcs
-            [$($acc)* $crate::FontSource::asset($a, Some($crate::FontFormat::$f), Some($crate::FontTech::$t)),]
+            [$($acc)* $crate::FontSource::url_asset($a, Some($crate::FontFormat::$f), Some($crate::FontTech::$t)),]
             $($($rest)*)?)
     };
     (@srcs [$($acc:tt)*] asset($a:expr) format($f:ident) $(, $($rest:tt)*)?) => {
         $crate::font_face!(@srcs
-            [$($acc)* $crate::FontSource::asset($a, Some($crate::FontFormat::$f), None),]
+            [$($acc)* $crate::FontSource::url_asset($a, Some($crate::FontFormat::$f), None),]
             $($($rest)*)?)
     };
     (@srcs [$($acc:tt)*] asset($a:expr) tech($t:ident) $(, $($rest:tt)*)?) => {
         $crate::font_face!(@srcs
-            [$($acc)* $crate::FontSource::asset($a, None, Some($crate::FontTech::$t)),]
+            [$($acc)* $crate::FontSource::url_asset($a, None, Some($crate::FontTech::$t)),]
             $($($rest)*)?)
     };
     (@srcs [$($acc:tt)*] asset($a:expr) $(, $($rest:tt)*)?) => {
-        $crate::font_face!(@srcs [$($acc)* $crate::FontSource::asset($a, None, None),] $($($rest)*)?)
+        $crate::font_face!(@srcs [$($acc)* $crate::FontSource::url_asset($a, None, None),] $($($rest)*)?)
     };
 
     // ----- `unicode-range` list -----
