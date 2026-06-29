@@ -10,6 +10,14 @@ asset = [
 discover = [
 	"dep:inventory"
 ]
+parsing = [
+	"dep:syn",
+	"dep:quote",
+]
+pretty = [
+	"parsing",
+	"dep:topcoat-pretty",
+]
 router = [
 	"dep:topcoat-router",
 ]
@@ -18,8 +26,12 @@ router = [
 topcoat-core.workspace = true
 topcoat-asset = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
+topcoat-pretty = { workspace = true, optional = true }
 
 inventory = { workspace = true, optional = true }
+proc-macro2 = { workspace = true, optional = true }
+quote = { workspace = true, optional = true }
+syn = { workspace = true, optional = true }
 
 [lints]
 workspace = true
