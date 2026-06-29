@@ -151,21 +151,23 @@ macro_rules! __register_font {
 #[macro_export]
 macro_rules! font {
     ($family:expr, $(@font-face { $($face:tt)* })+ $(,)?) => {{
-        const FONT: $crate::Font = $crate::Font::new(
+        const FONT: $crate::Font = $crate::runtime::Font::new(
             $family,
-            $crate::FontFaces::new(&[
-                $( $crate::font_face! { font-family: $family; $($face)* } ),+
+            $crate::runtime::FontFaces::new(&[
+                $( ::topcoat::font::font_face! { font-family: $family; $($face)* } ),+
             ]),
         );
         $crate::__register_font!(|| FONT);
         FONT
     }};
     ($family:expr, $faces:expr) => {{
-        const FONT: $crate::Font = $crate::Font::new(
+        const FONT: $crate::runtime::Font = $crate::runtime::Font::new(
             $family,
-            $crate::FontFaces::new($faces),
+            $crate::runtime::FontFaces::new($faces),
         );
         $crate::__register_font!(|| FONT);
         FONT
     }};
 }
+
+pub use font;

@@ -7,6 +7,7 @@ edition = "2024"
 default = [
 	"asset",
 	"cookie",
+	"font",
 	"router",
 	"runtime",
 	"view",
@@ -30,6 +31,9 @@ discover = [
 font = [
 	"dep:topcoat-font",
 	"dep:topcoat-font-macro",
+]
+font-fontsource = [
+	"dep:topcoat-font-fontsource",
 ]
 htmx = [
 	"dep:topcoat-htmx",
@@ -76,6 +80,7 @@ topcoat-core.workspace = true
 topcoat-core-macro.workspace = true
 topcoat-font = { workspace = true, optional = true }
 topcoat-font-macro = { workspace = true, optional = true }
+topcoat-font-fontsource = { workspace = true, optional = true }
 topcoat-htmx = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }

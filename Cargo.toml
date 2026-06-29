@@ -25,6 +25,7 @@ members = [
     "examples/assets",
     "examples/context",
     "examples/cookies",
+    "examples/font",
     "examples/hello-world",
     "examples/htmx",
     "examples/manual-router",

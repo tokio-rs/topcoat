@@ -8,7 +8,7 @@ asset = [
 	"dep:topcoat-asset",
 ]
 discover = [
-	"dep:inventory"
+	"dep:inventory",
 ]
 parsing = [
 	"topcoat-core/parsing",
