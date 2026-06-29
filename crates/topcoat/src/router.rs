@@ -16,6 +16,11 @@ impl RouterBuilderDiscoverExt for RouterBuilder {
         self = self.discover_pages();
         self = self.discover_layouts();
         self = self.discover_layers();
+        #[cfg(feature = "font")]
+        {
+            use topcoat_font::RouterBuilderFontExt;
+            self = self.discover_fonts();
+        }
         #[cfg(feature = "runtime")]
         {
             use topcoat_runtime::runtime::{RouterBuilderProcedureExt, RouterBuilderShardExt};
