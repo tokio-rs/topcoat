@@ -8,8 +8,6 @@ use syn::{
 
 use topcoat_core::ast::ParseOption;
 
-use crate::runtime;
-
 mod kw {
     use syn::custom_keyword;
 
@@ -52,9 +50,9 @@ impl ToTokens for FontTechHint {
 
 /// The technology inside a [`FontTechHint`].
 ///
-/// Wraps an expression that resolves to a [`runtime::FontTech`] at run time.
-/// When the expression is a string literal, it is validated at compile time
-/// against the known CSS technology keywords.
+/// Wraps an expression that resolves to a [`crate::runtime::FontTech`] at run
+/// time. When the expression is a string literal, it is validated at compile
+/// time against the known CSS technology keywords.
 pub struct FontTech(pub Expr);
 
 impl Parse for FontTech {
@@ -62,7 +60,7 @@ impl Parse for FontTech {
         let expr: Expr = input.parse()?;
         if let Expr::Lit(lit) = &expr
             && let Lit::Str(keyword) = &lit.lit
-            && runtime::FontTech::from_keyword(&keyword.value()).is_none()
+            && tech_variant(&keyword.value()).is_none()
         {
             return Err(syn::Error::new_spanned(
                 keyword,
@@ -78,7 +76,8 @@ impl ToTokens for FontTech {
         if let Expr::Lit(lit) = &self.0
             && let Lit::Str(keyword) = &lit.lit
         {
-            let variant = tech_variant(&keyword.value(), keyword.span());
+            let name = tech_variant(&keyword.value()).expect("validated at parse time");
+            let variant = proc_macro2::Ident::new(name, keyword.span());
             quote! { ::topcoat::font::FontTech::#variant }.to_tokens(tokens);
             return;
         }
@@ -87,8 +86,13 @@ impl ToTokens for FontTech {
     }
 }
 
-fn tech_variant(keyword: &str, span: proc_macro2::Span) -> proc_macro2::Ident {
-    let name = match keyword {
+/// The `FontTech` variant identifier for a CSS `tech(...)` keyword, or `None` if
+/// the keyword names no known technology.
+///
+/// This single mapping backs both parse-time validation and codegen, so the two
+/// can never disagree.
+fn tech_variant(keyword: &str) -> Option<&'static str> {
+    Some(match keyword {
         "color-cbdt" => "ColorCbdt",
         "color-colrv0" => "ColorColrV0",
         "color-colrv1" => "ColorColrV1",
@@ -100,7 +104,6 @@ fn tech_variant(keyword: &str, span: proc_macro2::Span) -> proc_macro2::Ident {
         "incremental" => "Incremental",
         "palettes" => "Palettes",
         "variations" => "Variations",
-        _ => unreachable!("validated at parse time"),
-    };
-    proc_macro2::Ident::new(name, span)
+        _ => return None,
+    })
 }

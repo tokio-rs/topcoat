@@ -12,6 +12,8 @@ mod kw {
 
     custom_keyword!(font);
     custom_keyword!(weight);
+    custom_keyword!(normal);
+    custom_keyword!(bold);
 }
 
 pub struct FontWeight {
@@ -71,7 +73,7 @@ pub enum FontWeightValue {
 
 impl Parse for FontWeightValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        if input.peek(LitInt) {
+        if FontWeightLevel::peek(input) {
             Ok(Self::Css(input.parse()?))
         } else {
             Ok(Self::Expr(input.parse()?))
@@ -88,17 +90,18 @@ impl ToTokens for FontWeightValue {
     }
 }
 
-/// A `font-weight` value: a single weight (`400`) or an inclusive range carried
-/// by a variable font, written as two space-separated weights (`400 700`).
+/// A `font-weight` value: a single weight (`400`, `bold`) or an inclusive range
+/// carried by a variable font, written as two space-separated weights
+/// (`400 700`, `normal bold`).
 pub struct FontWeightRange {
-    pub start: FontWeightNumber,
-    pub end: Option<FontWeightNumber>,
+    pub start: FontWeightLevel,
+    pub end: Option<FontWeightLevel>,
 }
 
 impl Parse for FontWeightRange {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let start: FontWeightNumber = input.parse()?;
-        let end = FontWeightNumber::parse_option(input)?;
+        let start: FontWeightLevel = input.parse()?;
+        let end = FontWeightLevel::parse_option(input)?;
         if let Some(end) = &end
             && end.value < start.value
         {
@@ -126,15 +129,26 @@ impl ToTokens for FontWeightRange {
     }
 }
 
-/// A single font weight written as a bare number, validated to be in
-/// `100..=900`.
-pub struct FontWeightNumber {
+/// A single absolute font weight, written as a bare number validated to be in
+/// `100..=900`, or one of the CSS keywords `normal` (`400`) or `bold` (`700`).
+pub struct FontWeightLevel {
     pub value: u16,
     pub span: Span,
 }
 
-impl Parse for FontWeightNumber {
+impl Parse for FontWeightLevel {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        if input.peek(kw::normal) {
+            let span = input.span();
+            input.parse::<kw::normal>()?;
+            return Ok(Self { value: 400, span });
+        }
+        if input.peek(kw::bold) {
+            let span = input.span();
+            input.parse::<kw::bold>()?;
+            return Ok(Self { value: 700, span });
+        }
+
         let literal: LitInt = input.parse()?;
         let value: u16 = literal.base10_parse()?;
         if !(100..=900).contains(&value) {
@@ -150,13 +164,13 @@ impl Parse for FontWeightNumber {
     }
 }
 
-impl ParseOption for FontWeightNumber {
+impl ParseOption for FontWeightLevel {
     fn peek(input: ParseStream) -> bool {
-        input.peek(LitInt)
+        input.peek(LitInt) || input.peek(kw::normal) || input.peek(kw::bold)
     }
 }
 
-impl ToTokens for FontWeightNumber {
+impl ToTokens for FontWeightLevel {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         Literal::u16_unsuffixed(self.value).to_tokens(tokens);
     }
@@ -206,6 +220,43 @@ mod tests {
         let range = css(&weight.value);
         assert_eq!(range.start.value, 100);
         assert_eq!(range.end.as_ref().unwrap().value, 900);
+    }
+
+    #[test]
+    fn parses_the_normal_keyword() {
+        let weight = parse("font-weight: normal");
+        let range = css(&weight.value);
+        assert_eq!(range.start.value, 400);
+        assert!(range.end.is_none());
+    }
+
+    #[test]
+    fn parses_the_bold_keyword() {
+        let weight = parse("font-weight: bold");
+        let range = css(&weight.value);
+        assert_eq!(range.start.value, 700);
+        assert!(range.end.is_none());
+    }
+
+    #[test]
+    fn parses_a_keyword_range() {
+        let weight = parse("font-weight: normal bold");
+        let range = css(&weight.value);
+        assert_eq!(range.start.value, 400);
+        assert_eq!(range.end.as_ref().unwrap().value, 700);
+    }
+
+    #[test]
+    fn mixes_keywords_and_numbers_in_a_range() {
+        let weight = parse("font-weight: 100 bold");
+        let range = css(&weight.value);
+        assert_eq!(range.start.value, 100);
+        assert_eq!(range.end.as_ref().unwrap().value, 700);
+    }
+
+    #[test]
+    fn rejects_an_empty_keyword_range() {
+        assert!(parse_err("font-weight: bold normal").contains("must not be empty"));
     }
 
     #[test]

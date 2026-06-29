@@ -66,6 +66,15 @@ impl ParseOption for FontFamilyKey {
 
 pub struct FontFamilyValue(pub Expr);
 
+impl FontFamilyValue {
+    /// Whether the family is written as a string literal, which the macro can
+    /// place in a `const` context.
+    #[must_use]
+    pub fn is_str_literal(&self) -> bool {
+        matches!(&self.0, Expr::Lit(lit) if matches!(&lit.lit, Lit::Str(_)))
+    }
+}
+
 impl Parse for FontFamilyValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self(input.parse()?))

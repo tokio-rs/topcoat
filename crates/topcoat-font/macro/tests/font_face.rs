@@ -102,6 +102,19 @@ fn single_weight() {
 }
 
 #[test]
+fn weight_keywords_normalize_to_numbers() {
+    const FACE: FontFace = font_face! {
+        font-family: "Inter";
+        src: local("Inter");
+        font-weight: normal bold;
+    };
+    assert_eq!(
+        render(&FACE),
+        r#"@font-face { font-family: "Inter"; src: local("Inter"); font-weight: 400 700 }"#,
+    );
+}
+
+#[test]
 fn negative_oblique_angle() {
     const FACE: FontFace = font_face! {
         font-family: "Inter";
@@ -144,6 +157,21 @@ fn dynamic_family_falls_back_to_new_constructor() {
     let face = font_face! {
         font-family: family;
         src: local("Inter");
+    };
+    assert_eq!(
+        render(&face),
+        r#"@font-face { font-family: "Inter"; src: local("Inter") }"#,
+    );
+}
+
+#[test]
+fn string_family_with_convertible_src_uses_try_into() {
+    // A string-literal family with an opaque `src` expression must route to
+    // `FontFace::new`, whose `TryInto<FontSources>` bound accepts a `Vec`.
+    let src = vec![topcoat::font::FontSource::local("Inter")];
+    let face = font_face! {
+        font-family: "Inter";
+        src: src;
     };
     assert_eq!(
         render(&face),

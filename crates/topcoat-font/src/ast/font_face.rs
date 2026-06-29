@@ -17,7 +17,7 @@ pub use weight::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Expr, Lit, Token,
+    Token,
     parse::{Parse, ParseStream},
 };
 
@@ -96,9 +96,12 @@ impl ToTokens for FontFace {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let family = &self.family;
         let src = &self.src;
-        let constructor = if let Expr::Lit(lit) = &family.value.0
-            && let Lit::Str(_) = &lit.lit
-        {
+        // `const_new` requires both operands to be compile-time constants: a
+        // `&'static str` family and an already-built `FontSources`. Use it only
+        // when the family is a string literal and the sources are the CSS form.
+        // An opaque `src` expression falls back to `new`, whose `TryInto` bound
+        // accepts `Vec`, slices, and other convertible values.
+        let constructor = if self.family.value.is_str_literal() && self.src.value.is_const() {
             quote! { ::topcoat::font::FontFace::const_new(#family, #src) }
         } else {
             quote! { ::topcoat::font::FontFace::new(#family, #src) }

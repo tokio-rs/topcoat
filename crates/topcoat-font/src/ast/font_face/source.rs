@@ -70,6 +70,16 @@ pub enum FontSourcesValue {
     Css(Punctuated<FontSource, Token![,]>),
 }
 
+impl FontSourcesValue {
+    /// Whether these sources can be built in a `const` context. The CSS form is
+    /// lowered to a `const`-capable `FontSources::const_new`; an opaque
+    /// expression is left to the `TryInto` conversion in `FontFace::new`.
+    #[must_use]
+    pub fn is_const(&self) -> bool {
+        matches!(self, Self::Css(_))
+    }
+}
+
 impl Parse for FontSourcesValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         if input.peek(kw::url) || input.peek(kw::local) {

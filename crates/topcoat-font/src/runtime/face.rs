@@ -30,14 +30,14 @@ impl FontFace {
     ///
     /// # Panics
     ///
-    /// Panics of the [`TryInto`] conversion of `src` fails.
+    /// Panics if the [`TryInto`] conversion of `src` fails.
     #[must_use]
     pub fn new(family: impl Into<Cow<'static, str>>, src: impl TryInto<FontSources>) -> Self {
         Self {
             family: family.into(),
             src: src
                 .try_into()
-                .unwrap_or_else(|_| panic!("`src` cannot be empty")),
+                .unwrap_or_else(|_| panic!("font sources must not be empty")),
             weight: None,
             style: None,
             unicode_range: None,

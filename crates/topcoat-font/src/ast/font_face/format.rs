@@ -8,8 +8,6 @@ use syn::{
 
 use topcoat_core::ast::ParseOption;
 
-use crate::runtime;
-
 mod kw {
     use syn::custom_keyword;
 
@@ -52,9 +50,9 @@ impl ToTokens for FontFormatHint {
 
 /// The format inside a [`FontFormatHint`].
 ///
-/// Wraps an expression that resolves to a [`runtime::FontFormat`] at run time.
-/// When the expression is a string literal, it is validated at compile time
-/// against the known CSS format keywords.
+/// Wraps an expression that resolves to a [`crate::runtime::FontFormat`] at run
+/// time. When the expression is a string literal, it is validated at compile
+/// time against the known CSS format keywords.
 pub struct FontFormat(pub Expr);
 
 impl Parse for FontFormat {
@@ -62,7 +60,7 @@ impl Parse for FontFormat {
         let expr: Expr = input.parse()?;
         if let Expr::Lit(lit) = &expr
             && let Lit::Str(keyword) = &lit.lit
-            && runtime::FontFormat::from_keyword(&keyword.value()).is_none()
+            && format_variant(&keyword.value()).is_none()
         {
             return Err(syn::Error::new_spanned(
                 keyword,
@@ -78,7 +76,8 @@ impl ToTokens for FontFormat {
         if let Expr::Lit(lit) = &self.0
             && let Lit::Str(keyword) = &lit.lit
         {
-            let variant = format_variant(&keyword.value(), keyword.span());
+            let name = format_variant(&keyword.value()).expect("validated at parse time");
+            let variant = proc_macro2::Ident::new(name, keyword.span());
             quote! { ::topcoat::font::FontFormat::#variant }.to_tokens(tokens);
             return;
         }
@@ -87,8 +86,13 @@ impl ToTokens for FontFormat {
     }
 }
 
-fn format_variant(keyword: &str, span: proc_macro2::Span) -> proc_macro2::Ident {
-    let name = match keyword {
+/// The `FontFormat` variant identifier for a CSS `format(...)` keyword, or
+/// `None` if the keyword names no known format.
+///
+/// This single mapping backs both parse-time validation and codegen, so the two
+/// can never disagree.
+fn format_variant(keyword: &str) -> Option<&'static str> {
+    Some(match keyword {
         "collection" => "Collection",
         "embedded-opentype" => "EmbeddedOpenType",
         "opentype" => "OpenType",
@@ -96,7 +100,6 @@ fn format_variant(keyword: &str, span: proc_macro2::Span) -> proc_macro2::Ident 
         "truetype" => "TrueType",
         "woff" => "Woff",
         "woff2" => "Woff2",
-        _ => unreachable!("validated at parse time"),
-    };
-    proc_macro2::Ident::new(name, span)
+        _ => return None,
+    })
 }
