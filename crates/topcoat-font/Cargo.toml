@@ -14,6 +14,7 @@ parsing = [
 	"topcoat-core/parsing",
 	"dep:syn",
 	"dep:quote",
+	"dep:proc-macro2",
 ]
 pretty = [
 	"parsing",

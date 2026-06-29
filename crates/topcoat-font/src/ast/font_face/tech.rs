@@ -45,7 +45,7 @@ impl ParseOption for FontTechHint {
 /// The technology inside a [`FontTechHint`].
 pub enum FontTech {
     Keyword(LitStr),
-    Expr(Expr),
+    Expr(Box<Expr>),
 }
 
 impl Parse for FontTech {

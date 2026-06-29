@@ -45,7 +45,7 @@ impl ParseOption for FontFormatHint {
 /// The format inside a [`FontFormatHint`].
 pub enum FontFormat {
     Keyword(LitStr),
-    Expr(Expr),
+    Expr(Box<Expr>),
 }
 
 impl Parse for FontFormat {
