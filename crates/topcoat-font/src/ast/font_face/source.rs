@@ -83,16 +83,14 @@ impl Parse for FontSourcesValue {
 impl ToTokens for FontSourcesValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            Self::Expr(inner) => quote! {
-                ::topcoat::font::FontSources::new(#inner)
-            },
+            Self::Expr(inner) => inner.to_tokens(tokens),
             Self::Css(inner) => quote! {
-                ::topcoat::font::FontSources::const_new(&[
-                    #inner
-                ])
-            },
+                ::topcoat::font::FontSources::const_new(const {
+                    &[#inner]
+                })
+            }
+            .to_tokens(tokens),
         }
-        .to_tokens(tokens);
     }
 }
 
@@ -172,9 +170,9 @@ impl ToTokens for FontSource {
                 if let Expr::Lit(lit) = expr
                     && let Lit::Str(lit_str) = &lit.lit
                 {
-                    quote! { ::topcoat::font::FontSource::url_str(#lit_str, #tech, #format) }
+                    quote! { ::topcoat::font::FontSource::url_str(#lit_str, #format, #tech) }
                 } else {
-                    quote! { ::topcoat::font::FontSource::url(#expr, #tech, #format) }
+                    quote! { ::topcoat::font::FontSource::url(#expr, #format, #tech) }
                 }
             }
             Self::Local { expr, .. } => {

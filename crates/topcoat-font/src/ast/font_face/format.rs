@@ -78,16 +78,25 @@ impl ToTokens for FontFormat {
         if let Expr::Lit(lit) = &self.0
             && let Lit::Str(keyword) = &lit.lit
         {
-            quote! {
-                ::topcoat::font::FontFormat::from_keyword(#keyword).unwrap()
-            }
-            .to_tokens(tokens);
+            let variant = format_variant(&keyword.value(), keyword.span());
+            quote! { ::topcoat::font::FontFormat::#variant }.to_tokens(tokens);
             return;
         }
         let inner = &self.0;
-        quote! {
-            ::topcoat::font::FontFormat::from(#inner)
-        }
-        .to_tokens(tokens);
+        inner.to_tokens(tokens);
     }
+}
+
+fn format_variant(keyword: &str, span: proc_macro2::Span) -> proc_macro2::Ident {
+    let name = match keyword {
+        "collection" => "Collection",
+        "embedded-opentype" => "EmbeddedOpenType",
+        "opentype" => "OpenType",
+        "svg" => "Svg",
+        "truetype" => "TrueType",
+        "woff" => "Woff",
+        "woff2" => "Woff2",
+        _ => unreachable!("validated at parse time"),
+    };
+    proc_macro2::Ident::new(name, span)
 }

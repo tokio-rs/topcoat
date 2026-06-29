@@ -78,16 +78,29 @@ impl ToTokens for FontTech {
         if let Expr::Lit(lit) = &self.0
             && let Lit::Str(keyword) = &lit.lit
         {
-            quote! {
-                ::topcoat::font::FontTech::from_keyword(#keyword).unwrap()
-            }
-            .to_tokens(tokens);
+            let variant = tech_variant(&keyword.value(), keyword.span());
+            quote! { ::topcoat::font::FontTech::#variant }.to_tokens(tokens);
             return;
         }
         let inner = &self.0;
-        quote! {
-            ::topcoat::font::FontTech::from(#inner)
-        }
-        .to_tokens(tokens);
+        inner.to_tokens(tokens);
     }
+}
+
+fn tech_variant(keyword: &str, span: proc_macro2::Span) -> proc_macro2::Ident {
+    let name = match keyword {
+        "color-cbdt" => "ColorCbdt",
+        "color-colrv0" => "ColorColrV0",
+        "color-colrv1" => "ColorColrV1",
+        "color-sbix" => "ColorSbix",
+        "color-svg" => "ColorSvg",
+        "features-aat" => "FeaturesAat",
+        "features-graphite" => "FeaturesGraphite",
+        "features-opentype" => "FeaturesOpenType",
+        "incremental" => "Incremental",
+        "palettes" => "Palettes",
+        "variations" => "Variations",
+        _ => unreachable!("validated at parse time"),
+    };
+    proc_macro2::Ident::new(name, span)
 }

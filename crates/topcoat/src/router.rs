@@ -18,7 +18,7 @@ impl RouterBuilderDiscoverExt for RouterBuilder {
         self = self.discover_layers();
         #[cfg(feature = "font")]
         {
-            use topcoat_font::RouterBuilderFontExt;
+            use topcoat_font::runtime::RouterBuilderFontExt;
             self = self.discover_fonts();
         }
         #[cfg(feature = "runtime")]

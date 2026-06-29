@@ -21,6 +21,7 @@ cookie = [
 ]
 discover = [
 	"dep:inventory",
+	"topcoat-font?/discover",
 	"topcoat-router?/discover",
 	"topcoat-router-macro?/discover",
 	"topcoat-runtime?/discover",
@@ -46,6 +47,7 @@ router = [
 	"view",
 	"topcoat-asset?/router",
 	"topcoat-cookie?/router",
+	"topcoat-font?/router",
 	"topcoat-runtime?/router",
 ]
 runtime = [
