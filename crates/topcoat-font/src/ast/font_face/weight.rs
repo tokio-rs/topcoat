@@ -1,4 +1,5 @@
-use proc_macro2::Span;
+use proc_macro2::{Literal, Span, TokenStream};
+use quote::{ToTokens, quote};
 use syn::{
     Expr, LitInt, Token,
     parse::{Parse, ParseStream},
@@ -32,6 +33,12 @@ impl Parse for FontWeight {
 impl ParseOption for FontWeight {
     fn peek(input: ParseStream) -> bool {
         FontWeightKey::peek(input)
+    }
+}
+
+impl ToTokens for FontWeight {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.value.to_tokens(tokens);
     }
 }
 
@@ -72,6 +79,15 @@ impl Parse for FontWeightValue {
     }
 }
 
+impl ToTokens for FontWeightValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Css(range) => range.to_tokens(tokens),
+            Self::Expr(inner) => inner.to_tokens(tokens),
+        }
+    }
+}
+
 /// A `font-weight` value: a single weight (`400`) or an inclusive range carried
 /// by a variable font, written as two space-separated weights (`400 700`).
 pub struct FontWeightRange {
@@ -92,6 +108,21 @@ impl Parse for FontWeightRange {
             ));
         }
         Ok(Self { start, end })
+    }
+}
+
+impl ToTokens for FontWeightRange {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let start = &self.start;
+        match &self.end {
+            None => quote! {
+                ::topcoat::font::FontWeightRange::from_u16(#start, #start)
+            },
+            Some(end) => quote! {
+                ::topcoat::font::FontWeightRange::from_u16(#start, #end)
+            },
+        }
+        .to_tokens(tokens);
     }
 }
 
@@ -122,6 +153,12 @@ impl Parse for FontWeightNumber {
 impl ParseOption for FontWeightNumber {
     fn peek(input: ParseStream) -> bool {
         input.peek(LitInt)
+    }
+}
+
+impl ToTokens for FontWeightNumber {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        Literal::u16_unsuffixed(self.value).to_tokens(tokens);
     }
 }
 

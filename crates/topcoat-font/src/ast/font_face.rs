@@ -14,8 +14,10 @@ pub use tech::*;
 pub use unicode::*;
 pub use weight::*;
 
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
 use syn::{
-    Token,
+    Expr, Lit, Token,
     parse::{Parse, ParseStream},
 };
 
@@ -87,6 +89,32 @@ impl Parse for FontFace {
             style,
             unicode_range,
         })
+    }
+}
+
+impl ToTokens for FontFace {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let family = &self.family;
+        let src = &self.src;
+        let constructor = if let Expr::Lit(lit) = &family.value.0
+            && let Lit::Str(_) = &lit.lit
+        {
+            quote! { ::topcoat::font::FontFace::const_new(#family, #src) }
+        } else {
+            quote! { ::topcoat::font::FontFace::new(#family, #src) }
+        };
+
+        let weight = self.weight.iter();
+        let style = self.style.iter();
+        let unicode_range = self.unicode_range.iter();
+
+        quote! {
+            #constructor
+            #(.with_weight(#weight))*
+            #(.with_style(#style))*
+            #(.with_unicode_range(#unicode_range))*
+        }
+        .to_tokens(tokens);
     }
 }
 

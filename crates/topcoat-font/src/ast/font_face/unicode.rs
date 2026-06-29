@@ -1,4 +1,5 @@
-use proc_macro2::Span;
+use proc_macro2::{Literal, Span, TokenStream};
+use quote::{ToTokens, quote};
 use syn::{
     Expr, Token,
     parse::{Parse, ParseStream},
@@ -34,6 +35,12 @@ impl Parse for UnicodeRanges {
 impl ParseOption for UnicodeRanges {
     fn peek(input: ParseStream) -> bool {
         UnicodeRangesKey::peek(input)
+    }
+}
+
+impl ToTokens for UnicodeRanges {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.value.to_tokens(tokens);
     }
 }
 
@@ -74,6 +81,20 @@ impl Parse for UnicodeRangesValue {
     }
 }
 
+impl ToTokens for UnicodeRangesValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Css(ranges) => quote! {
+                ::topcoat::font::UnicodeRanges::new(&[
+                    #ranges
+                ])
+            }
+            .to_tokens(tokens),
+            Self::Expr(inner) => inner.to_tokens(tokens),
+        }
+    }
+}
+
 /// A single `U+...` interval, either one code point (`U+0041`) or an inclusive
 /// range (`U+0041-005A`).
 pub struct UnicodeRange {
@@ -91,6 +112,21 @@ impl Parse for UnicodeRange {
             start: input.parse()?,
             end: UnicodeRangeEnd::parse_option(input)?,
         })
+    }
+}
+
+impl ToTokens for UnicodeRange {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let start = &self.start;
+        match &self.end {
+            None => quote! {
+                ::topcoat::font::UnicodeRange::from_u32(#start, #start)
+            },
+            Some(end) => quote! {
+                ::topcoat::font::UnicodeRange::from_u32(#start, #end)
+            },
+        }
+        .to_tokens(tokens);
     }
 }
 
@@ -112,6 +148,12 @@ impl Parse for UnicodeRangeEnd {
 impl ParseOption for UnicodeRangeEnd {
     fn peek(input: ParseStream) -> bool {
         input.peek(Token![-])
+    }
+}
+
+impl ToTokens for UnicodeRangeEnd {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.code_point.to_tokens(tokens);
     }
 }
 
@@ -146,6 +188,12 @@ impl Parse for UnicodeCodePoint {
         }
 
         Ok(Self { value, span })
+    }
+}
+
+impl ToTokens for UnicodeCodePoint {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        Literal::u32_unsuffixed(self.value).to_tokens(tokens);
     }
 }
 

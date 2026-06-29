@@ -1,5 +1,7 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
 use syn::{
-    Expr, Token,
+    Expr, Lit, Token,
     parse::{Parse, ParseStream},
 };
 
@@ -34,6 +36,12 @@ impl ParseOption for FontFamily {
     }
 }
 
+impl ToTokens for FontFamily {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.value.to_tokens(tokens);
+    }
+}
+
 pub struct FontFamilyKey {
     pub font_kw: kw::font,
     pub dash_token: Token![-],
@@ -61,5 +69,18 @@ pub struct FontFamilyValue(pub Expr);
 impl Parse for FontFamilyValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self(input.parse()?))
+    }
+}
+
+impl ToTokens for FontFamilyValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let expr = &self.0;
+        if let Expr::Lit(lit) = expr
+            && let Lit::Str(lit_str) = &lit.lit
+        {
+            quote! { #lit_str }.to_tokens(tokens);
+        } else {
+            expr.to_tokens(tokens);
+        }
     }
 }
