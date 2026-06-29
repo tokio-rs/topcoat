@@ -66,19 +66,22 @@ macro_rules! __register_font {
     ($font:expr) => {};
 }
 
-/// Declares a [`Font`] from a family name and one or more CSS `@font-face`-like
-/// blocks, and registers it for discovery.
-///
-/// The family name is given once and injected into every block, so the faces
-/// read like a CSS stylesheet without repeating it. Each `@font-face { ... }`
-/// block is a [`font_face!`](crate::font_face) body (minus its `font-family`).
+/// Declares a [`Font`] from a family name and its faces, and registers it for
+/// discovery.
 ///
 /// Expands to a `const` [`Font`]. With the `discover` feature, it is also
 /// registered so [`discover_fonts`](crate::RouterBuilderFontExt::discover_fonts)
 /// finds it; without it, register the returned font manually with
 /// [`font`](crate::RouterBuilderFontExt::font).
 ///
-/// # Examples
+/// The faces can be given in one of two forms.
+///
+/// # CSS-like form
+///
+/// Follow the family name with one or more CSS `@font-face`-like blocks. The
+/// family name is given once and injected into every block, so the faces read
+/// like a CSS stylesheet without repeating it. Each `@font-face { ... }` block
+/// is a [`font_face!`](crate::font_face) body (minus its `font-family`).
 ///
 /// ```rust
 /// # use topcoat_font::{Font, font};
@@ -95,14 +98,48 @@ macro_rules! __register_font {
 ///     }
 /// };
 /// ```
+///
+/// # Expression form
+///
+/// Alternatively, follow the family name with a single expression that
+/// evaluates to a `&'static [FontFace]`. This uses ordinary Rust syntax instead
+/// of the CSS-like blocks, which is handy when the faces are built up
+/// programmatically or shared between fonts:
+///
+/// ```rust
+/// # use topcoat_font::{Font, FontFace, FontFormat, FontSource, FontSources, font};
+/// #
+/// const INTER_FACES: &[FontFace] = &[
+///     FontFace::new(
+///         "Inter",
+///         FontSources::new(&[FontSource::url(
+///             "/inter-400.woff2",
+///             Some(FontFormat::Woff2),
+///             None,
+///         )]),
+///     ),
+/// ];
+/// const INTER: Font = font!("Inter", INTER_FACES);
+/// ```
+///
+/// Unlike the CSS-like form, the family name is not injected into the faces, so
+/// each [`FontFace`](crate::FontFace) must already carry the matching family.
 #[macro_export]
 macro_rules! font {
-    ($family:literal, $(@font-face { $($face:tt)* })+ $(,)?) => {{
+    ($family:expr, $(@font-face { $($face:tt)* })+ $(,)?) => {{
         const FONT: $crate::Font = $crate::Font::new(
             $family,
             $crate::FontFaces::new(&[
                 $( $crate::font_face! { font-family: $family; $($face)* } ),+
             ]),
+        );
+        $crate::__register_font!(FONT);
+        FONT
+    }};
+    ($family:expr, $faces:expr) => {{
+        const FONT: $crate::Font = $crate::Font::new(
+            $family,
+            $crate::FontFaces::new($faces),
         );
         $crate::__register_font!(FONT);
         FONT
