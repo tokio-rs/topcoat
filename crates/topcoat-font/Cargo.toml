@@ -11,6 +11,7 @@ discover = [
 	"dep:inventory"
 ]
 parsing = [
+	"topcoat-core/parsing",
 	"dep:syn",
 	"dep:quote",
 ]

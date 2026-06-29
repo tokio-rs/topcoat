@@ -9,6 +9,7 @@ members = [
     "crates/topcoat-core/macro",
     "crates/topcoat-font",
     "crates/topcoat-font/fontsource",
+    "crates/topcoat-font/macro",
     "crates/topcoat-htmx",
     "crates/topcoat-pretty",
     "crates/topcoat-router",
@@ -67,7 +68,8 @@ topcoat-cookie = { path = "crates/topcoat-cookie" }
 topcoat-core = { path = "crates/topcoat-core" }
 topcoat-core-macro = { path = "crates/topcoat-core/macro" }
 topcoat-font = { path = "crates/topcoat-font" }
-topcoat-font-fontsource = { path = "crates/topcoat-font-fontsource" }
+topcoat-font-fontsource = { path = "crates/topcoat-font/fontsource" }
+topcoat-font-macro = { path = "crates/topcoat-font/macro" }
 topcoat-htmx = { path = "crates/topcoat-htmx" }
 topcoat-pretty = { path = "crates/topcoat-pretty" }
 topcoat-router = { path = "crates/topcoat-router" }

@@ -41,6 +41,22 @@ impl FontFormat {
         }
     }
 
+    /// The format named by the given CSS `format(...)` keyword, if the keyword
+    /// names a known format.
+    #[must_use]
+    pub fn from_keyword(keyword: &str) -> Option<Self> {
+        Some(match keyword {
+            "collection" => Self::Collection,
+            "embedded-opentype" => Self::EmbeddedOpenType,
+            "opentype" => Self::OpenType,
+            "svg" => Self::Svg,
+            "truetype" => Self::TrueType,
+            "woff" => Self::Woff,
+            "woff2" => Self::Woff2,
+            _ => return None,
+        })
+    }
+
     /// The human-readable name of this format.
     #[must_use]
     pub const fn name(self) -> &'static str {

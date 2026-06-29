@@ -1754,6 +1754,7 @@ dependencies = [
  "topcoat-core",
  "topcoat-core-macro",
  "topcoat-font",
+ "topcoat-font-macro",
  "topcoat-htmx",
  "topcoat-router",
  "topcoat-router-macro",
@@ -1871,6 +1872,16 @@ dependencies = [
  "heck",
  "serde",
  "serde_json",
+ "topcoat-font",
+]
+
+[[package]]
+name = "topcoat-font-macro"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+ "topcoat",
  "topcoat-font",
 ]
 

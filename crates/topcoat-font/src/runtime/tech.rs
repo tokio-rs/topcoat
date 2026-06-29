@@ -55,6 +55,26 @@ impl FontTech {
         }
     }
 
+    /// The technology named by the given CSS `tech(...)` keyword, if the
+    /// keyword names a known technology.
+    #[must_use]
+    pub fn from_keyword(keyword: &str) -> Option<Self> {
+        Some(match keyword {
+            "color-cbdt" => Self::ColorCbdt,
+            "color-colrv0" => Self::ColorColrV0,
+            "color-colrv1" => Self::ColorColrV1,
+            "color-sbix" => Self::ColorSbix,
+            "color-svg" => Self::ColorSvg,
+            "features-aat" => Self::FeaturesAat,
+            "features-graphite" => Self::FeaturesGraphite,
+            "features-opentype" => Self::FeaturesOpenType,
+            "incremental" => Self::Incremental,
+            "palettes" => Self::Palettes,
+            "variations" => Self::Variations,
+            _ => return None,
+        })
+    }
+
     /// A human-readable description of this technology.
     #[must_use]
     pub const fn description(self) -> &'static str {
