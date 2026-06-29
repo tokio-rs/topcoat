@@ -1,11 +1,13 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
 use syn::{
-    Expr, Token, parenthesized,
+    Expr, Lit, Token, parenthesized,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     token::Paren,
 };
 
-use topcoat_core::ast::ParseOption;
+use topcoat_core::ast::{ParseOption, QuoteOption};
 
 use crate::ast::font_face::{FontFormatHint, FontTechHint};
 
@@ -39,6 +41,12 @@ impl ParseOption for FontSources {
     }
 }
 
+impl ToTokens for FontSources {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.value.to_tokens(tokens);
+    }
+}
+
 pub struct FontSourcesKey {
     pub src_kw: kw::src,
 }
@@ -69,6 +77,22 @@ impl Parse for FontSourcesValue {
         } else {
             Ok(Self::Expr(input.parse()?))
         }
+    }
+}
+
+impl ToTokens for FontSourcesValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Expr(inner) => quote! {
+                ::topcoat::font::FontSources::new(#inner)
+            },
+            Self::Css(inner) => quote! {
+                ::topcoat::font::FontSources::const_new(&[
+                    #inner
+                ])
+            },
+        }
+        .to_tokens(tokens);
     }
 }
 
@@ -137,3 +161,32 @@ impl Parse for FontSource {
     }
 }
 
+impl ToTokens for FontSource {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Url {
+                expr, tech, format, ..
+            } => {
+                let tech = QuoteOption::from(tech);
+                let format = QuoteOption::from(format);
+                if let Expr::Lit(lit) = expr
+                    && let Lit::Str(lit_str) = &lit.lit
+                {
+                    quote! { ::topcoat::font::FontSource::url_str(#lit_str, #tech, #format) }
+                } else {
+                    quote! { ::topcoat::font::FontSource::url(#expr, #tech, #format) }
+                }
+            }
+            Self::Local { expr, .. } => {
+                if let Expr::Lit(lit) = expr
+                    && let Lit::Str(lit_str) = &lit.lit
+                {
+                    quote! { ::topcoat::font::FontSource::local_str(#lit_str) }
+                } else {
+                    quote! { ::topcoat::font::FontSource::local(#expr) }
+                }
+            }
+        }
+        .to_tokens(tokens);
+    }
+}
