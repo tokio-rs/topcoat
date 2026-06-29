@@ -1,3 +1,5 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
 use syn::{
     Expr, LitStr, parenthesized,
     parse::{Parse, ParseStream},
@@ -6,7 +8,7 @@ use syn::{
 
 use topcoat_core::ast::ParseOption;
 
-use crate::runtime::{self};
+use crate::runtime;
 
 mod kw {
     use syn::custom_keyword;
@@ -42,6 +44,12 @@ impl ParseOption for FontTechHint {
     }
 }
 
+impl ToTokens for FontTechHint {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.value.to_tokens(tokens);
+    }
+}
+
 /// The technology inside a [`FontTechHint`].
 pub enum FontTech {
     Keyword(LitStr),
@@ -62,5 +70,19 @@ impl Parse for FontTech {
         } else {
             Ok(Self::Expr(input.parse()?))
         }
+    }
+}
+
+impl ToTokens for FontTech {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Keyword(keyword) => quote! {
+                ::topcoat::font::FontTech::from_keyword(#keyword).unwrap()
+            },
+            Self::Expr(inner) => quote! {
+                ::topcoat::font::FontTech::from(#inner)
+            },
+        }
+        .to_tokens(tokens);
     }
 }

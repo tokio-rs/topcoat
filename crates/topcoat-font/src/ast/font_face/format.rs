@@ -1,3 +1,5 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
 use syn::{
     Expr, LitStr, parenthesized,
     parse::{Parse, ParseStream},
@@ -42,6 +44,12 @@ impl ParseOption for FontFormatHint {
     }
 }
 
+impl ToTokens for FontFormatHint {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.value.to_tokens(tokens);
+    }
+}
+
 /// The format inside a [`FontFormatHint`].
 pub enum FontFormat {
     Keyword(LitStr),
@@ -62,5 +70,19 @@ impl Parse for FontFormat {
         } else {
             Ok(Self::Expr(input.parse()?))
         }
+    }
+}
+
+impl ToTokens for FontFormat {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Keyword(keyword) => quote! {
+                ::topcoat::font::FontFormat::from_keyword(#keyword).unwrap()
+            },
+            Self::Expr(inner) => quote! {
+                ::topcoat::font::FontFormat::from(#inner)
+            },
+        }
+        .to_tokens(tokens);
     }
 }
