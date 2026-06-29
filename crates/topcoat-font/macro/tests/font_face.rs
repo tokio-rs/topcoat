@@ -152,6 +152,23 @@ fn url_with_no_hints() {
 }
 
 #[test]
+fn runtime_face_with_unicode_range() {
+    // The unicode range slice must be `'static` so a face built outside a
+    // `const` and returned by value still borrows it for long enough.
+    fn build() -> FontFace {
+        font_face! {
+            font-family: "Inter";
+            src: local("Inter");
+            unicode-range: U+0000-00FF, U+0131;
+        }
+    }
+    assert_eq!(
+        render(&build()),
+        r#"@font-face { font-family: "Inter"; src: local("Inter"); unicode-range: U+0000-00FF, U+0131 }"#,
+    );
+}
+
+#[test]
 fn dynamic_family_falls_back_to_new_constructor() {
     let family = String::from("Inter");
     let face = font_face! {

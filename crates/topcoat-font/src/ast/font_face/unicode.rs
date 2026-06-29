@@ -85,9 +85,9 @@ impl ToTokens for UnicodeRangesValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::Css(ranges) => quote! {
-                ::topcoat::font::UnicodeRanges::new(&[
-                    #ranges
-                ])
+                ::topcoat::font::UnicodeRanges::new(const {
+                    &[#ranges]
+                })
             }
             .to_tokens(tokens),
             Self::Expr(inner) => inner.to_tokens(tokens),
