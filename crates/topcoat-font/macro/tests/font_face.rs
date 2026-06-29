@@ -169,6 +169,22 @@ fn runtime_face_with_unicode_range() {
 }
 
 #[test]
+fn runtime_expressions_inside_url_and_local() {
+    // A `url(...)`/`local(...)` argument may be a runtime expression; the list
+    // is then built at run time rather than as a `const`.
+    fn build(href: String, installed: String) -> FontFace {
+        font_face! {
+            font-family: "Inter";
+            src: local(installed), url(href) format("woff2");
+        }
+    }
+    assert_eq!(
+        render(&build("/inter.woff2".to_owned(), "Inter".to_owned())),
+        r#"@font-face { font-family: "Inter"; src: local("Inter"), url("/inter.woff2") format(woff2) }"#,
+    );
+}
+
+#[test]
 fn dynamic_family_falls_back_to_new_constructor() {
     let family = String::from("Inter");
     let face = font_face! {

@@ -71,12 +71,17 @@ pub enum FontSourcesValue {
 }
 
 impl FontSourcesValue {
-    /// Whether these sources can be built in a `const` context. The CSS form is
-    /// lowered to a `const`-capable `FontSources::const_new`; an opaque
-    /// expression is left to the `TryInto` conversion in `FontFace::new`.
+    /// Whether these sources can be built in a `const` context. A CSS list every
+    /// entry of which is itself `const` is lowered to a `const`-capable
+    /// `FontSources::const_new`; anything else (an opaque expression, or a list
+    /// with a runtime `url(...)`/`local(...)` argument or hint) is built at run
+    /// time instead.
     #[must_use]
     pub fn is_const(&self) -> bool {
-        matches!(self, Self::Css(_))
+        match self {
+            Self::Css(entries) => entries.iter().all(FontSource::is_const),
+            Self::Expr(_) => false,
+        }
     }
 }
 
@@ -94,10 +99,14 @@ impl ToTokens for FontSourcesValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::Expr(inner) => inner.to_tokens(tokens),
-            Self::Css(inner) => quote! {
+            Self::Css(inner) if self.is_const() => quote! {
                 ::topcoat::font::FontSources::const_new(const {
                     &[#inner]
                 })
+            }
+            .to_tokens(tokens),
+            Self::Css(inner) => quote! {
+                ::topcoat::font::FontSources::new(::std::vec![#inner])
             }
             .to_tokens(tokens),
         }
@@ -118,6 +127,31 @@ pub enum FontSource {
         paren_token: Paren,
         expr: Expr,
     },
+}
+
+impl FontSource {
+    /// Whether this source can be constructed in a `const` context: a string
+    /// literal URL or name, carrying only literal-keyword `format`/`tech` hints.
+    /// An expression argument (e.g. a runtime URL or an asset) or an expression
+    /// hint makes it run-time only.
+    #[must_use]
+    pub fn is_const(&self) -> bool {
+        match self {
+            Self::Local { expr, .. } => is_str_literal(expr),
+            Self::Url {
+                expr, format, tech, ..
+            } => {
+                is_str_literal(expr)
+                    && format.as_deref().is_none_or(FontFormatHint::is_const)
+                    && tech.as_deref().is_none_or(FontTechHint::is_const)
+            }
+        }
+    }
+}
+
+/// Whether `expr` is a string literal.
+fn is_str_literal(expr: &Expr) -> bool {
+    matches!(expr, Expr::Lit(lit) if matches!(&lit.lit, Lit::Str(_)))
 }
 
 impl Parse for FontSource {

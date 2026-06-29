@@ -36,6 +36,15 @@ impl Parse for FontTechHint {
     }
 }
 
+impl FontTechHint {
+    /// Whether this hint is a string-literal keyword, lowered to a `const`
+    /// [`runtime::FontTech`](crate::runtime::FontTech) variant.
+    #[must_use]
+    pub fn is_const(&self) -> bool {
+        self.value.is_const()
+    }
+}
+
 impl ParseOption for FontTechHint {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::tech)
@@ -54,6 +63,15 @@ impl ToTokens for FontTechHint {
 /// time. When the expression is a string literal, it is validated at compile
 /// time against the known CSS technology keywords.
 pub struct FontTech(pub Expr);
+
+impl FontTech {
+    /// Whether the technology is a string-literal keyword rather than an opaque
+    /// expression, and so lowers to a `const` variant.
+    #[must_use]
+    pub fn is_const(&self) -> bool {
+        matches!(&self.0, Expr::Lit(lit) if matches!(&lit.lit, Lit::Str(_)))
+    }
+}
 
 impl Parse for FontTech {
     fn parse(input: ParseStream) -> syn::Result<Self> {

@@ -44,6 +44,18 @@ font_face! {
 
 `format(…)` and `tech(…)` are each optional and may be written in either order. Their keywords are checked at compile time against the CSS-defined values, so a typo like `format("wof2")` fails to build.
 
+The argument to `local(…)` and `url(…)`, and the `format(…)` and `tech(…)` hints, can each be a Rust expression instead of a literal — resolving to the family name, URL, [`FontFormat`], or [`FontTech`] respectively. A `url(…)` argument may also be an [`Asset`], whose content-hashed URL is filled in when the face is rendered. A `src` list that uses any such expression is built at run time rather than as a `const`.
+
+```rust
+# use topcoat::font::*;
+# fn example(installed: String, href: String) -> FontFace {
+font_face! {
+    font-family: "Inter";
+    src: local(installed), url(href) format("woff2");
+}
+# }
+```
+
 ## `font-weight`
 
 A single weight, or a space-separated range carried by a variable font. Weights are the numbers `100..=900` or the keywords `normal` (`400`) and `bold` (`700`):
@@ -135,9 +147,8 @@ font_face! {
 # }
 ```
 
-The `format(…)` and `tech(…)` hints likewise accept a parenthesized expression resolving to a [`FontFormat`] or [`FontTech`].
-
 [`@font-face`]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face
+[`Asset`]: ../asset/struct.Asset.html
 [`FontFace`]: struct.FontFace.html
 [`FontFormat`]: enum.FontFormat.html
 [`FontSource`]: enum.FontSource.html

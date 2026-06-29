@@ -36,6 +36,15 @@ impl Parse for FontFormatHint {
     }
 }
 
+impl FontFormatHint {
+    /// Whether this hint is a string-literal keyword, lowered to a `const`
+    /// [`runtime::FontFormat`](crate::runtime::FontFormat) variant.
+    #[must_use]
+    pub fn is_const(&self) -> bool {
+        self.value.is_const()
+    }
+}
+
 impl ParseOption for FontFormatHint {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::format)
@@ -54,6 +63,15 @@ impl ToTokens for FontFormatHint {
 /// time. When the expression is a string literal, it is validated at compile
 /// time against the known CSS format keywords.
 pub struct FontFormat(pub Expr);
+
+impl FontFormat {
+    /// Whether the format is a string-literal keyword rather than an opaque
+    /// expression, and so lowers to a `const` variant.
+    #[must_use]
+    pub fn is_const(&self) -> bool {
+        matches!(&self.0, Expr::Lit(lit) if matches!(&lit.lit, Lit::Str(_)))
+    }
+}
 
 impl Parse for FontFormat {
     fn parse(input: ParseStream) -> syn::Result<Self> {
