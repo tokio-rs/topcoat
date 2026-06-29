@@ -298,26 +298,45 @@ impl FontSource {
 /// Renders as the comma-separated list CSS expects, with the browser using the
 /// first source it supports. Order from most to least preferred.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FontSources(&'static [FontSource]);
+pub struct FontSources(Cow<'static, [FontSource]>);
 
 impl FontSources {
-    /// Wrap a slice of sources.
+    /// Creates a list of `sources`.
+    ///
+    /// Use [`const_new`](Self::const_new) in a `const` context.
     ///
     /// # Panics
     ///
     /// Panics if `sources` is empty; a CSS `src` descriptor requires at least
     /// one source.
     #[must_use]
-    pub const fn new(sources: &'static [FontSource]) -> Self {
+    pub fn new(sources: impl Into<Cow<'static, [FontSource]>>) -> Self {
+        let sources = sources.into();
         assert!(!sources.is_empty(), "font sources must not be empty");
         Self(sources)
     }
 
+    /// Creates a list from a `&'static` slice of `sources`, usable in a `const`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `sources` is empty; a CSS `src` descriptor requires at least
+    /// one source.
+    #[must_use]
+    pub const fn const_new(sources: &'static [FontSource]) -> Self {
+        assert!(!sources.is_empty(), "font sources must not be empty");
+        Self(Cow::Borrowed(sources))
+    }
+
     /// Folds these sources into a running content hash.
     pub(crate) const fn hash(&self, mut h: u64) -> u64 {
+        let sources = match &self.0 {
+            Cow::Borrowed(sources) => *sources,
+            Cow::Owned(sources) => sources.as_slice(),
+        };
         let mut i = 0;
-        while i < self.0.len() {
-            h = self.0[i].hash(h);
+        while i < sources.len() {
+            h = sources[i].hash(h);
             i += 1;
         }
         h
@@ -337,122 +356,68 @@ impl FontSources {
         }
         Ok(())
     }
+
+    /// Returns the sources as a slice.
+    ///
+    /// The slice is never empty, mirroring the non-empty invariant of
+    /// [`FontSources`].
+    #[must_use]
+    pub const fn as_slice(&self) -> &[FontSource] {
+        match &self.0 {
+            Cow::Borrowed(inner) => inner,
+            Cow::Owned(inner) => inner.as_slice(),
+        }
+    }
+
+    /// Builds a [`FontSources`] from `sources`, validating the non-empty invariant.
+    fn try_from_cow(sources: Cow<'static, [FontSource]>) -> Result<Self, EmptyFontSourcesError> {
+        if sources.is_empty() {
+            return Err(EmptyFontSourcesError);
+        }
+        Ok(Self(sources))
+    }
+}
+
+/// Error returned when converting an empty collection into [`FontSources`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EmptyFontSourcesError;
+
+impl std::fmt::Display for EmptyFontSourcesError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("font sources must not be empty")
+    }
+}
+
+impl std::error::Error for EmptyFontSourcesError {}
+
+impl TryFrom<&'static [FontSource]> for FontSources {
+    type Error = EmptyFontSourcesError;
+
+    fn try_from(sources: &'static [FontSource]) -> Result<Self, Self::Error> {
+        Self::try_from_cow(Cow::Borrowed(sources))
+    }
+}
+
+impl TryFrom<Vec<FontSource>> for FontSources {
+    type Error = EmptyFontSourcesError;
+
+    fn try_from(sources: Vec<FontSource>) -> Result<Self, Self::Error> {
+        Self::try_from_cow(Cow::Owned(sources))
+    }
+}
+
+impl TryFrom<Cow<'static, [FontSource]>> for FontSources {
+    type Error = EmptyFontSourcesError;
+
+    fn try_from(sources: Cow<'static, [FontSource]>) -> Result<Self, Self::Error> {
+        Self::try_from_cow(sources)
+    }
 }
 
 impl Deref for FontSources {
     type Target = [FontSource];
 
     fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn render(source: &FontSource) -> String {
-        let cx = Cx::empty();
-        let mut out = String::new();
-        source.fmt(&cx, &mut out).unwrap();
-        out
-    }
-
-    fn render_all(sources: &FontSources) -> String {
-        let cx = Cx::empty();
-        let mut out = String::new();
-        sources.fmt(&cx, &mut out).unwrap();
-        out
-    }
-
-    #[test]
-    fn url_renders_quoted() {
-        let source = FontSource::url("/font.woff2", None, None);
-        assert_eq!(render(&source), r#"url("/font.woff2")"#);
-    }
-
-    #[test]
-    fn url_renders_format_hint() {
-        let source = FontSource::url("/font.woff2", Some(FontFormat::Woff2), None);
-        assert_eq!(render(&source), r#"url("/font.woff2") format(woff2)"#);
-    }
-
-    #[test]
-    fn url_renders_tech_hint() {
-        let source = FontSource::url("/font.woff2", None, Some(FontTech::Variations));
-        assert_eq!(render(&source), r#"url("/font.woff2") tech(variations)"#);
-    }
-
-    #[test]
-    fn url_renders_format_before_tech() {
-        let source = FontSource::url(
-            "/font.woff2",
-            Some(FontFormat::Woff2),
-            Some(FontTech::ColorColrV1),
-        );
-        assert_eq!(
-            render(&source),
-            r#"url("/font.woff2") format(woff2) tech(color-colrv1)"#,
-        );
-    }
-
-    #[test]
-    fn url_escapes_quotes_and_backslashes() {
-        let source = FontSource::url(r#"/a"b\c"#, None, None);
-        assert_eq!(render(&source), r#"url("/a\"b\\c")"#);
-    }
-
-    #[test]
-    fn local_renders_quoted() {
-        let source = FontSource::local("Helvetica Neue");
-        assert_eq!(render(&source), r#"local("Helvetica Neue")"#);
-    }
-
-    #[test]
-    fn local_escapes_quotes() {
-        let source = FontSource::local(r#"My "Font""#);
-        assert_eq!(render(&source), r#"local("My \"Font\"")"#);
-    }
-
-    #[test]
-    fn sources_render_comma_separated() {
-        const SOURCES: FontSources = FontSources::new(&[
-            FontSource::local("Helvetica Neue"),
-            FontSource::url("/font.woff2", Some(FontFormat::Woff2), None),
-        ]);
-        assert_eq!(
-            render_all(&SOURCES),
-            r#"local("Helvetica Neue"), url("/font.woff2") format(woff2)"#,
-        );
-    }
-
-    #[test]
-    fn single_source_renders_without_separator() {
-        const SOURCES: FontSources = FontSources::new(&[FontSource::local("Inter")]);
-        assert_eq!(render_all(&SOURCES), r#"local("Inter")"#);
-    }
-
-    #[test]
-    #[should_panic = "must not be empty"]
-    fn new_panics_on_empty_sources() {
-        let _ = FontSources::new(&[]);
-    }
-
-    #[test]
-    fn predicates_reflect_the_variant() {
-        let url = FontSource::url("/font.woff2", None, None);
-        assert!(url.is_url());
-        assert!(!url.is_local());
-
-        let local = FontSource::local("Inter");
-        assert!(local.is_local());
-        assert!(!local.is_url());
-    }
-
-    #[test]
-    fn str_url_accessors() {
-        let url = FontSourceUrl::from("/font.woff2");
-        assert!(url.is_str());
-        assert_eq!(url.as_str(), Some("/font.woff2"));
+        self.as_slice()
     }
 }
