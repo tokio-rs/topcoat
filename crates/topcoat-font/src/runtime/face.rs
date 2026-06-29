@@ -27,11 +27,17 @@ impl FontFace {
     /// [`with_weight`](Self::with_weight), [`with_style`](Self::with_style), and
     /// [`with_unicode_range`](Self::with_unicode_range). Use
     /// [`const_new`](Self::const_new) in a `const` context.
+    ///
+    /// # Panics
+    ///
+    /// Panics of the [`TryInto`] conversion of `src` fails.
     #[must_use]
-    pub fn new(family: impl Into<Cow<'static, str>>, src: FontSources) -> Self {
+    pub fn new(family: impl Into<Cow<'static, str>>, src: impl TryInto<FontSources>) -> Self {
         Self {
             family: family.into(),
-            src,
+            src: src
+                .try_into()
+                .unwrap_or_else(|_| panic!("`src` cannot be empty")),
             weight: None,
             style: None,
             unicode_range: None,
