@@ -136,7 +136,10 @@ fn parse_range_token(token: &str) -> (u32, u32) {
     if let Some((start, end)) = body.split_once('-') {
         (parse_hex(start), parse_hex(end))
     } else if body.contains('?') {
-        (parse_hex(&body.replace('?', "0")), parse_hex(&body.replace('?', "F")))
+        (
+            parse_hex(&body.replace('?', "0")),
+            parse_hex(&body.replace('?', "F")),
+        )
     } else {
         let cp = parse_hex(body);
         (cp, cp)
@@ -158,7 +161,11 @@ fn unicode_range_consts(ranges: &[String]) -> String {
             .map(|(start, end)| format!("UnicodeRange::from_u32({start:#x}, {end:#x})"))
             .collect::<Vec<_>>()
             .join(", ");
-        writeln!(out, "const UR{i}: UnicodeRanges = UnicodeRanges::new(&[{entries}]);").unwrap();
+        writeln!(
+            out,
+            "const UR{i}: UnicodeRanges = UnicodeRanges::new(&[{entries}]);"
+        )
+        .unwrap();
     }
     out
 }

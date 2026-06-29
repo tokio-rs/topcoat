@@ -135,16 +135,14 @@ macro_rules! __register_font {
 /// ```rust
 /// # use topcoat_font::{Font, FontFace, FontFormat, FontSource, FontSources, font};
 /// #
-/// const INTER_FACES: &[FontFace] = &[
-///     FontFace::new(
-///         "Inter",
-///         FontSources::new(&[FontSource::url(
-///             "/inter-400.woff2",
-///             Some(FontFormat::Woff2),
-///             None,
-///         )]),
-///     ),
-/// ];
+/// const INTER_FACES: &[FontFace] = &[FontFace::new(
+///     "Inter",
+///     FontSources::new(&[FontSource::url(
+///         "/inter-400.woff2",
+///         Some(FontFormat::Woff2),
+///         None,
+///     )]),
+/// )];
 /// const INTER: Font = font!("Inter", INTER_FACES);
 /// ```
 ///

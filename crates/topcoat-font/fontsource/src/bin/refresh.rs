@@ -87,7 +87,10 @@ struct FontOut {
 
 fn main() {
     let agent: ureq::Agent = ureq::Agent::config_builder()
-        .user_agent(concat!("topcoat-font-fontsource/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!(
+            "topcoat-font-fontsource/",
+            env!("CARGO_PKG_VERSION")
+        ))
         .build()
         .into();
 
@@ -138,7 +141,9 @@ fn main() {
 fn is_named_subset(subset: &str) -> bool {
     !(subset.starts_with('[')
         && subset.ends_with(']')
-        && subset[1..subset.len() - 1].bytes().all(|b| b.is_ascii_digit()))
+        && subset[1..subset.len() - 1]
+            .bytes()
+            .all(|b| b.is_ascii_digit()))
 }
 
 /// Collects the distinct range specs into a sorted table and rewrites each

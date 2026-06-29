@@ -257,8 +257,7 @@ mod tests {
 
     #[test]
     fn macro_builds_a_const_face() {
-        const _FACE: crate::FontFace =
-            crate::fontsource_font_face!(ROBOTO, weight: 500, style: Style::Normal, subset: Subset::Latin);
+        const _FACE: crate::FontFace = crate::fontsource_font_face!(ROBOTO, weight: 500, style: Style::Normal, subset: Subset::Latin);
     }
 
     #[test]

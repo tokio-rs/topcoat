@@ -181,7 +181,10 @@ impl Parse for UnicodeCodePoint {
         })?;
 
         let value = u32::from_str_radix(&text, 16).map_err(|_| {
-            syn::Error::new(span, format!("`{text}` is not a hexadecimal Unicode code point"))
+            syn::Error::new(
+                span,
+                format!("`{text}` is not a hexadecimal Unicode code point"),
+            )
         })?;
         if value > 0x10_FFFF {
             return Err(syn::Error::new(span, "Unicode code point exceeds U+10FFFF"));

@@ -214,8 +214,11 @@ fn string_family_with_convertible_src_uses_try_into() {
 
 #[test]
 fn dynamic_src_with_string_family_still_works() {
-    static SRC: &[topcoat::font::FontSource] =
-        &[topcoat::font::FontSource::url_str("/inter.woff2", None, None)];
+    static SRC: &[topcoat::font::FontSource] = &[topcoat::font::FontSource::url_str(
+        "/inter.woff2",
+        None,
+        None,
+    )];
     let src = topcoat::font::FontSources::new(SRC);
     let face = font_face! {
         font-family: "Inter";

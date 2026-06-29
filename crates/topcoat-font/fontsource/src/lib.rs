@@ -1,11 +1,3 @@
-//! Self-host or serve [Fontsource](https://fontsource.org) font families with
-//! Topcoat.
-//!
-//! The vendored catalog exposes one [`Family`] constant per family (e.g.
-//! [`ROBOTO`]), each carrying the weights, styles, and [`Subset`]s it ships.
-//! Build a [`FontFace`] for a specific weight/style/subset with the
-//! [`fontsource_font_face!`] macro.
-
 mod builder;
 mod family;
 mod style;
@@ -42,7 +34,7 @@ pub mod __private {
 /// `asset` feature.
 ///
 /// ```
-/// use topcoat_font_fontsource::{fontsource_font_face, FontFace, Style, Subset, ROBOTO};
+/// use topcoat_font_fontsource::{FontFace, ROBOTO, Style, Subset, fontsource_font_face};
 ///
 /// const REGULAR: FontFace =
 ///     fontsource_font_face!(ROBOTO, weight: 400, style: Style::Normal, subset: Subset::Latin);
@@ -51,14 +43,15 @@ pub mod __private {
 macro_rules! fontsource_font_face {
     ($family:expr, weight: $weight:expr, style: $style:expr, subset: $subset:expr $(,)?) => {{
         const URL: &str = $crate::__fontsource_url!($family, $weight, $style, $subset);
-        const SRC: $crate::__private::FontSources =
-            $crate::__private::FontSources::const_new(const {
+        const SRC: $crate::__private::FontSources = $crate::__private::FontSources::const_new(
+            const {
                 &[$crate::__private::FontSource::url_str(
                     URL,
                     ::core::option::Option::Some($crate::__private::FontFormat::Woff2),
                     ::core::option::Option::None,
                 )]
-            });
+            },
+        );
         $crate::FontFaceBuilder::new()
             .family($family)
             .weight($weight)
@@ -69,14 +62,15 @@ macro_rules! fontsource_font_face {
     ($family:expr, weight: $weight:expr, style: $style:expr, subset: $subset:expr, host: asset $(,)?) => {{
         const URL: &str = $crate::__fontsource_url!($family, $weight, $style, $subset);
         const ASSET: $crate::__private::Asset = $crate::__private::asset!(URL);
-        const SRC: $crate::__private::FontSources =
-            $crate::__private::FontSources::const_new(const {
+        const SRC: $crate::__private::FontSources = $crate::__private::FontSources::const_new(
+            const {
                 &[$crate::__private::FontSource::url_asset(
                     ASSET,
                     ::core::option::Option::Some($crate::__private::FontFormat::Woff2),
                     ::core::option::Option::None,
                 )]
-            });
+            },
+        );
         $crate::FontFaceBuilder::new()
             .family($family)
             .weight($weight)
