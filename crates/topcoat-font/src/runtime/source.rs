@@ -4,7 +4,7 @@ use std::{borrow::Cow, fmt::Write, ops::Deref};
 
 use topcoat_core::runtime::{context::Cx, fnv1a};
 
-use crate::{CssString, FontFormat, FontTech};
+use crate::runtime::{CssString, FontFormat, FontTech};
 
 /// The location of a font file, the URL of a `url()` entry in a CSS
 /// `@font-face` `src` descriptor.

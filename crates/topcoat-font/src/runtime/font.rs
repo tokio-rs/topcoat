@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use topcoat_core::runtime::fnv1a;
 
-use crate::FontFaces;
+use crate::runtime::FontFaces;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Font {

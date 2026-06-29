@@ -1,1 +1,1 @@
-pub use topcoat_font::*;
+pub use topcoat_font::runtime::*;

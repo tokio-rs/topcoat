@@ -3,7 +3,7 @@ use topcoat_router::runtime::{
     Body, IntoResponse, Method, Path, PathBuf, Route, RouteFuture, RouterBuilder,
 };
 
-use crate::Font;
+use crate::runtime::Font;
 
 const FONT_ROUTE_PREFIX: &str = "/_topcoat/fonts";
 

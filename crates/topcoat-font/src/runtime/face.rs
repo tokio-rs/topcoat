@@ -4,7 +4,7 @@ use std::{borrow::Cow, fmt::Write, ops::Deref};
 
 use topcoat_core::runtime::{context::Cx, fnv1a};
 
-use crate::{CssString, FontSources, FontStyle, FontWeightRange, UnicodeRanges};
+use crate::runtime::{CssString, FontSources, FontStyle, FontWeightRange, UnicodeRanges};
 
 /// A single CSS `@font-face` rule: a font family backed by one set of sources,
 /// scoped to an optional weight range, style, and unicode range.
