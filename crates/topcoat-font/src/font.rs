@@ -1,18 +1,44 @@
+use std::borrow::Cow;
+
 use topcoat_core::runtime::fnv1a;
 
 use crate::FontFaces;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Font {
-    family: &'static str,
+    family: Cow<'static, str>,
     faces: FontFaces,
     hash: u64,
 }
 
 impl Font {
+    /// Creates a font named `family`, backed by `faces`.
+    ///
+    /// Use [`const_new`](Self::const_new) in a `const` context.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `faces` cannot be converted into a non-empty [`FontFaces`].
     #[must_use]
-    pub const fn new(family: &'static str, faces: FontFaces) -> Self {
-        let h = fnv1a::hash_continue(fnv1a::hash(family.as_bytes()), b"\0");
+    pub fn new(family: impl Into<Cow<'static, str>>, faces: impl TryInto<FontFaces>) -> Self {
+        let faces = faces
+            .try_into()
+            .unwrap_or_else(|_| panic!("font faces must not be empty"));
+        Self::from_parts(family.into(), faces)
+    }
+
+    /// Creates a font named `family`, backed by `faces`, usable in a `const` context.
+    #[must_use]
+    pub const fn const_new(family: &'static str, faces: FontFaces) -> Self {
+        Self::from_parts(Cow::Borrowed(family), faces)
+    }
+
+    const fn from_parts(family: Cow<'static, str>, faces: FontFaces) -> Self {
+        let family_bytes = match &family {
+            Cow::Borrowed(s) => s.as_bytes(),
+            Cow::Owned(s) => s.as_bytes(),
+        };
+        let h = fnv1a::hash_continue(fnv1a::hash(family_bytes), b"\0");
         let hash = faces.hash(h);
         Self {
             family,
@@ -22,8 +48,8 @@ impl Font {
     }
 
     #[must_use]
-    pub fn family(&self) -> &'static str {
-        self.family
+    pub fn family(&self) -> &str {
+        &self.family
     }
 
     #[must_use]
@@ -42,36 +68,11 @@ impl Font {
     }
 }
 
-/// A function that builds a [`Font`].
-///
-/// Because [`Font`] is not `const`, we cannot submit an instance to [`inventory`] directly.
-/// Instead, we submit a newtype wrapper around the font's constructor function pointer.
 #[cfg(feature = "discover")]
-#[derive(Debug, Clone)]
-pub struct FontFn {
-    build: fn() -> Font,
-}
-
-#[cfg(feature = "discover")]
-impl FontFn {
-    /// Creates a function that builds a [`Font`].
-    #[must_use]
-    pub const fn new(build: fn() -> Font) -> Self {
-        Self { build }
-    }
-
-    /// Builds the [`Font`].
-    #[must_use]
-    pub fn build(&self) -> Font {
-        (self.build)()
-    }
-}
-
-#[cfg(feature = "discover")]
-inventory::collect!(FontFn);
+inventory::collect!(Font);
 
 /// Registers a [`Font`] for discovery when the `discover` feature is enabled,
-/// and expands to nothing otherwise. Takes the `fn() -> Font` that builds it.
+/// and expands to nothing otherwise.
 ///
 /// The feature gate lives here, in the defining crate, so it reflects
 /// topcoat-font's own `discover` feature rather than the calling crate's.
@@ -79,8 +80,8 @@ inventory::collect!(FontFn);
 #[cfg(feature = "discover")]
 #[macro_export]
 macro_rules! __register_font {
-    ($build:expr) => {
-        $crate::internal::inventory::submit! { $crate::FontFn::new($build) }
+    ($font:expr) => {
+        $crate::internal::inventory::submit! { $font }
     };
 }
 
@@ -88,7 +89,7 @@ macro_rules! __register_font {
 #[cfg(not(feature = "discover"))]
 #[macro_export]
 macro_rules! __register_font {
-    ($build:expr) => {};
+    ($font:expr) => {};
 }
 
 /// Declares a [`Font`] from a family name and its faces, and registers it for
