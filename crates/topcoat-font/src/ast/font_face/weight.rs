@@ -83,10 +83,13 @@ impl Parse for FontWeightRange {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let start: FontWeightNumber = input.parse()?;
         let end = FontWeightNumber::parse_option(input)?;
-        if let Some(end) = &end {
-            if end.value < start.value {
-                return Err(syn::Error::new(end.span, "font weight range must not be empty"));
-            }
+        if let Some(end) = &end
+            && end.value < start.value
+        {
+            return Err(syn::Error::new(
+                end.span,
+                "font weight range must not be empty",
+            ));
         }
         Ok(Self { start, end })
     }

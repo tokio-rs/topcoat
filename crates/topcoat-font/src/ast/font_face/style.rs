@@ -1,4 +1,5 @@
-use proc_macro2::Span;
+use proc_macro2::{Literal, Span, TokenStream};
+use quote::{ToTokens, quote};
 use syn::{
     Expr, LitFloat, LitInt, Token,
     parse::{Parse, ParseStream},
@@ -35,6 +36,12 @@ impl Parse for FontStyle {
 impl ParseOption for FontStyle {
     fn peek(input: ParseStream) -> bool {
         FontStyleKey::peek(input)
+    }
+}
+
+impl ToTokens for FontStyle {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.value.to_tokens(tokens);
     }
 }
 
@@ -75,6 +82,15 @@ impl Parse for FontStyleValue {
     }
 }
 
+impl ToTokens for FontStyleValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Css(kind) => kind.to_tokens(tokens),
+            Self::Expr(inner) => inner.to_tokens(tokens),
+        }
+    }
+}
+
 /// The style axis of a font face: `normal`, `italic`, or `oblique` with an
 /// optional slant angle or angle range.
 pub enum FontStyleKind {
@@ -104,6 +120,20 @@ impl Parse for FontStyleKind {
     }
 }
 
+impl ToTokens for FontStyleKind {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Normal(_) => quote! { ::topcoat::font::FontStyle::Normal },
+            Self::Italic(_) => quote! { ::topcoat::font::FontStyle::Italic },
+            Self::Oblique { angles, .. } => match angles {
+                None => quote! { ::topcoat::font::FontStyle::oblique() },
+                Some(range) => range.to_token_stream(),
+            },
+        }
+        .to_tokens(tokens);
+    }
+}
+
 /// The angle following `oblique`: a single angle (`14deg`) or an inclusive
 /// range carried by a variable font, written as two space-separated angles
 /// (`20deg 40deg`).
@@ -116,10 +146,13 @@ impl Parse for ObliqueAngleRange {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let start: ObliqueAngle = input.parse()?;
         let end = ObliqueAngle::parse_option(input)?;
-        if let Some(end) = &end {
-            if end.degrees < start.degrees {
-                return Err(syn::Error::new(end.span, "oblique angle range must not be empty"));
-            }
+        if let Some(end) = &end
+            && end.degrees < start.degrees
+        {
+            return Err(syn::Error::new(
+                end.span,
+                "oblique angle range must not be empty",
+            ));
         }
         Ok(Self { start, end })
     }
@@ -128,6 +161,17 @@ impl Parse for ObliqueAngleRange {
 impl ParseOption for ObliqueAngleRange {
     fn peek(input: ParseStream) -> bool {
         ObliqueAngle::peek(input)
+    }
+}
+
+impl ToTokens for ObliqueAngleRange {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let start = &self.start;
+        match &self.end {
+            None => quote! { ::topcoat::font::FontStyle::oblique_angle(#start) },
+            Some(end) => quote! { ::topcoat::font::FontStyle::oblique_range(#start, #end) },
+        }
+        .to_tokens(tokens);
     }
 }
 
@@ -163,7 +207,11 @@ impl Parse for ObliqueAngle {
         let magnitude: f32 = digits
             .parse()
             .map_err(|_| syn::Error::new(span, format!("`{text}` is not a valid angle")))?;
-        let degrees = if minus_token.is_some() { -magnitude } else { magnitude };
+        let degrees = if minus_token.is_some() {
+            -magnitude
+        } else {
+            magnitude
+        };
         if !(-90.0..=90.0).contains(&degrees) {
             return Err(syn::Error::new(
                 span,
@@ -184,6 +232,12 @@ impl ParseOption for ObliqueAngle {
         input.peek(LitInt)
             || input.peek(LitFloat)
             || (input.peek(Token![-]) && (input.peek2(LitInt) || input.peek2(LitFloat)))
+    }
+}
+
+impl ToTokens for ObliqueAngle {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        Literal::f32_suffixed(self.degrees).to_tokens(tokens);
     }
 }
 
@@ -218,8 +272,14 @@ mod tests {
 
     #[test]
     fn parses_normal_and_italic() {
-        assert!(matches!(css(&parse("font-style: normal").value), FontStyleKind::Normal(_)));
-        assert!(matches!(css(&parse("font-style: italic").value), FontStyleKind::Italic(_)));
+        assert!(matches!(
+            css(&parse("font-style: normal").value),
+            FontStyleKind::Normal(_)
+        ));
+        assert!(matches!(
+            css(&parse("font-style: italic").value),
+            FontStyleKind::Italic(_)
+        ));
     }
 
     #[test]
