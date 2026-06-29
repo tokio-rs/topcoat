@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Expr, LitStr, parenthesized,
+    Expr, Lit, parenthesized,
     parse::{Parse, ParseStream},
     token::Paren,
 };
@@ -51,37 +51,42 @@ impl ToTokens for FontFormatHint {
 }
 
 /// The format inside a [`FontFormatHint`].
-pub enum FontFormat {
-    Keyword(LitStr),
-    Expr(Box<Expr>),
-}
+///
+/// Wraps an expression that resolves to a [`runtime::FontFormat`] at run time.
+/// When the expression is a string literal, it is validated at compile time
+/// against the known CSS format keywords.
+pub struct FontFormat(pub Expr);
 
 impl Parse for FontFormat {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        if input.peek(LitStr) {
-            let keyword: LitStr = input.parse()?;
-            if runtime::FontFormat::from_keyword(&keyword.value()).is_none() {
-                return Err(syn::Error::new_spanned(
-                    &keyword,
-                    format!("`{}` is not a valid font format", keyword.value()),
-                ));
-            }
-            Ok(Self::Keyword(keyword))
-        } else {
-            Ok(Self::Expr(input.parse()?))
+        let expr: Expr = input.parse()?;
+        if let Expr::Lit(lit) = &expr
+            && let Lit::Str(keyword) = &lit.lit
+            && runtime::FontFormat::from_keyword(&keyword.value()).is_none()
+        {
+            return Err(syn::Error::new_spanned(
+                keyword,
+                format!("`{}` is not a valid font format", keyword.value()),
+            ));
         }
+        Ok(Self(expr))
     }
 }
 
 impl ToTokens for FontFormat {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            Self::Keyword(keyword) => quote! {
+        if let Expr::Lit(lit) = &self.0
+            && let Lit::Str(keyword) = &lit.lit
+        {
+            quote! {
                 ::topcoat::font::FontFormat::from_keyword(#keyword).unwrap()
-            },
-            Self::Expr(inner) => quote! {
-                ::topcoat::font::FontFormat::from(#inner)
-            },
+            }
+            .to_tokens(tokens);
+            return;
+        }
+        let inner = &self.0;
+        quote! {
+            ::topcoat::font::FontFormat::from(#inner)
         }
         .to_tokens(tokens);
     }
