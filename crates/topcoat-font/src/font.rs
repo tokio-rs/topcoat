@@ -42,11 +42,36 @@ impl Font {
     }
 }
 
+/// A function that builds a [`Font`].
+///
+/// Because [`Font`] is not `const`, we cannot submit an instance to [`inventory`] directly.
+/// Instead, we submit a newtype wrapper around the font's constructor function pointer.
 #[cfg(feature = "discover")]
-inventory::collect!(Font);
+#[derive(Debug, Clone)]
+pub struct FontFn {
+    build: fn() -> Font,
+}
+
+#[cfg(feature = "discover")]
+impl FontFn {
+    /// Creates a function that builds a [`Font`].
+    #[must_use]
+    pub const fn new(build: fn() -> Font) -> Self {
+        Self { build }
+    }
+
+    /// Builds the [`Font`].
+    #[must_use]
+    pub fn build(&self) -> Font {
+        (self.build)()
+    }
+}
+
+#[cfg(feature = "discover")]
+inventory::collect!(FontFn);
 
 /// Registers a [`Font`] for discovery when the `discover` feature is enabled,
-/// and expands to nothing otherwise.
+/// and expands to nothing otherwise. Takes the `fn() -> Font` that builds it.
 ///
 /// The feature gate lives here, in the defining crate, so it reflects
 /// topcoat-font's own `discover` feature rather than the calling crate's.
@@ -54,8 +79,8 @@ inventory::collect!(Font);
 #[cfg(feature = "discover")]
 #[macro_export]
 macro_rules! __register_font {
-    ($font:expr) => {
-        $crate::internal::inventory::submit! { $font }
+    ($build:expr) => {
+        $crate::internal::inventory::submit! { $crate::FontFn::new($build) }
     };
 }
 
@@ -63,7 +88,7 @@ macro_rules! __register_font {
 #[cfg(not(feature = "discover"))]
 #[macro_export]
 macro_rules! __register_font {
-    ($font:expr) => {};
+    ($build:expr) => {};
 }
 
 /// Declares a [`Font`] from a family name and its faces, and registers it for
@@ -133,7 +158,7 @@ macro_rules! font {
                 $( $crate::font_face! { font-family: $family; $($face)* } ),+
             ]),
         );
-        $crate::__register_font!(FONT);
+        $crate::__register_font!(|| FONT);
         FONT
     }};
     ($family:expr, $faces:expr) => {{
@@ -141,7 +166,7 @@ macro_rules! font {
             $family,
             $crate::FontFaces::new($faces),
         );
-        $crate::__register_font!(FONT);
+        $crate::__register_font!(|| FONT);
         FONT
     }};
 }

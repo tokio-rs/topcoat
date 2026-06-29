@@ -60,9 +60,10 @@ impl RouterBuilderFontExt for RouterBuilder {
         self
     }
 
+    #[cfg(feature = "discover")]
     fn discover_fonts(mut self) -> Self {
-        for font in inventory::iter::<Font> {
-            self = self.font(font.clone());
+        for font in inventory::iter::<crate::FontFn> {
+            self = self.font(font.build());
         }
         self
     }
