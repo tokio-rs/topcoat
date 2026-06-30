@@ -1,6 +1,6 @@
 //! Font sources for building the `src` descriptor of a CSS `@font-face` rule.
 
-use std::{borrow::Cow, fmt::Write, ops::Deref};
+use std::{fmt::Write, ops::Deref};
 
 use topcoat_core::runtime::{context::Cx, fnv1a};
 
@@ -15,7 +15,7 @@ use crate::runtime::{CssString, FontFormat, FontTech};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FontSourceUrl {
     /// A URL written as-is, such as an absolute URL or an external host.
-    Str(Cow<'static, str>),
+    Str(String),
     /// A bundled [`Asset`](topcoat_asset::Asset), resolved to its hosted URL.
     #[cfg(feature = "asset")]
     Asset(topcoat_asset::Asset),
@@ -87,14 +87,10 @@ impl FontSourceUrl {
     }
 
     /// Folds this URL into a running content hash.
-    pub(crate) const fn hash(&self, h: u64) -> u64 {
+    pub(crate) fn hash(&self, h: u64) -> u64 {
         match self {
             Self::Str(inner) => {
-                let bytes = match inner {
-                    Cow::Borrowed(s) => s.as_bytes(),
-                    Cow::Owned(s) => s.as_bytes(),
-                };
-                fnv1a::hash_continue(fnv1a::hash_continue(h, b"s"), bytes)
+                fnv1a::hash_continue(fnv1a::hash_continue(h, b"s"), inner.as_bytes())
             }
             #[cfg(feature = "asset")]
             Self::Asset(inner) => {
@@ -104,20 +100,14 @@ impl FontSourceUrl {
     }
 }
 
-impl From<&'static str> for FontSourceUrl {
-    fn from(v: &'static str) -> Self {
-        Self::Str(Cow::Borrowed(v))
+impl From<&str> for FontSourceUrl {
+    fn from(v: &str) -> Self {
+        Self::Str(v.to_owned())
     }
 }
 
 impl From<String> for FontSourceUrl {
     fn from(v: String) -> Self {
-        Self::Str(Cow::Owned(v))
-    }
-}
-
-impl From<Cow<'static, str>> for FontSourceUrl {
-    fn from(v: Cow<'static, str>) -> Self {
         Self::Str(v)
     }
 }
@@ -151,16 +141,13 @@ pub enum FontSource {
     /// A locally installed font, named by a `local()` entry.
     Local {
         /// The family name of the installed font.
-        name: Cow<'static, str>,
+        name: String,
     },
 }
 
 impl FontSource {
     /// A downloadable source from a URL, with optional `format()` and `tech()`
     /// hints.
-    ///
-    /// Use [`url_str`](Self::url_str) or [`url_asset`](Self::url_asset) in a
-    /// `const` context.
     #[must_use]
     pub fn url(
         url: impl Into<FontSourceUrl>,
@@ -174,54 +161,10 @@ impl FontSource {
         }
     }
 
-    /// A downloadable source from a URL string, with optional `format()` and
-    /// `tech()` hints, usable in a `const` context.
-    #[must_use]
-    pub const fn url_str(
-        url: &'static str,
-        format: Option<FontFormat>,
-        tech: Option<FontTech>,
-    ) -> Self {
-        Self::Url {
-            url: FontSourceUrl::Str(Cow::Borrowed(url)),
-            format,
-            tech,
-        }
-    }
-
-    /// A downloadable source from a bundled [`Asset`](topcoat_asset::Asset),
-    /// with optional `format()` and `tech()` hints, usable in a `const` context.
-    ///
-    /// The asset is resolved to its hosted router URL when formatted.
-    #[cfg(feature = "asset")]
-    #[must_use]
-    pub const fn url_asset(
-        url: topcoat_asset::Asset,
-        format: Option<FontFormat>,
-        tech: Option<FontTech>,
-    ) -> Self {
-        Self::Url {
-            url: FontSourceUrl::Asset(url),
-            format,
-            tech,
-        }
-    }
-
     /// A source naming a font already installed on the system.
-    ///
-    /// Use [`local_str`](Self::local_str) in a `const` context.
     #[must_use]
-    pub fn local(name: impl Into<Cow<'static, str>>) -> Self {
+    pub fn local(name: impl Into<String>) -> Self {
         Self::Local { name: name.into() }
-    }
-
-    /// A source naming a font already installed on the system, usable in a
-    /// `const` context.
-    #[must_use]
-    pub const fn local_str(name: &'static str) -> Self {
-        Self::Local {
-            name: Cow::Borrowed(name),
-        }
     }
 
     /// Writes this source as a single CSS `src` entry.
@@ -268,7 +211,7 @@ impl FontSource {
     }
 
     /// Folds this source into a running content hash.
-    pub(crate) const fn hash(&self, h: u64) -> u64 {
+    pub(crate) fn hash(&self, h: u64) -> u64 {
         match self {
             Self::Url { url, format, tech } => {
                 let h = url.hash(fnv1a::hash_continue(h, b"u"));
@@ -282,11 +225,7 @@ impl FontSource {
                 }
             }
             Self::Local { name } => {
-                let bytes = match name {
-                    Cow::Borrowed(s) => s.as_bytes(),
-                    Cow::Owned(s) => s.as_bytes(),
-                };
-                fnv1a::hash_continue(fnv1a::hash_continue(h, b"l"), bytes)
+                fnv1a::hash_continue(fnv1a::hash_continue(h, b"l"), name.as_bytes())
             }
         }
     }
@@ -298,46 +237,26 @@ impl FontSource {
 /// Renders as the comma-separated list CSS expects, with the browser using the
 /// first source it supports. Order from most to least preferred.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FontSources(Cow<'static, [FontSource]>);
+pub struct FontSources(Vec<FontSource>);
 
 impl FontSources {
     /// Creates a list of `sources`.
-    ///
-    /// Use [`const_new`](Self::const_new) in a `const` context.
     ///
     /// # Panics
     ///
     /// Panics if `sources` is empty; a CSS `src` descriptor requires at least
     /// one source.
     #[must_use]
-    pub fn new(sources: impl Into<Cow<'static, [FontSource]>>) -> Self {
+    pub fn new(sources: impl Into<Vec<FontSource>>) -> Self {
         let sources = sources.into();
         assert!(!sources.is_empty(), "font sources must not be empty");
         Self(sources)
     }
 
-    /// Creates a list from a `&'static` slice of `sources`, usable in a `const`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `sources` is empty; a CSS `src` descriptor requires at least
-    /// one source.
-    #[must_use]
-    pub const fn const_new(sources: &'static [FontSource]) -> Self {
-        assert!(!sources.is_empty(), "font sources must not be empty");
-        Self(Cow::Borrowed(sources))
-    }
-
     /// Folds these sources into a running content hash.
-    pub(crate) const fn hash(&self, mut h: u64) -> u64 {
-        let sources = match &self.0 {
-            Cow::Borrowed(sources) => *sources,
-            Cow::Owned(sources) => sources.as_slice(),
-        };
-        let mut i = 0;
-        while i < sources.len() {
-            h = sources[i].hash(h);
-            i += 1;
+    pub(crate) fn hash(&self, mut h: u64) -> u64 {
+        for source in &self.0 {
+            h = source.hash(h);
         }
         h
     }
@@ -362,15 +281,12 @@ impl FontSources {
     /// The slice is never empty, mirroring the non-empty invariant of
     /// [`FontSources`].
     #[must_use]
-    pub const fn as_slice(&self) -> &[FontSource] {
-        match &self.0 {
-            Cow::Borrowed(inner) => inner,
-            Cow::Owned(inner) => inner.as_slice(),
-        }
+    pub fn as_slice(&self) -> &[FontSource] {
+        &self.0
     }
 
     /// Builds a [`FontSources`] from `sources`, validating the non-empty invariant.
-    fn try_from_cow(sources: Cow<'static, [FontSource]>) -> Result<Self, EmptyFontSourcesError> {
+    fn try_from_vec(sources: Vec<FontSource>) -> Result<Self, EmptyFontSourcesError> {
         if sources.is_empty() {
             return Err(EmptyFontSourcesError);
         }
@@ -390,27 +306,19 @@ impl std::fmt::Display for EmptyFontSourcesError {
 
 impl std::error::Error for EmptyFontSourcesError {}
 
-impl TryFrom<&'static [FontSource]> for FontSources {
-    type Error = EmptyFontSourcesError;
-
-    fn try_from(sources: &'static [FontSource]) -> Result<Self, Self::Error> {
-        Self::try_from_cow(Cow::Borrowed(sources))
-    }
-}
-
 impl TryFrom<Vec<FontSource>> for FontSources {
     type Error = EmptyFontSourcesError;
 
     fn try_from(sources: Vec<FontSource>) -> Result<Self, Self::Error> {
-        Self::try_from_cow(Cow::Owned(sources))
+        Self::try_from_vec(sources)
     }
 }
 
-impl TryFrom<Cow<'static, [FontSource]>> for FontSources {
+impl TryFrom<&[FontSource]> for FontSources {
     type Error = EmptyFontSourcesError;
 
-    fn try_from(sources: Cow<'static, [FontSource]>) -> Result<Self, Self::Error> {
-        Self::try_from_cow(sources)
+    fn try_from(sources: &[FontSource]) -> Result<Self, Self::Error> {
+        Self::try_from_vec(sources.to_vec())
     }
 }
 

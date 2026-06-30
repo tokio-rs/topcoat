@@ -1,6 +1,6 @@
 //! Font faces for building CSS `@font-face` rules.
 
-use std::{borrow::Cow, fmt::Write, ops::Deref};
+use std::{fmt::Write, ops::Deref};
 
 use topcoat_core::runtime::{context::Cx, fnv1a};
 
@@ -13,7 +13,7 @@ use crate::runtime::{CssString, FontSources, FontStyle, FontWeightRange, Unicode
 /// descriptors omitted when unset.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FontFace {
-    family: Cow<'static, str>,
+    family: String,
     src: FontSources,
     weight: Option<FontWeightRange>,
     style: Option<FontStyle>,
@@ -25,14 +25,13 @@ impl FontFace {
     ///
     /// The weight, style, and unicode range start unset; add them with
     /// [`with_weight`](Self::with_weight), [`with_style`](Self::with_style), and
-    /// [`with_unicode_range`](Self::with_unicode_range). Use
-    /// [`const_new`](Self::const_new) in a `const` context.
+    /// [`with_unicode_range`](Self::with_unicode_range).
     ///
     /// # Panics
     ///
     /// Panics if the [`TryInto`] conversion of `src` fails.
     #[must_use]
-    pub fn new(family: impl Into<Cow<'static, str>>, src: impl TryInto<FontSources>) -> Self {
+    pub fn new(family: impl Into<String>, src: impl TryInto<FontSources>) -> Self {
         Self {
             family: family.into(),
             src: src
@@ -44,39 +43,23 @@ impl FontFace {
         }
     }
 
-    /// Creates a face for `family`, served from `src`, usable in a `const` context.
-    ///
-    /// The weight, style, and unicode range start unset; add them with
-    /// [`with_weight`](Self::with_weight), [`with_style`](Self::with_style), and
-    /// [`with_unicode_range`](Self::with_unicode_range).
-    #[must_use]
-    pub const fn const_new(family: &'static str, src: FontSources) -> Self {
-        Self {
-            family: Cow::Borrowed(family),
-            src,
-            weight: None,
-            style: None,
-            unicode_range: None,
-        }
-    }
-
     /// Sets the `font-weight` descriptor.
     #[must_use]
-    pub const fn with_weight(mut self, weight: FontWeightRange) -> Self {
+    pub fn with_weight(mut self, weight: FontWeightRange) -> Self {
         self.weight = Some(weight);
         self
     }
 
     /// Sets the `font-style` descriptor.
     #[must_use]
-    pub const fn with_style(mut self, style: FontStyle) -> Self {
+    pub fn with_style(mut self, style: FontStyle) -> Self {
         self.style = Some(style);
         self
     }
 
     /// Sets the `unicode-range` descriptor.
     #[must_use]
-    pub const fn with_unicode_range(mut self, unicode_range: UnicodeRanges) -> Self {
+    pub fn with_unicode_range(mut self, unicode_range: UnicodeRanges) -> Self {
         self.unicode_range = Some(unicode_range);
         self
     }
@@ -105,12 +88,8 @@ impl FontFace {
     }
 
     /// Folds this face into a running content hash.
-    pub(crate) const fn hash(&self, h: u64) -> u64 {
-        let family_bytes = match &self.family {
-            Cow::Borrowed(s) => s.as_bytes(),
-            Cow::Owned(s) => s.as_bytes(),
-        };
-        let h = fnv1a::hash_continue(h, family_bytes);
+    pub(crate) fn hash(&self, h: u64) -> u64 {
+        let h = fnv1a::hash_continue(h, self.family.as_bytes());
         let h = self.src.hash(h);
         let h = match self.weight {
             Some(weight) => weight.hash(fnv1a::hash_continue(h, &[1])),
@@ -131,44 +110,25 @@ impl FontFace {
 ///
 /// Renders as the faces' `@font-face` rules, separated by a space.
 #[derive(Debug, Clone, PartialEq)]
-pub struct FontFaces(Cow<'static, [FontFace]>);
+pub struct FontFaces(Vec<FontFace>);
 
 impl FontFaces {
     /// Creates a list of `faces`.
-    ///
-    /// Use [`const_new`](Self::const_new) in a `const` context.
     ///
     /// # Panics
     ///
     /// Panics if `faces` is empty.
     #[must_use]
-    pub fn new(faces: impl Into<Cow<'static, [FontFace]>>) -> Self {
+    pub fn new(faces: impl Into<Vec<FontFace>>) -> Self {
         let faces = faces.into();
         assert!(!faces.is_empty(), "font faces must not be empty");
         Self(faces)
     }
 
-    /// Creates a list from a `&'static` slice of `faces`, usable in a `const`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `faces` is empty.
-    #[must_use]
-    pub const fn const_new(faces: &'static [FontFace]) -> Self {
-        assert!(!faces.is_empty(), "font faces must not be empty");
-        Self(Cow::Borrowed(faces))
-    }
-
     /// Folds these faces into a running content hash.
-    pub(crate) const fn hash(&self, mut h: u64) -> u64 {
-        let faces = match &self.0 {
-            Cow::Borrowed(faces) => *faces,
-            Cow::Owned(faces) => faces.as_slice(),
-        };
-        let mut i = 0;
-        while i < faces.len() {
-            h = faces[i].hash(h);
-            i += 1;
+    pub(crate) fn hash(&self, mut h: u64) -> u64 {
+        for face in &self.0 {
+            h = face.hash(h);
         }
         h
     }
@@ -193,15 +153,12 @@ impl FontFaces {
     /// The slice is never empty, mirroring the non-empty invariant of
     /// [`FontFaces`].
     #[must_use]
-    pub const fn as_slice(&self) -> &[FontFace] {
-        match &self.0 {
-            Cow::Borrowed(inner) => inner,
-            Cow::Owned(inner) => inner.as_slice(),
-        }
+    pub fn as_slice(&self) -> &[FontFace] {
+        &self.0
     }
 
     /// Builds a [`FontFaces`] from `faces`, validating the non-empty invariant.
-    fn try_from_cow(faces: Cow<'static, [FontFace]>) -> Result<Self, EmptyFontFacesError> {
+    fn try_from_vec(faces: Vec<FontFace>) -> Result<Self, EmptyFontFacesError> {
         if faces.is_empty() {
             return Err(EmptyFontFacesError);
         }
@@ -221,27 +178,19 @@ impl std::fmt::Display for EmptyFontFacesError {
 
 impl std::error::Error for EmptyFontFacesError {}
 
-impl TryFrom<&'static [FontFace]> for FontFaces {
-    type Error = EmptyFontFacesError;
-
-    fn try_from(faces: &'static [FontFace]) -> Result<Self, Self::Error> {
-        Self::try_from_cow(Cow::Borrowed(faces))
-    }
-}
-
 impl TryFrom<Vec<FontFace>> for FontFaces {
     type Error = EmptyFontFacesError;
 
     fn try_from(faces: Vec<FontFace>) -> Result<Self, Self::Error> {
-        Self::try_from_cow(Cow::Owned(faces))
+        Self::try_from_vec(faces)
     }
 }
 
-impl TryFrom<Cow<'static, [FontFace]>> for FontFaces {
+impl TryFrom<&[FontFace]> for FontFaces {
     type Error = EmptyFontFacesError;
 
-    fn try_from(faces: Cow<'static, [FontFace]>) -> Result<Self, Self::Error> {
-        Self::try_from_cow(faces)
+    fn try_from(faces: &[FontFace]) -> Result<Self, Self::Error> {
+        Self::try_from_vec(faces.to_vec())
     }
 }
 
