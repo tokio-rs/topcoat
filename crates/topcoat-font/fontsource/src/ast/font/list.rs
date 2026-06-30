@@ -21,6 +21,11 @@ pub enum List<T> {
 impl<T> List<T> {
     /// Validates every item with `resolve`, in source order, rejecting an empty
     /// bracketed list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the list is an empty bracketed list, or if `resolve`
+    /// rejects any item.
     pub fn resolve_with<U>(
         &self,
         mut resolve: impl FnMut(&T) -> syn::Result<U>,

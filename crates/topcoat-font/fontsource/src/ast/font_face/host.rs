@@ -74,6 +74,12 @@ pub struct HostValue {
 }
 
 impl HostValue {
+    /// The host the parsed path refers to.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parsed path has no segments, which a successfully parsed
+    /// [`syn::Path`] never does.
     #[must_use]
     pub fn host(&self) -> runtime::Host {
         match self

@@ -61,11 +61,20 @@ pub struct WeightValue(LitInt);
 
 impl WeightValue {
     /// The weight as a number.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the literal does not parse as a [`u16`].
     pub fn value(&self) -> syn::Result<u16> {
         self.0.base10_parse()
     }
 
     /// Validates the weight against the family's catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the literal does not parse as a [`u16`], or if the
+    /// family does not ship the weight.
     pub fn resolve(&self, family: &runtime::Family) -> syn::Result<u16> {
         let value = self.value()?;
         if !family.has_weight(value) {

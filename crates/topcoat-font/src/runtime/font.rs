@@ -170,7 +170,11 @@ pub use register_font;
 /// fn inter_faces() -> Vec<FontFace> {
 ///     vec![FontFace::new(
 ///         "Inter",
-///         vec![FontSource::url("/inter-400.woff2", Some(FontFormat::Woff2), None)],
+///         vec![FontSource::url(
+///             "/inter-400.woff2",
+///             Some(FontFormat::Woff2),
+///             None,
+///         )],
 ///     )]
 /// }
 /// const INTER: Font = font!("Inter", inter_faces());

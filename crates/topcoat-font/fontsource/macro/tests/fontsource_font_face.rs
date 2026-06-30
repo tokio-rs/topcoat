@@ -24,13 +24,19 @@ fn roboto(file: &str, weight: u16, style: &str, range: &str) -> String {
 #[test]
 fn minimal_face_uses_the_default_subset() {
     let face = fontsource_font_face!("Roboto", weight: 400, style: Normal);
-    assert_eq!(render(&face), roboto("latin-400-normal", 400, "normal", LATIN));
+    assert_eq!(
+        render(&face),
+        roboto("latin-400-normal", 400, "normal", LATIN)
+    );
 }
 
 #[test]
 fn italic_style() {
     let face = fontsource_font_face!("Roboto", weight: 400, style: Italic);
-    assert_eq!(render(&face), roboto("latin-400-italic", 400, "italic", LATIN));
+    assert_eq!(
+        render(&face),
+        roboto("latin-400-italic", 400, "italic", LATIN)
+    );
 }
 
 #[test]
@@ -45,7 +51,10 @@ fn explicit_subset_drives_the_url_and_unicode_range() {
 #[test]
 fn arguments_in_any_order() {
     let face = fontsource_font_face!("Roboto", style: Normal, subset: Cyrillic, weight: 500);
-    assert_eq!(render(&face), roboto("cyrillic-500-normal", 500, "normal", CYRILLIC));
+    assert_eq!(
+        render(&face),
+        roboto("cyrillic-500-normal", 500, "normal", CYRILLIC)
+    );
 }
 
 #[test]

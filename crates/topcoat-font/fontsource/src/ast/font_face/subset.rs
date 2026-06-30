@@ -61,6 +61,12 @@ pub struct SubsetValue(Path);
 
 impl SubsetValue {
     /// The trailing path segment, e.g. `Subset::LatinExt` -> `LatinExt`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parsed path has no segments, which a successfully parsed
+    /// [`Path`] never does.
+    #[must_use]
     pub fn variant(&self) -> &Ident {
         &self
             .0
@@ -72,6 +78,10 @@ impl SubsetValue {
 
     /// Validates the subset against the family's catalog, matching on the enum
     /// variant name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the family does not ship the named subset.
     pub fn resolve(&self, family: &runtime::Family) -> syn::Result<runtime::Subset> {
         let variant = self.variant().to_string();
         family

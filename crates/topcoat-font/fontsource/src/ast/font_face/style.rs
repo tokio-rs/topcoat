@@ -61,6 +61,11 @@ pub struct StyleValue(Path);
 
 impl StyleValue {
     /// The trailing path segment, e.g. `Style::Normal` -> `Normal`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parsed path has no segments, which a successfully parsed
+    /// [`Path`] never does.
     #[must_use]
     pub fn variant(&self) -> &Ident {
         &self
@@ -72,6 +77,11 @@ impl StyleValue {
     }
 
     /// Validates the style against the family's catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the variant is not a known style, or if the family
+    /// does not ship it.
     pub fn resolve(&self, family: &runtime::Family) -> syn::Result<runtime::Style> {
         let variant = self.variant();
         let style = match variant.to_string().as_str() {

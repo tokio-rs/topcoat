@@ -192,7 +192,10 @@ mod tests {
     fn insert_replaces_and_returns_the_displaced_value() {
         let mut context = ContextMap::new();
         assert_eq!(context.insert(Database("primary")), None);
-        assert_eq!(context.insert(Database("replica")), Some(Database("primary")));
+        assert_eq!(
+            context.insert(Database("replica")),
+            Some(Database("primary"))
+        );
         assert_eq!(context.get::<Database>(), Some(&Database("replica")));
     }
 
