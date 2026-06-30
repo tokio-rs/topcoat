@@ -39,5 +39,8 @@ proc-macro2 = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 syn = { workspace = true, optional = true }
 
+[dev-dependencies]
+topcoat = { workspace = true, features = ["font"] }
+
 [lints]
 workspace = true

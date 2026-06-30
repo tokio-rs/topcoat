@@ -37,8 +37,9 @@ pub struct FontsourceFont {
 }
 
 impl FontsourceFont {
-    /// Validates the axes, then lowers to a `const` [`Font`] whose faces are the
-    /// cross product, emitted as `fontsource_font_face!` calls.
+    /// Validates the axes, then lowers to a [`Font`] via the [`font!`] macro,
+    /// whose faces are the cross product, emitted as `fontsource_font_face!`
+    /// calls.
     fn lower(&self) -> syn::Result<TokenStream> {
         let family = self.family.resolve()?;
         let weights = match &self.weight {
@@ -85,14 +86,9 @@ impl FontsourceFont {
             }
         }
 
-        Ok(quote! {{
-            const FONT: ::topcoat::font::Font = ::topcoat::font::Font::const_new(
-                #name,
-                ::topcoat::font::FontFaces::const_new(const { &[#(#faces),*] }),
-            );
-            ::topcoat::font::register_font!(FONT);
-            FONT
-        }})
+        Ok(quote! {
+            ::topcoat::font::font!(#name, ::std::vec![#(#faces),*])
+        })
     }
 }
 

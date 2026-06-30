@@ -1869,6 +1869,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+ "topcoat",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-pretty",

@@ -139,16 +139,16 @@ pub use register_font;
 /// is a [`font_face!`](crate::font_face) body (minus its `font-family`).
 ///
 /// ```rust
-/// # use topcoat_font::{Font, font};
+/// # use topcoat::font::{Font, font};
 /// #
 /// const INTER: Font = font! {
 ///     "Inter",
 ///     @font-face {
-///         src: url("/inter-400.woff2") format(Woff2);
+///         src: url("/inter-400.woff2") format("woff2");
 ///         font-weight: 400;
 ///     }
 ///     @font-face {
-///         src: url("/inter-700.woff2") format(Woff2);
+///         src: url("/inter-700.woff2") format("woff2");
 ///         font-weight: 700;
 ///     }
 /// };
@@ -157,22 +157,21 @@ pub use register_font;
 /// # Expression form
 ///
 /// Alternatively, follow the family name with a single expression that
-/// evaluates to a `&'static [FontFace]`. This uses ordinary Rust syntax instead
-/// of the CSS-like blocks, which is handy when the faces are built up
-/// programmatically or shared between fonts:
+/// evaluates to the faces — anything convertible into [`FontFaces`], such as a
+/// `Vec<FontFace>`. This uses ordinary Rust syntax instead of the CSS-like
+/// blocks, which is handy when the faces are built up programmatically or shared
+/// between fonts:
 ///
 /// ```rust
-/// # use topcoat_font::{Font, FontFace, FontFormat, FontSource, FontSources, font};
+/// # use topcoat::font::{Font, FontFace, FontFormat, FontSource, font};
 /// #
-/// const INTER_FACES: &[FontFace] = &[FontFace::new(
-///     "Inter",
-///     FontSources::new(&[FontSource::url(
-///         "/inter-400.woff2",
-///         Some(FontFormat::Woff2),
-///         None,
-///     )]),
-/// )];
-/// const INTER: Font = font!("Inter", INTER_FACES);
+/// fn inter_faces() -> Vec<FontFace> {
+///     vec![FontFace::new(
+///         "Inter",
+///         vec![FontSource::url("/inter-400.woff2", Some(FontFormat::Woff2), None)],
+///     )]
+/// }
+/// const INTER: Font = font!("Inter", inter_faces());
 /// ```
 ///
 /// Unlike the CSS-like form, the family name is not injected into the faces, so
@@ -180,26 +179,23 @@ pub use register_font;
 #[macro_export]
 macro_rules! font {
     ($family:expr, $(@font-face { $($face:tt)* })+ $(,)?) => {{
-        const FONT: $crate::runtime::Font = $crate::runtime::Font::const_new(
-            $family,
-const {
-            $crate::runtime::FontFaces::const_new(
-        const {
-                &[
-                    $(const { ::topcoat::font::font_face! { font-family: $family; $($face)* } }),+
-                ]
-        }
-            )
-        }
-        );
+        static FONT_DATA: ::std::sync::LazyLock<$crate::runtime::FontData> =
+            ::std::sync::LazyLock::new(|| {
+                $crate::runtime::FontData::new(
+                    $family,
+                    ::std::vec![
+                        $(::topcoat::font::font_face! { font-family: $family; $($face)* }),+
+                    ],
+                )
+            });
+        const FONT: $crate::runtime::Font = $crate::runtime::Font::new(&FONT_DATA);
         $crate::register_font!(FONT);
         FONT
     }};
     ($family:expr, $faces:expr) => {{
-        const FONT: $crate::runtime::Font = $crate::runtime::Font::new(
-            $family,
-            $crate::runtime::FontFaces::new($faces),
-        );
+        static FONT_DATA: ::std::sync::LazyLock<$crate::runtime::FontData> =
+            ::std::sync::LazyLock::new(|| $crate::runtime::FontData::new($family, $faces));
+        const FONT: $crate::runtime::Font = $crate::runtime::Font::new(&FONT_DATA);
         $crate::register_font!(FONT);
         FONT
     }};

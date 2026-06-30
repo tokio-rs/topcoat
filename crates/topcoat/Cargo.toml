@@ -35,6 +35,7 @@ font = [
 	"dep:topcoat-font-macro",
 ]
 font-fontsource = [
+	"font",
 	"dep:topcoat-font-fontsource",
 	"dep:topcoat-font-fontsource-macro",
 ]

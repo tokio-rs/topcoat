@@ -96,23 +96,13 @@ impl ToTokens for FontFace {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let family = &self.family;
         let src = &self.src;
-        // `const_new` requires both operands to be compile-time constants: a
-        // `&'static str` family and an already-built `FontSources`. Use it only
-        // when the family is a string literal and the sources are the CSS form.
-        // An opaque `src` expression falls back to `new`, whose `TryInto` bound
-        // accepts `Vec`, slices, and other convertible values.
-        let constructor = if self.family.value.is_str_literal() && self.src.value.is_const() {
-            quote! { ::topcoat::font::FontFace::const_new(#family, #src) }
-        } else {
-            quote! { ::topcoat::font::FontFace::new(#family, #src) }
-        };
 
         let weight = self.weight.iter();
         let style = self.style.iter();
         let unicode_range = self.unicode_range.iter();
 
         quote! {
-            #constructor
+            ::topcoat::font::FontFace::new(#family, #src)
             #(.with_weight(#weight))*
             #(.with_style(#style))*
             #(.with_unicode_range(#unicode_range))*
