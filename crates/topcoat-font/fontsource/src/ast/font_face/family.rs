@@ -5,29 +5,24 @@ use syn::{
 
 use crate::runtime::{ALL, Family};
 
-/// The leading family argument: a display name or Fontsource id (`"Roboto"`,
-/// `"roboto"`), resolved against the vendored catalog while parsing.
-pub struct FamilyName(&'static Family);
+/// A Fontsource font family string literal.
+pub struct FamilyName(LitStr);
 
 impl FamilyName {
-    /// The resolved catalog family.
-    pub fn family(&self) -> &'static Family {
-        self.0
+    #[must_use]
+    pub fn resolve(&self) -> syn::Result<&'static Family> {
+        let needle = self.0.value();
+        ALL.iter()
+            .copied()
+            .find(|family| family.name == &needle)
+            .ok_or_else(|| {
+                syn::Error::new_spanned(&self.0, format!("unknown Fontsource family {needle:?}"))
+            })
     }
 }
 
 impl Parse for FamilyName {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let lit: LitStr = input.parse()?;
-        let needle = lit.value();
-        ALL.iter()
-            .copied()
-            .find(|family| {
-                family.name.eq_ignore_ascii_case(&needle) || family.id.eq_ignore_ascii_case(&needle)
-            })
-            .map(Self)
-            .ok_or_else(|| {
-                syn::Error::new_spanned(&lit, format!("unknown Fontsource family {needle:?}"))
-            })
+        Ok(Self(input.parse()?))
     }
 }

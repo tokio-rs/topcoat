@@ -39,7 +39,7 @@ impl FontsourceFontFace {
     /// Validates every descriptor against the family and lowers the face to its
     /// `const` [`FontFace`] construction.
     fn lower(&self) -> syn::Result<TokenStream> {
-        let family = self.family.family();
+        let family = self.family.resolve()?;
         let weight = self.weight.value.resolve(family)?;
         let style = self.style.value.resolve(family)?;
         let subset = match &self.subset {

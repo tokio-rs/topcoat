@@ -40,7 +40,7 @@ impl FontsourceFont {
     /// Validates the axes, then lowers to a `const` [`Font`] whose faces are the
     /// cross product, emitted as `fontsource_font_face!` calls.
     fn lower(&self) -> syn::Result<TokenStream> {
-        let family = self.family.family();
+        let family = self.family.resolve()?;
         let weights = match &self.weight {
             Some(weight) => weight.value.resolve_with(|value| value.resolve(family))?,
             None => family.weights.to_vec(),
