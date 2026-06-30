@@ -5,7 +5,7 @@ use syn::{
 
 use topcoat_core::ast::ParseOption;
 
-use crate::{Family, Subset as CatalogSubset};
+use crate::runtime;
 
 mod kw {
     use syn::custom_keyword;
@@ -72,7 +72,7 @@ impl SubsetValue {
 
     /// Validates the subset against the family's catalog, matching on the enum
     /// variant name.
-    pub fn resolve(&self, family: &Family) -> syn::Result<CatalogSubset> {
+    pub fn resolve(&self, family: &runtime::Family) -> syn::Result<runtime::Subset> {
         let variant = self.variant().to_string();
         family
             .subsets

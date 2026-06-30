@@ -1,5 +1,3 @@
-//! The style axis a Fontsource family is cataloged under.
-
 use topcoat_font::runtime::FontStyle;
 
 /// Whether a catalog face is upright or italic.

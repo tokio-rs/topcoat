@@ -19,7 +19,7 @@ use syn::{
 
 use topcoat_core::ast::ParseOption;
 
-use crate::Style as CatalogStyle;
+use crate::runtime;
 
 /// One `fontsource_font_face!` invocation: a single Fontsource face served from
 /// the jsDelivr CDN, or, with `host: asset`, a bundled copy.
@@ -57,8 +57,8 @@ impl FontsourceFontFace {
         );
         let weight = Literal::u16_unsuffixed(weight);
         let style = match style {
-            CatalogStyle::Normal => quote! { ::topcoat::font::FontStyle::Normal },
-            CatalogStyle::Italic => quote! { ::topcoat::font::FontStyle::Italic },
+            runtime::Style::Normal => quote! { ::topcoat::font::FontStyle::Normal },
+            runtime::Style::Italic => quote! { ::topcoat::font::FontStyle::Italic },
         };
 
         // A bundled asset when self-hosted, otherwise the CDN URL verbatim.

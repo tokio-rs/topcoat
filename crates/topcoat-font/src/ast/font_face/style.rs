@@ -263,9 +263,9 @@ mod tests {
         }
     }
 
-    fn oblique(kind: &FontStyleKind) -> &Option<ObliqueAngleRange> {
+    fn oblique(kind: &FontStyleKind) -> Option<&ObliqueAngleRange> {
         match kind {
-            FontStyleKind::Oblique { angles, .. } => angles,
+            FontStyleKind::Oblique { angles, .. } => angles.as_ref(),
             _ => panic!("expected an oblique font-style"),
         }
     }
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn parses_oblique_with_an_angle() {
         let style = parse("font-style: oblique 14deg");
-        let range = oblique(css(&style.value)).as_ref().unwrap();
+        let range = oblique(css(&style.value)).unwrap();
         assert!((range.start.degrees - 14.0).abs() < 1e-6);
         assert!(range.end.is_none());
     }
@@ -299,7 +299,7 @@ mod tests {
     #[test]
     fn parses_a_negative_angle() {
         let style = parse("font-style: oblique -12.5deg");
-        let range = oblique(css(&style.value)).as_ref().unwrap();
+        let range = oblique(css(&style.value)).unwrap();
         assert!((range.start.degrees + 12.5).abs() < 1e-6);
         assert!(range.start.minus_token.is_some());
     }
@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn parses_an_oblique_range() {
         let style = parse("font-style: oblique 20deg 40deg");
-        let range = oblique(css(&style.value)).as_ref().unwrap();
+        let range = oblique(css(&style.value)).unwrap();
         assert!((range.start.degrees - 20.0).abs() < 1e-6);
         assert!((range.end.as_ref().unwrap().degrees - 40.0).abs() < 1e-6);
     }

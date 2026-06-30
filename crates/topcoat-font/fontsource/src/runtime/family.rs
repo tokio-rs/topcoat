@@ -8,7 +8,7 @@
 
 use topcoat_font::runtime::{UnicodeRange, UnicodeRanges};
 
-use crate::{Style, Subset};
+use crate::runtime::{Style, Subset};
 
 /// Static metadata describing a single font family in the Fontsource catalog.
 ///

@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::{ALL, Family};
+use crate::runtime::{ALL, Family};
 
 /// The leading family argument: a display name or Fontsource id (`"Roboto"`,
 /// `"roboto"`), resolved against the vendored catalog while parsing.

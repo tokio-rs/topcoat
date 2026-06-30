@@ -5,7 +5,7 @@ use syn::{
 
 use topcoat_core::ast::ParseOption;
 
-use crate::Family;
+use crate::runtime;
 
 mod kw {
     use syn::custom_keyword;
@@ -66,7 +66,7 @@ impl WeightValue {
     }
 
     /// Validates the weight against the family's catalog.
-    pub fn resolve(&self, family: &Family) -> syn::Result<u16> {
+    pub fn resolve(&self, family: &runtime::Family) -> syn::Result<u16> {
         let value = self.value()?;
         if !family.has_weight(value) {
             let available = family

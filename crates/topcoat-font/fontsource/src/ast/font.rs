@@ -18,8 +18,8 @@ use syn::{
 use topcoat_core::ast::ParseOption;
 
 use crate::{
-    Style as CatalogStyle,
     ast::font_face::{FamilyName, Host},
+    runtime,
 };
 
 /// One `fontsource_font!` invocation: a family and the axes to cross-product
@@ -67,8 +67,8 @@ impl FontsourceFont {
                 for &subset in &subsets {
                     let weight = Literal::u16_unsuffixed(weight);
                     let style = match style {
-                        CatalogStyle::Normal => Ident::new("Normal", Span::call_site()),
-                        CatalogStyle::Italic => Ident::new("Italic", Span::call_site()),
+                        runtime::Style::Normal => Ident::new("Normal", Span::call_site()),
+                        runtime::Style::Italic => Ident::new("Italic", Span::call_site()),
                     };
                     let subset = Ident::new(&format!("{subset:?}"), Span::call_site());
                     faces.push(quote! {

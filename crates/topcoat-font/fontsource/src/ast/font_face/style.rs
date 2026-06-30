@@ -5,7 +5,7 @@ use syn::{
 
 use topcoat_core::ast::ParseOption;
 
-use crate::{Family, Style as CatalogStyle};
+use crate::runtime;
 
 mod kw {
     use syn::custom_keyword;
@@ -71,11 +71,11 @@ impl StyleValue {
     }
 
     /// Validates the style against the family's catalog.
-    pub fn resolve(&self, family: &Family) -> syn::Result<CatalogStyle> {
+    pub fn resolve(&self, family: &runtime::Family) -> syn::Result<runtime::Style> {
         let variant = self.variant();
         let style = match variant.to_string().as_str() {
-            "Normal" => CatalogStyle::Normal,
-            "Italic" => CatalogStyle::Italic,
+            "Normal" => runtime::Style::Normal,
+            "Italic" => runtime::Style::Italic,
             _ => {
                 return Err(syn::Error::new_spanned(
                     &self.0,
