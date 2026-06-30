@@ -153,13 +153,19 @@ pub use register_font;
 #[macro_export]
 macro_rules! font {
     ($family:expr, $(@font-face { $($face:tt)* })+ $(,)?) => {{
-        const FONT: $crate::Font = $crate::runtime::Font::new(
+        const FONT: $crate::runtime::Font = $crate::runtime::Font::const_new(
             $family,
-            $crate::runtime::FontFaces::new(&[
-                $( ::topcoat::font::font_face! { font-family: $family; $($face)* } ),+
-            ]),
+const {
+            $crate::runtime::FontFaces::const_new(
+        const {
+                &[
+                    $(const { ::topcoat::font::font_face! { font-family: $family; $($face)* } }),+
+                ]
+        }
+            )
+        }
         );
-        $crate::register_font!(|| FONT);
+        $crate::register_font!(FONT);
         FONT
     }};
     ($family:expr, $faces:expr) => {{
@@ -167,7 +173,7 @@ macro_rules! font {
             $family,
             $crate::runtime::FontFaces::new($faces),
         );
-        $crate::register_font!(|| FONT);
+        $crate::register_font!(FONT);
         FONT
     }};
 }
