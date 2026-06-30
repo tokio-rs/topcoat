@@ -4,7 +4,7 @@ use crate::runtime::Font;
 
 /// Function that formats the URL at which a [`Font`]'s CSS is hosted by the
 /// router into a `dyn Write`.
-pub type ResolveFontRouteFn = dyn Fn(&Font, &mut dyn Write) -> std::fmt::Result + Send + Sync;
+pub type ResolveFontRouteFn = dyn Fn(Font, &mut dyn Write) -> std::fmt::Result + Send + Sync;
 
 /// Function registered with the app context that resolves a [`Font`] to its
 /// hosted stylesheet URL.
@@ -28,7 +28,7 @@ impl FontResolver {
     /// # Errors
     ///
     /// Propagates errors of the registered [`ResolveFontRouteFn`].
-    pub fn resolve(&self, font: &Font, write: &mut dyn Write) -> std::fmt::Result {
+    pub fn resolve(&self, font: Font, write: &mut dyn Write) -> std::fmt::Result {
         (self.resolve_fn)(font, write)
     }
 }

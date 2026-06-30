@@ -15,7 +15,7 @@ const FONT_ROUTE_PREFIX: &str = "/_topcoat/fonts";
 /// The family name is slugified to stay URL-safe (so the served route and the
 /// rendered `href` match without percent-encoding), and a content hash keeps the
 /// URL immutable for a given set of faces.
-fn font_route_path(font: &Font, write: &mut dyn std::fmt::Write) -> std::fmt::Result {
+fn font_route_path(font: Font, write: &mut dyn std::fmt::Write) -> std::fmt::Result {
     write.write_str(FONT_ROUTE_PREFIX)?;
     write.write_str("/")?;
     for ch in font.family().chars() {
@@ -34,7 +34,7 @@ impl FontRoute {
     #[must_use]
     pub fn new(font: Font) -> Self {
         let mut path = String::new();
-        let _ = font_route_path(&font, &mut path);
+        let _ = font_route_path(font, &mut path);
         Self {
             path: Path::new(&path).to_owned(),
             font,
@@ -84,7 +84,7 @@ impl RouterBuilderFontExt for RouterBuilder {
     #[cfg(feature = "discover")]
     fn discover_fonts(mut self) -> Self {
         for font in inventory::iter::<crate::runtime::Font> {
-            self = self.font(font.clone());
+            self = self.font(*font);
         }
         self
     }

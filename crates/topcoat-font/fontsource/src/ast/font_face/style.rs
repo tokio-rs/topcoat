@@ -61,6 +61,7 @@ pub struct StyleValue(Path);
 
 impl StyleValue {
     /// The trailing path segment, e.g. `Style::Normal` -> `Normal`.
+    #[must_use]
     pub fn variant(&self) -> &Ident {
         &self
             .0

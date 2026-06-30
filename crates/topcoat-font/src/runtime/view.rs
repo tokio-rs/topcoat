@@ -5,7 +5,7 @@ use crate::runtime::{Font, FontResolver};
 
 impl FmtHtml for Font {
     fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        let _ = app_context::<FontResolver>(cx).resolve(self, f);
+        let _ = app_context::<FontResolver>(cx).resolve(*self, f);
     }
 }
 
