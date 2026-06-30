@@ -77,7 +77,10 @@ impl WeightValue {
                 .join(", ");
             return Err(syn::Error::new_spanned(
                 &self.0,
-                format!("`{}` does not ship weight `{value}`; available: {available}", family.name),
+                format!(
+                    "`{}` does not ship weight `{value}`; available: {available}",
+                    family.name
+                ),
             ));
         }
         Ok(value)

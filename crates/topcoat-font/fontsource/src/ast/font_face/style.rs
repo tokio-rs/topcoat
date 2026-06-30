@@ -79,7 +79,9 @@ impl StyleValue {
             _ => {
                 return Err(syn::Error::new_spanned(
                     &self.0,
-                    format!("unknown style `{variant}`; expected `Style::Normal` or `Style::Italic`"),
+                    format!(
+                        "unknown style `{variant}`; expected `Style::Normal` or `Style::Italic`"
+                    ),
                 ));
             }
         };
