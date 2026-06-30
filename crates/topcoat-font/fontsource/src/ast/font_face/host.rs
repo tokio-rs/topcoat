@@ -1,3 +1,5 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
 use syn::{
     Token,
     parse::{Parse, ParseStream},
@@ -5,20 +7,25 @@ use syn::{
 
 use topcoat_core::ast::ParseOption;
 
+use crate::runtime;
+
 mod kw {
     use syn::custom_keyword;
 
     custom_keyword!(host);
-    custom_keyword!(asset);
 }
 
-/// A `host: asset` argument, opting the face into a self-hosted, bundled copy
-/// instead of the jsDelivr CDN. Its presence is the whole signal; there is one
-/// possible value.
 pub struct Host {
     pub key: HostKey,
     pub colon_token: Token![:],
     pub value: HostValue,
+}
+
+impl Host {
+    #[must_use]
+    pub fn host(&self) -> runtime::Host {
+        self.value.host()
+    }
 }
 
 impl Parse for Host {
@@ -34,6 +41,12 @@ impl Parse for Host {
 impl ParseOption for Host {
     fn peek(input: ParseStream) -> bool {
         HostKey::peek(input)
+    }
+}
+
+impl ToTokens for Host {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.value.to_tokens(tokens);
     }
 }
 
@@ -57,13 +70,44 @@ impl ParseOption for HostKey {
 
 /// The sole host value, the `asset` keyword.
 pub struct HostValue {
-    pub asset_kw: kw::asset,
+    pub path: syn::Path,
+}
+
+impl HostValue {
+    #[must_use]
+    pub fn host(&self) -> runtime::Host {
+        match self
+            .path
+            .segments
+            .last()
+            .expect("parsed path has at least one segment")
+            .ident
+            .to_string()
+            .as_str()
+        {
+            "Asset" => runtime::Host::Asset,
+            "JsDelivr" => runtime::Host::JsDelivr,
+            // For autocomplete to work, be lenient.
+            #[allow(clippy::match_same_arms)]
+            _ => runtime::Host::JsDelivr,
+        }
+    }
 }
 
 impl Parse for HostValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            asset_kw: input.parse()?,
+            path: input.parse()?,
         })
+    }
+}
+
+impl ToTokens for HostValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let path = &self.path;
+        quote! {
+            ::topcoat::font::fontsource::Host::#path
+        }
+        .to_tokens(tokens);
     }
 }

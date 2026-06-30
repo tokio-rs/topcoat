@@ -6,7 +6,7 @@ use topcoat::{
     view::view,
 };
 
-const FONT: Font = fontsource_font!("Lavishly Yours", host: asset);
+const FONT: Font = fontsource_font!("Lavishly Yours", host: Asset);
 
 #[tokio::main]
 async fn main() {

@@ -55,8 +55,9 @@ impl FontsourceFont {
         };
 
         let name = family.name;
-        let host = if self.host.is_some() {
-            quote! { , host: asset }
+        let host = if let Some(host) = self.host.as_ref() {
+            let host = &host.value.path;
+            quote! { , host: #host }
         } else {
             quote! {}
         };
