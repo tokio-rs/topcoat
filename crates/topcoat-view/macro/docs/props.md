@@ -24,7 +24,7 @@ let props = ButtonProps::builder()
 
 Fields can be annotated with special attributes to modify the builder's behavior:
 
-- `#[default]` makes a property optional. If it is not set, the field is filled with [`Default::default()`]. The field's type must implement [`Default`].
+- `#[default]` makes a property optional. If it is not set, the field is filled with [`Default::default()`], so its type must implement [`Default`]. Use `#[default(expr)]` to supply a custom fallback instead, evaluated only when the property is not set; the type need not implement [`Default`] in that case.
 - `#[into]` makes the generated setter accept any `impl Into<T>` instead of `T`.
 
 [`Default`]: https://doc.rust-lang.org/std/default/trait.Default.html

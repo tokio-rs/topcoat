@@ -135,6 +135,39 @@ fn struct_with_only_default_fields_builds_immediately() {
     assert_eq!(props.a, 7);
 }
 
+#[derive(Props, Debug, PartialEq)]
+struct DefaultExprProps {
+    #[default(5)]
+    limit: u32,
+    #[default("page".to_owned())]
+    #[into]
+    label: String,
+}
+
+#[test]
+fn unset_default_expr_field_uses_the_expression() {
+    let props = DefaultExprProps::builder().build();
+
+    assert_eq!(
+        props,
+        DefaultExprProps {
+            limit: 5,
+            label: "page".to_owned(),
+        }
+    );
+}
+
+#[test]
+fn set_default_expr_field_overrides_the_expression() {
+    let props = DefaultExprProps::builder()
+        .limit(10)
+        .label("section")
+        .build();
+
+    assert_eq!(props.limit, 10);
+    assert_eq!(props.label, "section");
+}
+
 #[derive(Props)]
 struct KeywordProps {
     r#type: String,

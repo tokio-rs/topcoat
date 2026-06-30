@@ -83,7 +83,7 @@ The trailing child nodes desugar to a `child` parameter whose value is a [`view!
 
 A component's properties can be modified with attributes:
 
-- `#[default]` makes the parameter optional; when not passed, it is set to `Default::default()`.
+- `#[default]` makes the parameter optional; when not passed, it is set to `Default::default()`. Use `#[default(expr)]` to supply a custom fallback instead, evaluated only when the parameter is omitted. The type need not implement `Default` in that case.
 - `#[into]` lets callers pass anything that converts via `Into`.
 
 ```rust
@@ -91,7 +91,7 @@ A component's properties can be modified with attributes:
 # #[derive(Default)]
 # struct Tone;
 #[component]
-async fn badge(#[into] label: String, #[default] tone: Tone) -> Result {
+async fn badge(#[into] label: String, #[default] tone: Tone, #[default(80)] max_length: usize) -> Result {
     // ...
 #     view! { <span>(label)</span> }
 }
