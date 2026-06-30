@@ -92,8 +92,8 @@ pub trait RouterBuilderAssetExt {
     ///
     /// This hosts each asset in `bundle` as an HTTP route in the router.
     /// It also registers the asset bundle with the app context, allowing access through
-    /// [`asset_bundle`] and [`bundled_asset`].
-    /// Additionally, [`Asset`] handles used as attribute values in the `view!` macro
+    /// [`asset_bundle`](crate::asset_bundle) and [`bundled_asset`](crate::bundled_asset).
+    /// Additionally, [`Asset`](crate::Asset) handles used as attribute values in the `view!` macro
     /// get rendered as the URL path the asset is hosted at.
     ///
     /// # Examples

@@ -127,9 +127,9 @@ pub use register_font;
 /// discovery.
 ///
 /// Expands to a `const` [`Font`]. With the `discover` feature, it is also
-/// registered so [`discover_fonts`](crate::RouterBuilderFontExt::discover_fonts)
+/// registered so [`discover_fonts`](crate::runtime::RouterBuilderFontExt::discover_fonts)
 /// finds it; without it, register the returned font manually with
-/// [`font`](crate::RouterBuilderFontExt::font).
+/// [`font`](crate::runtime::RouterBuilderFontExt::font).
 ///
 /// The faces can be given in one of two forms.
 ///
@@ -138,7 +138,8 @@ pub use register_font;
 /// Follow the family name with one or more CSS `@font-face`-like blocks. The
 /// family name is given once and injected into every block, so the faces read
 /// like a CSS stylesheet without repeating it. Each `@font-face { ... }` block
-/// is a [`font_face!`](crate::font_face) body (minus its `font-family`).
+/// is a [`font_face!`](../font/macro.font_face.html) body (minus its
+/// `font-family`).
 ///
 /// ```rust
 /// # use topcoat::font::{Font, font};
@@ -181,7 +182,7 @@ pub use register_font;
 /// ```
 ///
 /// Unlike the CSS-like form, the family name is not injected into the faces, so
-/// each [`FontFace`](crate::FontFace) must already carry the matching family.
+/// each [`FontFace`](crate::runtime::FontFace) must already carry the matching family.
 #[macro_export]
 macro_rules! font {
     ($family:expr, $(@font-face { $($face:tt)* })+ $(,)?) => {{
