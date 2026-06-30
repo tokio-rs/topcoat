@@ -85,6 +85,7 @@ impl HostValue {
             .to_string()
             .as_str()
         {
+            #[cfg(feature = "asset")]
             "Asset" => runtime::Host::Asset,
             "JsDelivr" => runtime::Host::JsDelivr,
             // For autocomplete to work, be lenient.

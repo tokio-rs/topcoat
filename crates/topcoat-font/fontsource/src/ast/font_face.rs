@@ -22,7 +22,7 @@ use topcoat_core::ast::ParseOption;
 use crate::runtime;
 
 /// One `fontsource_font_face!` invocation: a single Fontsource face served from
-/// the jsDelivr CDN, or, with `host: asset`, a bundled copy.
+/// the jsDelivr CDN, or, with `host: Asset`, a bundled copy.
 ///
 /// Holds the parsed descriptors; `weight` and `style` are required, `subset`
 /// defaults to the family's default subset. Each value is validated against the
@@ -67,6 +67,7 @@ impl FontsourceFontFace {
 
         // A bundled asset when self-hosted, otherwise the CDN URL verbatim.
         let src = match host {
+            #[cfg(feature = "asset")]
             runtime::Host::Asset => {
                 quote! {{
                     const ASSET: ::topcoat::asset::Asset = ::topcoat::asset::asset!(#url);

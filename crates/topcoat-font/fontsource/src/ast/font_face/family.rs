@@ -9,7 +9,6 @@ use crate::runtime::{ALL, Family};
 pub struct FamilyName(LitStr);
 
 impl FamilyName {
-    #[must_use]
     pub fn resolve(&self) -> syn::Result<&'static Family> {
         let needle = self.0.value();
         ALL.iter()
