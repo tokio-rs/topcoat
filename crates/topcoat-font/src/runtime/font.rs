@@ -79,7 +79,7 @@ inventory::collect!(Font);
 #[doc(hidden)]
 #[cfg(feature = "discover")]
 #[macro_export]
-macro_rules! __register_font {
+macro_rules! register_font {
     ($font:expr) => {
         $crate::runtime::internal::inventory::submit! { $font }
     };
@@ -88,9 +88,11 @@ macro_rules! __register_font {
 #[doc(hidden)]
 #[cfg(not(feature = "discover"))]
 #[macro_export]
-macro_rules! __register_font {
+macro_rules! register_font {
     ($font:expr) => {};
 }
+
+pub use register_font;
 
 /// Declares a [`Font`] from a family name and its faces, and registers it for
 /// discovery.
@@ -157,7 +159,7 @@ macro_rules! font {
                 $( ::topcoat::font::font_face! { font-family: $family; $($face)* } ),+
             ]),
         );
-        $crate::__register_font!(|| FONT);
+        $crate::register_font!(|| FONT);
         FONT
     }};
     ($family:expr, $faces:expr) => {{
@@ -165,7 +167,7 @@ macro_rules! font {
             $family,
             $crate::runtime::FontFaces::new($faces),
         );
-        $crate::__register_font!(|| FONT);
+        $crate::register_font!(|| FONT);
         FONT
     }};
 }

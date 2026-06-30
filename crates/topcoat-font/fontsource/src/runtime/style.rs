@@ -4,7 +4,7 @@ use topcoat_font::runtime::FontStyle;
 ///
 /// Fontsource describes every face as either [`Normal`](Self::Normal) or
 /// [`Italic`](Self::Italic); this is the `style` axis of a
-/// [`Family`](crate::Family).
+/// [`Family`](crate::runtime::Family).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Style {
     /// An upright face (`normal`).

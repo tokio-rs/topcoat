@@ -90,7 +90,7 @@ impl FontsourceFont {
                 #name,
                 ::topcoat::font::FontFaces::const_new(const { &[#(#faces),*] }),
             );
-            ::topcoat::font::__register_font!(FONT);
+            ::topcoat::font::register_font!(FONT);
             FONT
         }})
     }
