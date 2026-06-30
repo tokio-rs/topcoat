@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::any::{Any, type_name};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -329,8 +329,37 @@ impl RouterBuilder {
     where
         T: Any + Send + Sync,
     {
-        self.context.insert(value);
+        assert!(
+            self.context.insert(value).is_none(),
+            "duplicate context entry for type `{:?}`",
+            type_name::<T>()
+        );
         self
+    }
+
+    /// Returns a reference to the app context value of type `T` registered with
+    /// [`app_context`](Self::app_context), or `None` if none has been
+    /// registered.
+    ///
+    /// Lets code that registers a shared value lazily check for it first, rather
+    /// than tripping the duplicate-registration panic on a second call.
+    #[must_use]
+    pub fn get_app_context<T>(&self) -> Option<&T>
+    where
+        T: Any + Send + Sync,
+    {
+        self.context.get::<T>()
+    }
+
+    /// Returns a mutable reference to the app context value of type `T`
+    /// registered with [`app_context`](Self::app_context), or `None` if none
+    /// has been registered.
+    #[must_use]
+    pub fn get_app_context_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: Any + Send + Sync,
+    {
+        self.context.get_mut::<T>()
     }
 
     /// Finalizes the registered routes, pages, and layouts into a [`Router`].

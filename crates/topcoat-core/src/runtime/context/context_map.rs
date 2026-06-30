@@ -107,32 +107,48 @@ impl ContextMap {
         Self::default()
     }
 
-    /// Registers `value` under its concrete type `T`.
+    /// Registers `value` under its concrete type `T`, returning the value
+    /// previously registered for `T`, if any.
     ///
-    /// # Panics
-    ///
-    /// Panics if a value of type `T` has already been registered.
-    pub fn insert<T>(&mut self, value: T)
+    /// A type can hold only one value at a time, so registering a type that is
+    /// already present replaces it and hands back the displaced value.
+    pub fn insert<T>(&mut self, value: T) -> Option<T>
     where
         T: Any + Send + Sync,
     {
-        assert!(
-            self.entries.insert::<T>(value).is_none(),
-            "duplicate context entry for type `{:?}`",
-            type_name::<T>()
-        );
+        self.entries.insert::<T>(value)
+    }
+
+    /// Returns `true` if a value of type `T` has been registered.
+    #[must_use]
+    pub fn contains<T>(&self) -> bool
+    where
+        T: Any + Send + Sync,
+    {
+        self.entries.contains::<T>()
     }
 
     /// Returns a reference to the registered value of type `T`, or `None` if
     /// no such value has been registered.
     ///
-    /// This is an internal lookup used by [`app_context`] and [`request_context`]. Within a
-    /// request, prefer the free functions rather than calling this method directly.
-    fn get<T>(&self) -> Option<&T>
+    /// Within a request, prefer the [`app_context`] and [`request_context`] free
+    /// functions over reaching for this directly.
+    #[must_use]
+    pub fn get<T>(&self) -> Option<&T>
     where
         T: Any + Send + Sync,
     {
         self.entries.get::<T>()
+    }
+
+    /// Returns a mutable reference to the registered value of type `T`, or
+    /// `None` if no such value has been registered.
+    #[must_use]
+    pub fn get_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: Any + Send + Sync,
+    {
+        self.entries.get_mut::<T>()
     }
 }
 
@@ -173,11 +189,29 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "duplicate context entry")]
-    fn register_panics_on_duplicate_type() {
+    fn insert_replaces_and_returns_the_displaced_value() {
         let mut context = ContextMap::new();
+        assert_eq!(context.insert(Database("primary")), None);
+        assert_eq!(context.insert(Database("replica")), Some(Database("primary")));
+        assert_eq!(context.get::<Database>(), Some(&Database("replica")));
+    }
+
+    #[test]
+    fn contains_reports_registered_types() {
+        let mut context = ContextMap::new();
+        assert!(!context.contains::<Database>());
         context.insert(Database("primary"));
-        context.insert(Database("replica"));
+        assert!(context.contains::<Database>());
+        assert!(!context.contains::<Config>());
+    }
+
+    #[test]
+    fn get_mut_allows_mutation_in_place() {
+        let mut context = ContextMap::new();
+        context.insert(Config(1));
+        context.get_mut::<Config>().unwrap().0 = 42;
+        assert_eq!(context.get::<Config>(), Some(&Config(42)));
+        assert_eq!(context.get_mut::<Database>(), None);
     }
 
     #[test]
