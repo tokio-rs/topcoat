@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use topcoat_core::runtime::context::Cx;
 use topcoat_router::runtime::{
     Body, Css, IntoResponse, Method, Path, PathBuf, Route, RouteFuture, RouterBuilder,
@@ -25,6 +27,7 @@ fn font_route_path(font: &Font, write: &mut dyn std::fmt::Write) -> std::fmt::Re
 pub struct FontRoute {
     path: PathBuf,
     font: Font,
+    cache: OnceLock<Css<String>>,
 }
 
 impl FontRoute {
@@ -35,6 +38,7 @@ impl FontRoute {
         Self {
             path: Path::new(&path).to_owned(),
             font,
+            cache: OnceLock::new(),
         }
     }
 }
@@ -50,9 +54,13 @@ impl Route for FontRoute {
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
         Box::pin(async {
-            let mut css = String::new();
-            let _ = self.font.faces().fmt(cx, &mut css);
-            Css(css).into_response(cx)
+            // Render the `@font-face` CSS once and cache the result.
+            let cached = self.cache.get_or_init(|| {
+                let mut css = String::new();
+                let _ = self.font.faces().fmt(cx, &mut css);
+                Css(css)
+            });
+            cached.clone().into_response(cx)
         })
     }
 }
