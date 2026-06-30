@@ -1763,6 +1763,7 @@ dependencies = [
  "topcoat-core-macro",
  "topcoat-font",
  "topcoat-font-fontsource",
+ "topcoat-font-fontsource-macro",
  "topcoat-font-macro",
  "topcoat-htmx",
  "topcoat-router",
@@ -1872,6 +1873,7 @@ dependencies = [
  "topcoat-core",
  "topcoat-pretty",
  "topcoat-router",
+ "topcoat-view",
 ]
 
 [[package]]
@@ -1879,12 +1881,25 @@ name = "topcoat-font-fontsource"
 version = "0.1.0"
 dependencies = [
  "heck",
+ "proc-macro2",
+ "quote",
  "serde",
  "serde_json",
+ "syn",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-font",
  "ureq",
+]
+
+[[package]]
+name = "topcoat-font-fontsource-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "topcoat-font-fontsource",
 ]
 
 [[package]]

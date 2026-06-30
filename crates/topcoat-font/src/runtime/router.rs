@@ -1,11 +1,26 @@
 use topcoat_core::runtime::context::Cx;
 use topcoat_router::runtime::{
-    Body, IntoResponse, Method, Path, PathBuf, Route, RouteFuture, RouterBuilder,
+    Body, Css, IntoResponse, Method, Path, PathBuf, Route, RouteFuture, RouterBuilder,
 };
 
-use crate::runtime::Font;
+use crate::runtime::{Font, FontResolver};
 
 const FONT_ROUTE_PREFIX: &str = "/_topcoat/fonts";
+
+/// The URL path a font's stylesheet is served at, e.g.
+/// `/_topcoat/fonts/Lavishly-Yours-1a2b3c4d5e6f7a8b.css`.
+///
+/// The family name is slugified to stay URL-safe (so the served route and the
+/// rendered `href` match without percent-encoding), and a content hash keeps the
+/// URL immutable for a given set of faces.
+fn font_route_path(font: &Font, write: &mut dyn std::fmt::Write) -> std::fmt::Result {
+    write.write_str(FONT_ROUTE_PREFIX)?;
+    write.write_str("/")?;
+    for ch in font.family().chars() {
+        write.write_char(if ch.is_ascii_alphanumeric() { ch } else { '-' })?;
+    }
+    write!(write, "-{:016x}.css", font.hash())
+}
 
 pub struct FontRoute {
     path: PathBuf,
@@ -15,13 +30,10 @@ pub struct FontRoute {
 impl FontRoute {
     #[must_use]
     pub fn new(font: Font) -> Self {
+        let mut path = String::new();
+        let _ = font_route_path(&font, &mut path);
         Self {
-            path: Path::new(&format!(
-                "{FONT_ROUTE_PREFIX}/{}-{:016x}.css",
-                font.family(),
-                font.hash()
-            ))
-            .to_owned(),
+            path: Path::new(&path).to_owned(),
             font,
         }
     }
@@ -38,9 +50,9 @@ impl Route for FontRoute {
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
         Box::pin(async {
-            let mut response = String::new();
-            let _ = self.font.faces().fmt(cx, &mut response);
-            response.into_response(cx)
+            let mut css = String::new();
+            let _ = self.font.faces().fmt(cx, &mut css);
+            Css(css).into_response(cx)
         })
     }
 }
@@ -57,6 +69,7 @@ pub trait RouterBuilderFontExt {
 impl RouterBuilderFontExt for RouterBuilder {
     fn font(mut self, font: Font) -> Self {
         self = self.route(FontRoute::new(font));
+        self = self.app_context(FontResolver::new(Box::new(font_route_path)));
         self
     }
 

@@ -81,7 +81,7 @@ inventory::collect!(Font);
 #[macro_export]
 macro_rules! __register_font {
     ($font:expr) => {
-        $crate::internal::inventory::submit! { $font }
+        $crate::runtime::internal::inventory::submit! { $font }
     };
 }
 

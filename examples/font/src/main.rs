@@ -1,27 +1,18 @@
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
-    font::{Font, font, fontsource},
-    router::{Router, page},
+    font::{Font, fontsource::fontsource_font},
+    router::{Router, RouterBuilderDiscoverExt, page},
     view::view,
 };
 
-static FONT: Font = Font::new(
-    fontsource::LAVISHLY_YOURS.name,
-    &[fontsource::fontsource_font_face!(
-        fontsource::LAVISHLY_YOURS,
-        weight: 400,
-        style: fontsource::Style::Normal,
-        subset: fontsource::Subset::Latin,
-        host: asset,
-    )],
-);
+const FONT: Font = fontsource_font!("Lavishly Yours", host: asset);
 
 #[tokio::main]
 async fn main() {
     let router = Router::builder()
-        .page(home)
         .assets(AssetBundle::load().unwrap())
+        .discover()
         .build();
 
     topcoat::start(router).await.unwrap();
@@ -34,8 +25,12 @@ async fn home() -> Result {
         <html>
             <head>
                 topcoat::dev::script()
+                <link rel="stylesheet" href=(FONT)>
             </head>
             <body>
+                <h1 style=(format!("font-family: {:?}", FONT.family()))>
+                    "Lavishly Yours"
+                </h1>
             </body>
         </html>
     }
