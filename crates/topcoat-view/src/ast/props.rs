@@ -2,8 +2,8 @@ use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    Attribute, Data, DeriveInput, Fields, GenericParam, Generics, Ident, Type, Visibility,
-    ext::IdentExt, parse_quote,
+    Attribute, Data, DeriveInput, Expr, Fields, GenericParam, Generics, Ident, Meta, Type,
+    Visibility, ext::IdentExt, parse_quote,
 };
 
 /// A parsed `#[derive(Props)]` struct. Expands into a typestate builder where
@@ -35,6 +35,10 @@ struct PropsField {
     docs: Vec<Attribute>,
     /// `#[into]`: the setter accepts `impl Into<T>`.
     into: bool,
+    /// The expression a `#[default(expr)]` field falls back to when unset.
+    /// `None` for a bare `#[default]` (which uses `Default::default()`) and for
+    /// required fields.
+    default_expr: Option<Expr>,
     /// The typestate parameter tracking whether this field has been set.
     /// `None` for `#[default]` fields, which never need to be set.
     state: Option<Ident>,
@@ -88,12 +92,18 @@ impl Props {
             }
 
             let mut default = false;
+            let mut default_expr = None;
             let mut into = false;
             let mut docs = Vec::new();
             for attr in &field.attrs {
                 if attr.path().is_ident("default") {
-                    attr.meta.require_path_only()?;
                     default = true;
+                    match &attr.meta {
+                        Meta::List(list) => default_expr = Some(list.parse_args()?),
+                        meta => {
+                            meta.require_path_only()?;
+                        }
+                    }
                 } else if attr.path().is_ident("into") {
                     attr.meta.require_path_only()?;
                     into = true;
@@ -108,6 +118,7 @@ impl Props {
                 ty: field.ty,
                 docs,
                 into,
+                default_expr,
                 state,
             });
         }
@@ -274,6 +285,10 @@ impl ToTokens for Props {
                         ::core::option::Option::None => ::core::unreachable!(),
                     },
                 }
+            } else if let Some(expr) = &field.default_expr {
+                quote! {
+                    #field_ident: self.#field_ident.unwrap_or_else(|| #expr),
+                }
             } else {
                 quote! {
                     #field_ident: self.#field_ident.unwrap_or_default(),
@@ -306,7 +321,7 @@ impl ToTokens for Props {
                 ///
                 /// Only available once every required property has been set.
                 /// `#[default]` properties that were not set are filled with
-                /// `Default::default()`.
+                /// `Default::default()`, or the `#[default(expr)]` expression.
                 #vis fn build(self) -> #ident #ty_generics
                 where
                     #(#states: ::topcoat::view::IsSet,)*
