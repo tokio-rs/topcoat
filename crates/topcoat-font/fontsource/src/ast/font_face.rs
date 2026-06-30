@@ -37,7 +37,7 @@ pub struct FontsourceFontFace {
 
 impl FontsourceFontFace {
     /// Validates every descriptor against the family and lowers the face to its
-    /// `const` [`FontFace`] construction.
+    /// [`FontFace`] construction.
     fn lower(&self) -> syn::Result<TokenStream> {
         let family = self.family.resolve()?;
         let weight = self.weight.value.resolve(family)?;
@@ -71,24 +71,24 @@ impl FontsourceFontFace {
             runtime::Host::Asset => {
                 quote! {{
                     const ASSET: ::topcoat::asset::Asset = ::topcoat::asset::asset!(#url);
-                    ::topcoat::font::FontSources::const_new(const {
-                        &[::topcoat::font::FontSource::url_asset(
+                    ::topcoat::font::FontSources::new(::std::vec![
+                        ::topcoat::font::FontSource::url(
                             ASSET,
                             ::core::option::Option::Some(::topcoat::font::FontFormat::Woff2),
                             ::core::option::Option::None,
-                        )]
-                    })
+                        )
+                    ])
                 }}
             }
             runtime::Host::JsDelivr => {
                 quote! {
-                    ::topcoat::font::FontSources::const_new(const {
-                        &[::topcoat::font::FontSource::url_str(
+                    ::topcoat::font::FontSources::new(::std::vec![
+                        ::topcoat::font::FontSource::url(
                             #url,
                             ::core::option::Option::Some(::topcoat::font::FontFormat::Woff2),
                             ::core::option::Option::None,
-                        )]
-                    })
+                        )
+                    ])
                 }
             }
         };
@@ -107,7 +107,7 @@ impl FontsourceFontFace {
 
         Ok(quote! {{
             #host_autocomplete
-            ::topcoat::font::FontFace::const_new(#name, #src)
+            ::topcoat::font::FontFace::new(#name, #src)
                 .with_weight(::topcoat::font::FontWeightRange::from_u16(#weight, #weight))
                 .with_style(#style)
                 #unicode_range
