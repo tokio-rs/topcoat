@@ -56,6 +56,8 @@ impl FontData {
 /// It holds a reference to a lazily-initialized [`FontData`], so copying a
 /// `Font` is just copying a pointer; the underlying family name, faces, and
 /// hash are built once, on first access.
+///
+/// See [`font!`] on how to construct a [`Font`] handle.
 #[derive(Debug, Clone, Copy)]
 pub struct Font(&'static LazyLock<FontData>);
 

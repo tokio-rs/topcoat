@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
-// #[doc = include_str!("../docs/fontsource_font_face.md")]
+#[doc = include_str!("../docs/fontsource_font_face.md")]
 #[proc_macro]
 pub fn fontsource_font_face(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse_macro_input!(
@@ -10,7 +10,7 @@ pub fn fontsource_font_face(tokens: TokenStream) -> TokenStream {
     quote! { #parsed }.into()
 }
 
-// #[doc = include_str!("../docs/fontsource_font.md")]
+#[doc = include_str!("../docs/fontsource_font.md")]
 #[proc_macro]
 pub fn fontsource_font(tokens: TokenStream) -> TokenStream {
     let parsed =
