@@ -189,14 +189,14 @@ macro_rules! font {
                 )
             });
         const FONT: $crate::runtime::Font = $crate::runtime::Font::new(&FONT_DATA);
-        $crate::register_font!(FONT);
+        $crate::runtime::register_font!(FONT);
         FONT
     }};
     ($family:expr, $faces:expr) => {{
         static FONT_DATA: ::std::sync::LazyLock<$crate::runtime::FontData> =
             ::std::sync::LazyLock::new(|| $crate::runtime::FontData::new($family, $faces));
         const FONT: $crate::runtime::Font = $crate::runtime::Font::new(&FONT_DATA);
-        $crate::register_font!(FONT);
+        $crate::runtime::register_font!(FONT);
         FONT
     }};
 }
