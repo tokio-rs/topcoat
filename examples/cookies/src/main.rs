@@ -60,11 +60,13 @@ async fn home(cx: &Cx) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
-            <head>
-                topcoat::dev::script()
-            </head>
+            <head>topcoat::dev::script()</head>
             <body>
-                <p>"You have visited this page " (visits.0) " times."</p>
+                <p>
+                    "You have visited this page "
+                    (visits.0)
+                    " times."
+                </p>
             </body>
         </html>
     }

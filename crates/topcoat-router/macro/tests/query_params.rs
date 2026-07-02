@@ -18,8 +18,10 @@ struct PostsQuery {
 async fn posts(cx: &Cx) -> Result {
     let query = query_params::<PostsQuery>(cx).ok_or_bad_request("invalid query string")?;
     view! {
-        "page=" (query.page.unwrap_or(1).to_string())
-        " q=" (query.q.as_deref().unwrap_or("all"))
+        "page="
+        (query.page.unwrap_or(1).to_string())
+        " q="
+        (query.q.as_deref().unwrap_or("all"))
     }
 }
 

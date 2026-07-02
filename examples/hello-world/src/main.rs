@@ -20,9 +20,7 @@ async fn home() -> Result {
                 <title>"Hello world"</title>
                 topcoat::dev::script()
             </head>
-            <body>
-                hello(name: "World")
-            </body>
+            <body>hello(name: "World")</body>
         </html>
     }
 }
@@ -30,6 +28,10 @@ async fn home() -> Result {
 #[component]
 async fn hello(name: &str) -> Result {
     view! {
-        <h1>"Hello, " (name) "!"</h1>
+        <h1>
+            "Hello, "
+            (name)
+            "!"
+        </h1>
     }
 }

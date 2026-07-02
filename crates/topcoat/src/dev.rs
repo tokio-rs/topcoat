@@ -45,11 +45,9 @@ fn http_to_ws(url: &str) -> String {
 #[component]
 pub async fn script() -> Result {
     let Ok(base) = std::env::var("TOPCOAT_DEV_URL") else {
-        return view! {};
+        return view! {  };
     };
     let src = format!("{base}/dev.js");
 
-    view! {
-        <script src=(src)></script>
-    }
+    view! { <script src=(src)></script> }
 }

@@ -137,43 +137,16 @@ impl<B: Parse> Parse for TemplateMatchArm<B> {
             },
             fat_arrow_token: input.parse()?,
             body: Box::new(input.parse()?),
-            comma: {
-                if input.is_empty() {
-                    input.parse()?
-                } else {
-                    Some(input.parse()?)
-                }
-            },
+            comma: Some(input.parse()?),
         })
     }
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_pretty::PrettyPrint for TemplateMatchArm<crate::ast::view::Node> {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
-        self.pat.pretty_print(printer);
-        " ".pretty_print(printer);
-        self.fat_arrow_token.pretty_print(printer);
-        if let Some((if_token, expr)) = &self.guard {
-            " ".pretty_print(printer);
-            if_token.pretty_print(printer);
-            " ".pretty_print(printer);
-            expr.pretty_print(printer);
-        }
-        " ".pretty_print(printer);
-        self.body.pretty_print(printer);
-        if !self.body.is_block() {
-            if let Some(comma) = &self.comma {
-                comma.pretty_print(printer);
-            } else {
-                ",".pretty_print(printer);
-            }
-        }
-    }
-}
-
-#[cfg(feature = "pretty")]
-impl topcoat_pretty::PrettyPrint for TemplateMatchArm<crate::ast::attributes::AttributeNode> {
+impl<B> topcoat_pretty::PrettyPrint for TemplateMatchArm<B>
+where
+    B: topcoat_pretty::PrettyPrint,
+{
     fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         self.pat.pretty_print(printer);
         " ".pretty_print(printer);

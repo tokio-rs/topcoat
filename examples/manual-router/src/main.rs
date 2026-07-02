@@ -38,9 +38,7 @@ fn router() -> Router {
 async fn root_layout(slot: Slot<'_>) -> Result {
     view! {
         <html>
-            <head>
-                topcoat::dev::script()
-            </head>
+            <head>topcoat::dev::script()</head>
             <body>
                 <nav>
                     <a href="/">"home"</a>

@@ -32,7 +32,9 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
         <!DOCTYPE html>
         <html>
             <head>
-                <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
+                <script
+                    src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js">
+                </script>
                 topcoat::dev::script()
             </head>
             <body hx-boost="true">(slot.await?)</body>
@@ -43,9 +45,11 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
 #[page("/")]
 async fn home() -> Result {
     view! {
-        <h1>"Count: " <span id="count">"0"</span></h1>
-        <button hx-post="/increment" hx-target="#count" hx-swap="innerHTML">
-            "Increment"
+        <h1>
+            "Count: "
+            <span id="count">"0"</span>
+        </h1>
+        <button hx-post="/increment" hx-target="#count" hx-swap="innerHTML">"Increment"
         </button>
     }
 }

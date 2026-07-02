@@ -35,8 +35,14 @@ async fn home(cx: &Cx) -> Result {
             </head>
             <body>
                 <h1>"Cx functions"</h1>
-                <p>"path: " (current_path(cx))</p>
-                <p>"user agent: " (user_agent(cx))</p>
+                <p>
+                    "path: "
+                    (current_path(cx))
+                </p>
+                <p>
+                    "user agent: "
+                    (user_agent(cx))
+                </p>
             </body>
         </html>
     }

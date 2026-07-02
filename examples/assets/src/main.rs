@@ -20,12 +20,8 @@ async fn home() -> Result {
     view! {
         <!DOCTYPE html>
         <html>
-            <head>
-                topcoat::dev::script()
-            </head>
-            <body>
-                <img src=(asset!("./ferris.png"))>
-            </body>
+            <head>topcoat::dev::script()</head>
+            <body><img src=(asset!("./ferris.png"))></body>
         </html>
     }
 }

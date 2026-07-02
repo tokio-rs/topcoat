@@ -6,7 +6,7 @@ fn r(v: topcoat::Result) -> String {
 
 #[tokio::test]
 async fn empty_view_renders_to_empty_string() {
-    let html = r(view! {});
+    let html = r(view! {  });
     assert_eq!(html, "");
 }
 
@@ -46,7 +46,13 @@ async fn literal_attributes_render_quoted() {
 #[tokio::test]
 async fn rust_expression_in_child_position_becomes_a_node() {
     let name = "world";
-    let html = r(view! { <h1>"Hello, " (name) "!"</h1> });
+    let html = r(view! {
+        <h1>
+            "Hello, "
+            (name)
+            "!"
+        </h1>
+    });
     assert_eq!(html, "<h1>Hello, world!</h1>");
 }
 
@@ -82,7 +88,13 @@ async fn child_text_is_html_escaped() {
 async fn numeric_child_values_render_as_text() {
     let count: i32 = 42;
     let ratio: f64 = 1.5;
-    let html = r(view! { <span>(count) " " (ratio)</span> });
+    let html = r(view! {
+        <span>
+            (count)
+            " "
+            (ratio)
+        </span>
+    });
     assert_eq!(html, "<span>42 1.5</span>");
 }
 

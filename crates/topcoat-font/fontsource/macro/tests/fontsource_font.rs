@@ -57,7 +57,12 @@ fn a_single_face() {
 
 #[test]
 fn lists_cross_product_into_faces() {
-    let font = fontsource_font!("Roboto", weight: [400, 700], style: Normal, subset: Latin);
+    let font = fontsource_font!(
+        "Roboto",
+        weight: [400, 700],
+        style: Normal,
+        subset: Latin,
+    );
     let faces = [
         roboto("latin-400-normal", 400, "normal", LATIN),
         roboto("latin-700-normal", 700, "normal", LATIN),
@@ -69,13 +74,24 @@ fn lists_cross_product_into_faces() {
 fn every_axis_multiplies() {
     // Two weights × two styles × one subset.
     let font =
-        fontsource_font!("Roboto", weight: [400, 700], style: [Normal, Italic], subset: Latin);
+        fontsource_font!(
+        "Roboto",
+        weight: [400, 700],
+        style: [Normal, Italic],
+        subset: Latin,
+    );
     assert_eq!(font.faces().len(), 4);
 }
 
 #[test]
 fn display_applies_to_every_face() {
-    let font = fontsource_font!("Roboto", weight: [400, 700], style: Normal, subset: Latin, display: Optional);
+    let font = fontsource_font!(
+        "Roboto",
+        weight: [400, 700],
+        style: Normal,
+        subset: Latin,
+        display: Optional,
+    );
     let faces = [
         roboto_display("latin-400-normal", 400, "normal", "optional", LATIN),
         roboto_display("latin-700-normal", 700, "normal", "optional", LATIN),
@@ -86,6 +102,12 @@ fn display_applies_to_every_face() {
 #[test]
 fn self_hosting_changes_the_sources() {
     let cdn = fontsource_font!("Roboto", weight: 400, style: Normal, subset: Latin);
-    let asset = fontsource_font!("Roboto", weight: 400, style: Normal, subset: Latin, host: Asset);
+    let asset = fontsource_font!(
+        "Roboto",
+        weight: 400,
+        style: Normal,
+        subset: Latin,
+        host: Asset,
+    );
     assert_ne!(cdn.faces(), asset.faces());
 }

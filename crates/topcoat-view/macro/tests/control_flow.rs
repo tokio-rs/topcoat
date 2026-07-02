@@ -104,7 +104,9 @@ async fn for_loop_in_attribute_list_emits_attributes_per_item() {
             for (name, value) in extras {
                 (name)=(value)
             }
-        ></div>
+        >
+
+        </div>
     });
 
     assert!(html.contains(r#"data-a="1""#));
@@ -174,7 +176,9 @@ async fn match_in_attribute_list_emits_attribute_per_arm() {
                 Status::Published => class="published",
                 Status::Archived => class="archived",
             }
-        ></article>
+        >
+
+        </article>
     });
 
     assert_eq!(html, r#"<article class="draft"></article>"#);
@@ -197,13 +201,7 @@ async fn let_binding_introduces_variable_for_following_nodes() {
 #[tokio::test]
 async fn let_binding_in_attribute_list_is_in_scope_for_later_attributes() {
     let html = r(view! {
-        <a
-            let href = "/posts";
-            href=(href)
-            data-href=(href)
-        >
-            "Posts"
-        </a>
+        <a let href = "/posts"; href=(href) data-href=(href)>"Posts"</a>
     });
 
     assert!(html.contains(r#"href="/posts""#));

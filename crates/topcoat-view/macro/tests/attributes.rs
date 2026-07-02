@@ -13,10 +13,18 @@ fn attributes_macro_builds_runtime_attributes() {
         id=(id)
         :data-bound=$(id.to_owned())
         @input="(e) => console.log(e)"
-        if true { aria-label="Submit" } else { aria-label="Disabled" }
+        if true {
+            aria-label="Submit"
+        } else {
+            aria-label="Disabled"
+        }
         for (key, value) in dynamic {
-            if value == "skip" { continue; }
-            if value == "stop" { break; }
+            if value == "skip" {
+                continue;
+            }
+            if value == "stop" {
+                break;
+            }
             (key)=(value)
         }
         match id {
@@ -76,10 +84,7 @@ async fn spread_merges_within_attributes_macro() {
     use topcoat::{context::Cx, view::view};
 
     let base = topcoat::view::attributes! { class="btn" type="button" };
-    let merged = topcoat::view::attributes! {
-        class="card"
-        (base)
-    };
+    let merged = topcoat::view::attributes! { class="card" (base) };
 
     assert!(merged.contains_key("type"));
 

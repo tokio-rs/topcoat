@@ -16,7 +16,10 @@ struct PostId(u32);
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
     let id = path_param::<PostId>(cx).ok_or_bad_request("post_id must be a number")?;
-    view! { "post " (id.to_string()) }
+    view! {
+        "post "
+        (id.to_string())
+    }
 }
 
 // A borrowed (`&str`) path parameter: the raw segment is exposed without parsing.
@@ -26,7 +29,10 @@ struct Slug<'a>(&'a str);
 #[page("/tags/{slug}")]
 async fn tag(cx: &Cx) -> Result {
     let slug = path_param::<Slug>(cx);
-    view! { "tag " (&**slug) }
+    view! {
+        "tag "
+        (&**slug)
+    }
 }
 
 #[tokio::test]

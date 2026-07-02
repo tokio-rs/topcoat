@@ -13,18 +13,20 @@ fn empty_cx() -> Cx {
 
 #[component]
 async fn greeting(name: &str) -> Result {
-    view! { <h1>"Hello, " (name) "!"</h1> }
+    view! {
+        <h1>
+            "Hello, "
+            (name)
+            "!"
+        </h1>
+    }
 }
 
 #[tokio::test]
 async fn component_with_named_arg_renders_inline() {
     let cx = empty_cx();
     let __cx = &cx;
-    let result: Result = view! {
-        <main>
-            greeting(name: "Ada")
-        </main>
-    };
+    let result: Result = view! { <main>greeting(name: "Ada")</main> };
 
     assert_eq!(
         result.unwrap().render(__cx),
@@ -34,9 +36,7 @@ async fn component_with_named_arg_renders_inline() {
 
 #[component]
 async fn badge(label: &str, tone: &str) -> Result {
-    view! {
-        <span class=(format!("badge badge-{tone}"))>(label)</span>
-    }
+    view! { <span class=(format!("badge badge-{tone}"))>(label)</span> }
 }
 
 #[tokio::test]
@@ -44,7 +44,10 @@ async fn component_with_multiple_named_args_renders_attributes() {
     let cx = empty_cx();
     let __cx = &cx;
     let result: Result = view! {
-        badge(label: "New", tone: "success")
+        badge(
+            label: "New",
+            tone: "success"
+        )
     };
 
     assert_eq!(
@@ -95,9 +98,7 @@ async fn nested_caller(child: View) -> Result {
 async fn component_can_call_other_components_and_forward_child_views() {
     let cx = empty_cx();
     let __cx = &cx;
-    let result: Result = view! {
-        nested_caller(<em>"inner"</em>)
-    };
+    let result: Result = view! { nested_caller(<em>"inner"</em>) };
     let html = result.unwrap().render(__cx);
 
     assert!(html.contains("<h2>Outer</h2>"));
