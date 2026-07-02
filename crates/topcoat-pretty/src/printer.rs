@@ -267,6 +267,12 @@ impl<'a> Printer<'a> {
         }
         if !self.line_dirty() {
             string = string.trim_start();
+        } else if self.output.ends_with(' ') {
+            // Collapse redundant soft spaces. A break that stays flat renders as
+            // nothing but leaves its accompanying space behind, so two adjacent
+            // soft breaks (e.g. a trailing comment's break and the closing
+            // delimiter's) would otherwise produce a doubled space.
+            string = string.trim_start_matches(' ');
         }
         if string.is_empty() {
             return;

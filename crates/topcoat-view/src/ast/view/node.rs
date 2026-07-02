@@ -8,8 +8,8 @@ use topcoat_core::ast::ParseOption;
 
 use crate::ast::{
     template::{
-        RuntimeExpr, TemplateBlock, TemplateBreak, TemplateContinue, TemplateExpr, TemplateForLoop,
-        TemplateIf, TemplateLet, TemplateMatch,
+        MatchArmBody, RuntimeExpr, TemplateBlock, TemplateBreak, TemplateContinue, TemplateExpr,
+        TemplateForLoop, TemplateIf, TemplateLet, TemplateMatch,
     },
     view::{
         Component, DocumentType, Element, Nodes, ReactiveScope, SignalDeclaration, ViewWriter,
@@ -44,6 +44,12 @@ impl Node {
     #[must_use]
     pub fn is_block(&self) -> bool {
         matches!(self, Self::Block(..))
+    }
+}
+
+impl MatchArmBody for Node {
+    fn is_block_body(&self) -> bool {
+        self.is_block()
     }
 }
 

@@ -6,7 +6,7 @@ fn r(v: topcoat::Result) -> String {
 
 #[tokio::test]
 async fn empty_view_renders_to_empty_string() {
-    let html = r(view! {  });
+    let html = r(view! {});
     assert_eq!(html, "");
 }
 

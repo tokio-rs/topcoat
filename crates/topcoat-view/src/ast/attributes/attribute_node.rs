@@ -8,7 +8,8 @@ use crate::ast::{
         WriteAttribute,
     },
     template::{
-        TemplateBreak, TemplateContinue, TemplateForLoop, TemplateIf, TemplateLet, TemplateMatch,
+        MatchArmBody, TemplateBlock, TemplateBreak, TemplateContinue, TemplateForLoop, TemplateIf,
+        TemplateLet, TemplateMatch,
     },
     view::{ViewWriter, WriteView},
 };
@@ -26,6 +27,13 @@ pub enum AttributeNode {
     Continue(TemplateContinue),
     Break(TemplateBreak),
     Match(TemplateMatch<AttributeNode>),
+    Block(TemplateBlock<AttributeNodes>),
+}
+
+impl MatchArmBody for AttributeNode {
+    fn is_block_body(&self) -> bool {
+        matches!(self, Self::Block(..))
+    }
 }
 
 impl WriteView for AttributeNode {
@@ -41,6 +49,7 @@ impl WriteView for AttributeNode {
             Self::Continue(inner) => WriteView::write(inner, writer),
             Self::Break(inner) => WriteView::write(inner, writer),
             Self::Match(inner) => WriteView::write(inner, writer),
+            Self::Block(inner) => WriteView::write(inner, writer),
         }
     }
 }
@@ -58,6 +67,7 @@ impl WriteAttribute for AttributeNode {
             Self::Continue(inner) => WriteAttribute::write(inner, writer),
             Self::Break(inner) => WriteAttribute::write(inner, writer),
             Self::Match(inner) => WriteAttribute::write(inner, writer),
+            Self::Block(inner) => WriteAttribute::write(inner, writer),
         }
     }
 }
@@ -76,6 +86,8 @@ impl Parse for AttributeNode {
             Self::Break(input.parse()?)
         } else if TemplateMatch::<AttributeNode>::peek(input) {
             Self::Match(input.parse()?)
+        } else if TemplateBlock::<AttributeNodes>::peek(input) {
+            Self::Block(input.parse()?)
         } else if BindAttribute::peek(input) {
             Self::BindAttribute(input.parse()?)
         } else if EventHandler::peek(input) {
@@ -104,6 +116,7 @@ impl ParseOption for AttributeNode {
             || TemplateContinue::peek(input)
             || TemplateBreak::peek(input)
             || TemplateMatch::<AttributeNode>::peek(input)
+            || TemplateBlock::<AttributeNodes>::peek(input)
     }
 }
 
@@ -121,6 +134,7 @@ impl topcoat_pretty::PrettyPrint for AttributeNode {
             Self::Continue(inner) => inner.pretty_print(printer),
             Self::Break(inner) => inner.pretty_print(printer),
             Self::Match(inner) => inner.pretty_print(printer),
+            Self::Block(inner) => inner.pretty_print(printer),
         }
     }
 }
