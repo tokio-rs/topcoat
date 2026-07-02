@@ -26,11 +26,25 @@ fn all_descriptors() {
         src: url("/inter.woff2") format("woff2") tech("variations");
         font-weight: 400 700;
         font-style: oblique 14deg;
+        font-display: swap;
         unicode-range: U+0041-005A, U+0061-007A;
     };
     assert_eq!(
         render(&face),
-        r#"@font-face { font-family: "Inter"; src: url("/inter.woff2") format(woff2) tech(variations); font-weight: 400 700; font-style: oblique 14deg; unicode-range: U+0041-005A, U+0061-007A }"#,
+        r#"@font-face { font-family: "Inter"; src: url("/inter.woff2") format(woff2) tech(variations); font-weight: 400 700; font-style: oblique 14deg; font-display: swap; unicode-range: U+0041-005A, U+0061-007A }"#,
+    );
+}
+
+#[test]
+fn font_display_keyword() {
+    let face = font_face! {
+        font-family: "Inter";
+        src: local("Inter");
+        font-display: optional;
+    };
+    assert_eq!(
+        render(&face),
+        r#"@font-face { font-family: "Inter"; src: local("Inter"); font-display: optional }"#,
     );
 }
 

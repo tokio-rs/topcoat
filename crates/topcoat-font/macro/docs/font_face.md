@@ -28,6 +28,8 @@ font_face! {
 # }
 ```
 
+Learn more on [MDN][mdn-font-family].
+
 ## `src`
 
 `src` lists one or more sources, in preference order, separated by commas. Each entry is either `local("Family Name")`, naming a font already installed on the visitor's system, or `url("…")`, a font file to download with optional `format(…)` and `tech(…)` hints the browser uses to skip files it cannot use.
@@ -55,6 +57,8 @@ font_face! {
 }
 # }
 ```
+
+Learn more on [MDN][mdn-src].
 
 ## `font-weight`
 
@@ -86,6 +90,8 @@ font_face! {
 
 Keywords may be mixed with numbers in a range, so `font-weight: normal bold` is equivalent to `400 700`.
 
+Learn more on [MDN][mdn-font-weight].
+
 ## `font-style`
 
 `normal`, `italic`, or `oblique`. An oblique face may carry a slant angle, or an angle range for variable fonts. Angles are validated to `-90deg..=90deg`:
@@ -114,6 +120,25 @@ font_face! {
 # }
 ```
 
+Learn more on [MDN][mdn-font-style].
+
+## `font-display`
+
+How the face is shown while it loads: `auto`, `block`, `swap`, `fallback`, or `optional`. Each keyword trades off how long text is held invisible against how long a fallback may be shown before the face swaps in:
+
+```rust
+# use topcoat::font::*;
+# fn example() -> FontFace {
+font_face! {
+    font-family: "Inter";
+    src: local("Inter");
+    font-display: swap;
+}
+# }
+```
+
+Learn more on [MDN][mdn-font-display].
+
 ## `unicode-range`
 
 One or more `U+` ranges, separated by commas, restricting the face to a subset of code points. A bare `U+0041` covers a single code point; `U+0041-005A` covers an inclusive range:
@@ -129,9 +154,11 @@ font_face! {
 # }
 ```
 
+Learn more on [MDN][mdn-unicode-range].
+
 # Rust Expressions
 
-Any descriptor value can be a Rust expression instead of the literal CSS form, letting a face be assembled from runtime data. The expression must resolve to the runtime type for that descriptor: a family name convertible into [`String`] for `font-family`, a value convertible into [`FontSources`] (such as a `Vec<`[`FontSource`]`>`) for `src`, a [`FontWeightRange`] for `font-weight`, a [`FontStyle`] for `font-style`, and a [`UnicodeRanges`] for `unicode-range`.
+Any descriptor value can be a Rust expression instead of the literal CSS form, letting a face be assembled from runtime data. The expression must resolve to the runtime type for that descriptor: a family name convertible into [`String`] for `font-family`, a value convertible into [`FontSources`] (such as a `Vec<`[`FontSource`]`>`) for `src`, a [`FontWeightRange`] for `font-weight`, a [`FontStyle`] for `font-style`, a [`FontDisplay`] for `font-display`, and a [`UnicodeRanges`] for `unicode-range`.
 
 ```rust
 # use topcoat::font::*;
@@ -148,7 +175,14 @@ font_face! {
 ```
 
 [`@font-face`]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face
+[mdn-font-family]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-family
+[mdn-src]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/src
+[mdn-font-weight]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-weight
+[mdn-font-style]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-style
+[mdn-font-display]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display
+[mdn-unicode-range]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/unicode-range
 [`Asset`]: ../asset/struct.Asset.html
+[`FontDisplay`]: enum.FontDisplay.html
 [`FontFace`]: struct.FontFace.html
 [`FontFormat`]: enum.FontFormat.html
 [`FontSource`]: enum.FontSource.html

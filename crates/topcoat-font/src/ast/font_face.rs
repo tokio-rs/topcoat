@@ -1,3 +1,4 @@
+mod display;
 mod family;
 mod format;
 mod source;
@@ -6,6 +7,7 @@ mod tech;
 mod unicode;
 mod weight;
 
+pub use display::*;
 pub use family::*;
 pub use format::*;
 pub use source::*;
@@ -28,6 +30,7 @@ pub struct FontFace {
     pub src: FontSources,
     pub weight: Option<FontWeight>,
     pub style: Option<FontStyle>,
+    pub display: Option<FontDisplay>,
     pub unicode_range: Option<UnicodeRanges>,
 }
 
@@ -37,6 +40,7 @@ impl Parse for FontFace {
         let mut src = None;
         let mut weight = None;
         let mut style = None;
+        let mut display = None;
         let mut unicode_range = None;
 
         while !input.is_empty() {
@@ -60,6 +64,11 @@ impl Parse for FontFace {
                     return Err(input.error("duplicate `font-style` descriptor"));
                 }
                 style = Some(input.parse()?);
+            } else if FontDisplay::peek(input) {
+                if display.is_some() {
+                    return Err(input.error("duplicate `font-display` descriptor"));
+                }
+                display = Some(input.parse()?);
             } else if UnicodeRanges::peek(input) {
                 if unicode_range.is_some() {
                     return Err(input.error("duplicate `unicode-range` descriptor"));
@@ -68,7 +77,7 @@ impl Parse for FontFace {
             } else {
                 return Err(input.error(
                     "expected one of `font-family`, `src`, `font-weight`, `font-style`, \
-                     or `unicode-range`",
+                     `font-display`, or `unicode-range`",
                 ));
             }
 
@@ -87,6 +96,7 @@ impl Parse for FontFace {
             src,
             weight,
             style,
+            display,
             unicode_range,
         })
     }
@@ -99,13 +109,15 @@ impl ToTokens for FontFace {
 
         let weight = self.weight.iter();
         let style = self.style.iter();
+        let display = self.display.iter();
         let unicode_range = self.unicode_range.iter();
 
         quote! {
             ::topcoat::font::FontFace::new(#family, #src)
-            #(.with_weight(#weight))*
-            #(.with_style(#style))*
-            #(.with_unicode_range(#unicode_range))*
+                #(.with_weight(#weight))*
+                #(.with_style(#style))*
+                #(.with_display(#display))*
+                #(.with_unicode_range(#unicode_range))*
         }
         .to_tokens(tokens);
     }
@@ -132,6 +144,7 @@ mod tests {
         src: local("Inter"), url("/inter.woff2") format("woff2");
         font-weight: 400 700;
         font-style: oblique 14deg;
+        font-display: swap;
         unicode-range: U+0041-005A
     "#;
 
@@ -140,6 +153,7 @@ mod tests {
         let face = parse(FULL);
         assert!(face.weight.is_some());
         assert!(face.style.is_some());
+        assert!(face.display.is_some());
         assert!(face.unicode_range.is_some());
     }
 
@@ -149,6 +163,7 @@ mod tests {
             r#"
             unicode-range: U+0041-005A;
             font-style: italic;
+            font-display: optional;
             src: url("/inter.woff2") format("woff2");
             font-weight: 700;
             font-family: "Inter"
@@ -156,6 +171,7 @@ mod tests {
         );
         assert!(face.weight.is_some());
         assert!(face.style.is_some());
+        assert!(face.display.is_some());
         assert!(face.unicode_range.is_some());
     }
 
@@ -164,6 +180,7 @@ mod tests {
         let face = parse(MINIMAL);
         assert!(face.weight.is_none());
         assert!(face.style.is_none());
+        assert!(face.display.is_none());
         assert!(face.unicode_range.is_none());
     }
 
