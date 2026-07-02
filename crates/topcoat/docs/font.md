@@ -1,33 +1,32 @@
 Web fonts are typically loaded through CSS. A set of [`@font-face`] rules declare a font family and tells the browser where to download the font files. With Topcoat, you can programatically create these font faces and host them on your router.
 
-# Fontsource
+# Getting started
 
-[Fontsource] is an open-source catalog of web fonts. It includes every Google Font, plus other openly licensed families. [`fontsource_font!`] declares a font straight from the catalog, and checks the family name and every requested weight, style, and subset against it at compile time.
-
-## Getting started
-
-Fontsource support lives behind the `font-fontsource` feature:
-
-```toml
-topcoat = { version = "0.1", features = ["font-fontsource"] }
-```
-
-Declare the font you want to use as a constant by referencing its family name. Then, register it on the router, and load it in the page's `<head>`:
+[`font!`] declares a font from [`@font-face`] blocks you write yourself. The family name comes first and is injected into every block. Declare the font you want to use as a constant, register it on the router, and load it in the page's `<head>`:
 
 ```rust,no_run
 use topcoat::{
     Result,
-    font::{Font, fontsource::fontsource_font},
+    font::{Font, font},
     router::{Router, RouterBuilderDiscoverExt, page},
     view::view,
 };
 
-// Declare the "Roboto" font.
-const ROBOTO: Font = fontsource_font!("Roboto");
+// Declare the "Orbitron" font.
+const ORBITRON: Font = font! {
+    "Orbitron",
+    @font-face {
+        src: url(
+            "https://cdn.jsdelivr.net/fontsource/fonts/orbitron:vf@latest/latin-wght-normal.woff2"
+        ) format("woff2") tech("variations");
+        font-weight: 100 900;
+        font-display: swap;
+    }
+};
 
 #[tokio::main]
 async fn main() {
-    // `.discover()` will automatically find the font. You can also register it manually using `.font(ROBOTO)`.
+    // `.discover()` will automatically find the font. You can also register it manually using `.font(ORBITRON)`.
     let router = Router::builder().discover().build();
     topcoat::start(router).await.unwrap();
 }
@@ -38,19 +37,58 @@ async fn home() -> Result {
         <!DOCTYPE html>
         <html>
             <head>
-                topcoat::font::link(font: ROBOTO)
+                topcoat::font::link(font: ORBITRON)
             </head>
             <body>
-                <h1 style="font-family: 'Roboto'">"Hello!"</h1>
+                <h1 style="font-family: 'Orbitron'">"Hello!"</h1>
             </body>
         </html>
     }
 }
 ```
 
-The [`link`] component renders the stylesheet `<link>` that carries the font's `@font-face` rules. By default, this will include every weight and style Roboto ships, only in its default character subset, loaded by the browser from the [jsDelivr] CDN.
+The [`link`] component renders the stylesheet `<link>` that carries the font's `@font-face` rules.
 
-Using the font is then ordinary CSS: any rule on the page can refer to the family by name, like the `style` attribute in the example does. Rather than repeating the name as a string, you can also get it from [`ROBOTO.family()`].
+Using the font is then ordinary CSS: any rule on the page can refer to the family by name, like the `style` attribute in the example does. Rather than repeating the name as a string, you can also get it from [`ORBITRON.family()`].
+
+## Serving the files as assets
+
+`url(…)` accepts expressions that evaluate to URL strings, but also Topcoat [`Asset`]s. This downloads the file at build time and serves it from your own origin:
+
+```rust
+use topcoat::{asset::asset, font::{Font, font}};
+
+const INTER: Font = font! {
+    "Inter",
+    @font-face {
+        src: url(asset!(
+            "https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.woff2"
+        )) format("woff2");
+        font-weight: 400;
+    }
+};
+```
+
+Local files work similarly with the asset system: `url(asset!("./fonts/inter-400.woff2"))`. This needs the `asset` feature and the asset bundle loaded on the router. See the [asset guide] for how bundling works.
+
+# Fontsource
+
+[Fontsource] is an open-source catalog of web fonts. It includes every Google Font, plus other openly licensed families. [`fontsource_font!`] declares a font straight from the catalog, and checks the family name and every requested weight, style, and subset against it at compile time.
+
+Fontsource support lives behind the `font-fontsource` feature:
+
+```toml
+topcoat = { version = "0.1", features = ["font-fontsource"] }
+```
+
+Then specify which font you would like to use. By default, this will include every weight and style Roboto ships, only in its default character subset, loaded by the browser from the [jsDelivr] CDN:
+
+```rust
+# use topcoat::font::{Font, fontsource::fontsource_font};
+const ROBOTO: Font = fontsource_font!("Roboto");
+```
+
+The resulting [`Font`] can be registered, served, and loaded exactly like a custom one.
 
 ## Picking weights, styles, and subsets
 
@@ -87,81 +125,14 @@ let router = Router::builder()
     .build();
 ```
 
-This needs the `asset` feature and the asset bundle loaded on the router. See the [asset guide] for how bundling works.
-
-# Custom fonts
-
-For typefaces that aren't in the catalog, [`font!`] declares a font from [`@font-face`] blocks you write yourself. The family name comes first and is injected into every block, and the resulting [`Font`] is registered, served, and loaded exactly like a Fontsource one:
-
-```rust
-use topcoat::font::{Font, font};
-
-const ORBITRON: Font = font! {
-    "Orbitron",
-    @font-face {
-        src: url(
-            "https://cdn.jsdelivr.net/fontsource/fonts/orbitron:vf@latest/latin-wght-normal.woff2"
-        ) format("woff2") tech("variations");
-        font-weight: 100 900;
-        font-display: swap;
-    }
-};
-```
-
-## Serving the files as assets
-
-`url(…)` accepts expressions that evaluate to URL strings, but also Topcoat [`Asset`]s. This downloads the file at build time and serves it from your own origin:
-
-```rust
-use topcoat::{asset::asset, font::{Font, font}};
-
-const INTER: Font = font! {
-    "Inter",
-    @font-face {
-        src: url(asset!(
-            "https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.woff2"
-        )) format("woff2");
-        font-weight: 400;
-    }
-};
-```
-
-Local files work similarly with the asset system: `url(asset!("./fonts/inter-400.woff2"))`.
-
-# Serving and loading
-
-Every registered font is served as a small, content-hashed stylesheet containing its `@font-face` rules. The hash is derived from the family name and every face setting, so the URL changes when the font changes and responses can be cached indefinitely.
-
-When you use a [`Font`] as an attribute value in [`view!`] (e.g. `<link rel="stylesheet" href=(ROBOTO)>`), it renders as the URL of the CSS file. This allows linking the CSS from your HTML markup. You can also access the font's family name using `ROBOTO.family()`.
-
-The built-in [`link`] component makes this simple, and also adds preloading: by default it renders a `rel="preload"` link for the first source of each face, so the browser starts fetching the font files before it has parsed the stylesheet. Pass `preload: false` to turn that off:
-
-```rust
-# use topcoat::{font::{Font, fontsource::fontsource_font}, view::view};
-# const ROBOTO: Font = fontsource_font!("Roboto");
-# #[topcoat::view::component]
-# async fn example() -> topcoat::Result {
-view! {
-    topcoat::font::link(font: ROBOTO, preload: false)
-}
-# }
-```
-
 [Fontsource]: https://fontsource.org/
 [jsDelivr]: https://www.jsdelivr.com/
 [`@font-face`]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face
-[`font-display`]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display
 [asset guide]: crate::asset
 [assets]: crate::asset
-[`.discover()`]: crate::router::RouterBuilderDiscoverExt::discover
 [`Asset`]: crate::asset::Asset
 [`Font`]: Font
-[`ROBOTO.family()`]: Font::family
-[`FontFace`]: FontFace
-[`FontFaces`]: FontFaces
+[`ORBITRON.family()`]: Font::family
 [`font!`]: font
-[`font_face!`]: font_face
 [`fontsource_font!`]: fontsource::fontsource_font
-[`fontsource_font_face!`]: fontsource::fontsource_font_face
 [`link`]: link
-[`view!`]: crate::view::view
