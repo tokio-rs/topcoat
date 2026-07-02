@@ -143,7 +143,9 @@ impl Parse for FontsourceFont {
                 }
                 host = Some(input.parse()?);
             } else {
-                return Err(input.error("expected `weight`, `style`, `subset`, `display`, or `host`"));
+                return Err(
+                    input.error("expected `weight`, `style`, `subset`, `display`, or `host`")
+                );
             }
         }
 

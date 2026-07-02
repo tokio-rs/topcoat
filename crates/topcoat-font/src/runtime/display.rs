@@ -97,7 +97,10 @@ mod tests {
             FontDisplay::Fallback,
             FontDisplay::Optional,
         ] {
-            assert_eq!(FontDisplay::from_keyword(strategy.keyword()), Some(strategy));
+            assert_eq!(
+                FontDisplay::from_keyword(strategy.keyword()),
+                Some(strategy)
+            );
         }
     }
 
