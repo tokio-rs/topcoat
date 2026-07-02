@@ -14,11 +14,14 @@ pub mod fontsource {
 /// face so the browser can start fetching the files before the CSS is parsed.
 ///
 /// ```rust
-/// # use topcoat::font::{Font, fontsource::fontsource_font};
+/// # use topcoat::{font::{Font, fontsource::fontsource_font}, view::view};
 /// # const LAVISHLY_YOURS: Font = fontsource_font!("Lavishly Yours", host: Asset);
+/// # #[topcoat::view::component]
+/// # async fn example() -> topcoat::Result {
 /// view! {
 ///     topcoat::font::link(font: LAVISHLY_YOURS)
 /// }
+/// # }
 /// ```
 #[cfg(feature = "view")]
 #[topcoat::view::component]
