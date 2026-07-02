@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use topcoat_font::ast::font_face::FontFace;
+use topcoat_font::ast::{font::Font, font_face::FontFace};
 use topcoat_pretty::{Registry, pretty_print_str};
 
 fn diff(expected: &str, actual: &str) -> String {
@@ -30,7 +30,10 @@ fn diff(expected: &str, actual: &str) -> String {
 }
 
 fn registry() -> Registry {
-    Registry::one::<FontFace>("font_face")
+    let mut registry = Registry::new();
+    registry.register_macro::<FontFace>("font_face");
+    registry.register_macro::<Font>("font");
+    registry
 }
 
 fn assert_format(input: &str, expected: &str) {
@@ -137,5 +140,35 @@ fn keeps_a_line_comment_between_descriptors() {
     // the local copy is preferred
     src: local("Inter");
 }"#;
+    assert_format_idempotent(expected, expected);
+}
+
+#[test]
+fn formats_a_font_with_css_blocks() {
+    let expected = r#"font! {
+    "Inter",
+    @font-face {
+        src: url("/inter-400.woff2") format("woff2");
+        font-weight: 400;
+    }
+    @font-face {
+        src: url("/inter-700.woff2") format("woff2");
+        font-weight: 700;
+    }
+}"#;
+    assert_format_idempotent(expected, expected);
+}
+
+#[test]
+fn formats_a_compact_font_into_blocks() {
+    assert_format(
+        r#"font! { "Inter",@font-face{src:local("Inter");font-weight:400} }"#,
+        "font! {\n    \"Inter\",\n    @font-face {\n        src: local(\"Inter\");\n        font-weight: 400;\n    }\n}",
+    );
+}
+
+#[test]
+fn formats_a_font_with_an_expression() {
+    let expected = "font! {\n    \"Inter\",\n    inter_faces()\n}";
     assert_format_idempotent(expected, expected);
 }

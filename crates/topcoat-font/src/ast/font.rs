@@ -67,7 +67,7 @@ impl ToTokens for Font {
 /// [`FontFaces`](crate::runtime::FontFaces).
 pub enum FontFaces {
     Css(Vec<FontFaceBlock>),
-    Expr(Expr),
+    Expr(Box<Expr>),
 }
 
 impl Parse for FontFaces {
