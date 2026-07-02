@@ -19,6 +19,7 @@ const ORBITRON: Font = font! {
     @font-face {
         src: url("https://cdn.jsdelivr.net/fontsource/fonts/orbitron:vf@latest/latin-wght-normal.woff2") format("woff2") tech("variations");
         font-weight: 100 900;
+        font-display: swap;
     }
 };
 
