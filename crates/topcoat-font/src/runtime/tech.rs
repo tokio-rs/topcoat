@@ -75,32 +75,6 @@ impl FontTech {
         })
     }
 
-    /// A human-readable description of this technology.
-    #[must_use]
-    pub const fn description(self) -> &'static str {
-        match self {
-            Self::ColorCbdt => "Color bitmap data tables",
-            Self::ColorColrV0 => "Multi-colored glyphs via COLR version 0 table",
-            Self::ColorColrV1 => "Multi-colored glyphs via COLR version 1 table",
-            Self::ColorSbix => "Standard bitmap graphics tables",
-            Self::ColorSvg => "SVG multi-colored tables",
-            Self::FeaturesAat => "TrueType morx and kerx tables",
-            Self::FeaturesGraphite => {
-                "Graphite features, namely Silf, Glat, Gloc, Feat, and Sill tables"
-            }
-            Self::FeaturesOpenType => "OpenType GSUB and GPOS tables",
-            Self::Incremental => "Incremental font loading",
-            Self::Palettes => {
-                "Font palettes by means of font-palette to select one of many \
-                 color palettes in the font"
-            }
-            Self::Variations => {
-                "Font variations in TrueType and OpenType fonts to control the \
-                 font axis, weight, glyphs, etc."
-            }
-        }
-    }
-
     /// Folds this technology into a running content hash.
     pub(crate) const fn hash(self, h: u64) -> u64 {
         topcoat_core::runtime::fnv1a::hash_continue(h, self.keyword().as_bytes())

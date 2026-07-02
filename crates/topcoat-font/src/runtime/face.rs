@@ -4,10 +4,13 @@ use std::{fmt::Write, ops::Deref};
 
 use topcoat_core::runtime::{context::Cx, fnv1a};
 
-use crate::runtime::{CssString, FontSources, FontStyle, FontWeightRange, UnicodeRanges};
+use crate::runtime::{
+    CssString, FontDisplay, FontSources, FontStyle, FontWeightRange, UnicodeRanges,
+};
 
 /// A single CSS `@font-face` rule: a font family backed by one set of sources,
-/// scoped to an optional weight range, style, and unicode range.
+/// scoped to an optional weight range, style, display strategy, and unicode
+/// range.
 ///
 /// Renders as a complete `@font-face { ... }` block, with the optional
 /// descriptors omitted when unset.
@@ -17,15 +20,17 @@ pub struct FontFace {
     src: FontSources,
     weight: Option<FontWeightRange>,
     style: Option<FontStyle>,
+    display: Option<FontDisplay>,
     unicode_range: Option<UnicodeRanges>,
 }
 
 impl FontFace {
     /// Creates a face for `family`, served from `src`.
     ///
-    /// The weight, style, and unicode range start unset; add them with
-    /// [`with_weight`](Self::with_weight), [`with_style`](Self::with_style), and
-    /// [`with_unicode_range`](Self::with_unicode_range).
+    /// The weight, style, display strategy, and unicode range start unset; add
+    /// them with [`with_weight`](Self::with_weight),
+    /// [`with_style`](Self::with_style), [`with_display`](Self::with_display),
+    /// and [`with_unicode_range`](Self::with_unicode_range).
     ///
     /// # Panics
     ///
@@ -39,6 +44,7 @@ impl FontFace {
                 .unwrap_or_else(|_| panic!("font sources must not be empty")),
             weight: None,
             style: None,
+            display: None,
             unicode_range: None,
         }
     }
@@ -54,6 +60,13 @@ impl FontFace {
     #[must_use]
     pub fn with_style(mut self, style: FontStyle) -> Self {
         self.style = Some(style);
+        self
+    }
+
+    /// Sets the `font-display` descriptor.
+    #[must_use]
+    pub fn with_display(mut self, display: FontDisplay) -> Self {
+        self.display = Some(display);
         self
     }
 
@@ -80,6 +93,9 @@ impl FontFace {
         if let Some(style) = self.style {
             write!(f, "; font-style: {style}")?;
         }
+        if let Some(display) = self.display {
+            write!(f, "; font-display: {display}")?;
+        }
         if let Some(unicode_range) = self.unicode_range {
             write!(f, "; unicode-range: {unicode_range}")?;
         }
@@ -97,6 +113,10 @@ impl FontFace {
         };
         let h = match self.style {
             Some(style) => style.hash(fnv1a::hash_continue(h, &[1])),
+            None => fnv1a::hash_continue(h, &[0]),
+        };
+        let h = match self.display {
+            Some(display) => display.hash(fnv1a::hash_continue(h, &[1])),
             None => fnv1a::hash_continue(h, &[0]),
         };
         match self.unicode_range {
@@ -127,6 +147,12 @@ impl FontFace {
     #[must_use]
     pub fn style(&self) -> Option<FontStyle> {
         self.style
+    }
+
+    /// The `font-display` descriptor, if set.
+    #[must_use]
+    pub fn display(&self) -> Option<FontDisplay> {
+        self.display
     }
 
     /// The `unicode-range` descriptor, if set.

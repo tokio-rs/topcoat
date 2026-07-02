@@ -1,4 +1,5 @@
 mod css;
+mod display;
 mod face;
 mod font;
 mod format;
@@ -16,6 +17,7 @@ mod view;
 mod weight;
 
 pub(crate) use css::CssString;
+pub use display::*;
 pub use face::*;
 pub use font::*;
 pub use format::*;
