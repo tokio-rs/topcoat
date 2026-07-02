@@ -18,22 +18,76 @@ pub struct FmtCommand {
     /// If specified, reads the standard input and formats to standard output.
     stdin: bool,
 
+    /// Comma-separated list of macro names to register and format.
+    ///
+    /// Defaults to all supported macros. Only macro invocations whose name
+    /// appears in this list will have their bodies formatted.
+    #[arg(long, value_delimiter = ',')]
+    macros: Option<Vec<String>>,
+
     files: Vec<String>,
 }
 
 impl FmtCommand {
     pub async fn run(&self) {
-        let mut registry = Registry::new();
-        registry.register_macro::<topcoat_view::ast::view::View>("view");
-        registry.register_macro::<topcoat_view::ast::attributes::Attributes>("attributes");
-        registry.register_macro::<topcoat_font::ast::font_face::FontFace>("font_face");
-        registry.register_macro::<topcoat_font::ast::font::Font>("font");
-        registry.register_macro::<topcoat_font_fontsource::ast::font_face::FontsourceFontFace>(
-            "fontsource_font_face",
-        );
-        registry.register_macro::<topcoat_font_fontsource::ast::font::FontsourceFont>(
-            "fontsource_font",
-        );
+        let registry = {
+            // The full set of macros `topcoat fmt` knows how to format.
+            const ALL_MACROS: &[&str] = &[
+                "view",
+                "attributes",
+                "font_face",
+                "font",
+                "fontsource_font_face",
+                "fontsource_font",
+            ];
+
+            let mut registry = Registry::new();
+
+            let selected: BTreeSet<&str> = match &self.macros {
+                Some(names) => names.iter().map(String::as_str).collect(),
+                None => ALL_MACROS.iter().copied().collect(),
+            };
+
+            for name in &selected {
+                if !ALL_MACROS.contains(name) {
+                    eprintln!(
+                        "{}",
+                        style(format!(
+                            "unknown macro '{name}'; supported macros are: {}",
+                            ALL_MACROS.join(", ")
+                        ))
+                        .red()
+                    );
+                    std::process::exit(1);
+                }
+            }
+
+            if selected.contains("view") {
+                registry.register_macro::<topcoat_view::ast::view::View>("view");
+            }
+            if selected.contains("attributes") {
+                registry.register_macro::<topcoat_view::ast::attributes::Attributes>("attributes");
+            }
+            if selected.contains("font_face") {
+                registry.register_macro::<topcoat_font::ast::font_face::FontFace>("font_face");
+            }
+            if selected.contains("font") {
+                registry.register_macro::<topcoat_font::ast::font::Font>("font");
+            }
+            if selected.contains("fontsource_font_face") {
+                registry
+                    .register_macro::<topcoat_font_fontsource::ast::font_face::FontsourceFontFace>(
+                        "fontsource_font_face",
+                    );
+            }
+            if selected.contains("fontsource_font") {
+                registry.register_macro::<topcoat_font_fontsource::ast::font::FontsourceFont>(
+                    "fontsource_font",
+                );
+            }
+
+            registry
+        };
 
         let start = Instant::now();
         let result: Result<(), Error> = async {
