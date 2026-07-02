@@ -158,7 +158,7 @@ async fn match_arm_with_block_emits_multiple_siblings() {
             Some(name) => {
                 <h1>(name)</h1>
                 <p>"signed in"</p>
-            },
+            }
             None => <a href="/login">"sign in"</a>,
         }
     });
