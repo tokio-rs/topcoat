@@ -1,3 +1,5 @@
+#![doc = include_str!("../docs/font.md")]
+
 pub use topcoat_font::runtime::*;
 pub use topcoat_font_macro::*;
 

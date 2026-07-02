@@ -34,11 +34,13 @@ impl FontData {
         }
     }
 
+    /// The font's family name.
     #[must_use]
     pub fn family(&self) -> &str {
         &self.family
     }
 
+    /// The font's faces.
     #[must_use]
     pub fn faces(&self) -> &FontFaces {
         &self.faces
@@ -68,11 +70,13 @@ impl Font {
         Self(data)
     }
 
+    /// The font's family name.
     #[must_use]
     pub fn family(&self) -> &str {
         self.0.family()
     }
 
+    /// The font's faces.
     #[must_use]
     pub fn faces(&self) -> &FontFaces {
         self.0.faces()

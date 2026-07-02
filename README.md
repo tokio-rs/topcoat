@@ -114,12 +114,13 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 **Working with requests**
 - [Request context (`Cx`)](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/context.md) — the value pages, layouts, and components read from.
 - [App context](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/app_context.md) — share long-lived values across requests, keyed by type.
-- [Cookies](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/cookies.md) — read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
+- [Cookies](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/cookie.md) — read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
 - [Memoization](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-core/macro/docs/memoization.md) — `#[memoize]` for per-request caching and fan-out dedup.
 - [Functions, not middlewares](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/functions_not_middlewares.md) — the recommended way to model auth and other request-scoped concerns.
 
-**Project infrastructure**
-- [Assets](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/assets.md) — declare assets in Rust, serve them with content-hashed URLs.
+**Asset system**
+- [Assets](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/asset.md) — declare assets in Rust, serve them with content-hashed URLs.
+- [Fonts](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/font.md) — bundle and serve web fonts.
 
 **Third-party integrations**
 - [Tailwind](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/tailwind.md) — Tailwind CSS without Node, wired into the asset pipeline.
