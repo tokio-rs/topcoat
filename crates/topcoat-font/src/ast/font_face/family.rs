@@ -42,6 +42,16 @@ impl ToTokens for FontFamily {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontFamily {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct FontFamilyKey {
     pub font_kw: kw::font,
     pub dash_token: Token![-],
@@ -64,6 +74,16 @@ impl ParseOption for FontFamilyKey {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontFamilyKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.font_kw.span().start());
+        "font-family".pretty_print(printer);
+        printer.move_cursor(self.family_kw.span().end());
+    }
+}
+
 pub struct FontFamilyValue(pub Expr);
 
 impl Parse for FontFamilyValue {
@@ -82,5 +102,12 @@ impl ToTokens for FontFamilyValue {
         } else {
             expr.to_tokens(tokens);
         }
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontFamilyValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.0.pretty_print(printer);
     }
 }

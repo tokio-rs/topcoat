@@ -44,6 +44,16 @@ impl ToTokens for UnicodeRanges {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for UnicodeRanges {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct UnicodeRangesKey {
     pub unicode_kw: kw::unicode,
     pub dash_token: Token![-],
@@ -63,6 +73,16 @@ impl Parse for UnicodeRangesKey {
 impl ParseOption for UnicodeRangesKey {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::unicode) && input.peek2(Token![-]) && input.peek3(kw::range)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for UnicodeRangesKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.unicode_kw.span().start());
+        "unicode-range".pretty_print(printer);
+        printer.move_cursor(self.range_kw.span().end());
     }
 }
 
@@ -91,6 +111,22 @@ impl ToTokens for UnicodeRangesValue {
             }
             .to_tokens(tokens),
             Self::Expr(inner) => inner.to_tokens(tokens),
+        }
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for UnicodeRangesValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use topcoat_pretty::BreakMode;
+
+        match self {
+            Self::Css(ranges) => {
+                printer.scan_begin(BreakMode::Inconsistent);
+                ranges.pretty_print(printer);
+                printer.scan_end();
+            }
+            Self::Expr(inner) => inner.pretty_print(printer),
         }
     }
 }
@@ -130,6 +166,20 @@ impl ToTokens for UnicodeRange {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for UnicodeRange {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.u_token.span().start());
+        "U".pretty_print(printer);
+        self.plus_token.pretty_print(printer);
+        self.start.pretty_print(printer);
+        if let Some(end) = &self.end {
+            end.pretty_print(printer);
+        }
+    }
+}
+
 /// The `-005A` tail of a [`UnicodeRange`] that spans more than one code point.
 pub struct UnicodeRangeEnd {
     pub dash_token: Token![-],
@@ -154,6 +204,14 @@ impl ParseOption for UnicodeRangeEnd {
 impl ToTokens for UnicodeRangeEnd {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.code_point.to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for UnicodeRangeEnd {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.dash_token.pretty_print(printer);
+        self.code_point.pretty_print(printer);
     }
 }
 
@@ -197,6 +255,20 @@ impl Parse for UnicodeCodePoint {
 impl ToTokens for UnicodeCodePoint {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         Literal::u32_unsuffixed(self.value).to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for UnicodeCodePoint {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        // Preserve the written hexadecimal digits (e.g. `0041`, `D800`).
+        printer.move_cursor(self.span.start());
+        let source = self
+            .span
+            .source_text()
+            .expect("cannot pretty print code point without source text");
+        source.pretty_print(printer);
+        printer.move_cursor(self.span.end());
     }
 }
 

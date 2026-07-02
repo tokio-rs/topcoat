@@ -48,6 +48,20 @@ impl ToTokens for FontTechHint {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontTechHint {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        use topcoat_pretty::Delim;
+
+        printer.move_cursor(self.tech_kw.span().start());
+        "tech".pretty_print(printer);
+        self.paren_token.pretty_print(printer, None, |printer| {
+            self.value.pretty_print(printer);
+        });
+    }
+}
+
 /// The technology inside a [`FontTechHint`].
 ///
 /// Wraps an expression that resolves to a [`crate::runtime::FontTech`] at run
@@ -83,6 +97,13 @@ impl ToTokens for FontTech {
         }
         let inner = &self.0;
         inner.to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontTech {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.0.pretty_print(printer);
     }
 }
 

@@ -45,6 +45,16 @@ impl ToTokens for FontStyle {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontStyle {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct FontStyleKey {
     pub font_kw: kw::font,
     pub dash_token: Token![-],
@@ -64,6 +74,16 @@ impl Parse for FontStyleKey {
 impl ParseOption for FontStyleKey {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::font) && input.peek2(Token![-]) && input.peek3(kw::style)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontStyleKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.font_kw.span().start());
+        "font-style".pretty_print(printer);
+        printer.move_cursor(self.style_kw.span().end());
     }
 }
 
@@ -87,6 +107,16 @@ impl ToTokens for FontStyleValue {
         match self {
             Self::Css(kind) => kind.to_tokens(tokens),
             Self::Expr(inner) => inner.to_tokens(tokens),
+        }
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontStyleValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        match self {
+            Self::Css(kind) => kind.pretty_print(printer),
+            Self::Expr(inner) => inner.pretty_print(printer),
         }
     }
 }
@@ -131,6 +161,38 @@ impl ToTokens for FontStyleKind {
             },
         }
         .to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontStyleKind {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        match self {
+            Self::Normal(normal_kw) => {
+                printer.move_cursor(normal_kw.span().start());
+                "normal".pretty_print(printer);
+                printer.move_cursor(normal_kw.span().end());
+            }
+            Self::Italic(italic_kw) => {
+                printer.move_cursor(italic_kw.span().start());
+                "italic".pretty_print(printer);
+                printer.move_cursor(italic_kw.span().end());
+            }
+            Self::Oblique { oblique_kw, angles } => {
+                printer.move_cursor(oblique_kw.span().start());
+                "oblique".pretty_print(printer);
+                printer.move_cursor(oblique_kw.span().end());
+                if let Some(range) = angles {
+                    " ".pretty_print(printer);
+                    range.start.pretty_print(printer);
+                    if let Some(end) = &range.end {
+                        " ".pretty_print(printer);
+                        end.pretty_print(printer);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -238,6 +300,22 @@ impl ParseOption for ObliqueAngle {
 impl ToTokens for ObliqueAngle {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         Literal::f32_suffixed(self.degrees).to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for ObliqueAngle {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        if let Some(minus_token) = &self.minus_token {
+            minus_token.pretty_print(printer);
+        }
+        printer.move_cursor(self.span.start());
+        let source = self
+            .span
+            .source_text()
+            .expect("cannot pretty print oblique angle without source text");
+        source.pretty_print(printer);
+        printer.move_cursor(self.span.end());
     }
 }
 

@@ -42,6 +42,11 @@ syn = { workspace = true, optional = true }
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["font"] }
+topcoat-pretty.workspace = true
+
+[[test]]
+name = "pretty"
+required-features = ["pretty"]
 
 [lints]
 workspace = true

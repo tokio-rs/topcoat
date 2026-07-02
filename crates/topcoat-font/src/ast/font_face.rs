@@ -123,6 +123,51 @@ impl ToTokens for FontFace {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontFace {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+
+        // The descriptors are stored in fixed fields, so recover their written
+        // order from their spans to keep the output faithful and idempotent.
+        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_pretty::PrettyPrint)> = vec![
+            (self.family.key.font_kw.span().start(), &self.family),
+            (self.src.key.src_kw.span().start(), &self.src),
+        ];
+        if let Some(weight) = &self.weight {
+            descriptors.push((weight.key.font_kw.span().start(), weight));
+        }
+        if let Some(style) = &self.style {
+            descriptors.push((style.key.font_kw.span().start(), style));
+        }
+        if let Some(display) = &self.display {
+            descriptors.push((display.key.font_kw.span().start(), display));
+        }
+        if let Some(unicode_range) = &self.unicode_range {
+            descriptors.push((unicode_range.key.unicode_kw.span().start(), unicode_range));
+        }
+        descriptors.sort_by_key(|(position, _)| (position.line, position.column));
+
+        for (index, (_, descriptor)) in descriptors.iter().enumerate() {
+            descriptor.pretty_print(printer);
+            if index < descriptors.len() - 1 {
+                // Separate descriptors with a semicolon and lay each out on its
+                // own line, mirroring the CSS `@font-face` block form.
+                ";".pretty_print(printer);
+                printer.scan_same_line_trivia();
+                printer.scan_force_break();
+                printer.scan_trivia(true, true);
+            } else {
+                // A trailing semicolon is only rendered when the block breaks
+                // across lines, which it always does when it has more than the
+                // required two descriptors on separate lines.
+                printer.scan_text(";".into(), topcoat_pretty::TextMode::Break);
+                printer.advance_cursor(";");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1813,6 +1813,7 @@ dependencies = [
  "tokio",
  "topcoat",
  "topcoat-asset",
+ "topcoat-font",
  "topcoat-pretty",
  "topcoat-ui",
  "topcoat-view",

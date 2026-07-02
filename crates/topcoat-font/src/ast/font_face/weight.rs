@@ -44,6 +44,16 @@ impl ToTokens for FontWeight {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontWeight {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct FontWeightKey {
     pub font_kw: kw::font,
     pub dash_token: Token![-],
@@ -63,6 +73,16 @@ impl Parse for FontWeightKey {
 impl ParseOption for FontWeightKey {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::font) && input.peek2(Token![-]) && input.peek3(kw::weight)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontWeightKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.font_kw.span().start());
+        "font-weight".pretty_print(printer);
+        printer.move_cursor(self.weight_kw.span().end());
     }
 }
 
@@ -86,6 +106,16 @@ impl ToTokens for FontWeightValue {
         match self {
             Self::Css(range) => range.to_tokens(tokens),
             Self::Expr(inner) => inner.to_tokens(tokens),
+        }
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontWeightValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        match self {
+            Self::Css(range) => range.pretty_print(printer),
+            Self::Expr(inner) => inner.pretty_print(printer),
         }
     }
 }
@@ -126,6 +156,17 @@ impl ToTokens for FontWeightRange {
             },
         }
         .to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontWeightRange {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.start.pretty_print(printer);
+        if let Some(end) = &self.end {
+            " ".pretty_print(printer);
+            end.pretty_print(printer);
+        }
     }
 }
 
@@ -173,6 +214,21 @@ impl ParseOption for FontWeightLevel {
 impl ToTokens for FontWeightLevel {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         Literal::u16_unsuffixed(self.value).to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontWeightLevel {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        // Preserve the written form (`400`, `normal`, `bold`) rather than
+        // normalizing keywords to their numeric weight.
+        printer.move_cursor(self.span.start());
+        let source = self
+            .span
+            .source_text()
+            .expect("cannot pretty print font weight without source text");
+        source.pretty_print(printer);
+        printer.move_cursor(self.span.end());
     }
 }
 

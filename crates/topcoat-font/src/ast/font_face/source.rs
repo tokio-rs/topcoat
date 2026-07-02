@@ -47,6 +47,16 @@ impl ToTokens for FontSources {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontSources {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct FontSourcesKey {
     pub src_kw: kw::src,
 }
@@ -62,6 +72,16 @@ impl Parse for FontSourcesKey {
 impl ParseOption for FontSourcesKey {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::src)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontSourcesKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.src_kw.span().start());
+        "src".pretty_print(printer);
+        printer.move_cursor(self.src_kw.span().end());
     }
 }
 
@@ -88,6 +108,22 @@ impl ToTokens for FontSourcesValue {
                 ::topcoat::font::FontSources::new(::std::vec![#inner])
             }
             .to_tokens(tokens),
+        }
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontSourcesValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use topcoat_pretty::BreakMode;
+
+        match self {
+            Self::Expr(inner) => inner.pretty_print(printer),
+            Self::Css(sources) => {
+                printer.scan_begin(BreakMode::Inconsistent);
+                sources.pretty_print(printer);
+                printer.scan_end();
+            }
         }
     }
 }
@@ -172,5 +208,50 @@ impl ToTokens for FontSource {
             }
         }
         .to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontSource {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        use topcoat_pretty::Delim;
+
+        match self {
+            Self::Url {
+                url_kw,
+                paren_token,
+                expr,
+                tech,
+                format,
+            } => {
+                printer.move_cursor(url_kw.span().start());
+                "url".pretty_print(printer);
+                paren_token.pretty_print(printer, None, |printer| {
+                    expr.pretty_print(printer);
+                });
+                // `format(...)` precedes `tech(...)` in the CSS grammar; emit
+                // them in that canonical order regardless of source order.
+                if let Some(format) = format {
+                    " ".pretty_print(printer);
+                    format.pretty_print(printer);
+                }
+                if let Some(tech) = tech {
+                    " ".pretty_print(printer);
+                    tech.pretty_print(printer);
+                }
+            }
+            Self::Local {
+                local_kw,
+                paren_token,
+                expr,
+            } => {
+                printer.move_cursor(local_kw.span().start());
+                "local".pretty_print(printer);
+                paren_token.pretty_print(printer, None, |printer| {
+                    expr.pretty_print(printer);
+                });
+            }
+        }
     }
 }

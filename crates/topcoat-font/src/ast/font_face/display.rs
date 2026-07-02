@@ -47,6 +47,16 @@ impl ToTokens for FontDisplay {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontDisplay {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct FontDisplayKey {
     pub font_kw: kw::font,
     pub dash_token: Token![-],
@@ -66,6 +76,16 @@ impl Parse for FontDisplayKey {
 impl ParseOption for FontDisplayKey {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::font) && input.peek2(Token![-]) && input.peek3(kw::display)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontDisplayKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.font_kw.span().start());
+        "font-display".pretty_print(printer);
+        printer.move_cursor(self.display_kw.span().end());
     }
 }
 
@@ -89,6 +109,16 @@ impl ToTokens for FontDisplayValue {
         match self {
             Self::Css(kind) => kind.to_tokens(tokens),
             Self::Expr(inner) => inner.to_tokens(tokens),
+        }
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontDisplayValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        match self {
+            Self::Css(kind) => kind.pretty_print(printer),
+            Self::Expr(inner) => inner.pretty_print(printer),
         }
     }
 }
@@ -142,6 +172,23 @@ impl ToTokens for FontDisplayKind {
             Self::Optional(_) => quote! { ::topcoat::font::FontDisplay::Optional },
         }
         .to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontDisplayKind {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        let (span, keyword) = match self {
+            Self::Auto(kw) => (kw.span(), "auto"),
+            Self::Block(kw) => (kw.span(), "block"),
+            Self::Swap(kw) => (kw.span(), "swap"),
+            Self::Fallback(kw) => (kw.span(), "fallback"),
+            Self::Optional(kw) => (kw.span(), "optional"),
+        };
+        printer.move_cursor(span.start());
+        keyword.pretty_print(printer);
+        printer.move_cursor(span.end());
     }
 }
 
