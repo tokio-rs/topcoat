@@ -26,7 +26,11 @@ use syn::{
 use topcoat_core::ast::ParseOption;
 
 pub struct FontFace {
-    pub family: FontFamily,
+    /// The `font-family` descriptor. Optional in the AST because a
+    /// [`font!`](super::font::Font) `@font-face` block omits it and has the
+    /// family injected by the enclosing macro; the `font_face!` macro requires
+    /// it.
+    pub family: Option<FontFamily>,
     pub src: FontSources,
     pub weight: Option<FontWeight>,
     pub style: Option<FontStyle>,
@@ -87,8 +91,6 @@ impl Parse for FontFace {
             let _: Token![;] = input.parse()?;
         }
 
-        let family =
-            family.ok_or_else(|| input.error("missing required `font-family` descriptor"))?;
         let src = src.ok_or_else(|| input.error("missing required `src` descriptor"))?;
 
         Ok(Self {
@@ -102,9 +104,14 @@ impl Parse for FontFace {
     }
 }
 
-impl ToTokens for FontFace {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let family = &self.family;
+impl FontFace {
+    /// Emits the `FontFace::new(...)` construction, using `family` as the face's
+    /// family rather than the `font-family` descriptor stored on `self` (which
+    /// may be absent).
+    ///
+    /// This lets [`font!`](super::font::Font) reuse a `FontFace` block while
+    /// injecting the family declared once on the enclosing macro.
+    pub fn to_tokens_with_family(&self, family: &impl ToTokens) -> TokenStream {
         let src = &self.src;
 
         let weight = self.weight.iter();
@@ -119,7 +126,21 @@ impl ToTokens for FontFace {
                 #(.with_display(#display))*
                 #(.with_unicode_range(#unicode_range))*
         }
-        .to_tokens(tokens);
+    }
+}
+
+impl ToTokens for FontFace {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let Some(family) = &self.family else {
+            syn::Error::new(
+                proc_macro2::Span::call_site(),
+                "missing required `font-family` descriptor",
+            )
+            .to_compile_error()
+            .to_tokens(tokens);
+            return;
+        };
+        self.to_tokens_with_family(family).to_tokens(tokens);
     }
 }
 
@@ -130,10 +151,11 @@ impl topcoat_pretty::PrettyPrint for FontFace {
 
         // The descriptors are stored in fixed fields, so recover their written
         // order from their spans to keep the output faithful and idempotent.
-        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_pretty::PrettyPrint)> = vec![
-            (self.family.key.font_kw.span().start(), &self.family),
-            (self.src.key.src_kw.span().start(), &self.src),
-        ];
+        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_pretty::PrettyPrint)> =
+            vec![(self.src.key.src_kw.span().start(), &self.src)];
+        if let Some(family) = &self.family {
+            descriptors.push((family.key.font_kw.span().start(), family));
+        }
         if let Some(weight) = &self.weight {
             descriptors.push((weight.key.font_kw.span().start(), weight));
         }
@@ -236,8 +258,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_missing_font_family() {
-        assert!(parse_err(r#"src: local("Inter")"#).contains("font-family"));
+    fn allows_a_missing_font_family() {
+        // The descriptor is optional at the AST level: a `font!` `@font-face`
+        // block omits it and has the family injected. The `font_face!` macro
+        // enforces its presence when generating code.
+        let face = parse(r#"src: local("Inter")"#);
+        assert!(face.family.is_none());
     }
 
     #[test]
