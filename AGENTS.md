@@ -45,11 +45,11 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 - [`crates/topcoat/docs/app_context.md`](crates/topcoat/docs/app_context.md) — App context: registering long-lived values with `.app_context(value)` and reading them with `app_context::<T>(cx)`.
 - [`crates/topcoat-core/macro/docs/memoization.md`](crates/topcoat-core/macro/docs/memoization.md) — `#[memoize]` for per-request caching of function results keyed by arguments.
 - [`crates/topcoat/docs/functions_not_middlewares.md`](crates/topcoat/docs/functions_not_middlewares.md) — The framework's philosophy: prefer composable `cx: &Cx` functions over middleware/extractors for auth and request-scoped data.
-- [`crates/topcoat/docs/cookies.md`](crates/topcoat/docs/cookies.md) — Cookies: the request-scoped jar (`cookies(cx)`), the `cookie!` macro, attribute defaults, name prefixes, signed/private cookies, and typed `CookieStore<T>`.
+- [`crates/topcoat/docs/cookie.md`](crates/topcoat/docs/cookies.md) — Cookies: the request-scoped jar (`cookies(cx)`), the `cookie!` macro, attribute defaults, name prefixes, signed/private cookies, and typed `CookieStore<T>`.
 
 ### Assets and styling
 
-- [`crates/topcoat/docs/assets.md`](crates/topcoat/docs/assets.md) — Declaring static files with `asset!`, content-hashed URLs, and loading the asset bundle on the router.
+- [`crates/topcoat/docs/asset.md`](crates/topcoat/docs/assets.md) — Declaring static files with `asset!`, content-hashed URLs, and loading the asset bundle on the router.
 - [`crates/topcoat/docs/tailwind.md`](crates/topcoat/docs/tailwind.md) — The Tailwind integration: a build-script wrapper around the standalone Tailwind CLI served as a Topcoat asset.
 
 ### Tooling
