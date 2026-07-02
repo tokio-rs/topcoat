@@ -31,8 +31,9 @@ impl FmtCommand {
         registry.register_macro::<topcoat_font_fontsource::ast::font_face::FontsourceFontFace>(
             "fontsource_font_face",
         );
-        registry
-            .register_macro::<topcoat_font_fontsource::ast::font::FontsourceFont>("fontsource_font");
+        registry.register_macro::<topcoat_font_fontsource::ast::font::FontsourceFont>(
+            "fontsource_font",
+        );
 
         let start = Instant::now();
         let result: Result<(), Error> = async {

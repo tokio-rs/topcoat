@@ -80,7 +80,8 @@ fn formats_every_face_descriptor() {
 
 #[test]
 fn preserves_the_written_face_argument_order() {
-    let expected = r#"fontsource_font_face!("Inter", host: Asset, style: Style::Normal, weight: 400);"#;
+    let expected =
+        r#"fontsource_font_face!("Inter", host: Asset, style: Style::Normal, weight: 400);"#;
     assert_format_idempotent(expected, expected);
 }
 
