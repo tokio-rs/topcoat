@@ -104,6 +104,36 @@ impl FontFace {
             None => fnv1a::hash_continue(h, &[0]),
         }
     }
+
+    /// The `font-family` this face defines.
+    #[must_use]
+    pub fn family(&self) -> &str {
+        &self.family
+    }
+
+    /// The sources backing this face's `src` descriptor.
+    #[must_use]
+    pub fn src(&self) -> &FontSources {
+        &self.src
+    }
+
+    /// The `font-weight` descriptor, if set.
+    #[must_use]
+    pub fn weight(&self) -> Option<FontWeightRange> {
+        self.weight
+    }
+
+    /// The `font-style` descriptor, if set.
+    #[must_use]
+    pub fn style(&self) -> Option<FontStyle> {
+        self.style
+    }
+
+    /// The `unicode-range` descriptor, if set.
+    #[must_use]
+    pub fn unicode_range(&self) -> Option<UnicodeRanges> {
+        self.unicode_range
+    }
 }
 
 /// An ordered, non-empty list of [`FontFace`]s.

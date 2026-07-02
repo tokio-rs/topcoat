@@ -39,8 +39,9 @@ async fn home() -> Result {
         <html>
             <head>
                 topcoat::dev::script()
-                <link rel="stylesheet" href=(LAVISHLY_YOURS)>
-                <link rel="stylesheet" href=(ORBITRON)>
+                // The `link` component preloads fonts efficiently by default.
+                topcoat::font::link(font: LAVISHLY_YOURS)
+                topcoat::font::link(font: ORBITRON)
             </head>
             <body>
                 <h1 style=(format!("font-family: {:?}", LAVISHLY_YOURS.family()))>

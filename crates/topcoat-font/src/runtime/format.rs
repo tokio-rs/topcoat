@@ -57,6 +57,21 @@ impl FontFormat {
         })
     }
 
+    /// The MIME type of this format, as used in a `type` attribute (e.g. on a
+    /// `<link rel="preload" as="font">`).
+    #[must_use]
+    pub const fn mime_type(self) -> &'static str {
+        match self {
+            Self::Collection => "font/collection",
+            Self::EmbeddedOpenType => "application/vnd.ms-fontobject",
+            Self::OpenType => "font/otf",
+            Self::Svg => "image/svg+xml",
+            Self::TrueType => "font/ttf",
+            Self::Woff => "font/woff",
+            Self::Woff2 => "font/woff2",
+        }
+    }
+
     /// The human-readable name of this format.
     #[must_use]
     pub const fn name(self) -> &'static str {

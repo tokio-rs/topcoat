@@ -119,6 +119,20 @@ impl From<topcoat_asset::Asset> for FontSourceUrl {
     }
 }
 
+#[cfg(feature = "view")]
+impl topcoat_view::runtime::AttributeValueViewParts for FontSourceUrl {
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    fn into_view_parts(self, parts: &mut topcoat_view::runtime::ViewParts) {
+        match self {
+            Self::Str(inner) => inner.into_view_parts(parts),
+            Self::Asset(inner) => inner.into_view_parts(parts),
+        }
+    }
+}
+
 /// A single entry of a CSS `@font-face` `src` descriptor.
 ///
 /// A [`Url`](Self::Url) points at a font file to download, with optional
