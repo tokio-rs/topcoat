@@ -63,6 +63,7 @@ impl FmtCommand {
 
             let mut count = 0;
             let mut modified = 0;
+            let mut failed = 0;
             for file in &files {
                 match format_file(file, &registry) {
                     Ok(true) => {
@@ -73,8 +74,8 @@ impl FmtCommand {
                         count += 1;
                     }
                     Err(error) => {
+                        failed += 1;
                         eprintln!("{}", style(format!("{}: {error}", file.display())).red());
-                        std::process::exit(1);
                     }
                 }
             }
@@ -84,6 +85,16 @@ impl FmtCommand {
                 std::io::stdin().read_to_string(&mut buf)?;
                 buf = pretty_print_str(&registry, &buf)?;
                 print!("{buf}");
+            } else if failed > 0 {
+                eprintln!(
+                    "{}",
+                    style(format!(
+                        "formatted {count} files ({modified} modified), {failed} failed in {:.0?}",
+                        start.elapsed()
+                    ))
+                    .red()
+                );
+                std::process::exit(1);
             } else {
                 eprintln!(
                     "{}",
