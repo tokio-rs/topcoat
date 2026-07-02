@@ -1,9 +1,11 @@
+mod display;
 mod family;
 mod host;
 mod style;
 mod subset;
 mod weight;
 
+pub use display::*;
 pub use family::*;
 pub use host::*;
 pub use style::*;
@@ -25,13 +27,14 @@ use crate::runtime;
 /// the jsDelivr CDN, or, with `host: Asset`, a bundled copy.
 ///
 /// Holds the parsed descriptors; `weight` and `style` are required, `subset`
-/// defaults to the family's default subset. Each value is validated against the
-/// catalog when lowering to tokens.
+/// defaults to the family's default subset, and `display` defaults to `swap`.
+/// Each value is validated against the catalog when lowering to tokens.
 pub struct FontsourceFontFace {
     pub family: FamilyName,
     pub weight: Weight,
     pub style: Style,
     pub subset: Option<Subset>,
+    pub display: Option<Display>,
     pub host: Option<Host>,
 }
 
@@ -45,6 +48,11 @@ impl FontsourceFontFace {
         let subset = match &self.subset {
             Some(subset) => subset.value.resolve(family)?,
             None => family.default_subset,
+        };
+        let display = if let Some(display) = &self.display {
+            display.value.resolve()?
+        } else {
+            quote! { ::topcoat::font::FontDisplay::Swap }
         };
         let host = self
             .host
@@ -110,6 +118,7 @@ impl FontsourceFontFace {
             ::topcoat::font::FontFace::new(#name, #src)
                 .with_weight(::topcoat::font::FontWeightRange::from_u16(#weight, #weight))
                 .with_style(#style)
+                .with_display(#display)
                 #unicode_range
         }})
     }
@@ -122,6 +131,7 @@ impl Parse for FontsourceFontFace {
         let mut weight = None;
         let mut style = None;
         let mut subset = None;
+        let mut display = None;
         let mut host = None;
 
         while !input.is_empty() {
@@ -145,13 +155,18 @@ impl Parse for FontsourceFontFace {
                     return Err(input.error("duplicate `subset`"));
                 }
                 subset = Some(input.parse()?);
+            } else if Display::peek(input) {
+                if display.is_some() {
+                    return Err(input.error("duplicate `display`"));
+                }
+                display = Some(input.parse()?);
             } else if Host::peek(input) {
                 if host.is_some() {
                     return Err(input.error("duplicate `host`"));
                 }
                 host = Some(input.parse()?);
             } else {
-                return Err(input.error("expected `weight`, `style`, `subset`, or `host`"));
+                return Err(input.error("expected `weight`, `style`, `subset`, `display`, or `host`"));
             }
         }
 
@@ -162,6 +177,7 @@ impl Parse for FontsourceFontFace {
             style: style
                 .ok_or_else(|| input.error("`fontsource_font_face!` requires a `style`"))?,
             subset,
+            display,
             host,
         })
     }

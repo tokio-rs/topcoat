@@ -39,6 +39,16 @@ The remaining arguments each take either a single value or a bracketed list of t
 
 **`host`** says where the files are loaded from, and takes a single value rather than a list. It defaults to [`JsDelivr`], which links the fonts on the [jsDelivr] CDN. Pass [`Asset`] instead to download them at build time and serve them from your own origin as content-hashed Topcoat [`Asset`][asset-type]s — this needs the `asset` feature.
 
+**`display`** sets the [`FontDisplay`] strategy applied to every face — how text is shown while the font downloads. It takes a single value rather than a list, and defaults to `Swap`.
+
+```rust
+# use topcoat::font::*;
+# use topcoat::font::fontsource::*;
+# fn example() -> Font {
+fontsource_font!("Roboto", display: Optional)
+# }
+```
+
 ```rust
 # use topcoat::font::*;
 # use topcoat::font::fontsource::*;
@@ -60,6 +70,7 @@ To manage individual font faces reach for [`fontsource_font_face!`], which takes
 [`Italic`]: enum.Style.html#variant.Italic
 [`Latin`]: enum.Subset.html#variant.Latin
 [`Cyrillic`]: enum.Subset.html#variant.Cyrillic
+[`FontDisplay`]: ../enum.FontDisplay.html
 [`Font`]: ../struct.Font.html
 [`FontFace`]: ../struct.FontFace.html
 [`fontsource_font_face!`]: macro.fontsource_font_face.html

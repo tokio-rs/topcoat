@@ -14,10 +14,17 @@ fn render(face: &FontFace) -> String {
     out
 }
 
-/// Builds the `@font-face` rule a Roboto CDN face renders to.
+/// Builds the `@font-face` rule a Roboto CDN face renders to, using the default
+/// `swap` display strategy.
 fn roboto(file: &str, weight: u16, style: &str, range: &str) -> String {
+    roboto_display(file, weight, style, "swap", range)
+}
+
+/// Builds the `@font-face` rule a Roboto CDN face renders to with an explicit
+/// `font-display` strategy.
+fn roboto_display(file: &str, weight: u16, style: &str, display: &str, range: &str) -> String {
     format!(
-        r#"@font-face {{ font-family: "Roboto"; src: url("https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/{file}.woff2") format(woff2); font-weight: {weight}; font-style: {style}; unicode-range: {range} }}"#
+        r#"@font-face {{ font-family: "Roboto"; src: url("https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/{file}.woff2") format(woff2); font-weight: {weight}; font-style: {style}; font-display: {display}; unicode-range: {range} }}"#
     )
 }
 
@@ -54,6 +61,21 @@ fn arguments_in_any_order() {
     assert_eq!(
         render(&face),
         roboto("cyrillic-500-normal", 500, "normal", CYRILLIC)
+    );
+}
+
+#[test]
+fn display_defaults_to_swap() {
+    let face = fontsource_font_face!("Roboto", weight: 400, style: Normal);
+    assert!(render(&face).contains("font-display: swap"));
+}
+
+#[test]
+fn explicit_display_overrides_the_default() {
+    let face = fontsource_font_face!("Roboto", weight: 400, style: Normal, display: Fallback);
+    assert_eq!(
+        render(&face),
+        roboto_display("latin-400-normal", 400, "normal", "fallback", LATIN),
     );
 }
 

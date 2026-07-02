@@ -18,7 +18,7 @@ use syn::{
 use topcoat_core::ast::ParseOption;
 
 use crate::{
-    ast::font_face::{FamilyName, Host},
+    ast::font_face::{Display, FamilyName, Host},
     runtime,
 };
 
@@ -27,12 +27,14 @@ use crate::{
 ///
 /// Holds the parsed descriptors. An omitted `weight` or `style` expands to every
 /// value the family ships; an omitted `subset` expands to the family's default
-/// subset only. Each axis is validated against the catalog when lowering.
+/// subset only. `display` applies to every face and defaults to `swap`. Each
+/// axis is validated against the catalog when lowering.
 pub struct FontsourceFont {
     pub family: FamilyName,
     pub weight: Option<Weight>,
     pub style: Option<Style>,
     pub subset: Option<Subset>,
+    pub display: Option<Display>,
     pub host: Option<Host>,
 }
 
@@ -62,6 +64,12 @@ impl FontsourceFont {
         } else {
             quote! {}
         };
+        let display = if let Some(display) = self.display.as_ref() {
+            let display = &display.value;
+            quote! { , display: #display }
+        } else {
+            quote! {}
+        };
 
         let mut faces = Vec::new();
         for &weight in &weights {
@@ -79,6 +87,7 @@ impl FontsourceFont {
                             weight: #weight,
                             style: ::topcoat::font::fontsource::Style::#style,
                             subset: ::topcoat::font::fontsource::Subset::#subset
+                            #display
                             #host
                         )
                     });
@@ -99,6 +108,7 @@ impl Parse for FontsourceFont {
         let mut weight = None;
         let mut style = None;
         let mut subset = None;
+        let mut display = None;
         let mut host = None;
 
         while !input.is_empty() {
@@ -122,13 +132,18 @@ impl Parse for FontsourceFont {
                     return Err(input.error("duplicate `subset`"));
                 }
                 subset = Some(input.parse()?);
+            } else if Display::peek(input) {
+                if display.is_some() {
+                    return Err(input.error("duplicate `display`"));
+                }
+                display = Some(input.parse()?);
             } else if Host::peek(input) {
                 if host.is_some() {
                     return Err(input.error("duplicate `host`"));
                 }
                 host = Some(input.parse()?);
             } else {
-                return Err(input.error("expected `weight`, `style`, `subset`, or `host`"));
+                return Err(input.error("expected `weight`, `style`, `subset`, `display`, or `host`"));
             }
         }
 
@@ -137,6 +152,7 @@ impl Parse for FontsourceFont {
             weight,
             style,
             subset,
+            display,
             host,
         })
     }

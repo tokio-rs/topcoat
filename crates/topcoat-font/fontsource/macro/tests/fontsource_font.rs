@@ -11,10 +11,17 @@ fn render(font: Font) -> String {
     out
 }
 
-/// Builds the `@font-face` rule a Roboto CDN face renders to.
+/// Builds the `@font-face` rule a Roboto CDN face renders to, using the default
+/// `swap` display strategy.
 fn roboto(file: &str, weight: u16, style: &str, range: &str) -> String {
+    roboto_display(file, weight, style, "swap", range)
+}
+
+/// Builds the `@font-face` rule a Roboto CDN face renders to with an explicit
+/// `font-display` strategy.
+fn roboto_display(file: &str, weight: u16, style: &str, display: &str, range: &str) -> String {
     format!(
-        r#"@font-face {{ font-family: "Roboto"; src: url("https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/{file}.woff2") format(woff2); font-weight: {weight}; font-style: {style}; unicode-range: {range} }}"#
+        r#"@font-face {{ font-family: "Roboto"; src: url("https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/{file}.woff2") format(woff2); font-weight: {weight}; font-style: {style}; font-display: {display}; unicode-range: {range} }}"#
     )
 }
 
@@ -64,6 +71,16 @@ fn every_axis_multiplies() {
     let font =
         fontsource_font!("Roboto", weight: [400, 700], style: [Normal, Italic], subset: Latin);
     assert_eq!(font.faces().len(), 4);
+}
+
+#[test]
+fn display_applies_to_every_face() {
+    let font = fontsource_font!("Roboto", weight: [400, 700], style: Normal, subset: Latin, display: Optional);
+    let faces = [
+        roboto_display("latin-400-normal", 400, "normal", "optional", LATIN),
+        roboto_display("latin-700-normal", 700, "normal", "optional", LATIN),
+    ];
+    assert_eq!(render(font), faces.join(" "));
 }
 
 #[test]

@@ -1,4 +1,4 @@
-Constructs a [`FontFace`] for one face from the [Fontsource] catalog, picked out by family name and the weight, style, and subset that narrow it to a single font file. The family comes first as a string literal; the rest are `name: value` arguments in any order. `weight` and `style` are required, `subset` and `host` are optional.
+Constructs a [`FontFace`] for one face from the [Fontsource] catalog, picked out by family name and the weight, style, and subset that narrow it to a single font file. The family comes first as a string literal; the rest are `name: value` arguments in any order. `weight` and `style` are required, `subset`, `display`, and `host` are optional.
 
 ```rust
 # use topcoat::font::*;
@@ -24,6 +24,8 @@ The **family** comes first, as a string literal, and has to match a family in th
 
 **`subset`** selects the block of characters the face covers, such as [`Latin`] or [`Cyrillic`]; it also determines the face's `unicode-range`. Leave it off to get the family's default subset.
 
+**`display`** sets the face's [`FontDisplay`] strategy — how text is shown while the font downloads. It defaults to `Swap`.
+
 **`host`** says where the file is loaded from. It defaults to [`JsDelivr`], which links the font on the [jsDelivr] CDN. Pass [`Asset`] instead to download the file at build time and serve it from your own origin as a content-hashed Topcoat [`Asset`][asset-type] — this needs the `asset` feature.
 
 ```rust
@@ -35,6 +37,7 @@ fontsource_font_face!(
     weight: 700,
     style: Italic,
     subset: Cyrillic,
+    display: Optional,
     host: Asset,
 )
 # }
@@ -53,6 +56,7 @@ This macro builds one face at a time. To pull in a family across several weights
 [`Italic`]: enum.Style.html#variant.Italic
 [`Latin`]: enum.Subset.html#variant.Latin
 [`Cyrillic`]: enum.Subset.html#variant.Cyrillic
+[`FontDisplay`]: ../enum.FontDisplay.html
 [`Font`]: ../struct.Font.html
 [`FontFace`]: ../struct.FontFace.html
 [`fontsource_font!`]: macro.fontsource_font.html
