@@ -118,8 +118,9 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [Memoization](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-core/macro/docs/memoization.md) — `#[memoize]` for per-request caching and fan-out dedup.
 - [Functions, not middlewares](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/functions_not_middlewares.md) — the recommended way to model auth and other request-scoped concerns.
 
-**Project infrastructure**
+**Asset system**
 - [Assets](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/assets.md) — declare assets in Rust, serve them with content-hashed URLs.
+- [Fonts](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/fonts.md) — bundle and serve web fonts.
 
 **Third-party integrations**
 - [Tailwind](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/tailwind.md) — Tailwind CSS without Node, wired into the asset pipeline.

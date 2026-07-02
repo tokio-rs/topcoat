@@ -1,6 +1,6 @@
 Web fonts are typically loaded through CSS. A set of [`@font-face`] rules declare a font family and tells the browser where to download the font files. With Topcoat, you can programatically create these font faces and host them on your router.
 
-# Getting started
+# Declaring fonts
 
 [`font!`] declares a font from [`@font-face`] blocks you write yourself. The family name comes first and is injected into every block. Declare the font you want to use as a constant, register it on the router, and load it in the page's `<head>`:
 
@@ -106,9 +106,9 @@ const ROBOTO: Font = fontsource_font!(
 
 See [`fontsource_font!`] for the details of each argument.
 
-## Self-hosting the files
+## Self-hosting Fontsource fonts
 
-By default the Fontsource font files are loaded from the [jsDelivr] CDN by the user's browser. Pass `host: Asset` to download them at build time instead and serve them from your own origin as content-hashed Topcoat [assets]:
+By default the font files are loaded from the [jsDelivr] CDN by the user's browser. Pass `host: Asset` to download them at build time instead and serve them from your own origin as content-hashed Topcoat [assets]:
 
 ```rust,no_run
 use topcoat::{
@@ -134,5 +134,5 @@ let router = Router::builder()
 [`Font`]: Font
 [`ORBITRON.family()`]: Font::family
 [`font!`]: font
-[`fontsource_font!`]: fontsource::fontsource_font
+[`fontsource_font!`]: fontsource/macro.fontsource_font.html
 [`link`]: link
