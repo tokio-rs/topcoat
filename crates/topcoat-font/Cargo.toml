@@ -25,6 +25,7 @@ router = [
 ]
 view = [
 	"dep:topcoat-view",
+	"topcoat-asset?/view",
 ]
 
 [dependencies]
