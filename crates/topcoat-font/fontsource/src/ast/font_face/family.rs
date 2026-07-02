@@ -30,3 +30,10 @@ impl Parse for FamilyName {
         Ok(Self(input.parse()?))
     }
 }
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FamilyName {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.0.pretty_print(printer);
+    }
+}

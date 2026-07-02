@@ -15,6 +15,10 @@ parsing = [
 	"dep:quote",
 	"dep:syn",
 ]
+pretty = [
+	"parsing",
+	"dep:topcoat-pretty",
+]
 # Enables the `refresh` binary, which fetches data from the Fontsource API.
 refresh = [
 	"dep:serde",
@@ -26,6 +30,7 @@ refresh = [
 topcoat-core.workspace = true
 topcoat-font.workspace = true
 topcoat-asset = { workspace = true, optional = true }
+topcoat-pretty = { workspace = true, optional = true }
 
 proc-macro2 = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
@@ -40,9 +45,16 @@ heck.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 
+[dev-dependencies]
+topcoat-pretty.workspace = true
+
 [[bin]]
 name = "refresh"
 required-features = ["refresh"]
+
+[[test]]
+name = "pretty"
+required-features = ["pretty"]
 
 [lints]
 workspace = true

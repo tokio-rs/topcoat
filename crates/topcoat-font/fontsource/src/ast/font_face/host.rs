@@ -50,6 +50,16 @@ impl ToTokens for Host {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for Host {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct HostKey {
     pub host_kw: kw::host,
 }
@@ -65,6 +75,16 @@ impl Parse for HostKey {
 impl ParseOption for HostKey {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::host)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for HostKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.host_kw.span().start());
+        "host".pretty_print(printer);
+        printer.move_cursor(self.host_kw.span().end());
     }
 }
 
@@ -116,5 +136,12 @@ impl ToTokens for HostValue {
             ::topcoat::font::fontsource::Host::#path
         }
         .to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for HostValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.path.pretty_print(printer);
     }
 }

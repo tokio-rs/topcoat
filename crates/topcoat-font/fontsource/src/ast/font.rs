@@ -168,3 +168,34 @@ impl ToTokens for FontsourceFont {
         }
     }
 }
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontsourceFont {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+
+        // The axes live in fixed fields, so recover their written order from
+        // their spans to keep the output faithful and idempotent. Every axis is
+        // optional.
+        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_pretty::PrettyPrint)> =
+            Vec::new();
+        if let Some(weight) = &self.weight {
+            descriptors.push((weight.key.weight_kw.span().start(), weight));
+        }
+        if let Some(style) = &self.style {
+            descriptors.push((style.key.style_kw.span().start(), style));
+        }
+        if let Some(subset) = &self.subset {
+            descriptors.push((subset.key.subset_kw.span().start(), subset));
+        }
+        if let Some(display) = &self.display {
+            descriptors.push((display.key.display_kw.span().start(), display));
+        }
+        if let Some(host) = &self.host {
+            descriptors.push((host.key.host_kw.span().start(), host));
+        }
+        descriptors.sort_by_key(|(position, _)| (position.line, position.column));
+
+        crate::ast::font_face::pretty_print_arguments(printer, &self.family, &descriptors);
+    }
+}

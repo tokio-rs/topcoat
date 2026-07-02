@@ -193,3 +193,57 @@ impl ToTokens for FontsourceFontFace {
         }
     }
 }
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for FontsourceFontFace {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+
+        // The descriptors live in fixed fields, so recover their written order
+        // from their spans to keep the output faithful and idempotent. `weight`
+        // and `style` are required; the rest are optional.
+        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_pretty::PrettyPrint)> = vec![
+            (self.weight.key.weight_kw.span().start(), &self.weight),
+            (self.style.key.style_kw.span().start(), &self.style),
+        ];
+        if let Some(subset) = &self.subset {
+            descriptors.push((subset.key.subset_kw.span().start(), subset));
+        }
+        if let Some(display) = &self.display {
+            descriptors.push((display.key.display_kw.span().start(), display));
+        }
+        if let Some(host) = &self.host {
+            descriptors.push((host.key.host_kw.span().start(), host));
+        }
+        descriptors.sort_by_key(|(position, _)| (position.line, position.column));
+
+        pretty_print_arguments(printer, &self.family, &descriptors);
+    }
+}
+
+/// Lays out a Fontsource macro invocation as a comma-separated argument list: the
+/// family name literal followed by each descriptor in written order. The list
+/// stays on one line when it fits and otherwise breaks with one argument per line
+/// and a trailing comma.
+#[cfg(feature = "pretty")]
+pub(crate) fn pretty_print_arguments(
+    printer: &mut topcoat_pretty::Printer<'_>,
+    family: &FamilyName,
+    descriptors: &[(proc_macro2::LineColumn, &dyn topcoat_pretty::PrettyPrint)],
+) {
+    use topcoat_pretty::{PrettyPrint, TextMode};
+
+    family.pretty_print(printer);
+    for (_, descriptor) in descriptors {
+        ",".pretty_print(printer);
+        printer.scan_same_line_trivia();
+        printer.scan_break();
+        " ".pretty_print(printer);
+        printer.scan_trivia(true, true);
+        descriptor.pretty_print(printer);
+    }
+    // A trailing comma is only rendered when the argument list breaks across
+    // lines.
+    printer.scan_text(",".into(), TextMode::Break);
+    printer.advance_cursor(",");
+}

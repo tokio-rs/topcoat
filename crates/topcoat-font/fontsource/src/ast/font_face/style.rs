@@ -37,6 +37,16 @@ impl ParseOption for Style {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for Style {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct StyleKey {
     pub style_kw: kw::style,
 }
@@ -52,6 +62,16 @@ impl Parse for StyleKey {
 impl ParseOption for StyleKey {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::style)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for StyleKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.style_kw.span().start());
+        "style".pretty_print(printer);
+        printer.move_cursor(self.style_kw.span().end());
     }
 }
 
@@ -109,5 +129,12 @@ impl StyleValue {
 impl Parse for StyleValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self(input.parse()?))
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for StyleValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.0.pretty_print(printer);
     }
 }

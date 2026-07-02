@@ -1814,6 +1814,7 @@ dependencies = [
  "topcoat",
  "topcoat-asset",
  "topcoat-font",
+ "topcoat-font-fontsource",
  "topcoat-pretty",
  "topcoat-ui",
  "topcoat-view",
@@ -1891,6 +1892,7 @@ dependencies = [
  "topcoat-asset",
  "topcoat-core",
  "topcoat-font",
+ "topcoat-pretty",
  "ureq",
 ]
 

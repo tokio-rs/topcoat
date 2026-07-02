@@ -37,6 +37,16 @@ impl ParseOption for Subset {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for Subset {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct SubsetKey {
     pub subset_kw: kw::subset,
 }
@@ -52,6 +62,16 @@ impl Parse for SubsetKey {
 impl ParseOption for SubsetKey {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::subset)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for SubsetKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.subset_kw.span().start());
+        "subset".pretty_print(printer);
+        printer.move_cursor(self.subset_kw.span().end());
     }
 }
 
@@ -110,5 +130,12 @@ impl SubsetValue {
 impl Parse for SubsetValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self(input.parse()?))
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for SubsetValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.0.pretty_print(printer);
     }
 }

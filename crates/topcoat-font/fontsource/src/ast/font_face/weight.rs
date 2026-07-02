@@ -37,6 +37,16 @@ impl ParseOption for Weight {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for Weight {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct WeightKey {
     pub weight_kw: kw::weight,
 }
@@ -52,6 +62,16 @@ impl Parse for WeightKey {
 impl ParseOption for WeightKey {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::weight)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for WeightKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.weight_kw.span().start());
+        "weight".pretty_print(printer);
+        printer.move_cursor(self.weight_kw.span().end());
     }
 }
 
@@ -99,5 +119,12 @@ impl WeightValue {
 impl Parse for WeightValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self(input.parse()?))
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for WeightValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.0.pretty_print(printer);
     }
 }

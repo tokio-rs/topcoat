@@ -40,6 +40,16 @@ impl ParseOption for Display {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for Display {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.key.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 pub struct DisplayKey {
     pub display_kw: kw::display,
 }
@@ -55,6 +65,16 @@ impl Parse for DisplayKey {
 impl ParseOption for DisplayKey {
     fn peek(input: ParseStream) -> bool {
         input.peek(kw::display)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for DisplayKey {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        printer.move_cursor(self.display_kw.span().start());
+        "display".pretty_print(printer);
+        printer.move_cursor(self.display_kw.span().end());
     }
 }
 
@@ -113,5 +133,12 @@ impl Parse for DisplayValue {
 impl ToTokens for DisplayValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.0.to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_pretty::PrettyPrint for DisplayValue {
+    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        self.0.pretty_print(printer);
     }
 }
