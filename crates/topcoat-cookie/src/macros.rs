@@ -1,5 +1,6 @@
 /// Builds a [`Cookie`](crate::Cookie) with optional attributes, in a syntax
-/// that mirrors the `Set-Cookie` header.
+/// that mirrors the [`Set-Cookie`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie)
+/// header.
 ///
 /// The name and value come first as `name = value`, followed by any number of
 /// `;`-separated attributes. Flag attributes (`Secure`, `HttpOnly`) stand

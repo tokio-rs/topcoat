@@ -66,7 +66,7 @@ jar.add(("theme", "dark"));
 
 # Building cookies with `cookie!`
 
-For cookies with several attributes, the [`cookie!`] macro is more compact than the builder. It mirrors the `Set-Cookie` header: the `name = value` pair first, then any number of `;`-separated attributes.
+For cookies with several attributes, the [`cookie!`] macro is more compact than the builder. It mirrors the [`Set-Cookie`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie) header: the `name = value` pair first, then any number of `;`-separated attributes.
 
 ```rust
 use topcoat::cookie::{Cookie, SameSite, cookie, time::Duration};
