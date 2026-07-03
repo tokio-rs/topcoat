@@ -157,31 +157,17 @@ By default, Topcoat passes:
 --cwd $CARGO_MANIFEST_DIR
 ```
 
-So Tailwind scans from your package root: classes are found in Rust source files — including literal `class="..."` values in `view!` markup — and any other text files in the package. Classes assembled dynamically at runtime are invisible to Tailwind unless you include them through your Tailwind input/configuration.
+So Tailwind scans from your package root: classes are found in Rust source files, including literal `class="..."` values in `view!` markup. Classes assembled dynamically at runtime are invisible to Tailwind.
 
-Tailwind's automatic source detection walks every file under `--cwd` that is not matched by `.gitignore`, so the ignore file is load-bearing: Cargo's generated `.gitignore` excludes `target/`, but in a checkout without one (a tarball export, a Docker build context that omits dotfiles) the scan descends into build artifacts. That is slow, and because artifacts contain the class names of the previous build, removed classes can keep reappearing in the output. If the build environment cannot guarantee an ignore file, scope the scan down with `cwd`:
+The scan skips files matched by `.gitignore` — that is what keeps it out of `target/`. In a checkout without an ignore file it reads build artifacts, which is slow and can resurrect classes from previous builds; scope the scan down with `.cwd("src")` in that case.
 
-```rust,no_run
-# #[allow(clippy::needless_doctest_main)]
-fn main() {
-    topcoat::tailwind::BuildConfig::new()
-        .cwd("src")
-        .render()
-        .unwrap();
-}
-```
-
-The CLI resolves relative `input` and `output` paths against `--cwd` as well.
-
-For precise control — for example scanning only Rust files — use a custom input CSS that disables automatic detection and registers explicit sources:
+For precise control, use a custom input CSS with Tailwind's own source directives, e.g. to scan only Rust files:
 
 ```css
 @import "tailwindcss" source(none);
 
 @source "./src/**/*.rs";
 ```
-
-(`@source` globs resolve relative to the CSS file's own location.)
 
 # Custom input CSS
 
