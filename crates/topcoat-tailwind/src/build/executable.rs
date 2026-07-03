@@ -32,8 +32,10 @@ pub enum ExecutableSource {
     /// root (the directory the build script runs in).
     Path(PathBuf),
     /// Read the executable from the named environment variable at build time,
-    /// interpreting its value like [`ExecutableSource::Path`]. The build
-    /// script reruns when the variable changes.
+    /// interpreting its value like [`ExecutableSource::Path`]. Print
+    /// `cargo:rerun-if-env-changed=<name>` from your build script if a change
+    /// to the variable should rerun it; note that printing any `rerun-if-*`
+    /// directive replaces Cargo's default change detection.
     Env(String),
 }
 
@@ -56,10 +58,8 @@ impl ExecutableSource {
             }
             Self::Path(path) => Ok(Executable::new(path)),
             Self::Env(name) => {
-                println!("cargo:rerun-if-env-changed={name}");
-                let value = env::var_os(name).ok_or_else(|| BuildError::EnvNotSet {
-                    name: name.clone(),
-                })?;
+                let value = env::var_os(name)
+                    .ok_or_else(|| BuildError::EnvNotSet { name: name.clone() })?;
                 Ok(Executable::new(value))
             }
         }
@@ -168,6 +168,8 @@ impl ExecutableSource {
         })
     }
 
+    /// The `.tmp` sibling of `dest` where a download is staged before the
+    /// final rename.
     fn temp_path(dest: &Path) -> PathBuf {
         let file_name = dest
             .file_name()

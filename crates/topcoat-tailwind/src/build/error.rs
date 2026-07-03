@@ -2,6 +2,7 @@ use std::{io, path::PathBuf, process::ExitStatus};
 
 pub type Result<T = ()> = std::result::Result<T, BuildError>;
 
+/// Errors that can occur while resolving or running the Tailwind CLI.
 #[derive(Debug, thiserror::Error)]
 pub enum BuildError {
     #[error("unsupported platform: {os}-{arch}")]

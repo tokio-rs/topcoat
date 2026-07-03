@@ -2,9 +2,19 @@ use std::{env, fs, path::PathBuf};
 
 use crate::build::{BuildError, Command, ExecutableSource, Result};
 
+/// File name of the default [`output`](BuildConfig::output) inside `OUT_DIR`.
 pub const DEFAULT_OUTPUT_NAME: &str = "tailwind.css";
 const DEFAULT_INPUT_CSS: &str = "@import \"tailwindcss\";\n";
 
+/// Builder for a Tailwind CLI run from a Cargo build script.
+///
+/// The default configuration downloads the standalone Tailwind CLI, scans the
+/// package for class names, and writes the generated stylesheet to
+/// `$OUT_DIR/tailwind.css`:
+///
+/// ```rust,no_run
+/// topcoat::tailwind::BuildConfig::new().render().unwrap();
+/// ```
 pub struct BuildConfig {
     executable_source: ExecutableSource,
     input: Option<PathBuf>,
@@ -28,6 +38,8 @@ impl Default for BuildConfig {
 }
 
 impl BuildConfig {
+    /// The default configuration, ready to be customized with the builder
+    /// methods and executed with [`render`](Self::render).
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -63,11 +75,7 @@ impl BuildConfig {
     ///
     /// Shorthand for [`ExecutableSource::Github`] with a checksum.
     #[must_use]
-    pub fn version_checksum(
-        self,
-        version: impl Into<String>,
-        checksum: impl Into<String>,
-    ) -> Self {
+    pub fn version_checksum(self, version: impl Into<String>, checksum: impl Into<String>) -> Self {
         self.executable_source(ExecutableSource::Github {
             version: version.into(),
             checksum: Some(checksum.into()),
@@ -89,8 +97,8 @@ impl BuildConfig {
 
     /// Read the Tailwind CLI executable from an environment variable at build
     /// time. The variable's value is interpreted like
-    /// [`executable`](Self::executable), and the build script reruns when the
-    /// variable changes.
+    /// [`executable`](Self::executable). Print `cargo:rerun-if-env-changed`
+    /// yourself if changing the variable should rerun the build script.
     ///
     /// Shorthand for [`ExecutableSource::Env`].
     #[must_use]
@@ -100,6 +108,9 @@ impl BuildConfig {
 
     /// Input CSS file. Defaults to a generated `input.css` in `OUT_DIR` that
     /// just contains `@import "tailwindcss";`.
+    ///
+    /// The Tailwind CLI resolves a relative path against [`cwd`](Self::cwd),
+    /// which defaults to the package root.
     #[must_use]
     pub fn input(mut self, path: impl Into<PathBuf>) -> Self {
         self.input = Some(path.into());
@@ -108,13 +119,29 @@ impl BuildConfig {
 
     /// Output CSS file. Defaults to `$OUT_DIR/tailwind.css`, which can be
     /// loaded from source via `asset!(concat!(env!("OUT_DIR"), "/tailwind.css"))`.
+    ///
+    /// The Tailwind CLI resolves a relative path against [`cwd`](Self::cwd),
+    /// which defaults to the package root.
     #[must_use]
     pub fn output(mut self, path: impl Into<PathBuf>) -> Self {
         self.output = Some(path.into());
         self
     }
 
-    /// Pass `--cwd` to the Tailwind CLI. Defaults to `$CARGO_MANIFEST_DIR/src`.
+    /// Pass `--cwd` to the Tailwind CLI: the directory Tailwind scans for
+    /// class names, and the base for relative [`input`](Self::input) and
+    /// [`output`](Self::output) paths. Defaults to `$CARGO_MANIFEST_DIR`
+    /// (the package root).
+    ///
+    /// Tailwind's automatic source detection walks every file under this
+    /// directory that is not matched by `.gitignore`. That makes the ignore
+    /// file load-bearing: Cargo's generated `.gitignore` excludes `target/`,
+    /// but in a checkout without one the walk descends into build artifacts,
+    /// which is slow and resurrects class names from previous builds. If the
+    /// build environment cannot guarantee an ignore file, scope the scan
+    /// down (e.g. `.cwd("src")`), or disable directory scanning entirely
+    /// with a custom [`input`](Self::input) that uses
+    /// `@import "tailwindcss" source(none)` and explicit `@source` globs.
     #[must_use]
     pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
         self.cwd = Some(cwd.into());
@@ -159,9 +186,9 @@ impl BuildConfig {
         } else {
             let out_dir = out_dir.as_deref().ok_or(BuildError::NoOutDir)?;
             let path = out_dir.join("tailwind-input.css");
-            // Only write if contents would change; otherwise the file's
-            // mtime advances every build and the `rerun-if-changed` below
-            // forces the build script to run again next time.
+            // Only write if contents would change: the file's mtime then
+            // stays stable, so a user-supplied `rerun-if-changed` directive
+            // for it doesn't rerun the build script every build.
             let needs_write = match fs::read(&path) {
                 Ok(existing) => existing != DEFAULT_INPUT_CSS.as_bytes(),
                 Err(_) => true,
@@ -189,11 +216,8 @@ impl BuildConfig {
         } else {
             let manifest_dir =
                 env::var_os("CARGO_MANIFEST_DIR").ok_or(BuildError::NoManifestDir)?;
-            PathBuf::from(manifest_dir).join("src")
+            PathBuf::from(manifest_dir)
         };
-
-        println!("cargo:rerun-if-changed={}", input.display());
-        println!("cargo:rerun-if-changed={}", cwd.display());
 
         let command = Command {
             input,
