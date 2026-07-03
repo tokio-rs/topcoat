@@ -100,52 +100,14 @@ The default Tailwind CLI version is pinned by Topcoat to `4.3.2`. The downloaded
 
 # CLI executable
 
-Downloading from GitHub is only the default. Where the executable comes from is configured with an `ExecutableSource`:
+By default, Topcoat downloads the Tailwind CLI from GitHub. `BuildConfig` offers alternatives:
 
-- `ExecutableSource::Github { version, checksum }` — download the release into `OUT_DIR`, reusing the copy from a previous build if present. When `checksum` is set, the downloaded binary's SHA-256 (lowercase hex) is verified before the binary is used.
-- `ExecutableSource::Path(path)` — use an existing executable. A bare command name like `"tailwindcss"` is resolved through `PATH`; anything containing a path separator is used as a file path, with relative paths resolved against the package root.
-- `ExecutableSource::Env(name)` — read the executable from the named environment variable at build time, interpreted like `ExecutableSource::Path`. The build fails if the variable is unset.
+- `version("4.3.2")` — pin the release to download.
+- `version_checksum("4.3.2", "b800b065…")` — additionally verify the downloaded binary's SHA-256.
+- `executable("tailwindcss")` — use a preinstalled CLI instead of downloading. A bare name is resolved through `PATH`; relative paths resolve against the package root.
+- `executable_env("TAILWIND_CLI")` — like `executable`, with the value read from an environment variable at build time.
 
-`BuildConfig` has a shorthand setter for each variant. Pin and verify a download:
-
-```rust,no_run
-# #[allow(clippy::needless_doctest_main)]
-fn main() {
-    topcoat::tailwind::BuildConfig::new()
-        .version_checksum(
-            "4.3.2",
-            "b800b0659dc64b9f03ede5660244d9415d777d5739ae2889280877ca37be742a",
-        )
-        .render()
-        .unwrap();
-}
-```
-
-Downloading needs network access on the first build. Offline and sandboxed builds (Nix, locked-down CI, `cargo build --offline`) should use a preinstalled CLI instead, either fixed:
-
-```rust,no_run
-# #[allow(clippy::needless_doctest_main)]
-fn main() {
-    topcoat::tailwind::BuildConfig::new()
-        .executable("tailwindcss") // resolved through `PATH`
-        .render()
-        .unwrap();
-}
-```
-
-or chosen by the build environment, e.g. `TAILWIND_CLI=/usr/bin/tailwindcss`:
-
-```rust,no_run
-# #[allow(clippy::needless_doctest_main)]
-fn main() {
-    topcoat::tailwind::BuildConfig::new()
-        .executable_env("TAILWIND_CLI")
-        .render()
-        .unwrap();
-}
-```
-
-With a user-provided executable no download happens and `version(...)` plays no role: you get whatever the binary is.
+A user-provided executable is used as-is: no download happens and no network access is needed, which suits offline and sandboxed builds.
 
 # Class scanning
 
