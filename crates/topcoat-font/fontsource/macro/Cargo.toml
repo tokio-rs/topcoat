@@ -6,6 +6,11 @@ edition = "2024"
 [lib]
 proc-macro = true
 
+[features]
+asset = [
+	"topcoat-font-fontsource/asset",
+]
+
 [dependencies]
 topcoat-font-fontsource = { workspace = true, features = ["parsing"] }
 

@@ -17,7 +17,9 @@ default = [
 asset = [
 	"dep:topcoat-asset",
 	"topcoat-font?/asset",
+	"topcoat-font-macro?/asset",
 	"topcoat-font-fontsource?/asset",
+	"topcoat-font-fontsource-macro?/asset",
 ]
 cookie = [
 	"dep:topcoat-cookie",
