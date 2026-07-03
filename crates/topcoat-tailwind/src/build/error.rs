@@ -21,6 +21,10 @@ pub enum BuildError {
     NoOutDir,
     #[error("`CARGO_MANIFEST_DIR` is not set; `Config::render` must be called from a build script")]
     NoManifestDir,
+    #[error("environment variable `{name}` is not set")]
+    EnvNotSet { name: String },
+    #[error("checksum mismatch for downloaded tailwindcss: expected {expected}, actual {actual}")]
+    ChecksumMismatch { expected: String, actual: String },
     #[error("tailwindcss exited with {status}")]
     Cli { status: ExitStatus },
 }

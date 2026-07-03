@@ -5,9 +5,10 @@ edition = "2024"
 
 [features]
 default = ["build"]
-build = ["dep:thiserror", "dep:ureq"]
+build = ["dep:sha2", "dep:thiserror", "dep:ureq"]
 
 [dependencies]
+sha2 = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 ureq = { workspace = true, optional = true }
 
