@@ -34,4 +34,4 @@ pub use router::*;
 pub use serve::*;
 pub use service::*;
 
-pub use http::Method;
+pub use http;
