@@ -26,6 +26,8 @@ pub enum BuildError {
     EnvNotSet { name: String },
     #[error("checksum mismatch for downloaded tailwindcss: expected {expected}, actual {actual}")]
     ChecksumMismatch { expected: String, actual: String },
+    #[error("unsupported checksum {checksum:?} for tailwindcss: expected a `sha256:` prefix")]
+    UnsupportedChecksum { checksum: String },
     #[error("tailwindcss exited with {status}")]
     Cli { status: ExitStatus },
 }

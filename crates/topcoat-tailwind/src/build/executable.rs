@@ -22,8 +22,10 @@ pub enum ExecutableSource {
     Github {
         /// The release to download, without the leading `v`.
         version: String,
-        /// Expected SHA-256 of the downloaded binary as lowercase hex.
-        /// Verified once after download; `None` skips verification.
+        /// Expected hash of the downloaded binary as an `algorithm:hex`
+        /// string. Only `sha256` is currently supported, e.g.
+        /// `"sha256:b800b065…"`. Verified once after download; `None` skips
+        /// verification.
         checksum: Option<String>,
     },
     /// Use an existing executable. A bare command name like `"tailwindcss"`
@@ -68,14 +70,26 @@ impl ExecutableSource {
     /// Download the Tailwind CLI for `version` to `dest`.
     ///
     /// If `dest` already exists it's left untouched. When `checksum` is given,
-    /// the downloaded file's SHA-256 (as lowercase hex) is verified against it
-    /// before the file is moved into place. On Unix the file is made
-    /// executable.
+    /// the downloaded file's hash is verified against it before the file is
+    /// moved into place; `checksum` must carry a supported algorithm prefix
+    /// (`sha256:`). On Unix the file is made executable.
     fn download_from_github(
         version: &str,
         checksum: Option<&str>,
         dest: PathBuf,
     ) -> Result<Executable> {
+        // Parse the algorithm prefix up front so a malformed checksum fails
+        // before anything is downloaded.
+        let expected_digest = checksum
+            .map(|checksum| {
+                checksum
+                    .strip_prefix("sha256:")
+                    .ok_or_else(|| BuildError::UnsupportedChecksum {
+                        checksum: checksum.to_owned(),
+                    })
+            })
+            .transpose()?;
+
         if dest.exists() {
             return Ok(Executable::new(dest));
         }
@@ -109,7 +123,7 @@ impl ExecutableSource {
         })?;
         drop(file);
 
-        if let Some(expected) = checksum {
+        if let Some(expected_digest) = expected_digest {
             let bytes = fs::read(&temp).map_err(|source| BuildError::Io {
                 path: temp.clone(),
                 source,
@@ -119,11 +133,11 @@ impl ExecutableSource {
             for b in &digest {
                 let _ = write!(actual, "{b:02x}");
             }
-            if expected != actual {
+            if expected_digest != actual {
                 let _ = fs::remove_file(&temp);
                 return Err(BuildError::ChecksumMismatch {
-                    expected: expected.to_owned(),
-                    actual,
+                    expected: format!("sha256:{expected_digest}"),
+                    actual: format!("sha256:{actual}"),
                 });
             }
         }

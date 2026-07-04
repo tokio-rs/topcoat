@@ -103,7 +103,7 @@ The default Tailwind CLI version is pinned by Topcoat to `4.3.2`. The downloaded
 By default, Topcoat downloads the Tailwind CLI from GitHub. `BuildConfig` offers alternatives:
 
 - `version("4.3.2")` — pin the release to download.
-- `version_checksum("4.3.2", "b800b065…")` — additionally verify the downloaded binary's SHA-256.
+- `version_checksum("4.3.2", "sha256:b800b065…")` — additionally verify the downloaded binary's hash. The prefix selects the algorithm; only `sha256` is supported.
 - `executable("tailwindcss")` — use a preinstalled CLI instead of downloading. A bare name is resolved through `PATH`; relative paths resolve against the package root.
 - `executable_env("TAILWIND_CLI")` — like `executable`, with the value read from an environment variable at build time.
 

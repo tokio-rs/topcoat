@@ -21,10 +21,14 @@ pub struct AssetOptions {
     /// when the source has no extension or the wrong one. An empty
     /// string drops the extension entirely.
     pub extension: Option<Cow<'static, str>>,
-    /// Expected SHA-256 of the raw, unbundled source file, as a lowercase
-    /// hex string. The bundler fails with
+    /// Expected hash of the raw, unbundled source file, as an
+    /// `algorithm:hex` string. Only `sha256` is currently supported, e.g.
+    /// `"sha256:e3b0c442…"`. The bundler fails with
     /// [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's
-    /// actual hash differs. Recommended for remote assets.
+    /// actual hash differs, or
+    /// [`AssetError::UnsupportedChecksum`](crate::AssetError) if the
+    /// algorithm prefix is missing or unsupported. Recommended for remote
+    /// assets.
     pub checksum: Option<Cow<'static, str>>,
     /// Override the `Content-Type` the asset is served with. When unset, the
     /// bundler guesses it from the bundled file's extension.

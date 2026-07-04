@@ -70,8 +70,9 @@ impl BuildConfig {
     }
 
     /// Pin the Tailwind CLI release to download (without the leading `v`)
-    /// along with the expected SHA-256 of the downloaded binary, as lowercase
-    /// hex.
+    /// along with the expected hash of the downloaded binary as an
+    /// `algorithm:hex` string. Only `sha256` is currently supported, e.g.
+    /// `"sha256:b800b065…"`.
     ///
     /// Shorthand for [`ExecutableSource::Github`] with a checksum.
     #[must_use]

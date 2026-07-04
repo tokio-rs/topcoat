@@ -149,7 +149,7 @@ use topcoat::asset::{Asset, asset};
 const RUST_LOGO: Asset = asset!(
     "https://upload.wikimedia.org/wikipedia/commons/r/rust-logo.png",
     rename: "rust",
-    checksum: "e3b0c44298fc1c149afbf4c8996fb924..."
+    checksum: "sha256:e3b0c44298fc1c149afbf4c8996fb924..."
 );
 ```
 
@@ -159,7 +159,7 @@ Available options:
 |---|---|
 | `rename: "name"` | replaces the output file stem |
 | `extension: "ext"` | overrides the output extension, without the leading dot |
-| `checksum: "<sha256-hex>"` | requires the raw source file to match the SHA-256 hash |
+| `checksum: "sha256:<hex>"` | requires the raw source file to match the hash (only `sha256` is supported) |
 
 Use `checksum` for remote assets when you want deployments to fail if the remote file changes unexpectedly.
 

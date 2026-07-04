@@ -109,15 +109,21 @@ impl Bundler {
                 let _ = write!(hash, "{b:02x}");
             }
 
-            if let Some(expected) = asset.options().checksum()
-                && expected != hash
-            {
-                return Err(AssetError::ChecksumMismatch {
-                    asset: Box::new(asset.clone()),
-                    expected: expected.to_owned(),
-                    actual: hash,
+            if let Some(expected) = asset.options().checksum() {
+                let expected_digest = expected.strip_prefix("sha256:").ok_or_else(|| {
+                    AssetError::UnsupportedChecksum {
+                        asset: Box::new(asset.clone()),
+                        checksum: expected.to_owned(),
+                    }
+                })?;
+                if expected_digest != hash {
+                    return Err(AssetError::ChecksumMismatch {
+                        asset: Box::new(asset.clone()),
+                        expected: expected.to_owned(),
+                        actual: format!("sha256:{hash}"),
+                    }
+                    .into());
                 }
-                .into());
             }
 
             let short_hash = &hash[..16];

@@ -28,4 +28,12 @@ pub enum AssetError {
         expected: String,
         actual: String,
     },
+    #[error(
+        "unsupported checksum {checksum:?} for asset at {}: expected a `sha256:` prefix",
+        asset.source()
+    )]
+    UnsupportedChecksum {
+        asset: Box<RawAsset>,
+        checksum: String,
+    },
 }
