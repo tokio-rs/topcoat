@@ -17,7 +17,7 @@ pub mod fontsource {
 ///
 /// ```rust
 /// # use topcoat::{font::{Font, fontsource::fontsource_font}, view::view};
-/// # const LAVISHLY_YOURS: Font = fontsource_font!("Lavishly Yours", host: Asset);
+/// # const LAVISHLY_YOURS: Font = fontsource_font!(LAVISHLY_YOURS, host: Asset);
 /// # #[topcoat::view::component]
 /// # async fn example() -> topcoat::Result {
 /// view! {

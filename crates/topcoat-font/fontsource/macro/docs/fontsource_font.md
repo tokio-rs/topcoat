@@ -4,7 +4,7 @@ Constructs a [`Font`] from the [Fontsource] catalog, which can be a whole family
 # use topcoat::font::*;
 # use topcoat::font::fontsource::*;
 # fn example() -> Font {
-fontsource_font!("Roboto")
+fontsource_font!(ROBOTO)
 # }
 ```
 
@@ -15,7 +15,7 @@ With nothing but a family name you get every weight and style the [Fontsource] f
 # use topcoat::font::fontsource::*;
 # fn example() -> Font {
 fontsource_font!(
-    "Roboto",
+    ROBOTO,
     weight: [400, 700],
     style: Normal,
     subset: [Latin, Cyrillic],
@@ -23,11 +23,11 @@ fontsource_font!(
 # }
 ```
 
-The resulting font includes one font face per combination of parameters. The macro verifies the existence of each font face in the font family at compile time.
+The resulting font includes one font face per combination of parameters. Each combination is checked against the vendored catalog at compile time.
 
 # Arguments
 
-The **family** comes first, as a string literal, and has to match a family in the catalog.
+The **family** comes first, as the name of its [`families`] constant (e.g. `ROBOTO`).
 
 The remaining arguments each take either a single value or a bracketed list of them, `[a, b]`, to fan out across:
 
@@ -45,7 +45,7 @@ The remaining arguments each take either a single value or a bracketed list of t
 # use topcoat::font::*;
 # use topcoat::font::fontsource::*;
 # fn example() -> Font {
-fontsource_font!("Roboto", display: Optional)
+fontsource_font!(ROBOTO, display: Optional)
 # }
 ```
 
@@ -53,7 +53,7 @@ fontsource_font!("Roboto", display: Optional)
 # use topcoat::font::*;
 # use topcoat::font::fontsource::*;
 # fn example() -> Font {
-fontsource_font!("Roboto", host: Asset)
+fontsource_font!(ROBOTO, host: Asset)
 # }
 ```
 
@@ -63,6 +63,7 @@ To manage individual font faces reach for [`fontsource_font_face!`], which takes
 
 [Fontsource]: https://fontsource.org/
 [jsDelivr]: https://www.jsdelivr.com/
+[`families`]: families/index.html
 [asset-type]: ../../asset/struct.Asset.html
 [`Asset`]: enum.Host.html#variant.Asset
 [`JsDelivr`]: enum.Host.html#variant.JsDelivr

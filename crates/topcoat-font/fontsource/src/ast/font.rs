@@ -17,18 +17,16 @@ use syn::{
 
 use topcoat_core::ast::ParseOption;
 
-use crate::{
-    ast::font_face::{Display, FamilyName, Host},
-    runtime,
-};
+use crate::ast::font_face::{Display, FamilyName, Host};
 
 /// One `fontsource_font!` invocation: a family and the axes to cross-product
 /// into faces.
 ///
 /// Holds the parsed descriptors. An omitted `weight` or `style` expands to every
 /// value the family ships; an omitted `subset` expands to the family's default
-/// subset only. `display` applies to every face and defaults to `swap`. Each
-/// axis is validated against the catalog when lowering.
+/// subset only. `display` applies to every face and defaults to `swap`. The
+/// cross product is emitted as `fontsource_font_face!` calls, each of which
+/// verifies its own combination against the catalog.
 pub struct FontsourceFont {
     pub family: FamilyName,
     pub weight: Option<Weight>,
@@ -38,66 +36,115 @@ pub struct FontsourceFont {
     pub host: Option<Host>,
 }
 
-impl FontsourceFont {
-    /// Validates the axes, then lowers to a [`Font`] via the [`font!`] macro,
-    /// whose faces are the cross product, emitted as `fontsource_font_face!`
-    /// calls.
-    fn lower(&self) -> syn::Result<TokenStream> {
-        let family = self.family.resolve()?;
-        let weights = match &self.weight {
-            Some(weight) => weight.value.resolve_with(|value| value.resolve(family))?,
-            None => family.weights.to_vec(),
-        };
-        let styles = match &self.style {
-            Some(style) => style.value.resolve_with(|value| value.resolve(family))?,
-            None => family.styles.to_vec(),
-        };
-        let subsets = match &self.subset {
-            Some(subset) => subset.value.resolve_with(|value| value.resolve(family))?,
-            None => vec![family.default_subset],
-        };
+impl ToTokens for FontsourceFont {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let family_path = &self.family;
+        let family_ident = self.family.ident();
+        let family = self.family.family();
 
-        let name = family.name;
-        let host = if let Some(host) = self.host.as_ref() {
-            let host = &host.value.path;
-            quote! { , host: #host }
-        } else {
-            quote! {}
-        };
-        let display = if let Some(display) = self.display.as_ref() {
-            let display = &display.value;
-            quote! { , display: #display }
-        } else {
-            quote! {}
-        };
-
-        let mut faces = Vec::new();
-        for &weight in &weights {
-            for &style in &styles {
-                for &subset in &subsets {
-                    let weight = Literal::u16_unsuffixed(weight);
-                    let style = match style {
-                        runtime::Style::Normal => Ident::new("Normal", Span::call_site()),
-                        runtime::Style::Italic => Ident::new("Italic", Span::call_site()),
-                    };
-                    let subset = Ident::new(&format!("{subset:?}"), Span::call_site());
-                    faces.push(quote! {
-                        ::topcoat::font::fontsource::fontsource_font_face!(
-                            #name,
-                            weight: #weight,
-                            style: ::topcoat::font::fontsource::Style::#style,
-                            subset: ::topcoat::font::fontsource::Subset::#subset
-                            #display
-                            #host
-                        )
-                    });
-                }
-            }
+        // Empty bracketed lists are the only mistake the nested calls cannot
+        // report themselves, because they cross-product into no calls at all.
+        let mut checks = Vec::new();
+        if let Some(weight) = &self.weight {
+            checks.extend(weight.value.check_empty());
+        }
+        if let Some(style) = &self.style {
+            checks.extend(style.value.check_empty());
+        }
+        if let Some(subset) = &self.subset {
+            checks.extend(subset.value.check_empty());
         }
 
-        Ok(quote! {
-            ::topcoat::font::font!(#name, ::std::vec![#(#faces),*])
-        })
+        // Weight and style token lists: written values verbatim, otherwise
+        // every value the family ships. `None` when the family is unknown and
+        // the axis is omitted — the emitted family path reports the former.
+        let weights: Option<Vec<TokenStream>> = match &self.weight {
+            Some(weight) => Some(weight.value.iter().map(ToTokens::to_token_stream).collect()),
+            None => family.map(|family| {
+                family
+                    .weights
+                    .iter()
+                    .map(|&weight| Literal::u16_unsuffixed(weight).to_token_stream())
+                    .collect()
+            }),
+        };
+        let styles: Option<Vec<TokenStream>> = match &self.style {
+            Some(style) => Some(
+                style
+                    .value
+                    .iter()
+                    .map(|style| style.ident().to_token_stream())
+                    .collect(),
+            ),
+            None => family.map(|family| {
+                family
+                    .styles
+                    .iter()
+                    .map(|style| {
+                        Ident::new(&format!("{style:?}"), Span::call_site()).to_token_stream()
+                    })
+                    .collect()
+            }),
+        };
+        // An omitted subset is not passed on, leaving each face on the
+        // family's default subset.
+        let subsets: Vec<Option<TokenStream>> = match &self.subset {
+            Some(subset) => subset
+                .value
+                .iter()
+                .map(|subset| Some(subset.ident().to_token_stream()))
+                .collect(),
+            None => vec![None],
+        };
+
+        let display = self.display.as_ref().map(|display| {
+            let ident = display.value.ident();
+            quote! { , display: #ident }
+        });
+        let host = self.host.as_ref().map(|host| {
+            let ident = host.value.ident();
+            quote! { , host: #ident }
+        });
+
+        let faces = match (weights, styles) {
+            (Some(weights), Some(styles)) => {
+                let mut faces = Vec::new();
+                for weight in &weights {
+                    for style in &styles {
+                        for subset in &subsets {
+                            let subset = subset.as_ref().map(|subset| quote! { , subset: #subset });
+                            faces.push(quote! {
+                                ::topcoat::font::fontsource::fontsource_font_face!(
+                                    #family_ident,
+                                    weight: #weight,
+                                    style: #style
+                                    #subset
+                                    #display
+                                    #host
+                                )
+                            });
+                        }
+                    }
+                }
+                faces
+            }
+            _ => Vec::new(),
+        };
+
+        // With no faces the compiler is already reporting the cause (an
+        // unknown family or an empty axis), so emit a well-typed empty list.
+        let faces = if faces.is_empty() {
+            quote! { ::std::vec::Vec::<::topcoat::font::FontFace>::new() }
+        } else {
+            quote! { ::std::vec![#(#faces),*] }
+        };
+
+        quote! {{
+            const FAMILY: &'static ::topcoat::font::fontsource::Family = &#family_path;
+            #(#checks)*
+            ::topcoat::font::font!(FAMILY.name, #faces)
+        }}
+        .to_tokens(tokens);
     }
 }
 
@@ -157,15 +204,6 @@ impl Parse for FontsourceFont {
             display,
             host,
         })
-    }
-}
-
-impl ToTokens for FontsourceFont {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self.lower() {
-            Ok(font) => font.to_tokens(tokens),
-            Err(error) => error.to_compile_error().to_tokens(tokens),
-        }
     }
 }
 

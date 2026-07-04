@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::ToTokens;
 use syn::{
-    Ident, Path, Token,
+    Ident, Token,
     parse::{Parse, ParseStream},
 };
 
@@ -78,49 +78,20 @@ impl topcoat_pretty::PrettyPrint for DisplayKey {
     }
 }
 
-/// A single display strategy, written as an enum-variant name (`Swap`) or path
-/// (`FontDisplay::Swap`). Keeps the [`Path`] so its span drives validation
-/// errors, and forwards verbatim when re-emitted for a nested
-/// `fontsource_font_face!` call.
-pub struct DisplayValue(Path);
+/// A single display strategy, written as a bare variant name (`Swap`).
+///
+/// Emits the [`FontDisplay`] variant's path, keeping the written ident's span
+/// so the compiler reports unknown strategies on it and editors autocomplete
+/// them.
+///
+/// [`FontDisplay`]: ../../../font/enum.FontDisplay.html
+pub struct DisplayValue(Ident);
 
 impl DisplayValue {
-    /// The trailing path segment, e.g. `FontDisplay::Swap` -> `Swap`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the parsed path has no segments, which a successfully parsed
-    /// [`Path`] never does.
+    /// The written ident, e.g. `Swap`.
     #[must_use]
-    pub fn variant(&self) -> &Ident {
-        &self
-            .0
-            .segments
-            .last()
-            .expect("a parsed path has at least one segment")
-            .ident
-    }
-
-    /// Validates the strategy and lowers it to its `FontDisplay` construction.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the variant is not a known `font-display` strategy.
-    pub fn resolve(&self) -> syn::Result<TokenStream> {
-        let variant = self.variant();
-        if !matches!(
-            variant.to_string().as_str(),
-            "Auto" | "Block" | "Swap" | "Fallback" | "Optional"
-        ) {
-            return Err(syn::Error::new_spanned(
-                &self.0,
-                format!(
-                    "unknown display strategy `{variant}`; expected one of `Auto`, `Block`, \
-                     `Swap`, `Fallback`, or `Optional`"
-                ),
-            ));
-        }
-        Ok(quote! { ::topcoat::font::FontDisplay::#variant })
+    pub fn ident(&self) -> &Ident {
+        &self.0
     }
 }
 
@@ -132,7 +103,8 @@ impl Parse for DisplayValue {
 
 impl ToTokens for DisplayValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.0.to_tokens(tokens);
+        let ident = &self.0;
+        quote::quote! { ::topcoat::font::FontDisplay::#ident }.to_tokens(tokens);
     }
 }
 

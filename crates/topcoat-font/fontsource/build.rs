@@ -121,6 +121,14 @@ fn subsets(families: &[FamilyMetadata]) -> String {
     for (variant, id) in &variants {
         writeln!(out, "            {id:?} => Self::{variant},").unwrap();
     }
+    out.push_str("            _ => return None,\n        })\n    }\n\n");
+
+    out.push_str("    /// Parse a variant name, e.g. `\"LatinExt\"`, returning `None` if it is\n");
+    out.push_str("    /// not in the vendored catalog.\n");
+    out.push_str("    #[must_use]\n    pub fn from_variant(name: &str) -> Option<Self> {\n        Some(match name {\n");
+    for (variant, _) in &variants {
+        writeln!(out, "            {variant:?} => Self::{variant},").unwrap();
+    }
     out.push_str("            _ => return None,\n        })\n    }\n}\n");
     out
 }
@@ -216,6 +224,7 @@ fn catalog(families: &[FamilyMetadata], ranges: &[String]) -> String {
         .unwrap();
         writeln!(out, "pub const {ident}: Family = Family {{").unwrap();
         writeln!(out, "    id: {:?},", f.id).unwrap();
+        writeln!(out, "    ident: {ident:?},").unwrap();
         writeln!(out, "    name: {:?},", f.family).unwrap();
         writeln!(out, "    subsets: &[{subsets}],").unwrap();
         writeln!(out, "    weights: &[{weights}],").unwrap();

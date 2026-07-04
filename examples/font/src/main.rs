@@ -9,7 +9,7 @@ use topcoat::{
 // The simple way: let the `fontsource_font!` macro pick the faces out of the
 // Fontsource (Google Fonts) catalog. `host: Asset` downloads the files and
 // self-hosts them as Topcoat assets.
-const LAVISHLY_YOURS: Font = fontsource_font!("Lavishly Yours", host: Asset);
+const LAVISHLY_YOURS: Font = fontsource_font!(LAVISHLY_YOURS, host: Asset);
 
 // The manual way: declare the `@font-face` rules by hand with the `font!` macro,
 // in this case pointing straight at a font on the jsDelivr CDN. You can also use

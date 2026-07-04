@@ -29,7 +29,7 @@ fn roboto_display(file: &str, weight: u16, style: &str, display: &str, range: &s
 fn bare_family_expands_every_weight_and_style() {
     // Roboto ships nine weights and two styles, crossed over its single default
     // subset.
-    let font = fontsource_font!("Roboto");
+    let font = fontsource_font!(ROBOTO);
     assert_eq!(font.family(), "Roboto");
     assert_eq!(font.faces().len(), 9 * 2);
 }
@@ -38,7 +38,7 @@ fn bare_family_expands_every_weight_and_style() {
 fn omitting_the_subset_uses_the_default_only() {
     // Roboto ships nine subsets, but leaving `subset` off pulls in the default
     // (`latin`) alone rather than all of them.
-    let font = fontsource_font!("Roboto", weight: 400, style: Normal);
+    let font = fontsource_font!(ROBOTO, weight: 400, style: Normal);
     assert_eq!(
         render(font),
         roboto("latin-400-normal", 400, "normal", LATIN)
@@ -47,7 +47,7 @@ fn omitting_the_subset_uses_the_default_only() {
 
 #[test]
 fn a_single_face() {
-    let font = fontsource_font!("Roboto", weight: 400, style: Normal, subset: Latin);
+    let font = fontsource_font!(ROBOTO, weight: 400, style: Normal, subset: Latin);
     assert_eq!(font.faces().len(), 1);
     assert_eq!(
         render(font),
@@ -58,7 +58,7 @@ fn a_single_face() {
 #[test]
 fn lists_cross_product_into_faces() {
     let font = fontsource_font!(
-        "Roboto",
+        ROBOTO,
         weight: [400, 700],
         style: Normal,
         subset: Latin,
@@ -74,7 +74,7 @@ fn lists_cross_product_into_faces() {
 fn every_axis_multiplies() {
     // Two weights × two styles × one subset.
     let font = fontsource_font!(
-        "Roboto",
+        ROBOTO,
         weight: [400, 700],
         style: [Normal, Italic],
         subset: Latin,
@@ -85,7 +85,7 @@ fn every_axis_multiplies() {
 #[test]
 fn display_applies_to_every_face() {
     let font = fontsource_font!(
-        "Roboto",
+        ROBOTO,
         weight: [400, 700],
         style: Normal,
         subset: Latin,
@@ -100,9 +100,9 @@ fn display_applies_to_every_face() {
 
 #[test]
 fn self_hosting_changes_the_sources() {
-    let cdn = fontsource_font!("Roboto", weight: 400, style: Normal, subset: Latin);
+    let cdn = fontsource_font!(ROBOTO, weight: 400, style: Normal, subset: Latin);
     let asset = fontsource_font!(
-        "Roboto",
+        ROBOTO,
         weight: 400,
         style: Normal,
         subset: Latin,

@@ -1,3 +1,5 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote_spanned};
 use syn::{
     LitInt, Token,
     parse::{Parse, ParseStream},
@@ -75,50 +77,48 @@ impl topcoat_pretty::PrettyPrint for WeightKey {
     }
 }
 
-/// A single weight. Keeps the [`LitInt`] so its span drives catalog-validation
-/// errors.
+/// A single weight. Keeps the [`LitInt`] so it is emitted verbatim, with its
+/// span, into a [`u16`] position.
 pub struct WeightValue(LitInt);
 
 impl WeightValue {
-    /// The weight as a number.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the literal does not parse as a [`u16`].
-    pub fn value(&self) -> syn::Result<u16> {
-        self.0.base10_parse()
+    /// The weight as a number, or `None` when the literal does not fit a
+    /// [`u16`] — the compiler reports those on the emitted literal.
+    #[must_use]
+    pub fn value(&self) -> Option<u16> {
+        self.0.base10_parse().ok()
     }
 
-    /// Validates the weight against the family's catalog.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the literal does not parse as a [`u16`], or if the
-    /// family does not ship the weight.
-    pub fn resolve(&self, family: &runtime::Family) -> syn::Result<u16> {
+    /// The `compile_error!` for this weight, when the family does not ship it.
+    #[must_use]
+    pub fn check(&self, family: &runtime::Family) -> Option<TokenStream> {
         let value = self.value()?;
-        if !family.has_weight(value) {
-            let available = family
-                .weights
-                .iter()
-                .map(u16::to_string)
-                .collect::<Vec<_>>()
-                .join(", ");
-            return Err(syn::Error::new_spanned(
-                &self.0,
-                format!(
-                    "`{}` does not ship weight `{value}`; available: {available}",
-                    family.name
-                ),
-            ));
+        if family.has_weight(value) {
+            return None;
         }
-        Ok(value)
+        let available = family
+            .weights
+            .iter()
+            .map(u16::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let message = format!(
+            "`{}` does not ship weight `{value}`; available: {available}",
+            family.name
+        );
+        Some(quote_spanned! {self.0.span()=> ::core::compile_error!(#message); })
     }
 }
 
 impl Parse for WeightValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self(input.parse()?))
+    }
+}
+
+impl ToTokens for WeightValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens);
     }
 }
 

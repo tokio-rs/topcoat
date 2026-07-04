@@ -161,5 +161,5 @@ Example input:
 
 Printing any `rerun-if-*` directive from your build script replaces that default with exactly the paths and variables you list. Keep that in mind when combining the Tailwind build with your own directives; in particular, a directory directive is scanned recursively without respecting `.gitignore`, so never print one for a directory containing `target/`. Two situations require directives of your own:
 
-- `ExecutableSource::Env`: print `cargo:rerun-if-env-changed=<name>` if changing the variable should rerun the build script.
+- `executable_env(name)`: print `cargo:rerun-if-env-changed=<name>` if changing the variable should rerun the build script.
 - A `cwd` or `input` outside the package: Cargo's default only tracks package files, so print `cargo:rerun-if-changed` for the external paths.

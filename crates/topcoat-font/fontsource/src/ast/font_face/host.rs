@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::ToTokens;
 use syn::{
     Token,
     parse::{Parse, ParseStream},
@@ -88,29 +88,26 @@ impl topcoat_pretty::PrettyPrint for HostKey {
     }
 }
 
-/// The sole host value, the `asset` keyword.
-pub struct HostValue {
-    pub path: syn::Path,
-}
+/// A single host, written as a bare variant name (`Asset`).
+///
+/// Emits the [`Host`](runtime::Host) variant's path, keeping the written
+/// ident's span so the compiler reports unknown variants on it and editors
+/// autocomplete them.
+pub struct HostValue(syn::Ident);
 
 impl HostValue {
-    /// The host the parsed path refers to.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the parsed path has no segments, which a successfully parsed
-    /// [`syn::Path`] never does.
+    /// The written ident, e.g. `Asset`.
+    #[must_use]
+    pub fn ident(&self) -> &syn::Ident {
+        &self.0
+    }
+
+    /// The host the written variant names. Unknown names fall back to
+    /// [`JsDelivr`](runtime::Host::JsDelivr); the compiler reports them on the
+    /// emitted variant.
     #[must_use]
     pub fn host(&self) -> runtime::Host {
-        match self
-            .path
-            .segments
-            .last()
-            .expect("parsed path has at least one segment")
-            .ident
-            .to_string()
-            .as_str()
-        {
+        match self.0.to_string().as_str() {
             #[cfg(feature = "asset")]
             "Asset" => runtime::Host::Asset,
             "JsDelivr" => runtime::Host::JsDelivr,
@@ -123,25 +120,20 @@ impl HostValue {
 
 impl Parse for HostValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
-            path: input.parse()?,
-        })
+        Ok(Self(input.parse()?))
     }
 }
 
 impl ToTokens for HostValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let path = &self.path;
-        quote! {
-            ::topcoat::font::fontsource::Host::#path
-        }
-        .to_tokens(tokens);
+        let ident = &self.0;
+        quote::quote! { ::topcoat::font::fontsource::Host::#ident }.to_tokens(tokens);
     }
 }
 
 #[cfg(feature = "pretty")]
 impl topcoat_pretty::PrettyPrint for HostValue {
     fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
-        self.path.pretty_print(printer);
+        self.0.pretty_print(printer);
     }
 }

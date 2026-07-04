@@ -1,22 +1,22 @@
-Constructs a [`FontFace`] for one face from the [Fontsource] catalog, picked out by family name and the weight, style, and subset that narrow it to a single font file. The family comes first as a string literal; the rest are `name: value` arguments in any order. `weight` and `style` are required, `subset`, `display`, and `host` are optional.
+Constructs a [`FontFace`] for one face from the [Fontsource] catalog, picked out by family and the weight, style, and subset that narrow it to a single font file. The family comes first as the name of its [`families`] constant; the rest are `name: value` arguments in any order. `weight` and `style` are required, `subset`, `display`, and `host` are optional.
 
 ```rust
 # use topcoat::font::*;
 # use topcoat::font::fontsource::*;
 # fn example() -> FontFace {
 fontsource_font_face!(
-    "Roboto",
+    ROBOTO,
     weight: 400,
     style: Normal,
 )
 # }
 ```
 
-Every value is checked against the vendored catalog as your program compiles.
+Every value is checked against the vendored catalog at compile time.
 
 # Arguments
 
-The **family** comes first, as a string literal, and has to match a family in the catalog.
+The **family** comes first, as the name of its [`families`] constant (e.g. `ROBOTO`).
 
 **`weight`** is a single number in `100..=900` — only the weights the family ships are accepted.
 
@@ -33,7 +33,7 @@ The **family** comes first, as a string literal, and has to match a family in th
 # use topcoat::font::fontsource::*;
 # fn example() -> FontFace {
 fontsource_font_face!(
-    "Roboto",
+    ROBOTO,
     weight: 700,
     style: Italic,
     subset: Cyrillic,
@@ -49,6 +49,7 @@ This macro builds one face at a time. To pull in a family across several weights
 
 [Fontsource]: https://fontsource.org/
 [jsDelivr]: https://www.jsdelivr.com/
+[`families`]: families/index.html
 [asset-type]: ../../asset/struct.Asset.html
 [`Asset`]: enum.Host.html#variant.Asset
 [`JsDelivr`]: enum.Host.html#variant.JsDelivr

@@ -1,25 +1,19 @@
-//! Generated metadata for every font family in the vendored Fontsource
-//! catalog.
-//!
-//! Each family is a [`Family`] constant named after its id in
-//! `SCREAMING_SNAKE_CASE` (e.g. [`ROBOTO`], [`JETBRAINS_MONO`]). Iterate the
-//! whole catalog through [`ALL`], or look a family up by id with
-//! [`Family::by_id`].
+use topcoat_font::runtime::UnicodeRanges;
 
-use topcoat_font::runtime::{UnicodeRange, UnicodeRanges};
-
-use crate::runtime::{Style, Subset};
+use crate::runtime::{Style, Subset, families};
 
 /// Static metadata describing a single font family in the Fontsource catalog.
 ///
-/// One [`Family`] constant is generated for every family in the vendored
-/// catalog, and the full list is available as [`ALL`]. The values mirror the
-/// fields of the Fontsource [`/v1/fonts`](https://api.fontsource.org/v1/fonts)
-/// endpoint.
+/// One `Family` constant is generated for every family in the vendored
+/// catalog in the [`families`] module, and the full list is available as
+/// [`families::ALL`]. The values mirror the fields of the Fontsource
+/// [`/v1/fonts`](https://api.fontsource.org/v1/fonts) endpoint.
 #[derive(Debug, Clone, Copy)]
 pub struct Family {
     /// Fontsource id, used to build CDN URLs (e.g. `"roboto"`).
     pub id: &'static str,
+    /// Name of this family's [`families`] constant (e.g. `"ROBOTO"`).
+    pub ident: &'static str,
     /// Human-readable family name (e.g. `"Roboto"`).
     pub name: &'static str,
     /// Character subsets the family ships, such as
@@ -49,6 +43,35 @@ pub struct Family {
 }
 
 impl Family {
+    /// Look up a family by its Fontsource [`id`](Family::id), e.g. `"roboto"`.
+    ///
+    /// Returns `None` if no such family is in the vendored catalog.
+    #[must_use]
+    pub fn by_id(id: &str) -> Option<&'static Family> {
+        families::ALL
+            .binary_search_by(|f| f.id.cmp(id))
+            .ok()
+            .map(|i| families::ALL[i])
+    }
+
+    /// Look up a family by the name of its [`families`] constant, e.g.
+    /// `"ROBOTO"`.
+    ///
+    /// Returns `None` if no such family is in the vendored catalog.
+    #[must_use]
+    pub fn by_ident(ident: &str) -> Option<&'static Family> {
+        families::ALL.iter().copied().find(|f| f.ident == ident)
+    }
+
+    /// Look up a family by its human-readable [`name`](Family::name), e.g.
+    /// `"Roboto"`.
+    ///
+    /// Returns `None` if no such family is in the vendored catalog.
+    #[must_use]
+    pub fn by_name(name: &str) -> Option<&'static Family> {
+        families::ALL.iter().copied().find(|f| f.name == name)
+    }
+
     /// Whether the family offers the given weight.
     #[must_use]
     pub const fn has_weight(&self, weight: u16) -> bool {
@@ -105,13 +128,15 @@ impl Family {
         None
     }
 
-    /// Look up a family by its Fontsource [`id`](Family::id), e.g. `"roboto"`.
-    ///
-    /// Returns `None` if no such family is in the vendored catalog.
+    /// The jsDelivr CDN URL of this family's face with the given subset,
+    /// weight, and style.
     #[must_use]
-    pub fn by_id(id: &str) -> Option<&'static Family> {
-        ALL.binary_search_by(|f| f.id.cmp(id)).ok().map(|i| ALL[i])
+    pub fn jsdelivr_url(&self, subset: Subset, weight: u16, style: Style) -> String {
+        format!(
+            "https://cdn.jsdelivr.net/fontsource/fonts/{}@latest/{}-{weight}-{}.woff2",
+            self.id,
+            subset.as_str(),
+            style.as_str(),
+        )
     }
 }
-
-include!(concat!(env!("OUT_DIR"), "/families.rs"));

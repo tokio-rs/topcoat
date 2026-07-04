@@ -12,7 +12,7 @@ pub use style::*;
 pub use subset::*;
 pub use weight::*;
 
-use proc_macro2::{Literal, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
     Token,
@@ -28,7 +28,9 @@ use crate::runtime;
 ///
 /// Holds the parsed descriptors; `weight` and `style` are required, `subset`
 /// defaults to the family's default subset, and `display` defaults to `swap`.
-/// Each value is validated against the catalog when lowering to tokens.
+/// Every descriptor is emitted verbatim so the compiler reports unknown names
+/// on the written tokens; combinations the catalog does not ship additionally
+/// emit a `compile_error!` alongside the construction.
 pub struct FontsourceFontFace {
     pub family: FamilyName,
     pub weight: Weight,
@@ -38,45 +40,61 @@ pub struct FontsourceFontFace {
     pub host: Option<Host>,
 }
 
-impl FontsourceFontFace {
-    /// Validates every descriptor against the family and lowers the face to its
-    /// [`FontFace`] construction.
-    fn lower(&self) -> syn::Result<TokenStream> {
-        let family = self.family.resolve()?;
-        let weight = self.weight.value.resolve(family)?;
-        let style = self.style.value.resolve(family)?;
+impl ToTokens for FontsourceFontFace {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let family_path = &self.family;
+        let family = self.family.family();
+
+        let weight = &self.weight.value;
+        let style = &self.style.value;
         let subset = match &self.subset {
-            Some(subset) => subset.value.resolve(family)?,
-            None => family.default_subset,
+            Some(subset) => subset.value.to_token_stream(),
+            None => quote! { FAMILY.default_subset },
         };
-        let display = if let Some(display) = &self.display {
-            display.value.resolve()?
-        } else {
-            quote! { ::topcoat::font::FontDisplay::Swap }
+        let display = match &self.display {
+            Some(display) => display.value.to_token_stream(),
+            None => quote! { ::topcoat::font::FontDisplay::Swap },
         };
+
+        // Catalog-mismatch diagnostics, emitted alongside the construction so
+        // the expansion keeps working in the editor.
+        let mut checks = Vec::new();
+        if let Some(family) = family {
+            checks.extend(self.weight.value.check(family));
+            checks.extend(self.style.value.check(family));
+            if let Some(subset) = &self.subset {
+                checks.extend(subset.value.check(family));
+            }
+        }
+
         let host = self
             .host
             .as_ref()
             .map_or(runtime::Host::JsDelivr, Host::host);
-        let host_autocomplete = self.host.as_ref().map(|host| quote! { let _ = #host; });
+        let host_anchor = self.host.as_ref().map(|host| quote! { let _ = #host; });
 
-        let name = family.name;
-        let url = format!(
-            "https://cdn.jsdelivr.net/fontsource/fonts/{}@latest/{}-{weight}-{}.woff2",
-            family.id,
-            subset.as_str(),
-            style.as_str(),
-        );
-        let weight = Literal::u16_unsuffixed(weight);
-        let style = match style {
-            runtime::Style::Normal => quote! { ::topcoat::font::FontStyle::Normal },
-            runtime::Style::Italic => quote! { ::topcoat::font::FontStyle::Italic },
-        };
+        // The concrete descriptors, when the family and every written value
+        // resolve at expansion time — the URL can then be baked here, which
+        // bundling the file as an asset requires.
+        let resolved = family.and_then(|family| {
+            Some((
+                family,
+                self.weight.value.value()?,
+                self.style.value.style()?,
+                match &self.subset {
+                    Some(subset) => subset.value.subset()?,
+                    None => family.default_subset,
+                },
+            ))
+        });
 
-        // A bundled asset when self-hosted, otherwise the CDN URL verbatim.
-        let src = match host {
+        // A bundled asset when self-hosted, otherwise the baked CDN URL. When
+        // something did not resolve the compiler is already reporting it, so
+        // build the URL at run time to keep the expansion well-typed.
+        let src = match (host, &resolved) {
             #[cfg(feature = "asset")]
-            runtime::Host::Asset => {
+            (runtime::Host::Asset, Some((family, weight, style, subset))) => {
+                let url = family.jsdelivr_url(*subset, *weight, *style);
                 quote! {{
                     const ASSET: ::topcoat::asset::Asset = ::topcoat::asset::asset!(#url);
                     ::topcoat::font::FontSources::new(::std::vec![
@@ -88,7 +106,8 @@ impl FontsourceFontFace {
                     ])
                 }}
             }
-            runtime::Host::JsDelivr => {
+            (_, Some((family, weight, style, subset))) => {
+                let url = family.jsdelivr_url(*subset, *weight, *style);
                 quote! {
                     ::topcoat::font::FontSources::new(::std::vec![
                         ::topcoat::font::FontSource::url(
@@ -99,28 +118,46 @@ impl FontsourceFontFace {
                     ])
                 }
             }
+            (_, None) => quote! {
+                ::topcoat::font::FontSources::new(::std::vec![
+                    ::topcoat::font::FontSource::url(
+                        FAMILY.jsdelivr_url(SUBSET, WEIGHT, STYLE),
+                        ::core::option::Option::Some(::topcoat::font::FontFormat::Woff2),
+                        ::core::option::Option::None,
+                    )
+                ])
+            },
         };
 
         // The subset's `unicode-range`, when the catalog ships one for it.
-        let unicode_range = family.unicode_range(subset).map(|ranges| {
-            let entries = ranges.iter().map(|range| {
-                let start = u32::from(range.start());
-                let end = u32::from(range.end());
-                quote! { ::topcoat::font::UnicodeRange::from_u32(#start, #end) }
+        let unicode_range = resolved
+            .and_then(|(family, _, _, subset)| family.unicode_range(subset))
+            .map(|ranges| {
+                let entries = ranges.iter().map(|range| {
+                    let start = u32::from(range.start());
+                    let end = u32::from(range.end());
+                    quote! { ::topcoat::font::UnicodeRange::from_u32(#start, #end) }
+                });
+                quote! {
+                    .with_unicode_range(::topcoat::font::UnicodeRanges::new(const { &[#(#entries),*] }))
+                }
             });
-            quote! {
-                .with_unicode_range(::topcoat::font::UnicodeRanges::new(const { &[#(#entries),*] }))
-            }
-        });
 
-        Ok(quote! {{
-            #host_autocomplete
-            ::topcoat::font::FontFace::new(#name, #src)
-                .with_weight(::topcoat::font::FontWeightRange::from_u16(#weight, #weight))
-                .with_style(#style)
-                .with_display(#display)
+        quote! {{
+            const FAMILY: &'static ::topcoat::font::fontsource::Family = &#family_path;
+            const WEIGHT: u16 = #weight;
+            const STYLE: ::topcoat::font::fontsource::Style = #style;
+            const SUBSET: ::topcoat::font::fontsource::Subset = #subset;
+            const DISPLAY: ::topcoat::font::FontDisplay = #display;
+            #(#checks)*
+            #host_anchor
+            ::topcoat::font::FontFace::new(FAMILY.name, #src)
+                .with_weight(::topcoat::font::FontWeightRange::from_u16(WEIGHT, WEIGHT))
+                .with_style(STYLE.as_font_style())
+                .with_display(DISPLAY)
                 #unicode_range
-        }})
+        }}
+        .to_tokens(tokens);
     }
 }
 
@@ -182,15 +219,6 @@ impl Parse for FontsourceFontFace {
             display,
             host,
         })
-    }
-}
-
-impl ToTokens for FontsourceFontFace {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self.lower() {
-            Ok(face) => face.to_tokens(tokens),
-            Err(error) => error.to_compile_error().to_tokens(tokens),
-        }
     }
 }
 

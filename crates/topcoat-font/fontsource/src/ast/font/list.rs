@@ -19,31 +19,29 @@ pub enum List<T> {
 }
 
 impl<T> List<T> {
-    /// Validates every item with `resolve`, in source order, rejecting an empty
-    /// bracketed list.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the list is an empty bracketed list, or if `resolve`
-    /// rejects any item.
-    pub fn resolve_with<U>(
-        &self,
-        mut resolve: impl FnMut(&T) -> syn::Result<U>,
-    ) -> syn::Result<Vec<U>> {
+    /// The written items, in source order.
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        let (one, many) = match self {
+            Self::One(item) => (Some(item), None),
+            Self::Many { items, .. } => (None, Some(items.iter())),
+        };
+        one.into_iter().chain(many.into_iter().flatten())
+    }
+
+    /// The `compile_error!` for an empty bracketed list, which no axis accepts.
+    #[must_use]
+    pub fn check_empty(&self) -> Option<proc_macro2::TokenStream> {
         match self {
-            Self::One(item) => Ok(vec![resolve(item)?]),
             Self::Many {
                 bracket_token,
                 items,
-            } => {
-                if items.is_empty() {
-                    return Err(syn::Error::new(
-                        bracket_token.span.join(),
-                        "list must not be empty",
-                    ));
-                }
-                items.iter().map(resolve).collect()
+            } if items.is_empty() => {
+                let span = bracket_token.span.join();
+                Some(quote::quote_spanned! {span=>
+                    ::core::compile_error!("list must not be empty");
+                })
             }
+            _ => None,
         }
     }
 }

@@ -1,5 +1,7 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote_spanned};
 use syn::{
-    Ident, Path, Token,
+    Ident, Token,
     parse::{Parse, ParseStream},
 };
 
@@ -14,7 +16,7 @@ mod kw {
 }
 
 /// A `style:` argument carrying the single style one face ships, e.g.
-/// `style: Style::Italic`.
+/// `style: Italic`.
 pub struct Style {
     pub key: StyleKey,
     pub colon_token: Token![:],
@@ -75,60 +77,58 @@ impl topcoat_pretty::PrettyPrint for StyleKey {
     }
 }
 
-/// A single style, written as an enum-variant path (`Style::Normal`). Keeps the
-/// [`Path`] so its span drives validation errors.
-pub struct StyleValue(Path);
+/// A single style, written as a bare variant name (`Normal` or `Italic`).
+///
+/// Emits the [`Style`](runtime::Style) variant's path, keeping the written
+/// ident's span so the compiler reports unknown variants on it and editors
+/// autocomplete them.
+pub struct StyleValue(Ident);
 
 impl StyleValue {
-    /// The trailing path segment, e.g. `Style::Normal` -> `Normal`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the parsed path has no segments, which a successfully parsed
-    /// [`Path`] never does.
+    /// The written ident, e.g. `Normal`.
     #[must_use]
-    pub fn variant(&self) -> &Ident {
-        &self
-            .0
-            .segments
-            .last()
-            .expect("a parsed path has at least one segment")
-            .ident
+    pub fn ident(&self) -> &Ident {
+        &self.0
     }
 
-    /// Validates the style against the family's catalog.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the variant is not a known style, or if the family
-    /// does not ship it.
-    pub fn resolve(&self, family: &runtime::Family) -> syn::Result<runtime::Style> {
-        let variant = self.variant();
-        let style = match variant.to_string().as_str() {
-            "Normal" => runtime::Style::Normal,
-            "Italic" => runtime::Style::Italic,
-            _ => {
-                return Err(syn::Error::new_spanned(
-                    &self.0,
-                    format!(
-                        "unknown style `{variant}`; expected `Style::Normal` or `Style::Italic`"
-                    ),
-                ));
-            }
-        };
-        if !family.has_style(style) {
-            return Err(syn::Error::new_spanned(
-                &self.0,
-                format!("`{}` does not ship the `{variant}` style", family.name),
-            ));
+    /// The style the written variant names, or `None` when it is not a
+    /// [`Style`](runtime::Style) variant — the compiler reports those on the
+    /// emitted variant.
+    #[must_use]
+    pub fn style(&self) -> Option<runtime::Style> {
+        match self.ident().to_string().as_str() {
+            "Normal" => Some(runtime::Style::Normal),
+            "Italic" => Some(runtime::Style::Italic),
+            _ => None,
         }
-        Ok(style)
+    }
+
+    /// The `compile_error!` for this style, when the family does not ship it.
+    #[must_use]
+    pub fn check(&self, family: &runtime::Family) -> Option<TokenStream> {
+        let style = self.style()?;
+        if family.has_style(style) {
+            return None;
+        }
+        let message = format!(
+            "`{}` does not ship the `{}` style",
+            family.name,
+            self.ident()
+        );
+        Some(quote_spanned! {self.0.span()=> ::core::compile_error!(#message); })
     }
 }
 
 impl Parse for StyleValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self(input.parse()?))
+    }
+}
+
+impl ToTokens for StyleValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ident = &self.0;
+        quote::quote! { ::topcoat::font::fontsource::Style::#ident }.to_tokens(tokens);
     }
 }
 

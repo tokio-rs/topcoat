@@ -1,5 +1,7 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote_spanned};
 use syn::{
-    Ident, Path, Token,
+    Ident, Token,
     parse::{Parse, ParseStream},
 };
 
@@ -14,7 +16,7 @@ mod kw {
 }
 
 /// A `subset:` argument carrying the single subset one face ships, e.g.
-/// `subset: Subset::Latin`.
+/// `subset: Latin`.
 pub struct Subset {
     pub key: SubsetKey,
     pub colon_token: Token![:],
@@ -75,61 +77,59 @@ impl topcoat_pretty::PrettyPrint for SubsetKey {
     }
 }
 
-/// A single subset, written as an enum-variant path (`Subset::Latin`). Keeps the
-/// [`Path`] so its span drives validation errors.
-pub struct SubsetValue(Path);
+/// A single subset, written as a bare variant name (`Latin`).
+///
+/// Emits the [`Subset`](runtime::Subset) variant's path, keeping the written
+/// ident's span so the compiler reports unknown variants on it and editors
+/// autocomplete them.
+pub struct SubsetValue(Ident);
 
 impl SubsetValue {
-    /// The trailing path segment, e.g. `Subset::LatinExt` -> `LatinExt`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the parsed path has no segments, which a successfully parsed
-    /// [`Path`] never does.
+    /// The written ident, e.g. `LatinExt`.
     #[must_use]
-    pub fn variant(&self) -> &Ident {
-        &self
-            .0
-            .segments
-            .last()
-            .expect("a parsed path has at least one segment")
-            .ident
+    pub fn ident(&self) -> &Ident {
+        &self.0
     }
 
-    /// Validates the subset against the family's catalog, matching on the enum
-    /// variant name.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the family does not ship the named subset.
-    pub fn resolve(&self, family: &runtime::Family) -> syn::Result<runtime::Subset> {
-        let variant = self.variant().to_string();
-        family
+    /// The subset the written variant names, or `None` when it is not a
+    /// [`Subset`](runtime::Subset) variant — the compiler reports those on the
+    /// emitted variant.
+    #[must_use]
+    pub fn subset(&self) -> Option<runtime::Subset> {
+        runtime::Subset::from_variant(&self.0.to_string())
+    }
+
+    /// The `compile_error!` for this subset, when the family does not ship it.
+    #[must_use]
+    pub fn check(&self, family: &runtime::Family) -> Option<TokenStream> {
+        let subset = self.subset()?;
+        if family.has_subset(subset) {
+            return None;
+        }
+        let available = family
             .subsets
             .iter()
-            .copied()
-            .find(|subset| format!("{subset:?}") == variant)
-            .ok_or_else(|| {
-                let available = family
-                    .subsets
-                    .iter()
-                    .map(|subset| format!("{subset:?}"))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                syn::Error::new_spanned(
-                    &self.0,
-                    format!(
-                        "`{}` does not ship the `{variant}` subset; available: {available}",
-                        family.name,
-                    ),
-                )
-            })
+            .map(|subset| format!("{subset:?}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let message = format!(
+            "`{}` does not ship the `{}` subset; available: {available}",
+            family.name, self.0,
+        );
+        Some(quote_spanned! {self.0.span()=> ::core::compile_error!(#message); })
     }
 }
 
 impl Parse for SubsetValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self(input.parse()?))
+    }
+}
+
+impl ToTokens for SubsetValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ident = &self.0;
+        quote::quote! { ::topcoat::font::fontsource::Subset::#ident }.to_tokens(tokens);
     }
 }
 

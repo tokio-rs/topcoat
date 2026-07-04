@@ -73,7 +73,7 @@ Local files work similarly with the asset system: `url(asset!("./fonts/inter-400
 
 # Fontsource
 
-[Fontsource] is an open-source catalog of web fonts. It includes every Google Font, plus other openly licensed families. [`fontsource_font!`] declares a font straight from the catalog, and checks the family name and every requested weight, style, and subset against it at compile time.
+[Fontsource] is an open-source catalog of web fonts. It includes every Google Font, plus other openly licensed families. [`fontsource_font!`] declares a font straight from the catalog, and checks the family and every requested weight, style, and subset against it at compile time.
 
 Fontsource support lives behind the `font-fontsource` feature:
 
@@ -81,11 +81,11 @@ Fontsource support lives behind the `font-fontsource` feature:
 topcoat = { version = "0.1", features = ["font-fontsource"] }
 ```
 
-Then specify which font you would like to use. By default, this will include every weight and style Roboto ships, only in its default character subset, loaded by the browser from the [jsDelivr] CDN:
+Then specify which font from the [`families`] module you would like to use. By default, this will include every weight and style the font ships, only in its default character subset, loaded by the browser from the [jsDelivr] CDN:
 
 ```rust
 # use topcoat::font::{Font, fontsource::fontsource_font};
-const ROBOTO: Font = fontsource_font!("Roboto");
+const ROBOTO: Font = fontsource_font!(ROBOTO);
 ```
 
 The resulting [`Font`] can be registered, served, and loaded exactly like a custom one.
@@ -97,7 +97,7 @@ Every combination of weight, style, and subset is a separate font file, so only 
 ```rust
 # use topcoat::font::{Font, fontsource::fontsource_font};
 const ROBOTO: Font = fontsource_font!(
-    "Roboto",
+    ROBOTO,
     weight: [400, 700],
     style: Normal,
     subset: [Latin, Cyrillic],
@@ -117,7 +117,7 @@ use topcoat::{
     router::{Router, RouterBuilderDiscoverExt},
 };
 
-const ROBOTO: Font = fontsource_font!("Roboto", host: Asset);
+const ROBOTO: Font = fontsource_font!(ROBOTO, host: Asset);
 
 let router = Router::builder()
     .assets(AssetBundle::load().unwrap())
@@ -134,5 +134,6 @@ let router = Router::builder()
 [`Font`]: Font
 [`ORBITRON.family()`]: Font::family
 [`font!`]: font
+[`families`]: fontsource/families/index.html
 [`fontsource_font!`]: fontsource/macro.fontsource_font.html
 [`link`]: link

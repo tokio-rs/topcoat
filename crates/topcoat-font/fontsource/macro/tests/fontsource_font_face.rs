@@ -30,7 +30,7 @@ fn roboto_display(file: &str, weight: u16, style: &str, display: &str, range: &s
 
 #[test]
 fn minimal_face_uses_the_default_subset() {
-    let face = fontsource_font_face!("Roboto", weight: 400, style: Normal);
+    let face = fontsource_font_face!(ROBOTO, weight: 400, style: Normal);
     assert_eq!(
         render(&face),
         roboto("latin-400-normal", 400, "normal", LATIN)
@@ -39,7 +39,7 @@ fn minimal_face_uses_the_default_subset() {
 
 #[test]
 fn italic_style() {
-    let face = fontsource_font_face!("Roboto", weight: 400, style: Italic);
+    let face = fontsource_font_face!(ROBOTO, weight: 400, style: Italic);
     assert_eq!(
         render(&face),
         roboto("latin-400-italic", 400, "italic", LATIN)
@@ -48,7 +48,7 @@ fn italic_style() {
 
 #[test]
 fn explicit_subset_drives_the_url_and_unicode_range() {
-    let face = fontsource_font_face!("Roboto", weight: 700, style: Italic, subset: Cyrillic);
+    let face = fontsource_font_face!(ROBOTO, weight: 700, style: Italic, subset: Cyrillic);
     assert_eq!(
         render(&face),
         roboto("cyrillic-700-italic", 700, "italic", CYRILLIC),
@@ -57,7 +57,7 @@ fn explicit_subset_drives_the_url_and_unicode_range() {
 
 #[test]
 fn arguments_in_any_order() {
-    let face = fontsource_font_face!("Roboto", style: Normal, subset: Cyrillic, weight: 500);
+    let face = fontsource_font_face!(ROBOTO, style: Normal, subset: Cyrillic, weight: 500);
     assert_eq!(
         render(&face),
         roboto("cyrillic-500-normal", 500, "normal", CYRILLIC)
@@ -66,13 +66,13 @@ fn arguments_in_any_order() {
 
 #[test]
 fn display_defaults_to_swap() {
-    let face = fontsource_font_face!("Roboto", weight: 400, style: Normal);
+    let face = fontsource_font_face!(ROBOTO, weight: 400, style: Normal);
     assert!(render(&face).contains("font-display: swap"));
 }
 
 #[test]
 fn explicit_display_overrides_the_default() {
-    let face = fontsource_font_face!("Roboto", weight: 400, style: Normal, display: Fallback);
+    let face = fontsource_font_face!(ROBOTO, weight: 400, style: Normal, display: Fallback);
     assert_eq!(
         render(&face),
         roboto_display("latin-400-normal", 400, "normal", "fallback", LATIN),
@@ -81,15 +81,15 @@ fn explicit_display_overrides_the_default() {
 
 #[test]
 fn host_defaults_to_jsdelivr() {
-    let default = fontsource_font_face!("Roboto", weight: 400, style: Normal);
-    let explicit = fontsource_font_face!("Roboto", weight: 400, style: Normal, host: JsDelivr);
+    let default = fontsource_font_face!(ROBOTO, weight: 400, style: Normal);
+    let explicit = fontsource_font_face!(ROBOTO, weight: 400, style: Normal, host: JsDelivr);
     assert_eq!(default, explicit);
 }
 
 #[test]
 fn self_hosting_changes_the_source() {
-    let cdn = fontsource_font_face!("Roboto", weight: 400, style: Normal);
-    let asset = fontsource_font_face!("Roboto", weight: 400, style: Normal, host: Asset);
+    let cdn = fontsource_font_face!(ROBOTO, weight: 400, style: Normal);
+    let asset = fontsource_font_face!(ROBOTO, weight: 400, style: Normal, host: Asset);
     // The CDN face points at jsDelivr; the asset face is served from our own
     // bundle, so the two sources differ.
     assert_ne!(cdn, asset);
