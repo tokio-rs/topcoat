@@ -2,11 +2,8 @@ use std::sync::OnceLock;
 
 use topcoat_core::runtime::context::Cx;
 use topcoat_router::runtime::{
-    Body, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder,
-    http::{
-        HeaderValue, Method,
-        header::{CACHE_CONTROL, CONTENT_TYPE},
-    },
+    Body, HeaderValue, Method, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder,
+    header::{CACHE_CONTROL, CONTENT_TYPE},
 };
 
 use crate::runtime::{Font, FontResolver};

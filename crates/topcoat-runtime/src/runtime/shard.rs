@@ -6,7 +6,7 @@ use topcoat_core::runtime::{
 };
 
 use topcoat_router::runtime::{
-    Body, IntoResponse, Path, PathBuf, Route, RouteFuture, RouterBuilder, http::Method,
+    Body, IntoResponse, Method, Path, PathBuf, Route, RouteFuture, RouterBuilder,
 };
 use topcoat_view::runtime::View;
 

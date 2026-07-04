@@ -34,4 +34,4 @@ pub use router::*;
 pub use serve::*;
 pub use service::*;
 
-pub use http;
+pub use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};
