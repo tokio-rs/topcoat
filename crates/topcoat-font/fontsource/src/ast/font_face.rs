@@ -47,14 +47,14 @@ impl ToTokens for FontsourceFontFace {
 
         let weight = &self.weight.value;
         let style = &self.style.value;
-        let subset = match &self.subset {
-            Some(subset) => subset.value.to_token_stream(),
-            None => quote! { FAMILY.default_subset },
-        };
-        let display = match &self.display {
-            Some(display) => display.value.to_token_stream(),
-            None => quote! { ::topcoat::font::FontDisplay::Swap },
-        };
+        let subset = self.subset.as_ref().map_or_else(
+            || quote! { FAMILY.default_subset },
+            |subset| subset.value.to_token_stream(),
+        );
+        let display = self.display.as_ref().map_or_else(
+            || quote! { ::topcoat::font::FontDisplay::Swap },
+            |display| display.value.to_token_stream(),
+        );
 
         // Catalog-mismatch diagnostics, emitted alongside the construction so
         // the expansion keeps working in the editor.

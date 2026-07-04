@@ -60,27 +60,27 @@ fn assert_format_idempotent(input: &str, expected: &str) {
 #[test]
 fn formats_a_compact_face_inline() {
     assert_format(
-        r#"fontsource_font_face!(INTER,weight:400,style:Normal);"#,
-        r#"fontsource_font_face!(INTER, weight: 400, style: Normal);"#,
+        r"fontsource_font_face!(INTER,weight:400,style:Normal);",
+        r"fontsource_font_face!(INTER, weight: 400, style: Normal);",
     );
 }
 
 #[test]
 fn formats_every_face_descriptor() {
-    let expected = r#"fontsource_font_face!(
+    let expected = r"fontsource_font_face!(
     INTER,
     weight: 400,
     style: Normal,
     subset: Latin,
     display: Swap,
     host: Asset,
-);"#;
+);";
     assert_format_idempotent(expected, expected);
 }
 
 #[test]
 fn preserves_the_written_face_argument_order() {
-    let expected = r#"fontsource_font_face!(INTER, host: Asset, style: Normal, weight: 400);"#;
+    let expected = r"fontsource_font_face!(INTER, host: Asset, style: Normal, weight: 400);";
     assert_format_idempotent(expected, expected);
 }
 
@@ -88,44 +88,44 @@ fn preserves_the_written_face_argument_order() {
 fn collapses_whitespace_between_face_arguments() {
     assert_format(
         "fontsource_font_face!(  INTER , weight :  400 ,\n  style: Normal  );",
-        r#"fontsource_font_face!(INTER, weight: 400, style: Normal);"#,
+        r"fontsource_font_face!(INTER, weight: 400, style: Normal);",
     );
 }
 
 #[test]
 fn keeps_a_line_comment_between_face_arguments() {
-    let expected = r#"fontsource_font_face!(
+    let expected = r"fontsource_font_face!(
     INTER,
     // the regular weight
     weight: 400,
     style: Normal,
-);"#;
+);";
     assert_format_idempotent(expected, expected);
 }
 
 #[test]
 fn formats_a_compact_font_inline() {
     assert_format(
-        r#"fontsource_font!(INTER,weight:[400,700],style:Italic);"#,
-        r#"fontsource_font!(INTER, weight: [400, 700], style: Italic);"#,
+        r"fontsource_font!(INTER,weight:[400,700],style:Italic);",
+        r"fontsource_font!(INTER, weight: [400, 700], style: Italic);",
     );
 }
 
 #[test]
 fn formats_a_font_with_only_a_family() {
-    let expected = r#"fontsource_font!(LAVISHLY_YOURS, host: Asset);"#;
+    let expected = r"fontsource_font!(LAVISHLY_YOURS, host: Asset);";
     assert_format_idempotent(expected, expected);
 }
 
 #[test]
 fn formats_every_font_axis_with_lists() {
-    let expected = r#"fontsource_font!(
+    let expected = r"fontsource_font!(
     INTER,
     weight: [400, 700],
     style: [Normal, Italic],
     subset: [Latin, Cyrillic],
     display: Swap,
     host: Asset,
-);"#;
+);";
     assert_format_idempotent(expected, expected);
 }
