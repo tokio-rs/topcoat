@@ -16,7 +16,6 @@
 
   var enabled = script.getAttribute("data-status-indicator") !== "false";
 
-  var TICKS = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   var MUTED = "#a1a1aa";
   var ERROR = "#fca5a5";
 
@@ -25,6 +24,12 @@
     '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"' +
     ' fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"' +
     ' stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+
+  // Lucide "loader-circle", spun by the stylesheet.
+  var SPINNER_ICON =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"' +
+    ' fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"' +
+    ' stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
 
   var FONT_URL =
     "https://cdn.jsdelivr.net/fontsource/fonts/lexend-deca@latest/latin-";
@@ -38,12 +43,24 @@
     ".topcoat-dev-dismiss{all:unset;display:flex;align-items:center;" +
     "justify-content:center;width:18px;height:18px;border-radius:4px;" +
     "cursor:pointer;color:" + MUTED + ";transition:color .15s ease}" +
-    ".topcoat-dev-dismiss:hover{color:#fff}";
+    ".topcoat-dev-dismiss:hover{color:#fff}" +
+    ".topcoat-dev-busy{color:#a5f3fc}" +
+    ".topcoat-dev-spinner{display:flex;color:#a5f3fc;" +
+    "animation:topcoat-dev-spin 1s linear infinite}" +
+    "@keyframes topcoat-dev-spin{to{transform:rotate(360deg)}}" +
+    // Error labels catch the eye with a soft highlight sweeping across the
+    // text once every three seconds.
+    ".topcoat-dev-error{background-image:linear-gradient(100deg," +
+    ERROR + " 30%,#fecaca 50%," + ERROR + " 70%);" +
+    "background-size:300% 100%;-webkit-background-clip:text;" +
+    "background-clip:text;color:transparent;" +
+    "animation:topcoat-dev-shimmer 3s ease-in-out infinite}" +
+    "@keyframes topcoat-dev-shimmer{0%{background-position:100% 0}" +
+    "25%{background-position:0 0}100%{background-position:0 0}}";
 
   var pill = null;
   var statusEl = null;
   var spinnerEl = null;
-  var spinnerTimer = null;
 
   function createPill() {
     var style = document.createElement("style");
@@ -69,8 +86,8 @@
     pill.appendChild(statusEl);
 
     spinnerEl = document.createElement("span");
-    spinnerEl.style.cssText =
-      "display:inline-block;width:1em;text-align:center;color:#67e8f9";
+    spinnerEl.className = "topcoat-dev-spinner";
+    spinnerEl.innerHTML = SPINNER_ICON;
     pill.appendChild(spinnerEl);
 
     var close = document.createElement("button");
@@ -98,35 +115,16 @@
     if (!pill) createPill();
 
     statusEl.textContent = label;
-    statusEl.style.color = isError ? ERROR : "#fff";
-    spinnerEl.style.display = isError ? "none" : "inline-block";
-    if (isError) stopSpinner();
-    else startSpinner();
+    statusEl.className = isError ? "topcoat-dev-error" : "topcoat-dev-busy";
+    // An empty display falls back to the class's `flex`.
+    spinnerEl.style.display = isError ? "none" : "";
 
     // Re-attach even if previously dismissed: each event is news.
     if (!pill.parentNode) document.body.appendChild(pill);
   }
 
   function hideStatus() {
-    stopSpinner();
     if (pill && pill.parentNode) pill.parentNode.removeChild(pill);
-  }
-
-  function startSpinner() {
-    if (spinnerTimer) return;
-    var tick = 0;
-    spinnerEl.textContent = TICKS[0];
-    spinnerTimer = setInterval(function () {
-      tick = (tick + 1) % TICKS.length;
-      spinnerEl.textContent = TICKS[tick];
-    }, 80);
-  }
-
-  function stopSpinner() {
-    if (spinnerTimer) {
-      clearInterval(spinnerTimer);
-      spinnerTimer = null;
-    }
   }
 
   // --- Dev server connection ------------------------------------------------
@@ -153,4 +151,7 @@
     };
   }
   connect();
+
+  // TEMP: always show the pill to iterate on its design. Remove this.
+  showStatus("rebuilding", false);
 })();
