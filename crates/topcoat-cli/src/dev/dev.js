@@ -20,19 +20,43 @@
   var MUTED = "#a1a1aa";
   var ERROR = "#fca5a5";
 
+  // Lucide "x" (https://lucide.dev), inheriting the button's color.
+  var X_ICON =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"' +
+    ' fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"' +
+    ' stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+
+  var FONT_URL =
+    "https://cdn.jsdelivr.net/fontsource/fonts/lexend-deca@latest/latin-";
+  // The dismiss button is styled through a stylesheet rather than inline so
+  // it can have a :hover style; `all:unset` shields it from site styles.
+  var STYLE_CSS =
+    '@font-face{font-family:"Lexend Deca";font-style:normal;font-weight:400;' +
+    "font-display:swap;src:url(" + FONT_URL + '400-normal.woff2) format("woff2")}' +
+    '@font-face{font-family:"Lexend Deca";font-style:normal;font-weight:600;' +
+    "font-display:swap;src:url(" + FONT_URL + '600-normal.woff2) format("woff2")}' +
+    ".topcoat-dev-dismiss{all:unset;display:flex;align-items:center;" +
+    "justify-content:center;width:18px;height:18px;border-radius:4px;" +
+    "cursor:pointer;color:" + MUTED + ";transition:color .15s ease}" +
+    ".topcoat-dev-dismiss:hover{color:#fff}";
+
   var pill = null;
   var statusEl = null;
   var spinnerEl = null;
   var spinnerTimer = null;
 
   function createPill() {
+    var style = document.createElement("style");
+    style.textContent = STYLE_CSS;
+    document.head.appendChild(style);
+
     pill = document.createElement("div");
     pill.style.cssText =
       "position:fixed;bottom:16px;left:16px;z-index:2147483647;" +
       "display:flex;align-items:center;gap:7px;padding:7px 8px 7px 14px;" +
-      "background:#0a0a0a;color:#fff;border:1px solid #3f3f46;" +
+      "background:#0a0a0a;color:#fff;border:1px solid #000;" +
       "border-radius:8px;" +
-      "font:12px/1 ui-sans-serif,system-ui,sans-serif;" +
+      "font:12px/1 'Lexend Deca',ui-sans-serif,system-ui,sans-serif;" +
       "-webkit-font-smoothing:antialiased;user-select:none";
 
     var brand = document.createElement("span");
@@ -50,18 +74,9 @@
     pill.appendChild(spinnerEl);
 
     var close = document.createElement("button");
-    close.textContent = "✕";
+    close.className = "topcoat-dev-dismiss";
     close.setAttribute("aria-label", "Dismiss");
-    close.style.cssText =
-      "all:unset;display:flex;align-items:center;justify-content:center;" +
-      "width:18px;height:18px;border-radius:4px;cursor:pointer;" +
-      "color:" + MUTED + ";font-size:10px";
-    close.onmouseenter = function () {
-      close.style.color = "#fff";
-    };
-    close.onmouseleave = function () {
-      close.style.color = MUTED;
-    };
+    close.innerHTML = X_ICON;
     close.onclick = hideStatus;
     pill.appendChild(close);
   }
