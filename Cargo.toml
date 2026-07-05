@@ -23,9 +23,9 @@ members = [
     "crates/topcoat-view/macro",
 
     "examples/app-context",
-    "examples/assets",
+    "examples/asset",
     "examples/context",
-    "examples/cookies",
+    "examples/cookie",
     "examples/font",
     "examples/hello-world",
     "examples/htmx",
