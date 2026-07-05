@@ -1766,6 +1766,8 @@ dependencies = [
  "topcoat-font-fontsource-macro",
  "topcoat-font-macro",
  "topcoat-htmx",
+ "topcoat-icon",
+ "topcoat-icon-iconify",
  "topcoat-router",
  "topcoat-router-macro",
  "topcoat-runtime",
@@ -1929,6 +1931,14 @@ dependencies = [
  "topcoat-core",
  "topcoat-router",
 ]
+
+[[package]]
+name = "topcoat-icon"
+version = "0.1.0"
+
+[[package]]
+name = "topcoat-icon-iconify"
+version = "0.1.0"
 
 [[package]]
 name = "topcoat-pretty"

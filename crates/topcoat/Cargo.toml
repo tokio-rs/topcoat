@@ -8,6 +8,7 @@ default = [
 	"asset",
 	"cookie",
 	"font",
+	"icon",
 	"router",
 	"runtime",
 	"view",
@@ -43,6 +44,12 @@ font-fontsource = [
 ]
 htmx = [
 	"dep:topcoat-htmx",
+]
+icon = [
+	"dep:topcoat-icon",
+]
+icon-iconify = [
+	"dep:topcoat-icon-iconify",
 ]
 multipart = [
 	"router",
@@ -81,6 +88,8 @@ full = [
 	"font",
 	"font-fontsource",
 	"htmx",
+	"icon",
+	"icon-iconify",
 	"multipart",
 	"router",
 	"runtime",
@@ -104,6 +113,8 @@ topcoat-font-macro = { workspace = true, optional = true }
 topcoat-font-fontsource = { workspace = true, optional = true }
 topcoat-font-fontsource-macro = { workspace = true, optional = true }
 topcoat-htmx = { workspace = true, optional = true }
+topcoat-icon = { workspace = true, optional = true }
+topcoat-icon-iconify = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }
