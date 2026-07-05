@@ -1,4 +1,4 @@
-use topcoat_view::runtime::{Unescaped, View, svg::ViewBox};
+use topcoat_view::runtime::{View, svg::ViewBox};
 
 /// The renderable data of an SVG icon: its view box and its body markup.
 ///
@@ -18,15 +18,13 @@ impl IconData {
         Self { view_box, body }
     }
 
-    /// Creates an icon whose body renders verbatim.
-    ///
-    /// Because this constructor is `const`, the resulting icon can be stored
-    /// in `const` and `static` items.
+    /// Creates an icon whose body renders verbatim. The body is not checked
+    /// for syntax errors or XSS injections.
     #[must_use]
-    pub const fn unescaped(view_box: ViewBox, body: Unescaped<&'static str>) -> Self {
+    pub const fn unescaped_unchecked(view_box: ViewBox, body: &'static str) -> Self {
         Self {
             view_box,
-            body: View::unescaped(body),
+            body: View::unescaped_unchecked(body),
         }
     }
 

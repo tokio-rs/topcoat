@@ -2,17 +2,15 @@ use topcoat::{
     Result,
     icon::{IconData, icon},
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::{Unescaped, attributes, svg::ViewBox, view},
+    view::{attributes, svg::ViewBox, view},
 };
 
 // The const way: store the raw SVG body verbatim in a `const`. This is the
 // shape the iconify macros expand to, but nothing stops you from writing it
 // by hand.
-const TRASH: IconData = IconData::unescaped(
+const TRASH: IconData = IconData::unescaped_unchecked(
     ViewBox::new(0.0, 0.0, 24.0, 24.0),
-    Unescaped::new_unchecked(
-        r#"<path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>"#,
-    ),
+    r#"<path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>"#,
 );
 
 #[tokio::main]
