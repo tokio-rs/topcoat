@@ -7,7 +7,9 @@ use console::style;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
-pub async fn target_dir() -> Option<PathBuf> {
+/// Run `cargo metadata --no-deps` for the current workspace and parse its
+/// output. Returns `None` when cargo cannot be spawned or reports an error.
+pub async fn metadata() -> Option<serde_json::Value> {
     let output = Command::new("cargo")
         .args(["metadata", "--no-deps", "--format-version=1"])
         .stdout(Stdio::piped())
@@ -22,8 +24,16 @@ pub async fn target_dir() -> Option<PathBuf> {
         return None;
     }
 
-    let msg: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
-    msg.get("target_directory")?.as_str().map(PathBuf::from)
+    serde_json::from_slice(&output.stdout).ok()
+}
+
+/// The workspace's cargo target directory, from [`metadata`].
+pub async fn target_dir() -> Option<PathBuf> {
+    let metadata = metadata().await?;
+    metadata
+        .get("target_directory")?
+        .as_str()
+        .map(PathBuf::from)
 }
 
 #[derive(Default)]

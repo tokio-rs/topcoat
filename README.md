@@ -2,7 +2,7 @@
 
 > Early-stage and experimental. Expect breaking changes.
 
-A batteries-included Rust web framework for server-rendered apps.
+A modular, batteries-included Rust web framework for server-rendered apps.
 
 See the [Getting started guide](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md) to set up a new project.
 
