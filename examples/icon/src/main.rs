@@ -74,7 +74,7 @@ async fn home() -> Result {
                     "This one has an accessible label instead of aria-hidden: "
                     icon(
                         data: TRASH,
-                        label: "Delete".to_string()
+                        label: "Delete"
                     )
                 </p>
                 <p>

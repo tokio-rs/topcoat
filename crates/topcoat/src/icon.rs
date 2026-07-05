@@ -21,22 +21,19 @@ pub async fn icon(
     /// technology.
     #[default]
     #[into]
-    label: Option<String>,
+    label: String,
     /// Extra attributes for the `<svg>` element.
     #[default]
     attrs: topcoat::view::Attributes,
 ) -> topcoat::Result {
-    let view_box = data.view_box();
-    let hidden = label.is_none();
-
     topcoat::view::view! {
         <svg
-            viewBox=(view_box)
+            viewBox=(data.view_box())
             width=(size)
             height=(size)
-            aria-hidden=(hidden.then_some("true"))
-            role=(label.is_some().then_some("img"))
-            aria-label=(label)
+            aria-hidden=(label.is_empty().then_some("true"))
+            role=((!label.is_empty()).then_some("img"))
+            aria-label=((!label.is_empty()).then_some(label))
             (attrs)
         >
             (data.into_body())
