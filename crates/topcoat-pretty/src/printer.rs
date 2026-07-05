@@ -284,7 +284,13 @@ impl<'a> Printer<'a> {
 
     fn print_break(&mut self) {
         self.output.push('\n');
-        self.space = MARGIN;
+        // Subtract the new line's indentation from the available space right
+        // away, rather than deferring it to `print_indent`. A group's fit
+        // decision is made when its `Begin` token is printed, which happens
+        // before any of its text (and thus before `print_indent` would run), so
+        // the space must already reflect the indent or the group is measured
+        // against the full margin and wrongly judged to fit.
+        self.space = (MARGIN - self.print_indent * INDENT).max(MIN_SPACE);
         self.pending_break = false;
     }
 
@@ -292,7 +298,6 @@ impl<'a> Printer<'a> {
         if !self.line_dirty() {
             self.output
                 .push_str(&" ".repeat((self.print_indent * INDENT).try_into().unwrap()));
-            self.space = (self.space - self.print_indent * INDENT).max(MIN_SPACE);
         }
     }
 

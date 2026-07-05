@@ -89,6 +89,7 @@ fixture_test!(element_with_text);
 
 fixture_test!(attributes_short);
 fixture_test!(attributes_long);
+fixture_test!(attributes_overflow);
 fixture_test!(attributes_macro_short);
 fixture_test!(attributes_macro_long);
 fixture_test!(attribute_expr_value);
