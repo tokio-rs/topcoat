@@ -1,0 +1,11 @@
+[package]
+name = "icon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+topcoat = { workspace = true, features = ["icon"] }
+
+[lints]
+workspace = true

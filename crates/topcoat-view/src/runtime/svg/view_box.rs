@@ -55,7 +55,20 @@ impl AttributeValueViewParts for ViewBox {
 
 #[cfg(test)]
 mod tests {
+    use topcoat_core::runtime::context::Cx;
+
     use super::*;
+    use crate::runtime::{FmtHtml, Formatter, ViewPart};
+
+    fn render(value: impl AttributeValueViewParts) -> String {
+        let mut parts = ViewParts::new();
+        value.into_view_parts(&mut parts);
+        let part: ViewPart = parts.into();
+        let mut buf = String::new();
+        let mut f = Formatter::new(&mut buf);
+        part.fmt_html(&Cx::default(), &mut f);
+        buf
+    }
 
     #[test]
     fn displays_as_svg_view_box_value() {
@@ -64,5 +77,19 @@ mod tests {
             ViewBox::new(0.0, -0.5, 16.5, 16.0).to_string(),
             "0 -0.5 16.5 16"
         );
+    }
+
+    #[test]
+    fn renders_view_parts_as_space_separated_value() {
+        assert_eq!(render(ViewBox::new(0.0, 0.0, 24.0, 24.0)), "0 0 24 24");
+        assert_eq!(
+            render(ViewBox::new(0.0, -0.5, 16.5, 16.0)),
+            "0 -0.5 16.5 16"
+        );
+    }
+
+    #[test]
+    fn attribute_is_always_present() {
+        assert!(ViewBox::new(0.0, 0.0, 24.0, 24.0).attribute_present());
     }
 }

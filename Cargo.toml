@@ -32,6 +32,7 @@ members = [
     "examples/font",
     "examples/hello-world",
     "examples/htmx",
+    "examples/icon",
     "examples/manual-router",
     "examples/module-router",
     "examples/path-query-params",
