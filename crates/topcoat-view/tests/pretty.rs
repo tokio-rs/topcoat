@@ -78,14 +78,14 @@ macro_rules! fixture_test {
     };
 }
 
-// ── Basic elements ──────────────────────────────────────────────────────────
+// -- Basic elements ----------------------------------------------------------
 
 fixture_test!(single_element);
 fixture_test!(void_elements);
 fixture_test!(nested_elements);
 fixture_test!(element_with_text);
 
-// ── Attributes ──────────────────────────────────────────────────────────────
+// -- Attributes --------------------------------------------------------------
 
 fixture_test!(attributes_short);
 fixture_test!(attributes_long);
@@ -93,46 +93,46 @@ fixture_test!(attributes_macro_short);
 fixture_test!(attributes_macro_long);
 fixture_test!(attribute_expr_value);
 
-// ── Text nodes ──────────────────────────────────────────────────────────────
+// -- Text nodes --------------------------------------------------------------
 
 fixture_test!(text_nodes);
 
-// ── Expressions ─────────────────────────────────────────────────────────────
+// -- Expressions -------------------------------------------------------------
 
 fixture_test!(inline_expressions);
 
-// ── Control flow ────────────────────────────────────────────────────────────
+// -- Control flow ------------------------------------------------------------
 
 fixture_test!(if_else);
 fixture_test!(if_else_if_else);
 fixture_test!(for_loop);
 fixture_test!(match_expr);
 
-// ── Components ──────────────────────────────────────────────────────────────
+// -- Components --------------------------------------------------------------
 
 fixture_test!(component_empty);
 fixture_test!(component_with_child);
 fixture_test!(component_with_children);
 
-// ── Explicit context ────────────────────────────────────────────────────────
+// -- Explicit context --------------------------------------------------------
 
 fixture_test!(explicit_cx);
 fixture_test!(explicit_cx_multiline);
 
-// ── Let bindings ────────────────────────────────────────────────────────────
+// -- Let bindings ------------------------------------------------------------
 
 fixture_test!(let_binding);
 
-// ── DOCTYPE ─────────────────────────────────────────────────────────────────
+// -- DOCTYPE -----------------------------------------------------------------
 
 fixture_test!(doctype);
 
-// ── Comments ────────────────────────────────────────────────────────────────
+// -- Comments ----------------------------------------------------------------
 
 fixture_test!(line_comments);
 fixture_test!(block_comments);
 
-// ── Complex / realistic ─────────────────────────────────────────────────────
+// -- Complex / realistic -----------------------------------------------------
 
 fixture_test!(full_page);
 fixture_test!(deeply_nested);

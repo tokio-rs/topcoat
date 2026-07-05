@@ -12,7 +12,7 @@ use crate::ast::{
     view::{ExprKind, ViewWriter, WriteView},
 };
 
-/// A `:name=(expr)` or `:name=$(expr)` attribute — a one-way binding to a DOM
+/// A `:name=(expr)` or `:name=$(expr)` attribute: a one-way binding to a DOM
 /// attribute or property.
 pub struct BindAttribute {
     pub colon: Token![:],

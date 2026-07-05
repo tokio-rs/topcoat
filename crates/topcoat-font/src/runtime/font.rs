@@ -85,7 +85,7 @@ impl Font {
     /// The content hash of the family name and every face setting.
     ///
     /// It is computed once when the font data is initialized, stable across
-    /// builds for identical settings, and distinct when they differ — so it can
+    /// builds for identical settings, and distinct when they differ, so it can
     /// drive a cache-busting, immutable font URL.
     #[must_use]
     pub fn hash(&self) -> u64 {

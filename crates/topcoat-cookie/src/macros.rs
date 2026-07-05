@@ -10,19 +10,20 @@
 /// |------------|----------------------------|----------------|
 /// | `Secure`   | flag, or `Secure = bool`   | `Secure`       |
 /// | `HttpOnly` | flag, or `HttpOnly = bool` | `HttpOnly`     |
-/// | `Path`     | `Path = expr`              | `Path=…`       |
-/// | `Domain`   | `Domain = expr`            | `Domain=…`     |
+/// | `Path`     | `Path = expr`              | `Path=...`     |
+/// | `Domain`   | `Domain = expr`            | `Domain=...`   |
 /// | `SameSite` | `SameSite = Lax`           | `SameSite=Lax` |
-/// | `MaxAge`   | `MaxAge = duration`        | `Max-Age=…`    |
-/// | `Expires`  | `Expires = time`           | `Expires=…`    |
+/// | `MaxAge`   | `MaxAge = duration`        | `Max-Age=...`  |
+/// | `Expires`  | `Expires = time`           | `Expires=...`  |
 ///
 /// The name is a single token (a string literal, an identifier, or a
 /// parenthesized expression); the value and valued attributes are expressions.
 /// `SameSite` accepts the bare variant names `Lax`, `Strict`, and `None` as
 /// sugar, or any expression (e.g. a `SameSite`-typed variable).
 ///
-/// The flag attributes also accept a boolean expression — `Secure = is_prod`
-/// — to set them conditionally; a `false` value omits the attribute entirely.
+/// The flag attributes also accept a boolean expression, such as
+/// `Secure = is_prod`, to set them conditionally; a `false` value omits the
+/// attribute entirely.
 ///
 /// # Examples
 ///

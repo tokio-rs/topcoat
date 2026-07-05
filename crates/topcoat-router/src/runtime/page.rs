@@ -70,7 +70,7 @@ pub type Slot<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
 ///
 /// When multiple layouts match a page, they nest from most-specific (innermost)
 /// to least-specific (outermost). For example, layouts at `/` and `/settings`
-/// both match `/settings/profile`, rendering as: root → settings → page.
+/// both match `/settings/profile`, rendering as: root -> settings -> page.
 #[derive(Debug, Clone)]
 pub struct LayoutFn {
     /// The path prefix this layout applies to.

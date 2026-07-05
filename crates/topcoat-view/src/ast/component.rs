@@ -145,7 +145,7 @@ impl ToTokens for Component {
         // A lifetime or type parameter must appear in the body, so generic
         // markers carry a `PhantomData` field. Markers with no such parameters
         // are emitted as unit structs, which makes the marker's bare name a
-        // value (`combobox_content`) rather than a tuple-struct constructor —
+        // value (`combobox_content`) rather than a tuple-struct constructor,
         // letting callers pass it directly, e.g. `router.shard(combobox_content)`.
         let (marker_body, default_value) = if phantom_args.is_empty() {
             (quote! { #where_clause; }, quote! { Self })

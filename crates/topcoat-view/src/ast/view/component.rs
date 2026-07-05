@@ -119,7 +119,7 @@ impl Parse for Component {
             paren_token: parenthesized!(content in input),
             named_args: {
                 /// Peek whether the stream is positioned at a `name :` named-argument start
-                /// (a single colon — `::` would start a path, e.g. `foo::bar()`).
+                /// (a single colon: `::` would start a path, e.g. `foo::bar()`).
                 fn peek_named_arg(input: ParseStream) -> bool {
                     input.peek(Ident) && input.peek2(Token![:]) && !input.peek2(Token![::])
                 }

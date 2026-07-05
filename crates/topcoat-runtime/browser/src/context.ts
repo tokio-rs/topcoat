@@ -9,7 +9,7 @@ import {
 
 /**
  * The `cx` object passed into every compiled expression. It is the only
- * way generated code can reach back into the runtime — keeping the surface
+ * way generated code can reach back into the runtime, keeping the surface
  * narrow makes the generated JS easy to audit and keeps non-context globals
  * inaccessible from inside `new Function`.
  */

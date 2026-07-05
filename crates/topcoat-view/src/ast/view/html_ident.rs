@@ -11,7 +11,7 @@ use syn::{
 
 use topcoat_core::ast::ParseOption;
 
-/// An HTML identifier — a sequence of identifier segments joined by `-`, `:`,
+/// An HTML identifier: a sequence of identifier segments joined by `-`, `:`,
 /// or `.` with no intervening whitespace. Covers names like `data-foo`,
 /// `aria-label`, `xmlns:xlink`, or `class.active` that are valid in HTML but
 /// not valid Rust identifiers.

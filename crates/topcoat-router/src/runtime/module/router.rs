@@ -16,12 +16,12 @@ use crate::runtime::{
 ///
 /// Segment overrides (kind, rename) registered via `segment!` are applied during
 /// the module-to-path translation. Overrides must be registered before any pages
-/// or layouts — this is enforced with a panic.
+/// or layouts: this is enforced with a panic.
 ///
 /// The translation pipeline for a given module path:
 /// 1. Strip the `root_module_path` prefix
 /// 2. Walk each `::`-separated component, checking for a [`Segment`] override
-/// 3. Apply default kind (`_` prefix → `Group`, otherwise `Static`)
+/// 3. Apply default kind (`_` prefix -> `Group`, otherwise `Static`)
 /// 4. Kebab-case static segment names, leave others as-is
 /// 5. Collect into a [`PathBuf`]
 #[doc(hidden)]
@@ -324,7 +324,7 @@ mod tests {
         ModuleRouterBuilder::new("app")
     }
 
-    // ── relative_module_path ──
+    // -- relative_module_path --
 
     #[test]
     fn relative_path_of_root_is_empty() {
@@ -353,7 +353,7 @@ mod tests {
         builder().relative_module_path("application");
     }
 
-    // ── module_path_to_path ──
+    // -- module_path_to_path --
 
     fn path_of(module_path: &'static str) -> String {
         builder().module_path_to_path(module_path).to_string()
@@ -387,7 +387,7 @@ mod tests {
         assert_eq!(path.to_matchit_path(), "/pricing");
     }
 
-    // ── module_path_to_path with segment overrides ──
+    // -- module_path_to_path with segment overrides --
 
     fn builder_with(segment: Segment) -> ModuleRouterBuilder {
         builder().segment(segment)
@@ -464,7 +464,7 @@ mod tests {
         );
     }
 
-    // ── segment registration ──
+    // -- segment registration --
 
     #[test]
     #[should_panic(expected = "must be called before registering any resource")]
@@ -476,7 +476,7 @@ mod tests {
         ));
     }
 
-    // ── resource registration and conversion ──
+    // -- resource registration and conversion --
 
     #[test]
     fn fresh_builder_converts_to_empty_router_builder() {

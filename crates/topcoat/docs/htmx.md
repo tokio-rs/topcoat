@@ -1,4 +1,4 @@
-[htmx](https://htmx.org) is a small client-side library that lets HTML drive its own updates. Attributes like `hx-get` and `hx-post` make any element issue an HTTP request on an event — a click, a submit, an input — and swap the returned HTML fragment into the page, without a full reload and without writing JavaScript. The server just answers with the markup for the piece of the page that changed.
+[htmx](https://htmx.org) is a small client-side library that lets HTML drive its own updates. Attributes like `hx-get` and `hx-post` make any element issue an HTTP request on an event (a click, a submit, an input) and swap the returned HTML fragment into the page, without a full reload and without writing JavaScript. The server just answers with the markup for the piece of the page that changed.
 
 The browser and server coordinate this through a set of `HX-*` HTTP headers: the request carries headers describing what triggered it and where the response is headed, and the response can carry headers telling htmx how to apply the result. Topcoat helps you work with those request and response headers.
 
@@ -73,21 +73,21 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
 
 The boolean headers have boolean accessors:
 
-- [`hx_request`] — was this request issued by htmx?
-- [`hx_boosted`] — did it come from an `hx-boost` element?
-- [`hx_history_restore_request`] — is it restoring history after a cache miss?
+- [`hx_request`]: was this request issued by htmx?
+- [`hx_boosted`]: did it come from an `hx-boost` element?
+- [`hx_history_restore_request`]: is it restoring history after a cache miss?
 
 The rest return the header as `Option<&str>`, borrowed straight from the request:
 
-- [`hx_current_url`] — the browser's current URL.
-- [`hx_prompt`] — the user's response to an `hx-prompt`.
-- [`hx_target`] — the `id` of the target element.
-- [`hx_trigger`] — the `id` of the triggering element.
-- [`hx_trigger_name`] — the `name` of the triggering element.
+- [`hx_current_url`]: the browser's current URL.
+- [`hx_prompt`]: the user's response to an `hx-prompt`.
+- [`hx_target`]: the `id` of the target element.
+- [`hx_trigger`]: the `id` of the triggering element.
+- [`hx_trigger_name`]: the `name` of the triggering element.
 
 # Setting response headers
 
-htmx also reads a set of [response headers](https://htmx.org/reference/#response_headers) to redirect the browser, retarget the swap, refresh the page, or fire client-side events. Each one is a responder type implementing [`IntoResponseParts`], so you place it before the body in a handler's response tuple — exactly like a header array or a `StatusCode`.
+htmx also reads a set of [response headers](https://htmx.org/reference/#response_headers) to redirect the browser, retarget the swap, refresh the page, or fire client-side events. Each one is a responder type implementing [`IntoResponseParts`], so you place it before the body in a handler's response tuple, exactly like a header array or a `StatusCode`.
 
 ```rust
 use topcoat::{
@@ -111,13 +111,13 @@ async fn save(cx: &Cx) -> Result<(HxRetarget, HxReswap, View)> {
 
 The available responders:
 
-- [`HxLocation`] — client-side redirect without a full reload, optionally with a fetch/swap context.
-- [`HxPushUrl`] / [`HxReplaceUrl`] — update the browser history or location bar (or `prevent()` it).
-- [`HxRedirect`] — client-side redirect to a new location.
-- [`HxRefresh`] — force a full page refresh.
-- [`HxReswap`] — override how the response is swapped in, via a [`SwapOption`].
-- [`HxRetarget`] / [`HxReselect`] — retarget the swap, or reselect which part of the response is used.
-- [`HxResponseTrigger`] — trigger client-side events, immediately or after the settle/swap step.
+- [`HxLocation`]: client-side redirect without a full reload, optionally with a fetch/swap context.
+- [`HxPushUrl`] / [`HxReplaceUrl`]: update the browser history or location bar (or `prevent()` it).
+- [`HxRedirect`]: client-side redirect to a new location.
+- [`HxRefresh`]: force a full page refresh.
+- [`HxReswap`]: override how the response is swapped in, via a [`SwapOption`].
+- [`HxRetarget`] / [`HxReselect`]: retarget the swap, or reselect which part of the response is used.
+- [`HxResponseTrigger`]: trigger client-side events, immediately or after the settle/swap step.
 
 ## Triggering client-side events
 

@@ -48,7 +48,7 @@ impl ElementName {
     }
 
     /// Returns `true` if this name is one of the HTML void elements (`br`,
-    /// `img`, `input`, …) — those that take no closing tag and no children.
+    /// `img`, `input`, ...): those that take no closing tag and no children.
     /// Only matches identifier names; string and expression names always
     /// return `false`.
     #[must_use]

@@ -68,11 +68,11 @@ impl AssetBundle {
     /// Walks up from the current executable, checking each ancestor for an
     /// `assets/manifest.toml`. This covers, without configuration:
     ///
-    /// - `<exe_dir>/assets/` — deployment, bundle shipped next to the binary.
-    /// - `target/<profile>/<bin>` → `target/assets/` (typical `cargo run`).
-    /// - `target/<profile>/examples/<bin>` → `target/assets/`.
-    /// - `target/<triple>/<profile>/<bin>` → `target/assets/` (cross-compile).
-    /// - `target/<triple>/<profile>/examples/<bin>` → `target/assets/`.
+    /// - `<exe_dir>/assets/`: deployment, bundle shipped next to the binary.
+    /// - `target/<profile>/<bin>` -> `target/assets/` (typical `cargo run`).
+    /// - `target/<profile>/examples/<bin>` -> `target/assets/`.
+    /// - `target/<triple>/<profile>/<bin>` -> `target/assets/` (cross-compile).
+    /// - `target/<triple>/<profile>/examples/<bin>` -> `target/assets/`.
     ///
     /// The first directory that contains a readable `manifest.toml` is
     /// loaded. The walk stops once it reaches a directory named `target`

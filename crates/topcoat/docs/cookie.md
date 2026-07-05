@@ -125,9 +125,9 @@ fn cookies(cx: &Cx) -> impl Cookies {
 }
 ```
 
-Every handler that calls this `cookies(cx)` gets the defaults for free, and you can tighten them in one place. The same approach works for signed or private jars — return `impl Cookies` and layer on whatever combinators your app needs.
+Every handler that calls this `cookies(cx)` gets the defaults for free, and you can tighten them in one place. The same approach works for signed or private jars: return `impl Cookies` and layer on whatever combinators your app needs.
 
-For anything the named combinators don't cover, [`map`](Cookies::map) is the escape hatch — it runs a closure on every added cookie:
+For anything the named combinators don't cover, [`map`](Cookies::map) is the escape hatch; it runs a closure on every added cookie:
 
 ```rust
 # use topcoat::cookie::{Cookies, cookies};
@@ -140,8 +140,8 @@ let jar = cookies(cx).map(|cookie| cookie.set_partitioned(true));
 
 [RFC 6265bis] cookie name prefixes ask the browser to enforce extra constraints based on the cookie's name. Topcoat applies the prefix *and* its required attributes for you, and strips the prefix back off on read so your code keeps using the bare name.
 
-- `prefix_host` (`__Host-`) — the cookie must be `Secure`, have `Path=/`, and carry no `Domain`. The tightest scoping: bound to the exact host, unavailable to subdomains.
-- `prefix_secure` (`__Secure-`) — the cookie must be `Secure`.
+- `prefix_host` (`__Host-`): the cookie must be `Secure`, have `Path=/`, and carry no `Domain`. The tightest scoping: bound to the exact host, unavailable to subdomains.
+- `prefix_secure` (`__Secure-`): the cookie must be `Secure`.
 
 ```rust
 # fn _example(cx: &topcoat::context::Cx) {
@@ -163,7 +163,7 @@ As with attributes, each prefix has a `default_*` form that fills the required a
 
 # Signed cookies
 
-A **signed** cookie is tamper-proof but still readable by the client — useful when the value isn't secret but must not be forged (a user id, a feature flag). Signing wraps the jar with a [`Key`]; reads return `None` when a cookie is missing or its signature doesn't verify.
+A **signed** cookie is tamper-proof but still readable by the client: useful when the value isn't secret but must not be forged (a user id, a feature flag). Signing wraps the jar with a [`Key`]; reads return `None` when a cookie is missing or its signature doesn't verify.
 
 ```rust
 # fn _example(cx: &topcoat::context::Cx) {
@@ -181,7 +181,7 @@ let user_id = jar.get("user_id");
 
 # Private cookies
 
-A **private** cookie is encrypted with AES-256-GCM, so its value is both tamper-proof *and* unreadable by the client. Use it for anything sensitive. The cookie's name is bound into the ciphertext, so the name must match on write and read — which it does automatically, however you compose this layer.
+A **private** cookie is encrypted with AES-256-GCM, so its value is both tamper-proof *and* unreadable by the client. Use it for anything sensitive. The cookie's name is bound into the ciphertext, so the name must match on write and read, which it does automatically, however you compose this layer.
 
 ```rust
 # fn _example(cx: &topcoat::context::Cx) {
@@ -196,7 +196,7 @@ let session = jar.get("session"); // None if missing or it fails to decrypt
 # }
 ```
 
-Signing and private encryption operate on the cookie value (and, for private, the name) only — they compose freely with prefixes and attribute defaults in any order.
+Signing and private encryption operate on the cookie value (and, for private, the name) only: they compose freely with prefixes and attribute defaults in any order.
 
 # Keys from app context
 
@@ -234,13 +234,13 @@ async fn login(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-Both functions panic if no [`Key`] was registered — a startup-time bug, not a runtime one. Generate the key once and persist it; regenerating it on every boot invalidates every signed and encrypted cookie already in the wild.
+Both functions panic if no [`Key`] was registered: a startup-time bug, not a runtime one. Generate the key once and persist it; regenerating it on every boot invalidates every signed and encrypted cookie already in the wild.
 
 # Typed cookie stores
 
-The jar API works in terms of individual [`Cookie`] values. When you want to keep a *structured* value in a cookie — a cart, a preferences object, a visit counter — a [`CookieStore<T>`](CookieStore) wraps the read/serialize/write cycle so you work with your own type instead of strings. The value is stored as JSON, and `T` only needs `Serialize` and `DeserializeOwned`.
+The jar API works in terms of individual [`Cookie`] values. When you want to keep a *structured* value in a cookie (a cart, a preferences object, a visit counter), a [`CookieStore<T>`](CookieStore) wraps the read/serialize/write cycle so you work with your own type instead of strings. The value is stored as JSON, and `T` only needs `Serialize` and `DeserializeOwned`.
 
-A store is built on top of a jar with [`cookie_store`], so signing, encryption, prefixes, and default attributes all compose through the jar you hand it — a store over [`private_cookies`] is encrypted, a store over [`cookies(cx).signed(key)`](Cookies::signed) is signed, and so on.
+A store is built on top of a jar with [`cookie_store`], so signing, encryption, prefixes, and default attributes all compose through the jar you hand it: a store over [`private_cookies`] is encrypted, a store over [`cookies(cx).signed(key)`](Cookies::signed) is signed, and so on.
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -300,7 +300,7 @@ let cart = cookie_store::<Cart, _>(private_cookies(cx), "cart")
 # }
 ```
 
-Dropping the store without committing — or calling [`rollback`](CookieStore::rollback) to say so explicitly — discards the pending changes. This makes it easy to update a cookie only once some other work has succeeded: do the work first, and `commit` last.
+Dropping the store without committing (or calling [`rollback`](CookieStore::rollback) to say so explicitly) discards the pending changes. This makes it easy to update a cookie only once some other work has succeeded: do the work first, and `commit` last.
 
 To overwrite a cookie without reading its current contents, [`set`](UnparsedCookieStore::set) on the unparsed store skips the parse step entirely:
 
@@ -315,7 +315,7 @@ cookie_store::<Cart, _>(private_cookies(cx), "cart")
 # }
 ```
 
-To delete a cookie, `remove` queues an expiring removal. It's available both on a parsed store ([`CookieStore::remove`]) and directly on the unparsed one ([`UnparsedCookieStore::remove`]) when you just want to clear the cookie without reading it — for example on logout:
+To delete a cookie, `remove` queues an expiring removal. It's available both on a parsed store ([`CookieStore::remove`]) and directly on the unparsed one ([`UnparsedCookieStore::remove`]) when you just want to clear the cookie without reading it, for example on logout:
 
 ```rust
 # use topcoat::cookie::{cookie_store, private_cookies};
@@ -325,7 +325,7 @@ cookie_store::<Cart, _>(private_cookies(cx), "cart").remove();
 # }
 ```
 
-The removal goes through the jar, so the `Path`/`Domain` and prefix attributes the cookie was written with are reapplied — the browser matches the removal against the original and clears it.
+The removal goes through the jar, so the `Path`/`Domain` and prefix attributes the cookie was written with are reapplied: the browser matches the removal against the original and clears it.
 
 ## A helper per store
 

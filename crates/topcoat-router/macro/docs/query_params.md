@@ -12,7 +12,7 @@ struct PageQuery {
 
 # Reading the value
 
-[`query_params::<T>(cx)`](fn.query_params.html) parses the current request's query string with [`serde_urlencoded`](https://docs.rs/serde_urlencoded/latest/serde_urlencoded/) and returns `Result<&T, &serde_urlencoded::de::Error>`. Unlike a path parameter, the struct is not tied to a route — any handler can read it. Parsing runs at most once per request; the result is then memoized.
+[`query_params::<T>(cx)`](fn.query_params.html) parses the current request's query string with [`serde_urlencoded`](https://docs.rs/serde_urlencoded/latest/serde_urlencoded/) and returns `Result<&T, &serde_urlencoded::de::Error>`. Unlike a path parameter, the struct is not tied to a route: any handler can read it. Parsing runs at most once per request; the result is then memoized.
 
 # Example
 

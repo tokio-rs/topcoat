@@ -12,9 +12,9 @@ pub type Request<T = Body> = http::Request<T>;
 /// A type that can be built from an incoming request.
 ///
 /// A page or route handler may take a single `FromRequest` value as its request
-/// body parameter, optionally alongside `cx: &Cx`. The built-in extractors —
-/// [`Json`](crate::runtime::Json), [`Form`](crate::runtime::Form), [`Bytes`],
-/// [`String`], [`Body`], and more — all implement this trait; implement it
+/// body parameter, optionally alongside `cx: &Cx`. The built-in extractors
+/// ([`Json`](crate::runtime::Json), [`Form`](crate::runtime::Form), [`Bytes`],
+/// [`String`], [`Body`], and more) all implement this trait; implement it
 /// yourself for request-specific parsing the built-ins don't cover.
 ///
 /// Because the body is a stream that can only be read once, a handler may have
@@ -23,7 +23,7 @@ pub type Request<T = Body> = http::Request<T>;
 ///
 /// # Examples
 ///
-/// Implement it to parse a request in a way the built-ins don't cover — here,
+/// Implement it to parse a request in a way the built-ins don't cover. Here,
 /// JSON whose body is verified against an `x-signature` header before it is
 /// deserialized:
 ///

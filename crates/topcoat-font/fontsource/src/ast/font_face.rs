@@ -74,7 +74,7 @@ impl ToTokens for FontsourceFontFace {
         let host_anchor = self.host.as_ref().map(|host| quote! { let _ = #host; });
 
         // The concrete descriptors, when the family and every written value
-        // resolve at expansion time — the URL can then be baked here, which
+        // resolve at expansion time: the URL can then be baked here, which
         // bundling the file as an asset requires.
         let resolved = family.and_then(|family| {
             Some((

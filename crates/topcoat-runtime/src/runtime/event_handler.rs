@@ -8,7 +8,7 @@ impl<T, R> EventHandlerFn for T where T: Fn(Event) -> R {}
 
 /// An event handler attribute. Emits a JavaScript closure expression into a
 /// `data-topcoat-on:<event>` attribute on the element. The browser scanner
-/// wraps it in `new Function('__cx', …)` to obtain a real handler.
+/// wraps it in `new Function('__cx', ...)` to obtain a real handler.
 pub struct EventHandler<K, F> {
     key: K,
     value: Expr<F>,

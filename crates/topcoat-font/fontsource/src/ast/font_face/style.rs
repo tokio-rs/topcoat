@@ -92,7 +92,7 @@ impl StyleValue {
     }
 
     /// The style the written variant names, or `None` when it is not a
-    /// [`Style`](runtime::Style) variant — the compiler reports those on the
+    /// [`Style`](runtime::Style) variant: the compiler reports those on the
     /// emitted variant.
     #[must_use]
     pub fn style(&self) -> Option<runtime::Style> {

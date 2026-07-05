@@ -18,15 +18,15 @@ Every value is checked against the vendored catalog at compile time.
 
 The **family** comes first, as the name of its [`families`] constant (e.g. `ROBOTO`).
 
-**`weight`** is a single number in `100..=900` — only the weights the family ships are accepted.
+**`weight`** is a single number in `100..=900`: only the weights the family ships are accepted.
 
 **`style`** is [`Normal`] or [`Italic`], and the family has to offer it.
 
 **`subset`** selects the block of characters the face covers, such as [`Latin`] or [`Cyrillic`]; it also determines the face's `unicode-range`. Leave it off to get the family's default subset.
 
-**`display`** sets the face's [`FontDisplay`] strategy — how text is shown while the font downloads. It defaults to `Swap`.
+**`display`** sets the face's [`FontDisplay`] strategy: how text is shown while the font downloads. It defaults to `Swap`.
 
-**`host`** says where the file is loaded from. It defaults to [`JsDelivr`], which links the font on the [jsDelivr] CDN. Pass [`Asset`] instead to download the file at build time and serve it from your own origin as a content-hashed Topcoat [`Asset`][asset-type] — this needs the `asset` feature.
+**`host`** says where the file is loaded from. It defaults to [`JsDelivr`], which links the font on the [jsDelivr] CDN. Pass [`Asset`] instead to download the file at build time and serve it from your own origin as a content-hashed Topcoat [`Asset`][asset-type]: this needs the `asset` feature.
 
 ```rust
 # use topcoat::font::*;

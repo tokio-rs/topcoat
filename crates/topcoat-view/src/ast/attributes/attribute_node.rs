@@ -14,7 +14,7 @@ use crate::ast::{
     view::{ViewWriter, WriteView},
 };
 
-/// A single entry within an [`Attributes`](super::Attributes) list — the union
+/// A single entry within an [`Attributes`](super::Attributes) list: the union
 /// of every construct that can appear at attribute-list position.
 pub enum AttributeNode {
     Attribute(Attribute),

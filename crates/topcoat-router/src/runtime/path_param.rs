@@ -19,7 +19,7 @@ pub trait PathParam {
 
     /// Reads the parameter from the request `cx` belongs to.
     ///
-    /// Call [`path_param::<T>(cx)`](path_param) instead — this method is sealed
+    /// Call [`path_param::<T>(cx)`](path_param) instead: this method is sealed
     /// behind [`PathParamSealed`] and cannot be invoked directly.
     #[doc(hidden)]
     fn path_param(cx: &Cx, _: PathParamSealed) -> Self::Output<'_>;

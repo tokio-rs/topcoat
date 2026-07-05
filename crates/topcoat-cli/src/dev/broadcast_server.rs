@@ -94,7 +94,7 @@ pub async fn bind() -> TcpListener {
         }
     }
     panic!(
-        "failed to bind dev server port ({PORT_START}–{})",
+        "failed to bind dev server port ({PORT_START}-{})",
         PORT_START + PORT_RANGE
     );
 }

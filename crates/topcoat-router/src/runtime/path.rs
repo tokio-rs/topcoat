@@ -9,10 +9,10 @@ use ref_cast::{RefCastCustom, ref_cast_custom};
 /// A borrowed route path, similar to [`std::path::Path`] but for URL paths.
 ///
 /// A `Path` consists of `/`-separated segments, where each segment is one of:
-/// - **`Static`** — a literal string (e.g. `users`)
-/// - **`Param`** — a dynamic parameter in braces (e.g. `{id}`)
-/// - **`CatchAll`** — a wildcard tail in braces with `*` (e.g. `{*rest}`)
-/// - **`Group`** — a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to a
+/// - **`Static`**: a literal string (e.g. `users`)
+/// - **`Param`**: a dynamic parameter in braces (e.g. `{id}`)
+/// - **`CatchAll`**: a wildcard tail in braces with `*` (e.g. `{*rest}`)
+/// - **`Group`**: a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to a
 ///   `matchit` path
 ///
 /// The root path `"/"` is normalized to an empty inner string. Use [`Path::new`] to
@@ -171,7 +171,7 @@ impl Path {
             .inner;
         // Stripping groups can leave nothing behind (e.g. `/(marketing)` or
         // `/(a)/(b)`). Such a path addresses the root URL, so normalize the empty
-        // result back to "/" — matchit rejects route paths that don't start with "/".
+        // result back to "/": matchit rejects route paths that don't start with "/".
         if stripped.is_empty() {
             return Cow::Borrowed("/");
         }
@@ -181,7 +181,7 @@ impl Path {
     /// Returns `true` if this path starts with the given prefix path.
     ///
     /// Comparison is done segment-by-segment using [`PathSegment`] equality.
-    /// This is used to determine which layouts apply to a given page — a layout
+    /// This is used to determine which layouts apply to a given page: a layout
     /// at `"/settings"` matches any page whose path starts with `/settings`.
     ///
     /// Group segments are included in the comparison.
@@ -396,7 +396,7 @@ impl<'a> PathSegment<'a> {
     /// Parses a single path segment string into a [`PathSegment`], validating it.
     ///
     /// Returns [`PathError`] if `s` is not a well-formed segment: an empty string,
-    /// a `{…}`/`(…)` segment missing its closing bracket, a static segment that
+    /// a `{...}`/`(...)` segment missing its closing bracket, a static segment that
     /// contains a bracket, or a name that is not a valid identifier.
     ///
     /// # Errors
@@ -582,7 +582,7 @@ impl Display for PathSegment<'_> {
 mod tests {
     use super::*;
 
-    // ── Path ──
+    // -- Path --
 
     #[test]
     fn path_root_slash_normalized() {
@@ -666,7 +666,7 @@ mod tests {
         assert_eq!(path.to_string(), "/users/{id}");
     }
 
-    // ── Path validation ──
+    // -- Path validation --
 
     #[test]
     fn from_str_accepts_valid_paths() {
@@ -718,7 +718,7 @@ mod tests {
         let _ = Path::new("/foo{bar}");
     }
 
-    // ── PathBuf ──
+    // -- PathBuf --
 
     #[test]
     fn pathbuf_new_is_empty() {
@@ -762,7 +762,7 @@ mod tests {
         assert_eq!(&*buf, path);
     }
 
-    // ── PathSegment ──
+    // -- PathSegment --
 
     #[test]
     fn static_segment() {

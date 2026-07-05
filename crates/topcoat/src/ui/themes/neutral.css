@@ -1,4 +1,4 @@
-/* ─────────────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------
    THIRD-PARTY NOTICES
 
    This file vendors CSS from the MIT-licensed projects below. Topcoat projects
@@ -6,7 +6,7 @@
    (the Geist font is referenced from the jsDelivr CDN, not bundled). The
    copyright and permission notices are retained as the MIT License requires.
 
-     • shadcn/ui:      Copyright (c) 2023 shadcn
+     - shadcn/ui:      Copyright (c) 2023 shadcn
        https://github.com/shadcn-ui/ui
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,7 +26,7 @@
    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
-   ───────────────────────────────────────────────────────────────────────── */
+   ------------------------------------------------------------------------- */
 
 @import "tailwindcss";
 

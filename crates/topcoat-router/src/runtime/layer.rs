@@ -12,8 +12,8 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// A request-processing layer that wraps the routes nested under its path,
 /// similar to a tower middleware.
 ///
-/// A layer wraps every matched route whose path begins with the layer's path —
-/// the same prefix rule as layouts — so a layer at `/admin` wraps only routes
+/// A layer wraps every matched route whose path begins with the layer's path
+/// (the same prefix rule as layouts), so a layer at `/admin` wraps only routes
 /// under `/admin`, while a layer at `/` wraps everything. Each layer receives a
 /// mutable [`Cx`] and the request [`Body`], plus a [`Next`] representing the
 /// rest of the chain. A layer typically inspects or modifies the context, calls

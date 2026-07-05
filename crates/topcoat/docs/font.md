@@ -53,7 +53,7 @@ Using the font is then ordinary CSS: any rule on the page can refer to the famil
 
 ## Serving the files as assets
 
-`url(…)` accepts expressions that evaluate to URL strings, but also Topcoat [`Asset`]s. This downloads the file at build time and serves it from your own origin:
+`url(...)` accepts expressions that evaluate to URL strings, but also Topcoat [`Asset`]s. This downloads the file at build time and serves it from your own origin:
 
 ```rust
 use topcoat::{asset::asset, font::{Font, font}};

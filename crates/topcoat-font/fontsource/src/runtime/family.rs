@@ -113,8 +113,8 @@ impl Family {
 
     /// The `unicode-range` this family ships for `subset`, if known.
     ///
-    /// Returns `None` for subsets without vendored ranges — notably the
-    /// numbered CJK blocks — in which case a face for that subset is emitted
+    /// Returns `None` for subsets without vendored ranges (notably the
+    /// numbered CJK blocks), in which case a face for that subset is emitted
     /// without a `unicode-range` descriptor.
     #[must_use]
     pub const fn unicode_range(&self, subset: Subset) -> Option<UnicodeRanges> {

@@ -217,7 +217,7 @@ fn normalize(path: &Path) -> PathBuf {
 ///
 /// Because the macro expands to a `const` and a `#[used] static`, both
 /// the path and any options must be string literals (or other const
-/// expressions) — they cannot be computed at runtime.
+/// expressions): they cannot be computed at runtime.
 ///
 /// # Path resolution
 ///
@@ -236,10 +236,10 @@ fn normalize(path: &Path) -> PathBuf {
 /// Options control how the bundler names the output file and (optionally)
 /// pins its contents. All are optional:
 ///
-/// - `rename: "name"` — replace the file stem (everything before the final `.`) with `"name"`.
-/// - `extension: "ext"` — override the output extension (without the leading dot). Useful when the
+/// - `rename: "name"`: replace the file stem (everything before the final `.`) with `"name"`.
+/// - `extension: "ext"`: override the output extension (without the leading dot). Useful when the
 ///   source has no extension or a wrong one.
-/// - `checksum: "sha256:<hex>"` — assert the hash of the raw, unbundled source file. The prefix
+/// - `checksum: "sha256:<hex>"`: assert the hash of the raw, unbundled source file. The prefix
 ///   selects the algorithm; only `sha256` is currently supported. The bundler returns
 ///   [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's actual hash differs, or
 ///   [`AssetError::UnsupportedChecksum`](crate::AssetError) if the prefix is missing or
@@ -252,7 +252,7 @@ fn normalize(path: &Path) -> PathBuf {
 /// # Returns
 ///
 /// A `const` [`Asset`] ID. The ID is stable across builds as long as the
-/// declaring crate, source file, and path string don't change — renaming
+/// declaring crate, source file, and path string don't change: renaming
 /// the file on disk or changing options does *not* change the ID.
 ///
 /// # Examples

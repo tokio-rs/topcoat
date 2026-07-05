@@ -14,7 +14,7 @@ use crate::ast::{
     view::{ClosingTag, ElementName, ExprKind, Node, Nodes, OpeningTag, ViewWriter, WriteView},
 };
 
-/// An HTML element. `Void` covers the HTML void elements (`<br>`, `<img>`, …)
+/// An HTML element. `Void` covers the HTML void elements (`<br>`, `<img>`, ...)
 /// which take no closing tag and no children.
 // Optimize for the common case (normal elements).
 #[allow(clippy::large_enum_variant)]

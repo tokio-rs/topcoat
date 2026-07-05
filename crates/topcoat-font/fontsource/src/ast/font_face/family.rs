@@ -22,7 +22,7 @@ impl FamilyName {
     }
 
     /// The catalog family the written name refers to, or `None` when there is
-    /// no [`families`](crate::runtime::families) constant of that name — the
+    /// no [`families`](crate::runtime::families) constant of that name: the
     /// emitted path then fails to resolve and the compiler reports it.
     #[must_use]
     pub fn family(&self) -> Option<&'static Family> {

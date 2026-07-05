@@ -32,7 +32,7 @@ Learn more on [MDN][mdn-font-family].
 
 ## `src`
 
-`src` lists one or more sources, in preference order, separated by commas. Each entry is either `local("Family Name")`, naming a font already installed on the visitor's system, or `url("…")`, a font file to download with optional `format(…)` and `tech(…)` hints the browser uses to skip files it cannot use.
+`src` lists one or more sources, in preference order, separated by commas. Each entry is either `local("Family Name")`, naming a font already installed on the visitor's system, or `url("...")`, a font file to download with optional `format(...)` and `tech(...)` hints the browser uses to skip files it cannot use.
 
 ```rust
 # use topcoat::font::*;
@@ -44,9 +44,9 @@ font_face! {
 # }
 ```
 
-`format(…)` and `tech(…)` are each optional and may be written in either order. Their keywords are checked at compile time against the CSS-defined values, so a typo like `format("wof2")` fails to build.
+`format(...)` and `tech(...)` are each optional and may be written in either order. Their keywords are checked at compile time against the CSS-defined values, so a typo like `format("wof2")` fails to build.
 
-The argument to `local(…)` and `url(…)`, and the `format(…)` and `tech(…)` hints, can each be a Rust expression instead of a literal — resolving to the family name, URL, [`FontFormat`], or [`FontTech`] respectively. A `url(…)` argument may also be an [`Asset`], whose content-hashed URL is filled in when the face is rendered. A `src` list that uses any such expression is built at run time rather than as a `const`.
+The argument to `local(...)` and `url(...)`, and the `format(...)` and `tech(...)` hints, can each be a Rust expression instead of a literal: resolving to the family name, URL, [`FontFormat`], or [`FontTech`] respectively. A `url(...)` argument may also be an [`Asset`], whose content-hashed URL is filled in when the face is rendered. A `src` list that uses any such expression is built at run time rather than as a `const`.
 
 ```rust
 # use topcoat::font::*;

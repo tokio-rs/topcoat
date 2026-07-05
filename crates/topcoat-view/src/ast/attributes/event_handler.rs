@@ -59,7 +59,7 @@ impl topcoat_pretty::PrettyPrint for EventHandlerValue {
     }
 }
 
-/// An `@name=(expr)`, `@name=$(expr)`, or `@name="js"` attribute — a DOM event handler.
+/// An `@name=(expr)`, `@name=$(expr)`, or `@name="js"` attribute: a DOM event handler.
 pub struct EventHandler {
     pub at: Token![@],
     pub key: AttributeKey,

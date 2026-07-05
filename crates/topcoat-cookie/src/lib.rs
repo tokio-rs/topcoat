@@ -299,7 +299,7 @@ pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
 /// entries.
 ///
 /// Called by the router after each handler runs. If no cookie helper was used
-/// during the request, the jar was never built — we skip without parsing the
+/// during the request, the jar was never built, so we skip without parsing the
 /// incoming `Cookie` header at all.
 #[doc(hidden)]
 pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {

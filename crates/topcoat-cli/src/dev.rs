@@ -3,16 +3,16 @@
 //! Four pieces cooperate, tied together by the event loop in
 //! [`DevCommand::run`]:
 //!
-//! - [`broadcast_server`] — a long-lived local WebSocket server that browsers connect to; it
+//! - [`broadcast_server`]: a long-lived local WebSocket server that browsers connect to; it
 //!   broadcasts a reload message whenever a freshly started application reports ready.
-//! - [`watch`] — watches the workspace's source directories and coalesces bursts of filesystem
+//! - [`watch`]: watches the workspace's source directories and coalesces bursts of filesystem
 //!   events into single change notifications.
-//! - [`build`] — compiles the application and bundles its assets in a cancellable background task.
-//! - [`app_server`] — the application process itself.
+//! - [`build`]: compiles the application and bundles its assets in a cancellable background task.
+//! - [`app_server`]: the application process itself.
 //!
 //! The loop's core policy is that the running application is only ever
-//! replaced by a *successful* build: while a rebuild is in flight — and after
-//! a failed one — the previous process keeps serving.
+//! replaced by a *successful* build: while a rebuild is in flight, and after
+//! a failed one, the previous process keeps serving.
 
 mod app_server;
 mod broadcast_server;

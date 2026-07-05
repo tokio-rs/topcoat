@@ -60,8 +60,8 @@ impl Router {
         let (parts, body) = request.into_parts();
 
         // Resolve the layer stack and the chain's terminal. A matched path
-        // reuses its endpoint's precomputed layer stack — whether the method
-        // matches (a route) or not (405) — so both flow through the same layers.
+        // reuses its endpoint's precomputed layer stack, whether the method
+        // matches (a route) or not (405), so both flow through the same layers.
         // An unmatched path (404) has no precomputed stack, so its layers are
         // selected from the request path on this cold path.
         let not_found_layers: Vec<usize>;
@@ -192,7 +192,7 @@ impl RouterBuilder {
         self
     }
 
-    /// Registers a [`PageFn`]. Order doesn't matter — layout matching is based
+    /// Registers a [`PageFn`]. Order doesn't matter: layout matching is based
     /// on path prefixes, not registration order.
     #[must_use]
     pub fn page(mut self, page: PageFn) -> Self {
@@ -456,7 +456,7 @@ mod tests {
         to_bytes,
     };
 
-    // ── Test helpers ──
+    // -- Test helpers --
 
     fn block_on<F: Future>(future: F) -> F::Output {
         tokio::runtime::Builder::new_current_thread()
@@ -548,7 +548,7 @@ mod tests {
         Box::pin(async move { Ok(view("page")) })
     }
 
-    /// Wraps the child content in `R[ … ]` so layout nesting is observable.
+    /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
     fn layout_root<'cx>(_cx: &'cx Cx, slot: Slot<'cx>) -> ViewFuture<'cx> {
         Box::pin(async move {
             let inner = slot.await?;
@@ -560,7 +560,7 @@ mod tests {
         })
     }
 
-    /// Wraps the child content in `A[ … ]`.
+    /// Wraps the child content in `A[ ... ]`.
     fn layout_admin<'cx>(_cx: &'cx Cx, slot: Slot<'cx>) -> ViewFuture<'cx> {
         Box::pin(async move {
             let inner = slot.await?;
@@ -572,7 +572,7 @@ mod tests {
         })
     }
 
-    // ── request_path ──
+    // -- request_path --
 
     #[test]
     fn request_path_reads_a_valid_path() {
@@ -587,7 +587,7 @@ mod tests {
         assert_eq!(request_path(&uri), Path::new("/"));
     }
 
-    // ── layers_for ──
+    // -- layers_for --
 
     /// A layer that only carries a path; its `handle` is never invoked by
     /// `layers_for`, which inspects paths alone.
@@ -637,7 +637,7 @@ mod tests {
         assert_eq!(layers_for(Path::new("/anything"), &layers), vec![1, 0]);
     }
 
-    // ── RouterBuilder ──
+    // -- RouterBuilder --
 
     #[test]
     fn new_builder_is_empty() {
@@ -668,7 +668,7 @@ mod tests {
             .app_context(Greeting("b"));
     }
 
-    // ── Router::handle: dispatch ──
+    // -- Router::handle: dispatch --
 
     #[test]
     fn routes_to_the_matching_method() {
@@ -748,7 +748,7 @@ mod tests {
         assert_eq!(&body[..], b"hello");
     }
 
-    // ── Router::handle: layers ──
+    // -- Router::handle: layers --
 
     fn trace_router(builder: RouterBuilder) -> (Router, Arc<Trace>) {
         let trace: Arc<Trace> = Arc::new(Mutex::new(Vec::new()));
@@ -809,7 +809,7 @@ mod tests {
         assert_eq!(*trace.lock().unwrap(), vec!["root"]);
     }
 
-    // ── Router::handle: pages and layouts ──
+    // -- Router::handle: pages and layouts --
 
     #[test]
     fn page_renders_as_html() {

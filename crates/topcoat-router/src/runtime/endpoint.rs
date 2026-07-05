@@ -143,7 +143,7 @@ impl Endpoint {
 mod tests {
     use super::*;
 
-    // ── RouteIndex ──
+    // -- RouteIndex --
 
     #[test]
     fn route_index_wraps_and_unwraps() {
@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(RouteIndex::default(), RouteIndex::NONE);
     }
 
-    // ── Endpoint: standard methods ──
+    // -- Endpoint: standard methods --
 
     #[test]
     fn empty_endpoint_has_no_routes() {
@@ -199,7 +199,7 @@ mod tests {
         assert_eq!(endpoint.get(&Method::GET), Some(5));
     }
 
-    // ── Endpoint: extension methods ──
+    // -- Endpoint: extension methods --
 
     #[test]
     fn inserts_and_reads_back_extension_methods() {
@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(endpoint.get(&Method::GET), None);
     }
 
-    // ── Endpoint: HEAD aliasing ──
+    // -- Endpoint: HEAD aliasing --
 
     #[test]
     fn alias_points_head_at_get() {
@@ -237,7 +237,7 @@ mod tests {
         assert_eq!(endpoint.get(&Method::HEAD), None);
     }
 
-    // ── Endpoint: methods iterator ──
+    // -- Endpoint: methods iterator --
 
     #[test]
     fn methods_lists_standard_then_extension() {

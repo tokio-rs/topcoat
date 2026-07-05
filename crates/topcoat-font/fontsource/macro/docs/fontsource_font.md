@@ -35,11 +35,11 @@ The remaining arguments each take either a single value or a bracketed list of t
 
 **`style`** is [`Normal`] or [`Italic`]. Omit it for every style the family ships.
 
-**`subset`** is a block of characters such as [`Latin`] or [`Cyrillic`], and sets each face's `unicode-range`. Omit it for the family's default subset alone — unlike weight and style, leaving it out does *not* pull in everything.
+**`subset`** is a block of characters such as [`Latin`] or [`Cyrillic`], and sets each face's `unicode-range`. Omit it for the family's default subset alone: unlike weight and style, leaving it out does *not* pull in everything.
 
-**`host`** says where the files are loaded from, and takes a single value rather than a list. It defaults to [`JsDelivr`], which links the fonts on the [jsDelivr] CDN. Pass [`Asset`] instead to download them at build time and serve them from your own origin as content-hashed Topcoat [`Asset`][asset-type]s — this needs the `asset` feature.
+**`host`** says where the files are loaded from, and takes a single value rather than a list. It defaults to [`JsDelivr`], which links the fonts on the [jsDelivr] CDN. Pass [`Asset`] instead to download them at build time and serve them from your own origin as content-hashed Topcoat [`Asset`][asset-type]s: this needs the `asset` feature.
 
-**`display`** sets the [`FontDisplay`] strategy applied to every face — how text is shown while the font downloads. It takes a single value rather than a list, and defaults to `Swap`.
+**`display`** sets the [`FontDisplay`] strategy applied to every face: how text is shown while the font downloads. It takes a single value rather than a list, and defaults to `Swap`.
 
 ```rust
 # use topcoat::font::*;

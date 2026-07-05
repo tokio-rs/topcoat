@@ -28,7 +28,7 @@ async fn health() -> Result<&'static str> {
 }
 ```
 
-Route handlers can also read request bodies and return structured responses, the same way for explicit and module-router paths — see [Request and response bodies](#request-and-response-bodies).
+Route handlers can also read request bodies and return structured responses, the same way for explicit and module-router paths: see [Request and response bodies](#request-and-response-bodies).
 
 # Request and response bodies
 
@@ -56,8 +56,8 @@ The context and the body parameter are both optional and may appear in either or
 
 Two attribute macros declare typed structs for reading values out of a request. You declare a struct, then read it with a free function from any handler that has a `cx`:
 
-- [`#[path_param]`](macro@path_param) — one dynamic path segment (like the `{post_id}` in `/posts/{post_id}`), read with [`path_param::<T>(cx)`](fn@path_param).
-- [`#[query_params]`](macro@query_params) — the request's query string deserialized into a struct, read with [`query_params::<T>(cx)`](fn@query_params).
+- [`#[path_param]`](macro@path_param): one dynamic path segment (like the `{post_id}` in `/posts/{post_id}`), read with [`path_param::<T>(cx)`](fn@path_param).
+- [`#[query_params]`](macro@query_params): the request's query string deserialized into a struct, read with [`query_params::<T>(cx)`](fn@query_params).
 
 Both parse lazily and memoize the result for the rest of the request.
 
@@ -122,7 +122,7 @@ async fn docs_page() -> Result {
 
 # Layouts
 
-A layout wraps pages. It receives a [`Slot`] — a future that resolves to the inner page or layout. Annotate it with [`#[layout]`](layout) and an explicit path:
+A layout wraps pages. It receives a [`Slot`]: a future that resolves to the inner page or layout. Annotate it with [`#[layout]`](layout) and an explicit path:
 
 ```rust
 use topcoat::{

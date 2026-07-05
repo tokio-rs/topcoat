@@ -14,7 +14,7 @@ use crate::{Cookie, Cookies};
 /// Reads and mutations operate on the in-memory value only. **Nothing is written
 /// to the response until [`commit`](Self::commit) is called**; dropping the store
 /// (or calling [`rollback`](Self::rollback)) discards any pending changes. This
-/// makes it easy to update a cookie only once some other work has succeeded —
+/// makes it easy to update a cookie only once some other work has succeeded:
 /// just hold off on `commit` until then.
 ///
 /// Obtain one by reading the incoming cookie through [`cookie_store`]:
@@ -429,7 +429,7 @@ mod tests {
         // The value is handed back.
         assert_eq!(cart.items, ["widget"]);
 
-        // …and serialized into the jar under the right name.
+        // And serialized into the jar under the right name.
         let added = jar.added();
         assert_eq!(added.len(), 1);
         assert_eq!(added[0].name(), "cart");
@@ -481,7 +481,7 @@ mod tests {
 
     #[test]
     fn remove_queues_a_removal() {
-        // On a parsed store…
+        // On a parsed store.
         let parsed = MockJar::with(&[("cart", r#"{"items":[]}"#)]);
         cookie_store::<Cart, _>(&parsed, "cart")
             .parse_or_default()
@@ -491,7 +491,7 @@ mod tests {
         assert_eq!(removed[0].name(), "cart");
         assert!(parsed.added().is_empty());
 
-        // …and directly on the unparsed store.
+        // And directly on the unparsed store.
         let unparsed = MockJar::with(&[]);
         cookie_store::<Cart, _>(&unparsed, "cart").remove();
         assert_eq!(unparsed.removed()[0].name(), "cart");

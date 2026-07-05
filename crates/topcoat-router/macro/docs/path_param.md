@@ -2,9 +2,9 @@ Declares a typed path parameter.
 
 Apply `#[path_param]` to a tuple struct with a single field. The struct sets up three things:
 
-- **Name** — the struct name, snake-cased, is the parameter's name (`PostId` → `post_id`).
-- **Parsing** — the inner type decides how the raw URL segment is parsed.
-- **Access** — read the value with [`path_param::<PostId>(cx)`](fn.path_param.html) from any handler.
+- **Name**: the struct name, snake-cased, is the parameter's name (`PostId` -> `post_id`).
+- **Parsing**: the inner type decides how the raw URL segment is parsed.
+- **Access**: read the value with [`path_param::<PostId>(cx)`](fn.path_param.html) from any handler.
 
 ```rust
 # use topcoat::router::path_param;
@@ -16,8 +16,8 @@ struct PostId(uuid::Uuid);
 
 [`path_param::<T>(cx)`](fn.path_param.html) returns the parameter. The return type follows the inner type:
 
-- **`&str`** — returns the struct directly, borrowing the raw segment (no parsing).
-- **Anything else** — returns `Result<&T, &<Inner as FromStr>::Err>`, parsed with [`FromStr`](core::str::FromStr).
+- **`&str`**: returns the struct directly, borrowing the raw segment (no parsing).
+- **Anything else**: returns `Result<&T, &<Inner as FromStr>::Err>`, parsed with [`FromStr`](core::str::FromStr).
 
 Parsing runs at most once per request; the result is then memoized. The struct also [`Deref`](core::ops::Deref)s to its inner type, so you can use the value as if it were that type.
 
@@ -25,9 +25,9 @@ Parsing runs at most once per request; the result is then memoized. The struct a
 
 The parameter's name has to line up with a `{name}` segment in the route's URL. How that segment gets there depends on how the route is registered:
 
-- **Explicit path** — write the placeholder yourself, so `PostId` must appear as `{post_id}`:
+- **Explicit path**: write the placeholder yourself, so `PostId` must appear as `{post_id}`:
   `#[page("/posts/{post_id}")]`.
-- **[`module_router!`](../router/macro.module_router.html)** — defining a `#[path_param]` inside a module turns that module's own segment into the parameter, so there is no placeholder to write. A `PostId` in `src/app/posts/id.rs` makes the `id` module render as `{post_id}`.
+- **[`module_router!`](../router/macro.module_router.html)**: defining a `#[path_param]` inside a module turns that module's own segment into the parameter, so there is no placeholder to write. A `PostId` in `src/app/posts/id.rs` makes the `id` module render as `{post_id}`.
 
 # Examples
 
@@ -49,7 +49,7 @@ async fn post_page(cx: &Cx) -> Result {
 ## Module router
 
 ```rust
-// src/app/posts/id.rs — the `id` module becomes `{post_id}` in the URL.
+// src/app/posts/id.rs: the `id` module becomes `{post_id}` in the URL.
 use topcoat::{
     context::Cx,
     Result,

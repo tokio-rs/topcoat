@@ -102,10 +102,10 @@ The default Tailwind CLI version is pinned by Topcoat to `4.3.2`. The downloaded
 
 By default, Topcoat downloads the Tailwind CLI from GitHub. `BuildConfig` offers alternatives:
 
-- `version("4.3.2")` — pin the release to download.
-- `version_checksum("4.3.2", "sha256:b800b065…")` — additionally verify the downloaded binary's hash. The prefix selects the algorithm; only `sha256` is supported.
-- `executable("tailwindcss")` — use a preinstalled CLI instead of downloading. A bare name is resolved through `PATH`; relative paths resolve against the package root.
-- `executable_env("TAILWIND_CLI")` — like `executable`, with the value read from an environment variable at build time.
+- `version("4.3.2")`: pin the release to download.
+- `version_checksum("4.3.2", "sha256:b800b065...")`: additionally verify the downloaded binary's hash. The prefix selects the algorithm; only `sha256` is supported.
+- `executable("tailwindcss")`: use a preinstalled CLI instead of downloading. A bare name is resolved through `PATH`; relative paths resolve against the package root.
+- `executable_env("TAILWIND_CLI")`: like `executable`, with the value read from an environment variable at build time.
 
 A user-provided executable is used as-is: no download happens and no network access is needed, which suits offline and sandboxed builds.
 
@@ -121,7 +121,7 @@ By default, Topcoat passes:
 
 So Tailwind scans from your package root: classes are found in Rust source files, including literal `class="..."` values in `view!` markup. Classes assembled dynamically at runtime are invisible to Tailwind.
 
-The scan skips files matched by `.gitignore` — that is what keeps it out of `target/`. In a checkout without an ignore file it reads build artifacts, which is slow and can resurrect classes from previous builds; scope the scan down with `.cwd("src")` in that case.
+The scan skips files matched by `.gitignore`: that is what keeps it out of `target/`. In a checkout without an ignore file it reads build artifacts, which is slow and can resurrect classes from previous builds; scope the scan down with `.cwd("src")` in that case.
 
 For precise control, use a custom input CSS with Tailwind's own source directives, e.g. to scan only Rust files:
 
@@ -157,7 +157,7 @@ Example input:
 
 # Rebuild behavior
 
-`BuildConfig::render()` prints no Cargo `rerun-if-*` directives. Cargo therefore applies its default: the build script reruns whenever any non-ignored file in the package changes. That default respects `.gitignore`, always excludes `target/`, and notices created and deleted files, so class changes anywhere in the package — including in new files — regenerate the Tailwind output.
+`BuildConfig::render()` prints no Cargo `rerun-if-*` directives. Cargo therefore applies its default: the build script reruns whenever any non-ignored file in the package changes. That default respects `.gitignore`, always excludes `target/`, and notices created and deleted files, so class changes anywhere in the package, including in new files, regenerate the Tailwind output.
 
 Printing any `rerun-if-*` directive from your build script replaces that default with exactly the paths and variables you list. Keep that in mind when combining the Tailwind build with your own directives; in particular, a directory directive is scanned recursively without respecting `.gitignore`, so never print one for a directory containing `target/`. Two situations require directives of your own:
 

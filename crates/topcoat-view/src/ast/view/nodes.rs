@@ -6,7 +6,7 @@ use topcoat_core::ast::ParseOption;
 
 use crate::ast::view::{ClosingTag, Node, ViewWriter, WriteView};
 
-/// A sequence of sibling [`Node`]s — the shared building block used by both a
+/// A sequence of sibling [`Node`]s: the shared building block used by both a
 /// top-level [`View`](super::View), a [`Component`](super::Component)'s
 /// children, and any view-position template body. Owns the node list and the
 /// formatting rules for laying out siblings.

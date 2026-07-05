@@ -7,7 +7,7 @@ use crate::header;
 /// absent or not valid UTF-8.
 ///
 /// The header map is borrowed straight from the request, so these reads are
-/// cheap pointer lookups — there is nothing worth caching with `#[memoize]`,
+/// cheap pointer lookups: there is nothing worth caching with `#[memoize]`,
 /// and borrowing avoids the allocation a memoized owned value would require.
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
     request_context::<Parts>(cx)

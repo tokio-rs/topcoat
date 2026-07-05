@@ -218,7 +218,7 @@ fn catalog(families: &[FamilyMetadata], ranges: &[String]) -> String {
 
         writeln!(
             out,
-            "/// `{}` — `{}`, `{}`.",
+            "/// `{}`: `{}`, `{}`.",
             f.family, f.category, f.license
         )
         .unwrap();

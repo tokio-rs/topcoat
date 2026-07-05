@@ -59,7 +59,7 @@ async fn hello(name: &str) -> Result {
 A few things are happening here:
 
 - `topcoat::start` binds to `HOST` and `PORT` from the environment, defaulting to `127.0.0.1:3000`.
-- `Router::builder().discover().build()` collects every `#[page]`, `#[layout]`, `#[route]`, and `#[layer]` in the binary, then finalizes the router — `home` is registered automatically.
+- `Router::builder().discover().build()` collects every `#[page]`, `#[layout]`, `#[route]`, and `#[layer]` in the binary, then finalizes the router: `home` is registered automatically.
 - `topcoat::dev::script()` injects the dev-server live-reload script in debug builds and renders to nothing in release builds.
 - The `hello` component is invoked from `view!` with function-call syntax.
 
@@ -73,7 +73,7 @@ A few things are happening here:
 cargo install topcoat-cli
 ```
 
-This installs a single `topcoat` executable. It is also available as a Cargo subcommand (`cargo topcoat …`) if you prefer.
+This installs a single `topcoat` executable. It is also available as a Cargo subcommand (`cargo topcoat ...`) if you prefer.
 
 ## Start the dev server
 
@@ -95,7 +95,7 @@ HOST=0.0.0.0 PORT=8080 topcoat dev
 
 ## Where to next
 
-- [The `view!` macro](../../topcoat-view/macro/docs/view.md) — templating syntax and control flow.
-- [Router](router.md) and [Module-based routing](../../topcoat-router/docs/module_router.md) — how pages, layouts, and API routes are wired up.
-- [Request context (`Cx`)](context.md) — the value pages and components read from.
-- [Assets](assets.md) — declare static files in Rust and serve them with content-hashed URLs.
+- [The `view!` macro](../../topcoat-view/macro/docs/view.md): templating syntax and control flow.
+- [Router](router.md) and [Module-based routing](../../topcoat-router/docs/module_router.md): how pages, layouts, and API routes are wired up.
+- [Request context (`Cx`)](context.md): the value pages and components read from.
+- [Assets](assets.md): declare static files in Rust and serve them with content-hashed URLs.

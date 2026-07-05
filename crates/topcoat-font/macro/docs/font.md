@@ -26,7 +26,7 @@ const INTER: Font = font! {
 
 # Expression form
 
-Alternatively, follow the family name with a single expression that evaluates to the faces — anything convertible into [`FontFaces`], such as a `Vec<FontFace>`. This uses ordinary Rust syntax instead of the CSS-like blocks, which is handy when the faces are built up programmatically or shared between fonts:
+Alternatively, follow the family name with a single expression that evaluates to the faces: anything convertible into [`FontFaces`], such as a `Vec<FontFace>`. This uses ordinary Rust syntax instead of the CSS-like blocks, which is handy when the faces are built up programmatically or shared between fonts:
 
 ```rust
 # use topcoat::font::{Font, FontFace, FontFormat, FontSource, font};

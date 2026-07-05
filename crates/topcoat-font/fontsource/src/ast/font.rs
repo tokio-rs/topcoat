@@ -57,7 +57,7 @@ impl ToTokens for FontsourceFont {
 
         // Weight and style token lists: written values verbatim, otherwise
         // every value the family ships. `None` when the family is unknown and
-        // the axis is omitted — the emitted family path reports the former.
+        // the axis is omitted: the emitted family path reports the former.
         let weights: Option<Vec<TokenStream>> = match &self.weight {
             Some(weight) => Some(weight.value.iter().map(ToTokens::to_token_stream).collect()),
             None => family.map(|family| {

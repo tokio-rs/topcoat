@@ -9,7 +9,7 @@ use topcoat_core::runtime::context::Cx;
 pub trait QueryParams: Sized {
     /// Parses the query string of the request `cx` belongs to.
     ///
-    /// Call [`query_params::<T>(cx)`](query_params) instead — this method is
+    /// Call [`query_params::<T>(cx)`](query_params) instead: this method is
     /// sealed behind [`QueryParamsSealed`] and cannot be invoked directly.
     #[doc(hidden)]
     fn query_params(cx: &Cx, _: QueryParamsSealed) -> Result<&Self, &serde_urlencoded::de::Error>;

@@ -4,7 +4,7 @@ use quote::quote;
 /// Declares a page handler.
 ///
 /// The page's URL is the path string given to the attribute (`#[page("/about")]`). When no path is
-/// given, the URL is derived from the function's enclosing module path, kebab-cased — provided the
+/// given, the URL is derived from the function's enclosing module path, kebab-cased, provided the
 /// function is reachable from a [`module_router!`](../router/macro.module_router.html). Both
 /// forms register into the same router, so explicit and module-derived paths can be mixed freely
 /// in one app.
@@ -67,14 +67,14 @@ pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// A layout wraps every page whose URL begins with the layout's URL. The layout's URL is the path
 /// string given to the attribute (`#[layout("/settings")]`). When no path is given, it is derived
-/// from the function's enclosing module path, kebab-cased — provided the function is reachable
+/// from the function's enclosing module path, kebab-cased, provided the function is reachable
 /// from a [`module_router!`](../router/macro.module_router.html). When several layouts match a
 /// given page, they nest from least specific (outermost) to most specific (innermost).
 ///
 /// # Handler signature
 ///
 /// The function is `async` and returns [`Result`](../type.Result.html). One parameter must be a
-/// [`Slot<'_>`](../router/struct.Slot.html) — a future that resolves to the inner page's rendered
+/// [`Slot<'_>`](../router/struct.Slot.html): a future that resolves to the inner page's rendered
 /// output, expected to be `.await`ed somewhere in the layout's view. The function may also take
 /// [`cx: &Cx`](../context/struct.Cx.html) and one request body parameter implementing
 /// [`FromRequest`](../router/trait.FromRequest.html).
@@ -114,7 +114,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// A route always declares an HTTP method as its first argument (`GET`, `POST`, `PUT`, `DELETE`,
 /// `PATCH`, `HEAD`, or `OPTIONS`). The URL follows the method as an optional path string
 /// (`#[route(GET "/api/health")]`); when omitted, it is derived from the function's enclosing
-/// module path, kebab-cased — provided the function is reachable from a
+/// module path, kebab-cased, provided the function is reachable from a
 /// [`module_router!`](../router/macro.module_router.html). Both forms register into the same
 /// router and can be mixed.
 ///
@@ -131,7 +131,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// [`IntoResponse::into_response`](../router/trait.IntoResponse.html#tymethod.into_response).
 /// Strings, status codes, byte buffers, `(headers, body)` tuples, and
 /// [`Json<T>`](../router/struct.Json.html) all work. A raw `Result<T>` is not automatically
-/// serialized as JSON — wrap it in `Json<T>` to opt in.
+/// serialized as JSON; wrap it in `Json<T>` to opt in.
 ///
 /// # Examples
 ///
@@ -166,7 +166,7 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// [`#[layout]`](macro@layout)), so a layer at `/admin` wraps only routes under `/admin`, while a
 /// layer at `/` wraps everything. The layer's URL is the path string given to the attribute
 /// (`#[layer("/admin")]`); when omitted, it is derived from the function's enclosing module path,
-/// kebab-cased — provided the function is reachable from a
+/// kebab-cased, provided the function is reachable from a
 /// [`module_router!`](../router/macro.module_router.html). When several layers match a route, they
 /// nest from least specific (outermost) to most specific (innermost).
 ///
@@ -214,29 +214,28 @@ pub fn layer(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Forms
 ///
-/// - `segment!(rename = "name")` — replaces the URL segment with the literal, used as-is (no
+/// - `segment!(rename = "name")`: replaces the URL segment with the literal, used as-is (no
 ///   kebab-casing).
-/// - `segment!(kind = Group)` — turns the module into a *group*: it contributes no URL segment but
+/// - `segment!(kind = Group)`: turns the module into a *group*: it contributes no URL segment but
 ///   can still hold a shared layout. Equivalent to prefixing the module name with `_`.
-/// - `segment!(kind = Static)` — forces a `_`-prefixed module back into a regular static segment.
-/// - `segment!(kind = Param, rename = "name")` — turns the module into a dynamic `{name}`
-///   parameter. Emitted automatically by [`#[path_param]`](macro@path_param); rarely written by
-///   hand.
+/// - `segment!(kind = Static)`: forces a `_`-prefixed module back into a regular static segment.
+/// - `segment!(kind = Param, rename = "name")`: turns the module into a dynamic `{name}` parameter.
+///   Emitted automatically by [`#[path_param]`](macro@path_param); rarely written by hand.
 ///
 /// # Examples
 ///
 /// ```rust
-/// // src/app/blog_post.rs — module URL becomes `/articles` instead of `/blog-post`.
+/// // src/app/blog_post.rs: module URL becomes `/articles` instead of `/blog-post`.
 /// topcoat::router::segment!(rename = "articles");
 /// ```
 ///
 /// ```rust
-/// // src/app/marketing.rs — `marketing` contributes no URL segment.
+/// // src/app/marketing.rs: `marketing` contributes no URL segment.
 /// topcoat::router::segment!(kind = Group);
 /// ```
 ///
 /// ```rust
-/// // src/app/_group.rs — `_group` is reachable as `/group`.
+/// // src/app/_group.rs: `_group` is reachable as `/group`.
 /// topcoat::router::segment!(kind = Static);
 /// ```
 #[proc_macro]

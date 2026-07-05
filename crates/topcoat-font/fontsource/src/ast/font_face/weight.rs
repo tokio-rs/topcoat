@@ -83,7 +83,7 @@ pub struct WeightValue(LitInt);
 
 impl WeightValue {
     /// The weight as a number, or `None` when the literal does not fit a
-    /// [`u16`] — the compiler reports those on the emitted literal.
+    /// [`u16`]: the compiler reports those on the emitted literal.
     #[must_use]
     pub fn value(&self) -> Option<u16> {
         self.0.base10_parse().ok()

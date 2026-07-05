@@ -10,7 +10,7 @@
 //! The same range string repeats across thousands of families, so the ranges
 //! are interned: distinct range specs are collected into a top-level `ranges`
 //! table and each family references them by index. The numbered CJK subset
-//! blocks (`[0]`, `[1]`, …) are dropped — their ranges are per-font and opaque,
+//! blocks (`[0]`, `[1]`, ...) are dropped: their ranges are per-font and opaque,
 //! and keeping them would bloat the catalog many times over.
 
 use std::{
@@ -94,10 +94,10 @@ fn main() {
         .build()
         .into();
 
-    eprintln!("fetching catalog list…");
+    eprintln!("fetching catalog list...");
     let mut fonts: Vec<Font> = get_json(&agent, &format!("{API}/fonts"));
     fonts.sort_by(|a, b| a.id.cmp(&b.id));
-    eprintln!("{} families; fetching unicode ranges…", fonts.len());
+    eprintln!("{} families; fetching unicode ranges...", fonts.len());
 
     let done = AtomicUsize::new(0);
     let total = fonts.len();
@@ -136,8 +136,8 @@ fn main() {
     );
 }
 
-/// Whether a subset is a named subset (`latin`, `cyrillic`, …) rather than a
-/// numbered CJK block (`[0]`, `[12]`, …).
+/// Whether a subset is a named subset (`latin`, `cyrillic`, ...) rather than a
+/// numbered CJK block (`[0]`, `[12]`, ...).
 fn is_named_subset(subset: &str) -> bool {
     !(subset.starts_with('[')
         && subset.ends_with(']')

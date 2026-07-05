@@ -72,7 +72,7 @@ fn lists_cross_product_into_faces() {
 
 #[test]
 fn every_axis_multiplies() {
-    // Two weights × two styles × one subset.
+    // Two weights * two styles * one subset.
     let font = fontsource_font!(
         ROBOTO,
         weight: [400, 700],

@@ -1,6 +1,6 @@
 # App context
 
-Most apps need values that outlive any single request — a database pool, an HTTP client, a config struct loaded at startup. Topcoat exposes these through **app context**: register a value once on the router, then read it from any handler with `app_context(cx)`.
+Most apps need values that outlive any single request: a database pool, an HTTP client, a config struct loaded at startup. Topcoat exposes these through **app context**: register a value once on the router, then read it from any handler with `app_context(cx)`.
 
 App context is keyed by Rust type. Each type can be registered at most once, and lookups are typed: ask for `&Database` and you get a `&Database`.
 
@@ -20,7 +20,7 @@ pub fn router() -> Router {
 }
 ```
 
-The value is stored under its concrete type. Registering two values of the same type panics — wrap them in newtypes if you need more than one of the same underlying type:
+The value is stored under its concrete type. Registering two values of the same type panics: wrap them in newtypes if you need more than one of the same underlying type:
 
 ```rust
 struct PrimaryDb(Database);
@@ -52,10 +52,10 @@ async fn user_profile(cx: &Cx) -> Result {
 }
 ```
 
-The lookup is keyed by `T`'s `TypeId`, so the type you ask for must exactly match the type you registered. Asking for a type that wasn't registered panics — this is a startup-time bug, not a runtime one.
+The lookup is keyed by `T`'s `TypeId`, so the type you ask for must exactly match the type you registered. Asking for a type that wasn't registered panics: this is a startup-time bug, not a runtime one.
 
 ## Requirements
 
-The value type `T` must be `Any + Send + Sync`. There's no `'static` bound to write yourself — `Any` implies it.
+The value type `T` must be `Any + Send + Sync`. There's no `'static` bound to write yourself: `Any` implies it.
 
 App context is shared by reference across every request handled by the router, so values should be cheap to share (typically already wrapped in `Arc` internally, like a database pool or HTTP client) or trivially clonable.

@@ -31,7 +31,7 @@ A `#[page]` defines a page handler. A `#[layout]` wraps all pages in the same mo
 
 ```rust
 # use topcoat::{Result, router::{Slot, layout, page}, view::view};
-// src/app.rs — layout at "/" wraps all pages
+// src/app.rs: layout at "/" wraps all pages
 #[layout]
 async fn root_layout(slot: Slot<'_>) -> Result {
     view! {
@@ -47,7 +47,7 @@ async fn home() -> Result {
 
 ```rust
 # use topcoat::{Result, router::page, view::view};
-// src/app/about.rs — page at "/about"
+// src/app/about.rs: page at "/about"
 #[page]
 async fn about() -> Result {
     view! { <h1>"About"</h1> }
@@ -58,7 +58,7 @@ API routes use `#[route]` with an explicit HTTP method. Like pages and layouts, 
 
 ```rust
 # use topcoat::{Result, router::route};
-// src/app/api/health.rs — GET /api/health
+// src/app/api/health.rs: GET /api/health
 #[route(GET)]
 async fn health() -> Result<&'static str> {
     Ok("ok")
@@ -68,7 +68,7 @@ async fn health() -> Result<&'static str> {
 Layers use the same module-derived path as layouts, but wrap request handling instead of rendered view output:
 
 ```rust
-// src/app/api.rs — wraps routes under /api
+// src/app/api.rs: wraps routes under /api
 use topcoat::{
     Result,
     context::Cx,
@@ -168,6 +168,6 @@ app/
   _components/
     header.rs
     footer.rs
-  about.rs             # /about — can use app::_components::header
+  about.rs             # /about: can use app::_components::header
   contact.rs           # /contact
 ```

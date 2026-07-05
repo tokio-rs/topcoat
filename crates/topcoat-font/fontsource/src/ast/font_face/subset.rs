@@ -92,7 +92,7 @@ impl SubsetValue {
     }
 
     /// The subset the written variant names, or `None` when it is not a
-    /// [`Subset`](runtime::Subset) variant — the compiler reports those on the
+    /// [`Subset`](runtime::Subset) variant: the compiler reports those on the
     /// emitted variant.
     #[must_use]
     pub fn subset(&self) -> Option<runtime::Subset> {

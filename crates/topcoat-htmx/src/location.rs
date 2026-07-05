@@ -12,7 +12,7 @@ use crate::header;
 /// via the `HX-Location` header.
 ///
 /// In its simplest form it carries just a path. Set any of the [`LocationOptions`]
-/// fields — through the builder methods — to control how htmx fetches and swaps
+/// fields, through the builder methods, to control how htmx fetches and swaps
 /// the new content; when any option is set, the header is serialized as JSON.
 ///
 /// # Examples

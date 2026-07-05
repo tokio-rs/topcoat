@@ -29,7 +29,7 @@ pub fn redirect(uri: &str) -> RedirectError {
 
 /// Builds a permanent (HTTP 308) redirect to `uri`.
 ///
-/// Use this for URLs that have moved for good — clients and search engines
+/// Use this for URLs that have moved for good; clients and search engines
 /// are allowed to cache the new location.
 ///
 /// # Examples

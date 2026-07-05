@@ -24,7 +24,7 @@ pub enum ExecutableSource {
         version: String,
         /// Expected hash of the downloaded binary as an `algorithm:hex`
         /// string. Only `sha256` is currently supported, e.g.
-        /// `"sha256:b800b065…"`. Verified once after download; `None` skips
+        /// `"sha256:b800b065..."`. Verified once after download; `None` skips
         /// verification.
         checksum: Option<String>,
     },

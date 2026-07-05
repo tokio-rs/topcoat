@@ -23,7 +23,7 @@ pub struct AssetOptions {
     pub extension: Option<Cow<'static, str>>,
     /// Expected hash of the raw, unbundled source file, as an
     /// `algorithm:hex` string. Only `sha256` is currently supported, e.g.
-    /// `"sha256:e3b0c442…"`. The bundler fails with
+    /// `"sha256:e3b0c442..."`. The bundler fails with
     /// [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's
     /// actual hash differs, or
     /// [`AssetError::UnsupportedChecksum`](crate::AssetError) if the

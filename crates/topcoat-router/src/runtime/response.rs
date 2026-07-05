@@ -69,8 +69,8 @@ pub trait IntoResponse {
 
 /// Modifies a [`Response`]'s [`Parts`] without supplying a body.
 ///
-/// Types that implement this trait — header arrays, [`HeaderMap`],
-/// [`Extensions`], and their [`Option`] wrappers — can appear before the final
+/// Types that implement this trait (header arrays, [`HeaderMap`],
+/// [`Extensions`], and their [`Option`] wrappers) can appear before the final
 /// body element of an [`IntoResponse`] tuple to attach headers or extensions to
 /// the response. The conversion receives the request [`Cx`] so a part can
 /// depend on request-scoped state.
@@ -101,7 +101,7 @@ fn merge_parts(parts: &mut Parts, from: Parts) {
     parts.extensions.extend(from.extensions);
 }
 
-// ── Leaf IntoResponse impls ──
+// -- Leaf IntoResponse impls --
 
 impl IntoResponse for Infallible {
     fn into_response(self, _cx: &Cx) -> Result<Response> {
@@ -256,7 +256,7 @@ where
     }
 }
 
-// ── IntoResponseParts impls ──
+// -- IntoResponseParts impls --
 
 impl IntoResponseParts for () {
     fn into_response_parts(self, _cx: &Cx, _parts: &mut Parts) -> Result<()> {
@@ -309,7 +309,7 @@ where
     }
 }
 
-// ── Tuple IntoResponse impls ──
+// -- Tuple IntoResponse impls --
 
 /// Generates the four `IntoResponse` tuple families for a fixed number of
 /// [`IntoResponseParts`] members `T1..Tn`: a bare tuple, and tuples led by a
@@ -435,7 +435,7 @@ mod tests {
             .to_owned()
     }
 
-    // ── leaf bodies ──
+    // -- leaf bodies --
 
     #[test]
     fn str_is_text_plain() {
@@ -524,7 +524,7 @@ mod tests {
         assert_eq!(&body[..], b"yo");
     }
 
-    // ── header arrays ──
+    // -- header arrays --
 
     #[test]
     fn header_array_is_into_response() {
@@ -541,7 +541,7 @@ mod tests {
         assert!([("inva lid", "1")].into_response(&cx).is_err());
     }
 
-    // ── tuples ──
+    // -- tuples --
 
     #[test]
     fn one_tuple_is_just_the_body() {

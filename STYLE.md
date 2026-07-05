@@ -31,7 +31,7 @@ pub use http::Method;
 ## Dependencies
 
 Declare every dependency in the top-level `Cargo.toml` under
-`[workspace.dependencies]` with only its version — no features. Individual crates
+`[workspace.dependencies]` with only its version and no features. Individual crates
 pull it in with `workspace = true` and opt into the features they need there.
 
 ```toml
@@ -62,6 +62,18 @@ Documentation describe the current state only.
 The `docs/` folder contains markdown documentation which is kept in sync with
 module documentation in `crates/topcoat/src/*.rs`. However, the Rust module documentation
 should use relative code links whereas the markdown documentation uses absolute links.
+
+## Characters
+
+Write documentation and code using only characters found on a US layout
+keyboard. Avoid special characters such as em dashes, Unicode arrows, or the
+ellipsis. Use their plain-ASCII equivalents instead:
+
+- `-` or `--` instead of an em dash (`—`)
+- `->` instead of a Unicode arrow (`→`)
+- `...` (three periods) instead of a single ellipsis character (`…`)
+
+Use em dashes sparingly.
 
 ## Tests
 

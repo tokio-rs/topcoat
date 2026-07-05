@@ -34,7 +34,7 @@ pub struct View {
     ///
     /// Inside a `#[component]`, `#[page]`, or `#[layout]`, the context is
     /// available implicitly, so this is [`None`]. Anywhere else (for example a
-    /// `#[route]` handler), the caller names it explicitly as `view! { cx, … }`
+    /// `#[route]` handler), the caller names it explicitly as `view! { cx, ... }`
     /// and the rest of the view renders against it.
     pub cx: Option<Ident>,
     pub nodes: Nodes,

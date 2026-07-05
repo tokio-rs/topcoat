@@ -6,7 +6,7 @@ use crate::Cookies;
 /// through it.
 ///
 /// `Map` is how the attribute combinators ([`Cookies::default_same_site`],
-/// [`Cookies::override_secure`], …) and the general [`Cookies::map`] escape
+/// [`Cookies::override_secure`], ...) and the general [`Cookies::map`] escape
 /// hatch are implemented: the closure runs on `add`, mutating the cookie before
 /// it is forwarded inward.
 ///
