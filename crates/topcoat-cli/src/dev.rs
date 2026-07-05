@@ -3,13 +3,11 @@
 //! Four pieces cooperate, tied together by the event loop in
 //! [`DevCommand::run`]:
 //!
-//! - [`broadcast_server`] — a long-lived local WebSocket server that browsers
-//!   connect to; it broadcasts a reload message whenever a freshly started
-//!   application reports ready.
-//! - [`watch`] — watches the workspace's source directories and coalesces
-//!   bursts of filesystem events into single change notifications.
-//! - [`build`] — compiles the application and bundles its assets in a
-//!   cancellable background task.
+//! - [`broadcast_server`] — a long-lived local WebSocket server that browsers connect to; it
+//!   broadcasts a reload message whenever a freshly started application reports ready.
+//! - [`watch`] — watches the workspace's source directories and coalesces bursts of filesystem
+//!   events into single change notifications.
+//! - [`build`] — compiles the application and bundles its assets in a cancellable background task.
 //! - [`app_server`] — the application process itself.
 //!
 //! The loop's core policy is that the running application is only ever
@@ -80,21 +78,18 @@ impl DevCommand {
 
                 exe = async { build.as_mut().unwrap().finished().await }, if build.is_some() => {
                     build = None;
-                    match exe {
+                    if let Some(exe) = exe {
                         // The new process binds the same address as the old
                         // one, so the old one must be stopped first.
-                        Some(exe) => {
-                            if let Some(old) = server.take() {
-                                old.shutdown().await;
-                            }
-                            server = start_app(&exe, &dev_url, &events);
+                        if let Some(old) = server.take() {
+                            old.shutdown().await;
                         }
+                        server = start_app(&exe, &dev_url, &events);
+                    } else {
                         // The failure is already on the terminal; keep the
                         // previous process serving while the user fixes it.
-                        None => {
-                            events.publish(Event::BuildFailed);
-                            report_waiting(server.is_some());
-                        }
+                        events.publish(Event::BuildFailed);
+                        report_waiting(server.is_some());
                     }
                 }
 
