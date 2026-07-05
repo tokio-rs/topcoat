@@ -44,6 +44,22 @@ impl View {
         Self::default()
     }
 
+    /// Creates a view that renders `html` verbatim.
+    ///
+    /// The content is written to the output without escaping, exactly like
+    /// interpolating an [`Unescaped`] value in `view!`. Because this
+    /// constructor is `const`, the resulting view can be stored in `const`
+    /// and `static` items.
+    #[inline]
+    #[must_use]
+    pub const fn unescaped(html: Unescaped<&'static str>) -> Self {
+        let size_hint = html.0.len();
+        Self {
+            part: ViewPart::UnescapedStaticStr(html),
+            size_hint,
+        }
+    }
+
     /// Renders the view into an HTML string.
     pub fn render(&self, cx: &Cx) -> String {
         let mut buf = String::with_capacity(self.size_hint);

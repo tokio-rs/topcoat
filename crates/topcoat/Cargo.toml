@@ -47,9 +47,12 @@ htmx = [
 ]
 icon = [
 	"dep:topcoat-icon",
+	"view",
 ]
 icon-iconify = [
+	"icon",
 	"dep:topcoat-icon-iconify",
+	"dep:topcoat-icon-iconify-macro",
 ]
 multipart = [
 	"router",
@@ -115,6 +118,7 @@ topcoat-font-fontsource-macro = { workspace = true, optional = true }
 topcoat-htmx = { workspace = true, optional = true }
 topcoat-icon = { workspace = true, optional = true }
 topcoat-icon-iconify = { workspace = true, optional = true }
+topcoat-icon-iconify-macro = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }

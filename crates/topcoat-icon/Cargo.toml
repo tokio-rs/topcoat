@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+topcoat-view.workspace = true
 
 [lints]
 workspace = true

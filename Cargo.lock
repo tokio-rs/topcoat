@@ -1768,6 +1768,7 @@ dependencies = [
  "topcoat-htmx",
  "topcoat-icon",
  "topcoat-icon-iconify",
+ "topcoat-icon-iconify-macro",
  "topcoat-router",
  "topcoat-router-macro",
  "topcoat-runtime",
@@ -1935,10 +1936,32 @@ dependencies = [
 [[package]]
 name = "topcoat-icon"
 version = "0.1.0"
+dependencies = [
+ "topcoat-view",
+]
 
 [[package]]
 name = "topcoat-icon-iconify"
 version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn",
+ "ureq",
+]
+
+[[package]]
+name = "topcoat-icon-iconify-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "topcoat",
+ "topcoat-icon-iconify",
+]
 
 [[package]]
 name = "topcoat-pretty"

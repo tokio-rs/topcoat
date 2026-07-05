@@ -14,6 +14,7 @@ members = [
     "crates/topcoat-htmx",
     "crates/topcoat-icon",
     "crates/topcoat-icon/iconify",
+    "crates/topcoat-icon/iconify/macro",
     "crates/topcoat-pretty",
     "crates/topcoat-router",
     "crates/topcoat-router/macro",
@@ -78,6 +79,7 @@ topcoat-font-macro = { path = "crates/topcoat-font/macro" }
 topcoat-htmx = { path = "crates/topcoat-htmx" }
 topcoat-icon = { path = "crates/topcoat-icon" }
 topcoat-icon-iconify = { path = "crates/topcoat-icon/iconify" }
+topcoat-icon-iconify-macro = { path = "crates/topcoat-icon/iconify/macro" }
 topcoat-pretty = { path = "crates/topcoat-pretty" }
 topcoat-router = { path = "crates/topcoat-router" }
 topcoat-router-macro = { path = "crates/topcoat-router/macro" }

@@ -2,8 +2,10 @@ mod attribute;
 mod component;
 mod element;
 mod format;
+mod length;
 mod node;
 mod props;
+pub mod svg;
 mod unescaped;
 mod view;
 
@@ -11,6 +13,7 @@ pub use attribute::*;
 pub use component::*;
 pub use element::*;
 pub use format::*;
+pub use length::*;
 pub use node::*;
 pub use props::*;
 pub use unescaped::*;

@@ -31,6 +31,9 @@ pub mod font;
 #[cfg(feature = "htmx")]
 pub mod htmx;
 
+#[cfg(feature = "icon")]
+pub mod icon;
+
 #[cfg(feature = "router")]
 pub mod router;
 

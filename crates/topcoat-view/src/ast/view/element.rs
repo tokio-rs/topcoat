@@ -11,11 +11,16 @@ use topcoat_core::ast::ParseOption;
 
 use crate::ast::{
     attributes::Attributes,
-    view::{ClosingTag, ElementName, ExprKind, Node, Nodes, OpeningTag, ViewWriter, WriteView},
+    view::{
+        ClosingTag, ElementName, ElementTag, ExprKind, Node, Nodes, OpeningTag, SelfClosingTag,
+        ViewWriter, WriteView,
+    },
 };
 
-/// An HTML element. `Void` covers the HTML void elements (`<br>`, `<img>`, ...)
-/// which take no closing tag and no children.
+/// An HTML element. `SelfClosing` covers elements written with a trailing
+/// slash (`<path/>`), which take no children and render exactly as written.
+/// `Void` covers the HTML void elements (`<br>`, `<img>`, ...) which take no
+/// closing tag and no children.
 // Optimize for the common case (normal elements).
 #[allow(clippy::large_enum_variant)]
 pub enum Element {
@@ -23,6 +28,9 @@ pub enum Element {
         opening_tag: OpeningTag,
         children: Nodes,
         closing_tag: ClosingTag,
+    },
+    SelfClosing {
+        tag: SelfClosingTag,
     },
     Void {
         tag: OpeningTag,
@@ -35,6 +43,7 @@ impl Element {
     pub fn name(&self) -> &ElementName {
         match self {
             Self::Normal { opening_tag, .. } => &opening_tag.name,
+            Self::SelfClosing { tag } => &tag.name,
             Self::Void { tag } => &tag.name,
         }
     }
@@ -44,16 +53,18 @@ impl Element {
     pub fn attributes(&self) -> &Attributes {
         match self {
             Self::Normal { opening_tag, .. } => &opening_tag.attributes,
+            Self::SelfClosing { tag } => &tag.attributes,
             Self::Void { tag } => &tag.attributes,
         }
     }
 
-    /// The element's children. Always empty for void elements.
+    /// The element's children. Always empty for self-closing and void
+    /// elements.
     #[must_use]
     pub fn children(&self) -> &[Node] {
         match self {
             Self::Normal { children, .. } => children,
-            Self::Void { .. } => &[],
+            Self::SelfClosing { .. } | Self::Void { .. } => &[],
         }
     }
 }
@@ -97,6 +108,12 @@ impl WriteView for Element {
                 }
                 writer.write_str_unescaped(">");
             }
+            Self::SelfClosing { tag } => {
+                writer.write_str_unescaped("<");
+                tag.name.write(writer);
+                tag.attributes.write(writer);
+                writer.write_str_unescaped("/>");
+            }
             Self::Void { tag } => {
                 writer.write_str_unescaped("<");
                 tag.name.write(writer);
@@ -109,7 +126,10 @@ impl WriteView for Element {
 
 impl Parse for Element {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let opening_tag: OpeningTag = input.parse()?;
+        let opening_tag = match input.parse()? {
+            ElementTag::SelfClosing(tag) => return Ok(Self::SelfClosing { tag }),
+            ElementTag::Opening(tag) => tag,
+        };
 
         if opening_tag.name.is_void_element() {
             return Ok(Self::Void { tag: opening_tag });
@@ -168,6 +188,7 @@ impl topcoat_pretty::PrettyPrint for Element {
                 printer.scan_break();
                 closing_tag.pretty_print(printer);
             }
+            Self::SelfClosing { tag } => tag.pretty_print(printer),
             Self::Void { tag } => tag.pretty_print(printer),
         }
         printer.scan_end();
@@ -203,6 +224,30 @@ mod tests {
         let element = parse("<br>");
         assert!(matches!(element, Element::Void { .. }));
         assert!(element.children().is_empty());
+    }
+
+    #[test]
+    fn parses_self_closing_element() {
+        let element = parse(r#"<path d="M0 0h24v24H0z"/>"#);
+        assert!(matches!(element, Element::SelfClosing { .. }));
+        assert_eq!(element.name().string_name().as_deref(), Some("path"));
+        assert_eq!(element.attributes().items.len(), 1);
+        assert!(element.children().is_empty());
+    }
+
+    #[test]
+    fn parses_self_closing_void_element() {
+        // The trailing slash takes precedence over the void-element rule, so
+        // the slash is preserved in the rendered output.
+        let element = parse("<br/>");
+        assert!(matches!(element, Element::SelfClosing { .. }));
+    }
+
+    #[test]
+    fn parses_self_closing_expression_name() {
+        let element = parse("<(tag)/>");
+        assert!(matches!(element, Element::SelfClosing { .. }));
+        assert!(element.name().expr().is_some());
     }
 
     #[test]

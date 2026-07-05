@@ -3,7 +3,30 @@ name = "topcoat-icon-iconify"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+# Exposes the `ast` module.
+parsing = [
+	"dep:proc-macro2",
+	"dep:quote",
+	"dep:syn",
+	"dep:serde",
+	"dep:serde_json",
+]
+# Exposes the `build` module for staging icon sets from a build script.
+build = [
+	"dep:serde",
+	"dep:serde_json",
+	"dep:ureq",
+]
+
 [dependencies]
+proc-macro2 = { workspace = true, optional = true }
+quote = { workspace = true, optional = true }
+syn = { workspace = true, optional = true, features = ["full"] }
+
+serde = { workspace = true, optional = true, features = ["derive"] }
+serde_json = { workspace = true, optional = true }
+ureq = { workspace = true, optional = true }
 
 [lints]
 workspace = true
