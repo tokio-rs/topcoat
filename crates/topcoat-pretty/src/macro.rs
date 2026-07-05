@@ -213,6 +213,28 @@ mod tests {
     }
 
     #[test]
+    fn braced_body_indents_to_macro_source_line() {
+        // The macro is a call argument sitting at column 8. Its body must indent
+        // relative to that column (to 12) and its closing brace back to it (8),
+        // rather than following the shallow AST nesting depth of the call.
+        let source = "\
+fn f() {
+    wrapper(
+        first,
+        test! { this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_printed },
+    );
+}
+";
+        let result = crate::pretty_print_str(&registry(), source).unwrap();
+        assert!(
+            result.contains(
+                "        test! {\n            this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_printed\n        },"
+            ),
+            "unexpected output:\n{result}"
+        );
+    }
+
+    #[test]
     fn test_braced_long() {
         let source = "test! { this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed }";
         let result = crate::pretty_print_str(&registry(), source);
