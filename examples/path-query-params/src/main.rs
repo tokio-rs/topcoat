@@ -36,7 +36,8 @@ async fn home() -> Result {
     view! {
         <h1>"Path and query params"</h1>
         <ul>
-            <li><a href="/posts?page=2&q=rust">"query params: /posts?page=2&q=rust"</a>
+            <li>
+                <a href="/posts?page=2&q=rust">"query params: /posts?page=2&q=rust"</a>
             </li>
             <li><a href="/posts/42">"path param: /posts/42"</a></li>
         </ul>

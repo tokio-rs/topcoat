@@ -57,12 +57,7 @@ fn a_single_face() {
 
 #[test]
 fn lists_cross_product_into_faces() {
-    let font = fontsource_font!(
-        ROBOTO,
-        weight: [400, 700],
-        style: Normal,
-        subset: Latin,
-    );
+    let font = fontsource_font!(ROBOTO, weight: [400, 700], style: Normal, subset: Latin);
     let faces = [
         roboto("latin-400-normal", 400, "normal", LATIN),
         roboto("latin-700-normal", 700, "normal", LATIN),

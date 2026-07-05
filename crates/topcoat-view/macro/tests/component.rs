@@ -43,12 +43,7 @@ async fn badge(label: &str, tone: &str) -> Result {
 async fn component_with_multiple_named_args_renders_attributes() {
     let cx = empty_cx();
     let __cx = &cx;
-    let result: Result = view! {
-        badge(
-            label: "New",
-            tone: "success"
-        )
-    };
+    let result: Result = view! { badge(label: "New", tone: "success") };
 
     assert_eq!(
         result.unwrap().render(__cx),
@@ -86,12 +81,7 @@ async fn component_with_trailing_child_nodes_collects_them_as_child_view() {
 
 #[component]
 async fn nested_caller(child: View) -> Result {
-    view! {
-        panel(
-            title: "Outer",
-            (child)
-        )
-    }
+    view! { panel(title: "Outer", (child)) }
 }
 
 #[tokio::test]

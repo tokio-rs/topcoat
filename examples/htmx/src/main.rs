@@ -33,7 +33,9 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
         <html>
             <head>
                 <script
-                    src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js">
+                    src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+                >
+
                 </script>
                 topcoat::dev::script()
             </head>
@@ -49,7 +51,8 @@ async fn home() -> Result {
             "Count: "
             <span id="count">"0"</span>
         </h1>
-        <button hx-post="/increment" hx-target="#count" hx-swap="innerHTML">"Increment"
+        <button hx-post="/increment" hx-target="#count" hx-swap="innerHTML">
+            "Increment"
         </button>
     }
 }

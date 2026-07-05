@@ -65,17 +65,11 @@ async fn home() -> Result {
                 </p>
                 <p>
                     "This one is a fixed 48 pixels: "
-                    icon(
-                        data: TRASH,
-                        size: 48
-                    )
+                    icon(data: TRASH, size: 48)
                 </p>
                 <p>
                     "This one has an accessible label instead of aria-hidden: "
-                    icon(
-                        data: TRASH,
-                        label: "Delete"
-                    )
+                    icon(data: TRASH, label: "Delete")
                 </p>
                 <p>
                     "And this one gets extra attributes forwarded to the svg element: "

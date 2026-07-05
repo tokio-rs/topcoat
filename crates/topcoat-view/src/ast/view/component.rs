@@ -189,9 +189,6 @@ impl topcoat_pretty::PrettyPrint for Component {
             }
             self.children.pretty_print(printer);
 
-            if total > 1 {
-                printer.scan_force_break();
-            }
             printer.scan_same_line_trivia();
             printer.scan_trivia(true, false);
             printer.scan_indent(-1);
