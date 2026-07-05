@@ -1952,11 +1952,14 @@ dependencies = [
 name = "topcoat-icon-iconify"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "proc-macro2",
  "quote",
  "serde",
  "serde_json",
  "syn",
+ "thiserror",
+ "topcoat",
  "ureq",
 ]
 

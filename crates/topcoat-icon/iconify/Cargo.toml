@@ -6,27 +6,34 @@ edition = "2024"
 [features]
 # Exposes the `ast` module.
 parsing = [
+	"dep:heck",
 	"dep:proc-macro2",
 	"dep:quote",
 	"dep:syn",
 	"dep:serde",
 	"dep:serde_json",
 ]
-# Exposes the `build` module for staging icon sets from a build script.
+# Exposes the staging API (`Sets`) for use from a build script.
 build = [
 	"dep:serde",
 	"dep:serde_json",
+	"dep:thiserror",
 	"dep:ureq",
 ]
 
 [dependencies]
+heck = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 syn = { workspace = true, optional = true, features = ["full"] }
 
 serde = { workspace = true, optional = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
 ureq = { workspace = true, optional = true }
+
+[dev-dependencies]
+topcoat = { workspace = true, features = ["icon-iconify"] }
 
 [lints]
 workspace = true

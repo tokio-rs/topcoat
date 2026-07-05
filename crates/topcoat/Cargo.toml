@@ -53,6 +53,7 @@ icon-iconify = [
 	"icon",
 	"dep:topcoat-icon-iconify",
 	"dep:topcoat-icon-iconify-macro",
+	"topcoat-icon-iconify/build",
 ]
 multipart = [
 	"router",
