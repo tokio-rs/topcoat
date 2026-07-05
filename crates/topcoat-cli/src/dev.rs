@@ -28,6 +28,7 @@ use clap::Args;
 use console::style;
 
 use app_server::AppServer;
+use broadcast_server::{Event, EventBus};
 use build::{BuildKind, BuildTask};
 use spinner::Spinner;
 use watch::SourceWatcher;
@@ -41,7 +42,8 @@ impl DevCommand {
         // processes: browsers stay connected to it across rebuilds.
         let listener = broadcast_server::bind().await;
         let dev_url = format!("http://{}", listener.local_addr().unwrap());
-        tokio::spawn(broadcast_server::run(listener));
+        let events = EventBus::new();
+        tokio::spawn(broadcast_server::run(listener, events.clone()));
 
         eprintln!();
         eprintln!(
@@ -55,6 +57,7 @@ impl DevCommand {
 
         let mut build: Option<BuildTask> = Some(BuildTask::spawn(BuildKind::Initial));
         let mut server: Option<AppServer> = None;
+        events.publish(Event::Rebuilding);
 
         loop {
             // `select!` evaluates every branch expression even when its `if`
@@ -84,16 +87,20 @@ impl DevCommand {
                             if let Some(old) = server.take() {
                                 old.shutdown().await;
                             }
-                            server = start_app(&exe, &dev_url);
+                            server = start_app(&exe, &dev_url, &events);
                         }
                         // The failure is already on the terminal; keep the
                         // previous process serving while the user fixes it.
-                        None => report_waiting(server.is_some()),
+                        None => {
+                            events.publish(Event::BuildFailed);
+                            report_waiting(server.is_some());
+                        }
                     }
                 }
 
                 status = async { server.as_mut().unwrap().exited().await }, if server.is_some() => {
                     server = None;
+                    events.publish(Event::AppExited);
                     let status = status.map_or_else(|error| error.to_string(), |status| status.to_string());
                     eprintln!(
                         "  {}",
@@ -112,17 +119,20 @@ impl DevCommand {
                         stale.cancel().await;
                     }
                     build = Some(BuildTask::spawn(BuildKind::Rebuild));
+                    events.publish(Event::Rebuilding);
                 }
             }
         }
     }
 }
 
-/// Start the built executable, reporting a failure to the terminal.
-fn start_app(exe: &Path, dev_url: &str) -> Option<AppServer> {
+/// Start the built executable, reporting a failure to the terminal and to
+/// connected browsers.
+fn start_app(exe: &Path, dev_url: &str, events: &EventBus) -> Option<AppServer> {
     match AppServer::spawn(exe, dev_url) {
         Ok(server) => Some(server),
         Err(error) => {
+            events.publish(Event::AppExited);
             eprintln!(
                 "  {}",
                 style(format!("failed to start application: {error}"))

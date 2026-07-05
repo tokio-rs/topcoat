@@ -8,7 +8,7 @@ use tokio::time::{Duration, timeout};
 /// How long a burst of filesystem events must stay quiet before it is
 /// reported as a single change. Editors typically emit several events per
 /// save, and operations like a branch switch touch many files at once.
-const DEBOUNCE: Duration = Duration::from_millis(200);
+const DEBOUNCE: Duration = Duration::from_millis(50);
 
 /// Watches every workspace package's `src/` directory and coalesces bursts
 /// of filesystem events into single change notifications.
