@@ -1,0 +1,60 @@
+[package]
+name = "storefront-leptos"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+leptos = { version = "0.8" }
+leptos_meta = { version = "0.8" }
+leptos_router = { version = "0.8" }
+leptos_axum = { version = "0.8", optional = true }
+axum = { version = "0.8", optional = true }
+tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[features]
+hydrate = [
+    "leptos/hydrate",
+    "dep:wasm-bindgen",
+    "dep:console_error_panic_hook",
+]
+ssr = [
+    "dep:axum",
+    "dep:tokio",
+    "dep:leptos_axum",
+    "dep:serde_json",
+    "leptos/ssr",
+    "leptos_meta/ssr",
+    "leptos_router/ssr",
+]
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+
+[package.metadata.leptos]
+output-name = "storefront-leptos"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+site-addr = "127.0.0.1:8090"
+reload-port = 3001
+tailwind-input-file = "style/tailwind.css"
+browserquery = "defaults"
+env = "DEV"
+bin-features = ["ssr"]
+bin-default-features = false
+lib-features = ["hydrate"]
+lib-default-features = false
+lib-profile-release = "wasm-release"
+
+# Detached from the Topcoat workspace on purpose: this app pulls in the whole
+# Leptos dependency tree and has its own wasm profile.
+[workspace]

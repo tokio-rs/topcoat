@@ -41,6 +41,11 @@ members = [
     "examples/runtime",
     "examples/shard",
     "examples/tailwind",
+
+    "benchmarks/topcoat",
+]
+exclude = [
+    "benchmarks/leptos",
 ]
 
 [workspace.lints.rust]
@@ -55,7 +60,7 @@ pedantic = { level = "warn", priority = -1 }
 too_many_lines = "allow"
 
 [profile.dev]
-debug = 1
+debug = true
 
 [profile.dev.package."*"]
 debug = false

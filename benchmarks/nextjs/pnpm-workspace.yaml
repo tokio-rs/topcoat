@@ -1,0 +1,3 @@
+allowBuilds:
+  # Only used by next/image, which this app does not use.
+  sharp: false
