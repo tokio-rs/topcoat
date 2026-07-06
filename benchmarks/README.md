@@ -67,6 +67,9 @@ benchmarks/scripts/bench.sh topcoat leptos
 # Faster, noisier run while iterating:
 DURATION=5s WARMUP=2s RUNS=1 benchmarks/scripts/bench.sh
 
+# One core each: the Rust servers run single-threaded, like next start.
+SINGLE_THREAD=1 benchmarks/scripts/bench.sh
+
 # Re-render the table for any saved results directory:
 benchmarks/scripts/compare.sh benchmarks/results/<timestamp>
 
@@ -89,6 +92,9 @@ Each framework is measured in two modes per route:
 Defaults: 3 runs x 20s per route and mode, 32 connections, medians reported.
 
 ### Running one app manually
+
+Prefix either Rust server with `TOKIO_WORKER_THREADS=1` to run it single-threaded
+(what `SINGLE_THREAD=1` does under the hood).
 
 ```sh
 # Topcoat (release binary + dev-mode asset bundle):
@@ -128,10 +134,15 @@ cd benchmarks/leptos && LEPTOS_SITE_ADDR=127.0.0.1:8090 LEPTOS_SITE_ROOT=target/
   Leptos serve uncompressed documents. That is each framework's default
   production behavior; set `compress: false` in `next.config.ts` if you want
   to isolate rendering cost.
-- **Process models differ.** The Rust servers use every core; `next start` is
-  a single Node process, so JS rendering is effectively single-threaded. Real
-  Node deployments scale by running multiple instances; read the Next.js rows
-  as per-instance numbers.
+- **Process models differ.** By default the Rust servers use every core, while
+  `next start` is a single Node process, so JS rendering is effectively
+  single-threaded. Real Node deployments scale by running multiple instances;
+  read the default Next.js rows as per-instance numbers. For an apples-to-apples
+  one-core comparison, run with `SINGLE_THREAD=1`: it pins Topcoat and Leptos to
+  a single Tokio worker thread (`TOKIO_WORKER_THREADS=1`), matching the one
+  Node process, and the rendered table is labelled `single-threaded`. (This
+  caps the async runtime's worker threads; the OS still schedules that thread
+  across cores rather than hard-pinning it.)
 - **Same machine, one server at a time.** The load generator shares the
   machine with the server, so absolute numbers are pessimistic and only the
   relative comparison is meaningful. Close other heavy processes before a

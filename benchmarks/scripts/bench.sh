@@ -7,6 +7,9 @@
 # Tunables (environment variables):
 #
 #   DURATION=20s WARMUP=5s CONNECTIONS=32 RATE=200 RUNS=3 PORT=8090
+#
+# Set SINGLE_THREAD=1 to run the Rust servers on a single Tokio worker thread,
+# so every framework renders on one core (next start is already single-process).
 
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
@@ -29,6 +32,8 @@ require_port_free
 RESULTS_DIR="$BENCH/results/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$RESULTS_DIR"
 
+if [ -n "${SINGLE_THREAD:-}" ]; then single_thread_json=true; else single_thread_json=false; fi
+
 cat >"$RESULTS_DIR/meta.json" <<EOF
 {
   "git_rev": "$(git -C "$ROOT" rev-parse --short HEAD)",
@@ -40,7 +45,8 @@ cat >"$RESULTS_DIR/meta.json" <<EOF
   "warmup": "$WARMUP",
   "connections": $CONNECTIONS,
   "rate": $RATE,
-  "runs": $RUNS
+  "runs": $RUNS,
+  "single_thread": $single_thread_json
 }
 EOF
 

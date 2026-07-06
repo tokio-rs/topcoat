@@ -29,7 +29,7 @@ median() {
     echo "# Benchmark results"
     echo
     echo "Source: \`$RESULTS_DIR\`"
-    jq -r '"Machine: \(.cpu), \(.os) | oha \(.oha) | \(.runs) runs x \(.duration) at \(.connections) connections, fixed rate \(.rate) req/s"' \
+    jq -r '"Machine: \(.cpu), \(.os) | oha \(.oha) | \(.runs) runs x \(.duration) at \(.connections) connections, fixed rate \(.rate) req/s\(if .single_thread then " | single-threaded (TOKIO_WORKER_THREADS=1)" else "" end)"' \
         "$RESULTS_DIR/meta.json" 2>/dev/null || true
     echo
     echo "| Route | Framework | req/s (median) | p50 ms | p90 ms | p99 ms | bytes/resp | success |"

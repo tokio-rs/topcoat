@@ -9,6 +9,16 @@ BENCH="$ROOT/benchmarks"
 PORT="${PORT:-8090}"
 BASE="http://127.0.0.1:${PORT}"
 
+# When SINGLE_THREAD is set, the Rust servers (Topcoat, Leptos) run with a
+# single Tokio worker thread, so their request handling is single-threaded like
+# next start's one Node process. Next.js is already single-process and is not
+# affected. Empty otherwise, so the Rust servers use every core.
+if [ -n "${SINGLE_THREAD:-}" ]; then
+    RUST_SERVER_ENV="TOKIO_WORKER_THREADS=1"
+else
+    RUST_SERVER_ENV=""
+fi
+
 # The routes every framework is measured on. Labels are used in file names.
 ROUTE_LABELS=(home products product)
 ROUTE_PATHS=("/" "/products?page=3&sort=price" "/products/42")
@@ -68,7 +78,7 @@ build_topcoat() {
 }
 
 start_topcoat() {
-    PORT="$PORT" "$ROOT/target/release/storefront-topcoat" >"$LOG_FILE" 2>&1 &
+    env $RUST_SERVER_ENV PORT="$PORT" "$ROOT/target/release/storefront-topcoat" >"$LOG_FILE" 2>&1 &
     SERVER_PID=$!
 }
 
@@ -93,7 +103,7 @@ start_leptos() {
     (
         cd "$BENCH/leptos" &&
             LEPTOS_SITE_ADDR="127.0.0.1:${PORT}" LEPTOS_SITE_ROOT=target/site \
-                exec target/release/storefront-leptos
+                exec env $RUST_SERVER_ENV target/release/storefront-leptos
     ) >"$LOG_FILE" 2>&1 &
     SERVER_PID=$!
 }
