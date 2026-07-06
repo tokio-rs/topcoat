@@ -26,6 +26,8 @@ proc-macro2 = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 syn = { workspace = true, optional = true, features = ["full", "extra-traits", "visit-mut"] }
 
+memchr.workspace = true
+
 # TODO: Feature flag?
 uuid = { workspace = true, features = ["v4", "serde"] }
 

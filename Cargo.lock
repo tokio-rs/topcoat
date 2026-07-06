@@ -2098,6 +2098,7 @@ name = "topcoat-view"
 version = "0.1.0"
 dependencies = [
  "heck",
+ "memchr",
  "proc-macro2",
  "quote",
  "syn",

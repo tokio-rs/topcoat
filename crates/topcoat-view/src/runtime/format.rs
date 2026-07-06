@@ -47,31 +47,50 @@ impl<'a> Formatter<'a> {
     }
 
     /// Writes a string, escaping any HTML-significant characters.
-    #[inline]
     pub fn write_str(&mut self, s: &str) {
         let bytes = s.as_bytes();
-        let mut last = 0;
+        let len = bytes.len();
+        let mut start = 0;
 
-        for (i, &b) in bytes.iter().enumerate() {
-            let escape = match b {
-                b'&' => "&amp;",
-                b'<' => "&lt;",
-                b'>' => "&gt;",
-                b'"' => "&quot;",
-                b'\'' => "&#x27;",
-                _ => continue,
-            };
+        // Offsets of the next byte in each escapable group, or `len` when the
+        // group does not occur again. `memchr` searches at most three bytes per
+        // call, so the five specials are split across two searches whose results
+        // are merged by taking the earlier hit. Both are ASCII, so every hit
+        // falls on a UTF-8 character boundary.
+        let mut next_amp_lt_gt = memchr::memchr3(b'&', b'<', b'>', bytes).unwrap_or(len);
+        let mut next_quote = memchr::memchr2(b'"', b'\'', bytes).unwrap_or(len);
 
-            if last < i {
-                self.buf.push_str(&s[last..i]);
+        loop {
+            let i = next_amp_lt_gt.min(next_quote);
+            if i == len {
+                break;
             }
-            self.buf.push_str(escape);
-            last = i + 1;
+
+            // Copy the ordinary run preceding the next special in one shot.
+            self.buf.push_str(&s[start..i]);
+
+            // Emit the whole run of consecutive specials from the lookup table,
+            // so `memchr` is consulted once per run rather than once per byte.
+            let mut end = i;
+            while let Some(escape) = bytes.get(end).and_then(|&b| ESCAPE_TABLE[b as usize]) {
+                self.buf.push_str(escape);
+                end += 1;
+            }
+            start = end;
+
+            // Advance only the cursor(s) that fell inside the run just emitted;
+            // a group with no further occurrences is never searched again.
+            if next_amp_lt_gt < start {
+                next_amp_lt_gt =
+                    memchr::memchr3(b'&', b'<', b'>', &bytes[start..]).map_or(len, |o| start + o);
+            }
+            if next_quote < start {
+                next_quote =
+                    memchr::memchr2(b'"', b'\'', &bytes[start..]).map_or(len, |o| start + o);
+            }
         }
 
-        if last < s.len() {
-            self.buf.push_str(&s[last..]);
-        }
+        self.buf.push_str(&s[start..]);
     }
 
     /// Writes a string without escaping. Use for trusted markup like tags and attributes.
@@ -92,6 +111,18 @@ impl std::fmt::Write for Formatter<'_> {
         Ok(())
     }
 }
+
+/// Maps each byte to its HTML escape sequence, or `None` when the byte is safe
+/// to emit as-is. Only the five HTML-significant bytes have entries.
+const ESCAPE_TABLE: [Option<&'static str>; 256] = {
+    let mut table: [Option<&'static str>; 256] = [None; 256];
+    table[b'&' as usize] = Some("&amp;");
+    table[b'<' as usize] = Some("&lt;");
+    table[b'>' as usize] = Some("&gt;");
+    table[b'"' as usize] = Some("&quot;");
+    table[b'\'' as usize] = Some("&#x27;");
+    table
+};
 
 /// A value that can render itself into a [`Formatter`].
 ///
@@ -280,6 +311,66 @@ mod tests {
     #[test]
     fn multibyte_utf8() {
         assert_eq!(escape("café < résumé"), "café &lt; résumé");
+    }
+
+    #[test]
+    fn long_plain_run() {
+        // Exercises the bulk copy path over more than a SIMD vector width.
+        let s = "abcdefghij".repeat(50);
+        assert_eq!(escape(&s), s);
+    }
+
+    #[test]
+    fn special_inside_long_run() {
+        let s = format!("{}<{}", "a".repeat(100), "b".repeat(100));
+        let expected = format!("{}&lt;{}", "a".repeat(100), "b".repeat(100));
+        assert_eq!(escape(&s), expected);
+    }
+
+    #[test]
+    fn run_of_consecutive_specials() {
+        assert_eq!(escape("abc<>&\"'def"), "abc&lt;&gt;&amp;&quot;&#x27;def");
+    }
+
+    #[test]
+    fn adjacent_cross_group_specials() {
+        // '&' (found by the amp/lt/gt search) immediately followed by '"'
+        // (found by the quote search) forces both cursors to advance within a
+        // single run and be re-scanned together.
+        assert_eq!(escape("x&\"y"), "x&amp;&quot;y");
+    }
+
+    #[test]
+    fn quotes_only_no_amp_lt_gt() {
+        // Only the quote group occurs; the amp/lt/gt group is searched once and
+        // never again.
+        assert_eq!(escape("'a'b'c'"), "&#x27;a&#x27;b&#x27;c&#x27;");
+    }
+
+    #[test]
+    fn specials_at_boundaries() {
+        assert_eq!(escape("<middle>"), "&lt;middle&gt;");
+        assert_eq!(escape("&start"), "&amp;start");
+        assert_eq!(escape("end&"), "end&amp;");
+    }
+
+    #[test]
+    fn multibyte_hugging_specials() {
+        // Real specials directly adjacent to multibyte characters exercises the
+        // slicing between escapes and multibyte runs.
+        assert_eq!(escape("é<é>é&é"), "é&lt;é&gt;é&amp;é");
+    }
+
+    #[test]
+    fn multibyte_codepoint_embeds_special_byte() {
+        // These characters have code points that contain a special byte value
+        // (U+263C has 0x3C, U+2026 has 0x26, U+2022 has 0x22, U+2027 has 0x27,
+        // U+203E has 0x3E) but never encode to that byte, so they pass through
+        // untouched while the interleaved ASCII specials still escape.
+        assert_eq!(
+            escape("\u{263C}<\u{2026}&\u{2022}\"\u{2027}'\u{203E}>"),
+            "\u{263C}&lt;\u{2026}&amp;\u{2022}&quot;\u{2027}&#x27;\u{203E}&gt;"
+        );
     }
 
     #[test]
