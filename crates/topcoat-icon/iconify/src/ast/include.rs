@@ -17,10 +17,10 @@ use crate::{
 /// One `include!` invocation: an optional visibility and a [`Selection`],
 /// expanding to `const` icons.
 ///
-/// - `include!("mdi")` expands to a module `mdi` with a `pub const` per icon
-///   and alias of the set; the visibility applies to the module.
-/// - `include!("mdi:*")` inlines the consts into the current scope; the
-///   visibility applies to each one.
+/// - `include!("mdi")` expands to a module `mdi` with a `pub const` per icon and alias of the set;
+///   the visibility applies to the module.
+/// - `include!("mdi:*")` inlines the consts into the current scope; the visibility applies to each
+///   one.
 /// - `include!("mdi:delete")` expands to the single const `DELETE`.
 ///
 /// Globs skip icons and aliases their set marks as hidden; naming a hidden

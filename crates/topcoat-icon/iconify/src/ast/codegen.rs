@@ -66,7 +66,10 @@ pub(crate) fn const_item(
     icon: &ResolvedIcon<'_>,
     vis: &Visibility,
 ) -> TokenStream {
-    let doc = format!("The `{prefix}:{name}` Iconify icon.", prefix = selection.prefix);
+    let doc = format!(
+        "The `{prefix}:{name}` Iconify icon.",
+        prefix = selection.prefix
+    );
     let ident = selection.const_ident(name);
     let expr = icon_expr(icon);
     quote! {
