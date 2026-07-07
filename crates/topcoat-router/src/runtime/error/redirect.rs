@@ -110,7 +110,6 @@ impl IntoResponse for RedirectError {
 ///     Ok(see_other("/"))
 /// }
 /// ```
-#[must_use]
 pub fn see_other(uri: &str) -> SeeOther {
     SeeOther::new(uri)
 }
