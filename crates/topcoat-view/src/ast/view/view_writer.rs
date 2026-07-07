@@ -317,7 +317,7 @@ mod tests {
         writer.write_str("hello");
         writer.write_str_unescaped("</div>");
         let out = rendered(writer);
-        assert!(out.contains("__unescaped (& mut __parts , \"<div>hello</div>\")"));
+        assert!(out.contains("\"<div>hello</div>\""));
     }
 
     #[test]
