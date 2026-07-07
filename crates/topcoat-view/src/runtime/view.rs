@@ -31,9 +31,10 @@ impl View {
     #[inline]
     #[must_use]
     pub fn new(parts: ViewParts) -> Self {
+        let size_hint = parts.size_hint;
         Self {
             part: parts.into(),
-            size_hint: 0,
+            size_hint,
         }
     }
 
@@ -312,6 +313,7 @@ impl From<View> for ViewPart {
 pub struct ViewParts {
     first: Option<ViewPart>,
     items: Vec<ViewPart>,
+    size_hint: usize,
 }
 
 impl ViewParts {
@@ -326,6 +328,7 @@ impl ViewParts {
     #[inline]
     pub fn push(&mut self, part: impl Into<ViewPart>) -> &mut Self {
         let part = part.into();
+        self.size_hint += part.size_hint();
         if let Some(first) = self.first.take() {
             self.items.push(first);
             self.items.push(part);

@@ -133,11 +133,13 @@ pub trait FmtHtml {
     /// Writes into `f`, escaping content as appropriate.
     fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>);
 
-    /// Returns a lower bound on the number of bytes this fragment will write.
+    /// Returns an estimate of the number of bytes this fragment will write.
     ///
-    /// Used to pre-allocate the output buffer. Implementations should err on
-    /// the side of under-estimating; over-estimates waste memory while
-    /// under-estimates only cost an extra reallocation.
+    /// Used to pre-allocate the output buffer, so aim for a close estimate. A
+    /// slight over-estimate is usually preferable to an under-estimate: falling
+    /// even a little short forces the buffer to grow and copy the bytes already
+    /// written, whereas a modest over-estimate only leaves a small amount of
+    /// capacity unused.
     #[inline]
     fn size_hint(&self) -> usize {
         0
@@ -167,19 +169,21 @@ impl FmtHtml for str {
 
     #[inline]
     fn size_hint(&self) -> usize {
-        self.len()
+        // We have to assume some of the characters need to be escaped, producing several
+        // bytes instead of one per escaped character.
+        self.len() + self.len() / 8
     }
 }
 
 impl FmtHtml for String {
     #[inline]
-    fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
-        f.write_str(self);
+    fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
+        self.as_str().fmt_html(cx, f);
     }
 
     #[inline]
     fn size_hint(&self) -> usize {
-        self.len()
+        self.as_str().size_hint()
     }
 }
 
@@ -218,7 +222,7 @@ impl core::fmt::Write for UnescapedDisplayAdapter<'_, '_> {
 }
 
 macro_rules! impl_with_display {
-    ($ty:ty) => {
+    ($ty:ty, $size_hint:expr) => {
         impl FmtHtml for $ty {
             #[inline]
             fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
@@ -228,28 +232,37 @@ macro_rules! impl_with_display {
 
             #[inline]
             fn size_hint(&self) -> usize {
-                1
+                $size_hint
             }
         }
     };
 }
 
-impl_with_display!(i8);
-impl_with_display!(i16);
-impl_with_display!(i32);
-impl_with_display!(i64);
-impl_with_display!(i128);
-impl_with_display!(isize);
-impl_with_display!(u8);
-impl_with_display!(u16);
-impl_with_display!(u32);
-impl_with_display!(u64);
-impl_with_display!(u128);
-impl_with_display!(usize);
-impl_with_display!(f32);
-impl_with_display!(f64);
-impl_with_display!(bool);
-impl_with_display!(char);
+// Each hint is the midpoint, rounded up, between the shortest and widest output
+// the type can `Display`. For integers that runs from a single digit up to the
+// full decimal width, including the leading `-` for signed types
+// (`isize`/`usize` assume a 64-bit target).
+impl_with_display!(i8, 3);
+impl_with_display!(i16, 4);
+impl_with_display!(i32, 6);
+impl_with_display!(i64, 11);
+impl_with_display!(i128, 21);
+impl_with_display!(isize, 11);
+impl_with_display!(u8, 2);
+impl_with_display!(u16, 3);
+impl_with_display!(u32, 6);
+impl_with_display!(u64, 11);
+impl_with_display!(u128, 20);
+impl_with_display!(usize, 11);
+// A float's `Display` width is unbounded for extreme magnitudes, so the upper
+// end is the shortest round-trip form of a typical value rather than the
+// theoretical maximum.
+impl_with_display!(f32, 9);
+impl_with_display!(f64, 13);
+// `bool` runs from `true` (4) to `false` (5); a `char` from one to four UTF-8
+// bytes.
+impl_with_display!(bool, 5);
+impl_with_display!(char, 3);
 
 macro_rules! impl_smart_pointer {
     ($name:ident) => {

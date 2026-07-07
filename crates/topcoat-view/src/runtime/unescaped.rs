@@ -29,12 +29,20 @@ impl FmtHtml for Unescaped<&str> {
     fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
         f.write_str_unescaped(self.0);
     }
+
+    fn size_hint(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl FmtHtml for Unescaped<String> {
     #[inline]
     fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
         f.write_str_unescaped(&self.0);
+    }
+
+    fn size_hint(&self) -> usize {
+        self.0.len()
     }
 }
 
