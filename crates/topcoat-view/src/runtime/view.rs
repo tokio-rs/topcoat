@@ -334,7 +334,6 @@ impl From<View> for ViewPart {
 /// [`View::new`].
 #[derive(Debug, Default, Clone)]
 pub struct ViewParts {
-    first: Option<ViewPart>,
     items: Vec<ViewPart>,
 }
 
@@ -350,27 +349,18 @@ impl ViewParts {
     #[inline]
     pub fn push(&mut self, part: impl Into<ViewPart>) -> &mut Self {
         let part = part.into();
-        if let Some(first) = self.first.take() {
-            self.items.push(first);
-            self.items.push(part);
-        } else if self.items.is_empty() {
-            self.first = Some(part);
-        } else {
-            self.items.push(part);
-        }
+        self.items.push(part);
         self
     }
 }
 
 impl From<ViewParts> for ViewPart {
     #[inline]
-    fn from(value: ViewParts) -> Self {
-        if let Some(first) = value.first {
-            first
-        } else if value.items.is_empty() {
-            ViewPart::empty()
-        } else {
-            value.items.into()
+    fn from(mut value: ViewParts) -> Self {
+        match value.items.len() {
+            0 => ViewPart::empty(),
+            1 => value.items.pop().unwrap(),
+            _ => value.items.into(),
         }
     }
 }
