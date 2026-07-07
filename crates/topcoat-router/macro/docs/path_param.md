@@ -1,10 +1,6 @@
 Declares a typed path parameter.
 
-Apply `#[path_param]` to a tuple struct with a single field. The struct sets up three things:
-
-- **Name**: the struct name, snake-cased, is the parameter's name (`PostId` -> `post_id`).
-- **Parsing**: the inner type decides how the raw URL segment is parsed.
-- **Access**: read the value with [`path_param::<PostId>(cx)`](fn.path_param.html) from any handler.
+Apply `#[path_param]` to a single-field tuple struct. The struct name, snake-cased, becomes the parameter's name (`PostId` -> `post_id`), and the inner type decides how the raw URL segment is parsed.
 
 ```rust
 # use topcoat::router::path_param;
