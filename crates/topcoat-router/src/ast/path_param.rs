@@ -38,7 +38,6 @@ impl PathParamItem {
             Type::Path(path) if path.qself.is_none() && path.path.is_ident("str")
         )
     }
-
 }
 
 impl Parse for PathParamItem {
@@ -77,14 +76,14 @@ impl PathParam {
     /// Returns an error if the attribute declares `error = ...` for a `&str`
     /// parameter, which borrows the raw segment and cannot fail.
     pub fn new(attr: PathParamAttr, item: PathParamItem) -> syn::Result<Self> {
-        if let Some(error) = &attr.error {
-            if item.borrows_raw_segment() {
-                return Err(syn::Error::new(
-                    error.span(),
-                    "`error` cannot be used with a `&str` path parameter, \
+        if let Some(error) = &attr.error
+            && item.borrows_raw_segment()
+        {
+            return Err(syn::Error::new(
+                error.span(),
+                "`error` cannot be used with a `&str` path parameter, \
                      which borrows the raw segment and cannot fail",
-                ));
-            }
+            ));
         }
         Ok(Self(attr, item))
     }
