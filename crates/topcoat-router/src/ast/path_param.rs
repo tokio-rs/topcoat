@@ -6,17 +6,44 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-pub struct PathParamAttr;
+use super::error_attr::ErrorAttr;
+
+pub struct PathParamAttr {
+    error: Option<ErrorAttr>,
+}
 
 impl Parse for PathParamAttr {
-    fn parse(_input: ParseStream) -> syn::Result<Self> {
-        Ok(Self)
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            error: if input.is_empty() {
+                None
+            } else {
+                Some(input.parse()?)
+            },
+        })
     }
 }
 
 pub struct PathParamItem {
     item: DeriveInput,
     inner_ty: Type,
+}
+
+impl PathParamItem {
+    /// Whether the parameter borrows the raw segment (a `&str` inner type)
+    /// rather than parsing it.
+    fn borrows_raw_segment(&self) -> bool {
+        let Type::Reference(reference) = &self.inner_ty else {
+            return false;
+        };
+        if reference.mutability.is_some() {
+            return false;
+        }
+        let Type::Path(path) = &*reference.elem else {
+            return false;
+        };
+        path.qself.is_none() && path.path.is_ident("str")
+    }
 }
 
 impl Parse for PathParamItem {
@@ -48,9 +75,23 @@ impl Parse for PathParamItem {
 pub struct PathParam(PathParamAttr, PathParamItem);
 
 impl PathParam {
-    #[must_use]
-    pub fn new(attr: PathParamAttr, item: PathParamItem) -> Self {
-        Self(attr, item)
+    /// Combines a parsed attribute and item.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the attribute declares `error = ...` for a `&str`
+    /// parameter, which borrows the raw segment and cannot fail.
+    pub fn new(attr: PathParamAttr, item: PathParamItem) -> syn::Result<Self> {
+        if let Some(error) = &attr.error {
+            if item.borrows_raw_segment() {
+                return Err(syn::Error::new(
+                    error.span(),
+                    "`error` cannot be used with a `&str` path parameter, \
+                     which borrows the raw segment and cannot fail",
+                ));
+            }
+        }
+        Ok(Self(attr, item))
     }
 
     /// Parses a `path_param` attribute and item from token streams.
@@ -58,35 +99,23 @@ impl PathParam {
     /// # Errors
     ///
     /// Returns an error if either token stream fails to parse as a
-    /// [`PathParamAttr`] or [`PathParamItem`], or if the item is not a tuple
-    /// struct with exactly one unnamed field.
+    /// [`PathParamAttr`] or [`PathParamItem`], if the item is not a tuple
+    /// struct with exactly one unnamed field, or if the attribute and item
+    /// disagree as described on [`PathParam::new`].
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
-        Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
+        Self::new(syn::parse2(attr)?, syn::parse2(item)?)
     }
 }
 
 impl ToTokens for PathParam {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        fn is_str_ref(ty: &Type) -> bool {
-            let Type::Reference(reference) = ty else {
-                return false;
-            };
-            if reference.mutability.is_some() {
-                return false;
-            }
-            let Type::Path(path) = &*reference.elem else {
-                return false;
-            };
-            path.qself.is_none() && path.path.is_ident("str")
-        }
-
         let item = &self.1.item;
         let ident = &item.ident;
         let inner_ty = &self.1.inner_ty;
         let name_string = ident.to_string().to_snake_case();
         let (impl_generics, ty_generics, where_clause) = item.generics.split_for_impl();
 
-        let (output_ty, path_param_fn) = if is_str_ref(inner_ty) {
+        let (output_ty, path_param_fn) = if self.1.borrows_raw_segment() {
             (
                 quote! { &'__cx str },
                 quote! {
@@ -104,9 +133,21 @@ impl ToTokens for PathParam {
                 },
             )
         } else {
+            let (error_ty, map_err) = match &self.0.error {
+                Some(error) => {
+                    let construct = error.construct(&format!(
+                        "invalid value for path parameter \"{name_string}\""
+                    ));
+                    (error.ty(), quote! { .map_err(|_| #construct) })
+                }
+                None => (
+                    quote! { &'__cx <#inner_ty as ::core::str::FromStr>::Err },
+                    quote! {},
+                ),
+            };
             (
                 quote! {
-                    ::core::result::Result<&'__cx #inner_ty, &'__cx <#inner_ty as ::core::str::FromStr>::Err>
+                    ::core::result::Result<&'__cx #inner_ty, #error_ty>
                 },
                 quote! {
                     fn path_param(
@@ -122,7 +163,7 @@ impl ToTokens for PathParam {
                             }
                             panic!("path parameter \"{}\" was not found in request path", #name_string);
                         }
-                        parse(cx).map(|value| &value.0)
+                        parse(cx).map(|value| &value.0)#map_err
                     }
                 },
             )
