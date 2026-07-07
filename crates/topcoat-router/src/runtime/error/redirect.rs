@@ -110,6 +110,7 @@ impl IntoResponse for RedirectError {
 ///     Ok(see_other("/"))
 /// }
 /// ```
+#[must_use]
 pub fn see_other(uri: &str) -> SeeOther {
     SeeOther::new(uri)
 }
@@ -121,7 +122,6 @@ pub fn see_other(uri: &str) -> SeeOther {
 /// reply for a completed `POST`, `PUT`, or `DELETE`, sending the browser to a
 /// new location with a `GET`. Construct one with [`see_other`].
 #[derive(Debug)]
-#[must_use]
 pub struct SeeOther {
     location: HeaderValue,
 }
