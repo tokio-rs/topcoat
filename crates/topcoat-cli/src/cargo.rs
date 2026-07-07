@@ -3,6 +3,7 @@ use std::io;
 use std::path::PathBuf;
 use std::process::Stdio;
 
+use clap::Args;
 use console::style;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
@@ -36,10 +37,48 @@ pub async fn target_dir() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct BuildOpts {
     pub bin: Option<String>,
     pub package: Option<String>,
+    /// The cargo profile to build with, or `None` for the default (`dev`).
+    pub profile: Option<String>,
+}
+
+/// Command-line flags selecting which target to build and with which profile.
+///
+/// Shared by every command that compiles the application, flattened into their
+/// argument structs with `#[command(flatten)]` and converted into [`BuildOpts`]
+/// with [`Into::into`].
+#[derive(Args)]
+pub struct BuildFlags {
+    /// Build the named binary target
+    #[arg(long)]
+    pub bin: Option<String>,
+    /// Build the named package
+    #[arg(short, long)]
+    pub package: Option<String>,
+    /// Build with the `release` profile
+    #[arg(short, long, conflicts_with = "profile")]
+    pub release: bool,
+    /// Build with the named cargo profile
+    #[arg(long, value_name = "NAME")]
+    pub profile: Option<String>,
+}
+
+impl From<BuildFlags> for BuildOpts {
+    fn from(flags: BuildFlags) -> Self {
+        // `--release` is shorthand for `--profile release`; the two are
+        // mutually exclusive, so at most one of these is set.
+        let profile = flags
+            .profile
+            .or_else(|| flags.release.then(|| "release".to_string()));
+        Self {
+            bin: flags.bin,
+            package: flags.package,
+            profile,
+        }
+    }
 }
 
 pub enum BuildError {
@@ -121,6 +160,11 @@ pub async fn build(
     }
     if let Some(package) = &opts.package {
         cmd.args(["--package", package]);
+    }
+    // `--profile <name>` covers every profile: `--profile release` is exactly
+    // equivalent to `--release`, and `--profile dev` to passing nothing.
+    if let Some(profile) = &opts.profile {
+        cmd.args(["--profile", profile]);
     }
 
     let mut child = cmd

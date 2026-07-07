@@ -31,11 +31,18 @@ use build::{BuildKind, BuildTask};
 use spinner::Spinner;
 use watch::SourceWatcher;
 
+use crate::cargo::{BuildFlags, BuildOpts};
+
 #[derive(Args)]
-pub struct DevCommand {}
+pub struct DevCommand {
+    #[command(flatten)]
+    build: BuildFlags,
+}
 
 impl DevCommand {
     pub async fn run(self) {
+        let opts: BuildOpts = self.build.into();
+
         // The broadcast server outlives the individual application
         // processes: browsers stay connected to it across rebuilds.
         let listener = broadcast_server::bind().await;
@@ -44,16 +51,22 @@ impl DevCommand {
         tokio::spawn(broadcast_server::run(listener, events.clone()));
 
         eprintln!();
-        eprintln!(
+        eprint!(
             "  {} {}",
             style("topcoat").cyan().bold(),
             style("dev server").dim()
         );
+        // Flag a non-default profile; `None` is cargo's default `dev` profile,
+        // which is the norm and needs no mention.
+        if let Some(profile) = opts.profile.as_deref().filter(|&p| p != "dev") {
+            eprint!(" {}", style(format!("[{profile}]")).yellow());
+        }
+        eprintln!();
         let mut watcher = SourceWatcher::start().await;
         eprintln!("  {}", style("watching for file changes...").dim());
         eprintln!();
 
-        let mut build: Option<BuildTask> = Some(BuildTask::spawn(BuildKind::Initial));
+        let mut build: Option<BuildTask> = Some(BuildTask::spawn(BuildKind::Initial, opts.clone()));
         let mut server: Option<AppServer> = None;
         events.publish(Event::Rebuilding);
 
@@ -113,7 +126,7 @@ impl DevCommand {
                     if let Some(stale) = build.take() {
                         stale.cancel().await;
                     }
-                    build = Some(BuildTask::spawn(BuildKind::Rebuild));
+                    build = Some(BuildTask::spawn(BuildKind::Rebuild, opts.clone()));
                     events.publish(Event::Rebuilding);
                 }
             }

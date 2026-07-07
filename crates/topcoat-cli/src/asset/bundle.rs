@@ -4,29 +4,21 @@ use std::path::PathBuf;
 use clap::Args;
 use console::style;
 
-use crate::cargo::BuildOpts;
+use crate::cargo::BuildFlags;
 
 use super::{CACHE_SUBDIR, OUT_SUBDIR};
 
 #[derive(Args)]
 pub(super) struct BundleArgs {
-    /// Build and inspect the named binary target
-    #[arg(long)]
-    bin: Option<String>,
-    /// Build and inspect the named package
-    #[arg(short, long)]
-    package: Option<String>,
+    #[command(flatten)]
+    build: BuildFlags,
     /// Output directory for the bundle (defaults to <cargo-target>/assets)
     #[arg(short, long)]
     out: Option<PathBuf>,
 }
 
 pub(super) async fn run(args: BundleArgs) {
-    let opts = BuildOpts {
-        bin: args.bin,
-        package: args.package,
-    };
-    let (_, bytes) = crate::cargo::build_and_read(&opts, |_, _| {})
+    let (_, bytes) = crate::cargo::build_and_read(&args.build.into(), |_, _| {})
         .await
         .unwrap_or_else(|e| e.print_and_exit());
 

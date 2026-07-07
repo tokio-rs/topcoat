@@ -39,9 +39,9 @@ pub struct BuildTask {
 
 impl BuildTask {
     /// Start a build in the background.
-    pub fn spawn(kind: BuildKind) -> Self {
+    pub fn spawn(kind: BuildKind, opts: BuildOpts) -> Self {
         Self {
-            handle: tokio::spawn(build(kind)),
+            handle: tokio::spawn(build(kind, opts)),
         }
     }
 
@@ -74,11 +74,11 @@ impl Drop for BuildTask {
 ///
 /// Returns the path of the built executable, or `None` after reporting the
 /// failure to the terminal.
-async fn build(kind: BuildKind) -> Option<PathBuf> {
+async fn build(kind: BuildKind, opts: BuildOpts) -> Option<PathBuf> {
     let label = kind.label();
     let spinner = Spinner::new(label);
     let progress = spinner.bar();
-    let result = crate::cargo::build_and_read(&BuildOpts::default(), move |current, total| {
+    let result = crate::cargo::build_and_read(&opts, move |current, total| {
         progress.set_message(format!("{label} ({current}/{total})"));
     })
     .await;
