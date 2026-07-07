@@ -4,10 +4,10 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{
-        Form, HeaderName, Router, RouterBuilderDiscoverExt, RouterErrorExt, Slot, StatusCode,
-        header, layout, page, path_param, route,
+        Form, Router, RouterBuilderDiscoverExt, RouterErrorExt, SeeOther, Slot, layout, page,
+        path_param, route, see_other,
     },
-    view::view,
+    view::{component, view},
 };
 
 #[tokio::main]
@@ -60,14 +60,9 @@ async fn root(slot: Slot<'_>) -> Result {
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
-    let mut db = db(cx);
-    let todos = Todo::all()
-        .order_by(Todo::fields().id().asc())
-        .exec(&mut db)
-        .await?;
-
     view! {
         <h1>"Toasty Todos"</h1>
+
         <form method="post" action="/todos">
             <input
                 type="text"
@@ -77,6 +72,12 @@ async fn home(cx: &Cx) -> Result {
             >
             <button type="submit">"Add"</button>
         </form>
+
+        let todos = Todo::all()
+            .order_by(Todo::fields().id().asc())
+            .exec(&mut db(cx))
+            .await?;
+
         if todos.is_empty() {
             <p>"All done!"</p>
         } else {
@@ -85,33 +86,45 @@ async fn home(cx: &Cx) -> Result {
             >
                 for todo in todos {
                     <li style="display: flex; align-items: center; gap: 0.5em;">
-                        <form
-                            method="post"
-                            action=(format!("/todos/{}/toggle", todo.id))
-                        >
-                            <input
-                                type="checkbox"
-                                checked=(todo.done)
-                                onchange="this.form.submit()"
-                            >
-                        </form>
+                        toggle_checkbox(todo: &todo)
+
                         if todo.done {
-                            <s>(todo.title)</s>
+                            <s>(&todo.title)</s>
                         } else {
-                            (todo.title)
+                            (&todo.title)
                         }
-                        <form
-                            method="post"
-                            action=(format!("/todos/{}/delete", todo.id))
-                        >
-                            <button type="submit">"delete"</button>
-                        </form>
+
+                        delete_button(todo: &todo)
                     </li>
                 }
             </ul>
         }
     }
 }
+
+// -----------------------
+// Components
+
+#[component]
+async fn toggle_checkbox(todo: &Todo) -> Result {
+    view! {
+        <form method="post" action=(format!("/todos/{}/toggle", todo.id))>
+            <input type="checkbox" checked=(todo.done) onchange="this.form.submit()">
+        </form>
+    }
+}
+
+#[component]
+async fn delete_button(todo: &Todo) -> Result {
+    view! {
+        <form method="delete" action=(format!("/todos/{}", todo.id))>
+            <button type="submit">"delete"</button>
+        </form>
+    }
+}
+
+// -----------------------
+// API routes
 
 #[derive(Deserialize)]
 struct NewTodo {
@@ -133,31 +146,22 @@ async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<SeeOther> {
 #[path_param]
 struct TodoId(u64);
 
+fn todo_id(cx: &Cx) -> Result<u64> {
+    Ok(**path_param::<TodoId>(cx).ok_or_bad_request("invalid todo id")?)
+}
+
 #[route(POST "/todos/{todo_id}/toggle")]
 async fn toggle(cx: &Cx) -> Result<SeeOther> {
-    let todo_id = path_param::<TodoId>(cx).ok_or_bad_request("invalid todo id")?;
-
     let mut db = db(cx);
-    let mut todo = Todo::get_by_id(&mut db, **todo_id).await?;
+    let mut todo = Todo::get_by_id(&mut db, todo_id(cx)?).await?;
     let done = !todo.done;
     toasty::update!(todo { done }).exec(&mut db).await?;
 
     Ok(see_other("/"))
 }
 
-#[route(POST "/todos/{todo_id}/delete")]
+#[route(DELETE "/todos/{todo_id}")]
 async fn delete(cx: &Cx) -> Result<SeeOther> {
-    let todo_id = path_param::<TodoId>(cx).ok_or_bad_request("invalid todo id")?;
-
-    Todo::delete_by_id(&mut db(cx), **todo_id).await?;
-
+    Todo::delete_by_id(&mut db(cx), todo_id(cx)?).await?;
     Ok(see_other("/"))
-}
-
-// Every mutation above responds with "303 See Other", sending the browser
-// back to the todo list with a GET request.
-type SeeOther = (StatusCode, [(HeaderName, &'static str); 1]);
-
-fn see_other(uri: &'static str) -> SeeOther {
-    (StatusCode::SEE_OTHER, [(header::LOCATION, uri)])
 }
