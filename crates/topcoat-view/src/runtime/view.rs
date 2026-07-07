@@ -20,7 +20,6 @@ use crate::runtime::{FmtHtml, Formatter, Unescaped};
 #[derive(Debug, Default, Clone)]
 pub struct View {
     part: ViewPart,
-    size_hint: usize,
 }
 
 impl View {
@@ -31,11 +30,7 @@ impl View {
     #[inline]
     #[must_use]
     pub fn new(parts: ViewParts) -> Self {
-        let size_hint = parts.size_hint;
-        Self {
-            part: parts.into(),
-            size_hint,
-        }
+        Self { part: parts.into() }
     }
 
     /// Returns a `View` that renders to an empty string.
@@ -52,13 +47,12 @@ impl View {
     pub const fn unescaped_unchecked(body: &'static str) -> Self {
         Self {
             part: ViewPart::UnescapedStaticStr(Unescaped::new_unchecked(body)),
-            size_hint: body.len(),
         }
     }
 
     /// Renders the view into an HTML string.
     pub fn render(&self, cx: &Cx) -> String {
-        let mut buf = String::with_capacity(self.size_hint);
+        let mut buf = String::with_capacity(self.size_hint());
         let mut f = Formatter::new(&mut buf);
         self.fmt_html(cx, &mut f);
         buf
@@ -72,7 +66,7 @@ impl FmtHtml for View {
 
     #[inline]
     fn size_hint(&self) -> usize {
-        self.size_hint
+        self.part.size_hint()
     }
 }
 
@@ -148,13 +142,22 @@ pub enum ViewPart {
     UnescapedString(Unescaped<String>),
     /// A custom view part stored in a cloneable box.
     #[non_exhaustive]
-    BoxDyn(Box<dyn DynViewPart>),
+    BoxDyn {
+        inner: Box<dyn DynViewPart>,
+        size_hint: usize,
+    },
     /// A sequence of view parts rendered in order.
     #[non_exhaustive]
-    BoxSlice(Box<[ViewPart]>),
+    BoxSlice {
+        inner: Box<[ViewPart]>,
+        size_hint: usize,
+    },
     /// A Vec of view parts rendered in order.
     #[non_exhaustive]
-    Vec(Vec<ViewPart>),
+    Vec {
+        inner: Vec<ViewPart>,
+        size_hint: usize,
+    },
 }
 
 impl ViewPart {
@@ -216,13 +219,13 @@ impl FmtHtml for ViewPart {
             Self::StaticStr(inner) => inner.fmt_html(cx, f),
             Self::UnescapedString(inner) => inner.fmt_html(cx, f),
             Self::UnescapedStaticStr(inner) => inner.fmt_html(cx, f),
-            Self::BoxDyn(inner) => FmtHtml::fmt_html(inner, cx, f),
-            Self::BoxSlice(inner) => {
+            Self::BoxDyn { inner, .. } => FmtHtml::fmt_html(inner, cx, f),
+            Self::BoxSlice { inner, .. } => {
                 for part in inner {
                     part.fmt_html(cx, f);
                 }
             }
-            Self::Vec(inner) => {
+            Self::Vec { inner, .. } => {
                 for part in inner {
                     part.fmt_html(cx, f);
                 }
@@ -253,50 +256,70 @@ impl FmtHtml for ViewPart {
             Self::String(inner) => inner.size_hint(),
             Self::UnescapedString(inner) => inner.len(),
             Self::UnescapedStaticStr(inner) => inner.len(),
-            Self::BoxDyn(inner) => FmtHtml::size_hint(inner),
-            Self::BoxSlice(inner) => inner.iter().map(FmtHtml::size_hint).sum(),
-            Self::Vec(inner) => inner.iter().map(FmtHtml::size_hint).sum(),
+            Self::BoxDyn { size_hint, .. }
+            | Self::BoxSlice { size_hint, .. }
+            | Self::Vec { size_hint, .. } => *size_hint,
         }
     }
 }
 
 macro_rules! impl_from_for_view_part {
-    ($($variant:ident($ty:ty)),* $(,)?) => {
-        $(
-            impl From<$ty> for ViewPart {
-                #[inline]
-                fn from(value: $ty) -> Self {
-                    Self::$variant(value)
-                }
+    ($variant:ident($ty:ty)) => {
+        impl From<$ty> for ViewPart {
+            #[inline]
+            fn from(value: $ty) -> Self {
+                Self::$variant(value)
             }
-        )*
+        }
     };
 }
 
-impl_from_for_view_part! {
-    Bool(bool),
-    Char(char),
-    I8(i8),
-    I16(i16),
-    I32(i32),
-    I64(i64),
-    I128(i128),
-    Isize(isize),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    U64(u64),
-    U128(u128),
-    Usize(usize),
-    F32(f32),
-    F64(f64),
-    StaticStr(&'static str),
-    String(String),
-    UnescapedStaticStr(Unescaped<&'static str>),
-    UnescapedString(Unescaped<String>),
-    BoxDyn(Box<dyn DynViewPart>),
-    BoxSlice(Box<[ViewPart]>),
-    Vec(Vec<ViewPart>),
+impl_from_for_view_part! { Bool(bool) }
+impl_from_for_view_part! { Char(char) }
+impl_from_for_view_part! { I8(i8) }
+impl_from_for_view_part! { I16(i16) }
+impl_from_for_view_part! { I32(i32) }
+impl_from_for_view_part! { I64(i64) }
+impl_from_for_view_part! { I128(i128) }
+impl_from_for_view_part! { Isize(isize) }
+impl_from_for_view_part! { U8(u8) }
+impl_from_for_view_part! { U16(u16) }
+impl_from_for_view_part! { U32(u32) }
+impl_from_for_view_part! { U64(u64) }
+impl_from_for_view_part! { U128(u128) }
+impl_from_for_view_part! { Usize(usize) }
+impl_from_for_view_part! { F32(f32) }
+impl_from_for_view_part! { F64(f64) }
+impl_from_for_view_part! { StaticStr(&'static str) }
+impl_from_for_view_part! { String(String) }
+impl_from_for_view_part! { UnescapedStaticStr(Unescaped<&'static str>) }
+impl_from_for_view_part! { UnescapedString(Unescaped<String>) }
+
+impl From<Box<dyn DynViewPart>> for ViewPart {
+    fn from(value: Box<dyn DynViewPart>) -> Self {
+        Self::BoxDyn {
+            size_hint: value.size_hint(),
+            inner: value,
+        }
+    }
+}
+
+impl From<Box<[ViewPart]>> for ViewPart {
+    fn from(value: Box<[ViewPart]>) -> Self {
+        Self::BoxSlice {
+            size_hint: value.iter().map(ViewPart::size_hint).sum(),
+            inner: value,
+        }
+    }
+}
+
+impl From<Vec<ViewPart>> for ViewPart {
+    fn from(value: Vec<ViewPart>) -> Self {
+        Self::Vec {
+            size_hint: value.iter().map(ViewPart::size_hint).sum(),
+            inner: value,
+        }
+    }
 }
 
 impl From<View> for ViewPart {
@@ -313,7 +336,6 @@ impl From<View> for ViewPart {
 pub struct ViewParts {
     first: Option<ViewPart>,
     items: Vec<ViewPart>,
-    size_hint: usize,
 }
 
 impl ViewParts {
@@ -328,7 +350,6 @@ impl ViewParts {
     #[inline]
     pub fn push(&mut self, part: impl Into<ViewPart>) -> &mut Self {
         let part = part.into();
-        self.size_hint += part.size_hint();
         if let Some(first) = self.first.take() {
             self.items.push(first);
             self.items.push(part);
