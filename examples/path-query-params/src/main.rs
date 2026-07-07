@@ -74,12 +74,12 @@ async fn posts(cx: &Cx) -> Result {
 // --- Path params ------------------------------------------------------------
 
 // #[path_param] reads a matching {post_id} URL segment and parses it as u32.
-#[path_param]
+#[path_param(error = bad_request("post_id must be a number"))]
 struct PostId(u32);
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
-    let post_id = path_param::<PostId>(cx).ok_or_bad_request("post_id must be a number")?;
+    let post_id = path_param::<PostId>(cx)?;
 
     view! {
         <h1>

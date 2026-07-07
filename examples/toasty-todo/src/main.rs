@@ -4,8 +4,8 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{
-        Form, Router, RouterBuilderDiscoverExt, RouterErrorExt, SeeOther, Slot, layout, page,
-        path_param, route, see_other,
+        Form, Router, RouterBuilderDiscoverExt, SeeOther, Slot, layout, page, path_param, route,
+        see_other,
     },
     view::{component, view},
 };
@@ -143,17 +143,13 @@ async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<SeeOther> {
     Ok(see_other("/"))
 }
 
-#[path_param]
+#[path_param(error = bad_request)]
 struct TodoId(u64);
-
-fn todo_id(cx: &Cx) -> Result<u64> {
-    Ok(*path_param::<TodoId>(cx).ok_or_bad_request("invalid todo id")?)
-}
 
 #[route(POST "/todos/{todo_id}/toggle")]
 async fn toggle(cx: &Cx) -> Result<SeeOther> {
     let mut db = db(cx);
-    let mut todo = Todo::get_by_id(&mut db, todo_id(cx)?).await?;
+    let mut todo = Todo::get_by_id(&mut db, *path_param::<TodoId>(cx)?).await?;
     let done = !todo.done;
     toasty::update!(todo { done }).exec(&mut db).await?;
 
@@ -162,6 +158,6 @@ async fn toggle(cx: &Cx) -> Result<SeeOther> {
 
 #[route(POST "/todos/{todo_id}/delete")]
 async fn delete(cx: &Cx) -> Result<SeeOther> {
-    Todo::delete_by_id(&mut db(cx), todo_id(cx)?).await?;
+    Todo::delete_by_id(&mut db(cx), *path_param::<TodoId>(cx)?).await?;
     Ok(see_other("/"))
 }

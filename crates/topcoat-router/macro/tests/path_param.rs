@@ -22,9 +22,9 @@ async fn post(cx: &Cx) -> Result {
     }
 }
 
-// A borrowed (`&str`) path parameter: the raw segment is exposed without parsing.
+// A borrowed (`str`) path parameter: the raw segment is exposed without parsing.
 #[path_param]
-struct Slug<'a>(&'a str);
+struct Slug(str);
 
 #[page("/tags/{slug}")]
 async fn tag(cx: &Cx) -> Result {

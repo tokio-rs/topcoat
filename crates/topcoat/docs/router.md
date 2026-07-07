@@ -69,7 +69,7 @@ use topcoat::{
     view::view,
 };
 
-#[path_param]
+#[path_param(error = bad_request)]
 struct PostId(uuid::Uuid);
 
 #[query_params]
@@ -79,7 +79,7 @@ struct PostQuery {
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
-    let post_id = path_param::<PostId>(cx).ok_or_bad_request("invalid post id")?;
+    let post_id = path_param::<PostId>(cx)?;
     let query = query_params::<PostQuery>(cx).ok_or_bad_request("invalid query string")?;
     view! { /* ... */ }
 }

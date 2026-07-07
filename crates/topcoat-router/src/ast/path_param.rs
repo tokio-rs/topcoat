@@ -30,20 +30,15 @@ pub struct PathParamItem {
 }
 
 impl PathParamItem {
-    /// Whether the parameter borrows the raw segment (a `&str` inner type)
+    /// Whether the parameter borrows the raw segment (a `str` inner type)
     /// rather than parsing it.
     fn borrows_raw_segment(&self) -> bool {
-        let Type::Reference(reference) = &self.inner_ty else {
-            return false;
-        };
-        if reference.mutability.is_some() {
-            return false;
-        }
-        let Type::Path(path) = &*reference.elem else {
-            return false;
-        };
-        path.qself.is_none() && path.path.is_ident("str")
+        matches!(
+            &self.inner_ty,
+            Type::Path(path) if path.qself.is_none() && path.path.is_ident("str")
+        )
     }
+
 }
 
 impl Parse for PathParamItem {

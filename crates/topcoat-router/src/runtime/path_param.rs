@@ -12,9 +12,10 @@ use topcoat_core::runtime::context::Cx;
 pub trait PathParam {
     /// The value produced for a request bound to lifetime `'cx`.
     ///
-    /// For a `&str` inner type this is the param struct itself (borrowing the
-    /// segment); for any other inner type it is a `Result` of a reference to the
-    /// parsed struct or the [`FromStr`](core::str::FromStr) error.
+    /// For a `str` inner type this is the raw segment as a `&'cx str`; for
+    /// any other inner type it is a `Result` of a reference to the parsed
+    /// value or the error declared by the attribute (a reference to the
+    /// [`FromStr`](core::str::FromStr) error by default).
     type Output<'cx>;
 
     /// Reads the parameter from the request `cx` belongs to.
@@ -30,7 +31,7 @@ pub trait PathParam {
 /// See [`#[path_param]`](attr.path_param.html) for details.
 #[inline]
 #[must_use]
-pub fn path_param<T: PathParam>(cx: &Cx) -> T::Output<'_> {
+pub fn path_param<T: PathParam + ?Sized>(cx: &Cx) -> T::Output<'_> {
     T::path_param(cx, PathParamSealed::new())
 }
 
