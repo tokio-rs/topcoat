@@ -36,12 +36,11 @@ impl ViewWriter {
 
     pub fn flush(&mut self) {
         if !self.static_segment.is_empty() {
-            let static_segment = &self.static_segment;
-            self.chunks.push(Chunk::Expr {
-                kind: ExprKind::Unescaped,
-                tokens: quote! { #static_segment },
+            let mut static_segment = String::new();
+            std::mem::swap(&mut self.static_segment, &mut static_segment);
+            self.chunks.push(Chunk::Static {
+                string: static_segment,
             });
-            self.static_segment.clear();
         }
     }
 
@@ -114,11 +113,20 @@ impl ViewWriter {
             if self.chunks.is_empty() {
                 // Optimized path: The view has no content.
                 quote! { ::topcoat::view::View::empty() }
+            } else if self.chunks.len() == 1
+                && let Chunk::Static { string } = &self.chunks[0]
+            {
+                quote! { ::topcoat::view::View::unescaped_unchecked(#string) }
             } else {
                 fn build_parts(chunks: &[Chunk]) -> TokenStream {
                     let mut output = TokenStream::new();
                     for chunk in chunks {
                         match chunk {
+                            Chunk::Static { string } => {
+                                let helper = ExprKind::Unescaped.helper();
+                                let tokens = quote! { #string };
+                                quote! { #helper(&mut __parts, #tokens); }
+                            }
                             Chunk::Expr { kind, tokens } => {
                                 let helper = kind.helper();
                                 quote! { #helper(&mut __parts, #tokens); }
@@ -225,6 +233,9 @@ impl ExprKind {
 }
 
 enum Chunk {
+    Static {
+        string: String,
+    },
     Expr {
         kind: ExprKind,
         tokens: TokenStream,
