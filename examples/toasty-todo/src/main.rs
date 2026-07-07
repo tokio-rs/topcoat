@@ -117,7 +117,7 @@ async fn toggle_checkbox(todo: &Todo) -> Result {
 #[component]
 async fn delete_button(todo: &Todo) -> Result {
     view! {
-        <form method="delete" action=(format!("/todos/{}", todo.id))>
+        <form method="post" action=(format!("/todos/{}/delete", todo.id))>
             <button type="submit">"delete"</button>
         </form>
     }
@@ -160,7 +160,7 @@ async fn toggle(cx: &Cx) -> Result<SeeOther> {
     Ok(see_other("/"))
 }
 
-#[route(DELETE "/todos/{todo_id}")]
+#[route(POST "/todos/{todo_id}/delete")]
 async fn delete(cx: &Cx) -> Result<SeeOther> {
     Todo::delete_by_id(&mut db(cx), todo_id(cx)?).await?;
     Ok(see_other("/"))
