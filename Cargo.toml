@@ -41,6 +41,7 @@ members = [
     "examples/runtime",
     "examples/shard",
     "examples/tailwind",
+    "examples/toasty-todo",
 
     "benchmarks/topcoat",
 ]
@@ -137,6 +138,7 @@ serde_urlencoded = "0.7"
 sha2 = "0.11"
 syn = "2.0.117"
 thiserror = "2.0.18"
+toasty = "0.7"
 tokio = "1.51.1"
 toml = "1.1.2"
 tokio-tungstenite = "0.29"
