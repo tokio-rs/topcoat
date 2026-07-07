@@ -247,20 +247,6 @@ async fn dashboard(cx: &Cx) -> Result {
 
 The methods cover the same statuses: [`ok_or_not_found`](RouterErrorExt::ok_or_not_found), [`ok_or_unauthorized`](RouterErrorExt::ok_or_unauthorized), [`ok_or_forbidden`](RouterErrorExt::ok_or_forbidden), [`ok_or_bad_request`](RouterErrorExt::ok_or_bad_request), [`ok_or_redirect`](RouterErrorExt::ok_or_redirect), and [`ok_or_redirect_permanent`](RouterErrorExt::ok_or_redirect_permanent). A failed [`#[path_param]`](macro@path_param) parse feeds the same machinery through its `error = ...` option.
 
-## Redirects
-
-[`redirect`] and [`redirect_permanent`] are errors because they end a handler early. A redirect that is the *successful* result of a `POST`, `PUT`, or `DELETE` is not: return [`see_other`] from the `Ok` branch for the Post/Redirect/Get pattern, so reloading the landing page does not resubmit the request.
-
-```rust
-use topcoat::{Result, context::Cx, router::{SeeOther, route, see_other}};
-
-#[route(POST "/logout")]
-async fn logout(cx: &Cx) -> Result<SeeOther> {
-    // ...clear the session...
-    Ok(see_other("/"))
-}
-```
-
 # Manual registration
 
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
