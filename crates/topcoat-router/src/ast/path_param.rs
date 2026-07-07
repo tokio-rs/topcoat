@@ -103,13 +103,26 @@ impl PathParam {
 
 impl ToTokens for PathParam {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let item = &self.1.item;
+        let borrows_raw_segment = self.1.borrows_raw_segment();
+
+        // Emit a copy of the user's struct. When the parameter borrows the raw
+        // segment its tuple field is never constructed, so silence the
+        // resulting dead-code warning.
+        let mut item = self.1.item.clone();
+        if borrows_raw_segment
+            && let Data::Struct(data) = &mut item.data
+            && let Fields::Unnamed(unnamed) = &mut data.fields
+            && let Some(field) = unnamed.unnamed.first_mut()
+        {
+            field.attrs.push(syn::parse_quote!(#[allow(dead_code)]));
+        }
+
         let ident = &item.ident;
         let inner_ty = &self.1.inner_ty;
         let name_string = ident.to_string().to_snake_case();
         let (impl_generics, ty_generics, where_clause) = item.generics.split_for_impl();
 
-        let (output_ty, path_param_fn) = if self.1.borrows_raw_segment() {
+        let (output_ty, path_param_fn) = if borrows_raw_segment {
             (
                 quote! { &'__cx str },
                 quote! {
