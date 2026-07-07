@@ -138,7 +138,7 @@ async fn toggle(cx: &Cx) -> Result<SeeOther> {
     let todo_id = path_param::<TodoId>(cx).ok_or_bad_request("invalid todo id")?;
 
     let mut db = db(cx);
-    let mut todo = Todo::get_by_id(&mut db, &todo_id.0).await?;
+    let mut todo = Todo::get_by_id(&mut db, **todo_id).await?;
     let done = !todo.done;
     toasty::update!(todo { done }).exec(&mut db).await?;
 
@@ -149,7 +149,7 @@ async fn toggle(cx: &Cx) -> Result<SeeOther> {
 async fn delete(cx: &Cx) -> Result<SeeOther> {
     let todo_id = path_param::<TodoId>(cx).ok_or_bad_request("invalid todo id")?;
 
-    Todo::delete_by_id(&mut db(cx), todo_id.0).await?;
+    Todo::delete_by_id(&mut db(cx), **todo_id).await?;
 
     Ok(see_other("/"))
 }
