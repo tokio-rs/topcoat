@@ -50,7 +50,7 @@ async fn root(slot: Slot<'_>) -> Result {
         <!DOCTYPE html>
         <html>
             <head>
-                <title>"Todos"</title>
+                <title>"Toasty Todos"</title>
                 topcoat::dev::script()
             </head>
             <body>(slot.await?)</body>
@@ -67,7 +67,7 @@ async fn home(cx: &Cx) -> Result {
         .await?;
 
     view! {
-        <h1>"Todos"</h1>
+        <h1>"Toasty Todos"</h1>
         <form method="post" action="/todos">
             <input
                 type="text"
