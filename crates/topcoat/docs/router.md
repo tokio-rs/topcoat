@@ -201,6 +201,66 @@ async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
 
 Layer path matching follows the same prefix rule as layouts. A layer at `/` wraps everything, while a layer at `/admin` wraps only routes under `/admin`. Layers at different paths nest from least specific (outermost) to most specific (innermost). If you manually register multiple layers at the same path, the most recently registered layer runs first.
 
+# Errors
+
+Every page, layout, layer, and route handler returns a [`Result`](crate::Result). An `Err` becomes the response: the router maps each of its own error types onto an HTTP status code and turns anything else into a 500.
+
+Each status has a constructor:
+
+- [`not_found()`](not_found) responds 404 with [`NotFoundError`].
+- [`unauthorized()`](unauthorized) responds 401 with [`UnauthorizedError`].
+- [`forbidden()`](forbidden) responds 403 with [`ForbiddenError`].
+- [`bad_request(description)`](bad_request) responds 400 with [`BadRequestError`] and a client-safe `description`.
+- [`method_not_allowed(methods)`](method_not_allowed) responds 405 with [`MethodNotAllowedError`] and an `Allow` header. The router raises this one itself when a path matches but its method does not.
+- [`internal_server_error(error)`](internal_server_error) responds 500 with [`InternalServerError`], wrapping an unexpected error without leaking it to the client.
+- [`redirect(uri)`](redirect) and [`redirect_permanent(uri)`](redirect_permanent) respond 307 and 308 with [`RedirectError`].
+
+Each returns a concrete error type that converts into the handler's error, so bubble it up with `?`:
+
+```rust
+use topcoat::{Result, context::Cx, router::{not_found, page}, view::view};
+# struct Post;
+# async fn find_post(_cx: &Cx) -> Option<Post> { None }
+#[page("/posts/{id}")]
+async fn post(cx: &Cx) -> Result {
+    let Some(_post) = find_post(cx).await else {
+        return Err(not_found().into());
+    };
+    view! { <h1>"Post"</h1> }
+}
+```
+
+## From an `Option` or `Result`
+
+Usually the failing value is the condition. [`RouterErrorExt`] adds `ok_or_*` methods to [`Option`] and [`core::result::Result`] that replace `None` (or any `Err`) with a router error, ready for `?`:
+
+```rust
+# use topcoat::{Result, context::Cx, router::{RouterErrorExt, page}, view::view};
+# struct User;
+# async fn current_session(_cx: &Cx) -> Option<User> { None }
+#[page("/dashboard")]
+async fn dashboard(cx: &Cx) -> Result {
+    let _user = current_session(cx).await.ok_or_unauthorized()?;
+    view! { <h1>"Dashboard"</h1> }
+}
+```
+
+The methods cover the same statuses: [`ok_or_not_found`](RouterErrorExt::ok_or_not_found), [`ok_or_unauthorized`](RouterErrorExt::ok_or_unauthorized), [`ok_or_forbidden`](RouterErrorExt::ok_or_forbidden), [`ok_or_bad_request`](RouterErrorExt::ok_or_bad_request), [`ok_or_redirect`](RouterErrorExt::ok_or_redirect), and [`ok_or_redirect_permanent`](RouterErrorExt::ok_or_redirect_permanent). A failed [`#[path_param]`](macro@path_param) parse feeds the same machinery through its `error = ...` option.
+
+## Redirects
+
+[`redirect`] and [`redirect_permanent`] are errors because they end a handler early. A redirect that is the *successful* result of a `POST`, `PUT`, or `DELETE` is not: return [`see_other`] from the `Ok` branch for the Post/Redirect/Get pattern, so reloading the landing page does not resubmit the request.
+
+```rust
+use topcoat::{Result, context::Cx, router::{SeeOther, route, see_other}};
+
+#[route(POST "/logout")]
+async fn logout(cx: &Cx) -> Result<SeeOther> {
+    // ...clear the session...
+    Ok(see_other("/"))
+}
+```
+
 # Manual registration
 
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
