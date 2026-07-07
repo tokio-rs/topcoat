@@ -104,6 +104,7 @@ bytes = "1"
 clap = "4.6.0"
 console = "0.16"
 cookie = "0.18"
+criterion = "0.8"
 dialoguer = { version = "0.12", default-features = false }
 form_urlencoded = "1"
 futures-core = "0.3"
