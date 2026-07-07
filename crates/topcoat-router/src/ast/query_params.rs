@@ -5,11 +5,21 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-pub struct QueryParamsAttr;
+use super::error_attr::ErrorAttr;
+
+pub struct QueryParamsAttr {
+    error: Option<ErrorAttr>,
+}
 
 impl Parse for QueryParamsAttr {
-    fn parse(_input: ParseStream) -> syn::Result<Self> {
-        Ok(Self)
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            error: if input.is_empty() {
+                None
+            } else {
+                Some(input.parse()?)
+            },
+        })
     }
 }
 
@@ -49,23 +59,39 @@ impl ToTokens for QueryParams {
         let item = &self.1.item;
         let ident = &item.ident;
 
+        let (error_ty, map_err) = match &self.0.error {
+            Some(error) => (
+                error.ty(),
+                error.map_err(quote! {
+                    |error| ::topcoat::router::bad_request_at(
+                        error.path(),
+                        format!("invalid query value: {}", error.inner()),
+                    )
+                }),
+            ),
+            None => (
+                quote! { &'__cx ::topcoat::router::QueryParamsError },
+                quote! {},
+            ),
+        };
+
         quote! {
             #[derive(::topcoat::internal::serde::Deserialize)]
             #[serde(crate = "::topcoat::internal::serde")]
             #item
 
             impl ::topcoat::router::QueryParams for #ident {
-                fn query_params<'__cx>(
-                    cx: &'__cx ::topcoat::context::Cx,
+                type Output<'__cx> = ::core::result::Result<&'__cx Self, #error_ty>;
+
+                fn query_params(
+                    cx: &::topcoat::context::Cx,
                     _: ::topcoat::router::QueryParamsSealed,
-                ) -> ::core::result::Result<&'__cx Self, &'__cx ::topcoat::internal::serde_urlencoded::de::Error> {
+                ) -> Self::Output<'_> {
                     #[::topcoat::context::memoize]
-                    fn parse(cx: &::topcoat::context::Cx) -> ::core::result::Result<#ident, ::topcoat::internal::serde_urlencoded::de::Error> {
-                        ::topcoat::internal::serde_urlencoded::from_str(
-                            ::topcoat::router::uri(cx).path_and_query().map(|pq| pq.query().unwrap_or("")).unwrap_or("")
-                        )
+                    fn parse(cx: &::topcoat::context::Cx) -> ::core::result::Result<#ident, ::topcoat::router::QueryParamsError> {
+                        ::topcoat::router::parse_query_params(cx)
                     }
-                    parse(cx)
+                    parse(cx)#map_err
                 }
             }
         }

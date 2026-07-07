@@ -102,7 +102,7 @@ impl IntoResponse for RedirectError {
 /// ```rust
 /// use topcoat::Result;
 /// use topcoat::context::Cx;
-/// use topcoat::router::{route, see_other, SeeOther};
+/// use topcoat::router::{SeeOther, route, see_other};
 ///
 /// #[route(POST "/logout")]
 /// async fn logout(cx: &Cx) -> Result<SeeOther> {

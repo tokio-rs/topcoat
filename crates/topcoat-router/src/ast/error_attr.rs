@@ -48,20 +48,22 @@ impl ErrorAttr {
         }
     }
 
-    /// A call expression constructing the error.
+    /// The `.map_err(...)` adapter replacing a failed parse's error with the
+    /// declared response.
     ///
-    /// `default_description` fills `bad_request`'s description when the
-    /// attribute does not provide one. Argument arity and types are left to
-    /// the compiler, which checks the generated constructor call.
-    pub fn construct(&self, default_description: &str) -> TokenStream {
-        let name = self.kind.keyword();
-        let args = if matches!(self.kind, ErrorKind::BadRequest(_)) && self.args.is_empty() {
-            quote! { #default_description }
+    /// A bare `bad_request` carries no description to fill the constructor
+    /// with, so the macro's `default_bad_request` handler (a closure from the
+    /// original parse error to the response) is used instead. All other
+    /// constructor calls are checked by the compiler.
+    pub fn map_err(&self, default_bad_request: TokenStream) -> TokenStream {
+        let handler = if matches!(self.kind, ErrorKind::BadRequest(_)) && self.args.is_empty() {
+            default_bad_request
         } else {
+            let name = self.kind.keyword();
             let args = &self.args;
-            quote! { #(#args),* }
+            quote! { |_| ::topcoat::router::#name(#(#args),*) }
         };
-        quote! { ::topcoat::router::#name(#args) }
+        quote! { .map_err(#handler) }
     }
 }
 

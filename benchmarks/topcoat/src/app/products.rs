@@ -3,7 +3,7 @@ mod id;
 use topcoat::{
     Result,
     context::{Cx, app_context},
-    router::{RouterErrorExt, page, query_params},
+    router::{page, query_params},
     view::view,
 };
 
@@ -25,7 +25,7 @@ const CHIP_ACTIVE: &str = "rounded-full bg-slate-900 px-3 py-1 font-medium text-
 const CHIP_INACTIVE: &str =
     "rounded-full bg-white px-3 py-1 font-medium text-slate-600 shadow-sm hover:bg-slate-100";
 
-#[query_params]
+#[query_params(error = bad_request)]
 struct ProductsQuery {
     page: Option<usize>,
     sort: Option<String>,
@@ -34,7 +34,7 @@ struct ProductsQuery {
 
 #[page]
 async fn products(cx: &Cx) -> Result {
-    let query = query_params::<ProductsQuery>(cx).ok_or_bad_request("invalid query string")?;
+    let query = query_params::<ProductsQuery>(cx)?;
     let catalog = app_context::<Catalog>(cx);
     let sort = normalize_sort(query.sort.as_deref());
     let category = query.category.as_deref();

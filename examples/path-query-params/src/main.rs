@@ -1,10 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{
-        Router, RouterBuilderDiscoverExt, RouterErrorExt, Slot, layout, page, path_param,
-        query_params,
-    },
+    router::{Router, RouterBuilderDiscoverExt, Slot, layout, page, path_param, query_params},
     view::view,
 };
 
@@ -47,7 +44,8 @@ async fn home() -> Result {
 // --- Query params -----------------------------------------------------------
 
 // #[query_params] parses URL query strings into a typed struct.
-#[query_params]
+// A query string that fails to parse redirects back here with it cleared.
+#[query_params(error = redirect("?"))]
 struct PostsQuery {
     page: Option<u32>,
     q: Option<String>,
@@ -55,7 +53,7 @@ struct PostsQuery {
 
 #[page("/posts")]
 async fn posts(cx: &Cx) -> Result {
-    let query = query_params::<PostsQuery>(cx).ok_or_bad_request("invalid query string")?;
+    let query = query_params::<PostsQuery>(cx)?;
 
     view! {
         <h1>"Posts"</h1>

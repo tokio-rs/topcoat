@@ -129,10 +129,11 @@ impl ToTokens for PathParam {
         } else {
             let (error_ty, map_err) = match &self.0.error {
                 Some(error) => {
-                    let construct = error.construct(&format!(
-                        "invalid value for path parameter \"{name_string}\""
-                    ));
-                    (error.ty(), quote! { .map_err(|_| #construct) })
+                    let default = format!("invalid value for path parameter \"{name_string}\"");
+                    (
+                        error.ty(),
+                        error.map_err(quote! { |_| ::topcoat::router::bad_request(#default) }),
+                    )
                 }
                 None => (
                     quote! { &'__cx <#inner_ty as ::core::str::FromStr>::Err },

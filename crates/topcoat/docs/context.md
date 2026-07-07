@@ -63,14 +63,14 @@ The attribute macros [`#[path_param]`](macro@crate::router::path_param) and [`#[
 use topcoat::{
     Result,
     context::Cx,
-    router::{RouterErrorExt, page, path_param, query_params},
+    router::{page, path_param, query_params},
     view::view,
 };
 
 #[path_param(error = bad_request)]
 struct PostId(uuid::Uuid);
 
-#[query_params]
+#[query_params(error = bad_request)]
 struct PostQuery {
     preview: Option<bool>,
 }
@@ -78,7 +78,7 @@ struct PostQuery {
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
     let post_id = path_param::<PostId>(cx)?;
-    let query = query_params::<PostQuery>(cx).ok_or_bad_request("invalid query string")?;
+    let query = query_params::<PostQuery>(cx)?;
 
     view! {
         <article data-preview=(query.preview.unwrap_or(false))>
