@@ -147,7 +147,7 @@ async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<SeeOther> {
 struct TodoId(u64);
 
 fn todo_id(cx: &Cx) -> Result<u64> {
-    Ok(**path_param::<TodoId>(cx).ok_or_bad_request("invalid todo id")?)
+    Ok(*path_param::<TodoId>(cx).ok_or_bad_request("invalid todo id")?)
 }
 
 #[route(POST "/todos/{todo_id}/toggle")]

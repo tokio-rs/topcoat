@@ -84,7 +84,7 @@ async fn post(cx: &Cx) -> Result {
     view! {
         <h1>
             "Post "
-            (post_id.to_string())
+            (post_id)
         </h1>
         <p>"parsed from the {post_id} path segment"</p>
         <p><a href="/posts?page=1">"all posts"</a></p>

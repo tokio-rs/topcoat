@@ -17,7 +17,7 @@ struct ProductId(u32);
 async fn product_detail(cx: &Cx) -> Result {
     let product_id = path_param::<ProductId>(cx).ok_or_not_found()?;
     let catalog = app_context::<Catalog>(cx);
-    let product = catalog.get(**product_id).ok_or_not_found()?;
+    let product = catalog.get(*product_id).ok_or_not_found()?;
     let related: Vec<&Product> = product
         .related_ids
         .iter()

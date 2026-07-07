@@ -88,7 +88,7 @@ impl ToTokens for PathParam {
 
         let (output_ty, path_param_fn) = if is_str_ref(inner_ty) {
             (
-                quote! { #ident<'__cx> },
+                quote! { &'__cx str },
                 quote! {
                     fn path_param(
                         cx: &::topcoat::context::Cx,
@@ -96,7 +96,7 @@ impl ToTokens for PathParam {
                     ) -> Self::Output<'_> {
                         for (key, value) in ::topcoat::router::raw_path_params(cx) {
                             if key == #name_string {
-                                return #ident(value);
+                                return value;
                             }
                         }
                         panic!("path parameter \"{}\" was not found in request path", #name_string);
@@ -106,7 +106,7 @@ impl ToTokens for PathParam {
         } else {
             (
                 quote! {
-                    ::core::result::Result<&'__cx #ident #ty_generics, &'__cx <#inner_ty as ::core::str::FromStr>::Err>
+                    ::core::result::Result<&'__cx #inner_ty, &'__cx <#inner_ty as ::core::str::FromStr>::Err>
                 },
                 quote! {
                     fn path_param(
@@ -122,7 +122,7 @@ impl ToTokens for PathParam {
                             }
                             panic!("path parameter \"{}\" was not found in request path", #name_string);
                         }
-                        parse(cx)
+                        parse(cx).map(|value| &value.0)
                     }
                 },
             )
@@ -135,14 +135,6 @@ impl ToTokens for PathParam {
                 type Output<'__cx> = #output_ty;
 
                 #path_param_fn
-            }
-
-            impl #impl_generics ::core::ops::Deref for #ident #ty_generics #where_clause {
-                type Target = #inner_ty;
-
-                fn deref(&self) -> &Self::Target {
-                    &self.0
-                }
             }
 
             ::topcoat::router::segment!(kind = Param, rename = #name_string);
