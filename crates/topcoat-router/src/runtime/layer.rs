@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::ops::Index;
 use std::pin::Pin;
 
-use topcoat_core::runtime::{context::Cx, error::Result};
+use topcoat_core::runtime::{context::CxBuilder, error::Result};
 
 use crate::runtime::{Body, Endpoint, Path, Response, Route, method_not_allowed, not_found};
 
@@ -16,10 +16,10 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// A layer wraps every matched route whose path begins with the layer's path
 /// (the same prefix rule as layouts), so a layer at `/admin` wraps only routes
 /// under `/admin`, while a layer at `/` wraps everything. Each layer receives a
-/// mutable [`Cx`] and the request [`Body`], plus a [`Next`] representing the
-/// rest of the chain. A layer typically inspects or modifies the context, calls
-/// [`Next::run`] to invoke the inner layers and ultimately the route, then
-/// inspects or modifies the [`Response`].
+/// mutable [`CxBuilder`] and the request [`Body`], plus a [`Next`] representing
+/// the rest of the chain. A layer typically registers request-scoped values on
+/// the context, calls [`Next::run`] to invoke the inner layers and ultimately
+/// the route, then inspects or modifies the [`Response`].
 ///
 /// When several layers match a route they nest from least-specific (outermost)
 /// to most-specific (innermost), like layouts.
@@ -30,7 +30,7 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 ///
 /// ```rust
 /// use std::borrow::Cow;
-/// use topcoat::context::Cx;
+/// use topcoat::context::CxBuilder;
 /// use topcoat::router::{Body, Layer, LayerFuture, Next, Path};
 ///
 /// struct Timing;
@@ -40,7 +40,7 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 ///         Path::new("/")
 ///     }
 ///
-///     fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+///     fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
 ///         Box::pin(async move {
 ///             let start = std::time::Instant::now();
 ///             let response = next.run(cx, body).await?;
@@ -55,11 +55,12 @@ pub trait Layer: Send + Sync + 'static {
     fn path(&self) -> &Path;
 
     /// Handles a request, calling `next` to continue down the chain.
-    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
+    fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 }
 
 /// The handler function backing a [`LayerFn`].
-pub type LayerHandlerFn = for<'a> fn(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
+pub type LayerHandlerFn =
+    for<'a> fn(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 
 /// A [`Layer`] backed by a plain handler function.
 ///
@@ -87,7 +88,7 @@ impl Layer for LayerFn {
         &self.path
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         (self.handle)(cx, body, next)
     }
 }
@@ -201,7 +202,7 @@ impl<'a> Next<'a> {
 
     /// Runs the next layer in the chain, or the terminal handler once no layers
     /// remain.
-    pub fn run(self, cx: &'a mut Cx, body: Body) -> LayerFuture<'a> {
+    pub fn run(self, cx: &'a mut CxBuilder, body: Body) -> LayerFuture<'a> {
         match self.indices.split_first() {
             Some((&id, rest)) => self.layers[id].handle(
                 cx,
@@ -229,7 +230,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use http::StatusCode;
-    use topcoat_core::runtime::context::{ContextMap, app_context};
+    use topcoat_core::runtime::context::{ContextMap, CxBuilder, app_context};
 
     use super::*;
     use crate::runtime::{Bytes, IntoResponse, Method, RouteFn, RouteFuture, respond, to_bytes};
@@ -253,12 +254,12 @@ mod tests {
         Box::new(LayerFn::new(path(p), noop_layer))
     }
 
-    fn noop_layer<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn noop_layer<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         next.run(cx, body)
     }
 
-    fn empty_cx() -> Cx {
-        Cx::new(Arc::new(ContextMap::new()), ContextMap::new())
+    fn empty_cx() -> CxBuilder {
+        CxBuilder::default()
     }
 
     /// Reads a response body to completion.

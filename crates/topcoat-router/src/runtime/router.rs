@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use topcoat_core::runtime::context::{ContextMap, Cx};
+use topcoat_core::runtime::context::{ContextMap, CxBuilder};
 
 use crate::runtime::{
     Endpoint, Layer, LayerId, Layers, LayoutFn, Next, PageFn, PageWithLayouts, PathSegment,
@@ -88,7 +88,7 @@ impl Router {
                 )
             };
 
-        let mut cx = Cx::new(self.app_context.clone(), ContextMap::new());
+        let mut cx = CxBuilder::new(self.app_context.clone());
         cx.insert(path_params);
         cx.insert(parts);
 
@@ -447,7 +447,7 @@ mod tests {
     use std::sync::Mutex;
 
     use http::{HeaderMap, StatusCode};
-    use topcoat_core::runtime::context::{app_context, request_context};
+    use topcoat_core::runtime::context::{Cx, app_context, request_context};
     use topcoat_core::runtime::error::Result;
     use topcoat_view::runtime::{View, ViewParts};
 
@@ -522,14 +522,14 @@ mod tests {
     // test can observe the order layers run in.
     type Trace = Mutex<Vec<&'static str>>;
 
-    fn trace_root<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn trace_root<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("root");
             next.run(cx, body).await
         })
     }
 
-    fn trace_admin<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn trace_admin<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("admin");
             next.run(cx, body).await
