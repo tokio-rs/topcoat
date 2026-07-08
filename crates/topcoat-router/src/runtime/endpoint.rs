@@ -83,7 +83,7 @@ fn standard_slot(method: &Method) -> Option<usize> {
 pub(crate) struct Endpoint {
     standard: [RouteIndex; STANDARD_METHODS.len()],
     other: HashMap<Method, usize>,
-    /// Cheaply clonable path parameters for this endpoint.
+    /// Interned, cheaply clonable path parameter keys for this endpoint.
     path_params: Box<[Arc<str>]>,
     /// The layers wrapping every route at this path, as indices into the
     /// router's layer list, precomputed at build time and ordered from
@@ -96,7 +96,7 @@ impl Endpoint {
     pub(crate) fn new(path_params: Box<[Arc<str>]>, layers: Box<[usize]>) -> Self {
         Self {
             standard: Default::default(),
-            other: Default::default(),
+            other: HashMap::new(),
             path_params,
             layers,
         }
@@ -138,7 +138,7 @@ impl Endpoint {
             .chain(self.other.keys())
     }
 
-    /// Returns the precomputed path parameter keys for this endpoint.
+    /// Returns the interned path parameter keys for this endpoint.
     pub(crate) fn path_params(&self) -> &[Arc<str>] {
         &self.path_params
     }
