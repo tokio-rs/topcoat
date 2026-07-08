@@ -17,7 +17,7 @@ impl AttributeValueViewParts for Asset {
     }
 
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(Box::new(self) as Box<dyn DynViewPart>);
     }
 }

@@ -7,7 +7,8 @@ fn r(v: topcoat::Result) -> String {
 #[tokio::test]
 async fn if_true_branch_emits_its_body() {
     let signed_in = true;
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         if signed_in {
             <a href="/account">"Account"</a>
         } else {
@@ -21,7 +22,8 @@ async fn if_true_branch_emits_its_body() {
 #[tokio::test]
 async fn if_false_branch_emits_else_body() {
     let signed_in = false;
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         if signed_in {
             <a href="/account">"Account"</a>
         } else {
@@ -35,7 +37,8 @@ async fn if_false_branch_emits_else_body() {
 #[tokio::test]
 async fn if_without_else_emits_nothing_on_false() {
     let show = false;
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         <div>
             if show {
                 <p>"shown"</p>
@@ -49,7 +52,8 @@ async fn if_without_else_emits_nothing_on_false() {
 #[tokio::test]
 async fn if_else_if_else_chain_selects_first_match() {
     let n = 1;
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         if n == 0 {
             <p>"zero"</p>
         } else if n == 1 {
@@ -65,7 +69,8 @@ async fn if_else_if_else_chain_selects_first_match() {
 #[tokio::test]
 async fn if_in_attribute_list_adds_branch_attributes() {
     let current = true;
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         <a
             href="/posts"
             if current {
@@ -85,7 +90,8 @@ async fn if_in_attribute_list_adds_branch_attributes() {
 #[tokio::test]
 async fn for_loop_renders_body_per_item() {
     let posts = ["alpha", "beta", "gamma"];
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         <ul>
             for title in posts {
                 <li>(title)</li>
@@ -99,7 +105,8 @@ async fn for_loop_renders_body_per_item() {
 #[tokio::test]
 async fn for_loop_in_attribute_list_emits_attributes_per_item() {
     let extras = [("data-a", "1"), ("data-b", "2")];
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         <div
             for (name, value) in extras {
                 (name)=(value)
@@ -116,7 +123,8 @@ async fn for_loop_in_attribute_list_emits_attributes_per_item() {
 #[tokio::test]
 async fn for_loop_filtering_with_if_emits_subset() {
     let items = ["keep", "drop", "keep"];
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         <ul>
             for item in items {
                 if item == "keep" {
@@ -139,7 +147,8 @@ enum Status {
 
 #[tokio::test]
 async fn match_chooses_arm_body() {
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         match Status::Published {
             Status::Draft => <span>"draft"</span>,
             Status::Published => <a href="/post">"open"</a>,
@@ -153,7 +162,8 @@ async fn match_chooses_arm_body() {
 #[tokio::test]
 async fn match_arm_with_block_emits_multiple_siblings() {
     let user = Some("ada");
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         match user {
             Some(name) => {
                 <h1>(name)</h1>
@@ -169,7 +179,8 @@ async fn match_arm_with_block_emits_multiple_siblings() {
 #[tokio::test]
 async fn match_in_attribute_list_emits_attribute_per_arm() {
     let status = Status::Draft;
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         <article
             match status {
                 Status::Draft => class="draft",
@@ -186,7 +197,8 @@ async fn match_in_attribute_list_emits_attribute_per_arm() {
 
 #[tokio::test]
 async fn let_binding_introduces_variable_for_following_nodes() {
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         <article>
             let title = "  Hello  ".trim();
 
@@ -200,7 +212,8 @@ async fn let_binding_introduces_variable_for_following_nodes() {
 
 #[tokio::test]
 async fn let_binding_in_attribute_list_is_in_scope_for_later_attributes() {
-    let html = r(view! {
+    let cx = &Cx::empty();
+    let html = r(view! { cx,
         <a let href = "/posts"; href=(href) data-href=(href)>"Posts"</a>
     });
 

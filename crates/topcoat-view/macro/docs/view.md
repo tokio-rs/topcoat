@@ -416,12 +416,12 @@ For example, a type can opt into child-node rendering by implementing [`NodeView
 # use topcoat::{Result, view::*};
 # #[component]
 # async fn example() -> Result {
-use topcoat::view::{NodeViewParts, ViewParts};
+use topcoat::{context::Cx, view::{NodeViewParts, ViewParts}};
 
 struct Badge(String);
 
 impl NodeViewParts for Badge {
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self.0);
     }
 }
@@ -438,7 +438,7 @@ For attribute values, implement [`AttributeValueViewParts`]. Its [`attribute_pre
 # use topcoat::{Result, view::*};
 # #[component]
 # async fn example() -> Result {
-use topcoat::view::{AttributeValueViewParts, ViewParts};
+use topcoat::{context::Cx, view::{AttributeValueViewParts, ViewParts}};
 
 struct DataId(Option<String>);
 
@@ -447,7 +447,7 @@ impl AttributeValueViewParts for DataId {
         self.0.is_some()
     }
 
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         if let Some(value) = self.0 {
             parts.push(value);
         }

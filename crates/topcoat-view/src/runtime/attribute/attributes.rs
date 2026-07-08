@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use topcoat_core::runtime::context::Cx;
+
 use crate::runtime::{Attribute, AttributeValueViewParts, AttributeViewParts, ViewPart, ViewParts};
 
 /// A runtime collection of HTML attributes with unique keys.
@@ -61,11 +63,12 @@ impl Attributes {
     #[inline]
     pub fn insert(
         &mut self,
+        cx: &Cx,
         k: impl Into<String>,
         v: impl AttributeValueViewParts,
     ) -> Option<ViewPart> {
         let mut view_parts = ViewParts::new();
-        v.into_view_parts(&mut view_parts);
+        v.into_view_parts(cx, &mut view_parts);
         self.map.insert(k.into(), view_parts.into())
     }
 
@@ -91,9 +94,9 @@ impl Attributes {
 }
 
 impl AttributeViewParts for Attributes {
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
         for (key, value) in self {
-            Attribute::new(key, value).into_view_parts(parts);
+            Attribute::new(key, value).into_view_parts(cx, parts);
         }
     }
 }
@@ -129,7 +132,7 @@ mod tests {
 
     fn render(attrs: Attributes) -> String {
         let mut parts = ViewParts::new();
-        attrs.into_view_parts(&mut parts);
+        attrs.into_view_parts(&Cx::default(), &mut parts);
         let part: ViewPart = parts.into();
         let mut buf = String::new();
         let mut f = Formatter::new(&mut buf);
@@ -153,7 +156,7 @@ mod tests {
     #[test]
     fn insert_then_contains_key() {
         let mut attrs = Attributes::new();
-        attrs.insert("class", "button");
+        attrs.insert(&Cx::default(), "class", "button");
         assert!(attrs.contains_key("class"));
         assert!(!attrs.contains_key("id"));
     }
@@ -161,14 +164,14 @@ mod tests {
     #[test]
     fn insert_returns_none_for_new_key() {
         let mut attrs = Attributes::new();
-        assert!(attrs.insert("class", "button").is_none());
+        assert!(attrs.insert(&Cx::default(), "class", "button").is_none());
     }
 
     #[test]
     fn insert_replaces_existing_value() {
         let mut attrs = Attributes::new();
-        attrs.insert("class", "button");
-        let previous = attrs.insert("class", "link");
+        attrs.insert(&Cx::default(), "class", "button");
+        let previous = attrs.insert(&Cx::default(), "class", "link");
         assert!(previous.is_some());
         assert_eq!(render(attrs), " class=\"link\"");
     }
@@ -176,7 +179,7 @@ mod tests {
     #[test]
     fn get_returns_inserted_value() {
         let mut attrs = Attributes::new();
-        attrs.insert("class", "button");
+        attrs.insert(&Cx::default(), "class", "button");
         assert!(attrs.get("class").is_some());
         assert!(attrs.get("missing").is_none());
     }
@@ -184,8 +187,8 @@ mod tests {
     #[test]
     fn clear_removes_all_entries() {
         let mut attrs = Attributes::new();
-        attrs.insert("class", "button");
-        attrs.insert("id", "submit");
+        attrs.insert(&Cx::default(), "class", "button");
+        attrs.insert(&Cx::default(), "id", "submit");
         attrs.clear();
         assert_eq!(attrs.iter().count(), 0);
         assert!(!attrs.contains_key("class"));
@@ -194,15 +197,15 @@ mod tests {
     #[test]
     fn renders_single_attribute() {
         let mut attrs = Attributes::new();
-        attrs.insert("class", "button");
+        attrs.insert(&Cx::default(), "class", "button");
         assert_eq!(render(attrs), " class=\"button\"");
     }
 
     #[test]
     fn renders_multiple_attributes() {
         let mut attrs = Attributes::new();
-        attrs.insert("class", "button");
-        attrs.insert("id", "submit");
+        attrs.insert(&Cx::default(), "class", "button");
+        attrs.insert(&Cx::default(), "id", "submit");
         let rendered = render(attrs);
         let parts: HashSet<&str> = rendered
             .split_terminator(' ')
@@ -215,43 +218,43 @@ mod tests {
     #[test]
     fn escapes_attribute_value() {
         let mut attrs = Attributes::new();
-        attrs.insert("data-x", "a\"b<c");
+        attrs.insert(&Cx::default(), "data-x", "a\"b<c");
         assert_eq!(render(attrs), " data-x=\"a&quot;b&lt;c\"");
     }
 
     #[test]
     fn omits_false_boolean_attribute() {
         let mut attrs = Attributes::new();
-        attrs.insert("disabled", false);
+        attrs.insert(&Cx::default(), "disabled", false);
         assert_eq!(render(attrs), "");
     }
 
     #[test]
     fn renders_true_boolean_attribute() {
         let mut attrs = Attributes::new();
-        attrs.insert("disabled", true);
+        attrs.insert(&Cx::default(), "disabled", true);
         assert_eq!(render(attrs), " disabled=\"true\"");
     }
 
     #[test]
     fn omits_none_option_attribute() {
         let mut attrs = Attributes::new();
-        attrs.insert("title", Option::<&str>::None);
+        attrs.insert(&Cx::default(), "title", Option::<&str>::None);
         assert_eq!(render(attrs), "");
     }
 
     #[test]
     fn renders_some_option_attribute() {
         let mut attrs = Attributes::new();
-        attrs.insert("title", Some("hello"));
+        attrs.insert(&Cx::default(), "title", Some("hello"));
         assert_eq!(render(attrs), " title=\"hello\"");
     }
 
     #[test]
     fn iter_yields_inserted_entries() {
         let mut attrs = Attributes::new();
-        attrs.insert("class", "button");
-        attrs.insert("id", "submit");
+        attrs.insert(&Cx::default(), "class", "button");
+        attrs.insert(&Cx::default(), "id", "submit");
         let keys: HashSet<&str> = attrs.iter().map(|(k, _)| k.as_str()).collect();
         let expected: HashSet<&str> = ["class", "id"].into_iter().collect();
         assert_eq!(keys, expected);
@@ -260,8 +263,8 @@ mod tests {
     #[test]
     fn into_iter_yields_inserted_entries() {
         let mut attrs = Attributes::new();
-        attrs.insert("class", "button");
-        attrs.insert("id", "submit");
+        attrs.insert(&Cx::default(), "class", "button");
+        attrs.insert(&Cx::default(), "id", "submit");
         let keys: HashSet<String> = attrs.into_iter().map(|(k, _)| k).collect();
         let expected: HashSet<String> = ["class", "id"].into_iter().map(String::from).collect();
         assert_eq!(keys, expected);

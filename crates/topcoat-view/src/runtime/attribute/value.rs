@@ -1,3 +1,5 @@
+use topcoat_core::runtime::context::Cx;
+
 use crate::runtime::{Unescaped, ViewPart, ViewParts};
 
 /// Converts a value used as an attribute value into view parts.
@@ -6,7 +8,8 @@ use crate::runtime::{Unescaped, ViewPart, ViewParts};
 /// element in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
-/// # use topcoat::view::view;
+/// # use topcoat::view::{component, view};
+/// # #[component]
 /// # async fn example() -> topcoat::Result {
 /// # let my_value = "primary";
 /// view! {
@@ -30,7 +33,7 @@ pub trait AttributeValueViewParts {
     fn attribute_present(&self) -> bool;
 
     /// Appends this attribute value to `parts`.
-    fn into_view_parts(self, parts: &mut ViewParts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts);
 }
 
 macro_rules! impl_primitive {
@@ -42,7 +45,7 @@ macro_rules! impl_primitive {
             }
 
             #[inline]
-            fn into_view_parts(self, parts: &mut ViewParts) {
+            fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
                 parts.push(self);
             }
         }
@@ -57,8 +60,8 @@ macro_rules! impl_primitive {
             }
 
             #[inline]
-            fn into_view_parts(self, parts: &mut ViewParts) {
-                (*self).into_view_parts(parts);
+            fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+                (*self).into_view_parts(cx, parts);
             }
         }
     };
@@ -89,7 +92,7 @@ impl AttributeValueViewParts for &str {
     }
 
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self.to_owned());
     }
 }
@@ -101,7 +104,7 @@ impl AttributeValueViewParts for Unescaped<&'static str> {
     }
 
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self);
     }
 }
@@ -113,8 +116,8 @@ impl AttributeValueViewParts for &String {
     }
 
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        self.as_str().into_view_parts(parts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+        self.as_str().into_view_parts(cx, parts);
     }
 }
 
@@ -125,7 +128,7 @@ impl AttributeValueViewParts for bool {
     }
 
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self);
     }
 }
@@ -137,8 +140,8 @@ impl AttributeValueViewParts for &bool {
     }
 
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        (*self).into_view_parts(parts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+        (*self).into_view_parts(cx, parts);
     }
 }
 
@@ -152,8 +155,8 @@ where
     }
 
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        (*self).into_view_parts(parts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+        (*self).into_view_parts(cx, parts);
     }
 }
 
@@ -167,9 +170,9 @@ where
     }
 
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
         if let Some(value) = self {
-            value.into_view_parts(parts);
+            value.into_view_parts(cx, parts);
         }
     }
 }
@@ -185,7 +188,7 @@ impl AttributeValueViewParts for ViewPart {
     }
 
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self);
     }
 }
@@ -205,9 +208,9 @@ macro_rules! impl_tuple {
 
             #[inline]
             #[allow(non_snake_case)]
-            fn into_view_parts(self, parts: &mut ViewParts) {
+            fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
                 let ($($ty,)+) = self;
-                $($ty.into_view_parts(parts);)+
+                $($ty.into_view_parts(cx, parts);)+
             }
         }
     };

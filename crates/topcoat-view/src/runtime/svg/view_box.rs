@@ -1,5 +1,7 @@
 use std::fmt::{self, Display};
 
+use topcoat_core::runtime::context::Cx;
+
 use crate::runtime::{AttributeValueViewParts, Unescaped, ViewParts};
 
 /// The [`viewBox`] of an SVG element: `min-x`, `min-y`, `width`, and `height`.
@@ -41,7 +43,7 @@ impl AttributeValueViewParts for ViewBox {
         true
     }
 
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         const SPACE: Unescaped<&str> = Unescaped::new_unchecked(" ");
         parts.push(self.min_x);
         parts.push(SPACE);
@@ -62,7 +64,7 @@ mod tests {
 
     fn render(value: impl AttributeValueViewParts) -> String {
         let mut parts = ViewParts::new();
-        value.into_view_parts(&mut parts);
+        value.into_view_parts(&Cx::default(), &mut parts);
         let part: ViewPart = parts.into();
         let mut buf = String::new();
         let mut f = Formatter::new(&mut buf);

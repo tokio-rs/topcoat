@@ -27,7 +27,7 @@ impl AttributeWriter {
     #[allow(clippy::needless_pass_by_value)]
     pub fn insert(&mut self, key: TokenStream, value: TokenStream) {
         self.chunks.push(Chunk::Insert {
-            tokens: quote! { __attrs.insert(#key, #value); },
+            tokens: quote! { __attrs.insert(__cx, #key, #value); },
             capacity: 1,
         });
     }
@@ -246,8 +246,8 @@ mod tests {
         writer.insert(quote! { "id" }, quote! { "x" });
         let out = rendered(writer);
         assert!(out.contains("with_capacity (2usize)"));
-        assert!(out.contains("__attrs . insert (\"class\" , \"btn\")"));
-        assert!(out.contains("__attrs . insert (\"id\" , \"x\")"));
+        assert!(out.contains("__attrs . insert (__cx , \"class\" , \"btn\")"));
+        assert!(out.contains("__attrs . insert (__cx , \"id\" , \"x\")"));
     }
 
     #[test]

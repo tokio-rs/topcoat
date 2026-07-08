@@ -81,7 +81,7 @@ impl ToTokens for View {
 /// view syntax, so this only assigns meaning to input that was previously
 /// rejected. Matching only an identifier (rather than an arbitrary expression)
 /// keeps parsing cheap and unambiguous.
-fn parse_leading_cx(input: ParseStream) -> Option<Ident> {
+pub(crate) fn parse_leading_cx(input: ParseStream) -> Option<Ident> {
     if input.peek(Ident) && input.peek2(Token![,]) {
         let cx = input.parse::<Ident>().ok()?;
         input.parse::<Token![,]>().ok()?;

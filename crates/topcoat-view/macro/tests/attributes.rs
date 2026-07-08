@@ -1,5 +1,6 @@
 #[test]
 fn attributes_macro_builds_runtime_attributes() {
+    let cx = &topcoat::context::Cx::default();
     let id = "submit";
     let dynamic = [
         ("data-skip", "skip"),
@@ -9,6 +10,7 @@ fn attributes_macro_builds_runtime_attributes() {
     ];
 
     let mut attrs = topcoat::view::attributes! {
+        cx,
         class="button"
         id=(id)
         :data-bound=$(id.to_owned())
@@ -51,9 +53,10 @@ fn attributes_macro_builds_runtime_attributes() {
 async fn spread_inserts_attribute_fragment_into_element() {
     use topcoat::{context::Cx, view::view};
 
-    let attrs = topcoat::view::attributes! { type="submit" };
-    let result: topcoat::Result = view! { <button (attrs)>"Save"</button> };
-    let html = result.unwrap().render(&Cx::empty());
+    let cx = &Cx::empty();
+    let attrs = topcoat::view::attributes! { cx, type="submit" };
+    let result: topcoat::Result = view! { cx, <button (attrs)>"Save"</button> };
+    let html = result.unwrap().render(cx);
 
     assert_eq!(html, r#"<button type="submit">Save</button>"#);
 }
@@ -62,9 +65,10 @@ async fn spread_inserts_attribute_fragment_into_element() {
 async fn spread_follows_other_attributes() {
     use topcoat::{context::Cx, view::view};
 
-    let attrs = topcoat::view::attributes! { type="submit" };
-    let result: topcoat::Result = view! { <button class="btn" (attrs)>"Save"</button> };
-    let html = result.unwrap().render(&Cx::empty());
+    let cx = &Cx::empty();
+    let attrs = topcoat::view::attributes! { cx, type="submit" };
+    let result: topcoat::Result = view! { cx, <button class="btn" (attrs)>"Save"</button> };
+    let html = result.unwrap().render(cx);
 
     assert!(html.contains(r#"class="btn""#));
     assert!(html.contains(r#"type="submit""#));
@@ -74,8 +78,9 @@ async fn spread_follows_other_attributes() {
 fn dynamic_key_still_parses_after_spread_support() {
     // A parenthesized key followed by `=` remains a dynamic attribute, not a
     // spread.
+    let cx = &topcoat::context::Cx::default();
     let name = "data-state";
-    let attrs = topcoat::view::attributes! { (name)="ready" };
+    let attrs = topcoat::view::attributes! { cx, (name)="ready" };
     assert!(attrs.contains_key("data-state"));
 }
 
@@ -83,14 +88,15 @@ fn dynamic_key_still_parses_after_spread_support() {
 async fn spread_merges_within_attributes_macro() {
     use topcoat::{context::Cx, view::view};
 
-    let base = topcoat::view::attributes! { class="btn" type="button" };
-    let merged = topcoat::view::attributes! { class="card" (base) };
+    let cx = &Cx::empty();
+    let base = topcoat::view::attributes! { cx, class="btn" type="button" };
+    let merged = topcoat::view::attributes! { cx, class="card" (base) };
 
     assert!(merged.contains_key("type"));
 
     // The spread's keys replace earlier ones, so `class` renders as `btn`.
-    let result: topcoat::Result = view! { <div (merged)></div> };
-    let html = result.unwrap().render(&Cx::empty());
+    let result: topcoat::Result = view! { cx, <div (merged)></div> };
+    let html = result.unwrap().render(cx);
     assert!(html.contains(r#"class="btn""#));
     assert!(!html.contains(r#"class="card""#));
 }

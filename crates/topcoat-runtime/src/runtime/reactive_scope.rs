@@ -1,4 +1,5 @@
 use serde::Serialize;
+use topcoat_core::runtime::context::Cx;
 use topcoat_view::runtime::{NodeViewParts, Unescaped, View, ViewPart, ViewParts};
 use uuid::Uuid;
 
@@ -44,7 +45,7 @@ impl ReactiveScope {
 }
 
 impl NodeViewParts for ReactiveScope {
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         let shard_id = self.shard_id.as_str();
 
         // <!-- ::topcoat::scope::start("<id>", "<path>", ["<js>", ...]) -->
