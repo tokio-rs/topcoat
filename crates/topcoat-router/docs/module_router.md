@@ -71,12 +71,12 @@ Layers use the same module-derived path as layouts, but wrap request handling in
 // src/app/api.rs: wraps routes under /api
 use topcoat::{
     Result,
-    context::Cx,
+    context::CxBuilder,
     router::{Body, Next, Response, layer},
 };
 
 #[layer]
-async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+async fn api_log(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;
     println!("API response: {}", response.status());
     Ok(response)
@@ -90,7 +90,7 @@ Module-derived paths and explicit paths can be mixed in the same route tree. `#[
 ```rust
 # use topcoat::{
 #     Result,
-#     context::Cx,
+#     context::CxBuilder,
 #     router::{Body, Next, Response, Slot, layer, layout, page, route},
 #     view::view,
 # };
@@ -105,7 +105,7 @@ async fn admin_layout(slot: Slot<'_>) -> Result {
 }
 
 #[layer("/admin")]
-async fn admin_layer(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+async fn admin_layer(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
     next.run(cx, body).await
 }
 

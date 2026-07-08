@@ -186,12 +186,12 @@ A layer wraps matched routes under its path prefix. It receives a mutable reques
 ```rust
 use topcoat::{
     Result,
-    context::Cx,
+    context::CxBuilder,
     router::{Body, Next, Response, layer},
 };
 
 #[layer("/")]
-async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
     let start = std::time::Instant::now();
     let response = next.run(cx, body).await?;
     println!("handled in {:?}", start.elapsed());
@@ -252,10 +252,10 @@ The methods cover the same statuses: [`ok_or_not_found`](RouterErrorExt::ok_or_n
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
 
 ```rust
-# use topcoat::{Result, context::Cx, router::{Body, Next, Response, Slot, layer, layout, page, route}, view::view};
+# use topcoat::{Result, context::CxBuilder, router::{Body, Next, Response, Slot, layer, layout, page, route}, view::view};
 # #[layout("/")] async fn root_layout(slot: Slot<'_>) -> Result { view! { (slot.await?) } }
 # #[layout("/settings")] async fn settings_layout(slot: Slot<'_>) -> Result { view! { (slot.await?) } }
-# #[layer("/")] async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
+# #[layer("/")] async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
 # #[page("/")] async fn home() -> Result { view! { <h1>"Home"</h1> } }
 # #[page("/about")] async fn about() -> Result { view! { <h1>"About"</h1> } }
 # #[page("/settings/profile")] async fn profile() -> Result { view! { <h1>"Profile"</h1> } }
@@ -314,7 +314,7 @@ async fn main() {
 ```rust
 use topcoat::{
     Result,
-    context::Cx,
+    context::CxBuilder,
     router::{Body, Json, Next, Response, Router, Slot, layer, layout, page, route},
     view::view,
 };
@@ -341,7 +341,7 @@ async fn root_layout(slot: Slot<'_>) -> Result {
 }
 
 #[layer("/api")]
-async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+async fn api_log(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;
     println!("API response: {}", response.status());
     Ok(response)

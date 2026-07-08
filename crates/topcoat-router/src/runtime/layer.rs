@@ -235,7 +235,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use http::StatusCode;
-    use topcoat_core::runtime::context::{ContextMap, CxBuilder, app_context};
+    use topcoat_core::runtime::context::{ContextMap, Cx, CxBuilder, app_context};
 
     use super::*;
     use crate::runtime::{Bytes, IntoResponse, Method, RouteFn, RouteFuture, respond, to_bytes};
