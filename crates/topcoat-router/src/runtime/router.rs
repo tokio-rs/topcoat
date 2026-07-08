@@ -6,8 +6,8 @@ use std::sync::Arc;
 use topcoat_core::runtime::context::{ContextMap, Cx};
 
 use crate::runtime::{
-    Endpoint, Layer, LayoutFn, Next, PageFn, PageWithLayouts, Path, RawPathParams, Request,
-    Response, Route, Terminal, respond,
+    Endpoint, Layer, LayoutFn, Next, PageFn, PageWithLayouts, Path, PathSegment, RawPathParams,
+    Request, Response, Route, Terminal, respond,
 };
 
 /// A finalized Topcoat routing table.
@@ -64,11 +64,17 @@ impl Router {
         // matches (a route) or not (405), so both flow through the same layers.
         // An unmatched path (404) has no precomputed stack, so its layers are
         // selected from the request path on this cold path.
-        let not_found_layers: Vec<usize>;
+        let not_found_layers: Box<[usize]>;
         let (layers, terminal, path_params) =
             if let Ok(matched) = self.endpoints.at(parts.uri.path()) {
-                let path_params = RawPathParams::from_pairs(matched.params.iter());
-                let terminal = match matched.value.get(&parts.method) {
+                let endpoint = matched.value;
+                let path_params = {
+                    debug_assert_eq!(endpoint.path_params().len(), matched.params.len());
+                    let keys = endpoint.path_params().iter().cloned();
+                    let values = matched.params.iter().map(|(_, value)| value);
+                    RawPathParams::from_pairs(keys.zip(values))
+                };
+                let terminal = match endpoint.get(&parts.method) {
                     Some(index) => Terminal::Route(&*self.routes[index]),
                     None => Terminal::MethodNotAllowed(matched.value),
                 };
@@ -76,7 +82,7 @@ impl Router {
             } else {
                 not_found_layers = layers_for(request_path(&parts.uri), &self.layers);
                 (
-                    not_found_layers.as_slice(),
+                    &*not_found_layers,
                     Terminal::NotFound,
                     RawPathParams::default(),
                 )
@@ -103,8 +109,8 @@ fn request_path(uri: &http::Uri) -> &Path {
 ///
 /// Reversing the filtered indices before the stable sort means that among
 /// layers sharing a path the most recently registered ends up outermost.
-fn layers_for(path: &Path, layers: &[Box<dyn Layer>]) -> Vec<usize> {
-    let mut indices: Vec<usize> = (0..layers.len())
+fn layers_for(path: &Path, layers: &[Box<dyn Layer>]) -> Box<[usize]> {
+    let mut indices: Box<[usize]> = (0..layers.len())
         .filter(|&i| path.starts_with(layers[i].path()))
         .rev()
         .collect();
@@ -397,20 +403,36 @@ impl RouterBuilder {
         // intact, which `to_matchit_path` strips) to select the endpoint's
         // layers below.
         let mut grouped: HashMap<Cow<'static, str>, Endpoint> = HashMap::new();
-        let mut paths: HashMap<Cow<'static, str>, Cow<'static, Path>> = HashMap::new();
+        let mut interned_path_params: HashMap<&str, Arc<str>> = HashMap::new();
         for (index, route) in routes.iter().enumerate() {
-            let route_path = route.path();
-            let matchit_path = route_path.to_matchit_path();
+            let endpoint = grouped
+                .entry(route.path().to_matchit_path())
+                .or_insert_with(|| {
+                    let path_params = route
+                        .path()
+                        .segments()
+                        .filter_map(|segment| match segment {
+                            PathSegment::Param(param) => {
+                                let interned =
+                                    interned_path_params.entry(param).or_insert_with(|| {
+                                        Arc::from(param.to_owned().into_boxed_str())
+                                    });
+                                Some(interned.clone())
+                            }
+                            _ => None,
+                        })
+                        .collect();
+                    let layers = layers_for(route.path(), &layers);
+                    Endpoint::new(path_params, layers)
+                });
+
             let method = route.method();
-            let endpoint = grouped.entry(matchit_path.clone()).or_default();
             assert!(
                 endpoint.get(&method).is_none(),
-                "duplicate route registered for `{method} {matchit_path}`"
+                "duplicate route registered for `{method} {}`",
+                route.path().to_matchit_path()
             );
             endpoint.insert(method, index);
-            paths
-                .entry(matchit_path)
-                .or_insert(Cow::Owned(route_path.to_owned()));
         }
 
         // Precompute the layer stack wrapping each endpoint once, so dispatch
@@ -418,7 +440,6 @@ impl RouterBuilder {
         let mut endpoints = matchit::Router::new();
         for (path, mut endpoint) in grouped {
             endpoint.alias_head_to_get();
-            endpoint.set_layers(layers_for(&paths[&path], &layers).into_boxed_slice());
             endpoints
                 .insert(path.clone(), endpoint)
                 .unwrap_or_else(|error| panic!("failed to register route {path:?}: {error}"));
@@ -616,16 +637,19 @@ mod tests {
         // For `/admin/users/1` the matching layers are `/`, `/admin`,
         // `/admin/users`, ordered by ascending path length (outermost first).
         let indices = layers_for(Path::new("/admin/users/1"), &layers);
-        assert_eq!(indices, vec![1, 0, 2]);
+        assert_eq!(indices, vec![1, 0, 2].into_boxed_slice());
     }
 
     #[test]
     fn layers_for_excludes_non_prefixes() {
         let layers = path_layers(&["/admin", "/blog"]);
-        assert_eq!(layers_for(Path::new("/admin/x"), &layers), vec![0]);
+        assert_eq!(
+            layers_for(Path::new("/admin/x"), &layers),
+            vec![0].into_boxed_slice()
+        );
         assert_eq!(
             layers_for(Path::new("/marketing"), &layers),
-            Vec::<usize>::new()
+            Vec::<usize>::new().into_boxed_slice()
         );
     }
 
@@ -634,7 +658,10 @@ mod tests {
         // Two layers share the root path; the later-registered one (index 1)
         // ends up outermost.
         let layers = path_layers(&["/", "/"]);
-        assert_eq!(layers_for(Path::new("/anything"), &layers), vec![1, 0]);
+        assert_eq!(
+            layers_for(Path::new("/anything"), &layers),
+            vec![1, 0].into_boxed_slice()
+        );
     }
 
     // -- RouterBuilder --
