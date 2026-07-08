@@ -47,7 +47,8 @@ async fn literal_attributes_render_quoted() {
 async fn rust_expression_in_child_position_becomes_a_node() {
     let name = "world";
     let cx = &Cx::empty();
-    let html = r(view! { cx,
+    let html = r(view! {
+        cx,
         <h1>
             "Hello, "
             (name)
@@ -94,7 +95,8 @@ async fn numeric_child_values_render_as_text() {
     let count: i32 = 42;
     let ratio: f64 = 1.5;
     let cx = &Cx::empty();
-    let html = r(view! { cx,
+    let html = r(view! {
+        cx,
         <span>
             (count)
             " "

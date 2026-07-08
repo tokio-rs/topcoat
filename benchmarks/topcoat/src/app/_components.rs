@@ -118,7 +118,11 @@ pub async fn rating_stars(tenths: u32, size: &str) -> Result {
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden="true"
-                    class=((size, " ", if index < filled { "text-amber-400" } else { "text-slate-200" }))
+                    class=((
+                        size,
+                        " ",
+                        if index < filled { "text-amber-400" } else { "text-slate-200" },
+                    ))
                 >
                     <path d=(STAR_PATH)></path>
                 </svg>
