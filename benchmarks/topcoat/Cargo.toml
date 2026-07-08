@@ -9,6 +9,9 @@ serde_json.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 topcoat.workspace = true
 
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = "0.7"
+
 [build-dependencies]
 # We cannot use `workspace = true` with `default-features = false`.
 topcoat = { path = "../../crates/topcoat/", default-features = false, features = ["tailwind"] }

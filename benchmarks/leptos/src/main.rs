@@ -1,3 +1,7 @@
+#[cfg(all(feature = "ssr", not(target_env = "msvc")))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
