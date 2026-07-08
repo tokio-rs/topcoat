@@ -37,16 +37,14 @@ impl_primitive!(Unescaped<String>);
 impl ElementNameViewParts for &str {
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
-        let part: ViewPart = self.to_owned().into();
-        parts.push(part);
+        parts.push(self.to_owned());
     }
 }
 
-impl ElementNameViewParts for Unescaped<&str> {
+impl ElementNameViewParts for Unescaped<&'static str> {
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
-        let part: ViewPart = Unescaped::new_unchecked(String::from(*self)).into();
-        parts.push(part);
+        parts.push(self);
     }
 }
 

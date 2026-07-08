@@ -90,12 +90,11 @@ impl AttributeValueViewParts for &str {
 
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
-        let part: ViewPart = self.to_owned().into();
-        parts.push(part);
+        parts.push(self.to_owned());
     }
 }
 
-impl AttributeValueViewParts for Unescaped<&str> {
+impl AttributeValueViewParts for Unescaped<&'static str> {
     #[inline]
     fn attribute_present(&self) -> bool {
         true
@@ -103,8 +102,7 @@ impl AttributeValueViewParts for Unescaped<&str> {
 
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
-        let part: ViewPart = Unescaped::new_unchecked(String::from(*self)).into();
-        parts.push(part);
+        parts.push(self);
     }
 }
 

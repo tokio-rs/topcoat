@@ -37,7 +37,7 @@ pub mod internal {
     }
 
     #[inline]
-    pub fn __js_unescaped(parts: &mut ViewParts, s: &str) {
+    pub fn __js_unescaped(parts: &mut ViewParts, s: &'static str) {
         Unescaped::new_unchecked(s).into_view_parts(parts);
     }
 

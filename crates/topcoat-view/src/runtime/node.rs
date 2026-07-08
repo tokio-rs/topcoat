@@ -70,16 +70,14 @@ impl_primitive!(Unescaped<String>);
 impl NodeViewParts for &str {
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
-        let part: ViewPart = self.to_owned().into();
-        parts.push(part);
+        parts.push(self.to_owned());
     }
 }
 
-impl NodeViewParts for Unescaped<&str> {
+impl NodeViewParts for Unescaped<&'static str> {
     #[inline]
     fn into_view_parts(self, parts: &mut ViewParts) {
-        let part: ViewPart = Unescaped::new_unchecked(String::from(*self)).into();
-        parts.push(part);
+        parts.push(self);
     }
 }
 

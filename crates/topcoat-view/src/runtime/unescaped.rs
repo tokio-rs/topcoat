@@ -24,7 +24,7 @@ impl<T> Unescaped<T> {
     }
 }
 
-impl FmtHtml for Unescaped<&str> {
+impl FmtHtml for Unescaped<&'static str> {
     #[inline]
     fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
         f.write_str_unescaped(self.0);
