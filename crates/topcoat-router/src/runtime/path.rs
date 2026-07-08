@@ -209,8 +209,8 @@ impl Path {
     /// Each segment is matched against the corresponding URL segment:
     /// - **`Static`** segments must equal the URL segment.
     /// - **`Param`** segments match any single URL segment.
-    /// - **`CatchAll`** segments match the remaining URL (including any `/`
-    ///   separators) and require at least one segment to be present.
+    /// - **`CatchAll`** segments match the remaining URL (including any `/` separators) and require
+    ///   at least one segment to be present.
     /// - **`Group`** segments are ignored, as they are not part of the URL.
     ///
     /// # Examples
