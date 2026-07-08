@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use percent_encoding::percent_decode_str;
-use topcoat_core::runtime::context::Cx;
+use topcoat_core::runtime::context::{Cx, request_context};
 
 /// A typed view of a single path parameter, as declared by
 /// [`#[path_param]`](attr.path_param.html).
@@ -35,6 +35,14 @@ pub fn path_param<T: PathParam + ?Sized>(cx: &Cx) -> T::Output<'_> {
     T::path_param(cx, PathParamSealed::new())
 }
 
+/// This is an internal function, use direct path hooks instead.
+#[inline]
+#[must_use]
+#[doc(hidden)]
+pub fn raw_path_params(cx: &Cx) -> &RawPathParams {
+    request_context::<RawPathParams>(cx)
+}
+
 /// The path parameters captured from the matched route.
 ///
 /// Iterating over a reference yields each `(name, value)` pair as string
@@ -46,7 +54,7 @@ pub struct RawPathParams(Vec<(Arc<str>, Box<str>)>);
 impl RawPathParams {
     /// Captures the parameters of a route match, percent-decoding each value.
     pub(crate) fn from_pairs<'pairs>(
-        pairs: impl IntoIterator<Item = (&'pairs str, &'pairs str)>,
+        pairs: impl IntoIterator<Item = (Arc<str>, &'pairs str)>,
     ) -> Self {
         Self(
             pairs
@@ -56,7 +64,7 @@ impl RawPathParams {
                         .decode_utf8_lossy()
                         .into_owned()
                         .into_boxed_str();
-                    (Arc::from(key), value)
+                    (key, value)
                 })
                 .collect(),
         )

@@ -1,8 +1,6 @@
 use http::request::Parts;
 use topcoat_core::runtime::context::{Cx, request_context};
 
-use crate::runtime::RawPathParams;
-
 /// Returns the [`Parts`] of the current request.
 ///
 /// Use this when you need access to multiple components of the request at
@@ -141,12 +139,4 @@ pub fn content_type(cx: &Cx) -> Option<&str> {
 #[must_use]
 pub fn extensions(cx: &Cx) -> &http::Extensions {
     &parts(cx).extensions
-}
-
-/// This is an internal function, use direct path hooks instead.
-#[inline]
-#[must_use]
-#[doc(hidden)]
-pub fn raw_path_params(cx: &Cx) -> &RawPathParams {
-    request_context::<RawPathParams>(cx)
 }

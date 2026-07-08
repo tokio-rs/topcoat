@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use http::Method;
 
@@ -83,6 +83,8 @@ fn standard_slot(method: &Method) -> Option<usize> {
 pub(crate) struct Endpoint {
     standard: [RouteIndex; STANDARD_METHODS.len()],
     other: HashMap<Method, usize>,
+    /// Cheaply clonable path parameters for this endpoint.
+    path_params: Box<[Arc<str>]>,
     /// The layers wrapping every route at this path, as indices into the
     /// router's layer list, precomputed at build time and ordered from
     /// least- to most-specific so the outermost layer runs first. Shared by
@@ -91,6 +93,15 @@ pub(crate) struct Endpoint {
 }
 
 impl Endpoint {
+    pub(crate) fn new(path_params: Box<[Arc<str>]>, layers: Box<[usize]>) -> Self {
+        Self {
+            standard: Default::default(),
+            other: Default::default(),
+            path_params,
+            layers,
+        }
+    }
+
     /// Returns the route index handling `method`, if any.
     pub(crate) fn get(&self, method: &Method) -> Option<usize> {
         match standard_slot(method) {
@@ -127,9 +138,9 @@ impl Endpoint {
             .chain(self.other.keys())
     }
 
-    /// Records the precomputed layer stack wrapping this path's routes.
-    pub(crate) fn set_layers(&mut self, layers: Box<[usize]>) {
-        self.layers = layers;
+    /// Returns the precomputed path parameter keys for this endpoint.
+    pub(crate) fn path_params(&self) -> &[Arc<str>] {
+        &self.path_params
     }
 
     /// Returns the precomputed layer stack wrapping this path's routes, as
