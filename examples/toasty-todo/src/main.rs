@@ -108,7 +108,7 @@ async fn home(cx: &Cx) -> Result {
 #[component]
 async fn toggle_checkbox(todo: &Todo) -> Result {
     view! {
-        <form method="post" action=(format!("/todos/{}/toggle", todo.id))>
+        <form method="post" action=(("/todos/", todo.id, "/toggle"))>
             <input type="checkbox" checked=(todo.done) onchange="this.form.submit()">
         </form>
     }
@@ -117,7 +117,7 @@ async fn toggle_checkbox(todo: &Todo) -> Result {
 #[component]
 async fn delete_button(todo: &Todo) -> Result {
     view! {
-        <form method="post" action=(format!("/todos/{}/delete", todo.id))>
+        <form method="post" action=(("/todos/", todo.id, "/delete"))>
             <button type="submit">"delete"</button>
         </form>
     }

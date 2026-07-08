@@ -191,3 +191,39 @@ impl AttributeValueViewParts for ViewPart {
         parts.push(self);
     }
 }
+
+macro_rules! impl_tuple {
+    ($($ty:ident),+) => {
+        impl<$($ty),+> AttributeValueViewParts for ($($ty,)+)
+        where
+            $($ty: AttributeValueViewParts,)+
+        {
+            #[inline]
+            #[allow(non_snake_case)]
+            fn attribute_present(&self) -> bool {
+                let ($($ty,)+) = self;
+                $($ty.attribute_present())||+
+            }
+
+            #[inline]
+            #[allow(non_snake_case)]
+            fn into_view_parts(self, parts: &mut ViewParts) {
+                let ($($ty,)+) = self;
+                $($ty.into_view_parts(parts);)+
+            }
+        }
+    };
+}
+
+impl_tuple!(T1);
+impl_tuple!(T1, T2);
+impl_tuple!(T1, T2, T3);
+impl_tuple!(T1, T2, T3, T4);
+impl_tuple!(T1, T2, T3, T4, T5);
+impl_tuple!(T1, T2, T3, T4, T5, T6);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);

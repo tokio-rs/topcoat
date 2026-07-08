@@ -118,10 +118,7 @@ pub async fn rating_stars(tenths: u32, size: &str) -> Result {
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden="true"
-                    class=(format!(
-                        "{size} {}", if index < filled { "text-amber-400" } else {
-                        "text-slate-200" }
-                    ))
+                    class=((size, " ", if index < filled { "text-amber-400" } else { "text-slate-200" }))
                 >
                     <path d=(STAR_PATH)></path>
                 </svg>
@@ -134,7 +131,7 @@ pub async fn rating_stars(tenths: u32, size: &str) -> Result {
 pub async fn product_card(product: &Product) -> Result {
     view! {
         <a
-            href=(format!("/products/{}", product.id))
+            href=(("/products/", product.id))
             class="group flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md"
         >
             <div
@@ -214,7 +211,7 @@ pub async fn breadcrumbs(category: &str, category_slug: &str, name: &str) -> Res
                 <li>"/"</li>
                 <li>
                     <a
-                        href=(format!("/products?category={category_slug}"))
+                        href=(("/products?category=", category_slug))
                         class="hover:text-slate-900"
                     >
                         (category)
