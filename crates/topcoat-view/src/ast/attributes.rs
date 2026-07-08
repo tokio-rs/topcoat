@@ -19,15 +19,24 @@ pub use bind_attribute::*;
 pub use event_handler::*;
 
 use proc_macro2::TokenStream;
-use quote::ToTokens;
+use quote::{ToTokens, quote};
+use syn::Ident;
 use syn::parse::{Parse, ParseStream};
 
 use topcoat_core::ast::ParseOption;
 
-use crate::ast::view::{ViewWriter, WriteView};
+use crate::ast::view::{ViewWriter, WriteView, parse_leading_cx};
 
 /// The full list of attributes attached to a single tag.
 pub struct Attributes {
+    /// The request context binding supplied by a leading `cx,` argument to the
+    /// `attributes!` macro.
+    ///
+    /// Inside a `#[component]`, `#[page]`, or `#[layout]`, the context is
+    /// available implicitly, so this is [`None`]. Anywhere else the caller names
+    /// it explicitly as `attributes! { cx, ... }`, mirroring `view! { cx, ... }`.
+    /// Attributes parsed as part of an element tag never carry one.
+    pub cx: Option<Ident>,
     pub items: Vec<AttributeNode>,
 }
 
@@ -59,23 +68,45 @@ impl ToTokens for Attributes {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut writer = AttributeWriter::new();
         WriteAttribute::write(self, &mut writer);
-        writer.into_token_stream().to_tokens(tokens);
+        let attrs = writer.into_token_stream();
+
+        // When an explicit context is named, bind it to the `__cx` identifier
+        // the generated `__attrs.insert(__cx, ...)` calls read from. Inside a
+        // component/page/layout this binding is already in scope, so we emit the
+        // attributes untouched.
+        match &self.cx {
+            Some(cx) => quote! {{
+                let __cx: &::topcoat::context::Cx = #cx;
+                #attrs
+            }}
+            .to_tokens(tokens),
+            None => attrs.to_tokens(tokens),
+        }
     }
 }
 
 impl Parse for Attributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        let cx = parse_leading_cx(input);
         let mut items = Vec::new();
         while let Some(item) = input.call(AttributeNode::parse_option)? {
             items.push(item);
         }
-        Ok(Self { items })
+        Ok(Self { cx, items })
     }
 }
 
 #[cfg(feature = "pretty")]
 impl topcoat_pretty::PrettyPrint for Attributes {
     fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+        if let Some(cx) = &self.cx {
+            cx.pretty_print(printer);
+            ",".pretty_print(printer);
+            printer.scan_same_line_trivia();
+            printer.scan_break();
+            " ".pretty_print(printer);
+            printer.scan_trivia(true, true);
+        }
         if self.is_empty() {
             return;
         }

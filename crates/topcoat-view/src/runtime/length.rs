@@ -1,5 +1,7 @@
 use std::fmt::{self, Display};
 
+use topcoat_core::runtime::context::Cx;
+
 use crate::runtime::{AttributeValueViewParts, Unescaped, ViewParts};
 
 /// A CSS length unit.
@@ -531,7 +533,7 @@ impl AttributeValueViewParts for Length {
         true
     }
 
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self.value);
         parts.push(Unescaped::new_unchecked(self.unit.as_str()));
     }
@@ -600,7 +602,7 @@ mod tests {
 
     fn render(value: impl AttributeValueViewParts) -> String {
         let mut parts = ViewParts::new();
-        value.into_view_parts(&mut parts);
+        value.into_view_parts(&Cx::default(), &mut parts);
         let part: ViewPart = parts.into();
         let mut buf = String::new();
         let mut f = Formatter::new(&mut buf);

@@ -125,11 +125,11 @@ impl ViewWriter {
                             Chunk::Static { string } => {
                                 let helper = ExprKind::Unescaped.helper();
                                 let tokens = quote! { #string };
-                                quote! { #helper(&mut __parts, #tokens); }
+                                quote! { #helper(__cx, &mut __parts, #tokens); }
                             }
                             Chunk::Expr { kind, tokens } => {
                                 let helper = kind.helper();
-                                quote! { #helper(&mut __parts, #tokens); }
+                                quote! { #helper(__cx, &mut __parts, #tokens); }
                             }
                             Chunk::Let { pat, expr } => {
                                 quote! { let #pat = #expr; }
@@ -327,9 +327,9 @@ mod tests {
         writer.write_expr(ExprKind::Node, quote! { value });
         writer.write_str_unescaped("</p>");
         let out = rendered(writer);
-        assert!(out.contains("__unescaped (& mut __parts , \"<p>\")"));
-        assert!(out.contains("__node (& mut __parts , value)"));
-        assert!(out.contains("__unescaped (& mut __parts , \"</p>\")"));
+        assert!(out.contains("__unescaped (__cx , & mut __parts , \"<p>\")"));
+        assert!(out.contains("__node (__cx , & mut __parts , value)"));
+        assert!(out.contains("__unescaped (__cx , & mut __parts , \"</p>\")"));
     }
 
     #[test]

@@ -1,3 +1,4 @@
+use topcoat_core::runtime::context::Cx;
 use topcoat_view::runtime::{AttributeKeyViewParts, AttributeViewParts, Unescaped, ViewParts};
 
 use crate::runtime::{Event, Expr};
@@ -29,9 +30,9 @@ where
     K: AttributeKeyViewParts,
 {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
         parts.push(Unescaped::new_unchecked(" data-topcoat-on:"));
-        self.key.into_view_parts(parts);
+        self.key.into_view_parts(cx, parts);
         parts.push(Unescaped::new_unchecked("=\""));
         parts.push(self.value.js);
         parts.push(Unescaped::new_unchecked("\" "));

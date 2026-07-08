@@ -46,7 +46,9 @@ async fn literal_attributes_render_quoted() {
 #[tokio::test]
 async fn rust_expression_in_child_position_becomes_a_node() {
     let name = "world";
+    let cx = &Cx::empty();
     let html = r(view! {
+        cx,
         <h1>
             "Hello, "
             (name)
@@ -59,28 +61,32 @@ async fn rust_expression_in_child_position_becomes_a_node() {
 #[tokio::test]
 async fn rust_expression_in_attribute_value_becomes_the_value() {
     let url = "/about";
-    let html = r(view! { <a href=(url)>"about"</a> });
+    let cx = &Cx::empty();
+    let html = r(view! { cx, <a href=(url)>"about"</a> });
     assert_eq!(html, r#"<a href="/about">about</a>"#);
 }
 
 #[tokio::test]
 async fn dynamic_attribute_name_uses_parenthesized_expression() {
     let attr = "data-state";
-    let html = r(view! { <div (attr)="ready"></div> });
+    let cx = &Cx::empty();
+    let html = r(view! { cx, <div (attr)="ready"></div> });
     assert_eq!(html, r#"<div data-state="ready"></div>"#);
 }
 
 #[tokio::test]
 async fn dynamic_element_name_uses_parenthesized_expression() {
     let tag: String = "section".to_owned();
-    let html = r(view! { <(tag)>"body"</(tag)> });
+    let cx = &Cx::empty();
+    let html = r(view! { cx, <(tag)>"body"</(tag)> });
     assert_eq!(html, "<section>body</section>");
 }
 
 #[tokio::test]
 async fn child_text_is_html_escaped() {
     let raw = "<script>alert(1)</script>";
-    let html = r(view! { <p>(raw)</p> });
+    let cx = &Cx::empty();
+    let html = r(view! { cx, <p>(raw)</p> });
     assert_eq!(html, "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>");
 }
 
@@ -88,7 +94,9 @@ async fn child_text_is_html_escaped() {
 async fn numeric_child_values_render_as_text() {
     let count: i32 = 42;
     let ratio: f64 = 1.5;
+    let cx = &Cx::empty();
     let html = r(view! {
+        cx,
         <span>
             (count)
             " "
@@ -101,28 +109,32 @@ async fn numeric_child_values_render_as_text() {
 #[tokio::test]
 async fn conditional_attribute_false_omits_attribute() {
     let disabled = false;
-    let html = r(view! { <button disabled=(disabled)>"go"</button> });
+    let cx = &Cx::empty();
+    let html = r(view! { cx, <button disabled=(disabled)>"go"</button> });
     assert_eq!(html, "<button>go</button>");
 }
 
 #[tokio::test]
 async fn conditional_attribute_true_keeps_attribute() {
     let disabled = true;
-    let html = r(view! { <button disabled=(disabled)>"go"</button> });
+    let cx = &Cx::empty();
+    let html = r(view! { cx, <button disabled=(disabled)>"go"</button> });
     assert!(html.contains("disabled"));
 }
 
 #[tokio::test]
 async fn conditional_attribute_none_omits_attribute() {
     let title: Option<&str> = None;
-    let html = r(view! { <button title=(title)>"go"</button> });
+    let cx = &Cx::empty();
+    let html = r(view! { cx, <button title=(title)>"go"</button> });
     assert_eq!(html, "<button>go</button>");
 }
 
 #[tokio::test]
 async fn conditional_attribute_some_renders_with_inner_value() {
     let title: Option<&str> = Some("hi");
-    let html = r(view! { <button title=(title)>"go"</button> });
+    let cx = &Cx::empty();
+    let html = r(view! { cx, <button title=(title)>"go"</button> });
     assert_eq!(html, r#"<button title="hi">go</button>"#);
 }
 

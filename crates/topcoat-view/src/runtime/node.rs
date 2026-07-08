@@ -1,3 +1,5 @@
+use topcoat_core::runtime::context::Cx;
+
 use crate::runtime::{Unescaped, View, ViewPart, ViewParts};
 
 /// Converts a value used in node position into view parts.
@@ -6,7 +8,8 @@ use crate::runtime::{Unescaped, View, ViewPart, ViewParts};
 /// in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
-/// # use topcoat::view::view;
+/// # use topcoat::view::{component, view};
+/// # #[component]
 /// # async fn example() -> topcoat::Result {
 /// # let my_value = "value";
 /// view! {
@@ -16,12 +19,12 @@ use crate::runtime::{Unescaped, View, ViewPart, ViewParts};
 /// ```
 pub trait NodeViewParts {
     /// Appends this value to `parts`.
-    fn into_view_parts(self, parts: &mut ViewParts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts);
 }
 
 impl NodeViewParts for View {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self);
     }
 }
@@ -30,7 +33,7 @@ macro_rules! impl_primitive {
     ($ty:ty) => {
         impl NodeViewParts for $ty {
             #[inline]
-            fn into_view_parts(self, parts: &mut ViewParts) {
+            fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
                 parts.push(self);
             }
         }
@@ -40,8 +43,8 @@ macro_rules! impl_primitive {
 
         impl NodeViewParts for &$ty {
             #[inline]
-            fn into_view_parts(self, parts: &mut ViewParts) {
-                (*self).into_view_parts(parts)
+            fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+                (*self).into_view_parts(cx, parts)
             }
         }
     };
@@ -69,22 +72,22 @@ impl_primitive!(Unescaped<String>);
 
 impl NodeViewParts for &str {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self.to_owned());
     }
 }
 
 impl NodeViewParts for Unescaped<&'static str> {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self);
     }
 }
 
 impl NodeViewParts for &String {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        self.as_str().into_view_parts(parts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+        self.as_str().into_view_parts(cx, parts);
     }
 }
 
@@ -93,8 +96,8 @@ where
     &'b T: NodeViewParts,
 {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        (*self).into_view_parts(parts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+        (*self).into_view_parts(cx, parts);
     }
 }
 
@@ -103,9 +106,9 @@ where
     T: NodeViewParts,
 {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
         if let Some(value) = self {
-            value.into_view_parts(parts);
+            value.into_view_parts(cx, parts);
         }
     }
 }
@@ -115,9 +118,9 @@ where
     T: NodeViewParts,
 {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
         for value in self {
-            value.into_view_parts(parts);
+            value.into_view_parts(cx, parts);
         }
     }
 }
@@ -130,9 +133,9 @@ macro_rules! impl_tuple {
         {
             #[inline]
             #[allow(non_snake_case)]
-            fn into_view_parts(self, parts: &mut ViewParts) {
+            fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
                 let ($($ty,)+) = self;
-                $($ty.into_view_parts(parts);)+
+                $($ty.into_view_parts(cx, parts);)+
             }
         }
     };

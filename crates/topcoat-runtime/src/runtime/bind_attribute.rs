@@ -1,3 +1,4 @@
+use topcoat_core::runtime::context::Cx;
 use topcoat_view::runtime::{
     AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts, Unescaped, ViewParts,
 };
@@ -23,15 +24,15 @@ where
     V: AttributeValueViewParts,
 {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
         let Expr { evaluated, js } = self.value;
 
         parts.push(Unescaped::new_unchecked(" "));
-        self.key.clone().into_view_parts(parts);
+        self.key.clone().into_view_parts(cx, parts);
         parts.push(Unescaped::new_unchecked("=\""));
-        evaluated.into_view_parts(parts);
+        evaluated.into_view_parts(cx, parts);
         parts.push(Unescaped::new_unchecked("\" data-topcoat-bind:"));
-        self.key.into_view_parts(parts);
+        self.key.into_view_parts(cx, parts);
         parts.push(Unescaped::new_unchecked("=\""));
         parts.push(js);
         parts.push(Unescaped::new_unchecked("\" "));

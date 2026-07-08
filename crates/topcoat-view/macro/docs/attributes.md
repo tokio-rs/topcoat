@@ -68,6 +68,9 @@ let attrs = attributes! {
 The generated value is [`topcoat::view::Attributes`]. It is a runtime collection of attributes with unique keys.
 
 ```rust
+# use topcoat::{Result, context::Cx, view::{component, view}};
+# #[component]
+# async fn example(cx: &Cx) -> Result {
 use topcoat::view::attributes;
 
 let mut attrs = attributes! {
@@ -75,10 +78,12 @@ let mut attrs = attributes! {
     data-state="idle"
 };
 
-attrs.insert("data-state", "loading");
-attrs.insert("disabled", true);
+attrs.insert(cx, "data-state", "loading");
+attrs.insert(cx, "disabled", true);
 
 assert!(attrs.contains_key("class"));
+# view! { <div (attrs)></div> }
+# }
 ```
 
 Because [`Attributes`] is map-like, each key appears at most once. Inserting the same key again replaces the previous value. Do not rely on render order for attributes.

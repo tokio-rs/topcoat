@@ -1,6 +1,7 @@
 use std::{iter::empty, ops::Deref};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use topcoat_core::runtime::context::Cx;
 use topcoat_view::runtime::{NodeViewParts, Unescaped, ViewParts};
 use uuid::Uuid;
 
@@ -78,7 +79,7 @@ where
     for<'a> &'a T: Surrogated,
     for<'a> <&'a T as Surrogated>::Surrogate: Serialize,
 {
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         #[derive(Serialize)]
         struct SignalDeclarationPayload<'a, V>
         where

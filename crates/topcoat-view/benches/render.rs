@@ -174,8 +174,9 @@ async fn static_page() -> Result {
 /// with HTML-significant characters (`<`, `>`, `&`, quotes), so this scenario
 /// exercises the escaping path in the formatter rather than the bulk copy of
 /// safe runs.
-async fn comment_feed(comments: &[String]) -> Result {
+async fn comment_feed(cx: &Cx, comments: &[String]) -> Result {
     view! {
+        cx,
         <ul class="space-y-4">
             for comment in comments {
                 <li
@@ -207,8 +208,9 @@ fn make_comments(count: usize) -> Vec<String> {
 
 /// A dense table of integers. Every cell formats a number through the
 /// `Display`-based render path, isolating numeric formatting from markup.
-async fn numeric_table(rows: &[Vec<i64>]) -> Result {
+async fn numeric_table(cx: &Cx, rows: &[Vec<i64>]) -> Result {
     view! {
+        cx,
         <table class="w-full text-right font-mono text-sm">
             <tbody>
                 for row in rows {
@@ -245,8 +247,9 @@ fn make_number_rows(rows: usize, cols: usize) -> Vec<Vec<i64>> {
 /// One element per item, each carrying several dynamic attributes. Isolates the
 /// attribute-writing path: name emission, value escaping, and the surrounding
 /// quoting.
-async fn tag_cloud(tags: &[Tag]) -> Result {
+async fn tag_cloud(cx: &Cx, tags: &[Tag]) -> Result {
     view! {
+        cx,
         <div class="flex flex-wrap gap-2">
             for tag in tags {
                 <a
@@ -402,9 +405,8 @@ async fn product_card(product: &Product) -> Result {
 
 /// A responsive grid of product cards, the flagship realistic scenario.
 ///
-/// Unlike the leaf scenarios above, this one invokes a component
-/// (`product_card`), so it takes the request context and threads it in with the
-/// `cx,` form of `view!`.
+/// Like the leaf scenarios above, it threads the request context into `view!`
+/// with the `cx,` form; on top of that it invokes a component (`product_card`).
 async fn product_grid(cx: &Cx, products: &[Product]) -> Result {
     view! {
         cx,
@@ -431,15 +433,15 @@ fn bench_render(c: &mut Criterion) {
     measure(&mut group, "static_page", &cx, &static_view);
 
     let comments = make_comments(200);
-    let comment_view = block_on(comment_feed(&comments)).expect("render comment_feed");
+    let comment_view = block_on(comment_feed(&cx, &comments)).expect("render comment_feed");
     measure(&mut group, "text_escaping", &cx, &comment_view);
 
     let number_rows = make_number_rows(120, 10);
-    let number_view = block_on(numeric_table(&number_rows)).expect("render numeric_table");
+    let number_view = block_on(numeric_table(&cx, &number_rows)).expect("render numeric_table");
     measure(&mut group, "numeric_table", &cx, &number_view);
 
     let tags = make_tags(200);
-    let tag_view = block_on(tag_cloud(&tags)).expect("render tag_cloud");
+    let tag_view = block_on(tag_cloud(&cx, &tags)).expect("render tag_cloud");
     measure(&mut group, "attributes", &cx, &tag_view);
 
     // The realistic grid grows with the number of cards, showing how render

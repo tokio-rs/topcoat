@@ -6,6 +6,8 @@ pub use attributes::*;
 pub use key::*;
 pub use value::*;
 
+use topcoat_core::runtime::context::Cx;
+
 use crate::runtime::{Unescaped, ViewPart, ViewParts};
 
 /// A single HTML attribute.
@@ -32,7 +34,8 @@ impl<K, V> Attribute<K, V> {
 /// in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
-/// # use topcoat::view::{Attributes, view};
+/// # use topcoat::view::{Attributes, component, view};
+/// # #[component]
 /// # async fn example() -> topcoat::Result {
 /// # let my_value = Attributes::new();
 /// view! {
@@ -45,7 +48,7 @@ impl<K, V> Attribute<K, V> {
 /// the element name or preceding attributes.
 pub trait AttributeViewParts {
     /// Appends zero or more attributes to `parts`.
-    fn into_view_parts(self, parts: &mut ViewParts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts);
 }
 
 impl<K, V> AttributeViewParts for Attribute<K, V>
@@ -54,12 +57,12 @@ where
     V: AttributeValueViewParts,
 {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
         if self.value.attribute_present() {
             parts.push(Unescaped::new_unchecked(" "));
-            self.key.into_view_parts(parts);
+            self.key.into_view_parts(cx, parts);
             parts.push(Unescaped::new_unchecked("=\""));
-            self.value.into_view_parts(parts);
+            self.value.into_view_parts(cx, parts);
             parts.push(Unescaped::new_unchecked("\""));
         }
     }
@@ -67,7 +70,7 @@ where
 
 impl AttributeViewParts for ViewPart {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self);
     }
 }
@@ -77,9 +80,9 @@ where
     T: AttributeViewParts,
 {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
         if let Some(value) = self {
-            value.into_view_parts(parts);
+            value.into_view_parts(cx, parts);
         }
     }
 }
@@ -89,9 +92,9 @@ where
     T: AttributeViewParts,
 {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
         for value in self {
-            value.into_view_parts(parts);
+            value.into_view_parts(cx, parts);
         }
     }
 }
@@ -101,8 +104,8 @@ where
     &'b T: AttributeViewParts,
 {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        (*self).into_view_parts(parts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+        (*self).into_view_parts(cx, parts);
     }
 }
 
@@ -114,9 +117,9 @@ macro_rules! impl_tuple {
         {
             #[inline]
             #[allow(non_snake_case)]
-            fn into_view_parts(self, parts: &mut ViewParts) {
+            fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
                 let ($($ty,)+) = self;
-                $($ty.into_view_parts(parts);)+
+                $($ty.into_view_parts(cx, parts);)+
             }
         }
     };

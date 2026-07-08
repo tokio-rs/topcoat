@@ -1,3 +1,5 @@
+use topcoat_core::runtime::context::Cx;
+
 use crate::runtime::{Unescaped, ViewPart, ViewParts};
 
 /// Converts a value used as an element name into view parts.
@@ -6,7 +8,8 @@ use crate::runtime::{Unescaped, ViewPart, ViewParts};
 /// element in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
-/// # use topcoat::view::view;
+/// # use topcoat::view::{component, view};
+/// # #[component]
 /// # async fn example() -> topcoat::Result {
 /// # let tag_name = "div";
 /// view! {
@@ -16,14 +19,14 @@ use crate::runtime::{Unescaped, ViewPart, ViewParts};
 /// ```
 pub trait ElementNameViewParts {
     /// Appends this element name to `parts`.
-    fn into_view_parts(self, parts: &mut ViewParts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts);
 }
 
 macro_rules! impl_primitive {
     ($ty:ty) => {
         impl ElementNameViewParts for $ty {
             #[inline]
-            fn into_view_parts(self, parts: &mut ViewParts) {
+            fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
                 parts.push(self);
             }
         }
@@ -36,22 +39,22 @@ impl_primitive!(Unescaped<String>);
 
 impl ElementNameViewParts for &str {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self.to_owned());
     }
 }
 
 impl ElementNameViewParts for Unescaped<&'static str> {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
         parts.push(self);
     }
 }
 
 impl ElementNameViewParts for &String {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        self.as_str().into_view_parts(parts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+        self.as_str().into_view_parts(cx, parts);
     }
 }
 
@@ -60,8 +63,8 @@ where
     &'b T: ElementNameViewParts,
 {
     #[inline]
-    fn into_view_parts(self, parts: &mut ViewParts) {
-        (*self).into_view_parts(parts);
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+        (*self).into_view_parts(cx, parts);
     }
 }
 
@@ -73,9 +76,9 @@ macro_rules! impl_tuple {
         {
             #[inline]
             #[allow(non_snake_case)]
-            fn into_view_parts(self, parts: &mut ViewParts) {
+            fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
                 let ($($ty,)+) = self;
-                $($ty.into_view_parts(parts);)+
+                $($ty.into_view_parts(cx, parts);)+
             }
         }
     };

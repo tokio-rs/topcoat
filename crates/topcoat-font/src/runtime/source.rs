@@ -125,11 +125,15 @@ impl topcoat_view::runtime::AttributeValueViewParts for FontSourceUrl {
         true
     }
 
-    fn into_view_parts(self, parts: &mut topcoat_view::runtime::ViewParts) {
+    fn into_view_parts(
+        self,
+        cx: &topcoat_core::runtime::context::Cx,
+        parts: &mut topcoat_view::runtime::ViewParts,
+    ) {
         match self {
-            Self::Str(inner) => inner.into_view_parts(parts),
+            Self::Str(inner) => inner.into_view_parts(cx, parts),
             #[cfg(feature = "asset")]
-            Self::Asset(inner) => inner.into_view_parts(parts),
+            Self::Asset(inner) => inner.into_view_parts(cx, parts),
         }
     }
 }

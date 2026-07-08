@@ -1,3 +1,4 @@
+use topcoat_core::runtime::context::Cx;
 use topcoat_view::runtime::{NodeViewParts, Unescaped, ViewPart, ViewParts};
 
 #[derive(Debug, Clone)]
@@ -22,11 +23,11 @@ impl<T> NodeViewParts for Expr<T>
 where
     T: NodeViewParts,
 {
-    fn into_view_parts(self, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
         parts.push(Unescaped::new_unchecked("<!-- ::topcoat::expr::start(\""));
         parts.push(self.js);
         parts.push(Unescaped::new_unchecked("\") -->"));
-        self.evaluated.into_view_parts(parts);
+        self.evaluated.into_view_parts(cx, parts);
         parts.push(Unescaped::new_unchecked("<!-- ::topcoat::expr::end -->"));
     }
 }
