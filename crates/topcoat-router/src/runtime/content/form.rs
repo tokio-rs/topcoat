@@ -192,7 +192,7 @@ fn form_content_type(content_type: Option<&str>) -> bool {
 #[cfg(test)]
 mod tests {
     use http::{Method, Request, header::CONTENT_TYPE};
-    use topcoat_core::runtime::context::Cx;
+    use topcoat_core::runtime::context::{Cx, CxTestBuilder};
 
     use super::*;
     use crate::runtime::{BadRequestError, Body, FromRequest, OptionalFromRequest, to_bytes};
@@ -209,9 +209,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        let mut cx = Cx::empty();
-        cx.insert(parts);
-        cx
+        CxTestBuilder::new().request_context(parts).build()
     }
 
     #[tokio::test]
@@ -336,7 +334,7 @@ mod tests {
             ("a".to_owned(), "1".to_owned()),
             ("b".to_owned(), "two".to_owned()),
         ])
-        .into_response(&Cx::empty())
+        .into_response(&Cx::default())
         .expect("serialization succeeds");
 
         assert_eq!(

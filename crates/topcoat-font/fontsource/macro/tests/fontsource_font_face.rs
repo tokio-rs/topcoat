@@ -10,7 +10,7 @@ const CYRILLIC: &str = "U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116";
 
 fn render(face: &FontFace) -> String {
     let mut out = String::new();
-    face.fmt(&Cx::empty(), &mut out).unwrap();
+    face.fmt(&Cx::default(), &mut out).unwrap();
     out
 }
 

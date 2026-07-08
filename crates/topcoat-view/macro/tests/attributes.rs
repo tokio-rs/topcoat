@@ -53,7 +53,7 @@ fn attributes_macro_builds_runtime_attributes() {
 async fn spread_inserts_attribute_fragment_into_element() {
     use topcoat::{context::Cx, view::view};
 
-    let cx = &Cx::empty();
+    let cx = &Cx::default();
     let attrs = topcoat::view::attributes! { cx, type="submit" };
     let result: topcoat::Result = view! { cx, <button (attrs)>"Save"</button> };
     let html = result.unwrap().render(cx);
@@ -65,7 +65,7 @@ async fn spread_inserts_attribute_fragment_into_element() {
 async fn spread_follows_other_attributes() {
     use topcoat::{context::Cx, view::view};
 
-    let cx = &Cx::empty();
+    let cx = &Cx::default();
     let attrs = topcoat::view::attributes! { cx, type="submit" };
     let result: topcoat::Result = view! { cx, <button class="btn" (attrs)>"Save"</button> };
     let html = result.unwrap().render(cx);
@@ -88,7 +88,7 @@ fn dynamic_key_still_parses_after_spread_support() {
 async fn spread_merges_within_attributes_macro() {
     use topcoat::{context::Cx, view::view};
 
-    let cx = &Cx::empty();
+    let cx = &Cx::default();
     let base = topcoat::view::attributes! { cx, class="btn" type="button" };
     let merged = topcoat::view::attributes! { cx, class="card" (base) };
 

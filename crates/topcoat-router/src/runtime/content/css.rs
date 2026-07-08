@@ -84,7 +84,7 @@ fn css_content_type(content_type: Option<&str>) -> bool {
 #[cfg(test)]
 mod tests {
     use http::{Request, header::CONTENT_TYPE};
-    use topcoat_core::runtime::context::Cx;
+    use topcoat_core::runtime::context::{Cx, CxTestBuilder};
 
     use super::*;
     use crate::runtime::BadRequestError;
@@ -99,9 +99,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        let mut cx = Cx::empty();
-        cx.insert(parts);
-        cx
+        CxTestBuilder::new().request_context(parts).build()
     }
 
     #[tokio::test]
@@ -160,7 +158,7 @@ mod tests {
     #[tokio::test]
     async fn into_response_sets_css_content_type() {
         let response = Css("body { color: red; }")
-            .into_response(&Cx::empty())
+            .into_response(&Cx::default())
             .expect("response builds");
 
         assert_eq!(

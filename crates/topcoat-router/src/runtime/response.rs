@@ -419,7 +419,7 @@ mod tests {
 
     /// Renders a value into a response and reads the body fully into memory.
     fn run(value: impl IntoResponse) -> (Parts, Bytes) {
-        let cx = Cx::empty();
+        let cx = Cx::default();
         let (parts, body) = value.into_response(&cx).unwrap().into_parts();
         let bytes = block_on(to_bytes(body, usize::MAX)).unwrap();
         (parts, bytes)
@@ -537,7 +537,7 @@ mod tests {
     #[test]
     fn invalid_header_name_is_an_error() {
         // A space is not allowed in a header name.
-        let cx = Cx::empty();
+        let cx = Cx::default();
         assert!([("inva lid", "1")].into_response(&cx).is_err());
     }
 

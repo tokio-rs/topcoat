@@ -189,7 +189,7 @@ mod tests {
     fn push_url_sets_header() {
         let mut parts = parts();
         HxPushUrl::from("/new")
-            .into_response_parts(&Cx::empty(), &mut parts)
+            .into_response_parts(&Cx::default(), &mut parts)
             .unwrap();
         assert_eq!(header_value(&parts, &header::HX_PUSH_URL), "/new");
     }
@@ -198,7 +198,7 @@ mod tests {
     fn push_url_prevent_is_false() {
         let mut parts = parts();
         HxPushUrl::prevent()
-            .into_response_parts(&Cx::empty(), &mut parts)
+            .into_response_parts(&Cx::default(), &mut parts)
             .unwrap();
         assert_eq!(header_value(&parts, &header::HX_PUSH_URL), "false");
     }
@@ -207,7 +207,7 @@ mod tests {
     fn refresh_serializes_bool() {
         let mut parts = parts();
         HxRefresh(true)
-            .into_response_parts(&Cx::empty(), &mut parts)
+            .into_response_parts(&Cx::default(), &mut parts)
             .unwrap();
         assert_eq!(header_value(&parts, &header::HX_REFRESH), "true");
     }
@@ -216,7 +216,7 @@ mod tests {
     fn reswap_uses_swap_option_string() {
         let mut parts = parts();
         HxReswap(SwapOption::BeforeEnd)
-            .into_response_parts(&Cx::empty(), &mut parts)
+            .into_response_parts(&Cx::default(), &mut parts)
             .unwrap();
         assert_eq!(header_value(&parts, &header::HX_RESWAP), "beforeend");
     }
@@ -225,10 +225,10 @@ mod tests {
     fn retarget_and_reselect_carry_selectors() {
         let mut parts = parts();
         HxRetarget::from("#main")
-            .into_response_parts(&Cx::empty(), &mut parts)
+            .into_response_parts(&Cx::default(), &mut parts)
             .unwrap();
         HxReselect::from(".item")
-            .into_response_parts(&Cx::empty(), &mut parts)
+            .into_response_parts(&Cx::default(), &mut parts)
             .unwrap();
         assert_eq!(header_value(&parts, &header::HX_RETARGET), "#main");
         assert_eq!(header_value(&parts, &header::HX_RESELECT), ".item");

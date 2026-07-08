@@ -40,7 +40,12 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 ///         Path::new("/")
 ///     }
 ///
-///     fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+///     fn handle<'a>(
+///         &'a self,
+///         cx: &'a mut CxBuilder,
+///         body: Body,
+///         next: Next<'a>,
+///     ) -> LayerFuture<'a> {
 ///         Box::pin(async move {
 ///             let start = std::time::Instant::now();
 ///             let response = next.run(cx, body).await?;
@@ -258,10 +263,6 @@ mod tests {
         next.run(cx, body)
     }
 
-    fn empty_cx() -> CxBuilder {
-        CxBuilder::default()
-    }
-
     /// Reads a response body to completion.
     fn body_bytes(response: Response) -> Bytes {
         let (_, body) = response.into_parts();
@@ -272,20 +273,20 @@ mod tests {
     /// test can observe the order the chain executes in.
     type Trace = Mutex<Vec<&'static str>>;
 
-    fn cx_with_trace(trace: Arc<Trace>) -> Cx {
+    fn cx_with_trace(trace: Arc<Trace>) -> CxBuilder {
         let mut app = ContextMap::new();
         app.insert(trace);
-        Cx::new(Arc::new(app), ContextMap::new())
+        CxBuilder::new(Arc::new(app))
     }
 
-    fn record_a<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn record_a<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("a");
             next.run(cx, body).await
         })
     }
 
-    fn record_b<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn record_b<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("b");
             next.run(cx, body).await
@@ -293,7 +294,7 @@ mod tests {
     }
 
     /// A layer that answers the request itself, without invoking `next`.
-    fn short_circuit<'a>(cx: &'a mut Cx, _body: Body, _next: Next<'a>) -> LayerFuture<'a> {
+    fn short_circuit<'a>(cx: &'a mut CxBuilder, _body: Body, _next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move { "short".into_response(cx) })
     }
 
@@ -400,7 +401,7 @@ mod tests {
     fn run_invokes_the_route_terminal_when_no_layers_remain() {
         let layers = Layers::default();
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let mut cx = empty_cx();
+        let mut cx = CxBuilder::default();
 
         let indices: &[LayerId] = &[];
         let next = Next::new(&layers, indices, Terminal::Route(&route));
@@ -414,7 +415,7 @@ mod tests {
     #[test]
     fn run_resolves_the_not_found_terminal() {
         let layers = Layers::default();
-        let mut cx = empty_cx();
+        let mut cx = CxBuilder::default();
 
         let indices: &[LayerId] = &[];
         let next = Next::new(&layers, indices, Terminal::NotFound);
@@ -432,7 +433,7 @@ mod tests {
         let mut endpoint = Endpoint::new(no_params, no_layers);
         endpoint.insert(Method::GET, 0);
         endpoint.insert(Method::POST, 1);
-        let mut cx = empty_cx();
+        let mut cx = CxBuilder::default();
 
         let indices: &[LayerId] = &[];
         let next = Next::new(&layers, indices, Terminal::MethodNotAllowed(&endpoint));
@@ -476,7 +477,7 @@ mod tests {
         let indices = [stop];
         // The route would answer "route", but the layer never calls `next.run`.
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let mut cx = empty_cx();
+        let mut cx = CxBuilder::default();
 
         let next = Next::new(&layers, &indices, Terminal::Route(&route));
         let result = block_on(next.run(&mut cx, Body::empty()));

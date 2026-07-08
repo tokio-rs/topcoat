@@ -217,7 +217,7 @@ fn is_client_error(error: &multer::Error) -> bool {
 #[cfg(test)]
 mod tests {
     use http::{Request, header::CONTENT_TYPE};
-    use topcoat_core::runtime::context::Cx;
+    use topcoat_core::runtime::context::{Cx, CxTestBuilder};
 
     use super::*;
     use crate::runtime::{BadRequestError, Body, FromRequest, OptionalFromRequest};
@@ -240,9 +240,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        let mut cx = Cx::empty();
-        cx.insert(parts);
-        cx
+        CxTestBuilder::new().request_context(parts).build()
     }
 
     /// A two-field multipart body: a plain text `greeting` field and an

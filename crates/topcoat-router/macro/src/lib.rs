@@ -172,8 +172,8 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Handler signature
 ///
-/// The function is `async` and takes [`cx: &mut Cx`](../context/struct.Cx.html), the request
-/// [`body: Body`](../router/struct.Body.html), and a [`next:
+/// The function is `async` and takes [`cx: &mut CxBuilder`](../context/struct.CxBuilder.html), the
+/// request [`body: Body`](../router/struct.Body.html), and a [`next:
 /// Next<'_>`](../router/struct.Next.html), returning `Result<T>` where `T` implements
 /// [`IntoResponse`](../router/trait.IntoResponse.html). Call [`next.run(cx,
 /// body)`](../router/struct.Next.html#method.run) to invoke the inner layers and ultimately the
@@ -184,12 +184,12 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```rust
 /// use topcoat::{
 ///     Result,
-///     context::Cx,
+///     context::CxBuilder,
 ///     router::{Body, Next, Response, layer},
 /// };
 ///
 /// #[layer("/")]
-/// async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+/// async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
 ///     let start = std::time::Instant::now();
 ///     let response = next.run(cx, body).await?;
 ///     println!("handled in {:?}", start.elapsed());

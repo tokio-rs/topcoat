@@ -8,7 +8,7 @@ use topcoat::{
 // code that name is supplied by `#[page]`, `#[layout]`, `#[route]`, and
 // `#[component]`. These tests stand in for those wrappers by binding it by hand.
 fn empty_cx() -> Cx {
-    Cx::empty()
+    Cx::default()
 }
 
 #[component]

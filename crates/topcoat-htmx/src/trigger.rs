@@ -164,7 +164,7 @@ mod tests {
         let name = trigger.timing.header();
         let mut parts = http::Response::new(()).into_parts().0;
         trigger
-            .into_response_parts(&Cx::empty(), &mut parts)
+            .into_response_parts(&Cx::default(), &mut parts)
             .unwrap();
         let value = parts
             .headers

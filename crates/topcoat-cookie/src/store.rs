@@ -296,11 +296,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, collections::HashMap, sync::Arc};
+    use std::{cell::RefCell, collections::HashMap};
 
-    use http::{HeaderMap, Request, header, request::Parts};
+    use http::{HeaderMap, Request, header};
     use serde::{Deserialize, Serialize};
-    use topcoat_core::runtime::context::{ContextMap, Cx};
+    use topcoat_core::runtime::context::{Cx, CxTestBuilder};
 
     use super::*;
     use crate::{CookieJarCell, Key, cookies, write_cookies};
@@ -505,10 +505,10 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        let mut request_context = ContextMap::new();
-        request_context.insert::<Parts>(parts);
-        request_context.insert(CookieJarCell::new());
-        Cx::new(Arc::new(ContextMap::new()), request_context)
+        CxTestBuilder::new()
+            .request_context(parts)
+            .request_context(CookieJarCell::new())
+            .build()
     }
 
     /// The leading `name=value` pair of the request's first `Set-Cookie` value.

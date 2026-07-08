@@ -313,10 +313,8 @@ pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use http::{HeaderMap, Request, header, request::Parts};
-    use topcoat_core::runtime::context::ContextMap;
+    use http::{HeaderMap, Request, header};
+    use topcoat_core::runtime::context::CxTestBuilder;
 
     use super::*;
 
@@ -330,10 +328,10 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        let mut request_context = ContextMap::new();
-        request_context.insert::<Parts>(parts);
-        request_context.insert(CookieJarCell::new());
-        Cx::new(Arc::new(ContextMap::new()), request_context)
+        CxTestBuilder::new()
+            .request_context(parts)
+            .request_context(CookieJarCell::new())
+            .build()
     }
 
     /// Like [`cx_with`], but also registers `key` as app context so the
@@ -345,12 +343,11 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        let mut request_context = ContextMap::new();
-        request_context.insert::<Parts>(parts);
-        request_context.insert(CookieJarCell::new());
-        let mut app_context = ContextMap::new();
-        app_context.insert::<Key>(key);
-        Cx::new(Arc::new(app_context), request_context)
+        CxTestBuilder::new()
+            .app_context(key)
+            .request_context(parts)
+            .request_context(CookieJarCell::new())
+            .build()
     }
 
     /// The `Set-Cookie` header values the request would emit.
@@ -453,9 +450,9 @@ mod tests {
         // The jar is never accessed, so nothing should be written. Crucially,
         // we register no `Parts`: if `write_cookies` parsed the request anyway
         // it would panic looking them up, proving it short-circuits.
-        let mut request_context = ContextMap::new();
-        request_context.insert(CookieJarCell::new());
-        let cx = Cx::new(Arc::new(ContextMap::new()), request_context);
+        let cx = CxTestBuilder::new()
+            .request_context(CookieJarCell::new())
+            .build();
         let mut headers = HeaderMap::new();
         write_cookies(&cx, &mut headers);
 

@@ -13,7 +13,7 @@ async fn sync_memoized_function_runs_body_once_per_key_per_request() {
         x + y
     }
 
-    let cx = Cx::empty();
+    let cx = Cx::default();
 
     let a = add(&cx, 1, 2);
     let b = add(&cx, 1, 2);
@@ -36,8 +36,8 @@ async fn sync_memoized_function_cache_does_not_cross_requests() {
         x + y
     }
 
-    let cx1 = Cx::empty();
-    let cx2 = Cx::empty();
+    let cx1 = Cx::default();
+    let cx2 = Cx::default();
 
     add(&cx1, 7, 7);
     add(&cx2, 7, 7);
@@ -56,7 +56,7 @@ async fn async_memoized_function_runs_body_once_per_key_per_request() {
         format!("post:{slug}")
     }
 
-    let cx = Cx::empty();
+    let cx = Cx::default();
 
     let a = fetch(&cx, "hello").await;
     let b = fetch(&cx, "hello").await;
@@ -76,7 +76,7 @@ async fn async_memoized_function_returns_stable_reference() {
         format!("post:{slug}")
     }
 
-    let cx = Cx::empty();
+    let cx = Cx::default();
 
     let first: &String = fetch(&cx, "same").await;
     let second: &String = fetch(&cx, "same").await;
@@ -95,7 +95,7 @@ async fn memoized_option_return_is_borrowed_ergonomically() {
         if is_some { Some(42) } else { None }
     }
 
-    let cx = Cx::empty();
+    let cx = Cx::default();
 
     let some_value: Option<&i32> = maybe(&cx, true);
     let none_value: Option<&i32> = maybe(&cx, false);
@@ -126,7 +126,7 @@ async fn separate_memoized_functions_have_independent_caches() {
         x * 10
     }
 
-    let cx = Cx::empty();
+    let cx = Cx::default();
 
     assert_eq!(*fn_a(&cx, 1), 1);
     assert_eq!(*fn_b(&cx, 1), 10);

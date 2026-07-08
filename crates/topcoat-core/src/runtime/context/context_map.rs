@@ -154,9 +154,8 @@ impl ContextMap {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::*;
+    use crate::runtime::context::CxTestBuilder;
 
     #[derive(Debug, PartialEq)]
     struct Database(&'static str);
@@ -219,9 +218,9 @@ mod tests {
 
     #[test]
     fn app_context_returns_registered_value() {
-        let mut context = ContextMap::new();
-        context.insert(Database("primary"));
-        let cx = Cx::new(Arc::new(context), ContextMap::new());
+        let cx = CxTestBuilder::new()
+            .app_context(Database("primary"))
+            .build();
 
         let db: &Database = app_context(&cx);
         assert_eq!(db, &Database("primary"));
@@ -236,9 +235,9 @@ mod tests {
 
     #[test]
     fn request_context_returns_registered_value() {
-        let mut context = ContextMap::new();
-        context.insert(Database("primary"));
-        let cx = Cx::new(Arc::new(ContextMap::new()), context);
+        let cx = CxTestBuilder::new()
+            .request_context(Database("primary"))
+            .build();
 
         let db: &Database = request_context(&cx);
         assert_eq!(db, &Database("primary"));

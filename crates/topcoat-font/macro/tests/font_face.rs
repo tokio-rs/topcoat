@@ -3,7 +3,7 @@ use topcoat::font::{FontFace, FontSource, font_face};
 
 fn render(face: &FontFace) -> String {
     let mut out = String::new();
-    face.fmt(&Cx::empty(), &mut out).unwrap();
+    face.fmt(&Cx::default(), &mut out).unwrap();
     out
 }
 

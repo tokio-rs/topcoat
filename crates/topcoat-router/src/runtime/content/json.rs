@@ -189,7 +189,7 @@ fn json_deserialization_error(error: serde_path_to_error::Error<serde_json::Erro
 mod tests {
     use http::{Request, header::CONTENT_TYPE};
     use serde_json::{Value, json};
-    use topcoat_core::runtime::context::Cx;
+    use topcoat_core::runtime::context::{Cx, CxTestBuilder};
 
     use super::*;
     use crate::runtime::{BadRequestError, Body, FromRequest, OptionalFromRequest, to_bytes};
@@ -204,9 +204,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        let mut cx = Cx::empty();
-        cx.insert(parts);
-        cx
+        CxTestBuilder::new().request_context(parts).build()
     }
 
     #[tokio::test]
@@ -295,7 +293,7 @@ mod tests {
     #[tokio::test]
     async fn into_response_serializes_json_with_content_type() {
         let response = Json(json!({ "a": 1 }))
-            .into_response(&Cx::empty())
+            .into_response(&Cx::default())
             .expect("serialization succeeds");
 
         assert_eq!(

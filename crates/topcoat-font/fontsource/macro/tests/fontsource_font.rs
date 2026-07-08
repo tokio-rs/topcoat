@@ -7,7 +7,7 @@ const LATIN: &str = "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02
 
 fn render(font: Font) -> String {
     let mut out = String::new();
-    font.faces().fmt(&Cx::empty(), &mut out).unwrap();
+    font.faces().fmt(&Cx::default(), &mut out).unwrap();
     out
 }
 

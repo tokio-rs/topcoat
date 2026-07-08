@@ -115,10 +115,8 @@ pub fn hx_trigger_name(cx: &Cx) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use http::Request;
-    use topcoat_core::runtime::context::ContextMap;
+    use topcoat_core::runtime::context::CxTestBuilder;
 
     use super::*;
 
@@ -130,9 +128,7 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        let mut request_context = ContextMap::new();
-        request_context.insert::<Parts>(parts);
-        Cx::new(Arc::new(ContextMap::new()), request_context)
+        CxTestBuilder::new().request_context(parts).build()
     }
 
     #[test]
