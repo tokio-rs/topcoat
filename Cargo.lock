@@ -2875,6 +2875,7 @@ dependencies = [
  "sha2 0.11.0",
  "thiserror",
  "topcoat",
+ "topcoat-core",
  "ureq",
 ]
 
