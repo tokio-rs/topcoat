@@ -99,7 +99,7 @@ const TRASH: IconData = iconify::iconify_icon!("feather:trash-2");
 
 ## Caching and vendoring
 
-By default the downloaded sets are cached in the build directory. Pass [`cache_dir`] to keep the cache in a directory of your own instead:
+By default the downloaded sets are cached in Topcoat's cache inside the Cargo target directory, shared across the workspace. Pass [`cache_dir`] to keep the cache in a directory of your own instead:
 
 ```rust,no_run
 # #[allow(clippy::needless_doctest_main)]

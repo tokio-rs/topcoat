@@ -1,4 +1,6 @@
 pub mod abort;
+#[cfg(feature = "build")]
+pub mod cache;
 pub mod context;
 pub mod cursor;
 pub mod error;

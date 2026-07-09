@@ -2629,6 +2629,7 @@ dependencies = [
  "tokio",
  "topcoat",
  "topcoat-asset",
+ "topcoat-core",
  "topcoat-font",
  "topcoat-font-fontsource",
  "topcoat-pretty",
@@ -2765,6 +2766,7 @@ dependencies = [
  "syn",
  "thiserror",
  "topcoat",
+ "topcoat-core",
  "ureq",
 ]
 

@@ -7,7 +7,8 @@ use clap::{Args, Subcommand};
 pub(crate) use bundle::run_bundle;
 
 const OUT_SUBDIR: &str = "assets";
-const CACHE_SUBDIR: &str = "topcoat/cache/assets";
+/// The scope of the asset download cache inside the shared Topcoat cache.
+const CACHE_SCOPE: &str = "assets";
 
 #[derive(Args)]
 pub struct AssetCommand {

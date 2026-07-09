@@ -25,10 +25,11 @@ use crate::runtime::{BuildError, IconSet, Result, set::STAGE_DIR};
 /// from jsDelivr into a cache first. Once a set is cached, builds stay
 /// offline.
 ///
-/// The cache lives in the build directory by default; pass a
+/// The cache lives in `topcoat/cache/iconify` inside the Cargo target
+/// directory by default, shared across the workspace; pass a
 /// [`cache_dir`](Self::cache_dir) to use a directory of your own instead.
-/// Files you place there yourself are picked up without downloading, so
-/// icon sets that are not on Iconify can be vendored the same way.
+/// Files you place in the cache yourself are picked up without downloading,
+/// so icon sets that are not on Iconify can be vendored the same way.
 #[derive(Debug, Default)]
 pub struct BuildConfig {
     cache_dir: Option<PathBuf>,
@@ -66,9 +67,9 @@ impl BuildConfig {
         self
     }
 
-    /// Caches downloaded sets in `dir` instead of the build directory.
-    /// Relative paths resolve against `CARGO_MANIFEST_DIR` (the package
-    /// root).
+    /// Caches downloaded sets in `dir` instead of the shared Topcoat cache
+    /// in the target directory. Relative paths resolve against
+    /// `CARGO_MANIFEST_DIR` (the package root).
     ///
     /// Each set is cached at `<dir>/<set>.json` and downloaded only when
     /// its file is missing or, for an
@@ -105,7 +106,9 @@ impl BuildConfig {
                     env::var_os("CARGO_MANIFEST_DIR").ok_or(BuildError::NoManifestDir)?;
                 Some(PathBuf::from(manifest_dir).join(cache_dir))
             }
-            None => None,
+            // An `OUT_DIR` outside Cargo's layout has no shared cache; fall
+            // back to caching inside the stage directory itself.
+            None => topcoat_core::runtime::cache::cache_dir("iconify"),
         };
 
         for set in self.sets {
