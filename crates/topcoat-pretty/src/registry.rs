@@ -51,8 +51,7 @@ impl Registry {
 
         assert!(
             !self.macro_fns.contains_key(&name),
-            "registered multiple pretty print macros under the name `{}`",
-            &name
+            "registered multiple pretty print macros under the name `{name}`",
         );
 
         self.macro_fns.insert(name, pretty_print_fn);
