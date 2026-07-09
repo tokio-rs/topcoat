@@ -3,8 +3,8 @@ use topcoat_view::runtime::{View, svg::ViewBox};
 /// The renderable data of an SVG icon: its view box and its body markup.
 ///
 /// The body is the icon's inner SVG markup, without the `<svg>` element
-/// itself. Pass it to the [`icon`] component to turn it into a renderable
-/// HTML element.
+/// itself. Pass it to the [`icon`](../topcoat/icon/struct.icon.html) component
+/// to turn it into a renderable HTML element.
 #[derive(Debug, Clone)]
 pub struct IconData {
     view_box: ViewBox,
