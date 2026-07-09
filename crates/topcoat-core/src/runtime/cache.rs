@@ -13,7 +13,11 @@ use std::{
 /// `<target_dir>/topcoat/cache/<scope>`.
 #[must_use]
 pub fn cache_dir_in(target_dir: impl AsRef<Path>, scope: &str) -> PathBuf {
-    target_dir.as_ref().join("topcoat").join("cache").join(scope)
+    target_dir
+        .as_ref()
+        .join("topcoat")
+        .join("cache")
+        .join(scope)
 }
 
 /// The Topcoat cache directory for `scope` of the build the calling build
@@ -53,7 +57,10 @@ mod tests {
     fn cross_builds_resolve_to_the_triple_subdirectory() {
         let out_dir = "/repo/target/aarch64-unknown-linux-gnu/release/build/app-0123abc/out";
         let dir = target_dir(Path::new(out_dir));
-        assert_eq!(dir, Some(Path::new("/repo/target/aarch64-unknown-linux-gnu")));
+        assert_eq!(
+            dir,
+            Some(Path::new("/repo/target/aarch64-unknown-linux-gnu"))
+        );
     }
 
     #[test]

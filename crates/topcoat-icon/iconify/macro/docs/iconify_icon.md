@@ -21,6 +21,7 @@ The staged set is read at compile time, so the reference is checked while you bu
 Sets are staged by the crate's build script through [`BuildConfig`], which downloads them from Iconify or picks them up from a local cache directory:
 
 ```rust,no_run
+# #![allow(clippy::needless_doctest_main)]
 // build.rs
 fn main() {
     topcoat::icon::iconify::BuildConfig::new()

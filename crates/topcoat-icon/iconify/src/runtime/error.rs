@@ -25,7 +25,9 @@ pub enum BuildError {
     },
     #[error("`OUT_DIR` is not set; `BuildConfig::stage` must be called from a build script")]
     NoOutDir,
-    #[error("`CARGO_MANIFEST_DIR` is not set; `BuildConfig::stage` must be called from a build script")]
+    #[error(
+        "`CARGO_MANIFEST_DIR` is not set; `BuildConfig::stage` must be called from a build script"
+    )]
     NoManifestDir,
     #[error("icon set staged as `{requested}` declares the prefix `{declared}`")]
     PrefixMismatch { requested: String, declared: String },
