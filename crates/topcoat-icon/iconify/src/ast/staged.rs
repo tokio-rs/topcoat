@@ -117,8 +117,8 @@ fn staged_prefixes(dir: &Path) -> Vec<String> {
 fn stage_hint(set: &str) -> String {
     format!(
         "fn main() {{\n    \
-             topcoat::icon::iconify::Sets::new()\n        \
-                 .download(\"{set}\")\n        \
+             topcoat::icon::iconify::BuildConfig::new()\n        \
+                 .icon_set(\"{set}\")\n        \
                  .stage()\n        \
                  .unwrap();\n\
          }}"

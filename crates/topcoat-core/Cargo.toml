@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
+# Exposes the `runtime::cache` module for use from build scripts.
+build = []
 parsing = [
 	"dep:proc-macro2",
 	"dep:quote",

@@ -131,7 +131,7 @@ impl Parse for Component {
                     if !existing.insert(ident.to_string()) {
                         return Err(syn::Error::new_spanned(
                             &ident,
-                            format!("duplicate key `{}`", &ident),
+                            format!("duplicate key `{ident}`"),
                         ));
                     }
                     let colon: Token![:] = content.parse()?;
