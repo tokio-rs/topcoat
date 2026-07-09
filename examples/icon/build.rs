@@ -1,6 +1,6 @@
 fn main() {
-    topcoat::icon::iconify::Sets::new()
-        .vendor("vendor/demo.json")
+    topcoat::icon::iconify::BuildConfig::new()
+        .icon_set("feather")
         .stage()
         .unwrap();
 }

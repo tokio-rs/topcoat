@@ -13,7 +13,7 @@ parsing = [
 	"dep:serde",
 	"dep:serde_json",
 ]
-# Exposes the staging API (`Sets`) for use from a build script.
+# Exposes the staging API (`BuildConfig`) for use from a build script.
 build = [
 	"dep:serde",
 	"dep:serde_json",

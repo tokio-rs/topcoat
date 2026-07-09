@@ -23,11 +23,11 @@ pub enum BuildError {
         #[source]
         source: serde_json::Error,
     },
-    #[error("`OUT_DIR` is not set; `Sets::stage` must be called from a build script")]
+    #[error("`OUT_DIR` is not set; `BuildConfig::stage` must be called from a build script")]
     NoOutDir,
-    #[error("`CARGO_MANIFEST_DIR` is not set; `Sets::stage` must be called from a build script")]
+    #[error("`CARGO_MANIFEST_DIR` is not set; `BuildConfig::stage` must be called from a build script")]
     NoManifestDir,
-    #[error("icon set downloaded as `{requested}` declares the prefix `{declared}`")]
+    #[error("icon set staged as `{requested}` declares the prefix `{declared}`")]
     PrefixMismatch { requested: String, declared: String },
     #[error("alias `{alias}` in icon set `{prefix}` leads to no icon: `{parent}` is unknown")]
     UnknownAliasParent {
