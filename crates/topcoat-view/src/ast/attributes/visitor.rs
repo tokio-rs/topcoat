@@ -121,7 +121,7 @@ pub fn visit_for_loop<'ast>(
     visit: &mut (impl Visit<'ast> + ?Sized),
     node: &'ast TemplateForLoop<AttributeNodes>,
 ) {
-    visit_block(visit, &node.body)
+    visit_block(visit, &node.body);
 }
 
 pub fn visit_continue<'ast>(
