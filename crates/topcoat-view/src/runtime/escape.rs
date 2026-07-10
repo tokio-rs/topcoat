@@ -21,9 +21,11 @@ use crate::runtime::Formatter;
 /// | `AttributeKey`   | -       | panic  | panic  | panic    | see below    |
 /// | `ElementName`    | -       | panic  | panic  | panic    | see below    |
 ///
-/// The ident contexts reject whitespace, control characters, `"`, `'`, `<`,
-/// `>`, `/`, and `=`. This guarantees the identifier cannot terminate or
-/// corrupt its token; it does not check full spec validity.
+/// The ident contexts reject ASCII whitespace, ASCII control characters,
+/// `"`, `'`, `<`, `>`, `/`, and `=`: the characters the HTML tokenizer can
+/// treat as ending or altering a name token. This guarantees the identifier
+/// cannot terminate or corrupt its token; it does not check full spec
+/// validity.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HtmlContext {
@@ -56,11 +58,16 @@ impl HtmlContext {
         HtmlWriter { context: self, f }
     }
 
-    /// Returns `true` if `c` can terminate or corrupt an identifier and is
-    /// therefore rejected in the ident contexts.
+    /// Returns `true` if byte `b` can terminate or corrupt an identifier and
+    /// is therefore rejected in the ident contexts.
+    ///
+    /// Every forbidden byte is ASCII, so a byte-level scan is exact across
+    /// multibyte UTF-8: the bytes of a multibyte character are `0x80` or
+    /// above and never match. The comparisons are branchless so a scan over
+    /// them can vectorize.
     #[inline]
-    fn forbidden_in_ident(c: char) -> bool {
-        c.is_whitespace() || c.is_control() || matches!(c, '"' | '\'' | '<' | '>' | '/' | '=')
+    const fn forbidden_in_ident(b: u8) -> bool {
+        b <= b' ' || b == 0x7F || matches!(b, b'"' | b'\'' | b'/' | b'<' | b'=' | b'>')
     }
 
     /// A human-readable description of the context, used in panic messages.
@@ -178,7 +185,7 @@ impl HtmlWriter<'_, '_> {
             HtmlContext::Comment => &COMMENT_ESCAPES,
             HtmlContext::AttributeKey | HtmlContext::ElementName => {
                 assert!(
-                    !HtmlContext::forbidden_in_ident(c),
+                    !u8::try_from(c).is_ok_and(HtmlContext::forbidden_in_ident),
                     "invalid {}: forbidden character {c:?}",
                     self.context.description(),
                 );
@@ -214,16 +221,34 @@ impl HtmlWriter<'_, '_> {
         COMMENT_ESCAPES
     );
 
-    /// Writes `s` verbatim after checking that every character is allowed in
-    /// an ident context, panicking otherwise.
+    /// Writes `s` verbatim after checking that every byte is allowed in an
+    /// ident context, panicking otherwise.
     fn write_ident(&mut self, s: &str) {
-        if let Some(c) = s.chars().find(|&c| HtmlContext::forbidden_in_ident(c)) {
-            panic!(
-                "invalid {} {s:?}: forbidden character {c:?}",
-                self.context.description(),
-            );
+        // A branchless fold with no early exit, so the scan can vectorize.
+        // The happy path has to visit every byte anyway; only the failure
+        // path pays for the second scan in `panic_invalid_ident`.
+        let invalid = s
+            .bytes()
+            .fold(false, |invalid, b| invalid | HtmlContext::forbidden_in_ident(b));
+        if invalid {
+            self.panic_invalid_ident(s);
         }
         self.f.write_str(s);
+    }
+
+    /// Panics with the first forbidden character in `s`.
+    #[cold]
+    fn panic_invalid_ident(&self, s: &str) -> ! {
+        let position = s
+            .bytes()
+            .position(HtmlContext::forbidden_in_ident)
+            .expect("an invalid ident contains a forbidden byte");
+        // Forbidden bytes are ASCII, so the byte is the character.
+        let c = s.as_bytes()[position] as char;
+        panic!(
+            "invalid {} {s:?}: forbidden character {c:?}",
+            self.context.description(),
+        );
     }
 }
 
@@ -412,6 +437,16 @@ mod tests {
     fn ident_contexts_accept_multibyte() {
         // Custom element names may contain characters outside ASCII.
         assert_eq!(write(HtmlContext::ElementName, "emotion-😍"), "emotion-😍");
+    }
+
+    #[test]
+    fn ident_contexts_only_reject_ascii() {
+        // Non-ASCII whitespace and controls (here NBSP and NEL) do not end a
+        // name token in the HTML tokenizer, so they pass through.
+        assert_eq!(
+            write(HtmlContext::AttributeKey, "x\u{A0}\u{85}y"),
+            "x\u{A0}\u{85}y"
+        );
     }
 
     #[test]
