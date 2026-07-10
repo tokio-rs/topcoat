@@ -1,4 +1,10 @@
-use std::{env, fmt::Write as _, fs, io, path::PathBuf};
+use std::{
+    env,
+    fmt::Write as _,
+    fs, io,
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use sha2::{Digest, Sha256};
 
@@ -278,8 +284,25 @@ impl Executable {
     /// Returns `Err` if the process cannot be spawned or exits with a
     /// non-zero status.
     pub fn run(&self, command: &Command) -> Result {
+        // The standalone Tailwind CLI is a Bun single-file executable that
+        // unpacks its embedded native modules (the Oxide scanner, Lightning
+        // CSS, the file watcher) into the temporary directory and loads them
+        // with `dlopen`. On filesystems that support `O_TMPFILE` each run gets
+        // a private anonymous copy, but otherwise Bun falls back to named files
+        // at deterministic paths derived from the binary. Two processes running
+        // the same shared executable then race on those paths, and one can load
+        // a module while another is still writing it -- which surfaces, for the
+        // scanner, as its `Scanner` export being undefined. Give each run its
+        // own temporary directory so the extraction paths never collide.
+        // Rooting it next to the executable keeps it on a filesystem that
+        // permits execution, which the system temporary directory may not.
+        let scratch = ScratchDir::new(&self.scratch_root())?;
+
         let status = command
             .to_process(&self.path)
+            .env("TMPDIR", scratch.path())
+            .env("TMP", scratch.path())
+            .env("TEMP", scratch.path())
             .status()
             .map_err(|source| BuildError::Io {
                 path: self.path.clone(),
@@ -291,5 +314,81 @@ impl Executable {
         }
 
         Ok(())
+    }
+
+    /// The directory a per-run [`ScratchDir`] is created under: Cargo's
+    /// `OUT_DIR` when set, otherwise the directory holding the executable, and
+    /// finally the system temporary directory. The first two sit under the
+    /// Cargo target directory, which permits executing the native modules Bun
+    /// unpacks there.
+    fn scratch_root(&self) -> PathBuf {
+        if let Some(out_dir) = env::var_os("OUT_DIR") {
+            return PathBuf::from(out_dir);
+        }
+        match self.path.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+            _ => env::temp_dir(),
+        }
+    }
+}
+
+/// A private temporary directory for a single Tailwind CLI run, removed when
+/// dropped.
+#[derive(Debug)]
+struct ScratchDir {
+    path: PathBuf,
+}
+
+impl ScratchDir {
+    /// Create a uniquely named directory inside `root`.
+    fn new(root: &Path) -> Result<Self> {
+        // The counter keeps names unique within a build script, and the process
+        // id keeps them unique across the build scripts that share a `root`
+        // under the Cargo target directory.
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let path = root.join(format!(
+            "tailwind-scratch-{pid}-{n}",
+            pid = std::process::id(),
+            n = COUNTER.fetch_add(1, Ordering::Relaxed),
+        ));
+        fs::create_dir_all(&path).map_err(|source| BuildError::Io {
+            path: path.clone(),
+            source,
+        })?;
+        Ok(Self { path })
+    }
+
+    /// The path of the created directory.
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for ScratchDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scratch_dirs_get_distinct_paths() {
+        let first = ScratchDir::new(&env::temp_dir()).unwrap();
+        let second = ScratchDir::new(&env::temp_dir()).unwrap();
+        assert_ne!(first.path(), second.path());
+        assert!(first.path().is_dir());
+        assert!(second.path().is_dir());
+    }
+
+    #[test]
+    fn scratch_dir_is_removed_on_drop() {
+        let scratch = ScratchDir::new(&env::temp_dir()).unwrap();
+        let path = scratch.path().to_path_buf();
+        assert!(path.is_dir());
+        drop(scratch);
+        assert!(!path.exists());
     }
 }
