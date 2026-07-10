@@ -25,6 +25,42 @@ pub enum AttributeKey {
     Expr(Box<TemplateExpr>),
 }
 
+impl AttributeKey {
+    /// Returns `true` if the attribute key is [`Ident`].
+    ///
+    /// [`Ident`]: AttributeKey::Ident
+    #[must_use]
+    pub fn is_ident(&self) -> bool {
+        matches!(self, Self::Ident(..))
+    }
+
+    #[must_use]
+    pub fn as_ident(&self) -> Option<&HtmlIdent> {
+        if let Self::Ident(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// Returns `true` if the attribute key is [`Expr`].
+    ///
+    /// [`Expr`]: AttributeKey::Expr
+    #[must_use]
+    pub fn is_expr(&self) -> bool {
+        matches!(self, Self::Expr(..))
+    }
+
+    #[must_use]
+    pub fn as_expr(&self) -> Option<&TemplateExpr> {
+        if let Self::Expr(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
 impl WriteView for AttributeKey {
     fn write(&self, writer: &mut ViewWriter) {
         match self {
