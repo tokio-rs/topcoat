@@ -30,7 +30,7 @@ use syn::parse::{Parse, ParseStream};
 use topcoat_core::ast::ParseOption;
 
 use crate::ast::template::{TemplateElse, TemplateForLoop, TemplateIf, TemplateMatch};
-use crate::ast::view::{ViewWriter, WriteView, parse_leading_cx};
+use crate::ast::view::{self, ViewWriter, WriteView, parse_leading_cx};
 
 /// The full list of attributes attached to a single tag.
 pub struct Attributes {
@@ -55,8 +55,18 @@ impl Attributes {
 
 impl WriteView for Attributes {
     fn write(&self, writer: &mut ViewWriter) {
+        let mut visitor = DynamicAttributesVisitor::default();
         for item in &self.items {
-            WriteView::write(item, writer);
+            visitor.visit_node(item);
+        }
+        // If we cannot statically assert that all attribute keys are unique we must fall back to a
+        // slower runtime map of attributes.
+        if visitor.dynamic {
+            writer.write_expr(view::ExprKind::Attributes, self.to_token_stream());
+        } else {
+            for item in &self.items {
+                WriteView::write(item, writer);
+            }
         }
     }
 }
@@ -135,6 +145,57 @@ impl topcoat_pretty::PrettyPrint for Attributes {
     }
 }
 
+/// Visitor that checks whether attribute key uniqueness can be statically verified or if a runtime
+/// `Attributes` map has to be created.
+#[derive(Default)]
+struct DynamicAttributesVisitor {
+    dynamic: bool,
+}
+
+impl<'ast> Visit<'ast> for DynamicAttributesVisitor {
+    fn visit_attribute(&mut self, node: &'ast Attribute) {
+        // Dynamic keys cannot be checked at build time.
+        if node.key.is_expr() {
+            self.dynamic = true;
+        }
+    }
+
+    fn visit_bind_attribute(&mut self, node: &'ast BindAttribute) {
+        // Dynamic keys cannot be checked at build time.
+        if node.key.is_expr() {
+            self.dynamic = true;
+        }
+    }
+
+    fn visit_event_handler(&mut self, node: &'ast EventHandler) {
+        // Dynamic keys cannot be checked at build time.
+        if node.key.is_expr() {
+            self.dynamic = true;
+        }
+    }
+
+    fn visit_if(&mut self, _node: &'ast TemplateIf<AttributeNodes>) {
+        // Multiple conditionals could create the same key.
+        self.dynamic = true;
+    }
+
+    fn visit_for_loop(&mut self, _node: &'ast TemplateForLoop<AttributeNodes>) {
+        // Body could be run twice, creating duplicate attribute.
+        self.dynamic = true;
+    }
+
+    fn visit_match(&mut self, _node: &'ast TemplateMatch<AttributeNode>) {
+        // Multiple conditionals could create the same key.
+        self.dynamic = true;
+    }
+
+    fn visit_spread(&mut self, _node: &'ast AttributeSpread) {
+        // Dynamic keys cannot be checked at build time.
+        self.dynamic = true;
+    }
+}
+
+/// Visitor that returns a correctly spanned error in case of a duplicate attribute.
 #[derive(Default)]
 struct DuplicateAttributesVisitor {
     attributes: HashSet<String>,
