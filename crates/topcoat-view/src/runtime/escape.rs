@@ -56,31 +56,6 @@ impl HtmlContext {
         HtmlWriter { context: self, f }
     }
 
-    /// Returns the offset of the next byte that needs escaping in this
-    /// context, or `None` when nothing (more) needs escaping.
-    #[inline]
-    fn find_special(self, haystack: &[u8]) -> Option<usize> {
-        match self {
-            Self::Text => memchr3(b'&', b'<', b'>', haystack),
-            Self::AttributeValue => memchr2(b'&', b'"', haystack),
-            Self::Comment => memchr3(b'&', b'>', b'"', haystack),
-            Self::Unescaped | Self::AttributeKey | Self::ElementName => None,
-        }
-    }
-
-    /// Returns the escape sequence for `byte` in this context, or `None`
-    /// when it passes through as-is.
-    #[inline]
-    fn escape(self, byte: u8) -> Option<&'static str> {
-        match (self, byte) {
-            (Self::Text | Self::AttributeValue | Self::Comment, b'&') => Some("&amp;"),
-            (Self::Text, b'<') => Some("&lt;"),
-            (Self::Text | Self::Comment, b'>') => Some("&gt;"),
-            (Self::AttributeValue | Self::Comment, b'"') => Some("&quot;"),
-            _ => None,
-        }
-    }
-
     /// Returns `true` if `c` can terminate or corrupt an identifier and is
     /// therefore rejected in the ident contexts.
     #[inline]
@@ -99,6 +74,63 @@ impl HtmlContext {
             Self::ElementName => "element name",
         }
     }
+}
+
+/// Maps each byte to its escape sequence in one context, or `None` when the
+/// byte passes through as-is. Only ASCII bytes have entries, so escapes
+/// always fall on UTF-8 character boundaries.
+type EscapeTable = [Option<&'static str>; 256];
+
+const fn escape_table<const N: usize>(escapes: [(u8, &'static str); N]) -> EscapeTable {
+    let mut table: EscapeTable = [None; 256];
+    let mut i = 0;
+    while i < N {
+        table[escapes[i].0 as usize] = Some(escapes[i].1);
+        i += 1;
+    }
+    table
+}
+
+const TEXT_ESCAPES: EscapeTable =
+    escape_table([(b'&', "&amp;"), (b'<', "&lt;"), (b'>', "&gt;")]);
+
+const ATTRIBUTE_VALUE_ESCAPES: EscapeTable = escape_table([(b'&', "&amp;"), (b'"', "&quot;")]);
+
+const COMMENT_ESCAPES: EscapeTable =
+    escape_table([(b'&', "&amp;"), (b'>', "&gt;"), (b'"', "&quot;")]);
+
+/// Generates a write method specialized for one escaping context: a dedicated
+/// search for its escapable bytes and a dedicated lookup table, with no
+/// context dispatch anywhere in the loop.
+macro_rules! impl_write_escaped {
+    ($(#[$doc:meta])* $method:ident, $memchr:ident($($needle:literal),+), $table:ident) => {
+        $(#[$doc])*
+        #[inline]
+        fn $method(&mut self, s: &str) {
+            let bytes = s.as_bytes();
+            let mut start = 0;
+
+            // Escapable bytes are ASCII, so every hit falls on a UTF-8
+            // character boundary.
+            while let Some(offset) = $memchr($($needle,)+ &bytes[start..]) {
+                // Copy the ordinary run preceding the special in one shot.
+                let special = start + offset;
+                self.f.write_str(&s[start..special]);
+
+                // Emit the whole run of consecutive specials from the lookup
+                // table, so the search runs once per run rather than once per
+                // byte.
+                let mut end = special;
+                while let Some(escape) = bytes.get(end).and_then(|&b| $table[b as usize]) {
+                    self.f.write_str(escape);
+                    end += 1;
+                }
+                start = end;
+            }
+
+            self.f.write_str(&s[start..]);
+        }
+    };
 }
 
 /// A writer created by [`HtmlContext::writer`] that makes everything written
@@ -124,9 +156,9 @@ impl HtmlWriter<'_, '_> {
     pub fn write_str(&mut self, s: &str) {
         match self.context {
             HtmlContext::Unescaped => self.f.write_str(s),
-            HtmlContext::Text | HtmlContext::AttributeValue | HtmlContext::Comment => {
-                self.write_escaped(s);
-            }
+            HtmlContext::Text => self.write_text_escaped(s),
+            HtmlContext::AttributeValue => self.write_attribute_value_escaped(s),
+            HtmlContext::Comment => self.write_comment_escaped(s),
             HtmlContext::AttributeKey | HtmlContext::ElementName => self.write_ident(s),
         }
     }
@@ -139,50 +171,48 @@ impl HtmlWriter<'_, '_> {
     /// Panics in the ident contexts when `c` could break out of the
     /// identifier, like [`write_str`](Self::write_str).
     pub fn write_char(&mut self, c: char) {
-        match self.context {
-            HtmlContext::Unescaped => self.f.write_char(c),
-            HtmlContext::Text | HtmlContext::AttributeValue | HtmlContext::Comment => {
-                let escape = u8::try_from(c).ok().and_then(|b| self.context.escape(b));
-                match escape {
-                    Some(escape) => self.f.write_str(escape),
-                    None => self.f.write_char(c),
-                }
-            }
+        let table = match self.context {
+            HtmlContext::Unescaped => return self.f.write_char(c),
+            HtmlContext::Text => &TEXT_ESCAPES,
+            HtmlContext::AttributeValue => &ATTRIBUTE_VALUE_ESCAPES,
+            HtmlContext::Comment => &COMMENT_ESCAPES,
             HtmlContext::AttributeKey | HtmlContext::ElementName => {
                 assert!(
                     !HtmlContext::forbidden_in_ident(c),
                     "invalid {}: forbidden character {c:?}",
                     self.context.description(),
                 );
-                self.f.write_char(c);
+                return self.f.write_char(c);
             }
+        };
+        // A `char` casts to its code point; anything past the table passes
+        // through untouched.
+        match table.get(c as usize).copied().flatten() {
+            Some(escape) => self.f.write_str(escape),
+            None => self.f.write_char(c),
         }
     }
 
-    /// Writes `s`, escaping the characters significant in this context.
-    fn write_escaped(&mut self, s: &str) {
-        let bytes = s.as_bytes();
-        let mut start = 0;
+    impl_write_escaped!(
+        /// Writes `s` escaped for text node content.
+        write_text_escaped,
+        memchr3(b'&', b'<', b'>'),
+        TEXT_ESCAPES
+    );
 
-        // Escapable bytes are ASCII, so every hit falls on a UTF-8 character
-        // boundary.
-        while let Some(offset) = self.context.find_special(&bytes[start..]) {
-            // Copy the ordinary run preceding the special in one shot.
-            let special = start + offset;
-            self.f.write_str(&s[start..special]);
+    impl_write_escaped!(
+        /// Writes `s` escaped for a double-quoted attribute value.
+        write_attribute_value_escaped,
+        memchr2(b'&', b'"'),
+        ATTRIBUTE_VALUE_ESCAPES
+    );
 
-            // Emit the whole run of consecutive specials, so the search runs
-            // once per run rather than once per byte.
-            let mut end = special;
-            while let Some(escape) = bytes.get(end).and_then(|&b| self.context.escape(b)) {
-                self.f.write_str(escape);
-                end += 1;
-            }
-            start = end;
-        }
-
-        self.f.write_str(&s[start..]);
-    }
+    impl_write_escaped!(
+        /// Writes `s` escaped for a comment payload.
+        write_comment_escaped,
+        memchr3(b'&', b'>', b'"'),
+        COMMENT_ESCAPES
+    );
 
     /// Writes `s` verbatim after checking that every character is allowed in
     /// an ident context, panicking otherwise.
