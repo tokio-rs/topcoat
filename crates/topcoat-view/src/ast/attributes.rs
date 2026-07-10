@@ -300,6 +300,22 @@ mod tests {
         syn::parse_str(source).unwrap()
     }
 
+    /// Renders the `WriteView` output of an attribute list to a token string.
+    fn write_view(source: &str) -> String {
+        let mut writer = ViewWriter::new();
+        WriteView::write(&parse(source), &mut writer);
+        writer.into_token_stream().to_string()
+    }
+
+    /// Returns `true` if the attribute list falls back to a runtime `Attributes`
+    /// map instead of emitting a static view.
+    ///
+    /// The fallback is identified by the `Attributes::with_capacity` call the
+    /// runtime map builder always emits; the static path never produces it.
+    fn is_dynamic(source: &str) -> bool {
+        write_view(source).contains("Attributes :: with_capacity")
+    }
+
     #[test]
     fn empty_input_yields_no_items() {
         assert!(parse("").is_empty());
@@ -351,5 +367,71 @@ mod tests {
     #[should_panic(expected = "duplicate attribute `@dup-attr`")]
     fn errors_on_duplicate_event_handler() {
         let _ = parse(r"@not-dup=(()) @dup-attr=(()) @dup-attr=(()) @another=(())");
+    }
+
+    #[test]
+    fn generates_static_view_for_literal_attributes() {
+        // Statically known, unique keys are written straight into the markup.
+        let out = write_view(r#"class="button" id="main""#);
+        assert!(!out.contains("Attributes :: with_capacity"));
+        assert!(out.contains(r#" class=\"button\" id=\"main\""#));
+    }
+
+    #[test]
+    fn generates_static_view_for_expression_values() {
+        // Expression *values* keep static keys, so uniqueness is still provable.
+        assert!(!is_dynamic(r#"class="button" href=(url)"#));
+    }
+
+    #[test]
+    fn generates_static_view_for_bind_and_event_with_static_keys() {
+        // Bind attributes and event handlers with static keys stay static.
+        assert!(!is_dynamic(r#":value=$(value) @input="handle()""#));
+    }
+
+    #[test]
+    fn generates_static_view_with_let_binding() {
+        // A `let` introduces no key, so surrounding static keys remain provable.
+        assert!(!is_dynamic(r#"let cls = "x"; class=(cls)"#));
+    }
+
+    #[test]
+    fn generates_dynamic_attributes_for_expression_key() {
+        // A dynamic key cannot be checked for uniqueness at build time.
+        assert!(is_dynamic(r"(name)=(value)"));
+    }
+
+    #[test]
+    fn generates_dynamic_attributes_for_bind_expression_key() {
+        assert!(is_dynamic(r":(name)=$(value)"));
+    }
+
+    #[test]
+    fn generates_dynamic_attributes_for_event_expression_key() {
+        assert!(is_dynamic(r"@(name)=(handler)"));
+    }
+
+    #[test]
+    fn generates_dynamic_attributes_for_spread() {
+        // A spread contributes an unknown set of keys.
+        assert!(is_dynamic(r"(attrs)"));
+    }
+
+    #[test]
+    fn generates_dynamic_attributes_for_if() {
+        // Separate conditionals could each emit the same key.
+        assert!(is_dynamic(r#"if cond { class="a" } else { class="b" }"#));
+    }
+
+    #[test]
+    fn generates_dynamic_attributes_for_for_loop() {
+        // A loop body may run repeatedly, duplicating its keys.
+        assert!(is_dynamic(r#"for _ in items { class="a" }"#));
+    }
+
+    #[test]
+    fn generates_dynamic_attributes_for_match() {
+        // Match arms could emit overlapping keys with the surrounding list.
+        assert!(is_dynamic(r#"match kind { _ => class="a", }"#));
     }
 }
