@@ -2,7 +2,7 @@ use std::fmt::{self, Display};
 
 use topcoat_core::runtime::context::Cx;
 
-use crate::runtime::{AttributeValueViewParts, Unescaped, ViewParts};
+use crate::runtime::{AttributeValueViewParts, PartsWriter};
 
 /// A CSS length unit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -533,9 +533,9 @@ impl AttributeValueViewParts for Length {
         true
     }
 
-    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
-        parts.push(self.value);
-        parts.push(Unescaped::new_unchecked(self.unit.as_str()));
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_f32(self.value);
+        parts.push_str_unescaped(self.unit.as_str());
     }
 }
 
@@ -544,7 +544,7 @@ mod tests {
     use topcoat_core::runtime::context::Cx;
 
     use super::*;
-    use crate::runtime::{FmtHtml, Formatter, ViewPart};
+    use crate::runtime::{HtmlContext, View, ViewParts};
 
     /// Every unit constructor paired with its rendered form. The numeric value
     /// is the same across cases so each assertion focuses on the unit suffix.
@@ -602,12 +602,11 @@ mod tests {
 
     fn render(value: impl AttributeValueViewParts) -> String {
         let mut parts = ViewParts::new();
-        value.into_view_parts(&Cx::default(), &mut parts);
-        let part: ViewPart = parts.into();
-        let mut buf = String::new();
-        let mut f = Formatter::new(&mut buf);
-        part.fmt_html(&Cx::default(), &mut f);
-        buf
+        value.into_view_parts(
+            &Cx::default(),
+            &mut PartsWriter::new(&mut parts, HtmlContext::AttributeValue),
+        );
+        View::new(parts).render(&Cx::default())
     }
 
     #[test]

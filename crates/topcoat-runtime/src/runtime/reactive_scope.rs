@@ -1,6 +1,6 @@
 use serde::Serialize;
 use topcoat_core::runtime::context::Cx;
-use topcoat_view::runtime::{NodeViewParts, Unescaped, View, ViewPart, ViewParts};
+use topcoat_view::runtime::{NodeViewParts, PartsWriter, View, ViewPart};
 use uuid::Uuid;
 
 use crate::runtime::{SHARD_ROUTE_PREFIX, ShardId};
@@ -45,38 +45,35 @@ impl ReactiveScope {
 }
 
 impl NodeViewParts for ReactiveScope {
-    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         let shard_id = self.shard_id.as_str();
 
         // <!-- ::topcoat::scope::start("<id>", "<path>", ["<js>", ...]) -->
         //
         // Each parameter's JavaScript source is wrapped in a quoted string.
-        // Because the parts are HTML-escaped, any `"` inside the source becomes
-        // `&quot;`, so the quotes stay unambiguous delimiters on the client.
-        parts.push(Unescaped::new_unchecked("<!-- ::topcoat::scope::start("));
-        parts.push(Unescaped::new_unchecked(
-            serde_json::to_string(&self.id).unwrap(),
-        ));
-        parts.push(Unescaped::new_unchecked(", "));
-        parts.push(Unescaped::new_unchecked(
+        // The source parts are sealed with the comment context, so any `"`
+        // inside the source renders as `&quot;` and the quotes stay
+        // unambiguous delimiters on the client.
+        parts.push_str_unescaped("<!-- ::topcoat::scope::start(");
+        parts.push_str_unescaped(serde_json::to_string(&self.id).unwrap());
+        parts.push_str_unescaped(", ");
+        parts.push_str_unescaped(
             serde_json::to_string(&format!("{SHARD_ROUTE_PREFIX}/{shard_id}")).unwrap(),
-        ));
-        parts.push(Unescaped::new_unchecked(", ["));
+        );
+        parts.push_str_unescaped(", [");
         let last = self.exprs.len().saturating_sub(1);
         for (index, expr) in self.exprs.into_iter().enumerate() {
-            parts.push(Unescaped::new_unchecked("\""));
-            parts.push(expr);
-            parts.push(Unescaped::new_unchecked("\""));
+            parts.push_str_unescaped("\"");
+            parts.push_part(expr);
+            parts.push_str_unescaped("\"");
             if index != last {
-                parts.push(Unescaped::new_unchecked(", "));
+                parts.push_str_unescaped(", ");
             }
         }
-        parts.push(Unescaped::new_unchecked("]) -->"));
-        parts.push(self.placeholder);
-        parts.push(Unescaped::new_unchecked("<!-- ::topcoat::scope::end("));
-        parts.push(Unescaped::new_unchecked(
-            serde_json::to_string(&self.id).unwrap(),
-        ));
-        parts.push(Unescaped::new_unchecked(") -->"));
+        parts.push_str_unescaped("]) -->");
+        self.placeholder.into_view_parts(cx, parts);
+        parts.push_str_unescaped("<!-- ::topcoat::scope::end(");
+        parts.push_str_unescaped(serde_json::to_string(&self.id).unwrap());
+        parts.push_str_unescaped(") -->");
     }
 }

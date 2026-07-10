@@ -48,8 +48,20 @@ impl ViewWriter {
         self.static_segment.push_str(s);
     }
 
-    pub fn write_str(&mut self, s: &str) {
-        crate::runtime::Formatter::new(&mut self.static_segment).write_str(s);
+    /// Appends literal text escaped for a text node position.
+    pub fn write_text(&mut self, s: &str) {
+        self.write_in_context(crate::runtime::HtmlContext::Text, s);
+    }
+
+    /// Appends literal text escaped for a double-quoted attribute value
+    /// position.
+    pub fn write_attribute_value(&mut self, s: &str) {
+        self.write_in_context(crate::runtime::HtmlContext::AttributeValue, s);
+    }
+
+    fn write_in_context(&mut self, context: crate::runtime::HtmlContext, s: &str) {
+        let mut f = crate::runtime::Formatter::new(&mut self.static_segment);
+        context.writer(&mut f).write_str(s);
     }
 
     pub fn write_expr(&mut self, kind: ExprKind, tokens: TokenStream) {
@@ -208,6 +220,7 @@ impl ViewWriter {
 pub(crate) enum ExprKind {
     Unescaped,
     Node,
+    View,
     ElementName,
     Attribute,
     AttributeUnescaped,
@@ -221,6 +234,7 @@ impl ExprKind {
         let name = match self {
             Self::Unescaped => "__unescaped",
             Self::Node => "__node",
+            Self::View => "__view",
             Self::ElementName => "__element_name",
             Self::Attribute => "__attribute",
             Self::AttributeUnescaped => "__attribute_unescaped",
@@ -314,10 +328,27 @@ mod tests {
     fn adjacent_literal_text_is_concatenated() {
         let mut writer = ViewWriter::new();
         writer.write_str_unescaped("<div>");
-        writer.write_str("hello");
+        writer.write_text("hello");
         writer.write_str_unescaped("</div>");
         let out = rendered(writer);
         assert!(out.contains("\"<div>hello</div>\""));
+    }
+
+    #[test]
+    fn literal_text_is_escaped_for_its_position() {
+        let mut writer = ViewWriter::new();
+        writer.write_str_unescaped("<p>");
+        writer.write_text("a < b & \"c\"");
+        writer.write_str_unescaped("</p>");
+        let out = rendered(writer);
+        assert!(out.contains("a &lt; b &amp; \\\"c\\\""));
+
+        let mut writer = ViewWriter::new();
+        writer.write_str_unescaped("<p x=\"");
+        writer.write_attribute_value("a < b & \"c\"");
+        writer.write_str_unescaped("\">");
+        let out = rendered(writer);
+        assert!(out.contains("a < b &amp; &quot;c&quot;"));
     }
 
     #[test]
@@ -402,6 +433,7 @@ mod tests {
         for (kind, expected) in [
             (ExprKind::Unescaped, "__unescaped"),
             (ExprKind::Node, "__node"),
+            (ExprKind::View, "__view"),
             (ExprKind::ElementName, "__element_name"),
             (ExprKind::Attribute, "__attribute"),
             (ExprKind::AttributeUnescaped, "__attribute_unescaped"),

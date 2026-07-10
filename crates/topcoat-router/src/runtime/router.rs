@@ -449,7 +449,7 @@ mod tests {
     use http::{HeaderMap, StatusCode};
     use topcoat_core::runtime::context::{Cx, app_context, request_context};
     use topcoat_core::runtime::error::Result;
-    use topcoat_view::runtime::{View, ViewParts};
+    use topcoat_view::runtime::{HtmlContext, PartsWriter, View, ViewParts};
 
     use super::*;
     use crate::runtime::{
@@ -541,7 +541,7 @@ mod tests {
 
     fn view(text: &'static str) -> View {
         let mut parts = ViewParts::new();
-        parts.push(text);
+        PartsWriter::new(&mut parts, HtmlContext::Text).push_str(text);
         View::new(parts)
     }
 
@@ -554,9 +554,9 @@ mod tests {
         Box::pin(async move {
             let inner = slot.await?;
             let mut parts = ViewParts::new();
-            parts.push("R[");
-            parts.push(inner);
-            parts.push("]");
+            PartsWriter::new(&mut parts, HtmlContext::Text).push_str("R[");
+            parts.push_view(inner);
+            PartsWriter::new(&mut parts, HtmlContext::Text).push_str("]");
             Ok(View::new(parts))
         })
     }
@@ -566,9 +566,9 @@ mod tests {
         Box::pin(async move {
             let inner = slot.await?;
             let mut parts = ViewParts::new();
-            parts.push("A[");
-            parts.push(inner);
-            parts.push("]");
+            PartsWriter::new(&mut parts, HtmlContext::Text).push_str("A[");
+            parts.push_view(inner);
+            PartsWriter::new(&mut parts, HtmlContext::Text).push_str("]");
             Ok(View::new(parts))
         })
     }

@@ -66,9 +66,13 @@ impl Expr {
         let externals = names.externals();
 
         if externals.is_empty() {
-            Ok(quote! {
-                ::topcoat::runtime::Expr::new(#rust, ::topcoat::view::ViewPart::from(#js))
-            })
+            Ok(quote! {{
+                use ::topcoat::runtime::internal::*;
+
+                let mut __parts = ::topcoat::view::ViewParts::new();
+                __js(&mut __parts, #js);
+                ::topcoat::runtime::Expr::new(#rust, ::topcoat::view::ViewPart::from(__parts))
+            }})
         } else {
             let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
             let rust_external_values = externals.iter().map(|binding| {

@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use topcoat_core::runtime::context::Cx;
 
-use crate::runtime::{Attribute, AttributeValueViewParts, AttributeViewParts, ViewPart, ViewParts};
+use crate::runtime::{
+    Attribute, AttributeValueViewParts, AttributeViewParts, HtmlContext, PartsWriter, ViewPart,
+    ViewParts,
+};
 
 /// A runtime collection of HTML attributes with unique keys.
 ///
@@ -73,7 +76,10 @@ impl Attributes {
     ) -> Option<ViewPart> {
         if v.attribute_present() {
             let mut view_parts = ViewParts::new();
-            v.into_view_parts(cx, &mut view_parts);
+            v.into_view_parts(
+                cx,
+                &mut PartsWriter::new(&mut view_parts, HtmlContext::AttributeValue),
+            );
             self.map.insert(k.into(), view_parts.into())
         } else {
             self.map.insert(k.into(), ViewPart::empty())
@@ -102,7 +108,7 @@ impl Attributes {
 }
 
 impl AttributeViewParts for Attributes {
-    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         for (key, value) in self {
             Attribute::new(key, value).into_view_parts(cx, parts);
         }
@@ -136,16 +142,15 @@ mod tests {
     use topcoat_core::runtime::context::Cx;
 
     use super::*;
-    use crate::runtime::{FmtHtml, Formatter};
+    use crate::runtime::View;
 
     fn render(attrs: Attributes) -> String {
         let mut parts = ViewParts::new();
-        attrs.into_view_parts(&Cx::default(), &mut parts);
-        let part: ViewPart = parts.into();
-        let mut buf = String::new();
-        let mut f = Formatter::new(&mut buf);
-        part.fmt_html(&Cx::default(), &mut f);
-        buf
+        attrs.into_view_parts(
+            &Cx::default(),
+            &mut PartsWriter::new(&mut parts, HtmlContext::AttributeValue),
+        );
+        View::new(parts).render(&Cx::default())
     }
 
     #[test]
@@ -227,7 +232,7 @@ mod tests {
     fn escapes_attribute_value() {
         let mut attrs = Attributes::new();
         attrs.insert(&Cx::default(), "data-x", "a\"b<c");
-        assert_eq!(render(attrs), " data-x=\"a&quot;b&lt;c\"");
+        assert_eq!(render(attrs), " data-x=\"a&quot;b<c\"");
     }
 
     #[test]

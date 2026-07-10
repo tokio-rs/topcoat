@@ -1,6 +1,6 @@
 use topcoat_core::runtime::context::Cx;
 
-use crate::runtime::{Unescaped, ViewPart, ViewParts};
+use crate::runtime::{PartsWriter, Unescaped};
 
 /// Converts a value used as an element name into view parts.
 ///
@@ -18,42 +18,41 @@ use crate::runtime::{Unescaped, ViewPart, ViewParts};
 /// # }
 /// ```
 pub trait ElementNameViewParts {
-    /// Appends this element name to `parts`.
-    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts);
+    /// Appends this element name to the view being built.
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
 }
 
-macro_rules! impl_primitive {
-    ($ty:ty) => {
-        impl ElementNameViewParts for $ty {
-            #[inline]
-            fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
-                parts.push(self);
-            }
-        }
-    };
+impl ElementNameViewParts for String {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_str(self);
+    }
 }
-
-impl_primitive!(ViewPart);
-impl_primitive!(String);
-impl_primitive!(Unescaped<String>);
 
 impl ElementNameViewParts for &str {
     #[inline]
-    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
-        parts.push(self.to_owned());
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_str(self.to_owned());
+    }
+}
+
+impl ElementNameViewParts for Unescaped<String> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_str_unescaped(self.0);
     }
 }
 
 impl ElementNameViewParts for Unescaped<&'static str> {
     #[inline]
-    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
-        parts.push(self);
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_str_unescaped(self.0);
     }
 }
 
 impl ElementNameViewParts for &String {
     #[inline]
-    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         self.as_str().into_view_parts(cx, parts);
     }
 }
@@ -63,7 +62,7 @@ where
     &'b T: ElementNameViewParts,
 {
     #[inline]
-    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         (*self).into_view_parts(cx, parts);
     }
 }
@@ -76,7 +75,7 @@ macro_rules! impl_tuple {
         {
             #[inline]
             #[allow(non_snake_case)]
-            fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+            fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
                 let ($($ty,)+) = self;
                 $($ty.into_view_parts(cx, parts);)+
             }

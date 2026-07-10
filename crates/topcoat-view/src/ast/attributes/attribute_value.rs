@@ -25,7 +25,7 @@ impl WriteView for AttributeValue {
             Self::Expr(inner) => {
                 writer.write_expr(ExprKind::AttributeValue, inner.expr.to_token_stream());
             }
-            Self::LitStr(inner) => writer.write_str(&inner.value()),
+            Self::LitStr(inner) => writer.write_attribute_value(&inner.value()),
         }
     }
 }

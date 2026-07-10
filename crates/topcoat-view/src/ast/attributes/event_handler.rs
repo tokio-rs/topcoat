@@ -41,7 +41,15 @@ impl ToTokens for EventHandlerValue {
             Self::LitStr(inner) => quote! {
                 ::topcoat::runtime::Expr::new(
                     |_: ::topcoat::runtime::Event| {},
-                    ::topcoat::view::ViewPart::from(#inner),
+                    {
+                        let mut __parts = ::topcoat::view::ViewParts::new();
+                        ::topcoat::view::PartsWriter::new(
+                            &mut __parts,
+                            ::topcoat::view::HtmlContext::Comment,
+                        )
+                        .push_str(#inner);
+                        ::topcoat::view::ViewPart::from(__parts)
+                    },
                 )
             }
             .to_tokens(tokens),
@@ -76,7 +84,7 @@ impl WriteView for EventHandler {
                 writer.write_str_unescaped("data-topcoat-on:");
                 key.write(writer);
                 writer.write_str_unescaped("=\"");
-                writer.write_str(&value.value());
+                writer.write_attribute_value(&value.value());
                 writer.write_str_unescaped("\"");
             }
             EventHandlerValue::Expr(value) => {

@@ -29,23 +29,27 @@ pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");
 /// Macro helpers to shorten the generated source code.
 #[doc(hidden)]
 pub mod internal {
-    use topcoat_view::runtime::{Unescaped, ViewParts};
+    use topcoat_view::runtime::{HtmlContext, PartsWriter, ViewParts};
 
     #[inline]
-    pub fn __js(parts: &mut ViewParts, js: &str) {
-        parts.push(js.to_owned());
+    pub fn __js(parts: &mut ViewParts, js: impl Into<std::borrow::Cow<'static, str>>) {
+        // JavaScript source renders inside comment markers and double-quoted
+        // attributes; the comment context escapes the union of what both
+        // positions need.
+        PartsWriter::new(parts, HtmlContext::Comment).push_str(js);
     }
 
     #[inline]
     pub fn __js_unescaped(parts: &mut ViewParts, s: &'static str) {
-        parts.push(Unescaped::new_unchecked(s));
+        PartsWriter::new(parts, HtmlContext::Unescaped).push_str(s);
     }
 
     #[inline]
     pub fn __surrogate(parts: &mut ViewParts, value: &(impl serde::Serialize + ?Sized)) {
-        parts.push(Unescaped::new_unchecked("cx.hydrate("));
+        let mut writer = PartsWriter::new(parts, HtmlContext::Comment);
+        writer.push_str_unescaped("cx.hydrate(");
         let json = serde_json::to_string(value).expect("failed to serialize surrogate value");
-        parts.push(json);
-        parts.push(Unescaped::new_unchecked(")"));
+        writer.push_str(json);
+        writer.push_str_unescaped(")");
     }
 }

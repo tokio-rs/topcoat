@@ -92,7 +92,7 @@ impl WriteView for Component {
         });
 
         writer.write_expr(
-            ExprKind::Node,
+            ExprKind::View,
             quote_spanned! {self.paren_token.span.span()=>
                 {
                     // The marker is built via `Default` so the same construction

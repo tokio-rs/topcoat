@@ -2,7 +2,7 @@ use std::{iter::empty, ops::Deref};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use topcoat_core::runtime::context::Cx;
-use topcoat_view::runtime::{NodeViewParts, Unescaped, ViewParts};
+use topcoat_view::runtime::{NodeViewParts, PartsWriter};
 use uuid::Uuid;
 
 use crate::runtime::{Surrogate, Surrogated};
@@ -79,7 +79,7 @@ where
     for<'a> &'a T: Surrogated,
     for<'a> <&'a T as Surrogated>::Surrogate: Serialize,
 {
-    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         #[derive(Serialize)]
         struct SignalDeclarationPayload<'a, V>
         where
@@ -99,9 +99,9 @@ where
         let json = serde_json::to_string(&payload)
             .expect("failed to serialize signal declaration payload");
 
-        parts.push(Unescaped::new_unchecked("<!-- ::topcoat::signal("));
-        parts.push(Unescaped::new_unchecked(json));
-        parts.push(Unescaped::new_unchecked(") -->"));
+        parts.push_str_unescaped("<!-- ::topcoat::signal(");
+        parts.push_str_unescaped(json);
+        parts.push_str_unescaped(") -->");
     }
 }
 

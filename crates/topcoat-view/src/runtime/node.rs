@@ -1,6 +1,6 @@
 use topcoat_core::runtime::context::Cx;
 
-use crate::runtime::{Unescaped, View, ViewPart, ViewParts};
+use crate::runtime::{PartsWriter, Unescaped, View};
 
 /// Converts a value used in node position into view parts.
 ///
@@ -18,75 +18,80 @@ use crate::runtime::{Unescaped, View, ViewPart, ViewParts};
 /// # }
 /// ```
 pub trait NodeViewParts {
-    /// Appends this value to `parts`.
-    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts);
+    /// Appends this value to the view being built.
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
 }
 
 impl NodeViewParts for View {
     #[inline]
-    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
-        parts.push(self);
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_part(self.into_part());
     }
 }
 
 macro_rules! impl_primitive {
-    ($ty:ty) => {
+    ($ty:ty, $method:ident) => {
         impl NodeViewParts for $ty {
             #[inline]
-            fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
-                parts.push(self);
+            fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+                parts.$method(self);
             }
         }
     };
-    ($ty:ty, ref) => {
-        impl_primitive!($ty);
+    ($ty:ty, $method:ident, ref) => {
+        impl_primitive!($ty, $method);
 
         impl NodeViewParts for &$ty {
             #[inline]
-            fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+            fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
                 (*self).into_view_parts(cx, parts)
             }
         }
     };
 }
 
-impl_primitive!(ViewPart);
-impl_primitive!(bool, ref);
-impl_primitive!(char, ref);
-impl_primitive!(i8, ref);
-impl_primitive!(i16, ref);
-impl_primitive!(i32, ref);
-impl_primitive!(i64, ref);
-impl_primitive!(i128, ref);
-impl_primitive!(isize, ref);
-impl_primitive!(u8, ref);
-impl_primitive!(u16, ref);
-impl_primitive!(u32, ref);
-impl_primitive!(u64, ref);
-impl_primitive!(u128, ref);
-impl_primitive!(usize, ref);
-impl_primitive!(f32, ref);
-impl_primitive!(f64, ref);
-impl_primitive!(String);
-impl_primitive!(Unescaped<String>);
+impl_primitive!(bool, push_bool, ref);
+impl_primitive!(char, push_char, ref);
+impl_primitive!(i8, push_i8, ref);
+impl_primitive!(i16, push_i16, ref);
+impl_primitive!(i32, push_i32, ref);
+impl_primitive!(i64, push_i64, ref);
+impl_primitive!(i128, push_i128, ref);
+impl_primitive!(isize, push_isize, ref);
+impl_primitive!(u8, push_u8, ref);
+impl_primitive!(u16, push_u16, ref);
+impl_primitive!(u32, push_u32, ref);
+impl_primitive!(u64, push_u64, ref);
+impl_primitive!(u128, push_u128, ref);
+impl_primitive!(usize, push_usize, ref);
+impl_primitive!(f32, push_f32, ref);
+impl_primitive!(f64, push_f64, ref);
+impl_primitive!(String, push_str);
 
 impl NodeViewParts for &str {
     #[inline]
-    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
-        parts.push(self.to_owned());
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_str(self.to_owned());
+    }
+}
+
+impl NodeViewParts for Unescaped<String> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_str_unescaped(self.0);
     }
 }
 
 impl NodeViewParts for Unescaped<&'static str> {
     #[inline]
-    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
-        parts.push(self);
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_str_unescaped(self.0);
     }
 }
 
 impl NodeViewParts for &String {
     #[inline]
-    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         self.as_str().into_view_parts(cx, parts);
     }
 }
@@ -96,7 +101,7 @@ where
     &'b T: NodeViewParts,
 {
     #[inline]
-    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         (*self).into_view_parts(cx, parts);
     }
 }
@@ -106,7 +111,7 @@ where
     T: NodeViewParts,
 {
     #[inline]
-    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         if let Some(value) = self {
             value.into_view_parts(cx, parts);
         }
@@ -118,7 +123,7 @@ where
     T: NodeViewParts,
 {
     #[inline]
-    fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         for value in self {
             value.into_view_parts(cx, parts);
         }
@@ -133,7 +138,7 @@ macro_rules! impl_tuple {
         {
             #[inline]
             #[allow(non_snake_case)]
-            fn into_view_parts(self, cx: &Cx, parts: &mut ViewParts) {
+            fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
                 let ($($ty,)+) = self;
                 $($ty.into_view_parts(cx, parts);)+
             }

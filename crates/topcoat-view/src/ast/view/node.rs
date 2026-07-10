@@ -56,7 +56,7 @@ impl MatchArmBody for Node {
 impl WriteView for Node {
     fn write(&self, writer: &mut ViewWriter) {
         match self {
-            Self::Text(inner) => writer.write_str(&inner.value()),
+            Self::Text(inner) => writer.write_text(&inner.value()),
             Self::DocumentType(inner) => inner.write(writer),
             Self::Element(inner) => inner.write(writer),
             Self::Component(inner) => inner.write(writer),
