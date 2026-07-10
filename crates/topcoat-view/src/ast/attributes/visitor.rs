@@ -3,7 +3,9 @@ use crate::ast::template::{
     TemplateLet, TemplateMatch,
 };
 
-use super::*;
+use super::{
+    Attribute, AttributeNode, AttributeNodes, AttributeSpread, BindAttribute, EventHandler,
+};
 
 pub trait Visit<'ast> {
     fn visit_node(&mut self, node: &'ast AttributeNode) {

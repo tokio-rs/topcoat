@@ -29,7 +29,7 @@ use syn::parse::{Parse, ParseStream};
 
 use topcoat_core::ast::ParseOption;
 
-use crate::ast::template::{TemplateForLoop, TemplateIf, TemplateMatch};
+use crate::ast::template::{TemplateElse, TemplateForLoop, TemplateIf, TemplateMatch};
 use crate::ast::view::{ViewWriter, WriteView, parse_leading_cx};
 
 /// The full list of attributes attached to a single tag.
@@ -78,69 +78,12 @@ impl Parse for Attributes {
         }
 
         // Check for uniqueness of attribute keys.
-        {
-            #[derive(Default)]
-            struct Visitor {
-                attributes: HashSet<String>,
-                error: Option<syn::Error>,
-            }
-
-            impl Visitor {
-                fn register(&mut self, key: String, span: Span) {
-                    if self.error.is_some() {
-                        return;
-                    }
-                    if self.attributes.contains(&key) {
-                        self.error = Some(syn::Error::new(
-                            span,
-                            format!("duplicate attribute `{key}`"),
-                        ));
-                    }
-                    self.attributes.insert(key);
-                }
-            }
-
-            impl<'ast> Visit<'ast> for Visitor {
-                fn visit_attribute(&mut self, node: &'ast Attribute) {
-                    if let Some(ident) = node.key.as_ident() {
-                        self.register(ident.to_string(), ident.span());
-                    }
-                }
-
-                fn visit_bind_attribute(&mut self, node: &'ast BindAttribute) {
-                    if let Some(ident) = node.key.as_ident() {
-                        self.register(format!(":{ident}"), ident.span());
-                    }
-                }
-
-                fn visit_event_handler(&mut self, node: &'ast EventHandler) {
-                    if let Some(ident) = node.key.as_ident() {
-                        self.register(format!("@{ident}"), ident.span());
-                    }
-                }
-
-                fn visit_for_loop(&mut self, _node: &'ast TemplateForLoop<AttributeNodes>) {
-                    // We cannot statically assert that a for loop only creates a key at most once.
-                }
-
-                fn visit_if(&mut self, _node: &'ast TemplateIf<AttributeNodes>) {
-                    // We cannot statically assert that a combination of multiple conditionals
-                    // create a key at most once.
-                }
-
-                fn visit_match(&mut self, _node: &'ast TemplateMatch<AttributeNode>) {
-                    // We cannot statically assert that a combination of multiple conditionals
-                    // create a key at most once.
-                }
-            }
-
-            let mut visitor = Visitor::default();
-            for item in &items {
-                visitor.visit_node(item);
-            }
-            if let Some(error) = visitor.error {
-                return Err(error);
-            }
+        let mut visitor = DuplicateAttributesVisitor::default();
+        for item in &items {
+            visitor.visit_node(item);
+        }
+        if let Some(error) = visitor.error {
+            return Err(error);
         }
 
         Ok(Self { cx, items })
@@ -188,6 +131,102 @@ impl topcoat_pretty::PrettyPrint for Attributes {
                 printer.scan_break();
                 " ".pretty_print(printer);
             }
+        }
+    }
+}
+
+#[derive(Default)]
+struct DuplicateAttributesVisitor {
+    attributes: HashSet<String>,
+    error: Option<syn::Error>,
+}
+
+impl DuplicateAttributesVisitor {
+    fn register(&mut self, key: String, span: Span) {
+        if self.error.is_some() {
+            return;
+        }
+        if self.attributes.contains(&key) {
+            self.error = Some(syn::Error::new(
+                span,
+                format!("duplicate attribute `{key}`"),
+            ));
+        }
+        self.attributes.insert(key);
+    }
+}
+
+impl<'ast> Visit<'ast> for DuplicateAttributesVisitor {
+    fn visit_attribute(&mut self, node: &'ast Attribute) {
+        if let Some(ident) = node.key.as_ident() {
+            self.register(ident.to_string(), ident.span());
+        }
+    }
+
+    fn visit_bind_attribute(&mut self, node: &'ast BindAttribute) {
+        if let Some(ident) = node.key.as_ident() {
+            self.register(format!(":{ident}"), ident.span());
+        }
+    }
+
+    fn visit_event_handler(&mut self, node: &'ast EventHandler) {
+        if let Some(ident) = node.key.as_ident() {
+            self.register(format!("@{ident}"), ident.span());
+        }
+    }
+
+    fn visit_for_loop(&mut self, node: &'ast TemplateForLoop<AttributeNodes>) {
+        if self.error.is_some() {
+            return;
+        }
+
+        let mut visitor = DuplicateAttributesVisitor::default();
+        visit_for_loop(&mut visitor, node);
+        self.error = visitor.error;
+    }
+
+    fn visit_if(&mut self, node: &'ast TemplateIf<AttributeNodes>) {
+        if self.error.is_some() {
+            return;
+        }
+
+        let mut visitor = DuplicateAttributesVisitor::default();
+        for node in &node.then_branch.children {
+            visitor.visit_node(node);
+        }
+        self.error = visitor.error;
+
+        if let Some(else_branch) = &node.else_branch {
+            self.visit_else(else_branch);
+        }
+    }
+
+    fn visit_else(&mut self, node: &'ast TemplateElse<AttributeNodes>) {
+        if self.error.is_some() {
+            return;
+        }
+
+        match node {
+            TemplateElse::ElseIf { template_if, .. } => self.visit_if(template_if),
+            TemplateElse::Else { then_branch, .. } => {
+                let mut visitor = DuplicateAttributesVisitor::default();
+                for node in &then_branch.children {
+                    visitor.visit_node(node);
+                }
+                self.error = visitor.error;
+            }
+        }
+    }
+
+    fn visit_match(&mut self, node: &'ast TemplateMatch<AttributeNode>) {
+        for arm in &node.arms {
+            if self.error.is_some() {
+                return;
+            }
+
+            let mut visitor = DuplicateAttributesVisitor::default();
+            visitor.visit_node(&arm.body);
+            self.error = visitor.error;
         }
     }
 }
