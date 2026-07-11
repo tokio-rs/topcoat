@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{component, view},
+    view::{class, component, view},
 };
 
 use crate::{
@@ -118,10 +118,9 @@ pub async fn rating_stars(tenths: u32, size: &str) -> Result {
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden="true"
-                    class=((
+                    class=(class!(
                         size,
-                        " ",
-                        if index < filled { "text-amber-400" } else { "text-slate-200" },
+                        "text-amber-400" if index < filled else "text-slate-200",
                     ))
                 >
                     <path d=(STAR_PATH)></path>

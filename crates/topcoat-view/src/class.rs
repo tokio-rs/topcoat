@@ -80,7 +80,7 @@ where
 {
     #[inline]
     fn is_present(&self) -> bool {
-        self.as_ref().is_some_and(|value| value.is_present())
+        self.as_ref().is_some_and(T::is_present)
     }
 
     #[inline]

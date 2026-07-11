@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{page, query_params},
-    view::view,
+    view::{class, view},
 };
 
 use crate::{
@@ -53,11 +53,7 @@ async fn products(cx: &Cx) -> Result {
             for (value, label) in SORT_OPTIONS {
                 <a
                     href=(products_url(1, value, category))
-                    class=(if value == sort {
-                        CHIP_ACTIVE
-                    } else {
-                        CHIP_INACTIVE
-                    })
+                    class=(class!(CHIP_ACTIVE if value == sort else CHIP_INACTIVE))
                 >
                     (label)
                 </a>
@@ -67,22 +63,16 @@ async fn products(cx: &Cx) -> Result {
             <span class="font-medium text-slate-500">"Category:"</span>
             <a
                 href=(products_url(1, sort, None))
-                class=(if category.is_none() {
-                    CHIP_ACTIVE
-                } else {
-                    CHIP_INACTIVE
-                })
+                class=(class!(CHIP_ACTIVE if category.is_none() else CHIP_INACTIVE))
             >
                 "All"
             </a>
             for entry in catalog.categories() {
                 <a
                     href=(products_url(1, sort, Some(&entry.slug)))
-                    class=(if category == Some(entry.slug.as_str()) {
-                        CHIP_ACTIVE
-                    } else {
-                        CHIP_INACTIVE
-                    })
+                    class=(class!(
+                        CHIP_ACTIVE if category == Some(entry.slug.as_str()) else CHIP_INACTIVE
+                    ))
                 >
                     (&entry.name)
                 </a>
