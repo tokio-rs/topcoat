@@ -5,11 +5,6 @@ edition = "2024"
 
 [features]
 discover = ["dep:inventory"]
-parsing = [
-	"dep:proc-macro2",
-	"dep:quote",
-	"dep:syn",
-]
 router = [
 	"dep:topcoat-router",
 ]
@@ -21,12 +16,9 @@ topcoat-router = { workspace = true, optional = true }
 topcoat-view.workspace = true
 
 inventory = { workspace = true, optional = true }
-proc-macro2 = { workspace = true, optional = true }
-quote = { workspace = true, optional = true }
 ref-cast.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-syn = { workspace = true, optional = true, features = ["full", "visit"] }
 uuid = { workspace = true, features = ["v4", "serde"] }
 
 [dev-dependencies]

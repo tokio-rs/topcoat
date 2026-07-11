@@ -246,7 +246,7 @@ impl ExecutableSource {
     /// back to `OUT_DIR` itself when the build runs outside Cargo's target
     /// layout.
     fn cache_dir() -> Result<PathBuf> {
-        if let Some(dir) = topcoat_core::runtime::cache::cache_dir("tailwind") {
+        if let Some(dir) = topcoat_core::cache::cache_dir("tailwind") {
             return Ok(dir);
         }
         let out_dir = env::var_os("OUT_DIR").ok_or(BuildError::NoOutDir)?;

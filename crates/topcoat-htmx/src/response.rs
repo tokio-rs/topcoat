@@ -1,7 +1,7 @@
 use http::HeaderValue;
 use http::response::Parts;
-use topcoat_core::runtime::{context::Cx, error::Result};
-use topcoat_router::runtime::IntoResponseParts;
+use topcoat_core::{context::Cx, error::Result};
+use topcoat_router::IntoResponseParts;
 
 use crate::SwapOption;
 use crate::header;

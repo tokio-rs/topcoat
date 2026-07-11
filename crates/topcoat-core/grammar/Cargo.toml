@@ -1,0 +1,12 @@
+[package]
+name = "topcoat-core-grammar"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+syn = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

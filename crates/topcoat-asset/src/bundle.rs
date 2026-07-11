@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use topcoat_core::runtime::context::{Cx, app_context};
+use topcoat_core::context::{Cx, app_context};
 
 use crate::{Asset, MANIFEST_NAME, Manifest};
 

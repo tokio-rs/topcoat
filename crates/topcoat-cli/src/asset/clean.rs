@@ -22,7 +22,7 @@ pub(super) async fn run(args: CleanArgs) {
     };
 
     let out_dir = args.out.unwrap_or_else(|| target_dir.join(OUT_SUBDIR));
-    let cache_dir = topcoat_core::runtime::cache::cache_dir_in(&target_dir, CACHE_SCOPE);
+    let cache_dir = topcoat_core::cache::cache_dir_in(&target_dir, CACHE_SCOPE);
 
     for dir in [&out_dir, &cache_dir] {
         match std::fs::remove_dir_all(dir) {
