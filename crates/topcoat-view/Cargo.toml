@@ -8,9 +8,6 @@ topcoat-core.workspace = true
 
 memchr.workspace = true
 
-# TODO: Feature flag?
-uuid = { workspace = true, features = ["v4", "serde"] }
-
 [dev-dependencies]
 topcoat = { workspace = true, features = ["view"] }
 

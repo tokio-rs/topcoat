@@ -36,7 +36,6 @@ serde_json.workspace = true
 serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
 tokio = { workspace = true, features = ["net", "rt"] }
-uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["router"] }

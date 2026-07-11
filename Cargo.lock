@@ -2850,7 +2850,6 @@ dependencies = [
  "topcoat",
  "topcoat-core",
  "topcoat-view",
- "uuid",
 ]
 
 [[package]]
@@ -2948,7 +2947,6 @@ dependencies = [
  "memchr",
  "topcoat",
  "topcoat-core",
- "uuid",
 ]
 
 [[package]]
