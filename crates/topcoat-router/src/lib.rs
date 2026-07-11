@@ -19,7 +19,7 @@ mod service;
 pub use body::*;
 pub use content::*;
 pub use context::*;
-pub(crate) use endpoint::*;
+pub(crate) use endpoint::Endpoint;
 pub use error::*;
 pub use layer::*;
 pub use module::*;
