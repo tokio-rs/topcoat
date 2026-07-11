@@ -124,5 +124,3 @@ macro_rules! register_font {
 macro_rules! register_font {
     ($font:expr) => {};
 }
-
-pub use register_font;
