@@ -139,7 +139,8 @@ impl ModuleRouterBuilder {
     ///
     /// Panics if a page has already been registered for the same path.
     #[must_use]
-    pub fn page(mut self, page: ModulePageFn) -> Self {
+    pub fn page(mut self, page: impl Into<ModulePageFn>) -> Self {
+        let page = page.into();
         let module_path = page.module_path();
         let page = page.into_page(Cow::Owned(self.module_path_to_path(module_path)));
         self.inner = self.inner.page(page);
@@ -152,7 +153,8 @@ impl ModuleRouterBuilder {
     ///
     /// Panics if a layout has already been registered for the same path.
     #[must_use]
-    pub fn layout(mut self, layout: ModuleLayoutFn) -> Self {
+    pub fn layout(mut self, layout: impl Into<ModuleLayoutFn>) -> Self {
+        let layout = layout.into();
         let module_path = layout.module_path();
         let layout = layout.into_layout(Cow::Owned(self.module_path_to_path(module_path)));
         self.inner = self.inner.layout(layout);

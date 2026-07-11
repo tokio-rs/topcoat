@@ -75,9 +75,8 @@ impl ToTokens for Route {
             .insert(0, parse_quote! { __cx: &'__cx ::topcoat::context::Cx });
         let ident = &item.sig.ident;
         let args = self.1.args.call_args();
-        let parse_request = self.1.args.request().map(|request| {
+        let parse_request = self.1.args.request().map(|request_ty| {
             let request_ident = request_ident();
-            let request_ty = &request.ty;
             quote_spanned! {request_ty.span()=>
                 let #request_ident = <#request_ty as ::topcoat::router::FromRequest>::from_request(cx, body).await?;
             }

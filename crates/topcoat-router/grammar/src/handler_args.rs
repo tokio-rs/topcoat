@@ -4,27 +4,19 @@ use syn::{FnArg, Ident, ItemFn, Type};
 
 pub struct HandlerArgs {
     args: Vec<HandlerArg>,
-    request: Option<RequestArg>,
 }
 
-struct HandlerArg {
-    kind: HandlerArgKind,
-}
-
-enum HandlerArgKind {
+/// A handler function parameter, classified by role.
+pub enum HandlerArg {
+    /// The `cx: &Cx` request context parameter.
     Cx,
-    Request,
-}
-
-pub struct RequestArg {
-    pub ty: Type,
+    /// The request body parameter, with its declared type.
+    Request(Box<Type>),
 }
 
 impl HandlerArgs {
     pub fn parse(item: &ItemFn, kind: &str) -> syn::Result<Self> {
-        let mut args = Vec::new();
-        let mut has_cx = false;
-        let mut request = None;
+        let mut args: Vec<HandlerArg> = Vec::new();
 
         for arg in &item.sig.inputs {
             match arg {
@@ -36,7 +28,7 @@ impl HandlerArgs {
                 }
                 FnArg::Typed(pat_type) => {
                     if is_cx(&pat_type.ty) {
-                        if has_cx {
+                        if args.iter().any(|arg| matches!(arg, HandlerArg::Cx)) {
                             return Err(syn::Error::new_spanned(
                                 pat_type,
                                 format!(
@@ -44,12 +36,9 @@ impl HandlerArgs {
                                 ),
                             ));
                         }
-                        has_cx = true;
-                        args.push(HandlerArg {
-                            kind: HandlerArgKind::Cx,
-                        });
+                        args.push(HandlerArg::Cx);
                     } else {
-                        if request.is_some() {
+                        if args.iter().any(|arg| matches!(arg, HandlerArg::Request(_))) {
                             return Err(syn::Error::new_spanned(
                                 pat_type,
                                 format!(
@@ -57,35 +46,39 @@ impl HandlerArgs {
                                 ),
                             ));
                         }
-                        request = Some(RequestArg {
-                            ty: (*pat_type.ty).clone(),
-                        });
-                        args.push(HandlerArg {
-                            kind: HandlerArgKind::Request,
-                        });
+                        args.push(HandlerArg::Request(pat_type.ty.clone()));
                     }
                 }
             }
         }
 
-        Ok(Self { args, request })
+        Ok(Self { args })
+    }
+
+    /// The handler's parameters in declaration order.
+    pub fn iter(&self) -> impl Iterator<Item = &HandlerArg> {
+        self.args.iter()
+    }
+
+    /// The declared type of the request body parameter, if any.
+    pub fn request(&self) -> Option<&Type> {
+        self.args.iter().find_map(|arg| match arg {
+            HandlerArg::Request(ty) => Some(&**ty),
+            HandlerArg::Cx => None,
+        })
     }
 
     pub fn call_args(&self) -> Vec<TokenStream> {
         self.args
             .iter()
-            .map(|arg| match arg.kind {
-                HandlerArgKind::Cx => quote! { cx },
-                HandlerArgKind::Request => {
+            .map(|arg| match arg {
+                HandlerArg::Cx => quote! { cx },
+                HandlerArg::Request(_) => {
                     let ident = request_ident();
                     quote! { #ident }
                 }
             })
             .collect()
-    }
-
-    pub fn request(&self) -> Option<&RequestArg> {
-        self.request.as_ref()
     }
 }
 

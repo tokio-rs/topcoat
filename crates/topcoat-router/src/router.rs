@@ -178,11 +178,12 @@ impl RouterBuilder {
         self
     }
 
-    /// Registers a [`PageFn`]. Order doesn't matter: layout matching is based
-    /// on path prefixes, not registration order.
+    /// Registers a page: anything convertible into a [`PageFn`], like the
+    /// marker `#[page]` generates. Order doesn't matter: layout matching is
+    /// based on path prefixes, not registration order.
     #[must_use]
-    pub fn page(mut self, page: PageFn) -> Self {
-        self.pages.push(page);
+    pub fn page(mut self, page: impl Into<PageFn>) -> Self {
+        self.pages.push(page.into());
         self
     }
 
@@ -197,11 +198,12 @@ impl RouterBuilder {
         self
     }
 
-    /// Registers a [`LayoutFn`]. A layout applies to every page whose path
+    /// Registers a layout: anything convertible into a [`LayoutFn`], like the
+    /// marker `#[layout]` generates. A layout applies to every page whose path
     /// starts with the layout's path prefix.
     #[must_use]
-    pub fn layout(mut self, layout: LayoutFn) -> Self {
-        self.layouts.push(layout);
+    pub fn layout(mut self, layout: impl Into<LayoutFn>) -> Self {
+        self.layouts.push(layout.into());
         self
     }
 
