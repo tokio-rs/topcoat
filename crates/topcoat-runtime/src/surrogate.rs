@@ -58,7 +58,6 @@ macro_rules! impl_surrogate {
         }
     };
 }
-pub(crate) use impl_surrogate;
 
 #[macro_export]
 macro_rules! impl_surrogate_ref {
@@ -87,7 +86,6 @@ macro_rules! impl_surrogate_ref {
         }
     };
 }
-pub(crate) use impl_surrogate_ref;
 
 #[macro_export]
 macro_rules! impl_surrogate_mut {
@@ -116,7 +114,6 @@ macro_rules! impl_surrogate_mut {
         }
     };
 }
-pub(crate) use impl_surrogate_mut;
 
 #[derive(Serialize)]
 struct TaggedRef<'a, T>

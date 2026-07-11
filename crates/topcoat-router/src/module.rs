@@ -20,5 +20,3 @@ macro_rules! module_router {
         )
     };
 }
-#[cfg(feature = "discover")]
-pub use module_router;
