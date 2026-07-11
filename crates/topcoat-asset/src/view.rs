@@ -1,5 +1,5 @@
-use topcoat_core::runtime::context::{Cx, app_context};
-use topcoat_view::runtime::{AttributeValueViewParts, DynViewPart, HtmlWriter, PartsWriter};
+use topcoat_core::context::{Cx, app_context};
+use topcoat_view::{AttributeValueViewParts, DynViewPart, HtmlWriter, PartsWriter};
 
 use crate::{Asset, AssetRouteResolver, bundled_asset};
 

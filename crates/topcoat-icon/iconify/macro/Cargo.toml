@@ -7,7 +7,7 @@ edition = "2024"
 proc-macro = true
 
 [dependencies]
-topcoat-icon-iconify = { workspace = true, features = ["parsing"] }
+topcoat-icon-iconify-grammar.workspace = true
 
 proc-macro2.workspace = true
 quote.workspace = true

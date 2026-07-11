@@ -14,7 +14,7 @@ pub use options::*;
 pub use resolver::*;
 pub use source::*;
 
-pub use topcoat_core::runtime::cursor::{ConstReader, ConstWriter};
+pub use topcoat_core::cursor::{ConstReader, ConstWriter};
 
 #[cfg(feature = "bundler")]
 mod bundler;

@@ -22,7 +22,7 @@ use std::sync::OnceLock;
 
 pub use cookie::{Cookie, Expiration, Key, SameSite, time};
 
-use topcoat_core::runtime::context::{Cx, app_context, request_context};
+use topcoat_core::context::{Cx, app_context, request_context};
 
 /// A request-scoped cookie jar.
 ///
@@ -314,7 +314,7 @@ pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
 #[cfg(test)]
 mod tests {
     use http::{HeaderMap, Request, header};
-    use topcoat_core::runtime::context::CxTestBuilder;
+    use topcoat_core::context::CxTestBuilder;
 
     use super::*;
 

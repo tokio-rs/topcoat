@@ -44,7 +44,7 @@ pub(crate) async fn run_bundle(
         .await
         .ok_or("could not derive cargo target directory")?;
     let out_dir = out_override.unwrap_or_else(|| target_dir.join(OUT_SUBDIR));
-    let cache_dir = topcoat_core::runtime::cache::cache_dir_in(&target_dir, CACHE_SCOPE);
+    let cache_dir = topcoat_core::cache::cache_dir_in(&target_dir, CACHE_SCOPE);
 
     // `bundle` blocks on filesystem and network I/O, so run it off the runtime.
     let bytes = bytes.to_vec();
