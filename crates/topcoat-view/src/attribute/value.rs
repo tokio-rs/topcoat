@@ -177,7 +177,8 @@ where
 {
     #[inline]
     fn attribute_present(&self) -> bool {
-        self.is_some()
+        self.as_ref()
+            .is_some_and(AttributeValueViewParts::attribute_present)
     }
 
     #[inline]

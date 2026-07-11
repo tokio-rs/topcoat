@@ -25,25 +25,28 @@ pub(crate) use view_writer::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use syn::{Ident, Token};
+
+use topcoat_core_grammar::ParseOption;
+
+use crate::leading_cx::LeadingCx;
 
 /// The parsed body of a `view!` invocation. Lowers to a
 /// [`runtime::View`](topcoat_view::View).
 pub struct View {
-    /// The request context binding supplied by a leading `cx,` argument.
+    /// The request context binding supplied by a leading `cx =>` argument.
     ///
     /// Inside a `#[component]`, `#[page]`, or `#[layout]`, the context is
     /// available implicitly, so this is [`None`]. Anywhere else (for example a
-    /// `#[route]` handler), the caller names it explicitly as `view! { cx, ... }`
+    /// `#[route]` handler), the caller names it explicitly as `view! { cx => ... }`
     /// and the rest of the view renders against it.
-    pub cx: Option<Ident>,
+    pub cx: Option<LeadingCx>,
     pub nodes: Nodes,
 }
 
 impl Parse for View {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            cx: parse_leading_cx(input),
+            cx: input.call(LeadingCx::parse_option)?,
             nodes: input.parse()?,
         })
     }
@@ -64,7 +67,7 @@ impl ToTokens for View {
         match &self.cx {
             Some(cx) => quote! {
                 {
-                    let __cx: &::topcoat::context::Cx = #cx;
+                    #cx
                     #view
                 }
             }
@@ -74,33 +77,10 @@ impl ToTokens for View {
     }
 }
 
-/// Parses an optional leading `cx,` argument: a bare identifier immediately
-/// followed by a comma, before any view content.
-///
-/// A leading identifier followed by a top-level comma is not otherwise valid
-/// view syntax, so this only assigns meaning to input that was previously
-/// rejected. Matching only an identifier (rather than an arbitrary expression)
-/// keeps parsing cheap and unambiguous.
-pub(crate) fn parse_leading_cx(input: ParseStream) -> Option<Ident> {
-    if input.peek(Ident) && input.peek2(Token![,]) {
-        let cx = input.parse::<Ident>().ok()?;
-        input.parse::<Token![,]>().ok()?;
-        return Some(cx);
-    }
-    None
-}
-
 impl topcoat_pretty::PrettyPrint for View {
     fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         if let Some(cx) = &self.cx {
             cx.pretty_print(printer);
-            ",".pretty_print(printer);
-            // Break after the `cx,` argument just like between sibling nodes, so
-            // it sits on its own line when the view is laid out multiline.
-            printer.scan_same_line_trivia();
-            printer.scan_break();
-            " ".pretty_print(printer);
-            printer.scan_trivia(true, true);
         }
         self.nodes.pretty_print(printer);
     }
@@ -129,8 +109,8 @@ mod tests {
 
     #[test]
     fn parses_leading_cx_argument() {
-        let view = parse("cx, <div></div>");
-        assert_eq!(view.cx.map(|cx| cx.to_string()), Some("cx".to_owned()));
+        let view = parse("cx => <div></div>");
+        assert_eq!(view.cx.map(|cx| cx.cx.to_string()), Some("cx".to_owned()));
         assert_eq!(view.nodes.len(), 1);
     }
 
@@ -140,9 +120,9 @@ mod tests {
     }
 
     #[test]
-    fn component_without_comma_is_not_mistaken_for_cx() {
+    fn component_invocation_is_not_mistaken_for_cx() {
         // A component invocation also starts with an identifier, but it is
-        // followed by `(`, not a comma, so it stays a node.
+        // followed by `(`, not `=>`, so it stays a node.
         let view = parse(r#"greeting(name: "World")"#);
         assert!(view.cx.is_none());
         assert_eq!(view.nodes.len(), 1);
@@ -159,7 +139,7 @@ mod tests {
 
     #[test]
     fn explicit_cx_binds_the_context_identifier() {
-        let tokens = parse("cx, <div></div>").to_token_stream().to_string();
+        let tokens = parse("cx => <div></div>").to_token_stream().to_string();
         assert!(tokens.contains("let __cx"), "{tokens}");
     }
 

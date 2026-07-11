@@ -24,24 +24,24 @@ pub use visitor::*;
 
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
-use syn::Ident;
 use syn::parse::{Parse, ParseStream};
 
 use topcoat_core_grammar::ParseOption;
 
+use crate::leading_cx::LeadingCx;
 use crate::template::{TemplateElse, TemplateForLoop, TemplateIf, TemplateMatch};
-use crate::view::{self, ViewWriter, WriteView, parse_leading_cx};
+use crate::view::{self, ViewWriter, WriteView};
 
 /// The full list of attributes attached to a single tag.
 pub struct Attributes {
-    /// The request context binding supplied by a leading `cx,` argument to the
-    /// `attributes!` macro.
+    /// The request context binding supplied by a leading `cx =>` argument to
+    /// the `attributes!` macro.
     ///
     /// Inside a `#[component]`, `#[page]`, or `#[layout]`, the context is
     /// available implicitly, so this is [`None`]. Anywhere else the caller names
-    /// it explicitly as `attributes! { cx, ... }`, mirroring `view! { cx, ... }`.
+    /// it explicitly as `attributes! { cx => ... }`, mirroring `view! { cx => ... }`.
     /// Attributes parsed as part of an element tag never carry one.
-    pub cx: Option<Ident>,
+    pub cx: Option<LeadingCx>,
     pub items: Vec<AttributeNode>,
 }
 
@@ -81,7 +81,7 @@ impl WriteAttribute for Attributes {
 
 impl Parse for Attributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let cx = parse_leading_cx(input);
+        let cx = input.call(LeadingCx::parse_option)?;
         let mut items = Vec::new();
         while let Some(item) = input.call(AttributeNode::parse_option)? {
             items.push(item);
@@ -112,7 +112,7 @@ impl ToTokens for Attributes {
         // attributes untouched.
         match &self.cx {
             Some(cx) => quote! {{
-                let __cx: &::topcoat::context::Cx = #cx;
+                #cx
                 #attrs
             }}
             .to_tokens(tokens),
@@ -125,11 +125,6 @@ impl topcoat_pretty::PrettyPrint for Attributes {
     fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
         if let Some(cx) = &self.cx {
             cx.pretty_print(printer);
-            ",".pretty_print(printer);
-            printer.scan_same_line_trivia();
-            printer.scan_break();
-            " ".pretty_print(printer);
-            printer.scan_trivia(true, true);
         }
         if self.is_empty() {
             return;

@@ -106,6 +106,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [The `view!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/view.md): templating syntax, control flow, conditional attributes.
 - [The `component` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/component.md): async functions as components, with child content.
 - [The `attributes!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/attributes.md): reusable runtime attribute fragments.
+- [The `class!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/class.md): space-separated class lists from static and conditional entries.
 
 **Routing**
 - [Router](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/router.md): pages, layouts, and API routes; manual and auto-discovered.

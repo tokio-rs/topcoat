@@ -1,1 +1,1 @@
-view! { cx, greeting(<span>"Hi"</span>) }
+view! { cx => greeting(<span>"Hi"</span>) }

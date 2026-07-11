@@ -9,7 +9,7 @@ async fn if_true_branch_emits_its_body() {
     let signed_in = true;
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         if signed_in {
             <a href="/account">"Account"</a>
         } else {
@@ -25,7 +25,7 @@ async fn if_false_branch_emits_else_body() {
     let signed_in = false;
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         if signed_in {
             <a href="/account">"Account"</a>
         } else {
@@ -41,7 +41,7 @@ async fn if_without_else_emits_nothing_on_false() {
     let show = false;
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         <div>
             if show {
                 <p>"shown"</p>
@@ -57,7 +57,7 @@ async fn if_else_if_else_chain_selects_first_match() {
     let n = 1;
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         if n == 0 {
             <p>"zero"</p>
         } else if n == 1 {
@@ -75,7 +75,7 @@ async fn if_in_attribute_list_adds_branch_attributes() {
     let current = true;
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         <a
             href="/posts"
             if current {
@@ -97,7 +97,7 @@ async fn for_loop_renders_body_per_item() {
     let posts = ["alpha", "beta", "gamma"];
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         <ul>
             for title in posts {
                 <li>(title)</li>
@@ -113,7 +113,7 @@ async fn for_loop_in_attribute_list_emits_attributes_per_item() {
     let extras = [("data-a", "1"), ("data-b", "2")];
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         <div
             for (name, value) in extras {
                 (name)=(value)
@@ -132,7 +132,7 @@ async fn for_loop_filtering_with_if_emits_subset() {
     let items = ["keep", "drop", "keep"];
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         <ul>
             for item in items {
                 if item == "keep" {
@@ -157,7 +157,7 @@ enum Status {
 async fn match_chooses_arm_body() {
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         match Status::Published {
             Status::Draft => <span>"draft"</span>,
             Status::Published => <a href="/post">"open"</a>,
@@ -173,7 +173,7 @@ async fn match_arm_with_block_emits_multiple_siblings() {
     let user = Some("ada");
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         match user {
             Some(name) => {
                 <h1>(name)</h1>
@@ -191,7 +191,7 @@ async fn match_in_attribute_list_emits_attribute_per_arm() {
     let status = Status::Draft;
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         <article
             match status {
                 Status::Draft => class="draft",
@@ -210,7 +210,7 @@ async fn match_in_attribute_list_emits_attribute_per_arm() {
 async fn let_binding_introduces_variable_for_following_nodes() {
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         <article>
             let title = "  Hello  ".trim();
 
@@ -226,7 +226,7 @@ async fn let_binding_introduces_variable_for_following_nodes() {
 async fn let_binding_in_attribute_list_is_in_scope_for_later_attributes() {
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         <a let href = "/posts"; href=(href) data-href=(href)>"Posts"</a>
     });
 

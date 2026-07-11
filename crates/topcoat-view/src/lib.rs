@@ -1,4 +1,5 @@
 mod attribute;
+mod class;
 mod component;
 mod element;
 mod escape;
@@ -11,6 +12,7 @@ mod unescaped;
 mod view;
 
 pub use attribute::*;
+pub use class::*;
 pub use component::*;
 pub use element::*;
 pub use escape::*;

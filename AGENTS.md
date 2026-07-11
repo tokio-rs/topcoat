@@ -9,7 +9,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable e
 `crates/topcoat` is the user-facing **facade** crate. It re-exports everything through feature-gated modules. Application code depends on this crate only; everything below is an implementation detail reached through it.
 
 - `topcoat-core` (+ `macro/`): foundations shared by the other crates: the `Error`/`Result` types and the request context (`Cx`, `app_context`, `request_context`). Its macro crate provides `#[memoize]`.
-- `topcoat-view` (+ `macro/`): the `view!` and `attributes!` macros, the `#[component]` macro, and the runtime `View`/`Attributes` types.
+- `topcoat-view` (+ `macro/`): the `view!`, `attributes!`, and `class!` macros, the `#[component]` macro, and the runtime `View`/`Attributes`/`Class` types.
 - `topcoat-router` (+ `macro/`): `Router`, the `#[page]`/`#[layout]`/`#[route]` macros, `module_router!`, and `#[path_param]`/`#[query_params]`.
 - `topcoat-runtime` (+ `macro/`): the client-side interactive runtime (signals, event handlers, bind attributes, the `expr!` macro) and the injected browser script.
 - `topcoat-asset`: the `asset!` macro and `AssetBundle` for declaring and serving content-hashed static files.
@@ -38,6 +38,7 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 - [`crates/topcoat-view/macro/docs/view.md`](crates/topcoat-view/macro/docs/view.md): The `view!` macro: HTML-like templating syntax, expression interpolation, control flow (`if`/`for`/`match`/`let`), components, and conditional attributes.
 - [`crates/topcoat-view/macro/docs/component.md`](crates/topcoat-view/macro/docs/component.md): The `#[component]` macro: defining components, props, child content, generics, and the `cx` parameter.
 - [`crates/topcoat-view/macro/docs/attributes.md`](crates/topcoat-view/macro/docs/attributes.md): The `attributes!` macro and the runtime `Attributes` value for building/forwarding attribute collections.
+- [`crates/topcoat-view/macro/docs/class.md`](crates/topcoat-view/macro/docs/class.md): The `class!` macro: assembling a space-separated class list from static and conditional entries.
 
 ### Request context and state
 

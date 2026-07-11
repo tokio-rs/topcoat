@@ -15,6 +15,13 @@ pub fn attributes(tokens: TokenStream) -> TokenStream {
     quote! { #parsed }.into()
 }
 
+#[doc = include_str!("../docs/class.md")]
+#[proc_macro]
+pub fn class(tokens: TokenStream) -> TokenStream {
+    let parsed = syn::parse_macro_input!(tokens as topcoat_view_grammar::class::Class);
+    quote! { #parsed }.into()
+}
+
 #[doc = include_str!("../docs/component.md")]
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {

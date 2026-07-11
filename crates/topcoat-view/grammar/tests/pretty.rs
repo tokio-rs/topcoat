@@ -36,6 +36,7 @@ fn registry() -> Registry {
     let mut registry = Registry::new();
     registry.register_macro::<View>("view");
     registry.register_macro::<topcoat_view_grammar::attributes::Attributes>("attributes");
+    registry.register_macro::<topcoat_view_grammar::class::Class>("class");
     registry
 }
 
@@ -119,6 +120,11 @@ fixture_test!(component_with_children);
 
 fixture_test!(explicit_cx);
 fixture_test!(explicit_cx_multiline);
+
+// -- Class lists --------------------------------------------------------------
+
+fixture_test!(class_macro_short);
+fixture_test!(class_macro_long);
 
 // -- Let bindings ------------------------------------------------------------
 

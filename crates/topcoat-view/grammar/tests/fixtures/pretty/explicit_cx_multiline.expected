@@ -1,5 +1,5 @@
 view! {
-    cx,
+    cx =>
     <section>
         <h1>"Dashboard"</h1>
         if ready {
