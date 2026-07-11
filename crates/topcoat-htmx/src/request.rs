@@ -1,5 +1,5 @@
 use http::{HeaderName, request::Parts};
-use topcoat_core::runtime::context::{Cx, request_context};
+use topcoat_core::context::{Cx, request_context};
 
 use crate::header;
 
@@ -116,7 +116,7 @@ pub fn hx_trigger_name(cx: &Cx) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use http::Request;
-    use topcoat_core::runtime::context::CxTestBuilder;
+    use topcoat_core::context::CxTestBuilder;
 
     use super::*;
 

@@ -1,4 +1,4 @@
-use topcoat_view::runtime::{View, svg::ViewBox};
+use topcoat_view::{View, svg::ViewBox};
 
 /// The renderable data of an SVG icon: its view box and its body markup.
 ///

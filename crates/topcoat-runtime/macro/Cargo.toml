@@ -8,11 +8,11 @@ proc-macro = true
 
 [features]
 discover = [
-	"topcoat-runtime/discover"
+	"topcoat-runtime-grammar/discover"
 ]
 
 [dependencies]
-topcoat-runtime = { workspace = true, features = ["parsing"] }
+topcoat-runtime-grammar.workspace = true
 
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }

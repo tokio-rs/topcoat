@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use topcoat_core::runtime::fnv1a;
+use topcoat_core::fnv1a;
 
 use crate::{ConstReader, ConstWriter};
 

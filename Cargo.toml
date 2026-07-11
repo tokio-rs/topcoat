@@ -6,23 +6,30 @@ members = [
     "crates/topcoat-cli",
     "crates/topcoat-cookie",
     "crates/topcoat-core",
+    "crates/topcoat-core/grammar",
     "crates/topcoat-core/macro",
     "crates/topcoat-font",
-    "crates/topcoat-font/fontsource",
-    "crates/topcoat-font/fontsource/macro",
+    "crates/topcoat-font/grammar",
     "crates/topcoat-font/macro",
+    "crates/topcoat-font/fontsource",
+    "crates/topcoat-font/fontsource/grammar",
+    "crates/topcoat-font/fontsource/macro",
     "crates/topcoat-htmx",
     "crates/topcoat-icon",
     "crates/topcoat-icon/iconify",
+    "crates/topcoat-icon/iconify/grammar",
     "crates/topcoat-icon/iconify/macro",
     "crates/topcoat-pretty",
     "crates/topcoat-router",
+    "crates/topcoat-router/grammar",
     "crates/topcoat-router/macro",
     "crates/topcoat-runtime",
+    "crates/topcoat-runtime/grammar",
     "crates/topcoat-runtime/macro",
     "crates/topcoat-tailwind",
     "crates/topcoat-ui",
     "crates/topcoat-view",
+    "crates/topcoat-view/grammar",
     "crates/topcoat-view/macro",
 
     "examples/app-context",
@@ -78,23 +85,30 @@ topcoat = { path = "crates/topcoat" }
 topcoat-asset = { path = "crates/topcoat-asset" }
 topcoat-cookie = { path = "crates/topcoat-cookie" }
 topcoat-core = { path = "crates/topcoat-core" }
+topcoat-core-grammar = { path = "crates/topcoat-core/grammar" }
 topcoat-core-macro = { path = "crates/topcoat-core/macro" }
 topcoat-font = { path = "crates/topcoat-font" }
-topcoat-font-fontsource = { path = "crates/topcoat-font/fontsource" }
-topcoat-font-fontsource-macro = { path = "crates/topcoat-font/fontsource/macro" }
+topcoat-font-grammar = { path = "crates/topcoat-font/grammar" }
 topcoat-font-macro = { path = "crates/topcoat-font/macro" }
+topcoat-font-fontsource = { path = "crates/topcoat-font/fontsource" }
+topcoat-font-fontsource-grammar = { path = "crates/topcoat-font/fontsource/grammar" }
+topcoat-font-fontsource-macro = { path = "crates/topcoat-font/fontsource/macro" }
 topcoat-htmx = { path = "crates/topcoat-htmx" }
 topcoat-icon = { path = "crates/topcoat-icon" }
 topcoat-icon-iconify = { path = "crates/topcoat-icon/iconify" }
+topcoat-icon-iconify-grammar = { path = "crates/topcoat-icon/iconify/grammar" }
 topcoat-icon-iconify-macro = { path = "crates/topcoat-icon/iconify/macro" }
 topcoat-pretty = { path = "crates/topcoat-pretty" }
 topcoat-router = { path = "crates/topcoat-router" }
+topcoat-router-grammar = { path = "crates/topcoat-router/grammar" }
 topcoat-router-macro = { path = "crates/topcoat-router/macro" }
 topcoat-runtime = { path = "crates/topcoat-runtime" }
+topcoat-runtime-grammar = { path = "crates/topcoat-runtime/grammar" }
 topcoat-runtime-macro = { path = "crates/topcoat-runtime/macro" }
 topcoat-tailwind = { path = "crates/topcoat-tailwind" }
 topcoat-ui = { path = "crates/topcoat-ui" }
 topcoat-view = { path = "crates/topcoat-view" }
+topcoat-view-grammar = { path = "crates/topcoat-view/grammar" }
 topcoat-view-macro = { path = "crates/topcoat-view/macro" }
 
 anyhow = "1.0"

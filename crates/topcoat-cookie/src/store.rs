@@ -300,7 +300,7 @@ mod tests {
 
     use http::{HeaderMap, Request, header};
     use serde::{Deserialize, Serialize};
-    use topcoat_core::runtime::context::{Cx, CxTestBuilder};
+    use topcoat_core::context::{Cx, CxTestBuilder};
 
     use super::*;
     use crate::{CookieJarCell, Key, cookies, write_cookies};

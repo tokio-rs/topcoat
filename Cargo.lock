@@ -2630,11 +2630,11 @@ dependencies = [
  "topcoat",
  "topcoat-asset",
  "topcoat-core",
- "topcoat-font",
- "topcoat-font-fontsource",
+ "topcoat-font-fontsource-grammar",
+ "topcoat-font-grammar",
  "topcoat-pretty",
  "topcoat-ui",
- "topcoat-view",
+ "topcoat-view-grammar",
 ]
 
 [[package]]
@@ -2660,11 +2660,17 @@ dependencies = [
  "boxcar",
  "hashbrown 0.17.0",
  "pin-project-lite",
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
+name = "topcoat-core-grammar"
+version = "0.1.0"
+dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "tokio",
- "topcoat",
 ]
 
 [[package]]
@@ -2677,7 +2683,7 @@ dependencies = [
  "syn",
  "tokio",
  "topcoat",
- "topcoat-core",
+ "topcoat-core-grammar",
 ]
 
 [[package]]
@@ -2685,13 +2691,9 @@ name = "topcoat-font"
 version = "0.1.0"
 dependencies = [
  "inventory",
- "proc-macro2",
- "quote",
- "syn",
  "topcoat",
  "topcoat-asset",
  "topcoat-core",
- "topcoat-pretty",
  "topcoat-router",
  "topcoat-view",
 ]
@@ -2701,16 +2703,25 @@ name = "topcoat-font-fontsource"
 version = "0.1.0"
 dependencies = [
  "heck",
- "proc-macro2",
- "quote",
  "serde",
  "serde_json",
- "syn",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-font",
- "topcoat-pretty",
  "ureq",
+]
+
+[[package]]
+name = "topcoat-font-fontsource-grammar"
+version = "0.1.0"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "topcoat-core-grammar",
+ "topcoat-font-fontsource",
+ "topcoat-pretty",
 ]
 
 [[package]]
@@ -2721,7 +2732,19 @@ dependencies = [
  "quote",
  "syn",
  "topcoat",
- "topcoat-font-fontsource",
+ "topcoat-font-fontsource-grammar",
+]
+
+[[package]]
+name = "topcoat-font-grammar"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "topcoat-core-grammar",
+ "topcoat-font",
+ "topcoat-pretty",
 ]
 
 [[package]]
@@ -2731,7 +2754,7 @@ dependencies = [
  "quote",
  "syn",
  "topcoat",
- "topcoat-font",
+ "topcoat-font-grammar",
 ]
 
 [[package]]
@@ -2758,16 +2781,24 @@ dependencies = [
 name = "topcoat-icon-iconify"
 version = "0.1.0"
 dependencies = [
- "heck",
- "proc-macro2",
- "quote",
  "serde",
  "serde_json",
- "syn",
  "thiserror",
  "topcoat",
  "topcoat-core",
  "ureq",
+]
+
+[[package]]
+name = "topcoat-icon-iconify-grammar"
+version = "0.1.0"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn",
+ "topcoat-icon-iconify",
 ]
 
 [[package]]
@@ -2778,7 +2809,7 @@ dependencies = [
  "quote",
  "syn",
  "topcoat",
- "topcoat-icon-iconify",
+ "topcoat-icon-iconify-grammar",
 ]
 
 [[package]]
@@ -2810,19 +2841,26 @@ dependencies = [
  "matchit 0.9.2",
  "multer",
  "percent-encoding",
- "proc-macro2",
- "quote",
  "ref-cast",
  "serde",
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
- "syn",
  "tokio",
  "topcoat",
  "topcoat-core",
  "topcoat-view",
- "uuid",
+]
+
+[[package]]
+name = "topcoat-router-grammar"
+version = "0.1.0"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "topcoat-core-grammar",
 ]
 
 [[package]]
@@ -2835,7 +2873,7 @@ dependencies = [
  "syn",
  "tokio",
  "topcoat",
- "topcoat-router",
+ "topcoat-router-grammar",
  "uuid",
 ]
 
@@ -2844,17 +2882,27 @@ name = "topcoat-runtime"
 version = "0.1.0"
 dependencies = [
  "inventory",
- "proc-macro2",
- "quote",
  "ref-cast",
  "serde",
  "serde_json",
- "syn",
  "topcoat",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-router",
  "topcoat-view",
+ "uuid",
+]
+
+[[package]]
+name = "topcoat-runtime-grammar"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn",
+ "topcoat-runtime",
  "uuid",
 ]
 
@@ -2865,7 +2913,7 @@ dependencies = [
  "quote",
  "syn",
  "topcoat",
- "topcoat-runtime",
+ "topcoat-runtime-grammar",
 ]
 
 [[package]]
@@ -2896,15 +2944,22 @@ name = "topcoat-view"
 version = "0.1.0"
 dependencies = [
  "criterion",
- "heck",
  "memchr",
+ "topcoat",
+ "topcoat-core",
+]
+
+[[package]]
+name = "topcoat-view-grammar"
+version = "0.1.0"
+dependencies = [
+ "heck",
  "proc-macro2",
  "quote",
  "syn",
- "topcoat",
- "topcoat-core",
+ "topcoat-core-grammar",
  "topcoat-pretty",
- "uuid",
+ "topcoat-view",
 ]
 
 [[package]]
@@ -2915,7 +2970,7 @@ dependencies = [
  "syn",
  "tokio",
  "topcoat",
- "topcoat-view",
+ "topcoat-view-grammar",
 ]
 
 [[package]]
