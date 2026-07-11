@@ -5,10 +5,7 @@ use http::{HeaderValue, Method, StatusCode};
 use topcoat_core::runtime::context::Cx;
 use topcoat_router::runtime::{Body, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder};
 
-use crate::{AssetBundle, AssetRouteResolver, BundledAsset};
-
-/// URL prefix every bundled asset is served under.
-const ASSET_ROUTE_PREFIX: &str = "/_topcoat/assets";
+use crate::{ASSET_ROUTE_PREFIX, AssetBundle, AssetRouteResolver, BundledAsset};
 
 /// `Cache-Control` applied to every served asset. Bundled filenames carry a
 /// content hash, so their contents never change for a given URL.
@@ -121,17 +118,7 @@ impl RouterBuilderAssetExt for RouterBuilder {
         }
 
         self = self.app_context(bundle);
-        self = self.app_context(AssetRouteResolver::new(Box::new(|bundled_asset, write| {
-            write.write_str(ASSET_ROUTE_PREFIX)?;
-            write.write_str("/")?;
-            write.write_str(
-                bundled_asset
-                    .name()
-                    .to_str()
-                    .expect("asset needs UTF-8 name"),
-            )?;
-            Ok(())
-        })));
+        self = self.app_context(AssetRouteResolver::default());
 
         self
     }
