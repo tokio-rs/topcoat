@@ -43,13 +43,7 @@ pub fn app_context<T>(cx: &Cx) -> &T
 where
     T: Any + Send + Sync,
 {
-    match cx.app_context.get::<T>() {
-        Some(value) => value,
-        None => panic!(
-            "attempted to access app context of type `{:?}`, but this type was not registered for this context",
-            type_name::<T>()
-        ),
-    }
+    cx.render_context().app_context().require::<T>()
 }
 
 /// Returns a reference to the request context value of type `T` registered on
@@ -149,6 +143,10 @@ impl ContextMap {
         T: Any + Send + Sync,
     {
         self.entries.get_mut::<T>()
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.entries.len()
     }
 }
 

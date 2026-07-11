@@ -1,6 +1,6 @@
 use core::fmt;
 
-use topcoat_core::runtime::context::Cx;
+use topcoat_core::runtime::context::{AsRenderContext, RenderContext};
 
 use crate::runtime::{FmtHtml, Formatter, Unescaped};
 
@@ -51,16 +51,16 @@ impl View {
     }
 
     /// Renders the view into an HTML string.
-    pub fn render(&self, cx: &Cx) -> String {
+    pub fn render(&self, cx: &impl AsRenderContext) -> String {
         let mut buf = String::with_capacity(self.size_hint());
         let mut f = Formatter::new(&mut buf);
-        self.fmt_html(cx, &mut f);
+        self.fmt_html(cx.as_render_context(), &mut f);
         buf
     }
 }
 
 impl FmtHtml for View {
-    fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
+    fn fmt_html(&self, cx: &RenderContext, f: &mut Formatter<'_>) {
         self.part.fmt_html(cx, f);
     }
 
@@ -196,7 +196,7 @@ impl Clone for Box<dyn DynViewPart> {
 }
 
 impl FmtHtml for ViewPart {
-    fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
+    fn fmt_html(&self, cx: &RenderContext, f: &mut Formatter<'_>) {
         match self {
             Self::Empty => {}
             Self::Bool(inner) => inner.fmt_html(cx, f),
@@ -362,5 +362,21 @@ impl From<ViewParts> for ViewPart {
             1 => value.items.pop().unwrap(),
             _ => value.items.into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use topcoat_core::runtime::context::RenderContext;
+
+    use super::*;
+
+    #[test]
+    fn renders_without_an_http_request_context() {
+        let mut parts = ViewParts::new();
+        parts.push("hello");
+        let view = View::new(parts);
+
+        assert_eq!(view.render(&RenderContext::empty()), "hello");
     }
 }

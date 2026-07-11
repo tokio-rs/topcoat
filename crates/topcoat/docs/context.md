@@ -2,6 +2,30 @@
 
 Add `cx: &Cx` to the function signature when needed; leave it out when the function does not need request context. Topcoat passes it automatically when the parameter is present.
 
+Every request context contains a [`RenderContext`]. The render context owns
+application services, render-scoped memoization, and rendering state, but no
+HTTP method, URI, headers, cookies, or body. Non-request systems can construct
+a `RenderContext` from an [`AppContext`] and render ordinary Topcoat views
+without creating an HTTP request.
+
+```rust
+use topcoat::{
+    context::{AppContext, RenderContext},
+    view::view,
+};
+# struct Settings;
+# impl Settings { fn load() -> Self { Self } }
+# async fn example() -> Result<(), topcoat::Error> {
+
+let services = AppContext::builder().insert(Settings::load()).build();
+let render = RenderContext::new(services);
+let view = view! { <p>"Rendered outside a request"</p> }?;
+
+assert_eq!(view.render(&render), "<p>Rendered outside a request</p>");
+# Ok(())
+# }
+```
+
 # Router request helpers
 
 The [`router`](crate::router) module exposes small functions for reading HTTP request data from `cx`.

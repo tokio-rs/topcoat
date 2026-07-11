@@ -131,12 +131,13 @@ mod tests {
     use crate::runtime::{FmtHtml, Formatter};
 
     fn render(attrs: Attributes) -> String {
+        let cx = Cx::default();
         let mut parts = ViewParts::new();
-        attrs.into_view_parts(&Cx::default(), &mut parts);
+        attrs.into_view_parts(&cx, &mut parts);
         let part: ViewPart = parts.into();
         let mut buf = String::new();
         let mut f = Formatter::new(&mut buf);
-        part.fmt_html(&Cx::default(), &mut f);
+        part.fmt_html(cx.render_context(), &mut f);
         buf
     }
 

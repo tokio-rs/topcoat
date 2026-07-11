@@ -59,3 +59,36 @@ The lookup is keyed by `T`'s `TypeId`, so the type you ask for must exactly matc
 The value type `T` must be `Any + Send + Sync`. There's no `'static` bound to write yourself: `Any` implies it.
 
 App context is shared by reference across every request handled by the router, so values should be cheap to share (typically already wrapped in `Arc` internally, like a database pool or HTTP client) or trivially clonable.
+
+## Sharing services with non-request renderers
+
+[`AppContext`](crate::context::AppContext) is the reusable form of the service
+registry. Build one when a renderer such as a mailer, background worker, or CLI
+command needs the same services as the router:
+
+```rust
+use topcoat::{
+    context::{AppContext, RenderContext},
+    router::Router,
+};
+# struct Database;
+# impl Database { fn connect() -> Self { Self } }
+# struct HttpClient;
+# impl HttpClient { fn new() -> Self { Self } }
+
+let services = AppContext::builder()
+    .insert(Database::connect())
+    .insert(HttpClient::new())
+    .build();
+
+let render = RenderContext::new(services.clone());
+
+let router = Router::builder()
+    .app_context_map(services)
+    .build();
+```
+
+`AppContext` is immutable and cheap to clone. `render` and `router` above use
+the same registered services. Each renderer creates its own
+per-render state while borrowing the same registered services. Call
+`app_context_map` before router-local `app_context` registrations.

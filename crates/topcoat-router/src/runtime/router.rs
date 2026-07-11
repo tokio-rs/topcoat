@@ -1,9 +1,9 @@
-use std::any::{Any, type_name};
+use std::any::Any;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use topcoat_core::runtime::context::{ContextMap, Cx};
+use topcoat_core::runtime::context::{AppContext, AppContextBuilder, ContextMap, Cx};
 
 use crate::runtime::{
     Endpoint, Layer, LayerId, Layers, LayoutFn, Next, PageFn, PageWithLayouts, PathSegment,
@@ -40,7 +40,7 @@ pub struct Router {
     layers: Layers,
     /// The values shared by every request, read back via
     /// [`app_context`](topcoat_core::runtime::context::app_context).
-    app_context: Arc<ContextMap>,
+    app_context: AppContext,
 }
 
 impl Router {
@@ -134,16 +134,16 @@ pub struct RouterBuilder {
     pages: Vec<PageFn>,
     layouts: Vec<LayoutFn>,
     layers: Layers,
-    context: ContextMap,
+    context: AppContextBuilder,
 }
 
 impl RouterBuilder {
     /// Creates an empty builder with no routes registered.
     #[must_use]
     pub fn new() -> Self {
-        let mut context = ContextMap::new();
+        let context = AppContext::builder();
         // Register `()` so APIs generic over an app context type can default to `S = ()`.
-        context.insert(());
+        let context = context.insert(());
         Self {
             routes: Vec::new(),
             pages: Vec::new(),
@@ -315,11 +315,32 @@ impl RouterBuilder {
     where
         T: Any + Send + Sync,
     {
+        self.context = self.context.insert(value);
+        self
+    }
+
+    /// Includes every value from a reusable application context.
+    ///
+    /// Call this before registering router-local values with
+    /// [`app_context`](Self::app_context). The supplied context can also be
+    /// shared with renderers that run outside an HTTP request.
+    ///
+    /// # Panics
+    ///
+    /// Panics if router-local values have already been registered.
+    #[must_use]
+    pub fn app_context_map(mut self, context: AppContext) -> Self {
+        let local = self.context.build();
+        let mut combined = AppContext::builder_from(context);
+
         assert!(
-            self.context.insert(value).is_none(),
-            "duplicate context entry for type `{:?}`",
-            type_name::<T>()
+            local.len() == 1 && local.get::<()>().is_some(),
+            "app_context_map must be called before app_context"
         );
+        if combined.get::<()>().is_none() {
+            combined = combined.insert(());
+        }
+        self.context = combined;
         self
     }
 
@@ -429,7 +450,7 @@ impl RouterBuilder {
             routes,
             endpoints,
             layers,
-            app_context: Arc::new(context),
+            app_context: context.build(),
         }
     }
 }
@@ -682,6 +703,19 @@ mod tests {
         let (status, _, body) = send(&router, Method::GET, "/hi");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"hello");
+    }
+
+    #[test]
+    fn reusable_app_context_is_available_to_handlers() {
+        let services = AppContext::builder().insert(Greeting("shared")).build();
+        let router = RouterBuilder::new()
+            .app_context_map(services)
+            .route(RouteFn::new(Method::GET, path("/hi"), say_greeting))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/hi");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"shared");
     }
 
     // -- Router::handle: layers --

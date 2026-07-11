@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use topcoat_core::runtime::context::{Cx, app_context};
+use topcoat_core::runtime::context::AsRenderContext;
 
 use crate::{Asset, MANIFEST_NAME, Manifest};
 
@@ -193,8 +193,10 @@ impl AssetBundle {
 ///
 /// Panics if no [`AssetBundle`] was registered.
 #[must_use]
-pub fn asset_bundle(cx: &Cx) -> &AssetBundle {
-    app_context(cx)
+pub fn asset_bundle(cx: &impl AsRenderContext) -> &AssetBundle {
+    cx.as_render_context()
+        .app_context()
+        .require::<AssetBundle>()
 }
 
 /// Resolves an [`Asset`] ID to its [`BundledAsset`] in the context's
@@ -205,7 +207,7 @@ pub fn asset_bundle(cx: &Cx) -> &AssetBundle {
 /// Panics if no [`AssetBundle`] was registered, or if the bundle does
 /// not contain the given asset.
 #[must_use]
-pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
+pub fn bundled_asset(cx: &impl AsRenderContext, asset: Asset) -> &BundledAsset {
     match asset_bundle(cx).get(asset) {
         Some(asset) => asset,
         None => panic!("failed to resolve asset {asset:?} in app context's asset bundle"),

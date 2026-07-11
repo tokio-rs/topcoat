@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use topcoat_core::runtime::context::Cx;
+use topcoat_core::runtime::context::RenderContext;
 
 use crate::runtime::{FmtHtml, Formatter};
 
@@ -26,7 +26,7 @@ impl<T> Unescaped<T> {
 
 impl FmtHtml for Unescaped<&'static str> {
     #[inline]
-    fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
+    fn fmt_html(&self, _cx: &RenderContext, f: &mut Formatter<'_>) {
         f.write_str_unescaped(self.0);
     }
 
@@ -37,7 +37,7 @@ impl FmtHtml for Unescaped<&'static str> {
 
 impl FmtHtml for Unescaped<String> {
     #[inline]
-    fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
+    fn fmt_html(&self, _cx: &RenderContext, f: &mut Formatter<'_>) {
         f.write_str_unescaped(&self.0);
     }
 

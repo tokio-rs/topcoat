@@ -1,6 +1,6 @@
 use std::{ops::Deref, rc::Rc, sync::Arc};
 
-use topcoat_core::runtime::context::Cx;
+use topcoat_core::runtime::context::RenderContext;
 
 /// An HTML-aware writer.
 ///
@@ -131,7 +131,7 @@ const ESCAPE_TABLE: [Option<&'static str>; 256] = {
 /// for trusted markup.
 pub trait FmtHtml {
     /// Writes into `f`, escaping content as appropriate.
-    fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>);
+    fn fmt_html(&self, cx: &RenderContext, f: &mut Formatter<'_>);
 
     /// Returns an estimate of the number of bytes this fragment will write.
     ///
@@ -151,7 +151,7 @@ where
     T: FmtHtml + ?Sized,
 {
     #[inline]
-    fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
+    fn fmt_html(&self, cx: &RenderContext, f: &mut Formatter<'_>) {
         (*self).fmt_html(cx, f);
     }
 
@@ -163,7 +163,7 @@ where
 
 impl FmtHtml for str {
     #[inline]
-    fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
+    fn fmt_html(&self, _cx: &RenderContext, f: &mut Formatter<'_>) {
         f.write_str(self);
     }
 
@@ -177,7 +177,7 @@ impl FmtHtml for str {
 
 impl FmtHtml for String {
     #[inline]
-    fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
+    fn fmt_html(&self, cx: &RenderContext, f: &mut Formatter<'_>) {
         self.as_str().fmt_html(cx, f);
     }
 
@@ -192,7 +192,7 @@ where
     T: FmtHtml,
 {
     #[inline]
-    fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
+    fn fmt_html(&self, cx: &RenderContext, f: &mut Formatter<'_>) {
         if let Some(fragment) = self {
             fragment.fmt_html(cx, f);
         }
@@ -225,7 +225,7 @@ macro_rules! impl_with_display {
     ($ty:ty, $size_hint:expr) => {
         impl FmtHtml for $ty {
             #[inline]
-            fn fmt_html(&self, _cx: &Cx, f: &mut Formatter<'_>) {
+            fn fmt_html(&self, _cx: &RenderContext, f: &mut Formatter<'_>) {
                 use core::fmt::Write;
                 let _ = write!(UnescapedDisplayAdapter(f), "{self}");
             }
@@ -271,7 +271,7 @@ macro_rules! impl_smart_pointer {
             T: FmtHtml + ?Sized,
         {
             #[inline]
-            fn fmt_html(&self, cx: &Cx, f: &mut Formatter<'_>) {
+            fn fmt_html(&self, cx: &RenderContext, f: &mut Formatter<'_>) {
                 self.deref().fmt_html(cx, f);
             }
 
