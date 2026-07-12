@@ -16,7 +16,9 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::{topcoat_font, topcoat_font_fontsource};
+use topcoat_core_grammar::paths::{
+    topcoat_font, topcoat_font_fontsource, topcoat_font_fontsource_macro, topcoat_font_macro,
+};
 
 use crate::font_face::{Display, FamilyName, Host};
 
@@ -115,7 +117,7 @@ impl ToTokens for FontsourceFont {
                         for subset in &subsets {
                             let subset = subset.as_ref().map(|subset| quote! { , subset: #subset });
                             faces.push(quote! {
-                                #topcoat_font_fontsource::fontsource_font_face!(
+                                #topcoat_font_fontsource_macro::fontsource_font_face!(
                                     #family_ident,
                                     weight: #weight,
                                     style: #style
@@ -143,7 +145,7 @@ impl ToTokens for FontsourceFont {
         quote! {{
             const FAMILY: &'static #topcoat_font_fontsource::Family = &#family_path;
             #(#checks)*
-            #topcoat_font::font!(FAMILY.name, #faces)
+            #topcoat_font_macro::font!(FAMILY.name, #faces)
         }}
         .to_tokens(tokens);
     }

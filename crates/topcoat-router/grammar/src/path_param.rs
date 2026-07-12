@@ -5,7 +5,9 @@ use syn::{
     Data, DeriveInput, Fields, Type,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_router};
+use topcoat_core_grammar::paths::{
+    topcoat_context, topcoat_context_macro, topcoat_router, topcoat_router_macro,
+};
 
 use super::error_attr::ErrorAttr;
 
@@ -163,7 +165,7 @@ impl ToTokens for PathParam {
                         cx: &#topcoat_context::Cx,
                         _: #topcoat_router::PathParamSealed,
                     ) -> Self::Output<'_> {
-                        #[#topcoat_context::memoize]
+                        #[#topcoat_context_macro::memoize]
                         fn parse(cx: &#topcoat_context::Cx) -> ::core::result::Result<#ident #ty_generics, <#inner_ty as ::core::str::FromStr>::Err> {
                             for (key, value) in #topcoat_router::raw_path_params(cx) {
                                 if key == #name_string {
@@ -187,7 +189,7 @@ impl ToTokens for PathParam {
                 #path_param_fn
             }
 
-            #topcoat_router::segment!(kind = Param, rename = #name_string);
+            #topcoat_router_macro::segment!(kind = Param, rename = #name_string);
         }
         .to_tokens(tokens);
     }

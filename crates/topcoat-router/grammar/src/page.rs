@@ -7,7 +7,7 @@ use syn::{
     spanned::Spanned,
 };
 use topcoat_core_grammar::paths::{
-    topcoat_context, topcoat_inventory, topcoat_router, topcoat_view,
+    topcoat_context, topcoat_inventory, topcoat_router, topcoat_view_macro,
 };
 
 use super::handler_args::{HandlerArg, HandlerArgs, request_ident};
@@ -87,7 +87,7 @@ impl ToTokens for Page {
         let body_param = args.request().map(|ty| quote! { , body: #ty });
         let body_arg = args.request().map(|_| quote! { , body });
         quote! {
-            #[#topcoat_view::component]
+            #[#topcoat_view_macro::component]
             #vis async fn #ident(cx: &#topcoat_context::Cx #body_param) #output {
                 #ident::handler(cx #body_arg).await
             }

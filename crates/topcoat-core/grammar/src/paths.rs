@@ -132,26 +132,22 @@ fn package(package: &'static str) -> String {
         .clone()
 }
 
-/// `::topcoat` (the facade root), or `topcoat_core::error` standalone: the
-/// `Error` and `Result` types, which the facade re-exports at its root.
+/// `::topcoat::asset`, or `topcoat_asset` standalone.
 #[allow(non_upper_case_globals)]
-pub const topcoat_error: Crate = Crate::new("", "topcoat-core", "error");
-
-/// `::topcoat::view`, or `topcoat_view` standalone.
-#[allow(non_upper_case_globals)]
-pub const topcoat_view: Crate = Crate::new("view", "topcoat-view", "");
+pub const topcoat_asset: Crate = Crate::new("asset", "topcoat-asset", "");
 
 /// `::topcoat::context`, or `topcoat_core::context` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_context: Crate = Crate::new("context", "topcoat-core", "context");
 
-/// `::topcoat::runtime`, or `topcoat_runtime` standalone.
+/// The `memoize` macro: `::topcoat::context`, or `topcoat_core_macro` standalone.
 #[allow(non_upper_case_globals)]
-pub const topcoat_runtime: Crate = Crate::new("runtime", "topcoat-runtime", "");
+pub const topcoat_context_macro: Crate = Crate::new("context", "topcoat-core-macro", "");
 
-/// `::topcoat::router`, or `topcoat_router` standalone.
+/// `::topcoat` (the facade root), or `topcoat_core::error` standalone: the
+/// `Error` and `Result` types, which the facade re-exports at its root.
 #[allow(non_upper_case_globals)]
-pub const topcoat_router: Crate = Crate::new("router", "topcoat-router", "");
+pub const topcoat_error: Crate = Crate::new("", "topcoat-core", "error");
 
 /// `::topcoat::internal`, or `topcoat_core::internal` standalone.
 #[allow(non_upper_case_globals)]
@@ -167,13 +163,14 @@ pub const topcoat_inventory: Crate = Crate::new("internal::inventory", "inventor
 #[allow(non_upper_case_globals)]
 pub const topcoat_serde: Crate = Crate::new("internal::serde", "serde", "");
 
-/// `::topcoat::asset`, or `topcoat_asset` standalone.
-#[allow(non_upper_case_globals)]
-pub const topcoat_asset: Crate = Crate::new("asset", "topcoat-asset", "");
-
 /// `::topcoat::font`, or `topcoat_font` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_font: Crate = Crate::new("font", "topcoat-font", "");
+
+/// The `font!` (and sibling) macros: `::topcoat::font`, or `topcoat_font_macro`
+/// standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_font_macro: Crate = Crate::new("font", "topcoat-font-macro", "");
 
 /// `::topcoat::font::fontsource`, or the standalone `topcoat-font-fontsource`
 /// crate that the facade re-exports there.
@@ -181,6 +178,39 @@ pub const topcoat_font: Crate = Crate::new("font", "topcoat-font", "");
 pub const topcoat_font_fontsource: Crate =
     Crate::new("font::fontsource", "topcoat-font-fontsource", "");
 
+/// The `fontsource_font_face!` (and sibling) macros:
+/// `::topcoat::font::fontsource`, or `topcoat_font_fontsource_macro` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_font_fontsource_macro: Crate =
+    Crate::new("font::fontsource", "topcoat-font-fontsource-macro", "");
+
 /// `::topcoat::icon`, or `topcoat_icon` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_icon: Crate = Crate::new("icon", "topcoat-icon", "");
+
+/// `::topcoat::router`, or `topcoat_router` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_router: Crate = Crate::new("router", "topcoat-router", "");
+
+/// The `segment!` (and sibling) macros: `::topcoat::router`, or
+/// `topcoat_router_macro` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_router_macro: Crate = Crate::new("router", "topcoat-router-macro", "");
+
+/// `::topcoat::runtime`, or `topcoat_runtime` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_runtime: Crate = Crate::new("runtime", "topcoat-runtime", "");
+
+/// The `expr!` (and sibling) macros: `::topcoat::runtime`, or
+/// `topcoat_runtime_macro` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_runtime_macro: Crate = Crate::new("runtime", "topcoat-runtime-macro", "");
+
+/// `::topcoat::view`, or `topcoat_view` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_view: Crate = Crate::new("view", "topcoat-view", "");
+
+/// The `view!`, `component`, and `Props` (and sibling) macros:
+/// `::topcoat::view`, or `topcoat_view_macro` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_view_macro: Crate = Crate::new("view", "topcoat-view-macro", "");

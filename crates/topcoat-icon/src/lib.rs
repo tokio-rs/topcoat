@@ -1,3 +1,5 @@
-mod icon;
+mod component;
+mod data;
 
-pub use icon::*;
+pub use component::*;
+pub use data::*;

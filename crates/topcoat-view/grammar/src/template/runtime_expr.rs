@@ -6,7 +6,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_runtime;
+use topcoat_core_grammar::paths::topcoat_runtime_macro;
 
 use crate::view::{ExprKind, ViewWriter, WriteView};
 
@@ -45,7 +45,7 @@ impl ToTokens for RuntimeExpr {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let expr = &self.expr;
         quote! {
-            #topcoat_runtime::expr! { #expr }
+            #topcoat_runtime_macro::expr! { #expr }
         }
         .to_tokens(tokens);
     }
@@ -62,7 +62,7 @@ impl topcoat_pretty::PrettyPrint for RuntimeExpr {
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
+    use quote::{ToTokens, quote};
 
     use super::*;
 
@@ -71,7 +71,7 @@ mod tests {
         let expr = syn::parse_str::<RuntimeExpr>("$(value + 1)").unwrap();
         assert_eq!(
             expr.to_token_stream().to_string(),
-            ":: topcoat :: runtime :: expr ! { value + 1 }",
+            quote! { #topcoat_runtime_macro::expr! { value + 1 } }.to_string(),
         );
     }
 }

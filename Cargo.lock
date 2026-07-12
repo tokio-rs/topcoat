@@ -2797,7 +2797,9 @@ dependencies = [
 name = "topcoat-icon"
 version = "0.1.0"
 dependencies = [
+ "topcoat-core",
  "topcoat-view",
+ "topcoat-view-macro",
 ]
 
 [[package]]

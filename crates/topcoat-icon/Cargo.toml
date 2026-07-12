@@ -4,7 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+topcoat-core.workspace = true
 topcoat-view.workspace = true
+topcoat-view-macro.workspace = true
 
 [lints]
 workspace = true

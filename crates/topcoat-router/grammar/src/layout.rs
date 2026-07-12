@@ -8,6 +8,7 @@ use syn::{
 };
 use topcoat_core_grammar::paths::{
     topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_view,
+    topcoat_view_macro,
 };
 
 pub struct LayoutAttr {
@@ -135,7 +136,7 @@ impl ToTokens for Layout {
             },
         });
         quote! {
-            #[#topcoat_view::component]
+            #[#topcoat_view_macro::component]
             #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_view::View) #output {
                 #ident::handler(cx #(, #component_args)*).await
             }

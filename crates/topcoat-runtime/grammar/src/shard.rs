@@ -8,7 +8,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use topcoat_core_grammar::paths::{
     topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_runtime,
-    topcoat_view,
+    topcoat_view, topcoat_view_macro,
 };
 use uuid::Uuid;
 
@@ -107,7 +107,7 @@ impl ToTokens for Shard {
             // Component face: renders the shard inline, splitting each `Expr<T>`
             // into its evaluated value (for the initial server render) and its
             // JavaScript source (tracked by the browser).
-            #[#topcoat_view::component]
+            #[#topcoat_view_macro::component]
             #vis async fn #ident(#component_params) -> #topcoat_error::Result<#topcoat_view::View> {
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
@@ -118,7 +118,7 @@ impl ToTokens for Shard {
                     ::std::vec![#(#js_idents),*],
                     __placeholder,
                 );
-                #topcoat_view::view! { (__scope) }
+                #topcoat_view_macro::view! { (__scope) }
             }
         }
         .to_tokens(tokens);

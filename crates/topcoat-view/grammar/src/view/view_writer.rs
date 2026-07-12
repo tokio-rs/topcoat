@@ -313,7 +313,7 @@ mod tests {
     fn empty_top_level_writer_emits_view_empty() {
         let out = rendered(ViewWriter::new());
         assert!(out.contains("async"));
-        assert!(out.contains(":: topcoat :: view :: View :: empty"));
+        assert!(out.contains(&quote! { #topcoat_view::View::empty }.to_string()));
     }
 
     #[test]
@@ -322,7 +322,7 @@ mod tests {
         // and must not introduce their own async block.
         let out = rendered(ViewWriter::new_nested());
         assert!(!out.contains("async"));
-        assert!(out.contains(":: topcoat :: view :: View :: empty"));
+        assert!(out.contains(&quote! { #topcoat_view::View::empty }.to_string()));
     }
 
     #[test]

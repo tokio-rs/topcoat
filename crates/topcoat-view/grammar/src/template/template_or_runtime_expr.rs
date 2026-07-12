@@ -55,7 +55,8 @@ impl topcoat_pretty::PrettyPrint for TemplateOrRuntimeExpr {
 
 #[cfg(test)]
 mod tests {
-    use quote::ToTokens;
+    use quote::{ToTokens, quote};
+    use topcoat_core_grammar::paths::topcoat_runtime_macro;
 
     use super::*;
 
@@ -80,7 +81,7 @@ mod tests {
         let expr = syn::parse_str::<TemplateOrRuntimeExpr>("(value + 1)").unwrap();
         assert_eq!(
             expr.to_token_stream().to_string(),
-            ":: topcoat :: runtime :: Expr :: from (value + 1)"
+            quote! { #topcoat_runtime::Expr::from(value + 1) }.to_string(),
         );
     }
 
@@ -89,7 +90,7 @@ mod tests {
         let expr = syn::parse_str::<TemplateOrRuntimeExpr>("$(value + 1)").unwrap();
         assert_eq!(
             expr.to_token_stream().to_string(),
-            ":: topcoat :: runtime :: expr ! { value + 1 }",
+            quote! { #topcoat_runtime_macro::expr! { value + 1 } }.to_string(),
         );
     }
 }

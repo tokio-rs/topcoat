@@ -15,7 +15,7 @@ use syn::{
     visit_mut::{self, VisitMut},
 };
 
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_view};
+use topcoat_core_grammar::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
 
 use crate::component::{ComponentAttr, ComponentItem};
 
@@ -186,7 +186,7 @@ impl ToTokens for Component {
             }
 
             #(#attrs)*
-            #[derive(#topcoat_view::Props)]
+            #[derive(#topcoat_view_macro::Props)]
             #vis struct #props_ident #impl_generics #where_clause {
                 #(#fields),*
             }
