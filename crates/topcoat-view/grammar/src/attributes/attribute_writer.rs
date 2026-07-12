@@ -236,9 +236,9 @@ mod tests {
     fn empty_writer_emits_zero_capacity_block() {
         let writer = AttributeWriter::new();
         let out = rendered(writer);
-        assert!(out.contains(
-            &quote! { #topcoat_view::Attributes::with_capacity(0usize) }.to_string()
-        ));
+        assert!(
+            out.contains(&quote! { #topcoat_view::Attributes::with_capacity(0usize) }.to_string())
+        );
         assert!(!out.contains("insert"));
     }
 
