@@ -6,9 +6,9 @@ fn main() {
         .render()
         .unwrap();
 
-    // Stage the Lucide icon set for the `iconify_icon!` references in main.rs.
+    // Stage the Feather icon set for the `iconify_icon!` references in main.rs.
     topcoat::icon::iconify::BuildConfig::new()
-        .icon_set("lucide")
+        .icon_set("feather")
         .stage()
         .unwrap();
 }

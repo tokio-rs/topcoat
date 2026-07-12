@@ -46,7 +46,7 @@ async fn home() -> Result {
                         button(
                             size: ButtonSize::Lg,
                             "Get started"
-                            icon(data: iconify::iconify_icon!("lucide:arrow-right"))
+                            icon(data: iconify::iconify_icon!("feather:arrow-right"))
                         )
                         // Anything can borrow a button's looks: `button_variants`
                         // returns the class string for a variant and size.
@@ -89,7 +89,7 @@ async fn home() -> Result {
                             size: ButtonSize::Icon,
                             variant: ButtonVariant::Outline,
                             icon(
-                                data: iconify::iconify_icon!("lucide:plus"),
+                                data: iconify::iconify_icon!("feather:plus"),
                                 label: "Add item"
                             )
                         )
