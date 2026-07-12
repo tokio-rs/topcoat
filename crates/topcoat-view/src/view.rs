@@ -1,6 +1,7 @@
 use core::fmt;
 use std::borrow::Cow;
 
+use smallvec::SmallVec;
 use topcoat_core::context::Cx;
 
 use crate::{Formatter, HtmlContext, HtmlWriter};
@@ -330,7 +331,7 @@ impl Clone for Box<dyn DynViewPart> {
 #[doc(hidden)]
 #[derive(Debug, Default, Clone)]
 pub struct ViewParts {
-    items: Vec<ViewPart>,
+    items: SmallVec<[ViewPart; 8]>,
 }
 
 impl ViewParts {
@@ -371,7 +372,7 @@ impl From<ViewParts> for ViewPart {
             _ => {
                 let size_hint = value.items.iter().map(ViewPart::size_hint).sum();
                 ViewPart::Vec {
-                    inner: value.items,
+                    inner: value.items.into_vec(),
                     size_hint,
                 }
             }
