@@ -1,4 +1,5 @@
 mod delim;
+mod error;
 mod r#macro;
 mod pretty_print;
 mod printer;
@@ -12,6 +13,7 @@ mod token;
 mod trivia;
 
 pub use delim::*;
+pub use error::*;
 pub use r#macro::*;
 pub use pretty_print::*;
 pub use printer::*;
@@ -22,6 +24,8 @@ pub use span::*;
 pub use token::*;
 pub use trivia::*;
 
+use proc_macro2::LineColumn;
+
 struct Replace {
     start: usize,
     end: usize,
@@ -31,16 +35,24 @@ struct Replace {
 /// Pretty-prints the Topcoat macro invocations in `input`.
 ///
 /// Returns the source with each macro body replaced by its formatted form, or
-/// the collection of errors encountered while parsing or formatting them.
+/// the collection of errors encountered while parsing or formatting them. Each
+/// error's location is reported in the coordinates of `input`.
 ///
 /// # Errors
 ///
-/// Returns `Err` with the accumulated `syn::Error`s if parsing `input` or any
+/// Returns `Err` with the accumulated [`FormatError`]s if parsing `input` or any
 /// macro body fails, or if a registered pretty-printer returns an error.
-pub fn pretty_print_str(registry: &Registry, input: &str) -> Result<String, Vec<syn::Error>> {
+pub fn pretty_print_str(registry: &Registry, input: &str) -> Result<String, Vec<FormatError>> {
     let mut output = String::new();
 
-    let file = syn::parse_file(input).map_err(|error| vec![error])?;
+    // The whole file is parsed as a unit, so this error's span already refers to
+    // positions in `input`; its body starts at the very first line and column.
+    let file = syn::parse_file(input).map_err(|error| {
+        vec![FormatError::new(
+            &error,
+            LineColumn { line: 1, column: 0 },
+        )]
+    })?;
     let snippets = MacroSnippet::collect_from_file(&file);
     let mut errors = Vec::new();
     let mut replacements = Vec::new();
@@ -55,7 +67,9 @@ pub fn pretty_print_str(registry: &Registry, input: &str) -> Result<String, Vec<
                 end: snippet.span().byte_range().end,
                 replacement,
             }),
-            Err(error) => errors.push(error),
+            // A body is parsed in isolation, so its error span is relative to
+            // the body; anchor it to where the body begins in the file.
+            Err(error) => errors.push(FormatError::new(&error, snippet.span().start())),
         }
     }
 

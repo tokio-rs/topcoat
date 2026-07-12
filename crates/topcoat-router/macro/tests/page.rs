@@ -22,7 +22,12 @@ struct Search {
 // A page that reads a request body through a destructuring pattern.
 #[page("/search")]
 async fn search(Form(input): Form<Search>) -> Result {
-    view! { <p>"searching for " (input.q)</p> }
+    view! {
+        <p>
+            "searching for "
+            (input.q)
+        </p>
+    }
 }
 
 #[page("/whoami")]
