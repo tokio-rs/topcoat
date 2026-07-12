@@ -22,6 +22,7 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
+use topcoat_core_grammar::paths::topcoat_font;
 
 use topcoat_core_grammar::ParseOption;
 
@@ -120,7 +121,7 @@ impl FontFace {
         let unicode_range = self.unicode_range.iter();
 
         quote! {
-            ::topcoat::font::FontFace::new(#family, #src)
+            #topcoat_font::FontFace::new(#family, #src)
                 #(.with_weight(#weight))*
                 #(.with_style(#style))*
                 #(.with_display(#display))*

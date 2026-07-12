@@ -6,6 +6,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_font;
 
 mod kw {
     use syn::custom_keyword;
@@ -102,7 +103,7 @@ impl Parse for DisplayValue {
 impl ToTokens for DisplayValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let ident = &self.0;
-        quote::quote! { ::topcoat::font::FontDisplay::#ident }.to_tokens(tokens);
+        quote::quote! { #topcoat_font::FontDisplay::#ident }.to_tokens(tokens);
     }
 }
 

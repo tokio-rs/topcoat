@@ -10,6 +10,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::{
     template::RuntimeExpr,
@@ -97,7 +98,7 @@ impl WriteView for Component {
                     // The marker is built via `Default` so the same construction
                     // works for both unit-struct and generic (`PhantomData`) markers.
                     #![allow(clippy::default_constructed_unit_structs)]
-                    use ::topcoat::view::Component;
+                    use #topcoat_view::Component;
                     let props = #name::props_builder()#(#setters)*#child.build();
                     Component::render(
                         #name::default(),

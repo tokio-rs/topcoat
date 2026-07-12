@@ -6,6 +6,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_font;
 
 mod kw {
     use syn::custom_keyword;
@@ -146,10 +147,10 @@ impl ToTokens for FontWeightRange {
         let start = &self.start;
         match &self.end {
             None => quote! {
-                ::topcoat::font::FontWeightRange::from_u16(#start, #start)
+                #topcoat_font::FontWeightRange::from_u16(#start, #start)
             },
             Some(end) => quote! {
-                ::topcoat::font::FontWeightRange::from_u16(#start, #end)
+                #topcoat_font::FontWeightRange::from_u16(#start, #end)
             },
         }
         .to_tokens(tokens);

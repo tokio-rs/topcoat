@@ -5,6 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
+use topcoat_core_grammar::paths::topcoat_font_fontsource;
 use topcoat_font_fontsource::Family;
 
 /// A Fontsource font family, written as the name of its
@@ -39,7 +40,7 @@ impl Parse for FamilyName {
 impl ToTokens for FamilyName {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let ident = &self.0;
-        quote! { ::topcoat::font::fontsource::families::#ident }.to_tokens(tokens);
+        quote! { #topcoat_font_fontsource::families::#ident }.to_tokens(tokens);
     }
 }
 

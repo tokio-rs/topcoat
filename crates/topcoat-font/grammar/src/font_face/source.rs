@@ -7,6 +7,7 @@ use syn::{
     token::Paren,
 };
 
+use topcoat_core_grammar::paths::topcoat_font;
 use topcoat_core_grammar::{ParseOption, QuoteOption};
 
 use crate::font_face::{FontFormatHint, FontTechHint};
@@ -103,7 +104,7 @@ impl ToTokens for FontSourcesValue {
         match self {
             Self::Expr(inner) => inner.to_tokens(tokens),
             Self::Css(inner) => quote! {
-                ::topcoat::font::FontSources::new(::std::vec![#inner])
+                #topcoat_font::FontSources::new(::std::vec![#inner])
             }
             .to_tokens(tokens),
         }
@@ -198,10 +199,10 @@ impl ToTokens for FontSource {
             } => {
                 let tech = QuoteOption::from(tech);
                 let format = QuoteOption::from(format);
-                quote! { ::topcoat::font::FontSource::url(#expr, #format, #tech) }
+                quote! { #topcoat_font::FontSource::url(#expr, #format, #tech) }
             }
             Self::Local { expr, .. } => {
-                quote! { ::topcoat::font::FontSource::local(#expr) }
+                quote! { #topcoat_font::FontSource::local(#expr) }
             }
         }
         .to_tokens(tokens);

@@ -4,6 +4,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::{Ident, Token};
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_context;
 
 /// The leading `cx =>` argument naming the request context a macro body
 /// renders against.
@@ -43,7 +44,7 @@ impl ToTokens for LeadingCx {
     /// identifier the surrounding generated code reads from.
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let cx = &self.cx;
-        quote! { let __cx: &::topcoat::context::Cx = #cx; }.to_tokens(tokens);
+        quote! { let __cx: &#topcoat_context::Cx = #cx; }.to_tokens(tokens);
     }
 }
 

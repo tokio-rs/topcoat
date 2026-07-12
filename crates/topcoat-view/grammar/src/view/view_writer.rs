@@ -1,6 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::{Expr, Ident, Pat};
+use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 /// AST nodes that can emit themselves into a [`ViewWriter`].
 pub(crate) trait WriteView {
@@ -124,11 +125,11 @@ impl ViewWriter {
         let format_expr = {
             if self.chunks.is_empty() {
                 // Optimized path: The view has no content.
-                quote! { ::topcoat::view::View::empty() }
+                quote! { #topcoat_view::View::empty() }
             } else if self.chunks.len() == 1
                 && let Chunk::Static { string } = &self.chunks[0]
             {
-                quote! { ::topcoat::view::View::unescaped_unchecked(#string) }
+                quote! { #topcoat_view::View::unescaped_unchecked(#string) }
             } else {
                 fn build_parts(chunks: &[Chunk]) -> TokenStream {
                     let mut output = TokenStream::new();
@@ -197,10 +198,10 @@ impl ViewWriter {
                 let statements = build_parts(&self.chunks);
 
                 quote! {{
-                    use ::topcoat::view::internal::*;
-                    let mut __parts = ::topcoat::view::ViewParts::new();
+                    use #topcoat_view::internal::*;
+                    let mut __parts = #topcoat_view::ViewParts::new();
                     #statements
-                    ::topcoat::view::View::new(__parts)
+                    #topcoat_view::View::new(__parts)
                 }}
             }
         };
@@ -208,7 +209,7 @@ impl ViewWriter {
         if self.nested {
             format_expr
         } else {
-            quote! { async { ::core::result::Result::<::topcoat::view::View, ::topcoat::Error>::Ok(#format_expr) }.await }
+            quote! { async { ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#format_expr) }.await }
         }
     }
 }

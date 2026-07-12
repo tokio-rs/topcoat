@@ -7,6 +7,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_font;
 
 mod kw {
     use syn::custom_keyword;
@@ -103,7 +104,7 @@ impl ToTokens for UnicodeRangesValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::Css(ranges) => quote! {
-                ::topcoat::font::UnicodeRanges::new(const {
+                #topcoat_font::UnicodeRanges::new(const {
                     &[#ranges]
                 })
             }
@@ -153,10 +154,10 @@ impl ToTokens for UnicodeRange {
         let start = &self.start;
         match &self.end {
             None => quote! {
-                ::topcoat::font::UnicodeRange::from_u32(#start, #start)
+                #topcoat_font::UnicodeRange::from_u32(#start, #start)
             },
             Some(end) => quote! {
-                ::topcoat::font::UnicodeRange::from_u32(#start, #end)
+                #topcoat_font::UnicodeRange::from_u32(#start, #end)
             },
         }
         .to_tokens(tokens);

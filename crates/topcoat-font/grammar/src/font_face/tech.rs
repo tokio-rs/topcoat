@@ -7,6 +7,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_font;
 
 mod kw {
     use syn::custom_keyword;
@@ -91,7 +92,7 @@ impl ToTokens for FontTech {
         {
             let name = tech_variant(&keyword.value()).expect("validated at parse time");
             let variant = proc_macro2::Ident::new(name, keyword.span());
-            quote! { ::topcoat::font::FontTech::#variant }.to_tokens(tokens);
+            quote! { #topcoat_font::FontTech::#variant }.to_tokens(tokens);
             return;
         }
         let inner = &self.0;

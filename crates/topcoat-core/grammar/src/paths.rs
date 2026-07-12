@@ -7,10 +7,9 @@
 //!
 //! - Application crates depend on the `topcoat` facade and name the type
 //!   `::topcoat::view::Component`.
-//! - Component libraries depend on the individual crates (`topcoat-view`, and
-//!   so on) directly, and name it `::topcoat_view::Component` instead. Forcing
-//!   them onto the facade is undesirable, and a crate that the facade itself
-//!   re-exports could not depend on the facade without a cycle.
+//! - Component libraries depend on the individual crates (`topcoat-view`, and so on) directly, and
+//!   name it `::topcoat_view::Component` instead. Forcing them onto the facade is undesirable, and
+//!   a crate that the facade itself re-exports could not depend on the facade without a cycle.
 //!
 //! Each framework crate is therefore represented by a [`Crate`] constant that
 //! resolves to the right path for whoever is compiling the call site: through
@@ -61,6 +60,12 @@ impl Crate {
             package,
             module,
         }
+    }
+
+    /// The resolved crate path as a string, for contexts that need a string
+    /// literal rather than tokens -- such as `#[serde(crate = "...")]`.
+    pub fn path_string(&self) -> String {
+        resolve(self)
     }
 }
 
@@ -156,3 +161,26 @@ pub const topcoat_internal: Crate = Crate::new("internal", "topcoat-core", "inte
 /// the facade re-exports there.
 #[allow(non_upper_case_globals)]
 pub const topcoat_inventory: Crate = Crate::new("internal::inventory", "inventory", "");
+
+/// `::topcoat::internal::serde`, or the standalone `serde` crate that the facade
+/// re-exports there.
+#[allow(non_upper_case_globals)]
+pub const topcoat_serde: Crate = Crate::new("internal::serde", "serde", "");
+
+/// `::topcoat::asset`, or `topcoat_asset` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_asset: Crate = Crate::new("asset", "topcoat-asset", "");
+
+/// `::topcoat::font`, or `topcoat_font` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_font: Crate = Crate::new("font", "topcoat-font", "");
+
+/// `::topcoat::font::fontsource`, or the standalone `topcoat-font-fontsource`
+/// crate that the facade re-exports there.
+#[allow(non_upper_case_globals)]
+pub const topcoat_font_fontsource: Crate =
+    Crate::new("font::fontsource", "topcoat-font-fontsource", "");
+
+/// `::topcoat::icon`, or `topcoat_icon` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_icon: Crate = Crate::new("icon", "topcoat-icon", "");

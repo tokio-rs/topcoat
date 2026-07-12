@@ -6,6 +6,7 @@ use syn::{
     parse_quote,
     spanned::Spanned,
 };
+use topcoat_core_grammar::paths::{topcoat_context, topcoat_inventory, topcoat_router};
 
 use super::handler_args::{HandlerArgs, request_ident};
 
@@ -72,13 +73,13 @@ impl ToTokens for Route {
         item.sig.generics.params.insert(0, parse_quote! { '__cx });
         item.sig
             .inputs
-            .insert(0, parse_quote! { __cx: &'__cx ::topcoat::context::Cx });
+            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
         let ident = &item.sig.ident;
         let args = self.1.args.call_args();
         let parse_request = self.1.args.request().map(|request_ty| {
             let request_ident = request_ident();
             quote_spanned! {request_ty.span()=>
-                let #request_ident = <#request_ty as ::topcoat::router::FromRequest>::from_request(cx, body).await?;
+                let #request_ident = <#request_ty as #topcoat_router::FromRequest>::from_request(cx, body).await?;
             }
         });
 
@@ -88,7 +89,7 @@ impl ToTokens for Route {
                 #item
                 Box::pin(async move {
                     #parse_request
-                    ::topcoat::router::IntoResponse::into_response(#ident(cx, #(#args),*).await?, cx)
+                    #topcoat_router::IntoResponse::into_response(#ident(cx, #(#args),*).await?, cx)
                 })
             }
         };
@@ -97,9 +98,9 @@ impl ToTokens for Route {
             let method = &attr.method;
             quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: ::topcoat::router::RouteFn = ::topcoat::router::RouteFn::new(
-                    ::topcoat::router::Method::#method,
-                    ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
+                const #ident: #topcoat_router::RouteFn = #topcoat_router::RouteFn::new(
+                    #topcoat_router::Method::#method,
+                    ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );
             }
@@ -107,8 +108,8 @@ impl ToTokens for Route {
             let method = &attr.method;
             quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: ::topcoat::router::ModuleRouteFn = ::topcoat::router::ModuleRouteFn::new(
-                    ::topcoat::router::Method::#method,
+                const #ident: #topcoat_router::ModuleRouteFn = #topcoat_router::ModuleRouteFn::new(
+                    #topcoat_router::Method::#method,
                     module_path!(),
                     #render,
                 );
@@ -117,7 +118,7 @@ impl ToTokens for Route {
         .to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { ::topcoat::internal::inventory::submit! { #ident } }.to_tokens(tokens);
+            quote! { #topcoat_inventory::submit! { #ident } }.to_tokens(tokens);
         }
     }
 }

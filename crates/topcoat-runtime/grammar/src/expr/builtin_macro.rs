@@ -9,6 +9,8 @@ use syn::{
     visit::{self, Visit},
 };
 
+use topcoat_core_grammar::paths::topcoat_runtime;
+
 use crate::expr::{
     Expr,
     name_resolver::{NameResolver, ResolvedIdent},
@@ -107,11 +109,16 @@ impl RawMacro {
         match &self.rust {
             Some(rust_expr) => {
                 let locals = RawRustLocalCollector::collect(rust_expr, names);
+                // Bound to a local because it is interpolated inside the
+                // `#(...)*` repetition below, where a bare `#topcoat_runtime`
+                // would expand to a `let` binding that cannot shadow the
+                // imported constant.
+                let into_real = quote!(#topcoat_runtime::Surrogate::into_real);
                 quote! {{
                     #(
-                        let #locals = ::topcoat::runtime::Surrogate::into_real(#locals);
+                        let #locals = #into_real(#locals);
                     )*
-                    ::topcoat::runtime::Surrogated::into_surrogate(#rust_expr)
+                    #topcoat_runtime::Surrogated::into_surrogate(#rust_expr)
                 }}
                 .to_tokens(rust);
             }

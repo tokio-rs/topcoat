@@ -7,6 +7,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::view::{ExprKind, ViewWriter, WriteView};
 
@@ -44,12 +45,17 @@ impl WriteView for ReactiveScope {
         let path = &self.path;
         let signals = self.signals.iter();
 
+        // Bound to a local because it is interpolated inside the `#(...)*`
+        // repetition below, where a bare `#topcoat_runtime` would expand to a
+        // `let` binding that cannot shadow the imported constant.
+        let read_signal = quote!(#topcoat_runtime::ReadSignal);
+
         writer.write_expr(
             ExprKind::Node,
             quote! {
-                ::topcoat::runtime::ReactiveScope::new(
+                #topcoat_runtime::ReactiveScope::new(
                     __cx,
-                    (#(::topcoat::runtime::ReadSignal::new(&#signals),)*),
+                    (#(#read_signal::new(&#signals),)*),
                     #path,
                 ).await?
             },

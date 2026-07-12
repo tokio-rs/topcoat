@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Expr, Pat};
+use topcoat_core_grammar::paths::topcoat_view;
 
 /// AST nodes that can emit themselves into an [`AttributeWriter`].
 pub(crate) trait WriteAttribute {
@@ -141,7 +142,7 @@ impl AttributeWriter {
         let capacity = Chunk::capacity_of(&self.chunks);
         let statements = build_parts(&self.chunks);
         quote! {{
-            let mut __attrs = ::topcoat::view::Attributes::with_capacity(#capacity);
+            let mut __attrs = #topcoat_view::Attributes::with_capacity(#capacity);
             #statements
             __attrs
         }}

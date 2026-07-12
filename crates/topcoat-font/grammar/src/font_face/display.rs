@@ -6,6 +6,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_font;
 
 mod kw {
     use syn::custom_keyword;
@@ -162,11 +163,11 @@ impl Parse for FontDisplayKind {
 impl ToTokens for FontDisplayKind {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            Self::Auto(_) => quote! { ::topcoat::font::FontDisplay::Auto },
-            Self::Block(_) => quote! { ::topcoat::font::FontDisplay::Block },
-            Self::Swap(_) => quote! { ::topcoat::font::FontDisplay::Swap },
-            Self::Fallback(_) => quote! { ::topcoat::font::FontDisplay::Fallback },
-            Self::Optional(_) => quote! { ::topcoat::font::FontDisplay::Optional },
+            Self::Auto(_) => quote! { #topcoat_font::FontDisplay::Auto },
+            Self::Block(_) => quote! { #topcoat_font::FontDisplay::Block },
+            Self::Swap(_) => quote! { #topcoat_font::FontDisplay::Swap },
+            Self::Fallback(_) => quote! { #topcoat_font::FontDisplay::Fallback },
+            Self::Optional(_) => quote! { #topcoat_font::FontDisplay::Optional },
         }
         .to_tokens(tokens);
     }

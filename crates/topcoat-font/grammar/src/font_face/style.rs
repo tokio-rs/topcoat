@@ -6,6 +6,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_font;
 
 mod kw {
     use syn::custom_keyword;
@@ -150,10 +151,10 @@ impl Parse for FontStyleKind {
 impl ToTokens for FontStyleKind {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            Self::Normal(_) => quote! { ::topcoat::font::FontStyle::Normal },
-            Self::Italic(_) => quote! { ::topcoat::font::FontStyle::Italic },
+            Self::Normal(_) => quote! { #topcoat_font::FontStyle::Normal },
+            Self::Italic(_) => quote! { #topcoat_font::FontStyle::Italic },
             Self::Oblique { angles, .. } => match angles {
-                None => quote! { ::topcoat::font::FontStyle::oblique() },
+                None => quote! { #topcoat_font::FontStyle::oblique() },
                 Some(range) => range.to_token_stream(),
             },
         }
@@ -226,8 +227,8 @@ impl ToTokens for ObliqueAngleRange {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let start = &self.start;
         match &self.end {
-            None => quote! { ::topcoat::font::FontStyle::oblique_angle(#start) },
-            Some(end) => quote! { ::topcoat::font::FontStyle::oblique_range(#start, #end) },
+            None => quote! { #topcoat_font::FontStyle::oblique_angle(#start) },
+            Some(end) => quote! { #topcoat_font::FontStyle::oblique_range(#start, #end) },
         }
         .to_tokens(tokens);
     }

@@ -6,6 +6,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::view::{ExprKind, ViewWriter, WriteView};
 
@@ -44,7 +45,7 @@ impl ToTokens for RuntimeExpr {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let expr = &self.expr;
         quote! {
-            ::topcoat::runtime::expr! { #expr }
+            #topcoat_runtime::expr! { #expr }
         }
         .to_tokens(tokens);
     }

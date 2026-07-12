@@ -6,6 +6,8 @@ use syn::{
     parse_quote,
 };
 
+use crate::paths::{topcoat_context, topcoat_internal};
+
 pub struct MemoizeAttr {}
 
 impl Parse for MemoizeAttr {
@@ -95,7 +97,7 @@ impl ToTokens for Memoize {
             if let Pat::Ident(pi) = &*pat_type.pat
                 && pi.ident == "cx"
             {
-                new_inputs.push(quote! { cx: &'__cx ::topcoat::context::Cx });
+                new_inputs.push(quote! { cx: &'__cx #topcoat_context::Cx });
                 continue;
             }
             let ty = &pat_type.ty;
@@ -132,14 +134,14 @@ impl ToTokens for Memoize {
         let return_type = quote! { #return_ty };
         let return_type_as_ref = is_option_or_result(&return_ty);
         let output_type = if return_type_as_ref {
-            quote! { <&'__cx #return_type as ::topcoat::internal::MemoizeAsRef>::AsRef }
+            quote! { <&'__cx #return_type as #topcoat_internal::MemoizeAsRef>::AsRef }
         } else {
             quote! { &'__cx #return_type }
         };
 
         let call = if asyncness.is_some() {
             quote! {
-                ::topcoat::context::memoize_cache(cx).eq_cache().memoize_async(
+                #topcoat_context::memoize_cache(cx).eq_cache().memoize_async(
                     cx,
                     (#(#borrowed_keys,)*),
                     (#(#key_idents,)*),
@@ -151,7 +153,7 @@ impl ToTokens for Memoize {
             }
         } else {
             quote! {
-                ::topcoat::context::memoize_cache(cx).eq_cache().memoize(
+                #topcoat_context::memoize_cache(cx).eq_cache().memoize(
                     cx,
                     (#(#borrowed_keys,)*),
                     (#(#key_idents,)*),

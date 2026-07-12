@@ -4,6 +4,9 @@ use syn::{
     FnArg, ItemFn, Pat, PatIdent, PatType, ReturnType,
     parse::{Parse, ParseStream},
 };
+use topcoat_core_grammar::paths::{
+    topcoat_internal, topcoat_inventory, topcoat_router, topcoat_runtime,
+};
 
 pub struct ProcedureAttr {}
 
@@ -83,23 +86,23 @@ impl ToTokens for Procedure {
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("procedures must return a value")
         };
-        let return_ty = quote! { <#return_ty as ::topcoat::internal::ResultExt>::T };
+        let return_ty = quote! { <#return_ty as #topcoat_internal::ResultExt>::T };
 
         let id = uuid::Uuid::new_v4().to_string();
 
         quote! {
             #[allow(non_upper_case_globals)]
-            const #ident: &::topcoat::runtime::Procedure::<(#(#arg_tys,)*), #return_ty> = &::topcoat::runtime::Procedure::new(
-                ::topcoat::runtime::ProcedureId::new(#id),
+            const #ident: &#topcoat_runtime::Procedure::<(#(#arg_tys,)*), #return_ty> = &#topcoat_runtime::Procedure::new(
+                #topcoat_runtime::ProcedureId::new(#id),
                 |cx, body| {
                     #[allow(clippy::unused_async)]
                     #item
                     Box::pin(async {
-                        type Surrogate = <(#(#arg_tys,)*) as ::topcoat::runtime::Surrogated>::Surrogate;
-                        let ::topcoat::router::Json(args) = <::topcoat::router::Json<Surrogate> as topcoat::router::FromRequest>::from_request(cx, body).await?;
-                        let (#(#args,)*) = ::topcoat::runtime::Surrogate::into_real(args);
-                        let response = ::topcoat::runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
-                        ::topcoat::router::IntoResponse::into_response(::topcoat::router::Json(response), cx)
+                        type Surrogate = <(#(#arg_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
+                        let #topcoat_router::Json(args) = <#topcoat_router::Json<Surrogate> as #topcoat_router::FromRequest>::from_request(cx, body).await?;
+                        let (#(#args,)*) = #topcoat_runtime::Surrogate::into_real(args);
+                        let response = #topcoat_runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
+                        #topcoat_router::IntoResponse::into_response(#topcoat_router::Json(response), cx)
                     })
                 },
             );
@@ -107,7 +110,7 @@ impl ToTokens for Procedure {
         .to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { ::topcoat::internal::inventory::submit! { ::topcoat::runtime::ErasedProcedure::new(#ident) } }.to_tokens(tokens);
+            quote! { #topcoat_inventory::submit! { #topcoat_runtime::ErasedProcedure::new(#ident) } }.to_tokens(tokens);
         }
     }
 }

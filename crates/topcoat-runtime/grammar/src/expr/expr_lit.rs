@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{ExprLit, Lit};
+use topcoat_core_grammar::paths::topcoat_runtime;
 use topcoat_runtime::Surrogated;
 
 use crate::expr::Expr;
@@ -13,16 +14,16 @@ impl Expr {
     ) -> syn::Result<()> {
         match &lit.lit {
             Lit::Float(inner) => {
-                quote! { ::topcoat::runtime::Surrogated::into_surrogate(#inner) }.to_tokens(rust);
+                quote! { #topcoat_runtime::Surrogated::into_surrogate(#inner) }.to_tokens(rust);
                 let value: f64 = inner.base10_parse()?;
                 push_js_surrogate(js, &value.into_surrogate())?;
             }
             Lit::Bool(inner) => {
-                quote! { ::topcoat::runtime::Surrogated::into_surrogate(#inner) }.to_tokens(rust);
+                quote! { #topcoat_runtime::Surrogated::into_surrogate(#inner) }.to_tokens(rust);
                 push_js_surrogate(js, &inner.value.into_surrogate())?;
             }
             Lit::Str(inner) => {
-                quote! { ::topcoat::runtime::Surrogated::into_surrogate(#inner) }.to_tokens(rust);
+                quote! { #topcoat_runtime::Surrogated::into_surrogate(#inner) }.to_tokens(rust);
                 let value = inner.value();
                 push_js_surrogate(js, value.as_str().into_surrogate())?;
             }

@@ -20,6 +20,9 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+#[cfg(feature = "asset")]
+use topcoat_core_grammar::paths::topcoat_asset;
+use topcoat_core_grammar::paths::{topcoat_font, topcoat_font_fontsource};
 
 use topcoat_font_fontsource as runtime;
 
@@ -52,7 +55,7 @@ impl ToTokens for FontsourceFontFace {
             |subset| subset.value.to_token_stream(),
         );
         let display = self.display.as_ref().map_or_else(
-            || quote! { ::topcoat::font::FontDisplay::Swap },
+            || quote! { #topcoat_font::FontDisplay::Swap },
             |display| display.value.to_token_stream(),
         );
 
@@ -96,11 +99,11 @@ impl ToTokens for FontsourceFontFace {
             (runtime::Host::Asset, Some((family, weight, style, subset))) => {
                 let url = family.jsdelivr_url(*subset, *weight, *style);
                 quote! {{
-                    const ASSET: ::topcoat::asset::Asset = ::topcoat::asset::asset!(#url);
-                    ::topcoat::font::FontSources::new(::std::vec![
-                        ::topcoat::font::FontSource::url(
+                    const ASSET: #topcoat_asset::Asset = #topcoat_asset::asset!(#url);
+                    #topcoat_font::FontSources::new(::std::vec![
+                        #topcoat_font::FontSource::url(
                             ASSET,
-                            ::core::option::Option::Some(::topcoat::font::FontFormat::Woff2),
+                            ::core::option::Option::Some(#topcoat_font::FontFormat::Woff2),
                             ::core::option::Option::None,
                         )
                     ])
@@ -109,20 +112,20 @@ impl ToTokens for FontsourceFontFace {
             (_, Some((family, weight, style, subset))) => {
                 let url = family.jsdelivr_url(*subset, *weight, *style);
                 quote! {
-                    ::topcoat::font::FontSources::new(::std::vec![
-                        ::topcoat::font::FontSource::url(
+                    #topcoat_font::FontSources::new(::std::vec![
+                        #topcoat_font::FontSource::url(
                             #url,
-                            ::core::option::Option::Some(::topcoat::font::FontFormat::Woff2),
+                            ::core::option::Option::Some(#topcoat_font::FontFormat::Woff2),
                             ::core::option::Option::None,
                         )
                     ])
                 }
             }
             (_, None) => quote! {
-                ::topcoat::font::FontSources::new(::std::vec![
-                    ::topcoat::font::FontSource::url(
+                #topcoat_font::FontSources::new(::std::vec![
+                    #topcoat_font::FontSource::url(
                         FAMILY.jsdelivr_url(SUBSET, WEIGHT, STYLE),
-                        ::core::option::Option::Some(::topcoat::font::FontFormat::Woff2),
+                        ::core::option::Option::Some(#topcoat_font::FontFormat::Woff2),
                         ::core::option::Option::None,
                     )
                 ])
@@ -136,23 +139,23 @@ impl ToTokens for FontsourceFontFace {
                 let entries = ranges.iter().map(|range| {
                     let start = u32::from(range.start());
                     let end = u32::from(range.end());
-                    quote! { ::topcoat::font::UnicodeRange::from_u32(#start, #end) }
+                    quote! { #topcoat_font::UnicodeRange::from_u32(#start, #end) }
                 });
                 quote! {
-                    .with_unicode_range(::topcoat::font::UnicodeRanges::new(const { &[#(#entries),*] }))
+                    .with_unicode_range(#topcoat_font::UnicodeRanges::new(const { &[#(#entries),*] }))
                 }
             });
 
         quote! {{
-            const FAMILY: &'static ::topcoat::font::fontsource::Family = &#family_path;
+            const FAMILY: &'static #topcoat_font_fontsource::Family = &#family_path;
             const WEIGHT: u16 = #weight;
-            const STYLE: ::topcoat::font::fontsource::Style = #style;
-            const SUBSET: ::topcoat::font::fontsource::Subset = #subset;
-            const DISPLAY: ::topcoat::font::FontDisplay = #display;
+            const STYLE: #topcoat_font_fontsource::Style = #style;
+            const SUBSET: #topcoat_font_fontsource::Subset = #subset;
+            const DISPLAY: #topcoat_font::FontDisplay = #display;
             #(#checks)*
             #host_anchor
-            ::topcoat::font::FontFace::new(FAMILY.name, #src)
-                .with_weight(::topcoat::font::FontWeightRange::from_u16(WEIGHT, WEIGHT))
+            #topcoat_font::FontFace::new(FAMILY.name, #src)
+                .with_weight(#topcoat_font::FontWeightRange::from_u16(WEIGHT, WEIGHT))
                 .with_style(STYLE.as_font_style())
                 .with_display(DISPLAY)
                 #unicode_range

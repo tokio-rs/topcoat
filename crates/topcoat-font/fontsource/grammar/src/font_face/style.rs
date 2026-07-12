@@ -6,6 +6,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_font_fontsource;
 
 use topcoat_font_fontsource as runtime;
 
@@ -126,7 +127,7 @@ impl Parse for StyleValue {
 impl ToTokens for StyleValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let ident = &self.0;
-        quote::quote! { ::topcoat::font::fontsource::Style::#ident }.to_tokens(tokens);
+        quote::quote! { #topcoat_font_fontsource::Style::#ident }.to_tokens(tokens);
     }
 }
 

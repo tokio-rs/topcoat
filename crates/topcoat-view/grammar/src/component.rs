@@ -15,6 +15,8 @@ use syn::{
     visit_mut::{self, VisitMut},
 };
 
+use topcoat_core_grammar::paths::{topcoat_context, topcoat_view};
+
 use crate::component::{ComponentAttr, ComponentItem};
 
 /// A parsed `#[component] async fn ...`. Expands into:
@@ -67,7 +69,7 @@ impl ToTokens for Component {
         item.sig.generics.params.insert(0, parse_quote! { '__cx });
         item.sig
             .inputs
-            .insert(0, parse_quote! { __cx: &'__cx ::topcoat::context::Cx });
+            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
 
         // The `#[default]` and `#[into]` helper attributes are only meaningful to
         // the `Props` derive, which sees them on the generated struct's fields.
@@ -174,17 +176,17 @@ impl ToTokens for Component {
                 }
             }
 
-            impl #impl_generics ::topcoat::view::Component for #ident #ty_generics #where_clause {
+            impl #impl_generics #topcoat_view::Component for #ident #ty_generics #where_clause {
                 type Props = #props_ident #ty_generics;
 
-                async fn render(self, cx: &::topcoat::context::Cx, props: Self::Props) -> #return_ty {
+                async fn render(self, cx: &#topcoat_context::Cx, props: Self::Props) -> #return_ty {
                     #item
                     #ident(cx, #(#args),*).await
                 }
             }
 
             #(#attrs)*
-            #[derive(::topcoat::view::Props)]
+            #[derive(#topcoat_view::Props)]
             #vis struct #props_ident #impl_generics #where_clause {
                 #(#fields),*
             }

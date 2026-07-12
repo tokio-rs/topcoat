@@ -5,6 +5,7 @@ use syn::punctuated::Punctuated;
 use syn::{Expr, ExprLit, Lit, LitStr, Token};
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_view;
 
 /// The parsed body of a `class!` invocation. Lowers to a
 /// [`runtime::Class`](topcoat_view::Class).
@@ -54,7 +55,7 @@ impl ToTokens for Class {
         }
 
         let entries = entries_tuple(entries);
-        quote! { ::topcoat::view::Class(#entries) }.to_tokens(tokens);
+        quote! { #topcoat_view::Class(#entries) }.to_tokens(tokens);
     }
 }
 
@@ -141,9 +142,9 @@ impl ClassSegment {
         } else {
             quote! {
                 if #cond {
-                    ::topcoat::view::ClassBranch::Then(#value)
+                    #topcoat_view::ClassBranch::Then(#value)
                 } else {
-                    ::topcoat::view::ClassBranch::Else(#alt)
+                    #topcoat_view::ClassBranch::Else(#alt)
                 }
             }
         }

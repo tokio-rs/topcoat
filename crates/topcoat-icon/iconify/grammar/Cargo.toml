@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+topcoat-core-grammar.workspace = true
 topcoat-icon-iconify.workspace = true
 
 heck.workspace = true

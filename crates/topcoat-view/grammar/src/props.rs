@@ -5,6 +5,7 @@ use syn::{
     Attribute, Data, DeriveInput, Expr, Fields, GenericParam, Generics, Ident, Meta, Type,
     Visibility, ext::IdentExt, parse_quote,
 };
+use topcoat_core_grammar::paths::topcoat_view;
 
 /// A parsed `#[derive(Props)]` struct. Expands into a typestate builder where
 /// every field without `#[default]` must be set before `build()` becomes
@@ -248,7 +249,7 @@ impl ToTokens for Props {
             if let Some(state) = &field.state {
                 let ret_ty = builder_ty(&|_, other| {
                     if other == state {
-                        quote!(::topcoat::view::Set)
+                        quote!(#topcoat_view::Set)
                     } else {
                         other.to_token_stream()
                     }
@@ -302,6 +303,11 @@ impl ToTokens for Props {
         );
         let builder_fn_doc = format!(" Returns a [`{builder_ident}`] with no properties set.");
 
+        // Bound to a local because it is interpolated inside a `#(...)*`
+        // repetition below, where a bare `#topcoat_view` would expand to a `let`
+        // binding that cannot shadow the imported constant.
+        let is_set = quote!(#topcoat_view::IsSet);
+
         quote! {
             #members
 
@@ -324,7 +330,7 @@ impl ToTokens for Props {
                 /// `Default::default()`, or the `#[default(expr)]` expression.
                 #vis fn build(self) -> #ident #ty_generics
                 where
-                    #(#states: ::topcoat::view::IsSet,)*
+                    #(#states: #is_set,)*
                 {
                     #ident {
                         #(#build_fields)*
@@ -345,7 +351,7 @@ impl ToTokens for Props {
             }
 
             #[automatically_derived]
-            impl #impl_generics ::topcoat::view::Props for #ident #ty_generics #where_clause {
+            impl #impl_generics #topcoat_view::Props for #ident #ty_generics #where_clause {
                 type Builder = #unset_ty;
 
                 fn builder() -> Self::Builder {

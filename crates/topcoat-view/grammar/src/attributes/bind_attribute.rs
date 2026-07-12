@@ -5,6 +5,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::{
     attributes::{AttributeKey, AttributeWriter, WriteAttribute},
@@ -28,7 +29,7 @@ impl WriteView for BindAttribute {
         writer.write_expr(
             ExprKind::Attributes,
             quote! {
-                ::topcoat::runtime::BindAttribute::new(#key, #value)
+                #topcoat_runtime::BindAttribute::new(#key, #value)
             },
         );
     }

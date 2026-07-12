@@ -25,6 +25,7 @@ mod stmt;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
+use topcoat_core_grammar::paths::{topcoat_runtime, topcoat_view};
 
 use crate::expr::name_resolver::NameResolver;
 
@@ -56,7 +57,7 @@ impl Expr {
         Self::dispatch(&self.inner, &mut rust, &mut js, &mut names)?;
 
         if !matches!(self.inner, syn::Expr::Closure(..)) {
-            rust = quote! { ::topcoat::runtime::Surrogate::into_real(#rust) }
+            rust = quote! { #topcoat_runtime::Surrogate::into_real(#rust) }
         }
 
         // Identifiers referenced but not declared by the expression are
@@ -67,17 +68,17 @@ impl Expr {
 
         if externals.is_empty() {
             Ok(quote! {{
-                use ::topcoat::runtime::internal::*;
+                use #topcoat_runtime::internal::*;
 
-                let mut __parts = ::topcoat::view::ViewParts::new();
+                let mut __parts = #topcoat_view::ViewParts::new();
                 __js(&mut __parts, #js);
-                ::topcoat::runtime::Expr::new(#rust, ::topcoat::view::ViewPart::from(__parts))
+                #topcoat_runtime::Expr::new(#rust, #topcoat_view::ViewPart::from(__parts))
             }})
         } else {
             let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
             let rust_external_values = externals.iter().map(|binding| {
                 let ident = &binding.original_ident;
-                quote! { ::topcoat::runtime::Surrogated::into_surrogate(#ident) }
+                quote! { #topcoat_runtime::Surrogated::into_surrogate(#ident) }
             });
 
             let mut js_head = "(() => { const [".to_owned();
@@ -101,15 +102,15 @@ impl Expr {
             let js_tail = "]; return ".to_owned() + &js + "; })()";
 
             Ok(quote! {{
-                use ::topcoat::runtime::internal::*;
+                use #topcoat_runtime::internal::*;
 
                 let (#(#rust_external_idents,)*) = (#(#rust_external_values,)*);
-                let mut __parts = ::topcoat::view::ViewParts::new();
+                let mut __parts = #topcoat_view::ViewParts::new();
                 __js_unescaped(&mut __parts, #js_head);
                 #js_externals
                 let __rust = #rust;
                 __js(&mut __parts, #js_tail);
-                ::topcoat::runtime::Expr::new(__rust, ::topcoat::view::ViewPart::from(__parts))
+                #topcoat_runtime::Expr::new(__rust, #topcoat_view::ViewPart::from(__parts))
             }})
         }
     }

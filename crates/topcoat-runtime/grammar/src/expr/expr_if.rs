@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Expr as SynExpr, ExprIf};
+use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::expr::{Expr, name_resolver::NameResolver};
 
@@ -58,13 +59,13 @@ impl Expr {
         let if_token = &if_expr.if_token;
         let rust = if let Some(else_kw) = else_kw {
             quote! {
-                #if_token ::topcoat::runtime::Surrogate::into_real(#cond)
+                #if_token #topcoat_runtime::Surrogate::into_real(#cond)
                 #then_tokens
                 #else_kw #else_tokens
             }
         } else {
             quote! {
-                #if_token ::topcoat::runtime::Surrogate::into_real(#cond)
+                #if_token #topcoat_runtime::Surrogate::into_real(#cond)
                 #then_tokens
             }
         };

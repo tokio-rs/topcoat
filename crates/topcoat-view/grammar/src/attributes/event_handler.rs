@@ -6,6 +6,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::{
     attributes::{AttributeKey, AttributeWriter, WriteAttribute},
@@ -76,7 +77,7 @@ impl WriteView for EventHandler {
                 writer.write_expr(
                     ExprKind::Attributes,
                     quote! {
-                        ::topcoat::runtime::EventHandler::new(
+                        #topcoat_runtime::EventHandler::new(
                             #key,
                             #value,
                         )

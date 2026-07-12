@@ -4,6 +4,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Visibility;
 
+use topcoat_core_grammar::paths::{topcoat_icon, topcoat_view};
 use topcoat_icon_iconify::{IconSet, ResolvedIcon};
 
 use crate::{Selection, suggest::did_you_mean};
@@ -51,8 +52,8 @@ pub(crate) fn icon_expr(icon: &ResolvedIcon<'_>) -> TokenStream {
         ..
     } = icon;
     quote! {
-        ::topcoat::icon::IconData::unescaped_unchecked(
-            ::topcoat::view::svg::ViewBox::new(#left, #top, #width, #height),
+        #topcoat_icon::IconData::unescaped_unchecked(
+            #topcoat_view::svg::ViewBox::new(#left, #top, #width, #height),
             #body,
         )
     }
@@ -73,7 +74,7 @@ pub(crate) fn const_item(
     let expr = icon_expr(icon);
     quote! {
         #[doc = #doc]
-        #vis const #ident: ::topcoat::icon::IconData = #expr;
+        #vis const #ident: #topcoat_icon::IconData = #expr;
     }
 }
 
@@ -127,8 +128,8 @@ mod tests {
         let icon = resolve_icon(&set, "trash", Span::call_site()).unwrap();
 
         let expected = quote! {
-            ::topcoat::icon::IconData::unescaped_unchecked(
-                ::topcoat::view::svg::ViewBox::new(0f32, 0f32, 24f32, 24f32),
+            #topcoat_icon::IconData::unescaped_unchecked(
+                #topcoat_view::svg::ViewBox::new(0f32, 0f32, 24f32, 24f32),
                 "<path d=\"M1 1\"/>",
             )
         };

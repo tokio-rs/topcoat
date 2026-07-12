@@ -4,6 +4,7 @@ use syn::{
     ItemFn, LitStr,
     parse::{Parse, ParseStream},
 };
+use topcoat_core_grammar::paths::{topcoat_inventory, topcoat_router};
 
 pub struct LayerAttr {
     path: Option<LitStr>,
@@ -59,7 +60,7 @@ impl ToTokens for Layer {
                 #[allow(clippy::unused_async)]
                 #item
                 Box::pin(async move {
-                    ::topcoat::router::IntoResponse::into_response(#ident(cx, body, next).await?, cx)
+                    #topcoat_router::IntoResponse::into_response(#ident(cx, body, next).await?, cx)
                 })
             }
         };
@@ -67,21 +68,21 @@ impl ToTokens for Layer {
         if let Some(path) = attr.path.as_ref() {
             quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: ::topcoat::router::LayerFn = ::topcoat::router::LayerFn::new(
-                    ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
+                const #ident: #topcoat_router::LayerFn = #topcoat_router::LayerFn::new(
+                    ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );
             }
         } else {
             quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: ::topcoat::router::ModuleLayerFn = ::topcoat::router::ModuleLayerFn::new(module_path!(), #render);
+                const #ident: #topcoat_router::ModuleLayerFn = #topcoat_router::ModuleLayerFn::new(module_path!(), #render);
             }
         }
         .to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { ::topcoat::internal::inventory::submit! { #ident } }.to_tokens(tokens);
+            quote! { #topcoat_inventory::submit! { #ident } }.to_tokens(tokens);
         }
     }
 }

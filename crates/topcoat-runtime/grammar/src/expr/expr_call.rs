@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Expr as SynExpr, ExprCall, Token, punctuated::Punctuated};
+use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::expr::{Expr, name_resolver::NameResolver};
 
@@ -22,18 +23,17 @@ impl Expr {
             let path_arguments = &segment.arguments;
             match segment.ident.to_string().as_str() {
                 "Some" => {
-                    quote! { ::topcoat::runtime::Option #path_arguments ::some }.to_tokens(rust);
+                    quote! { #topcoat_runtime::Option #path_arguments ::some }.to_tokens(rust);
                     *js += "cx.some";
                     return Self::args(args, rust, js, names);
                 }
                 "Ok" => {
-                    quote! { ::topcoat::runtime::Result #path_arguments ::from_ok }.to_tokens(rust);
+                    quote! { #topcoat_runtime::Result #path_arguments ::from_ok }.to_tokens(rust);
                     *js += "cx.ok";
                     return Self::args(args, rust, js, names);
                 }
                 "Err" => {
-                    quote! { ::topcoat::runtime::Result #path_arguments ::from_err }
-                        .to_tokens(rust);
+                    quote! { #topcoat_runtime::Result #path_arguments ::from_err }.to_tokens(rust);
                     *js += "cx.err";
                     return Self::args(args, rust, js, names);
                 }

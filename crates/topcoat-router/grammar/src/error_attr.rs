@@ -7,6 +7,7 @@ use syn::{
     spanned::Spanned,
     token::Paren,
 };
+use topcoat_core_grammar::paths::topcoat_router;
 
 mod kw {
     syn::custom_keyword!(error);
@@ -38,13 +39,13 @@ impl ErrorAttr {
     /// The router error type the constructor produces.
     pub fn ty(&self) -> TokenStream {
         match self.kind {
-            ErrorKind::BadRequest(_) => quote! { ::topcoat::router::BadRequestError },
-            ErrorKind::Forbidden(_) => quote! { ::topcoat::router::ForbiddenError },
-            ErrorKind::NotFound(_) => quote! { ::topcoat::router::NotFoundError },
+            ErrorKind::BadRequest(_) => quote! { #topcoat_router::BadRequestError },
+            ErrorKind::Forbidden(_) => quote! { #topcoat_router::ForbiddenError },
+            ErrorKind::NotFound(_) => quote! { #topcoat_router::NotFoundError },
             ErrorKind::Redirect(_) | ErrorKind::RedirectPermanent(_) => {
-                quote! { ::topcoat::router::RedirectError }
+                quote! { #topcoat_router::RedirectError }
             }
-            ErrorKind::Unauthorized(_) => quote! { ::topcoat::router::UnauthorizedError },
+            ErrorKind::Unauthorized(_) => quote! { #topcoat_router::UnauthorizedError },
         }
     }
 
@@ -61,7 +62,7 @@ impl ErrorAttr {
         } else {
             let name = self.kind.keyword();
             let args = &self.args;
-            quote! { |_| ::topcoat::router::#name(#(#args),*) }
+            quote! { |_| #topcoat_router::#name(#(#args),*) }
         };
         quote! { .map_err(#handler) }
     }

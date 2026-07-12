@@ -8,6 +8,7 @@ use syn::{
     punctuated::Punctuated,
 };
 use topcoat_core_grammar::QuoteOption;
+use topcoat_core_grammar::paths::{topcoat_inventory, topcoat_router};
 
 pub struct Segment {
     attrs: Punctuated<SegmentAttr, Token![,]>,
@@ -50,13 +51,13 @@ impl ToTokens for Segment {
             let rename = self.find_rename();
 
             let kind =
-                QuoteOption::new(kind.map(|kind| quote! { ::topcoat::router::SegmentKind::#kind }));
+                QuoteOption::new(kind.map(|kind| quote! { #topcoat_router::SegmentKind::#kind }));
             let rename = QuoteOption::new(
                 rename.map(|rename| quote! { ::std::borrow::Cow::Borrowed(#rename) }),
             );
             quote! {
-                ::topcoat::internal::inventory::submit! {
-                    ::topcoat::router::Segment::new(
+                #topcoat_inventory::submit! {
+                    #topcoat_router::Segment::new(
                         module_path!(),
                         #kind,
                         #rename,

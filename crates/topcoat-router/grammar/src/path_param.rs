@@ -5,6 +5,7 @@ use syn::{
     Data, DeriveInput, Fields, Type,
     parse::{Parse, ParseStream},
 };
+use topcoat_core_grammar::paths::{topcoat_context, topcoat_router};
 
 use super::error_attr::ErrorAttr;
 
@@ -127,10 +128,10 @@ impl ToTokens for PathParam {
                 quote! { &'__cx str },
                 quote! {
                     fn path_param(
-                        cx: &::topcoat::context::Cx,
-                        _: ::topcoat::router::PathParamSealed,
+                        cx: &#topcoat_context::Cx,
+                        _: #topcoat_router::PathParamSealed,
                     ) -> Self::Output<'_> {
-                        for (key, value) in ::topcoat::router::raw_path_params(cx) {
+                        for (key, value) in #topcoat_router::raw_path_params(cx) {
                             if key == #name_string {
                                 return value;
                             }
@@ -145,7 +146,7 @@ impl ToTokens for PathParam {
                     let default = format!("invalid value for path parameter \"{name_string}\"");
                     (
                         error.ty(),
-                        error.map_err(quote! { |_| ::topcoat::router::bad_request(#default) }),
+                        error.map_err(quote! { |_| #topcoat_router::bad_request(#default) }),
                     )
                 }
                 None => (
@@ -159,12 +160,12 @@ impl ToTokens for PathParam {
                 },
                 quote! {
                     fn path_param(
-                        cx: &::topcoat::context::Cx,
-                        _: ::topcoat::router::PathParamSealed,
+                        cx: &#topcoat_context::Cx,
+                        _: #topcoat_router::PathParamSealed,
                     ) -> Self::Output<'_> {
-                        #[::topcoat::context::memoize]
-                        fn parse(cx: &::topcoat::context::Cx) -> ::core::result::Result<#ident #ty_generics, <#inner_ty as ::core::str::FromStr>::Err> {
-                            for (key, value) in ::topcoat::router::raw_path_params(cx) {
+                        #[#topcoat_context::memoize]
+                        fn parse(cx: &#topcoat_context::Cx) -> ::core::result::Result<#ident #ty_generics, <#inner_ty as ::core::str::FromStr>::Err> {
+                            for (key, value) in #topcoat_router::raw_path_params(cx) {
                                 if key == #name_string {
                                     return ::core::str::FromStr::from_str(value).map(#ident);
                                 }
@@ -180,13 +181,13 @@ impl ToTokens for PathParam {
         quote! {
             #item
 
-            impl #impl_generics ::topcoat::router::PathParam for #ident #ty_generics #where_clause {
+            impl #impl_generics #topcoat_router::PathParam for #ident #ty_generics #where_clause {
                 type Output<'__cx> = #output_ty;
 
                 #path_param_fn
             }
 
-            ::topcoat::router::segment!(kind = Param, rename = #name_string);
+            #topcoat_router::segment!(kind = Param, rename = #name_string);
         }
         .to_tokens(tokens);
     }

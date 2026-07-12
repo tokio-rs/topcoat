@@ -6,6 +6,9 @@ use syn::{
     parse_quote,
     spanned::Spanned,
 };
+use topcoat_core_grammar::paths::{
+    topcoat_context, topcoat_inventory, topcoat_router, topcoat_view,
+};
 
 use super::handler_args::{HandlerArg, HandlerArgs, request_ident};
 
@@ -84,8 +87,8 @@ impl ToTokens for Page {
         let body_param = args.request().map(|ty| quote! { , body: #ty });
         let body_arg = args.request().map(|_| quote! { , body });
         quote! {
-            #[::topcoat::view::component]
-            #vis async fn #ident(cx: &::topcoat::context::Cx #body_param) #output {
+            #[#topcoat_view::component]
+            #vis async fn #ident(cx: &#topcoat_context::Cx #body_param) #output {
                 #ident::handler(cx #body_arg).await
             }
         }
@@ -102,7 +105,7 @@ impl ToTokens for Page {
         inner
             .sig
             .inputs
-            .insert(0, parse_quote! { __cx: &'__cx ::topcoat::context::Cx });
+            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
         inner
             .attrs
             .push(parse_quote! { #[allow(clippy::unused_async)] });
@@ -117,7 +120,7 @@ impl ToTokens for Page {
         });
         let handler = quote! {
             impl #ident {
-                async fn handler(cx: &::topcoat::context::Cx #body_param) #output {
+                async fn handler(cx: &#topcoat_context::Cx #body_param) #output {
                     #ident(cx #(, #forward_args)*).await
                 }
             }
@@ -129,7 +132,7 @@ impl ToTokens for Page {
         let parse_request = args.request().map(|request_ty| {
             let request_ident = request_ident();
             quote! {
-                let #request_ident = <#request_ty as ::topcoat::router::FromRequest>::from_request(cx, body).await?;
+                let #request_ident = <#request_ty as #topcoat_router::FromRequest>::from_request(cx, body).await?;
             }
         });
         let call_args = args.call_args();
@@ -146,12 +149,12 @@ impl ToTokens for Page {
         // `static`, requiring a const initializer).
         let erased = if let Some(path) = attr.path.as_ref() {
             quote! {
-                const ERASED: ::topcoat::router::PageFn = ::topcoat::router::PageFn::new(
-                    ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
+                const ERASED: #topcoat_router::PageFn = #topcoat_router::PageFn::new(
+                    ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );
 
-                impl ::core::convert::From<#ident> for ::topcoat::router::PageFn {
+                impl ::core::convert::From<#ident> for #topcoat_router::PageFn {
                     fn from(_: #ident) -> Self {
                         ERASED
                     }
@@ -159,10 +162,10 @@ impl ToTokens for Page {
             }
         } else {
             quote! {
-                const ERASED: ::topcoat::router::ModulePageFn =
-                    ::topcoat::router::ModulePageFn::new(module_path!(), #render);
+                const ERASED: #topcoat_router::ModulePageFn =
+                    #topcoat_router::ModulePageFn::new(module_path!(), #render);
 
-                impl ::core::convert::From<#ident> for ::topcoat::router::ModulePageFn {
+                impl ::core::convert::From<#ident> for #topcoat_router::ModulePageFn {
                     fn from(_: #ident) -> Self {
                         ERASED
                     }
@@ -170,8 +173,8 @@ impl ToTokens for Page {
             }
         };
 
-        let submit = cfg!(feature = "discover")
-            .then(|| quote! { ::topcoat::internal::inventory::submit! { ERASED } });
+        let submit =
+            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { ERASED } });
 
         quote! {
             const _: () = {

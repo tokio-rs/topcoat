@@ -6,6 +6,10 @@ pub use item::*;
 
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
+use topcoat_core_grammar::paths::{
+    topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_runtime,
+    topcoat_view,
+};
 use uuid::Uuid;
 
 use crate::shard::{ShardAttr, ShardItem};
@@ -80,10 +84,14 @@ impl ToTokens for Shard {
         let call_args: Vec<_> = call_args.collect();
 
         // The component face takes each value parameter as an `Expr<T>`.
-        let cx_param = has_cx.then(|| quote!(cx: &::topcoat::context::Cx,));
+        let cx_param = has_cx.then(|| quote!(cx: &#topcoat_context::Cx,));
+        // Bound to a local because it is interpolated inside the `#(...)*`
+        // repetition below, where a bare `#topcoat_runtime` would expand to a
+        // `let` binding that cannot shadow the imported constant.
+        let expr_ty = quote!(#topcoat_runtime::Expr);
         let component_params = quote! {
             #cx_param
-            #(#value_idents: ::topcoat::runtime::Expr<#value_tys>,)*
+            #(#value_idents: #expr_ty<#value_tys>,)*
         };
 
         let impl_ident = format_ident!("__topcoat_shard_impl_{}", ident);
@@ -99,18 +107,18 @@ impl ToTokens for Shard {
             // Component face: renders the shard inline, splitting each `Expr<T>`
             // into its evaluated value (for the initial server render) and its
             // JavaScript source (tracked by the browser).
-            #[::topcoat::view::component]
-            #vis async fn #ident(#component_params) -> ::topcoat::Result<::topcoat::view::View> {
+            #[#topcoat_view::component]
+            #vis async fn #ident(#component_params) -> #topcoat_error::Result<#topcoat_view::View> {
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
                 let __placeholder = #impl_ident(#(#call_args),*).await?;
-                let __scope = ::topcoat::runtime::ReactiveScope::new(
-                    ::topcoat::runtime::ShardId::new(#id),
+                let __scope = #topcoat_runtime::ReactiveScope::new(
+                    #topcoat_runtime::ShardId::new(#id),
                     ::std::vec![#(#js_idents),*],
                     __placeholder,
                 );
-                ::topcoat::view::view! { (__scope) }
+                #topcoat_view::view! { (__scope) }
             }
         }
         .to_tokens(tokens);
@@ -123,23 +131,23 @@ impl ToTokens for Shard {
         quote! {
             #[doc(hidden)]
             #[allow(non_upper_case_globals)]
-            const #erased_ident: ::topcoat::runtime::ErasedShard =
-                ::topcoat::runtime::ErasedShard::new(
-                    ::topcoat::runtime::ShardId::new(#id),
+            const #erased_ident: #topcoat_runtime::ErasedShard =
+                #topcoat_runtime::ErasedShard::new(
+                    #topcoat_runtime::ShardId::new(#id),
                     |cx, body| ::std::boxed::Box::pin(async move {
                         type __Surrogate =
-                            <(#(#value_tys,)*) as ::topcoat::runtime::Surrogated>::Surrogate;
-                        let ::topcoat::router::Json(__args) =
-                            <::topcoat::router::Json<__Surrogate> as ::topcoat::router::FromRequest>
+                            <(#(#value_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
+                        let #topcoat_router::Json(__args) =
+                            <#topcoat_router::Json<__Surrogate> as #topcoat_router::FromRequest>
                                 ::from_request(cx, body).await?;
                         let (#(#value_idents,)*) =
-                            ::topcoat::runtime::Surrogate::into_real(__args);
+                            #topcoat_runtime::Surrogate::into_real(__args);
                         let __view = #impl_ident(#(#call_args),*).await?;
-                        ::topcoat::Result::Ok(__view)
+                        #topcoat_error::Result::Ok(__view)
                     }),
                 );
 
-            impl ::core::convert::From<#ident> for ::topcoat::runtime::ErasedShard {
+            impl ::core::convert::From<#ident> for #topcoat_runtime::ErasedShard {
                 fn from(_: #ident) -> Self {
                     #erased_ident
                 }
@@ -149,7 +157,7 @@ impl ToTokens for Shard {
 
         if cfg!(feature = "discover") {
             quote! {
-                ::topcoat::internal::inventory::submit! { #erased_ident }
+                #topcoat_inventory::submit! { #erased_ident }
             }
             .to_tokens(tokens);
         }

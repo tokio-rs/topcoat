@@ -6,6 +6,7 @@ use syn::{
 };
 
 use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::view::{ExprKind, ViewWriter, WriteView};
 
@@ -30,11 +31,11 @@ impl WriteView for SignalDeclaration {
         writer.let_binding(&parse_quote! { #ident }, expr);
         writer.let_binding(
             &parse_quote! { #ident },
-            &parse_quote! { &::topcoat::runtime::Signal::new(#ident) },
+            &parse_quote! { &#topcoat_runtime::Signal::new(#ident) },
         );
         writer.write_expr(
             ExprKind::Node,
-            quote! { ::topcoat::runtime::SignalDeclaration::new(#ident) },
+            quote! { #topcoat_runtime::SignalDeclaration::new(#ident) },
         );
     }
 }

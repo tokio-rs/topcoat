@@ -6,6 +6,9 @@ use syn::{
     parse_quote,
     spanned::Spanned,
 };
+use topcoat_core_grammar::paths::{
+    topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_view,
+};
 
 pub struct LayoutAttr {
     path: Option<LitStr>,
@@ -128,12 +131,12 @@ impl ToTokens for Layout {
         let component_args = args.iter().map(|arg| match arg {
             LayoutArg::Cx => quote! { cx },
             LayoutArg::Slot => quote! {
-                ::std::boxed::Box::pin(::std::future::ready(::topcoat::Result::Ok(slot)))
+                ::std::boxed::Box::pin(::std::future::ready(#topcoat_error::Result::Ok(slot)))
             },
         });
         quote! {
-            #[::topcoat::view::component]
-            #vis async fn #ident(cx: &::topcoat::context::Cx, slot: ::topcoat::view::View) #output {
+            #[#topcoat_view::component]
+            #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_view::View) #output {
                 #ident::handler(cx #(, #component_args)*).await
             }
         }
@@ -156,7 +159,7 @@ impl ToTokens for Layout {
         handler
             .sig
             .inputs
-            .insert(0, parse_quote! { __cx: &'__cx ::topcoat::context::Cx });
+            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
         handler
             .attrs
             .push(parse_quote! { #[allow(clippy::unused_async)] });
@@ -178,12 +181,12 @@ impl ToTokens for Layout {
         // `static`, requiring a const initializer).
         let erased = if let Some(path) = attr.path.as_ref() {
             quote! {
-                const ERASED: ::topcoat::router::LayoutFn = ::topcoat::router::LayoutFn::new(
-                    ::std::borrow::Cow::Borrowed(::topcoat::router::Path::new(#path)),
+                const ERASED: #topcoat_router::LayoutFn = #topcoat_router::LayoutFn::new(
+                    ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );
 
-                impl ::core::convert::From<#ident> for ::topcoat::router::LayoutFn {
+                impl ::core::convert::From<#ident> for #topcoat_router::LayoutFn {
                     fn from(_: #ident) -> Self {
                         ERASED
                     }
@@ -191,10 +194,10 @@ impl ToTokens for Layout {
             }
         } else {
             quote! {
-                const ERASED: ::topcoat::router::ModuleLayoutFn =
-                    ::topcoat::router::ModuleLayoutFn::new(module_path!(), #render);
+                const ERASED: #topcoat_router::ModuleLayoutFn =
+                    #topcoat_router::ModuleLayoutFn::new(module_path!(), #render);
 
-                impl ::core::convert::From<#ident> for ::topcoat::router::ModuleLayoutFn {
+                impl ::core::convert::From<#ident> for #topcoat_router::ModuleLayoutFn {
                     fn from(_: #ident) -> Self {
                         ERASED
                     }
@@ -202,8 +205,8 @@ impl ToTokens for Layout {
             }
         };
 
-        let submit = cfg!(feature = "discover")
-            .then(|| quote! { ::topcoat::internal::inventory::submit! { ERASED } });
+        let submit =
+            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { ERASED } });
 
         quote! {
             const _: () = {

@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{ExprPath, PathArguments, PathSegment};
+use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::expr::{
     Expr,
@@ -36,9 +37,9 @@ impl Expr {
         if ident == "None" {
             js.push_str("cx.none()");
             let ctor = match arguments {
-                PathArguments::None => quote! { ::topcoat::runtime::Option::<_>::none },
+                PathArguments::None => quote! { #topcoat_runtime::Option::<_>::none },
                 PathArguments::AngleBracketed(arguments) => {
-                    quote! { ::topcoat::runtime::Option #arguments ::none }
+                    quote! { #topcoat_runtime::Option #arguments ::none }
                 }
                 PathArguments::Parenthesized(_) => unreachable!("rejected above"),
             };

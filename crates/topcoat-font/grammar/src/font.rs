@@ -5,6 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Brace,
 };
+use topcoat_core_grammar::paths::topcoat_font;
 
 use crate::font_face::FontFace;
 
@@ -43,19 +44,19 @@ impl ToTokens for Font {
                     .iter()
                     .map(|block| block.face.to_tokens_with_family(family));
                 quote! {
-                    ::topcoat::font::FontData::new(#family, ::std::vec![#(#faces),*])
+                    #topcoat_font::FontData::new(#family, ::std::vec![#(#faces),*])
                 }
             }
             FontFaces::Expr(faces) => {
-                quote! { ::topcoat::font::FontData::new(#family, #faces) }
+                quote! { #topcoat_font::FontData::new(#family, #faces) }
             }
         };
 
         quote! {{
-            static FONT_DATA: ::std::sync::LazyLock<::topcoat::font::FontData> =
+            static FONT_DATA: ::std::sync::LazyLock<#topcoat_font::FontData> =
                 ::std::sync::LazyLock::new(|| #data);
-            const FONT: ::topcoat::font::Font = ::topcoat::font::Font::new(&FONT_DATA);
-            ::topcoat::font::register_font!(FONT);
+            const FONT: #topcoat_font::Font = #topcoat_font::Font::new(&FONT_DATA);
+            #topcoat_font::register_font!(FONT);
             FONT
         }}
         .to_tokens(tokens);
