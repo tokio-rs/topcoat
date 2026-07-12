@@ -22,6 +22,7 @@ members = [
     "crates/topcoat-runtime/macro",
     "crates/topcoat-tailwind",
     "crates/topcoat-ui",
+    "crates/topcoat-ui/registry",
     "crates/topcoat-view",
     "crates/topcoat-view/macro",
 
@@ -94,6 +95,7 @@ topcoat-runtime = { path = "crates/topcoat-runtime" }
 topcoat-runtime-macro = { path = "crates/topcoat-runtime/macro" }
 topcoat-tailwind = { path = "crates/topcoat-tailwind" }
 topcoat-ui = { path = "crates/topcoat-ui" }
+topcoat-ui-registry = { path = "crates/topcoat-ui/registry" }
 topcoat-view = { path = "crates/topcoat-view" }
 topcoat-view-macro = { path = "crates/topcoat-view/macro" }
 

@@ -10,9 +10,9 @@ use super::package::Package;
 ///
 /// A registry is a crate, referenced by name. To be used as a registry a crate
 /// must (a) be reachable in the package's dependency graph and (b) be a *direct*
-/// dependency declared in the package's `Cargo.toml`. The built-in `topcoat`
-/// registry is no exception: every Topcoat project depends on `topcoat` directly,
-/// so it satisfies these rules like any other registry.
+/// dependency declared in the package's `Cargo.toml`. The built-in
+/// `topcoat-ui-registry` is no exception: it must be declared as a direct
+/// dependency to be used, like any other registry.
 pub(super) struct Workspace {
     /// Every resolved package, indexed by crate name.
     packages: HashMap<String, MetadataPackage>,

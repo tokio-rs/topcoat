@@ -14,9 +14,9 @@ pub const MANIFEST_FILE: &str = "registry.toml";
 pub const MANIFEST_VERSION: u32 = 1;
 
 /// The crate name of the registry used when a project does not specify one: the
-/// `topcoat` facade crate, which carries the default component registry and is
-/// always a direct dependency of a Topcoat project.
-pub const DEFAULT_REGISTRY_CRATE: &str = "topcoat";
+/// `topcoat-ui-registry` crate, which carries the built-in component registry.
+/// Like any registry, it must be a direct dependency of the project to be used.
+pub const DEFAULT_REGISTRY_CRATE: &str = "topcoat-ui-registry";
 
 /// The parsed `registry.toml` manifest. Written by hand: it records no hashes,
 /// since a component's hash is computed from its source (see [`content_hash`]).

@@ -101,12 +101,6 @@ full = [
 	"view",
 ]
 
-# Declares this crate as a topcoat-ui component registry: `topcoat ui` reads the
-# `registry.toml` (and component sources) under this directory, relative to the
-# crate root. A crate is usable as a registry only if it carries this key.
-[package.metadata.topcoat-ui]
-registry = "src/ui"
-
 [dependencies]
 topcoat-asset = { workspace = true, optional = true }
 topcoat-cookie = { workspace = true, optional = true }
