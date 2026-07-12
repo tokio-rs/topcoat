@@ -64,6 +64,7 @@ impl Crate {
 
     /// The resolved crate path as a string, for contexts that need a string
     /// literal rather than tokens -- such as `#[serde(crate = "...")]`.
+    #[must_use]
     pub fn path_string(&self) -> String {
         resolve(self)
     }
@@ -88,53 +89,48 @@ impl ToTokens for Crate {
 /// cannot tell a dev-dependency from a real one). Only a caller that depends on
 /// the facade alone -- an application crate -- falls through to the facade path.
 fn resolve(krate: &Crate) -> String {
-    if let Some(base) = package(krate.package) {
-        return if krate.module.is_empty() {
-            base
-        } else {
-            format!("{base}::{}", krate.module)
-        };
+    if let Some(base) = crate_base(krate.package) {
+        return join(&base, krate.module);
     }
 
-    if let Some(base) = facade() {
-        return if krate.facade.is_empty() {
-            base.to_owned()
-        } else {
-            format!("{base}::{}", krate.facade)
-        };
+    if let Some(base) = crate_base("topcoat") {
+        return join(&base, krate.facade);
     }
 
     // Neither the crate nor the facade is a declared dependency (as in a grammar
     // crate's own unit tests). Fall back to the bare underscored crate name.
-    let base = format!("::{}", krate.package.replace('-', "_"));
-    if krate.module.is_empty() {
-        base
+    join(
+        &format!("::{}", krate.package.replace('-', "_")),
+        krate.module,
+    )
+}
+
+/// Joins a resolved crate base with a submodule path, e.g. `("::topcoat",
+/// "view")` becomes `"::topcoat::view"`. An empty submodule leaves the base
+/// untouched, as for the facade root or a crate referred to at its top level.
+fn join(base: &str, submodule: &str) -> String {
+    if submodule.is_empty() {
+        base.to_owned()
     } else {
-        format!("{base}::{}", krate.module)
+        format!("{base}::{submodule}")
     }
 }
 
-/// The base path to the `topcoat` facade: `::topcoat`, or `crate` when the
-/// facade itself is being compiled. `None` when the crate being compiled does
-/// not depend on the facade.
+/// The base path to `package` when it is a direct dependency of the crate being
+/// compiled: `::renamed` under whatever name the dependent gives it, or the
+/// crate's own extern name when it *is* that crate. `None` when it is not a
+/// dependency.
+///
+/// The self-referential case names the crate `::topcoat_view` rather than
+/// `crate`, because `crate_name` reports `Itself` even inside a doctest -- which
+/// is compiled as a *separate* crate that links the real one as an extern, where
+/// `crate` would point at the doctest binary. Each framework crate carries an
+/// `extern crate self as topcoat_...;` alias so that this same extern name also
+/// resolves within its own non-doctest builds. See the [module docs](self).
 ///
 /// One `rustc` process compiles one crate, so the answer is fixed for the whole
-/// compilation; it is resolved once and cached.
-fn facade() -> Option<&'static str> {
-    static CACHE: OnceLock<Option<String>> = OnceLock::new();
-    CACHE
-        .get_or_init(|| match crate_name("topcoat") {
-            Ok(FoundCrate::Itself) => Some("crate".to_owned()),
-            Ok(FoundCrate::Name(name)) => Some(format!("::{name}")),
-            Err(_) => None,
-        })
-        .as_deref()
-}
-
-/// The base path to a standalone crate when it is a direct dependency of the
-/// crate being compiled: `crate` when it *is* that crate, or `::renamed`
-/// otherwise. `None` when it is not a dependency. Cached per package name.
-fn package(package: &'static str) -> Option<String> {
+/// compilation; it is resolved once per package and cached.
+fn crate_base(package: &'static str) -> Option<String> {
     static CACHE: OnceLock<Mutex<HashMap<&'static str, Option<String>>>> = OnceLock::new();
     CACHE
         .get_or_init(Mutex::default)
@@ -142,7 +138,7 @@ fn package(package: &'static str) -> Option<String> {
         .expect("crate path cache is not poisoned")
         .entry(package)
         .or_insert_with(|| match crate_name(package) {
-            Ok(FoundCrate::Itself) => Some("crate".to_owned()),
+            Ok(FoundCrate::Itself) => Some(format!("::{}", package.replace('-', "_"))),
             Ok(FoundCrate::Name(name)) => Some(format!("::{name}")),
             Err(_) => None,
         })

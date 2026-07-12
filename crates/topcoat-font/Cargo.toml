@@ -29,7 +29,7 @@ topcoat-view-macro = { workspace = true, optional = true }
 inventory = { workspace = true, optional = true }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["font"] }
+topcoat = { workspace = true, features = ["view", "asset", "font-fontsource"] }
 
 [lints]
 workspace = true
