@@ -5,11 +5,11 @@ edition.workspace = true
 
 [dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
-topcoat = { workspace = true, features = ["font-fontsource", "tailwind", "ui"] }
+topcoat = { workspace = true, features = ["font-fontsource", "icon-iconify", "tailwind", "ui"] }
 
 [build-dependencies]
 # We cannot use `workspace = true` with `default-features = false`.
-topcoat = { path = "../../crates/topcoat/", default-features = false, features = ["tailwind"] }
+topcoat = { path = "../../crates/topcoat/", default-features = false, features = ["icon-iconify", "tailwind"] }
 
 [dev-dependencies]
 topcoat-ui.workspace = true

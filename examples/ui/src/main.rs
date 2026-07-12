@@ -4,26 +4,12 @@ use components::button::{ButtonSize, ButtonVariant, button, button_variants};
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
-    font::{Font, fontsource::fontsource_font},
-    icon::{IconData, icon},
+    font::fontsource::fontsource_font,
+    icon::{icon, iconify},
     router::{Router, RouterBuilderDiscoverExt, page},
     tailwind,
-    view::{View, attributes, component, svg::ViewBox, view},
+    view::{View, attributes, component, view},
 };
-
-// The neutral theme sets Lexend as its sans-serif family but does not bundle
-// the files; topcoat-font provides them from the Fontsource catalog.
-const LEXEND: Font = fontsource_font!(LEXEND);
-
-const ARROW_RIGHT: IconData = IconData::unescaped_unchecked(
-    ViewBox::new(0.0, 0.0, 24.0, 24.0),
-    r#"<path fill="currentColor" d="M4,11V13H16L10.5,18.5L11.92,19.92L19.84,12L11.92,4.08L10.5,5.5L16,11H4Z"/>"#,
-);
-
-const PLUS: IconData = IconData::unescaped_unchecked(
-    ViewBox::new(0.0, 0.0, 24.0, 24.0),
-    r#"<path fill="currentColor" d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>"#,
-);
 
 #[tokio::main]
 async fn main() {
@@ -43,7 +29,7 @@ async fn home() -> Result {
             <head>
                 <title>"Topcoat UI"</title>
                 topcoat::dev::script()
-                topcoat::font::link(font: LEXEND)
+                topcoat::font::link(font: fontsource_font!(LEXEND, host: Asset))
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
             </head>
             // The body's background, text color, and font come from the
@@ -60,7 +46,7 @@ async fn home() -> Result {
                         button(
                             size: ButtonSize::Lg,
                             "Get started"
-                            icon(data: ARROW_RIGHT)
+                            icon(data: iconify::iconify_icon!("lucide:arrow-right"))
                         )
                         // Anything can borrow a button's looks: `button_variants`
                         // returns the class string for a variant and size.
@@ -102,10 +88,12 @@ async fn home() -> Result {
                         button(
                             size: ButtonSize::Icon,
                             variant: ButtonVariant::Outline,
-                            icon(data: PLUS, label: "Add item")
+                            icon(
+                                data: iconify::iconify_icon!("lucide:plus"),
+                                label: "Add item"
+                            )
                         )
                     )
-
                     showcase(
                         title: "Disabled",
                         description: "Extra attributes forward to the underlying \
