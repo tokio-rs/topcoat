@@ -1,255 +1,87 @@
-/* -------------------------------------------------------------------------
-   THIRD-PARTY NOTICES
+/* Neutral, the built-in Topcoat theme: a graphite palette set in Lexend.
 
-   This file vendors CSS from the MIT-licensed projects below. Topcoat projects
-   have no node_modules, so the CSS is inlined here rather than imported from npm
-   (the Geist font is not bundled here; set it up separately with topcoat-font).
-   The copyright and permission notices are retained as the MIT License requires.
+   The theme is a small set of design tokens. Components refer to tokens only,
+   never to raw colors, so a project restyles itself by editing the values in
+   `:root` and `.dark` below.
 
-     - shadcn/ui:      Copyright (c) 2023 shadcn
-       https://github.com/shadcn-ui/ui
+     --background              the page background
+     --foreground              text and iconography on the background
+     --muted-foreground        secondary text: captions, descriptions, placeholders
+     --primary                 the emphasis color: primary actions, selection, highlights
+     --primary-foreground      text on a primary-filled surface
+     --destructive             destructive actions and error states
+     --destructive-foreground  text on a destructive-filled surface
+     --border                  hairline borders and dividers
+     --ring                    the focus ring
+     --shadow-xs               a subtle shadow for controls: buttons, inputs
+     --shadow-sm               a shadow for raised surfaces: cards, menus
 
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
+   Interactive states (hover, press) have no tokens of their own: components
+   derive them by applying the fill or foreground color at reduced opacity,
+   which adapts to both color schemes automatically.
 
-   The above copyright notice and this permission notice shall be included in all
-   copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE.
-   ------------------------------------------------------------------------- */
+   The Lexend font is not bundled here; provide it with topcoat-font. */
 
 @import "tailwindcss";
-
-/* shadcn/tailwind.css: base keyframes, data-state variants, utilities. */
-@theme inline {
-  @keyframes accordion-down {
-    from {
-      height: 0;
-    }
-    to {
-      height: var(
-        --radix-accordion-content-height,
-        var(--accordion-panel-height, auto)
-      );
-    }
-  }
-
-  @keyframes accordion-up {
-    from {
-      height: var(
-        --radix-accordion-content-height,
-        var(--accordion-panel-height, auto)
-      );
-    }
-    to {
-      height: 0;
-    }
-  }
-}
-
-/* Custom variants */
-@custom-variant data-open {
-  &:where([data-state="open"]),
-  &:where([data-open]:not([data-open="false"])) {
-    @slot;
-  }
-}
-
-@custom-variant data-closed {
-  &:where([data-state="closed"]),
-  &:where([data-closed]:not([data-closed="false"])) {
-    @slot;
-  }
-}
-
-@custom-variant data-checked {
-  &:where([data-state="checked"]),
-  &:where([data-checked]:not([data-checked="false"])) {
-    @slot;
-  }
-}
-
-@custom-variant data-unchecked {
-  &:where([data-state="unchecked"]),
-  &:where([data-unchecked]:not([data-unchecked="false"])) {
-    @slot;
-  }
-}
-
-@custom-variant data-selected {
-  &:where([data-selected="true"]) {
-    @slot;
-  }
-}
-
-@custom-variant data-disabled {
-  &:where([data-disabled="true"]),
-  &:where([data-disabled]:not([data-disabled="false"])) {
-    @slot;
-  }
-}
-
-@custom-variant data-active {
-  &:where([data-state="active"]),
-  &:where([data-active]:not([data-active="false"])) {
-    @slot;
-  }
-}
-
-@custom-variant data-horizontal {
-  &:where([data-orientation="horizontal"]) {
-    @slot;
-  }
-}
-
-@custom-variant data-vertical {
-  &:where([data-orientation="vertical"]) {
-    @slot;
-  }
-}
-
-@utility no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    display: none;
-  }
-}
-
-@custom-variant dark (&:is(.dark *));
 
 /* Scan the project's Rust sources for the Tailwind classes they use. This
    file is installed at the project root, so `./src` is the crate's source. */
 @source "./src/**/*.rs";
 
+/* Dark mode is opted into by putting the `dark` class on an ancestor,
+   typically <html>. */
+@custom-variant dark (&:is(.dark *));
+
+/* Expose the tokens as Tailwind utilities (`bg-background`, `text-primary`,
+   `border-border`, ...). The indirection through plain variables on `:root`
+   and `.dark` is what lets the values swap when the color scheme changes. */
 @theme inline {
-    --font-heading: var(--font-sans);
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-foreground: var(--foreground);
-    --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
-    --font-sans: 'Geist', sans-serif;
+  --font-sans: "Lexend", sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+  --background: oklch(0.995 0.003 260);
+  --foreground: oklch(0.24 0.012 260);
+  --muted-foreground: oklch(0.51 0.014 260);
+  --primary: oklch(0.31 0.02 260);
+  --primary-foreground: oklch(0.985 0.003 260);
+  --destructive: oklch(0.55 0.2 27);
+  --destructive-foreground: oklch(0.99 0.012 27);
+  --border: oklch(0.9 0.008 260);
+  --ring: oklch(0.62 0.06 260);
+  --shadow-xs: 0 1px 2px oklch(0.24 0.02 260 / 7%);
+  --shadow-sm:
+    0 1px 2px oklch(0.24 0.02 260 / 7%), 0 2px 8px -2px oklch(0.24 0.02 260 / 6%);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+  --background: oklch(0.17 0.012 260);
+  --foreground: oklch(0.93 0.006 260);
+  --muted-foreground: oklch(0.68 0.012 260);
+  --primary: oklch(0.92 0.008 260);
+  --primary-foreground: oklch(0.21 0.015 260);
+  --destructive: oklch(0.66 0.18 25);
+  --destructive-foreground: oklch(0.14 0.02 25);
+  --border: oklch(0.3 0.012 260);
+  --ring: oklch(0.6 0.05 260);
+  /* Light-mode shadows disappear on a dark background, so these are deeper. */
+  --shadow-xs: 0 1px 2px oklch(0 0 0 / 35%);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 35%), 0 2px 8px -2px oklch(0 0 0 / 30%);
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-    }
   body {
-    @apply bg-background text-foreground;
-    }
+    @apply bg-background font-sans text-foreground;
+  }
 }

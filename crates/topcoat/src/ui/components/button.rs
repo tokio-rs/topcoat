@@ -5,150 +5,94 @@ use topcoat::{
 
 /// The visual style of a [`button`].
 ///
-/// [`Default`] is `ButtonVariant::Default`, used when no variant is given.
+/// [`Default`] is `ButtonVariant::Primary`, used when no variant is given.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum ButtonVariant {
-    /// The primary, filled button.
+    /// The primary-filled button for the main action.
     #[default]
-    Default,
-    /// A destructive action, such as deleting data.
-    Destructive,
-    /// A bordered button with a transparent background.
-    Outline,
-    /// A muted, secondary button.
+    Primary,
+    /// A muted, tinted fill for secondary actions.
     Secondary,
-    /// A button with no background until hovered.
+    /// A hairline-bordered button on the page background.
+    Outline,
+    /// No fill until hovered, for toolbars and inline actions.
     Ghost,
-    /// A button styled as an inline text link.
-    Link,
+    /// A destructive-filled button for actions such as deleting data.
+    Destructive,
 }
 
 impl ButtonVariant {
-    /// The string key for this variant, emitted as `data-variant`.
-    fn name(self) -> &'static str {
-        match self {
-            Self::Default => "default",
-            Self::Destructive => "destructive",
-            Self::Outline => "outline",
-            Self::Secondary => "secondary",
-            Self::Ghost => "ghost",
-            Self::Link => "link",
-        }
-    }
-
     /// The Tailwind classes for this variant.
+    ///
+    /// Hover and press states apply the fill or foreground color at reduced
+    /// opacity, so they hold up in both color schemes without `dark:`
+    /// overrides. Every variant with a resting fill or border casts the
+    /// theme's control shadow; `Ghost` is flat until hovered, so it casts
+    /// none.
     fn classes(self) -> &'static str {
         match self {
-            Self::Default => "bg-primary text-primary-foreground hover:bg-primary/80",
-            Self::Destructive => {
-                "bg-destructive/10 text-destructive hover:bg-destructive/20 \
-                 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 \
-                 dark:bg-destructive/20 dark:hover:bg-destructive/30 \
-                 dark:focus-visible:ring-destructive/40"
-            }
-            Self::Outline => {
-                "border-border bg-background hover:bg-muted hover:text-foreground \
-                 aria-expanded:bg-muted aria-expanded:text-foreground \
-                 dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
+            Self::Primary => {
+                "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 \
+                 active:bg-primary/80"
             }
             Self::Secondary => {
-                "bg-secondary text-secondary-foreground \
-                 hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] \
-                 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground"
+                "bg-foreground/5 text-foreground shadow-xs hover:bg-foreground/10 \
+                 active:bg-foreground/15"
             }
-            Self::Ghost => {
-                "hover:bg-muted hover:text-foreground aria-expanded:bg-muted \
-                 aria-expanded:text-foreground dark:hover:bg-muted/50"
+            Self::Outline => {
+                "border-border text-foreground shadow-xs hover:bg-foreground/5 \
+                 active:bg-foreground/10"
             }
-            Self::Link => "text-primary underline-offset-4 hover:underline",
+            Self::Ghost => "text-foreground hover:bg-foreground/5 active:bg-foreground/10",
+            Self::Destructive => {
+                "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90 \
+                 active:bg-destructive/80"
+            }
         }
     }
 }
 
 /// The size of a [`button`].
 ///
-/// [`Default`] is `ButtonSize::Default`, used when no size is given.
+/// [`Default`] is `ButtonSize::Md`, used when no size is given.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum ButtonSize {
-    /// The standard button height.
-    #[default]
-    Default,
-    /// An extra-small button.
-    Xs,
     /// A compact button.
     Sm,
-    /// A larger button.
+    /// The standard button size.
+    #[default]
+    Md,
+    /// A prominent button.
     Lg,
     /// A square button sized for a single icon.
     Icon,
-    /// An extra-small square icon button.
-    IconXs,
-    /// A small square icon button.
-    IconSm,
-    /// A large square icon button.
-    IconLg,
 }
 
 impl ButtonSize {
-    /// The string key for this size, emitted as `data-size`.
-    fn name(self) -> &'static str {
-        match self {
-            Self::Default => "default",
-            Self::Xs => "xs",
-            Self::Sm => "sm",
-            Self::Lg => "lg",
-            Self::Icon => "icon",
-            Self::IconXs => "icon-xs",
-            Self::IconSm => "icon-sm",
-            Self::IconLg => "icon-lg",
-        }
-    }
-
     /// The Tailwind classes for this size.
+    ///
+    /// Each size sets a text size, which also scales any icons inside: the
+    /// `icon` component is `1em` square by default.
     fn classes(self) -> &'static str {
         match self {
-            Self::Default => {
-                "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 \
-                 has-data-[icon=inline-start]:pl-2"
-            }
-            Self::Xs => {
-                "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs \
-                 in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 \
-                 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3"
-            }
-            Self::Sm => {
-                "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] \
-                 in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 \
-                 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5"
-            }
-            Self::Lg => {
-                "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 \
-                 has-data-[icon=inline-start]:pl-2"
-            }
-            Self::Icon => "size-8",
-            Self::IconXs => {
-                "size-6 rounded-[min(var(--radius-md),10px)] \
-                 in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3"
-            }
-            Self::IconSm => {
-                "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg"
-            }
-            Self::IconLg => "size-9",
+            Self::Sm => "h-8 gap-1.5 rounded-md px-3 text-xs",
+            Self::Md => "h-9 gap-2 rounded-lg px-4 text-sm",
+            Self::Lg => "h-10 gap-2 rounded-lg px-5 text-base",
+            Self::Icon => "size-9 rounded-lg text-base",
         }
     }
 }
 
 /// The classes shared by every button, regardless of variant or size.
-const BASE: &str = "group/button inline-flex shrink-0 items-center justify-center rounded-lg \
-    border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all \
-    outline-none select-none focus-visible:border-ring focus-visible:ring-3 \
-    focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px \
-    disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive \
-    aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 \
-    dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 \
-    [&_svg:not([class*='size-'])]:size-4";
+///
+/// Every button carries a transparent border so that the `Outline` variant,
+/// which only recolors it, does not change the button's dimensions.
+const BASE: &str = "inline-flex shrink-0 items-center justify-center border border-transparent \
+    font-medium whitespace-nowrap transition-colors outline-none select-none \
+    focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
+    focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
 
 /// Builds the full class string for a button of the given `variant` and `size`.
 ///
@@ -157,7 +101,7 @@ const BASE: &str = "group/button inline-flex shrink-0 items-center justify-cente
 ///
 /// ```rust
 /// view! {
-///     <a href="/login" class=(button_variants(ButtonVariant::Outline, ButtonSize::Default))>
+///     <a href="/login" class=(button_variants(ButtonVariant::Outline, ButtonSize::Md))>
 ///         "Sign in"
 ///     </a>
 /// }
@@ -168,8 +112,8 @@ pub fn button_variants(variant: ButtonVariant, size: ButtonSize) -> String {
 
 /// A button component.
 ///
-/// The `variant` and `size` parameters select the styling, both defaulting to
-/// their `Default` value. Extra `class`es are appended to the computed ones, and
+/// The `variant` and `size` parameters select the styling, defaulting to
+/// `Primary` and `Md`. Extra `class`es are appended to the computed ones, and
 /// any further `attrs` (such as `type`, `disabled`, or event handlers) are
 /// forwarded to the underlying `<button>`. Child nodes become the button's
 /// content.
@@ -205,13 +149,7 @@ pub async fn button(
     };
 
     view! {
-        <button
-            data-slot="button"
-            data-variant=(variant.name())
-            data-size=(size.name())
-            class=(class)
-            (attrs)
-        >
+        <button class=(class) (attrs)>
             (child)
         </button>
     }
