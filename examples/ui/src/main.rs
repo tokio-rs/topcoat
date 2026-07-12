@@ -1,6 +1,9 @@
 mod components;
 
 use components::button::{ButtonSize, ButtonVariant, button, button_variants};
+use components::card::{
+    card, card_content, card_description, card_footer, card_header, card_title,
+};
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
@@ -107,24 +110,58 @@ async fn home() -> Result {
                     )
 
                     showcase(
+                        title: "Card",
+                        description: "A card stacks a header, content, and footer \
+                            on a bordered, raised surface. Every section is \
+                            optional.",
+                        card(
+                            attrs: attributes! { class="max-w-sm" },
+                            card_header(
+                                card_title("Invite your team")
+                                card_description(
+                                    "Collaborators get access to every project \
+                                     in this workspace."
+                                )
+                            )
+                            card_content(
+                                <p class="text-sm">
+                                    "Invited members can view and edit projects, \
+                                     but only owners can change billing."
+                                </p>
+                            )
+                            card_footer(
+                                button(size: ButtonSize::Sm, "Send invites")
+                                button(
+                                    size: ButtonSize::Sm,
+                                    variant: ButtonVariant::Ghost,
+                                    "Copy link"
+                                )
+                            )
+                        )
+                    )
+
+                    showcase(
                         title: "In context",
                         description: "A confirmation card pairing a quiet dismiss \
                             action with a destructive commit.",
-                        <div
-                            class="max-w-sm rounded-xl border border-border p-6 shadow-sm"
-                        >
-                            <h3 class="font-semibold">"Delete workspace"</h3>
-                            <p class="mt-1 text-sm text-muted-foreground">
-                                "This permanently removes the workspace and all of its data."
-                            </p>
-                            <div class="mt-5 flex justify-end gap-2">
+                        card(
+                            attrs: attributes! { class="max-w-sm" },
+                            card_header(
+                                card_title("Delete workspace")
+                                card_description(
+                                    "This permanently removes the workspace and \
+                                     all of its data."
+                                )
+                            )
+                            card_footer(
+                                attrs: attributes! { class="justify-end" },
                                 button(variant: ButtonVariant::Ghost, "Cancel")
                                 button(
                                     variant: ButtonVariant::Destructive,
                                     "Delete workspace"
                                 )
-                            </div>
-                        </div>
+                            )
+                        )
                     )
 
                     showcase(
@@ -159,23 +196,29 @@ async fn showcase(title: &'static str, description: &'static str, child: View) -
 #[component]
 async fn scheme_panel(label: &'static str) -> Result {
     view! {
-        <div class="rounded-xl border border-border bg-background p-5 shadow-sm">
-            <p class="text-xs font-medium text-muted-foreground">(label)</p>
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-                button(size: ButtonSize::Sm, "Primary")
-                button(
-                    size: ButtonSize::Sm,
-                    variant: ButtonVariant::Secondary,
-                    "Secondary"
-                )
-                button(size: ButtonSize::Sm, variant: ButtonVariant::Outline, "Outline")
-                button(size: ButtonSize::Sm, variant: ButtonVariant::Ghost, "Ghost")
-                button(
-                    size: ButtonSize::Sm,
-                    variant: ButtonVariant::Destructive,
-                    "Destructive"
-                )
-            </div>
-        </div>
+        card(
+            card_content(
+                <p class="text-xs font-medium text-muted-foreground">(label)</p>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    button(size: ButtonSize::Sm, "Primary")
+                    button(
+                        size: ButtonSize::Sm,
+                        variant: ButtonVariant::Secondary,
+                        "Secondary"
+                    )
+                    button(
+                        size: ButtonSize::Sm,
+                        variant: ButtonVariant::Outline,
+                        "Outline"
+                    )
+                    button(size: ButtonSize::Sm, variant: ButtonVariant::Ghost, "Ghost")
+                    button(
+                        size: ButtonSize::Sm,
+                        variant: ButtonVariant::Destructive,
+                        "Destructive"
+                    )
+                </div>
+            )
+        )
     }
 }

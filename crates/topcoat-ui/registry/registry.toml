@@ -11,3 +11,6 @@ source = "themes/neutral.css"
 
 [components.button]
 source = "src/components/button.rs"
+
+[components.card]
+source = "src/components/card.rs"

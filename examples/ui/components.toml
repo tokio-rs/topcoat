@@ -11,3 +11,7 @@ file = "styles.css"
 [registries.topcoat.components.button]
 hash = "sha256:47244c31d8274fc7d9512659b94306efcbcd9ea845369cc09691d8e5aced1aa0"
 file = "src/components/button.rs"
+
+[registries.topcoat.components.card]
+hash = "sha256:45cbe0f5a790e7359ff72ecda4fbf40fb6c7bc8c4928593d1352813a86543a01"
+file = "src/components/card.rs"
