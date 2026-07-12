@@ -3,6 +3,7 @@ use std::{
     fmt::Write as _,
     fs, io,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 use sha2::{Digest, Sha256};
@@ -42,9 +43,9 @@ pub enum ExecutableSource {
 }
 
 impl ExecutableSource {
-    /// Resolve to a runnable [`Executable`], downloading the CLI into Cargo's
-    /// `OUT_DIR` if needed. Only [`ExecutableSource::Github`] requires
-    /// `OUT_DIR` to be set.
+    /// Resolve to a runnable [`Executable`], downloading the CLI into the
+    /// shared Topcoat cache if needed. Only [`ExecutableSource::Github`]
+    /// downloads, and it needs `OUT_DIR` set to locate the cache.
     ///
     /// # Errors
     ///
@@ -54,9 +55,7 @@ impl ExecutableSource {
     pub fn resolve(&self) -> Result<Executable> {
         match self {
             Self::Github { version, checksum } => {
-                let out_dir = PathBuf::from(env::var_os("OUT_DIR").ok_or(BuildError::NoOutDir)?);
-                let dest = out_dir.join(format!("tailwindcss-{version}"));
-                Self::download_from_github(version, checksum.as_deref(), dest)
+                Self::download_from_github(version, checksum.as_deref())
             }
             Self::Path(path) => Ok(Executable::new(path)),
             Self::Env(name) => {
@@ -67,17 +66,20 @@ impl ExecutableSource {
         }
     }
 
-    /// Download the Tailwind CLI for `version` to `dest`.
+    /// Download the Tailwind CLI for `version` into the shared Topcoat cache,
+    /// reusing the cached copy without downloading when it is already present.
     ///
-    /// If `dest` already exists it's left untouched. When `checksum` is given,
-    /// the downloaded file's hash is verified against it before the file is
-    /// moved into place; `checksum` must carry a supported algorithm prefix
-    /// (`sha256:`). On Unix the file is made executable.
-    fn download_from_github(
-        version: &str,
-        checksum: Option<&str>,
-        dest: PathBuf,
-    ) -> Result<Executable> {
+    /// The binary is cached at
+    /// `topcoat/cache/tailwind/tailwindcss-<version>-<platform>` inside the
+    /// Cargo target directory, so it is shared across the workspace and reused
+    /// by later builds even after a package's build fingerprint changes. Build
+    /// scripts racing to download the same version are serialized with an
+    /// exclusive file lock so only one downloads while the others wait and
+    /// reuse its result. When `checksum` is given, the download's hash is
+    /// verified against it before the file is moved into place; `checksum` must
+    /// carry a supported algorithm prefix (`sha256:`). On Unix the file is made
+    /// executable.
+    fn download_from_github(version: &str, checksum: Option<&str>) -> Result<Executable> {
         // Parse the algorithm prefix up front so a malformed checksum fails
         // before anything is downloaded.
         let expected_digest = checksum
@@ -90,15 +92,63 @@ impl ExecutableSource {
             })
             .transpose()?;
 
+        let dir = Self::cache_dir()?;
+        // The platform is baked into the file name so a cache directory shared
+        // across hosts (e.g. a mounted target directory) never hands one host
+        // another's binary.
+        let file_name = format!(
+            "tailwindcss-{version}-{platform}",
+            platform = Self::platform()?
+        );
+        let dest = dir.join(&file_name);
+
+        // Fast path: a previous build already cached a verified copy. `dest`
+        // only ever appears via an atomic rename of a fully downloaded and
+        // checksum-verified file, so its mere existence means it is complete.
         if dest.exists() {
             return Ok(Executable::new(dest));
         }
 
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent).map_err(|source| BuildError::Io {
-                path: parent.to_path_buf(),
+        fs::create_dir_all(&dir).map_err(|source| BuildError::Io {
+            path: dir.clone(),
+            source,
+        })?;
+
+        // Serialize the download across processes. Cargo runs build scripts
+        // concurrently, so several packages can reach here at once for the same
+        // version; without this they would all download and race to rename over
+        // `dest`. Holding an exclusive lock on a sibling lock file lets the
+        // first process download while the rest block, then find the cached
+        // copy below. The lock is advisory, but every code path that writes
+        // `dest` goes through here, and the OS drops the lock if a holder dies,
+        // so a crash can never wedge later builds. It is held until this
+        // function returns.
+        //
+        // The lock file is intentionally left on disk and never removed:
+        // `lock` acts on the file's inode, so unlinking it would let a waiter
+        // and a newcomer that recreates the path lock two different inodes and
+        // both proceed. It is an empty marker; once `dest` exists the fast path
+        // above returns before it is even opened.
+        let lock_path = dir.join(format!("{file_name}.lock"));
+        let lock = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(|source| BuildError::Io {
+                path: lock_path.clone(),
                 source,
             })?;
+        lock.lock().map_err(|source| BuildError::Io {
+            path: lock_path.clone(),
+            source,
+        })?;
+
+        // Re-check under the lock: another process may have finished the
+        // download while we waited to acquire it.
+        if dest.exists() {
+            return Ok(Executable::new(dest));
         }
 
         let url = format!(
@@ -112,7 +162,7 @@ impl ExecutableSource {
             .into_body();
         let mut reader = body.as_reader();
 
-        let temp = Self::temp_path(&dest);
+        let temp = dir.join(format!("{file_name}.download"));
         let mut file = fs::File::create(&temp).map_err(|source| BuildError::Io {
             path: temp.clone(),
             source,
@@ -182,14 +232,25 @@ impl ExecutableSource {
         })
     }
 
-    /// The `.tmp` sibling of `dest` where a download is staged before the
-    /// final rename.
-    fn temp_path(dest: &Path) -> PathBuf {
-        let file_name = dest
-            .file_name()
-            .and_then(|file_name| file_name.to_str())
-            .unwrap_or("tailwindcss");
-        dest.with_file_name(format!("{file_name}.tmp"))
+    /// The host platform suffix baked into cache file names, e.g.
+    /// `macos-arm64` or `windows-x64.exe`. Derived from
+    /// [`asset_name`](Self::asset_name), which every supported platform
+    /// prefixes with `tailwindcss-`.
+    fn platform() -> Result<&'static str> {
+        let asset = Self::asset_name()?;
+        Ok(asset.strip_prefix("tailwindcss-").unwrap_or(asset))
+    }
+
+    /// The directory the downloaded CLI is cached in: the shared Topcoat cache
+    /// (`topcoat/cache/tailwind`) under the Cargo target directory, falling
+    /// back to `OUT_DIR` itself when the build runs outside Cargo's target
+    /// layout.
+    fn cache_dir() -> Result<PathBuf> {
+        if let Some(dir) = topcoat_core::cache::cache_dir("tailwind") {
+            return Ok(dir);
+        }
+        let out_dir = env::var_os("OUT_DIR").ok_or(BuildError::NoOutDir)?;
+        Ok(PathBuf::from(out_dir))
     }
 }
 
@@ -223,8 +284,25 @@ impl Executable {
     /// Returns `Err` if the process cannot be spawned or exits with a
     /// non-zero status.
     pub fn run(&self, command: &Command) -> Result {
+        // The standalone Tailwind CLI is a Bun single-file executable that
+        // unpacks its embedded native modules (the Oxide scanner, Lightning
+        // CSS, the file watcher) into the temporary directory and loads them
+        // with `dlopen`. On filesystems that support `O_TMPFILE` each run gets
+        // a private anonymous copy, but otherwise Bun falls back to named files
+        // at deterministic paths derived from the binary. Two processes running
+        // the same shared executable then race on those paths, and one can load
+        // a module while another is still writing it -- which surfaces, for the
+        // scanner, as its `Scanner` export being undefined. Give each run its
+        // own temporary directory so the extraction paths never collide.
+        // Rooting it next to the executable keeps it on a filesystem that
+        // permits execution, which the system temporary directory may not.
+        let scratch = ScratchDir::new(&self.scratch_root())?;
+
         let status = command
             .to_process(&self.path)
+            .env("TMPDIR", scratch.path())
+            .env("TMP", scratch.path())
+            .env("TEMP", scratch.path())
             .status()
             .map_err(|source| BuildError::Io {
                 path: self.path.clone(),
@@ -236,5 +314,81 @@ impl Executable {
         }
 
         Ok(())
+    }
+
+    /// The directory a per-run [`ScratchDir`] is created under: Cargo's
+    /// `OUT_DIR` when set, otherwise the directory holding the executable, and
+    /// finally the system temporary directory. The first two sit under the
+    /// Cargo target directory, which permits executing the native modules Bun
+    /// unpacks there.
+    fn scratch_root(&self) -> PathBuf {
+        if let Some(out_dir) = env::var_os("OUT_DIR") {
+            return PathBuf::from(out_dir);
+        }
+        match self.path.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+            _ => env::temp_dir(),
+        }
+    }
+}
+
+/// A private temporary directory for a single Tailwind CLI run, removed when
+/// dropped.
+#[derive(Debug)]
+struct ScratchDir {
+    path: PathBuf,
+}
+
+impl ScratchDir {
+    /// Create a uniquely named directory inside `root`.
+    fn new(root: &Path) -> Result<Self> {
+        // The counter keeps names unique within a build script, and the process
+        // id keeps them unique across the build scripts that share a `root`
+        // under the Cargo target directory.
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let path = root.join(format!(
+            "tailwind-scratch-{pid}-{n}",
+            pid = std::process::id(),
+            n = COUNTER.fetch_add(1, Ordering::Relaxed),
+        ));
+        fs::create_dir_all(&path).map_err(|source| BuildError::Io {
+            path: path.clone(),
+            source,
+        })?;
+        Ok(Self { path })
+    }
+
+    /// The path of the created directory.
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for ScratchDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scratch_dirs_get_distinct_paths() {
+        let first = ScratchDir::new(&env::temp_dir()).unwrap();
+        let second = ScratchDir::new(&env::temp_dir()).unwrap();
+        assert_ne!(first.path(), second.path());
+        assert!(first.path().is_dir());
+        assert!(second.path().is_dir());
+    }
+
+    #[test]
+    fn scratch_dir_is_removed_on_drop() {
+        let scratch = ScratchDir::new(&env::temp_dir()).unwrap();
+        let path = scratch.path().to_path_buf();
+        assert!(path.is_dir());
+        drop(scratch);
+        assert!(!path.exists());
     }
 }

@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 use http::Uri;
 use memchr::memmem;
 use serde::{Deserialize, Serialize};
-use topcoat_core::runtime::fnv1a;
+use topcoat_core::fnv1a;
 
 use crate::{AssetOptions, ConstReader, ConstWriter, Source};
 

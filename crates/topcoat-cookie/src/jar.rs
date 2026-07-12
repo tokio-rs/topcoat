@@ -2,7 +2,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use cookie::{Cookie, CookieJar as RawCookieJar};
 use http::{HeaderValue, header, request::Parts};
-use topcoat_core::runtime::context::{Cx, request_context};
+use topcoat_core::context::{Cx, request_context};
 
 use crate::Cookies;
 

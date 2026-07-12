@@ -1,16 +1,16 @@
 [package]
 name = "topcoat-router-macro"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [lib]
 proc-macro = true
 
 [features]
-discover = ["topcoat-router/discover"]
+discover = ["topcoat-router-grammar/discover"]
 
 [dependencies]
-topcoat-router = { workspace = true, features = ["parsing"] }
+topcoat-router-grammar.workspace = true
 
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }

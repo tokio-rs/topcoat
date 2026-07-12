@@ -104,8 +104,9 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 
 **Rendering**
 - [The `view!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/view.md): templating syntax, control flow, conditional attributes.
-- [The `component` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/component.md): async functions as components, with child content.
+- [The `#[component]` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/component.md): async functions as components, with child content.
 - [The `attributes!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/attributes.md): reusable runtime attribute fragments.
+- [The `class!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/class.md): space-separated class lists from static and conditional entries.
 
 **Routing**
 - [Router](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/router.md): pages, layouts, and API routes; manual and auto-discovered.
@@ -121,6 +122,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 **Asset system**
 - [Assets](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/asset.md): declare assets in Rust, serve them with content-hashed URLs.
 - [Fonts](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/font.md): bundle and serve web fonts.
+- [Icons](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/icon.md): download Iconify icon sets or declare your own.
 
 **Third-party integrations**
 - [Tailwind](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/tailwind.md): Tailwind CSS without Node, wired into the asset pipeline.

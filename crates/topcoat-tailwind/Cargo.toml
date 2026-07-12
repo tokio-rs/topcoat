@@ -1,13 +1,15 @@
 [package]
 name = "topcoat-tailwind"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [features]
 default = ["build"]
-build = ["dep:sha2", "dep:thiserror", "dep:ureq"]
+build = ["dep:topcoat-core", "dep:sha2", "dep:thiserror", "dep:ureq"]
 
 [dependencies]
+topcoat-core = { workspace = true, optional = true, features = ["build"] }
+
 sha2 = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 ureq = { workspace = true, optional = true }

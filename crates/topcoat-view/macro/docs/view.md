@@ -387,6 +387,8 @@ view! {
 
 For reusable runtime attribute collections, use the [`attributes!`] macro. It has the same attribute syntax as the [`view!`] macro but generates an [`topcoat::view::Attributes`] value that can be passed around and inserted into an element as an attribute fragment.
 
+To assemble a `class` attribute value from static and conditional parts, use the [`class!`] macro. It builds a [`topcoat::view::Class`] value whose entries join with single spaces, and the attribute is omitted entirely when no entry is present.
+
 # Rendering Outside A Component
 
 Inside a [`component`], `#[page]`, or `#[layout]`, the request context is in scope implicitly, so `view!` can render components and reactive markup with no ceremony. In a plain function you need to pass it at the start of the `view!` macro explicitely:
@@ -396,7 +398,7 @@ Inside a [`component`], `#[page]`, or `#[layout]`, the request context is in sco
 # #[component]
 # async fn greeting(name: &str) -> Result { view! { <h1>(name)</h1> } }
 async fn render(cx: &Cx) -> Result {
-    view! { cx, greeting(name: "World") }
+    view! { cx => greeting(name: "World") }
 }
 ```
 
@@ -410,19 +412,21 @@ The macro accepts dynamic Rust values by routing them through small runtime trai
 - [`AttributeViewParts`] for values that emit one or more full attributes in APIs that accept complete attribute fragments.
 - [`ElementNameViewParts`] for values used as dynamic element names: `<(name)>...</(name)>`.
 
+Each trait method receives a [`PartsWriter`] for the position being filled. Everything pushed through its `push_*` methods is escaped or validated for that position when the view renders; [`push_str_unescaped`][PartsWriter::push_str_unescaped] is the only opt-out and must only be given trusted markup.
+
 For example, a type can opt into child-node rendering by implementing [`NodeViewParts`]:
 
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
 # async fn example() -> Result {
-use topcoat::{context::Cx, view::{NodeViewParts, ViewParts}};
+use topcoat::{context::Cx, view::{NodeViewParts, PartsWriter}};
 
 struct Badge(String);
 
 impl NodeViewParts for Badge {
-    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
-        parts.push(self.0);
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_str(self.0);
     }
 }
 
@@ -438,7 +442,7 @@ For attribute values, implement [`AttributeValueViewParts`]. Its [`attribute_pre
 # use topcoat::{Result, view::*};
 # #[component]
 # async fn example() -> Result {
-use topcoat::{context::Cx, view::{AttributeValueViewParts, ViewParts}};
+use topcoat::{context::Cx, view::{AttributeValueViewParts, PartsWriter}};
 
 struct DataId(Option<String>);
 
@@ -447,9 +451,9 @@ impl AttributeValueViewParts for DataId {
         self.0.is_some()
     }
 
-    fn into_view_parts(self, _cx: &Cx, parts: &mut ViewParts) {
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         if let Some(value) = self.0 {
-            parts.push(value);
+            parts.push_str(value);
         }
     }
 }
@@ -466,10 +470,14 @@ view! {
 [`AttributeViewParts`]: trait.AttributeViewParts.html
 [`ElementNameViewParts`]: trait.ElementNameViewParts.html
 [`NodeViewParts`]: trait.NodeViewParts.html
+[`PartsWriter`]: struct.PartsWriter.html
+[PartsWriter::push_str_unescaped]: struct.PartsWriter.html#method.push_str_unescaped
 [`component`]: attr.component.html
 [`attributes!`]: macro.attributes.html
+[`class!`]: macro.class.html
 [`false`]: https://doc.rust-lang.org/std/keyword.false.html
 [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
 [`Some`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.Some
 [`topcoat::view::Attributes`]: struct.Attributes.html
+[`topcoat::view::Class`]: struct.Class.html
 [`view!`]: macro.view.html

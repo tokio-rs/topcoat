@@ -1,0 +1,20 @@
+[package]
+name = "topcoat-view-grammar"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+topcoat-core-grammar.workspace = true
+topcoat-pretty.workspace = true
+topcoat-view.workspace = true
+
+heck.workspace = true
+proc-macro2 = { workspace = true, features = ["span-locations"] }
+quote.workspace = true
+syn = { workspace = true, features = ["full", "extra-traits", "visit-mut"] }
+
+[[test]]
+name = "pretty"
+
+[lints]
+workspace = true

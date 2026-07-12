@@ -1,0 +1,21 @@
+[package]
+name = "topcoat-runtime-grammar"
+version.workspace = true
+edition.workspace = true
+
+[features]
+discover = []
+
+[dependencies]
+topcoat-runtime.workspace = true
+
+proc-macro2.workspace = true
+quote.workspace = true
+syn = { workspace = true, features = ["full", "visit"] }
+
+serde.workspace = true
+serde_json.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+
+[lints]
+workspace = true

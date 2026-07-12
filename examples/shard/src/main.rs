@@ -57,7 +57,7 @@ async fn combobox() -> Result {
 async fn combobox_content(cx: &Cx, input: String) -> Result {
     let results = search_fruit(cx, &input).await;
     view! {
-        cx,
+        cx =>
         <div>
             <b>"results:"</b>
             for item in results {

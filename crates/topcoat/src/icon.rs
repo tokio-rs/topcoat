@@ -4,7 +4,7 @@ pub use topcoat_icon::*;
 
 #[cfg(feature = "icon-iconify")]
 pub mod iconify {
-    pub use topcoat_icon_iconify::runtime::*;
+    pub use topcoat_icon_iconify::*;
     pub use topcoat_icon_iconify_macro::*;
 }
 
@@ -34,9 +34,7 @@ pub async fn icon(
             viewBox=(data.view_box())
             width=(size)
             height=(size)
-            if !attrs.contains_key("style") {
-                style="vertical-align: -0.125em"
-            }
+            style="vertical-align: -0.125em"
             aria-hidden=(label.is_empty().then_some("true"))
             role=((!label.is_empty()).then_some("img"))
             aria-label=((!label.is_empty()).then_some(label))

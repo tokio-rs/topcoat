@@ -1,6 +1,6 @@
 #![doc = include_str!("../docs/router.md")]
 
-pub use topcoat_router::runtime::*;
+pub use topcoat_router::*;
 pub use topcoat_router_macro::*;
 
 #[cfg(feature = "discover")]
@@ -18,12 +18,12 @@ impl RouterBuilderDiscoverExt for RouterBuilder {
         self = self.discover_layers();
         #[cfg(feature = "font")]
         {
-            use topcoat_font::runtime::RouterBuilderFontExt;
+            use topcoat_font::RouterBuilderFontExt;
             self = self.discover_fonts();
         }
         #[cfg(feature = "runtime")]
         {
-            use topcoat_runtime::runtime::{RouterBuilderProcedureExt, RouterBuilderShardExt};
+            use topcoat_runtime::{RouterBuilderProcedureExt, RouterBuilderShardExt};
             self = self.discover_procedures();
             self = self.discover_shards();
         }

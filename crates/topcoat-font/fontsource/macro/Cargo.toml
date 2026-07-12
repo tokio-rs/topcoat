@@ -1,18 +1,18 @@
 [package]
 name = "topcoat-font-fontsource-macro"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [lib]
 proc-macro = true
 
 [features]
 asset = [
-	"topcoat-font-fontsource/asset",
+	"topcoat-font-fontsource-grammar/asset",
 ]
 
 [dependencies]
-topcoat-font-fontsource = { workspace = true, features = ["parsing"] }
+topcoat-font-fontsource-grammar.workspace = true
 
 proc-macro2.workspace = true
 quote.workspace = true

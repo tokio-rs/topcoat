@@ -48,7 +48,7 @@ async fn rust_expression_in_child_position_becomes_a_node() {
     let name = "world";
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         <h1>
             "Hello, "
             (name)
@@ -62,7 +62,7 @@ async fn rust_expression_in_child_position_becomes_a_node() {
 async fn rust_expression_in_attribute_value_becomes_the_value() {
     let url = "/about";
     let cx = &Cx::default();
-    let html = r(view! { cx, <a href=(url)>"about"</a> });
+    let html = r(view! { cx => <a href=(url)>"about"</a> });
     assert_eq!(html, r#"<a href="/about">about</a>"#);
 }
 
@@ -70,7 +70,7 @@ async fn rust_expression_in_attribute_value_becomes_the_value() {
 async fn dynamic_attribute_name_uses_parenthesized_expression() {
     let attr = "data-state";
     let cx = &Cx::default();
-    let html = r(view! { cx, <div (attr)="ready"></div> });
+    let html = r(view! { cx => <div (attr)="ready"></div> });
     assert_eq!(html, r#"<div data-state="ready"></div>"#);
 }
 
@@ -78,7 +78,7 @@ async fn dynamic_attribute_name_uses_parenthesized_expression() {
 async fn dynamic_element_name_uses_parenthesized_expression() {
     let tag: String = "section".to_owned();
     let cx = &Cx::default();
-    let html = r(view! { cx, <(tag)>"body"</(tag)> });
+    let html = r(view! { cx => <(tag)>"body"</(tag)> });
     assert_eq!(html, "<section>body</section>");
 }
 
@@ -86,7 +86,7 @@ async fn dynamic_element_name_uses_parenthesized_expression() {
 async fn child_text_is_html_escaped() {
     let raw = "<script>alert(1)</script>";
     let cx = &Cx::default();
-    let html = r(view! { cx, <p>(raw)</p> });
+    let html = r(view! { cx => <p>(raw)</p> });
     assert_eq!(html, "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>");
 }
 
@@ -96,7 +96,7 @@ async fn numeric_child_values_render_as_text() {
     let ratio: f64 = 1.5;
     let cx = &Cx::default();
     let html = r(view! {
-        cx,
+        cx =>
         <span>
             (count)
             " "
@@ -110,7 +110,7 @@ async fn numeric_child_values_render_as_text() {
 async fn conditional_attribute_false_omits_attribute() {
     let disabled = false;
     let cx = &Cx::default();
-    let html = r(view! { cx, <button disabled=(disabled)>"go"</button> });
+    let html = r(view! { cx => <button disabled=(disabled)>"go"</button> });
     assert_eq!(html, "<button>go</button>");
 }
 
@@ -118,7 +118,7 @@ async fn conditional_attribute_false_omits_attribute() {
 async fn conditional_attribute_true_keeps_attribute() {
     let disabled = true;
     let cx = &Cx::default();
-    let html = r(view! { cx, <button disabled=(disabled)>"go"</button> });
+    let html = r(view! { cx => <button disabled=(disabled)>"go"</button> });
     assert!(html.contains("disabled"));
 }
 
@@ -126,7 +126,7 @@ async fn conditional_attribute_true_keeps_attribute() {
 async fn conditional_attribute_none_omits_attribute() {
     let title: Option<&str> = None;
     let cx = &Cx::default();
-    let html = r(view! { cx, <button title=(title)>"go"</button> });
+    let html = r(view! { cx => <button title=(title)>"go"</button> });
     assert_eq!(html, "<button>go</button>");
 }
 
@@ -134,7 +134,7 @@ async fn conditional_attribute_none_omits_attribute() {
 async fn conditional_attribute_some_renders_with_inner_value() {
     let title: Option<&str> = Some("hi");
     let cx = &Cx::default();
-    let html = r(view! { cx, <button title=(title)>"go"</button> });
+    let html = r(view! { cx => <button title=(title)>"go"</button> });
     assert_eq!(html, r#"<button title="hi">go</button>"#);
 }
 

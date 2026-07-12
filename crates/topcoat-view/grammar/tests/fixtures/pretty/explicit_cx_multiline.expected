@@ -1,0 +1,11 @@
+view! {
+    cx =>
+    <section>
+        <h1>"Dashboard"</h1>
+        if ready {
+            <p>"Ready"</p>
+        } else {
+            <p>"Loading"</p>
+        }
+    </section>
+}

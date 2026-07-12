@@ -1,7 +1,7 @@
 [package]
 name = "topcoat"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [features]
 default = [
@@ -14,11 +14,26 @@ default = [
 	"view",
 	"discover",
 ]
+full = [
+	"asset",
+	"cookie",
+	"discover",
+	"font",
+	"font-fontsource",
+	"htmx",
+	"icon",
+	"icon-iconify",
+	"multipart",
+	"router",
+	"runtime",
+	"tailwind",
+	"ui",
+	"view",
+]
 
 asset = [
 	"dep:topcoat-asset",
 	"topcoat-font?/asset",
-	"topcoat-font-macro?/asset",
 	"topcoat-font-fontsource?/asset",
 	"topcoat-font-fontsource-macro?/asset",
 ]
@@ -88,22 +103,11 @@ view = [
 	"topcoat-font?/view",
 ]
 
-full = [
-	"asset",
-	"cookie",
-	"discover",
-	"font",
-	"font-fontsource",
-	"htmx",
-	"icon",
-	"icon-iconify",
-	"multipart",
-	"router",
-	"runtime",
-	"tailwind",
-	"ui",
-	"view",
-]
+# Declares this crate as a topcoat-ui component registry: `topcoat ui` reads the
+# `registry.toml` (and component sources) under this directory, relative to the
+# crate root. A crate is usable as a registry only if it carries this key.
+[package.metadata.topcoat-ui]
+registry = "src/ui"
 
 [dependencies]
 topcoat-asset = { workspace = true, optional = true }

@@ -176,7 +176,7 @@ async fn static_page() -> Result {
 /// safe runs.
 async fn comment_feed(cx: &Cx, comments: &[String]) -> Result {
     view! {
-        cx,
+        cx =>
         <ul class="space-y-4">
             for comment in comments {
                 <li
@@ -210,7 +210,7 @@ fn make_comments(count: usize) -> Vec<String> {
 /// `Display`-based render path, isolating numeric formatting from markup.
 async fn numeric_table(cx: &Cx, rows: &[Vec<i64>]) -> Result {
     view! {
-        cx,
+        cx =>
         <table class="w-full text-right font-mono text-sm">
             <tbody>
                 for row in rows {
@@ -249,7 +249,7 @@ fn make_number_rows(rows: usize, cols: usize) -> Vec<Vec<i64>> {
 /// quoting.
 async fn tag_cloud(cx: &Cx, tags: &[Tag]) -> Result {
     view! {
-        cx,
+        cx =>
         <div class="flex flex-wrap gap-2">
             for tag in tags {
                 <a
@@ -409,7 +409,7 @@ async fn product_card(product: &Product) -> Result {
 /// with the `cx,` form; on top of that it invokes a component (`product_card`).
 async fn product_grid(cx: &Cx, products: &[Product]) -> Result {
     view! {
-        cx,
+        cx =>
         <main class="mx-auto w-full max-w-6xl px-4 py-10">
             <h1 class="text-2xl font-bold tracking-tight">"All products"</h1>
             <div class="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">

@@ -1,18 +1,18 @@
 [package]
 name = "topcoat-runtime-macro"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [lib]
 proc-macro = true
 
 [features]
 discover = [
-	"topcoat-runtime/discover"
+	"topcoat-runtime-grammar/discover"
 ]
 
 [dependencies]
-topcoat-runtime = { workspace = true, features = ["parsing"] }
+topcoat-runtime-grammar.workspace = true
 
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }

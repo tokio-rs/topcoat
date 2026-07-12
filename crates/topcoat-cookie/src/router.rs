@@ -1,5 +1,5 @@
-use topcoat_core::runtime::context::CxBuilder;
-use topcoat_router::runtime::{Body, Layer, LayerFuture, Next, Path, RouterBuilder};
+use topcoat_core::context::CxBuilder;
+use topcoat_router::{Body, Layer, LayerFuture, Next, Path, RouterBuilder};
 
 use crate::{CookieJarCell, write_cookies};
 
@@ -56,8 +56,8 @@ impl RouterBuilderCookieExt for RouterBuilder {
 #[cfg(test)]
 mod tests {
     use http::{Method, Request, header};
-    use topcoat_core::runtime::{context::Cx, error::Result};
-    use topcoat_router::runtime::{Body, Path, Response, Route, RouteFuture, Router};
+    use topcoat_core::{context::Cx, error::Result};
+    use topcoat_router::{Body, Path, Response, Route, RouteFuture, Router};
 
     use crate::{Cookies, RouterBuilderCookieExt, cookies};
 

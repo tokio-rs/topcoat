@@ -35,6 +35,7 @@ impl FmtCommand {
             const ALL_MACROS: &[&str] = &[
                 "view",
                 "attributes",
+                "class",
                 "font_face",
                 "font",
                 "fontsource_font_face",
@@ -63,25 +64,29 @@ impl FmtCommand {
             }
 
             if selected.contains("view") {
-                registry.register_macro::<topcoat_view::ast::view::View>("view");
+                registry.register_macro::<topcoat_view_grammar::view::View>("view");
             }
             if selected.contains("attributes") {
-                registry.register_macro::<topcoat_view::ast::attributes::Attributes>("attributes");
+                registry
+                    .register_macro::<topcoat_view_grammar::attributes::Attributes>("attributes");
+            }
+            if selected.contains("class") {
+                registry.register_macro::<topcoat_view_grammar::class::Class>("class");
             }
             if selected.contains("font_face") {
-                registry.register_macro::<topcoat_font::ast::font_face::FontFace>("font_face");
+                registry.register_macro::<topcoat_font_grammar::font_face::FontFace>("font_face");
             }
             if selected.contains("font") {
-                registry.register_macro::<topcoat_font::ast::font::Font>("font");
+                registry.register_macro::<topcoat_font_grammar::font::Font>("font");
             }
             if selected.contains("fontsource_font_face") {
                 registry
-                    .register_macro::<topcoat_font_fontsource::ast::font_face::FontsourceFontFace>(
+                    .register_macro::<topcoat_font_fontsource_grammar::font_face::FontsourceFontFace>(
                         "fontsource_font_face",
                     );
             }
             if selected.contains("fontsource_font") {
-                registry.register_macro::<topcoat_font_fontsource::ast::font::FontsourceFont>(
+                registry.register_macro::<topcoat_font_fontsource_grammar::font::FontsourceFont>(
                     "fontsource_font",
                 );
             }
