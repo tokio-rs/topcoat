@@ -1,0 +1,87 @@
+/* Neutral, the built-in Topcoat theme: a graphite palette set in Lexend.
+
+   The theme is a small set of design tokens. Components refer to tokens only,
+   never to raw colors, so a project restyles itself by editing the values in
+   `:root` and `.dark` below.
+
+     --background              the page background
+     --foreground              text and iconography on the background
+     --muted-foreground        secondary text: captions, descriptions, placeholders
+     --primary                 the emphasis color: primary actions, selection, highlights
+     --primary-foreground      text on a primary-filled surface
+     --destructive             destructive actions and error states
+     --destructive-foreground  text on a destructive-filled surface
+     --border                  hairline borders and dividers
+     --ring                    the focus ring
+     --shadow-xs               a subtle shadow for controls: buttons, inputs
+     --shadow-sm               a shadow for raised surfaces: cards, menus
+
+   Interactive states (hover, press) have no tokens of their own: components
+   derive them by applying the fill or foreground color at reduced opacity,
+   which adapts to both color schemes automatically.
+
+   The Lexend font is not bundled here; provide it with topcoat-font. */
+
+@import "tailwindcss";
+
+/* Scan the project's Rust sources for the Tailwind classes they use. This
+   file is installed at the project root, so `./src` is the crate's source. */
+@source "./src/**/*.rs";
+
+/* Dark mode is opted into by putting the `dark` class on an ancestor,
+   typically <html>. */
+@custom-variant dark (&:is(.dark *));
+
+/* Expose the tokens as Tailwind utilities (`bg-background`, `text-primary`,
+   `border-border`, ...). The indirection through plain variables on `:root`
+   and `.dark` is what lets the values swap when the color scheme changes. */
+@theme inline {
+  --font-sans: "Lexend", sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+}
+
+:root {
+  --background: oklch(0.995 0.003 260);
+  --foreground: oklch(0.24 0.012 260);
+  --muted-foreground: oklch(0.51 0.014 260);
+  --primary: oklch(0.31 0.02 260);
+  --primary-foreground: oklch(0.985 0.003 260);
+  --destructive: oklch(0.55 0.2 27);
+  --destructive-foreground: oklch(0.99 0.012 27);
+  --border: oklch(0.9 0.008 260);
+  --ring: oklch(0.62 0.06 260);
+  --shadow-xs: 0 1px 2px oklch(0.24 0.02 260 / 7%);
+  --shadow-sm:
+    0 1px 2px oklch(0.24 0.02 260 / 7%), 0 2px 8px -2px oklch(0.24 0.02 260 / 6%);
+}
+
+.dark {
+  --background: oklch(0.17 0.012 260);
+  --foreground: oklch(0.93 0.006 260);
+  --muted-foreground: oklch(0.68 0.012 260);
+  --primary: oklch(0.92 0.008 260);
+  --primary-foreground: oklch(0.21 0.015 260);
+  --destructive: oklch(0.66 0.18 25);
+  --destructive-foreground: oklch(0.14 0.02 25);
+  --border: oklch(0.3 0.012 260);
+  --ring: oklch(0.6 0.05 260);
+  /* Light-mode shadows disappear on a dark background, so these are deeper. */
+  --shadow-xs: 0 1px 2px oklch(0 0 0 / 35%);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 35%), 0 2px 8px -2px oklch(0 0 0 / 30%);
+}
+
+@layer base {
+  body {
+    @apply bg-background font-sans text-foreground;
+  }
+}
