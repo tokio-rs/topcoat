@@ -38,21 +38,7 @@ impl ToTokens for EventHandlerValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::Expr(inner) => inner.to_tokens(tokens),
-            Self::LitStr(inner) => quote! {
-                ::topcoat::runtime::Expr::new(
-                    |_: ::topcoat::runtime::Event| {},
-                    {
-                        let mut __parts = ::topcoat::view::ViewParts::new();
-                        ::topcoat::view::PartsWriter::new(
-                            &mut __parts,
-                            ::topcoat::view::HtmlContext::Comment,
-                        )
-                        .push_str(#inner);
-                        ::topcoat::view::ViewPart::from(__parts)
-                    },
-                )
-            }
-            .to_tokens(tokens),
+            Self::LitStr(inner) => inner.to_tokens(tokens),
         }
     }
 }
@@ -104,17 +90,31 @@ impl WriteView for EventHandler {
 impl WriteAttribute for EventHandler {
     fn write(&self, writer: &mut AttributeWriter) {
         let key = &self.key;
-        let value = &self.value;
-        writer.insert_block(
-            1,
-            quote! {
-                {
-                    let __key = ::core::convert::Into::<::std::string::String>::into(#key);
-                    let (_, __js) = #value.into_evaluated_and_js();
-                    __attrs.insert(__cx, ::std::format!("data-topcoat-on:{}", __key), __js);
-                }
-            },
-        );
+        match &self.value {
+            EventHandlerValue::LitStr(value) => {
+                writer.insert_block(
+                    1,
+                    quote! {
+                        {
+                            let __key = ::core::convert::Into::<::std::string::String>::into(#key);
+                            __attrs.insert(__cx, ::std::format!("data-topcoat-on:{}", __key), #value);
+                        }
+                    },
+                );
+            }
+            EventHandlerValue::Expr(value) => {
+                writer.insert_block(
+                    1,
+                    quote! {
+                        {
+                            let __key = ::core::convert::Into::<::std::string::String>::into(#key);
+                            let (_, __js) = #value.into_evaluated_and_js();
+                            __attrs.insert(__cx, ::std::format!("data-topcoat-on:{}", __key), __js);
+                        }
+                    },
+                );
+            }
+        }
     }
 }
 
