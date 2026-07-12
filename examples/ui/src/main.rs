@@ -8,7 +8,7 @@ use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
     font::fontsource::fontsource_font,
-    icon::{icon, iconify},
+    icon::{icon, iconify::iconify_icon},
     router::{Router, RouterBuilderDiscoverExt, page},
     tailwind,
     view::{View, attributes, component, view},
@@ -38,37 +38,137 @@ async fn home() -> Result {
             // The body's background, text color, and font come from the
             // theme's base layer in styles.css; nothing to set up here.
             <body>
-                <main class="mx-auto max-w-3xl px-6 py-16">
-                    <h1 class="text-4xl font-bold tracking-tight">"Topcoat UI"</h1>
-                    <p class="mt-3 max-w-xl text-muted-foreground">
-                        "Components vendored into this project with "
-                        <code class="text-foreground">"topcoat ui add"</code>
-                        ", styled by the design tokens of the installed theme."
-                    </p>
-                    <div class="mt-6 flex flex-wrap items-center gap-3">
-                        button(
-                            size: ButtonSize::Lg,
-                            "Get started"
-                            icon(data: iconify::iconify_icon!("feather:arrow-right"))
-                        )
-                        // Anything can borrow a button's looks: `button_variants`
-                        // returns the class string for a variant and size.
-                        <a
-                            href="https://github.com/tokio-rs/topcoat"
-                            class=(button_variants(
-                                ButtonVariant::Outline,
-                                ButtonSize::Lg,
-                            ))
-                        >
-                            "View on GitHub"
-                        </a>
-                    </div>
+                <main class="mx-auto max-w-6xl px-6 py-16">
+                    <header class="max-w-2xl">
+                        <h1 class="text-4xl font-bold tracking-tight">
+                            "Build your component library"
+                        </h1>
+                        <p class="mt-3 text-muted-foreground">
+                            "Accessible, themeable components vendored into your \
+                             project with "
+                            <code class="text-foreground">"topcoat ui add"</code>
+                            ". Yours to restyle, rewrite, and ship."
+                        </p>
+                        <div class="mt-6 flex flex-wrap items-center gap-3">
+                            button(
+                                size: ButtonSize::Lg,
+                                "Get started"
+                                icon(data: iconify_icon!("feather:arrow-right"))
+                            )
+                            // Anything can borrow a button's looks:
+                            // `button_variants` returns the class string for a
+                            // variant and size.
+                            <a
+                                href="https://github.com/tokio-rs/topcoat"
+                                class=(button_variants(
+                                    ButtonVariant::Outline,
+                                    ButtonSize::Lg,
+                                ))
+                            >
+                                "View on GitHub"
+                            </a>
+                        </div>
+                    </header>
 
-                    showcase(
-                        title: "Variants",
-                        description: "Five variants rank actions from the one \
-                            primary action of a screen down to inline commands, \
-                            plus a destructive style for irreversible ones.",
+                    // A masonry of small, self-contained demos. Each cell is
+                    // a `demo` (built from installed components) or a
+                    // `coming_soon` placeholder for one not yet in the
+                    // registry.
+                    <div class="mt-14 columns-1 gap-4 sm:columns-2 xl:columns-3">
+                        demo(team_card())
+                        demo(buttons_card())
+                        coming_soon(name: "Input")
+                        demo(upgrade_card())
+                        demo(deploy_card())
+                        coming_soon(name: "Tabs")
+                        demo(delete_card())
+                        coming_soon(name: "Switch")
+                        demo(share_card())
+                        coming_soon(name: "Select")
+                        demo(notifications_card())
+                        coming_soon(name: "Dialog")
+                        coming_soon(name: "Dropdown menu")
+                        coming_soon(name: "Avatar")
+                    </div>
+                </main>
+            </body>
+        </html>
+    }
+}
+
+/// A masonry cell: keeps a demo from splitting across columns.
+#[component]
+async fn demo(child: View) -> Result {
+    view! { <div class="mb-4 break-inside-avoid">(child)</div> }
+}
+
+/// A placeholder cell for a component that is not in the registry yet.
+#[component]
+async fn coming_soon(name: &'static str) -> Result {
+    view! {
+        <div
+            class="mb-4 flex break-inside-avoid flex-col items-center justify-center \
+                gap-1 rounded-xl border border-dashed border-border px-6 py-10"
+        >
+            <p class="text-sm font-medium">(name)</p>
+            <p class="text-xs text-muted-foreground">"Coming soon"</p>
+        </div>
+    }
+}
+
+/// A team roster with per-member role controls.
+#[component]
+async fn team_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Your team")
+                card_description("Everyone with access to this workspace.")
+            )
+            card_content(
+                <div class="flex flex-col gap-4">
+                    for (name, email, role) in [
+                        ("Ada Lovelace", "ada@example.com", "Owner"),
+                        ("Grace Hopper", "grace@example.com", "Member"),
+                        ("Alan Turing", "alan@example.com", "Member"),
+                    ] {
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-medium">(name)</p>
+                                <p class="truncate text-xs text-muted-foreground">
+                                    (email)
+                                </p>
+                            </div>
+                            button(
+                                size: ButtonSize::Sm,
+                                variant: ButtonVariant::Outline,
+                                (role)
+                                icon(data: iconify_icon!("feather:chevron-down"))
+                            )
+                        </div>
+                    }
+                </div>
+            )
+            card_footer(
+                button(
+                    size: ButtonSize::Sm,
+                    variant: ButtonVariant::Secondary,
+                    icon(data: iconify_icon!("feather:user-plus"))
+                    "Invite member"
+                )
+            )
+        )
+    }
+}
+
+/// The button family: variants, sizes, and the disabled state at a glance.
+#[component]
+async fn buttons_card() -> Result {
+    view! {
+        card(
+            card_content(
+                <div class="flex flex-col gap-3">
+                    <div class="flex flex-wrap items-center gap-2">
                         for (variant, label) in [
                             (ButtonVariant::Primary, "Primary"),
                             (ButtonVariant::Secondary, "Secondary"),
@@ -76,148 +176,170 @@ async fn home() -> Result {
                             (ButtonVariant::Ghost, "Ghost"),
                             (ButtonVariant::Destructive, "Destructive"),
                         ] {
-                            button(variant: variant, (label))
+                            button(size: ButtonSize::Sm, variant: variant, (label))
                         }
-                    )
-
-                    showcase(
-                        title: "Sizes",
-                        description: "Three text sizes and a square one for \
-                            icon-only buttons. Icons are 1em square, so they \
-                            follow the button's text size.",
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
                         button(size: ButtonSize::Sm, "Small")
                         button(size: ButtonSize::Md, "Medium")
                         button(size: ButtonSize::Lg, "Large")
                         button(
                             size: ButtonSize::Icon,
                             variant: ButtonVariant::Outline,
-                            icon(
-                                data: iconify::iconify_icon!("feather:plus"),
-                                label: "Add item"
-                            )
+                            icon(data: iconify_icon!("feather:plus"), label: "Add item")
                         )
-                    )
-                    showcase(
-                        title: "Disabled",
-                        description: "Extra attributes forward to the underlying \
-                            <button> element, so disabling works like plain HTML.",
                         button(attrs: attributes! { disabled=(true) }, "Saving...")
-                        button(
-                            variant: ButtonVariant::Outline,
-                            attrs: attributes! { disabled=(true) },
-                            "Undo"
-                        )
-                    )
-
-                    showcase(
-                        title: "Card",
-                        description: "A card stacks a header, content, and footer \
-                            on a bordered, raised surface. Every section is \
-                            optional.",
-                        card(
-                            attrs: attributes! { class="max-w-sm" },
-                            card_header(
-                                card_title("Invite your team")
-                                card_description(
-                                    "Collaborators get access to every project \
-                                     in this workspace."
-                                )
-                            )
-                            card_content(
-                                <p class="text-sm">
-                                    "Invited members can view and edit projects, \
-                                     but only owners can change billing."
-                                </p>
-                            )
-                            card_footer(
-                                button(size: ButtonSize::Sm, "Send invites")
-                                button(
-                                    size: ButtonSize::Sm,
-                                    variant: ButtonVariant::Ghost,
-                                    "Copy link"
-                                )
-                            )
-                        )
-                    )
-
-                    showcase(
-                        title: "In context",
-                        description: "A confirmation card pairing a quiet dismiss \
-                            action with a destructive commit.",
-                        card(
-                            attrs: attributes! { class="max-w-sm" },
-                            card_header(
-                                card_title("Delete workspace")
-                                card_description(
-                                    "This permanently removes the workspace and \
-                                     all of its data."
-                                )
-                            )
-                            card_footer(
-                                attrs: attributes! { class="justify-end" },
-                                button(variant: ButtonVariant::Ghost, "Cancel")
-                                button(
-                                    variant: ButtonVariant::Destructive,
-                                    "Delete workspace"
-                                )
-                            )
-                        )
-                    )
-
-                    showcase(
-                        title: "Color schemes",
-                        description: "Components reference theme tokens instead of \
-                            raw colors, so putting the dark class on an ancestor \
-                            restyles everything inside it.",
-                        <div class="grid w-full gap-4 sm:grid-cols-2">
-                            scheme_panel(label: "Light")
-                            <div class="dark">scheme_panel(label: "Dark")</div>
-                        </div>
-                    )
-                </main>
-            </body>
-        </html>
+                    </div>
+                </div>
+            )
+        )
     }
 }
 
-/// A titled gallery section with a wrapping row for its demos.
+/// A pricing card with a feature list and an upgrade action.
 #[component]
-async fn showcase(title: &'static str, description: &'static str, child: View) -> Result {
-    view! {
-        <section class="mt-14">
-            <h2 class="text-lg font-semibold">(title)</h2>
-            <p class="mt-1 max-w-xl text-sm text-muted-foreground">(description)</p>
-            <div class="mt-5 flex flex-wrap items-center gap-3">(child)</div>
-        </section>
-    }
-}
-
-/// One color scheme's rendition of the button variants, on its own background.
-#[component]
-async fn scheme_panel(label: &'static str) -> Result {
+async fn upgrade_card() -> Result {
     view! {
         card(
+            card_header(
+                card_title("Pro")
+                card_description("For teams shipping to production.")
+            )
             card_content(
-                <p class="text-xs font-medium text-muted-foreground">(label)</p>
-                <div class="mt-3 flex flex-wrap items-center gap-2">
-                    button(size: ButtonSize::Sm, "Primary")
-                    button(
-                        size: ButtonSize::Sm,
-                        variant: ButtonVariant::Secondary,
-                        "Secondary"
+                <p>
+                    <span class="text-3xl font-bold">"$24"</span>
+                    <span class="text-sm text-muted-foreground">" / month"</span>
+                </p>
+                <ul class="mt-4 flex flex-col gap-2 text-sm">
+                    for feature in [
+                        "Unlimited projects",
+                        "Preview deployments",
+                        "Audit log",
+                        "Priority support",
+                    ] {
+                        <li class="flex items-center gap-2">
+                            icon(data: iconify_icon!("feather:check"))
+                            (feature)
+                        </li>
+                    }
+                </ul>
+            )
+            card_footer(button(attrs: attributes! { class="w-full" }, "Upgrade"))
+        )
+    }
+}
+
+/// A dark-scheme demo: the `dark` class on the wrapper restyles everything
+/// inside it, because components reference theme tokens instead of raw colors.
+#[component]
+async fn deploy_card() -> Result {
+    view! {
+        <div class="dark">
+            card(
+                card_header(
+                    card_title("Deployment ready")
+                    card_description(
+                        "topcoat-ui@0.4.2 built in 38s and passed all checks."
                     )
+                )
+                card_footer(
+                    button(size: ButtonSize::Sm, "Promote to production")
                     button(
                         size: ButtonSize::Sm,
+                        variant: ButtonVariant::Ghost,
+                        "View logs"
+                    )
+                )
+            )
+        </div>
+    }
+}
+
+/// A confirmation card pairing a quiet dismiss with a destructive commit.
+#[component]
+async fn delete_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Delete workspace")
+                card_description(
+                    "This permanently removes the workspace and all of its data."
+                )
+            )
+            card_footer(
+                attrs: attributes! { class="justify-end" },
+                button(variant: ButtonVariant::Ghost, "Cancel")
+                button(variant: ButtonVariant::Destructive, "Delete workspace")
+            )
+        )
+    }
+}
+
+/// A share sheet with a copyable link.
+#[component]
+async fn share_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Share this document")
+                card_description("Anyone with the link can view it.")
+            )
+            card_content(
+                <div class="flex items-center gap-2">
+                    <p
+                        class="min-w-0 flex-1 truncate rounded-lg border border-border \
+                            px-3 py-2 text-sm text-muted-foreground"
+                    >
+                        "https://topcoat.dev/d/quickstart"
+                    </p>
+                    button(
+                        size: ButtonSize::Icon,
                         variant: ButtonVariant::Outline,
-                        "Outline"
-                    )
-                    button(size: ButtonSize::Sm, variant: ButtonVariant::Ghost, "Ghost")
-                    button(
-                        size: ButtonSize::Sm,
-                        variant: ButtonVariant::Destructive,
-                        "Destructive"
+                        icon(data: iconify_icon!("feather:copy"), label: "Copy link")
                     )
                 </div>
+            )
+        )
+    }
+}
+
+/// An inbox digest with a bulk action in the footer.
+#[component]
+async fn notifications_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Notifications")
+                card_description("You have 3 unread messages.")
+            )
+            card_content(
+                <div class="flex flex-col gap-4">
+                    for (title, time) in [
+                        ("Your invoice for June is ready.", "2h ago"),
+                        ("grace@example.com joined your team.", "5h ago"),
+                        ("Deployment to production succeeded.", "1d ago"),
+                    ] {
+                        <div class="flex items-start gap-3">
+                            <span
+                                class="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
+                            >
+
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-sm">(title)</p>
+                                <p class="text-xs text-muted-foreground">(time)</p>
+                            </div>
+                        </div>
+                    }
+                </div>
+            )
+            card_footer(
+                button(
+                    size: ButtonSize::Sm,
+                    variant: ButtonVariant::Outline,
+                    icon(data: iconify_icon!("feather:check"))
+                    "Mark all as read"
+                )
             )
         )
     }
