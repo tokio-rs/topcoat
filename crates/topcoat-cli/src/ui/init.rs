@@ -47,11 +47,29 @@ impl InitCommand {
             ))
             .dim(),
         );
+        let theme_file = initialized.theme.file.display().to_string();
         println!(
             "{} installed theme {} {}",
             style("+").green(),
             style(initialized.theme.name).bold(),
-            style(format!("({})", initialized.theme.file.display())).dim(),
+            style(format!("({theme_file})")).dim(),
+        );
+
+        // The installed stylesheet is the theme's Tailwind input (it carries the
+        // `@import "tailwindcss"` and the theme tokens), so nothing loads until
+        // the Tailwind build script is pointed at it. Tell the user to wire it up.
+        println!();
+        println!(
+            "{} Load the theme by using it as your Tailwind {} in build.rs:",
+            style("!").yellow(),
+            style("input").bold(),
+        );
+        println!(
+            "{}",
+            style(format!(
+                "      topcoat::tailwind::BuildConfig::new().input({theme_file:?}).render().unwrap();"
+            ))
+            .dim(),
         );
 
         // The theme's `--font-sans` expects the Lexend family to be available.
