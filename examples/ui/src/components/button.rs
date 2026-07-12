@@ -1,6 +1,7 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, component, view},
+    context::Cx,
+    view::{Attributes, View, class, component, view},
 };
 
 /// The visual style of a [`button`].
@@ -114,9 +115,9 @@ pub fn button_variants(variant: ButtonVariant, size: ButtonSize) -> String {
 /// A button component.
 ///
 /// The `variant` and `size` parameters select the styling, defaulting to
-/// `Primary` and `Md`. Extra `class`es are appended to the computed ones, and
-/// any further `attrs` (such as `type`, `disabled`, or event handlers) are
-/// forwarded to the underlying `<button>`. Child nodes become the button's
+/// `Primary` and `Md`. The `attrs` (such as `class`, `type`, `disabled`, or
+/// event handlers) are forwarded to the underlying `<button>`; a `class` among
+/// them is appended to the computed classes. Child nodes become the button's
 /// content.
 ///
 /// ```rust
@@ -133,21 +134,19 @@ pub fn button_variants(variant: ButtonVariant, size: ButtonSize) -> String {
 /// directly.
 #[component]
 pub async fn button(
+    cx: &Cx,
     #[default] variant: ButtonVariant,
     #[default] size: ButtonSize,
-    #[into]
-    #[default]
-    class: String,
-    #[default] attrs: Attributes,
+    #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
-    // There is no tailwind-merge here, so caller classes are appended rather
-    // than merged: a conflicting utility wins by being last, per the CSS
-    // cascade.
-    let class = match class.trim() {
-        "" => button_variants(variant, size),
-        extra => format!("{} {extra}", button_variants(variant, size)),
-    };
+    // There is no tailwind-merge here, so a caller's `class` is appended
+    // rather than merged: a conflicting utility wins by being last, per the
+    // CSS cascade.
+    let class = class!(BASE, variant.classes(), size.classes());
+    if let Some(extra) = attrs.insert(cx, "class", class) {
+        attrs.insert(cx, "class", (class, " ", extra));
+    }
 
-    view! { <button class=(class) (attrs)>(child)</button> }
+    view! { <button (attrs)>(child)</button> }
 }
