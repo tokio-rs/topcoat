@@ -85,7 +85,7 @@ impl InitCommand {
             style("-").dim(),
             style("font-fontsource").bold(),
         );
-        println!("  {} load it in your page's <head>:", style("-").dim(),);
+        println!("  {} load it in your page's <head>:", style("-").dim());
         println!(
             "{}",
             style("      topcoat::font::link(font: fontsource_font!(LEXEND))").dim(),
