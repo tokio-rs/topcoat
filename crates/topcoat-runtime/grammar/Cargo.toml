@@ -7,6 +7,7 @@ edition.workspace = true
 discover = []
 
 [dependencies]
+topcoat-core-grammar.workspace = true
 topcoat-runtime.workspace = true
 
 proc-macro2.workspace = true
