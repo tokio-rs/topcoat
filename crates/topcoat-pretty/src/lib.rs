@@ -47,12 +47,8 @@ pub fn pretty_print_str(registry: &Registry, input: &str) -> Result<String, Vec<
 
     // The whole file is parsed as a unit, so this error's span already refers to
     // positions in `input`; its body starts at the very first line and column.
-    let file = syn::parse_file(input).map_err(|error| {
-        vec![FormatError::new(
-            &error,
-            LineColumn { line: 1, column: 0 },
-        )]
-    })?;
+    let file = syn::parse_file(input)
+        .map_err(|error| vec![FormatError::new(&error, LineColumn { line: 1, column: 0 })])?;
     let snippets = MacroSnippet::collect_from_file(&file);
     let mut errors = Vec::new();
     let mut replacements = Vec::new();
