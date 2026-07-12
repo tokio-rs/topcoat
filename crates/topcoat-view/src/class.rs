@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use topcoat_core::context::Cx;
 
-use crate::{AttributeValueViewParts, PartsWriter};
+use crate::{AttributeValueViewParts, PartsWriter, ViewPart};
 
 /// Converts a value used as a class list entry into view parts.
 ///
@@ -71,6 +71,35 @@ impl ClassViewParts for Cow<'static, str> {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         parts.push_str(self);
+    }
+}
+
+/// An attribute value, such as one taken from an
+/// [`Attributes`](crate::Attributes) collection with
+/// [`get`](crate::Attributes::get), spliced in as a single entry.
+impl ClassViewParts for ViewPart {
+    #[inline]
+    fn is_present(&self) -> bool {
+        self.attribute_present()
+    }
+
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        // The part was already sealed with the context it was written in, so
+        // it is spliced in verbatim rather than escaped a second time.
+        parts.push_part(self);
+    }
+}
+
+impl ClassViewParts for &ViewPart {
+    #[inline]
+    fn is_present(&self) -> bool {
+        self.attribute_present()
+    }
+
+    #[inline]
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        ClassViewParts::into_view_parts(ViewPart::clone(self), cx, parts);
     }
 }
 
@@ -433,6 +462,20 @@ mod tests {
     fn array_entries_render_with_separators() {
         let class = Class([Some("a"), None, Some("b")]);
         assert_eq!(render(class), "a b");
+    }
+
+    #[test]
+    fn attribute_value_entries_are_spliced_verbatim() {
+        let mut parts = ViewParts::new();
+        PartsWriter::new(&mut parts, HtmlContext::AttributeValue).push_str("[&>*]:mt-2");
+        let part = ViewPart::from(parts);
+        assert_eq!(render(Class(("btn", &part))), "btn [&amp;>*]:mt-2");
+    }
+
+    #[test]
+    fn empty_attribute_value_entry_is_skipped_without_a_separator() {
+        let part = ViewPart::empty();
+        assert_eq!(render(Class(("a", &part, "b"))), "a b");
     }
 
     #[test]

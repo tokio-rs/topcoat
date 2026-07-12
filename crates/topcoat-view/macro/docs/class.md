@@ -43,7 +43,7 @@ view! {
 # }
 ```
 
-An entry can be any value implementing [`ClassViewParts`]: string types, `Option`s of them, a `Vec` or array of entries, or another [`Class`]. Implement the trait for your own types to use them as entries.
+An entry can be any value implementing [`ClassViewParts`]: string types, `Option`s of them, a `Vec` or array of entries, another [`Class`], or an attribute value ([`ViewPart`]) taken from an [`Attributes`] collection. Implement the trait for your own types to use them as entries.
 
 # Absent entries
 
@@ -63,7 +63,9 @@ view! {
 # }
 ```
 
+[`Attributes`]: struct.Attributes.html
 [`Class`]: struct.Class.html
 [`ClassViewParts`]: trait.ClassViewParts.html
+[`ViewPart`]: enum.ViewPart.html
 [`class!`]: macro.class.html
 [`topcoat::view::Class`]: struct.Class.html

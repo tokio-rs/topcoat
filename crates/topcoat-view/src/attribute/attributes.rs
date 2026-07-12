@@ -55,7 +55,7 @@ impl Attributes {
 
     /// Returns the view parts stored for attribute key `k`, if present.
     #[inline]
-    pub fn get(&mut self, k: impl AsRef<str>) -> Option<&ViewPart> {
+    pub fn get(&self, k: impl AsRef<str>) -> Option<&ViewPart> {
         self.map.get(k.as_ref())
     }
 
@@ -84,6 +84,13 @@ impl Attributes {
         } else {
             self.map.insert(k.into(), ViewPart::empty())
         }
+    }
+
+    /// Removes an attribute, returning its rendered value if the key was
+    /// present.
+    #[inline]
+    pub fn remove(&mut self, k: impl AsRef<str>) -> Option<ViewPart> {
+        self.map.remove(k.as_ref())
     }
 
     /// Removes all attributes from the collection.
@@ -195,6 +202,15 @@ mod tests {
         attrs.insert(&Cx::default(), "class", "button");
         assert!(attrs.get("class").is_some());
         assert!(attrs.get("missing").is_none());
+    }
+
+    #[test]
+    fn remove_returns_value_and_deletes_entry() {
+        let mut attrs = Attributes::new();
+        attrs.insert(&Cx::default(), "class", "button");
+        assert!(attrs.remove("class").is_some());
+        assert!(!attrs.contains_key("class"));
+        assert!(attrs.remove("class").is_none());
     }
 
     #[test]

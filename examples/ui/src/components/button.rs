@@ -1,6 +1,5 @@
 use topcoat::{
     Result,
-    context::Cx,
     view::{Attributes, View, class, component, view},
 };
 
@@ -134,19 +133,17 @@ pub fn button_variants(variant: ButtonVariant, size: ButtonSize) -> String {
 /// directly.
 #[component]
 pub async fn button(
-    cx: &Cx,
     #[default] variant: ButtonVariant,
     #[default] size: ButtonSize,
     #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
-    // There is no tailwind-merge here, so a caller's `class` is appended
-    // rather than merged: a conflicting utility wins by being last, per the
-    // CSS cascade.
-    let class = class!(BASE, variant.classes(), size.classes());
-    if let Some(extra) = attrs.insert(cx, "class", class) {
-        attrs.insert(cx, "class", (class, " ", extra));
+    view! {
+        <button
+            class=(class!(BASE, variant.classes(), size.classes(), attrs.remove("class")))
+            (attrs)
+        >
+            (child)
+        </button>
     }
-
-    view! { <button (attrs)>(child)</button> }
 }
