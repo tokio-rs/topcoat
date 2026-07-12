@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
-use crate::{DEFAULT_REGISTRY_CRATE, Dependency, Registry, content_hash};
+use crate::{DEFAULT_REGISTRY, Dependency, Registry, content_hash};
 
 use super::Confirm;
 use super::module;
@@ -314,7 +314,7 @@ fn resolve_root_registry(
     // Prefer the default registry whenever it offers the component. It may not
     // offer it (or, for a project that does not depend on `topcoat`, not load at
     // all), in which case fall through to the package's other registries.
-    let default = DEFAULT_REGISTRY_CRATE;
+    let default = DEFAULT_REGISTRY;
     let offers_default = match load_registry(registries, workspace, default) {
         Ok(registry) => registry.get(component).is_some(),
         Err(_) => false,

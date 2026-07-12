@@ -10,7 +10,11 @@ edition = "2024"
 [package.metadata.topcoat-ui]
 registry = "."
 
-[dependencies]
+# `topcoat` is a dev-dependency, not a normal one: the `topcoat` facade pulls
+# this registry in under its `ui` feature, so a normal dependency back on
+# `topcoat` would form a cycle. As a dev-dependency it is available when the
+# component sources are compiled (under `cfg(test)`) without creating one.
+[dev-dependencies]
 topcoat.workspace = true
 
 [lints]

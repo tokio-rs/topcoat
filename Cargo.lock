@@ -2587,6 +2587,7 @@ dependencies = [
  "topcoat-runtime",
  "topcoat-runtime-macro",
  "topcoat-tailwind",
+ "topcoat-ui-registry",
  "topcoat-view",
  "topcoat-view-macro",
  "uuid",

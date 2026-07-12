@@ -4,15 +4,18 @@ use std::process::Command;
 
 use serde::Deserialize;
 
+use crate::{DEFAULT_REGISTRY, DEFAULT_REGISTRY_CRATE};
+
 use super::package::Package;
 
 /// The cargo dependency graph of a package, used to resolve registries.
 ///
 /// A registry is a crate, referenced by name. To be used as a registry a crate
 /// must (a) be reachable in the package's dependency graph and (b) be a *direct*
-/// dependency declared in the package's `Cargo.toml`. The built-in
-/// `topcoat-ui-registry` is no exception: it must be declared as a direct
-/// dependency to be used, like any other registry.
+/// dependency declared in the package's `Cargo.toml`. The built-in registry is
+/// the one exception: it is named by the alias [`DEFAULT_REGISTRY`], provided by
+/// the [`DEFAULT_REGISTRY_CRATE`] crate, and pulled in transitively by the
+/// `topcoat` facade's `ui` feature, so it need not be a direct dependency.
 pub(super) struct Workspace {
     /// Every resolved package, indexed by crate name.
     packages: HashMap<String, MetadataPackage>,
@@ -86,51 +89,77 @@ impl Workspace {
         })
     }
 
-    /// Resolves a registry crate name to its registry directory (the directory
-    /// holding `registry.toml`), enforcing the dependency rules.
-    pub(super) fn registry_dir(&self, crate_name: &str) -> Result<PathBuf, String> {
-        let package = self.packages.get(crate_name).ok_or_else(|| {
-            format!(
-                "registry crate `{crate_name}` is not in the dependency graph; add it to Cargo.toml"
-            )
+    /// Resolves a registry name to its registry directory (the directory holding
+    /// `registry.toml`), enforcing the dependency rules.
+    ///
+    /// The built-in registry is named by the alias [`DEFAULT_REGISTRY`]: it
+    /// resolves to the [`DEFAULT_REGISTRY_CRATE`] crate and, since that crate is
+    /// pulled in transitively, is exempt from the direct-dependency rule.
+    pub(super) fn registry_dir(&self, name: &str) -> Result<PathBuf, String> {
+        if name == DEFAULT_REGISTRY {
+            let package = self.packages.get(DEFAULT_REGISTRY_CRATE).ok_or_else(|| {
+                format!(
+                    "the built-in registry crate `{DEFAULT_REGISTRY_CRATE}` is not in the \
+                     dependency graph; enable the `ui` feature on `topcoat`"
+                )
+            })?;
+            return registry_path(package, DEFAULT_REGISTRY_CRATE);
+        }
+
+        let package = self.packages.get(name).ok_or_else(|| {
+            format!("registry crate `{name}` is not in the dependency graph; add it to Cargo.toml")
         })?;
 
-        if !self.direct_deps.contains(crate_name) {
+        if !self.direct_deps.contains(name) {
             return Err(format!(
-                "registry crate `{crate_name}` must be a direct dependency in Cargo.toml"
+                "registry crate `{name}` must be a direct dependency in Cargo.toml"
             ));
         }
 
-        let registry = registry_subdir(package).ok_or_else(|| {
-            format!(
-                "crate `{crate_name}` is not a topcoat-ui registry \
-                 (missing `[package.metadata.topcoat-ui].registry`)"
-            )
-        })?;
-
-        let crate_root = package
-            .manifest_path
-            .parent()
-            .expect("a manifest path always has a parent directory");
-        Ok(crate_root.join(registry))
+        registry_path(package, name)
     }
 
-    /// The crate names of every registry the package may add from: every direct
-    /// dependency that declares a registry (including the default `topcoat`
-    /// crate), sorted.
+    /// The names of every registry the package may add from, sorted: the built-in
+    /// registry under its alias [`DEFAULT_REGISTRY`] whenever its crate is
+    /// reachable, plus every direct dependency that declares a registry.
     pub(super) fn available_registries(&self) -> Vec<String> {
         let mut names: Vec<String> = self
             .packages
             .values()
             .filter(|package| {
-                self.direct_deps.contains(&package.name) && registry_subdir(package).is_some()
+                package.name != DEFAULT_REGISTRY_CRATE
+                    && self.direct_deps.contains(&package.name)
+                    && registry_subdir(package).is_some()
             })
             .map(|package| package.name.clone())
             .collect();
+        if self
+            .packages
+            .get(DEFAULT_REGISTRY_CRATE)
+            .is_some_and(|package| registry_subdir(package).is_some())
+        {
+            names.push(DEFAULT_REGISTRY.to_string());
+        }
         names.sort();
         names.dedup();
         names
     }
+}
+
+/// The registry directory `package` declares (the directory holding
+/// `registry.toml`), resolved against the crate root.
+fn registry_path(package: &MetadataPackage, name: &str) -> Result<PathBuf, String> {
+    let registry = registry_subdir(package).ok_or_else(|| {
+        format!(
+            "crate `{name}` is not a topcoat-ui registry \
+             (missing `[package.metadata.topcoat-ui].registry`)"
+        )
+    })?;
+    let crate_root = package
+        .manifest_path
+        .parent()
+        .expect("a manifest path always has a parent directory");
+    Ok(crate_root.join(registry))
 }
 
 /// The registry directory a crate declares via `[package.metadata.topcoat-ui]`,

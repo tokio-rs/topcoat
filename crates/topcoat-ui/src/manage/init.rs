@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{DEFAULT_REGISTRY_CRATE, Registry, content_hash};
+use crate::{DEFAULT_REGISTRY, Registry, content_hash};
 
 use super::ChooseTheme;
 use super::package::Package;
@@ -119,18 +119,18 @@ fn plan_theme(
     requested: Option<&str>,
     choose: &mut ChooseTheme<'_>,
 ) -> Result<ThemePlan, String> {
-    let registry_crate = DEFAULT_REGISTRY_CRATE;
+    let registry_name = DEFAULT_REGISTRY;
     let workspace = Workspace::load(package)?;
     let dir = workspace
-        .registry_dir(registry_crate)
+        .registry_dir(registry_name)
         .map_err(|error| format!("cannot install a theme: {error}"))?;
     let registry = Registry::load(dir)
-        .map_err(|error| format!("failed to load registry `{registry_crate}`: {error}"))?;
+        .map_err(|error| format!("failed to load registry `{registry_name}`: {error}"))?;
 
     let names: Vec<String> = registry.theme_names().map(str::to_string).collect();
     if names.is_empty() {
         return Err(format!(
-            "registry `{registry_crate}` offers no themes to install"
+            "registry `{registry_name}` offers no themes to install"
         ));
     }
 
@@ -157,7 +157,7 @@ fn plan_theme(
 
     Ok(ThemePlan {
         name: chosen,
-        registry: registry_crate.to_string(),
+        registry: registry_name.to_string(),
         hash: content_hash(&contents),
         // Installed at the package root by default, alongside `components.toml`.
         file: PathBuf::from(theme.file_name()),
