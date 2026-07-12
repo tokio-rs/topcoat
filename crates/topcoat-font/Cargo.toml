@@ -15,6 +15,7 @@ router = [
 ]
 view = [
 	"dep:topcoat-view",
+	"dep:topcoat-view-macro",
 	"topcoat-asset?/view",
 ]
 
@@ -23,6 +24,7 @@ topcoat-core.workspace = true
 topcoat-asset = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
+topcoat-view-macro = { workspace = true, optional = true }
 
 inventory = { workspace = true, optional = true }
 

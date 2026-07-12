@@ -12,9 +12,9 @@
 //!   a crate that the facade itself re-exports could not depend on the facade without a cycle.
 //!
 //! Each framework crate is therefore represented by a [`Crate`] constant that
-//! resolves to the right path for whoever is compiling the call site: through
-//! the facade when the caller depends on it, and straight to the standalone
-//! crate otherwise.
+//! resolves to the right path for whoever is compiling the call site: straight
+//! to the standalone crate when the caller depends on it directly, and through
+//! the facade otherwise.
 //!
 //! Interpolate a constant into `quote!` like any other path:
 //!
@@ -77,10 +77,25 @@ impl ToTokens for Crate {
     }
 }
 
-/// Resolves `krate` to a path for the crate currently being compiled: a
-/// facade-relative path when the call site depends on `topcoat`, and a path into
-/// the standalone crate otherwise.
+/// Resolves `krate` to a path for the crate currently being compiled.
+///
+/// The standalone crate is preferred whenever it is a direct dependency: a
+/// component library depends on the individual crates (`topcoat-view`, and so
+/// on) and names them directly. This holds even when the library *also* pulls
+/// the facade in as a dev-dependency for its tests -- keying off the standalone
+/// crate keeps the library's own code resolving to the crates its `lib` target
+/// actually links, which a facade-first check would get wrong (`crate_name`
+/// cannot tell a dev-dependency from a real one). Only a caller that depends on
+/// the facade alone -- an application crate -- falls through to the facade path.
 fn resolve(krate: &Crate) -> String {
+    if let Some(base) = package(krate.package) {
+        return if krate.module.is_empty() {
+            base
+        } else {
+            format!("{base}::{}", krate.module)
+        };
+    }
+
     if let Some(base) = facade() {
         return if krate.facade.is_empty() {
             base.to_owned()
@@ -89,7 +104,9 @@ fn resolve(krate: &Crate) -> String {
         };
     }
 
-    let base = package(krate.package);
+    // Neither the crate nor the facade is a declared dependency (as in a grammar
+    // crate's own unit tests). Fall back to the bare underscored crate name.
+    let base = format!("::{}", krate.package.replace('-', "_"));
     if krate.module.is_empty() {
         base
     } else {
@@ -114,20 +131,20 @@ fn facade() -> Option<&'static str> {
         .as_deref()
 }
 
-/// The base path to a standalone crate: `crate` when it's the one being
-/// compiled, `::renamed` when the caller renamed it, or `::package_name` as a
-/// fallback. Cached per package name.
-fn package(package: &'static str) -> String {
-    static CACHE: OnceLock<Mutex<HashMap<&'static str, String>>> = OnceLock::new();
+/// The base path to a standalone crate when it is a direct dependency of the
+/// crate being compiled: `crate` when it *is* that crate, or `::renamed`
+/// otherwise. `None` when it is not a dependency. Cached per package name.
+fn package(package: &'static str) -> Option<String> {
+    static CACHE: OnceLock<Mutex<HashMap<&'static str, Option<String>>>> = OnceLock::new();
     CACHE
         .get_or_init(Mutex::default)
         .lock()
         .expect("crate path cache is not poisoned")
         .entry(package)
         .or_insert_with(|| match crate_name(package) {
-            Ok(FoundCrate::Itself) => "crate".to_owned(),
-            Ok(FoundCrate::Name(name)) => format!("::{name}"),
-            Err(_) => format!("::{}", package.replace('-', "_")),
+            Ok(FoundCrate::Itself) => Some("crate".to_owned()),
+            Ok(FoundCrate::Name(name)) => Some(format!("::{name}")),
+            Err(_) => None,
         })
         .clone()
 }

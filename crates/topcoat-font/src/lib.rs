@@ -1,3 +1,5 @@
+#[cfg(feature = "view")]
+mod component;
 mod css;
 mod display;
 mod face;
@@ -16,6 +18,8 @@ mod unicode;
 mod view;
 mod weight;
 
+#[cfg(feature = "view")]
+pub use component::*;
 pub(crate) use css::CssString;
 pub use display::*;
 pub use face::*;
