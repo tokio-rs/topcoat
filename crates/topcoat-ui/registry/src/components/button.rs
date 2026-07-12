@@ -140,7 +140,12 @@ pub async fn button(
 ) -> Result {
     view! {
         <button
-            class=(class!(BASE, variant.classes(), size.classes(), attrs.remove("class")))
+            class=(class!(
+                BASE,
+                variant.classes(),
+                size.classes(),
+                attrs.remove("class"),
+            ))
             (attrs)
         >
             (child)
