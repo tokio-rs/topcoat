@@ -57,3 +57,13 @@ jobs:
       - uses: taiki-e/install-action@cargo-hack
       - run: cargo fetch --locked
       - run: cargo hack clippy --workspace --each-feature --no-dev-deps --offline -- -D warnings
+
+  udeps:
+    name: udeps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update nightly && rustup default nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-udeps
+      - run: cargo udeps --workspace --all-targets --all-features --locked
