@@ -2,6 +2,7 @@
 name = "font"
 version.workspace = true
 edition.workspace = true
+publish = false
 
 [dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

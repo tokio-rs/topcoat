@@ -59,7 +59,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
 
 [workspace.lints.rust]
@@ -87,36 +87,36 @@ debug = false
 
 [workspace.dependencies]
 # Topcoat crates
-topcoat = { path = "crates/topcoat" }
-topcoat-asset = { path = "crates/topcoat-asset" }
-topcoat-cookie = { path = "crates/topcoat-cookie" }
-topcoat-core = { path = "crates/topcoat-core" }
-topcoat-core-grammar = { path = "crates/topcoat-core/grammar" }
-topcoat-core-macro = { path = "crates/topcoat-core/macro" }
-topcoat-font = { path = "crates/topcoat-font" }
-topcoat-font-grammar = { path = "crates/topcoat-font/grammar" }
-topcoat-font-macro = { path = "crates/topcoat-font/macro" }
-topcoat-font-fontsource = { path = "crates/topcoat-font/fontsource" }
-topcoat-font-fontsource-grammar = { path = "crates/topcoat-font/fontsource/grammar" }
-topcoat-font-fontsource-macro = { path = "crates/topcoat-font/fontsource/macro" }
-topcoat-htmx = { path = "crates/topcoat-htmx" }
-topcoat-icon = { path = "crates/topcoat-icon" }
-topcoat-icon-iconify = { path = "crates/topcoat-icon/iconify" }
-topcoat-icon-iconify-grammar = { path = "crates/topcoat-icon/iconify/grammar" }
-topcoat-icon-iconify-macro = { path = "crates/topcoat-icon/iconify/macro" }
-topcoat-pretty = { path = "crates/topcoat-pretty" }
-topcoat-router = { path = "crates/topcoat-router" }
-topcoat-router-grammar = { path = "crates/topcoat-router/grammar" }
-topcoat-router-macro = { path = "crates/topcoat-router/macro" }
-topcoat-runtime = { path = "crates/topcoat-runtime" }
-topcoat-runtime-grammar = { path = "crates/topcoat-runtime/grammar" }
-topcoat-runtime-macro = { path = "crates/topcoat-runtime/macro" }
-topcoat-tailwind = { path = "crates/topcoat-tailwind" }
-topcoat-ui = { path = "crates/topcoat-ui" }
-topcoat-ui-registry = { path = "crates/topcoat-ui/registry" }
-topcoat-view = { path = "crates/topcoat-view" }
-topcoat-view-grammar = { path = "crates/topcoat-view/grammar" }
-topcoat-view-macro = { path = "crates/topcoat-view/macro" }
+topcoat = { version = "0.0.1", path = "crates/topcoat" }
+topcoat-asset = { version = "0.0.1", path = "crates/topcoat-asset" }
+topcoat-cookie = { version = "0.0.1", path = "crates/topcoat-cookie" }
+topcoat-core = { version = "0.0.1", path = "crates/topcoat-core" }
+topcoat-core-grammar = { version = "0.0.1", path = "crates/topcoat-core/grammar" }
+topcoat-core-macro = { version = "0.0.1", path = "crates/topcoat-core/macro" }
+topcoat-font = { version = "0.0.1", path = "crates/topcoat-font" }
+topcoat-font-grammar = { version = "0.0.1", path = "crates/topcoat-font/grammar" }
+topcoat-font-macro = { version = "0.0.1", path = "crates/topcoat-font/macro" }
+topcoat-font-fontsource = { version = "0.0.1", path = "crates/topcoat-font/fontsource" }
+topcoat-font-fontsource-grammar = { version = "0.0.1", path = "crates/topcoat-font/fontsource/grammar" }
+topcoat-font-fontsource-macro = { version = "0.0.1", path = "crates/topcoat-font/fontsource/macro" }
+topcoat-htmx = { version = "0.0.1", path = "crates/topcoat-htmx" }
+topcoat-icon = { version = "0.0.1", path = "crates/topcoat-icon" }
+topcoat-icon-iconify = { version = "0.0.1", path = "crates/topcoat-icon/iconify" }
+topcoat-icon-iconify-grammar = { version = "0.0.1", path = "crates/topcoat-icon/iconify/grammar" }
+topcoat-icon-iconify-macro = { version = "0.0.1", path = "crates/topcoat-icon/iconify/macro" }
+topcoat-pretty = { version = "0.0.1", path = "crates/topcoat-pretty" }
+topcoat-router = { version = "0.0.1", path = "crates/topcoat-router" }
+topcoat-router-grammar = { version = "0.0.1", path = "crates/topcoat-router/grammar" }
+topcoat-router-macro = { version = "0.0.1", path = "crates/topcoat-router/macro" }
+topcoat-runtime = { version = "0.0.1", path = "crates/topcoat-runtime" }
+topcoat-runtime-grammar = { version = "0.0.1", path = "crates/topcoat-runtime/grammar" }
+topcoat-runtime-macro = { version = "0.0.1", path = "crates/topcoat-runtime/macro" }
+topcoat-tailwind = { version = "0.0.1", path = "crates/topcoat-tailwind" }
+topcoat-ui = { version = "0.0.1", path = "crates/topcoat-ui" }
+topcoat-ui-registry = { version = "0.0.1", path = "crates/topcoat-ui/registry" }
+topcoat-view = { version = "0.0.1", path = "crates/topcoat-view" }
+topcoat-view-grammar = { version = "0.0.1", path = "crates/topcoat-view/grammar" }
+topcoat-view-macro = { version = "0.0.1", path = "crates/topcoat-view/macro" }
 
 anyhow = "1.0"
 anymap3 = "1.0"

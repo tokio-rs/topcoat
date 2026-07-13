@@ -1,0 +1,133 @@
+[workspace]
+git_release_draft = true
+pr_draft = true
+pr_labels = ["release"]
+release_always = false
+
+# Every crate shares one lockstep version and is released together, so a
+# bump to any crate bumps them all to the same version. Keep this list in
+# sync with the publishable members under `crates/` (examples and
+# benchmarks are `publish = false` and excluded automatically).
+[[package]]
+name = "topcoat"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-asset"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-cli"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-cookie"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-core"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-core-grammar"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-core-macro"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-font"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-font-grammar"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-font-macro"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-font-fontsource"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-font-fontsource-grammar"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-font-fontsource-macro"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-htmx"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-icon"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-icon-iconify"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-icon-iconify-grammar"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-icon-iconify-macro"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-pretty"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-router"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-router-grammar"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-router-macro"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-runtime"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-runtime-grammar"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-runtime-macro"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-tailwind"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-ui"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-ui-registry"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-view"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-view-grammar"
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-view-macro"
+version_group = "topcoat"
