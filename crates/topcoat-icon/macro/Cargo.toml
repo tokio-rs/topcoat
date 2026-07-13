@@ -15,11 +15,11 @@ proc-macro = true
 
 [features]
 iconify = [
-	"dep:topcoat-icon-grammar",
+	"topcoat-icon-grammar/iconify"
 ]
 
 [dependencies]
-topcoat-icon-grammar = { workspace = true, optional = true, features = ["iconify"] }
+topcoat-icon-grammar.workspace = true
 
 proc-macro2.workspace = true
 quote.workspace = true

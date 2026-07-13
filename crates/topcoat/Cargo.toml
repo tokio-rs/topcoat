@@ -69,11 +69,11 @@ htmx = [
 ]
 icon = [
 	"dep:topcoat-icon",
+	"dep:topcoat-icon-macro",
 	"view",
 ]
 icon-iconify = [
 	"icon",
-	"dep:topcoat-icon-macro",
 	"topcoat-icon-macro/iconify",
 	"topcoat-icon/iconify-build",
 ]
