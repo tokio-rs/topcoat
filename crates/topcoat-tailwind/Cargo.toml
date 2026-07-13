@@ -2,6 +2,13 @@
 name = "topcoat-tailwind"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 
 [features]
 default = ["build"]
@@ -15,7 +22,7 @@ thiserror = { workspace = true, optional = true }
 ureq = { workspace = true, optional = true }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["tailwind"] }
+topcoat = { path = "../topcoat", features = ["tailwind"] }
 
 [lints]
 workspace = true

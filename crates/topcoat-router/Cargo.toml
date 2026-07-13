@@ -2,6 +2,13 @@
 name = "topcoat-router"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 
 [features]
 discover = [
@@ -38,7 +45,7 @@ serde_urlencoded.workspace = true
 tokio = { workspace = true, features = ["net", "rt"] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["router"] }
+topcoat = { path = "../topcoat", features = ["router"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]

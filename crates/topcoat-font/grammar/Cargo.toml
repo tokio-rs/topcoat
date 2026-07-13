@@ -2,6 +2,13 @@
 name = "topcoat-font-grammar"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 topcoat-core-grammar.workspace = true

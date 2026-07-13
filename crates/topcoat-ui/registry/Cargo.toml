@@ -1,7 +1,14 @@
 [package]
 name = "topcoat-ui-registry"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 
 # Declares this crate as a topcoat-ui component registry: `topcoat ui` reads the
 # `registry.toml` (and the theme and component sources it names) under this
@@ -15,7 +22,7 @@ registry = "."
 # `topcoat` would form a cycle. As a dev-dependency it is available when the
 # component sources are compiled (under `cfg(test)`) without creating one.
 [dev-dependencies]
-topcoat = { workspace = true, features = ["icon-iconify"] }
+topcoat = { path = "../../topcoat", features = ["icon-iconify"] }
 
 [build-dependencies]
 # The staging API is used directly rather than through the `topcoat` facade:

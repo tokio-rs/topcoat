@@ -2,6 +2,13 @@
 name = "topcoat-cli"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 default-run = "topcoat"
 
 [[bin]]
@@ -35,7 +42,7 @@ syn.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "process", "signal", "io-util", "time", "sync"] }
 
 [dev-dependencies]
-topcoat.workspace = true
+topcoat = { path = "../topcoat" }
 
 [lints]
 workspace = true

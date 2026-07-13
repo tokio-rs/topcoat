@@ -2,6 +2,13 @@
 name = "topcoat-view-macro"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 
 [lib]
 proc-macro = true
@@ -13,7 +20,7 @@ quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["view"] }
+topcoat = { path = "../../topcoat", features = ["view"] }
 
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 

@@ -2,6 +2,13 @@
 name = "topcoat-runtime"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 
 [features]
 discover = ["dep:inventory"]
@@ -22,7 +29,7 @@ serde_json.workspace = true
 uuid = { workspace = true, features = ["v4", "serde"] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["runtime"] }
+topcoat = { path = "../topcoat", features = ["runtime"] }
 
 [lints]
 workspace = true

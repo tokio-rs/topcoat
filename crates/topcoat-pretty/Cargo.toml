@@ -2,6 +2,13 @@
 name = "topcoat-pretty"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 prettyplease.workspace = true
@@ -10,7 +17,7 @@ quote.workspace = true
 syn = { workspace = true, features = ["full", "extra-traits", "visit"] }
 
 [dev-dependencies]
-topcoat.workspace = true
+topcoat = { path = "../topcoat" }
 
 [lints]
 workspace = true

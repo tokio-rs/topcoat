@@ -2,6 +2,13 @@
 name = "topcoat-asset"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 
 [features]
 default = []
@@ -35,7 +42,7 @@ toml.workspace = true
 ureq = { workspace = true, optional = true }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["asset"] }
+topcoat = { path = "../topcoat", features = ["asset"] }
 
 [lints]
 workspace = true

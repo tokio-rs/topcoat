@@ -2,6 +2,13 @@
 name = "topcoat-font-fontsource-macro"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 
 [lib]
 proc-macro = true
@@ -19,7 +26,7 @@ quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["font-fontsource", "asset"] }
+topcoat = { path = "../../../topcoat", features = ["font-fontsource", "asset"] }
 
 [lints]
 workspace = true
