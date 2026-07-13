@@ -9,7 +9,7 @@ fn attributes_macro_builds_runtime_attributes() {
         ("data-after", "after"),
     ];
 
-    let mut attrs = topcoat::view::attributes! {
+    let attrs = topcoat::view::attributes! {
         cx =>
         class="button"
         id=(id)
