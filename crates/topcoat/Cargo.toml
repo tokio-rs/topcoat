@@ -147,8 +147,5 @@ workspace = true
 [package.metadata.docs.rs]
 all-features = true
 
-# The `ui` feature pulls in `topcoat-ui-registry` as the built-in component
-# registry backing `topcoat ui add`; the facade never references its items
-# directly, so `cargo-udeps` reports it as unused.
 [package.metadata.cargo-udeps.ignore]
 normal = ["topcoat-ui-registry"]

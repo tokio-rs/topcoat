@@ -2646,6 +2646,7 @@ dependencies = [
  "serde_json",
  "syn",
  "tokio",
+ "topcoat",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-core-grammar",
