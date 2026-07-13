@@ -1,5 +1,5 @@
 [package]
-name = "topcoat-font-grammar"
+name = "topcoat-icon-macro"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -10,29 +10,23 @@ keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
 
+[lib]
+proc-macro = true
+
 [features]
-fontsource = [
-	"topcoat-font/fontsource",
-]
-asset = [
-	"topcoat-font/asset",
+iconify = [
+	"dep:topcoat-icon-grammar",
 ]
 
 [dependencies]
-topcoat-core-grammar.workspace = true
-topcoat-font.workspace = true
-topcoat-pretty.workspace = true
+topcoat-icon-grammar = { workspace = true, optional = true, features = ["iconify"] }
 
 proc-macro2.workspace = true
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
-[[test]]
-name = "pretty"
-
-[[test]]
-name = "fontsource_pretty"
-required-features = ["fontsource"]
+[dev-dependencies]
+topcoat = { workspace = true, features = ["icon-iconify"] }
 
 [lints]
 workspace = true

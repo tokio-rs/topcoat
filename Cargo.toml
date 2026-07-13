@@ -11,14 +11,10 @@ members = [
     "crates/topcoat-font",
     "crates/topcoat-font/grammar",
     "crates/topcoat-font/macro",
-    "crates/topcoat-font/fontsource",
-    "crates/topcoat-font/fontsource/grammar",
-    "crates/topcoat-font/fontsource/macro",
     "crates/topcoat-htmx",
     "crates/topcoat-icon",
-    "crates/topcoat-icon/iconify",
-    "crates/topcoat-icon/iconify/grammar",
-    "crates/topcoat-icon/iconify/macro",
+    "crates/topcoat-icon/grammar",
+    "crates/topcoat-icon/macro",
     "crates/topcoat-pretty",
     "crates/topcoat-router",
     "crates/topcoat-router/grammar",
@@ -103,14 +99,10 @@ topcoat-core-macro = { version = "0.0.1", path = "crates/topcoat-core/macro" }
 topcoat-font = { version = "0.0.1", path = "crates/topcoat-font" }
 topcoat-font-grammar = { version = "0.0.1", path = "crates/topcoat-font/grammar" }
 topcoat-font-macro = { version = "0.0.1", path = "crates/topcoat-font/macro" }
-topcoat-font-fontsource = { version = "0.0.1", path = "crates/topcoat-font/fontsource" }
-topcoat-font-fontsource-grammar = { version = "0.0.1", path = "crates/topcoat-font/fontsource/grammar" }
-topcoat-font-fontsource-macro = { version = "0.0.1", path = "crates/topcoat-font/fontsource/macro" }
 topcoat-htmx = { version = "0.0.1", path = "crates/topcoat-htmx" }
 topcoat-icon = { version = "0.0.1", path = "crates/topcoat-icon" }
-topcoat-icon-iconify = { version = "0.0.1", path = "crates/topcoat-icon/iconify" }
-topcoat-icon-iconify-grammar = { version = "0.0.1", path = "crates/topcoat-icon/iconify/grammar" }
-topcoat-icon-iconify-macro = { version = "0.0.1", path = "crates/topcoat-icon/iconify/macro" }
+topcoat-icon-grammar = { version = "0.0.1", path = "crates/topcoat-icon/grammar" }
+topcoat-icon-macro = { version = "0.0.1", path = "crates/topcoat-icon/macro" }
 topcoat-pretty = { version = "0.0.1", path = "crates/topcoat-pretty" }
 topcoat-router = { version = "0.0.1", path = "crates/topcoat-router" }
 topcoat-router-grammar = { version = "0.0.1", path = "crates/topcoat-router/grammar" }

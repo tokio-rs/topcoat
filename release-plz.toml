@@ -63,21 +63,6 @@ release = true
 version_group = "topcoat"
 
 [[package]]
-name = "topcoat-font-fontsource"
-release = true
-version_group = "topcoat"
-
-[[package]]
-name = "topcoat-font-fontsource-grammar"
-release = true
-version_group = "topcoat"
-
-[[package]]
-name = "topcoat-font-fontsource-macro"
-release = true
-version_group = "topcoat"
-
-[[package]]
 name = "topcoat-htmx"
 release = true
 version_group = "topcoat"
@@ -88,17 +73,12 @@ release = true
 version_group = "topcoat"
 
 [[package]]
-name = "topcoat-icon-iconify"
+name = "topcoat-icon-grammar"
 release = true
 version_group = "topcoat"
 
 [[package]]
-name = "topcoat-icon-iconify-grammar"
-release = true
-version_group = "topcoat"
-
-[[package]]
-name = "topcoat-icon-iconify-macro"
+name = "topcoat-icon-macro"
 release = true
 version_group = "topcoat"
 

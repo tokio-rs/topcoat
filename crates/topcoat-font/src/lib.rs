@@ -4,6 +4,8 @@ mod css;
 mod display;
 mod face;
 mod font;
+#[cfg(feature = "fontsource")]
+pub mod fontsource;
 mod format;
 #[doc(hidden)]
 pub mod internal;

@@ -22,8 +22,7 @@ path = "src/bin/cargo_topcoat.rs"
 [dependencies]
 topcoat-asset = { workspace = true, features = ["bundler"] }
 topcoat-core = { workspace = true, features = ["build"] }
-topcoat-font-grammar.workspace = true
-topcoat-font-fontsource-grammar.workspace = true
+topcoat-font-grammar = { workspace = true, features = ["fontsource"] }
 topcoat-pretty.workspace = true
 topcoat-ui.workspace = true
 topcoat-view-grammar.workspace = true

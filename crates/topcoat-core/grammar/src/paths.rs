@@ -185,17 +185,16 @@ pub const topcoat_font: Crate = Crate::new("font", "topcoat-font", "");
 #[allow(non_upper_case_globals)]
 pub const topcoat_font_macro: Crate = Crate::new("font", "topcoat-font-macro", "");
 
-/// `::topcoat::font::fontsource`, or the standalone `topcoat-font-fontsource`
-/// crate that the facade re-exports there.
+/// `::topcoat::font::fontsource`, or `topcoat_font::fontsource` standalone: the
+/// Fontsource catalog types, behind the `fontsource` feature.
 #[allow(non_upper_case_globals)]
-pub const topcoat_font_fontsource: Crate =
-    Crate::new("font::fontsource", "topcoat-font-fontsource", "");
+pub const topcoat_font_fontsource: Crate = Crate::new("font::fontsource", "topcoat-font", "fontsource");
 
 /// The `fontsource_font_face!` (and sibling) macros:
-/// `::topcoat::font::fontsource`, or `topcoat_font_fontsource_macro` standalone.
+/// `::topcoat::font::fontsource`, or `topcoat_font_macro` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_font_fontsource_macro: Crate =
-    Crate::new("font::fontsource", "topcoat-font-fontsource-macro", "");
+    Crate::new("font::fontsource", "topcoat-font-macro", "");
 
 /// `::topcoat::icon`, or `topcoat_icon` standalone.
 #[allow(non_upper_case_globals)]

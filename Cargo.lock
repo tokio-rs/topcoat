@@ -2596,13 +2596,10 @@ dependencies = [
  "topcoat-core",
  "topcoat-core-macro",
  "topcoat-font",
- "topcoat-font-fontsource",
- "topcoat-font-fontsource-macro",
  "topcoat-font-macro",
  "topcoat-htmx",
  "topcoat-icon",
- "topcoat-icon-iconify",
- "topcoat-icon-iconify-macro",
+ "topcoat-icon-macro",
  "topcoat-router",
  "topcoat-router-macro",
  "topcoat-runtime",
@@ -2652,7 +2649,6 @@ dependencies = [
  "topcoat",
  "topcoat-asset",
  "topcoat-core",
- "topcoat-font-fontsource-grammar",
  "topcoat-font-grammar",
  "topcoat-pretty",
  "topcoat-ui",
@@ -2713,50 +2709,17 @@ dependencies = [
 name = "topcoat-font"
 version = "0.0.1"
 dependencies = [
+ "heck",
  "inventory",
+ "serde",
+ "serde_json",
  "topcoat",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-router",
  "topcoat-view",
  "topcoat-view-macro",
-]
-
-[[package]]
-name = "topcoat-font-fontsource"
-version = "0.0.1"
-dependencies = [
- "heck",
- "serde",
- "serde_json",
- "topcoat-asset",
- "topcoat-core",
- "topcoat-font",
  "ureq",
-]
-
-[[package]]
-name = "topcoat-font-fontsource-grammar"
-version = "0.0.1"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn",
- "topcoat-core-grammar",
- "topcoat-font-fontsource",
- "topcoat-pretty",
-]
-
-[[package]]
-name = "topcoat-font-fontsource-macro"
-version = "0.0.1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "topcoat",
- "topcoat-font-fontsource-grammar",
 ]
 
 [[package]]
@@ -2798,25 +2761,18 @@ dependencies = [
 name = "topcoat-icon"
 version = "0.0.1"
 dependencies = [
- "topcoat-core",
- "topcoat-view",
- "topcoat-view-macro",
-]
-
-[[package]]
-name = "topcoat-icon-iconify"
-version = "0.0.1"
-dependencies = [
  "serde",
  "serde_json",
  "thiserror",
  "topcoat",
  "topcoat-core",
+ "topcoat-view",
+ "topcoat-view-macro",
  "ureq",
 ]
 
 [[package]]
-name = "topcoat-icon-iconify-grammar"
+name = "topcoat-icon-grammar"
 version = "0.0.1"
 dependencies = [
  "heck",
@@ -2825,18 +2781,18 @@ dependencies = [
  "serde_json",
  "syn",
  "topcoat-core-grammar",
- "topcoat-icon-iconify",
+ "topcoat-icon",
 ]
 
 [[package]]
-name = "topcoat-icon-iconify-macro"
+name = "topcoat-icon-macro"
 version = "0.0.1"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
  "topcoat",
- "topcoat-icon-iconify-grammar",
+ "topcoat-icon-grammar",
 ]
 
 [[package]]
@@ -2972,7 +2928,7 @@ name = "topcoat-ui-registry"
 version = "0.0.1"
 dependencies = [
  "topcoat",
- "topcoat-icon-iconify",
+ "topcoat-icon",
 ]
 
 [[package]]

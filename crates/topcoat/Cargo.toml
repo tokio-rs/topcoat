@@ -42,8 +42,7 @@ full = [
 asset = [
 	"dep:topcoat-asset",
 	"topcoat-font?/asset",
-	"topcoat-font-fontsource?/asset",
-	"topcoat-font-fontsource-macro?/asset",
+	"topcoat-font-macro?/asset",
 ]
 cookie = [
 	"dep:topcoat-cookie",
@@ -62,8 +61,8 @@ font = [
 ]
 font-fontsource = [
 	"font",
-	"dep:topcoat-font-fontsource",
-	"dep:topcoat-font-fontsource-macro",
+	"topcoat-font/fontsource",
+	"topcoat-font-macro/fontsource",
 ]
 htmx = [
 	"dep:topcoat-htmx",
@@ -74,9 +73,9 @@ icon = [
 ]
 icon-iconify = [
 	"icon",
-	"dep:topcoat-icon-iconify",
-	"dep:topcoat-icon-iconify-macro",
-	"topcoat-icon-iconify/build",
+	"dep:topcoat-icon-macro",
+	"topcoat-icon-macro/iconify",
+	"topcoat-icon/iconify-build",
 ]
 multipart = [
 	"router",
@@ -118,12 +117,9 @@ topcoat-core.workspace = true
 topcoat-core-macro.workspace = true
 topcoat-font = { workspace = true, optional = true }
 topcoat-font-macro = { workspace = true, optional = true }
-topcoat-font-fontsource = { workspace = true, optional = true }
-topcoat-font-fontsource-macro = { workspace = true, optional = true }
 topcoat-htmx = { workspace = true, optional = true }
 topcoat-icon = { workspace = true, optional = true }
-topcoat-icon-iconify = { workspace = true, optional = true }
-topcoat-icon-iconify-macro = { workspace = true, optional = true }
+topcoat-icon-macro = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }

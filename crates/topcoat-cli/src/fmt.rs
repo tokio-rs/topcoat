@@ -81,12 +81,12 @@ impl FmtCommand {
             }
             if selected.contains("fontsource_font_face") {
                 registry
-                    .register_macro::<topcoat_font_fontsource_grammar::font_face::FontsourceFontFace>(
+                    .register_macro::<topcoat_font_grammar::fontsource::font_face::FontsourceFontFace>(
                         "fontsource_font_face",
                     );
             }
             if selected.contains("fontsource_font") {
-                registry.register_macro::<topcoat_font_fontsource_grammar::font::FontsourceFont>(
+                registry.register_macro::<topcoat_font_grammar::fontsource::font::FontsourceFont>(
                     "fontsource_font",
                 );
             }

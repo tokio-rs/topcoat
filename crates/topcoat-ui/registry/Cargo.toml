@@ -28,7 +28,7 @@ topcoat = { workspace = true, features = ["icon-iconify"] }
 # The staging API is used directly rather than through the `topcoat` facade:
 # a build-dependency on the facade would close the dependency cycle that the
 # dev-dependency above avoids.
-topcoat-icon-iconify = { path = "../../topcoat-icon/iconify", features = ["build"] }
+topcoat-icon = { path = "../../topcoat-icon", features = ["iconify-build"] }
 
 [lints]
 workspace = true

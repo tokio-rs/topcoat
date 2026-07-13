@@ -13,6 +13,14 @@ rust-version.workspace = true
 [lib]
 proc-macro = true
 
+[features]
+fontsource = [
+	"topcoat-font-grammar/fontsource",
+]
+asset = [
+	"topcoat-font-grammar/asset",
+]
+
 [dependencies]
 topcoat-font-grammar.workspace = true
 
@@ -20,7 +28,7 @@ quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["font"] }
+topcoat = { workspace = true, features = ["font-fontsource", "asset"] }
 
 [lints]
 workspace = true
