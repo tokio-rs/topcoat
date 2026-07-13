@@ -2791,6 +2791,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+ "topcoat",
  "topcoat-icon-grammar",
 ]
 
