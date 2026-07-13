@@ -17,7 +17,7 @@ hash = "sha256:45cbe0f5a790e7359ff72ecda4fbf40fb6c7bc8c4928593d1352813a86543a01"
 file = "src/components/card.rs"
 
 [registries.topcoat.components.dropdown_menu]
-hash = "sha256:9b7399d9cb61a3684dea25384a57184e389c3232c91406d5ba2efca8e7675c25"
+hash = "sha256:9e2a7e6f4992b8d38de3439bda5b1d92a8bd1dc6db1e579eb90601992c315a1a"
 file = "src/components/dropdown_menu.rs"
 
 [registries.topcoat.components.input]

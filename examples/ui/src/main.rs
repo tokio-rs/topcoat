@@ -6,7 +6,8 @@ use components::card::{
 };
 use components::dropdown_menu::{
     dropdown_menu, dropdown_menu_content, dropdown_menu_item, dropdown_menu_label,
-    dropdown_menu_separator, dropdown_menu_trigger,
+    dropdown_menu_separator, dropdown_menu_sub, dropdown_menu_sub_content,
+    dropdown_menu_sub_trigger, dropdown_menu_trigger,
 };
 use components::input::input;
 use components::select::select;
@@ -297,12 +298,23 @@ async fn branches_card() -> Result {
                         dropdown_menu_item("feature/showcase")
                         dropdown_menu_item("feature/dark-mode")
                         dropdown_menu_separator()
+                        // A submenu opens its own panel beside this row; it is
+                        // rendered open here so the page shows it.
+                        dropdown_menu_sub(
+                            attrs: attributes! { open=(true) },
+                            dropdown_menu_sub_trigger("Checkout tag")
+                            dropdown_menu_sub_content(
+                                dropdown_menu_item("v1.2.0")
+                                dropdown_menu_item("v1.1.0")
+                                dropdown_menu_item("v1.0.0")
+                            )
+                        )
                         dropdown_menu_item("Create branch...")
                     )
                 )
-                // The open menu floats over the flow; reserve its room so it
-                // stays within the card.
-                <div class="h-44"></div>
+                // The open menu and submenu float over the flow; reserve
+                // their room so they stay within the card.
+                <div class="h-64"></div>
             )
         )
     }

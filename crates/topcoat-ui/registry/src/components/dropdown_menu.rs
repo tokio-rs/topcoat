@@ -1,6 +1,7 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    icon::{icon, iconify::iconify_icon},
+    view::{Attributes, View, attributes, class, component, view},
 };
 
 /// A dropdown menu: a trigger that toggles a floating panel of actions.
@@ -39,6 +40,10 @@ pub async fn dropdown_menu(#[default] mut attrs: Attributes, #[default] child: V
     }
 }
 
+/// The classes making a `<summary>` a plain clickable trigger: the default
+/// disclosure marker is hidden and the cursor marks it as interactive.
+const TRIGGER: &str = "cursor-pointer list-none [&::-webkit-details-marker]:hidden";
+
 /// The trigger of a [`dropdown_menu`]: a `<summary>` that toggles the menu.
 ///
 /// Child nodes become the trigger's content; any view works. The trigger
@@ -69,34 +74,35 @@ pub async fn dropdown_menu_trigger(
     #[default] child: View,
 ) -> Result {
     view! {
-        <summary
-            class=(class!(
-                "cursor-pointer list-none [&::-webkit-details-marker]:hidden",
-                attrs.remove("class"),
-            ))
-            (attrs)
-        >
+        <summary class=(class!(TRIGGER, attrs.remove("class"))) (attrs)>
             (child)
         </summary>
     }
 }
 
-/// The classes for the [`dropdown_menu_content`] panel.
-///
-/// The panel drops directly below the trigger, aligned to its left edge, on a
-/// raised surface styled like a card; `z-50` lifts it over later content. It
-/// sets its own background and text color, so it reads the same on any
-/// ancestor.
-const CONTENT: &str = "absolute top-full left-0 z-50 mt-1 min-w-40 rounded-lg border \
-    border-border bg-background p-1 text-foreground shadow-sm";
+/// The classes shared by the [`dropdown_menu_content`] and
+/// [`dropdown_menu_sub_content`] panels: a raised surface styled like a card;
+/// `z-50` lifts it over later content. It sets its own background and text
+/// color, so it reads the same on any ancestor.
+const PANEL: &str = "absolute z-50 min-w-40 rounded-lg border border-border bg-background p-1 \
+    text-foreground shadow-sm";
 
 /// The floating panel of a [`dropdown_menu`], holding the menu's items.
+///
+/// The panel drops directly below the trigger, aligned to its left edge.
 #[component]
 pub async fn dropdown_menu_content(
     #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
-    view! { <div class=(class!(CONTENT, attrs.remove("class"))) (attrs)>(child)</div> }
+    view! {
+        <div
+            class=(class!(PANEL, "top-full left-0 mt-1", attrs.remove("class")))
+            (attrs)
+        >
+            (child)
+        </div>
+    }
 }
 
 /// The classes for a [`dropdown_menu_item`] row.
@@ -109,9 +115,99 @@ const ITEM: &str = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-l
 
 /// One action in a [`dropdown_menu_content`], rendered as a `<button>`.
 #[component]
-pub async fn dropdown_menu_item(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
+pub async fn dropdown_menu_item(
+    #[default] mut attrs: Attributes,
+    #[default] child: View,
+) -> Result {
     view! {
         <button class=(class!(ITEM, attrs.remove("class"))) (attrs)>(child)</button>
+    }
+}
+
+/// A nested submenu placed among the items of a [`dropdown_menu_content`].
+///
+/// Like the [`dropdown_menu`] itself it is built on `<details>`, so clicking
+/// the [`dropdown_menu_sub_trigger`] toggles its [`dropdown_menu_sub_content`]
+/// panel without scripting. The submenu tracks its own open state under the
+/// `group/sub` name, so the `group-open/sub:` variant targets it without
+/// disturbing the enclosing menu's `group`. Closing the enclosing menu hides
+/// an open submenu but does not close it, so it is open again the next time
+/// the menu opens; resetting it needs scripting. The `attrs` are forwarded to
+/// the underlying `<details>`; a `class` among them is appended to the
+/// computed classes.
+///
+/// ```rust
+/// view! {
+///     dropdown_menu_content(
+///         dropdown_menu_item("Back")
+///         dropdown_menu_sub(
+///             dropdown_menu_sub_trigger("Move to")
+///             dropdown_menu_sub_content(
+///                 dropdown_menu_item("Inbox")
+///                 dropdown_menu_item("Archive")
+///             )
+///         )
+///     )
+/// }
+/// ```
+#[component]
+pub async fn dropdown_menu_sub(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
+    view! {
+        <details class=(class!("group/sub relative", attrs.remove("class"))) (attrs)>
+            (child)
+        </details>
+    }
+}
+
+/// The trigger row of a [`dropdown_menu_sub`]: a `<summary>` styled as a
+/// [`dropdown_menu_item`] that toggles the submenu.
+///
+/// Child nodes become the row's label; a chevron pointing toward the submenu
+/// is appended automatically, and the row stays tinted while the submenu is
+/// open. The `attrs` are forwarded to the `<summary>`; a `class` among them is
+/// appended to the computed classes.
+#[component]
+pub async fn dropdown_menu_sub_trigger(
+    #[default] mut attrs: Attributes,
+    #[default] child: View,
+) -> Result {
+    view! {
+        <summary
+            class=(class!(
+                ITEM,
+                TRIGGER,
+                "group-open/sub:bg-foreground/5",
+                attrs.remove("class"),
+            ))
+            (attrs)
+        >
+            (child)
+            icon(
+                data: iconify_icon!("feather:chevron-right"),
+                attrs: attributes! { class="ml-auto size-4" }
+            )
+        </summary>
+    }
+}
+
+/// The floating panel of a [`dropdown_menu_sub`], holding the submenu's items.
+///
+/// A submenu opens beside its trigger rather than below it: `left-full` places
+/// it against the right edge of the parent panel, `top-0` lines its top up with
+/// the trigger row, and `ml-1` leaves the same gap the menu keeps from its own
+/// trigger.
+#[component]
+pub async fn dropdown_menu_sub_content(
+    #[default] mut attrs: Attributes,
+    #[default] child: View,
+) -> Result {
+    view! {
+        <div
+            class=(class!(PANEL, "top-0 left-full ml-1", attrs.remove("class")))
+            (attrs)
+        >
+            (child)
+        </div>
     }
 }
 
