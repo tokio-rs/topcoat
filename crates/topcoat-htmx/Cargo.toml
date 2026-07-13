@@ -19,7 +19,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 
 [dev-dependencies]
-topcoat = { path = "../topcoat", features = ["htmx", "router"] }
+topcoat = { workspace = true, features = ["htmx", "router"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]

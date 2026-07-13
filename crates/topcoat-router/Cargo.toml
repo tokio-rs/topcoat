@@ -45,7 +45,7 @@ serde_urlencoded.workspace = true
 tokio = { workspace = true, features = ["net", "rt"] }
 
 [dev-dependencies]
-topcoat = { path = "../topcoat", features = ["router"] }
+topcoat = { workspace = true, features = ["router"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]

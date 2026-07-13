@@ -17,7 +17,7 @@ memchr.workspace = true
 smallvec.workspace = true
 
 [dev-dependencies]
-topcoat = { path = "../topcoat", features = ["view"] }
+topcoat = { workspace = true, features = ["view"] }
 
 criterion = { workspace = true }
 

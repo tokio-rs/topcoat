@@ -21,7 +21,7 @@ quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
-topcoat = { path = "../../../topcoat", features = ["icon-iconify"] }
+topcoat = { workspace = true, features = ["icon-iconify"] }
 
 [lints]
 workspace = true

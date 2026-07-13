@@ -25,7 +25,7 @@ serde.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
-topcoat = { path = "../topcoat", features = ["cookie"] }
+topcoat = { workspace = true, features = ["cookie"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]

@@ -36,7 +36,7 @@ topcoat-view-macro = { workspace = true, optional = true }
 inventory = { workspace = true, optional = true }
 
 [dev-dependencies]
-topcoat = { path = "../topcoat", features = ["view", "asset", "font-fontsource"] }
+topcoat = { workspace = true, features = ["view", "asset", "font-fontsource"] }
 
 [lints]
 workspace = true

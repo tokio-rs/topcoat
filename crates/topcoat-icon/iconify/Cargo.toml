@@ -28,7 +28,7 @@ thiserror = { workspace = true, optional = true }
 ureq = { workspace = true, optional = true }
 
 [dev-dependencies]
-topcoat = { path = "../../topcoat", features = ["icon-iconify"] }
+topcoat = { workspace = true, features = ["icon-iconify"] }
 serde_json.workspace = true
 
 [lints]

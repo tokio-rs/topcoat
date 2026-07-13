@@ -3,131 +3,166 @@ git_release_draft = true
 pr_draft = true
 pr_labels = ["release"]
 release_always = false
+# Default to NOT releasing. Each publishable crate opts in with `release = true`
+# below. This is deliberate: release-plz's release-order pass runs over *all*
+# workspace members (including the `publish = false` examples/benchmarks) and its
+# topological sort trips over the facade<->sub-crate dependencies, reporting a
+# spurious "circular dependency" error. Defaulting to `release = false` keeps the
+# non-publishable crates out of that pass. Keep the opt-in list below in sync with
+# the publishable members under `crates/`.
+release = false
 
-# Every crate shares one lockstep version and is released together, so a
-# bump to any crate bumps them all to the same version. Keep this list in
-# sync with the publishable members under `crates/` (examples and
-# benchmarks are `publish = false` and excluded automatically).
 [[package]]
 name = "topcoat"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-asset"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-cli"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-cookie"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-core"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-core-grammar"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-core-macro"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-font"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-font-grammar"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-font-macro"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-font-fontsource"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-font-fontsource-grammar"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-font-fontsource-macro"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-htmx"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-icon"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-icon-iconify"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-icon-iconify-grammar"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-icon-iconify-macro"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-pretty"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-router"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-router-grammar"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-router-macro"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-runtime"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-runtime-grammar"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-runtime-macro"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-tailwind"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-ui"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-ui-registry"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-view"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-view-grammar"
+release = true
 version_group = "topcoat"
 
 [[package]]
 name = "topcoat-view-macro"
+release = true
 version_group = "topcoat"
