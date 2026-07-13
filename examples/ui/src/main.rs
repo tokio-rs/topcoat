@@ -4,6 +4,12 @@ use components::button::{ButtonSize, ButtonVariant, button, button_variants};
 use components::card::{
     card, card_content, card_description, card_footer, card_header, card_title,
 };
+use components::dropdown_menu::{
+    dropdown_menu, dropdown_menu_content, dropdown_menu_item, dropdown_menu_label,
+    dropdown_menu_separator, dropdown_menu_trigger,
+};
+use components::input::input;
+use components::select::select;
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
@@ -77,17 +83,17 @@ async fn home() -> Result {
                     <div class="mt-14 columns-1 gap-4 sm:columns-2 xl:columns-3">
                         demo(team_card())
                         demo(buttons_card())
-                        coming_soon(name: "Input")
+                        demo(sign_in_card())
                         demo(upgrade_card())
                         demo(deploy_card())
                         coming_soon(name: "Tabs")
                         demo(delete_card())
-                        coming_soon(name: "Switch")
+                        demo(branches_card())
                         demo(share_card())
-                        coming_soon(name: "Select")
+                        coming_soon(name: "Switch")
+                        demo(project_card())
                         demo(notifications_card())
                         coming_soon(name: "Dialog")
-                        coming_soon(name: "Dropdown menu")
                         coming_soon(name: "Avatar")
                     </div>
                 </main>
@@ -191,6 +197,112 @@ async fn buttons_card() -> Result {
                         button(attrs: attributes! { disabled=(true) }, "Saving...")
                     </div>
                 </div>
+            )
+        )
+    }
+}
+
+/// A sign-in form pairing labeled inputs with a full-width submit.
+#[component]
+async fn sign_in_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Sign in")
+                card_description("Use your work email to continue.")
+            )
+            card_content(
+                <form class="flex flex-col gap-4">
+                    <label class="flex flex-col gap-2">
+                        <span class="text-sm font-medium">"Email"</span>
+                        input(
+                            attrs: attributes! { type="email" placeholder="you@example.com" }
+                        )
+                    </label>
+                    <label class="flex flex-col gap-2">
+                        <span class="text-sm font-medium">"Password"</span>
+                        input(attrs: attributes! { type="password" })
+                    </label>
+                </form>
+            )
+            card_footer(button(attrs: attributes! { class="w-full" }, "Sign in"))
+        )
+    }
+}
+
+/// A creation form mixing an input, a select, and a confirming footer.
+#[component]
+async fn project_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Create project")
+                card_description("Deploys go to the region you pick here.")
+            )
+            card_content(
+                <form class="flex flex-col gap-4">
+                    <label class="flex flex-col gap-2">
+                        <span class="text-sm font-medium">"Name"</span>
+                        input(attrs: attributes! { placeholder="my-app" })
+                    </label>
+                    <label class="flex flex-col gap-2">
+                        <span class="text-sm font-medium">"Region"</span>
+                        select(
+                            <option>"eu-central-1"</option>
+                            <option>"us-east-1"</option>
+                            <option>"ap-southeast-2"</option>
+                        )
+                    </label>
+                </form>
+            )
+            card_footer(
+                attrs: attributes! { class="justify-end" },
+                button(variant: ButtonVariant::Ghost, "Cancel")
+                button("Create project")
+            )
+        )
+    }
+}
+
+/// A branch switcher, rendered open so the menu shows on the page.
+#[component]
+async fn branches_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Branches")
+                card_description("Switch the branch this preview builds from.")
+            )
+            card_content(
+                dropdown_menu(
+                    attrs: attributes! { open=(true) },
+                    // The trigger takes any content; this one borrows the
+                    // outline button's looks and adds a flipping chevron.
+                    dropdown_menu_trigger(
+                        attrs: attributes! {
+                            class=(button_variants(
+                                ButtonVariant::Outline,
+                                ButtonSize::Sm,
+                            ))
+                        },
+                        "feature/showcase"
+                        icon(
+                            data: iconify_icon!("feather:chevron-down"),
+                            attrs: attributes! { class="transition-transform group-open:rotate-180" }
+                        )
+                    )
+                    dropdown_menu_content(
+                        dropdown_menu_label("Switch branch")
+                        dropdown_menu_item("main")
+                        dropdown_menu_item("feature/showcase")
+                        dropdown_menu_item("feature/dark-mode")
+                        dropdown_menu_separator()
+                        dropdown_menu_item("Create branch...")
+                    )
+                )
+                // The open menu floats over the flow; reserve its room so it
+                // stays within the card.
+                <div class="h-44"></div>
             )
         )
     }

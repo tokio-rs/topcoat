@@ -15,7 +15,13 @@ registry = "."
 # `topcoat` would form a cycle. As a dev-dependency it is available when the
 # component sources are compiled (under `cfg(test)`) without creating one.
 [dev-dependencies]
-topcoat.workspace = true
+topcoat = { workspace = true, features = ["icon-iconify"] }
+
+[build-dependencies]
+# The staging API is used directly rather than through the `topcoat` facade:
+# a build-dependency on the facade would close the dependency cycle that the
+# dev-dependency above avoids.
+topcoat-icon-iconify = { workspace = true, features = ["build"] }
 
 [lints]
 workspace = true

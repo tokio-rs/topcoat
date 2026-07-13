@@ -9,9 +9,21 @@ hash = "sha256:0e87209c2c62b4a7bd091afc24f9635887d9fda2c90f4471534b1c26e9baa3ce"
 file = "styles.css"
 
 [registries.topcoat.components.button]
-hash = "sha256:47244c31d8274fc7d9512659b94306efcbcd9ea845369cc09691d8e5aced1aa0"
+hash = "sha256:db42b8405ca43e7bc857e9edeb78a115c4de5d4bee7d5085c357579ae2aaf01c"
 file = "src/components/button.rs"
 
 [registries.topcoat.components.card]
 hash = "sha256:45cbe0f5a790e7359ff72ecda4fbf40fb6c7bc8c4928593d1352813a86543a01"
 file = "src/components/card.rs"
+
+[registries.topcoat.components.dropdown_menu]
+hash = "sha256:9b7399d9cb61a3684dea25384a57184e389c3232c91406d5ba2efca8e7675c25"
+file = "src/components/dropdown_menu.rs"
+
+[registries.topcoat.components.input]
+hash = "sha256:fbbe56c47d871e333183ee8b91a0360fe4e7b4326bf7e71defee20417c55445c"
+file = "src/components/input.rs"
+
+[registries.topcoat.components.select]
+hash = "sha256:19d7779d8e7e75a2db78904232fa3db11f8e0e49cfca8a1852c4dcd686ac2d69"
+file = "src/components/select.rs"

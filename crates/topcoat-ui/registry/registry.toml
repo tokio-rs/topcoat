@@ -14,3 +14,12 @@ source = "src/components/button.rs"
 
 [components.card]
 source = "src/components/card.rs"
+
+[components.dropdown_menu]
+source = "src/components/dropdown_menu.rs"
+
+[components.input]
+source = "src/components/input.rs"
+
+[components.select]
+source = "src/components/select.rs"
