@@ -28,8 +28,5 @@ serde.workspace = true
 serde_json.workspace = true
 uuid = { workspace = true, features = ["v4", "serde"] }
 
-[dev-dependencies]
-topcoat = { workspace = true, features = ["runtime"] }
-
 [lints]
 workspace = true

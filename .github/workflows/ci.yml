@@ -57,3 +57,16 @@ jobs:
       - uses: taiki-e/install-action@cargo-hack
       - run: cargo fetch --locked
       - run: cargo hack clippy --workspace --each-feature --no-dev-deps --offline -- -D warnings
+
+  udeps:
+    name: udeps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # `cargo-udeps` needs nightly for `-Z binary-dep-depinfo`. The `+nightly`
+      # override outranks the `stable` pin in `rust-toolchain.toml`, and cargo
+      # passes its own toolchain to `cargo-udeps`' child builds via `$CARGO`.
+      - run: rustup toolchain install nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-udeps
+      - run: cargo +nightly udeps --workspace --all-targets --all-features --locked

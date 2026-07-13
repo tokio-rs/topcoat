@@ -2857,7 +2857,6 @@ dependencies = [
  "ref-cast",
  "serde",
  "serde_json",
- "topcoat",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-router",
@@ -2885,7 +2884,6 @@ version = "0.0.1"
 dependencies = [
  "quote",
  "syn",
- "topcoat",
  "topcoat-runtime-grammar",
 ]
 
@@ -2909,7 +2907,6 @@ dependencies = [
  "sha2 0.11.0",
  "thiserror",
  "toml",
- "topcoat",
 ]
 
 [[package]]
