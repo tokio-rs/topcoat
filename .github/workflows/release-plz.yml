@@ -31,6 +31,7 @@ jobs:
           command: release
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   # Maintains a draft "Release PR" containing the pending version bumps and
   # changelog updates. Force-pushed on every merge to main.
