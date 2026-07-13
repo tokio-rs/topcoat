@@ -146,3 +146,8 @@ workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
+
+# `topcoat-ui-registry` is linked for its side effects rather than referenced
+# directly, which `cargo-udeps` cannot see, so it must be ignored here.
+[package.metadata.cargo-udeps.ignore]
+normal = ["topcoat-ui-registry"]
