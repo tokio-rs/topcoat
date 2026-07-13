@@ -68,6 +68,7 @@ repository = "https://github.com/tokio-rs/topcoat"
 homepage = "https://github.com/tokio-rs/topcoat"
 keywords = ["web", "framework", "ssr", "html", "server"]
 categories = ["web-programming", "web-programming::http-server"]
+rust-version = "1.95"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

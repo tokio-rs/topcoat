@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
+rust-version.workspace = true
 
 [features]
 # Exposes the staging API (`BuildConfig`) for use from a build script.

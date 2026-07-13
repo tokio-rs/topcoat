@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
+rust-version.workspace = true
 
 # Declares this crate as a topcoat-ui component registry: `topcoat ui` reads the
 # `registry.toml` (and the theme and component sources it names) under this
