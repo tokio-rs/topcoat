@@ -64,12 +64,13 @@ impl<B: Parse + MatchArmBody> ParseOption for TemplateMatch<B> {
     }
 }
 
-impl<B> topcoat_pretty::PrettyPrint for TemplateMatch<B>
+#[cfg(feature = "pretty")]
+impl<B> topcoat_core_grammar::pretty::PrettyPrint for TemplateMatch<B>
 where
-    TemplateMatchArm<B>: topcoat_pretty::PrettyPrint,
+    TemplateMatchArm<B>: topcoat_core_grammar::pretty::PrettyPrint,
 {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
-        use topcoat_pretty::{BreakMode, Delim};
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::{BreakMode, Delim};
 
         self.match_token.pretty_print(printer);
 
@@ -160,11 +161,12 @@ impl<B: Parse + MatchArmBody> Parse for TemplateMatchArm<B> {
     }
 }
 
-impl<B> topcoat_pretty::PrettyPrint for TemplateMatchArm<B>
+#[cfg(feature = "pretty")]
+impl<B> topcoat_core_grammar::pretty::PrettyPrint for TemplateMatchArm<B>
 where
-    B: topcoat_pretty::PrettyPrint + MatchArmBody,
+    B: topcoat_core_grammar::pretty::PrettyPrint + MatchArmBody,
 {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.pat.pretty_print(printer);
         " ".pretty_print(printer);
         self.fat_arrow_token.pretty_print(printer);

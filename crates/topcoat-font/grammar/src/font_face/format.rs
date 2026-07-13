@@ -49,10 +49,11 @@ impl ToTokens for FontFormatHint {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontFormatHint {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontFormatHint {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
-        use topcoat_pretty::Delim;
+        use topcoat_core_grammar::pretty::Delim;
 
         printer.move_cursor(self.format_kw.span().start());
         "format".pretty_print(printer);
@@ -100,8 +101,9 @@ impl ToTokens for FontFormat {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontFormat {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontFormat {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

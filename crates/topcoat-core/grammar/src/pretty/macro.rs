@@ -4,7 +4,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-use crate::{BreakMode, Delim, PrettyPrint, Printer};
+use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer};
 
 /// A wrapper type that parses and pretty-prints content with any of the three delimiter types.
 ///
@@ -131,7 +131,7 @@ where
 mod tests {
     use syn::parse::{Parse, ParseStream};
 
-    use crate::{PrettyPrint, Printer, registry::Registry};
+    use crate::pretty::{PrettyPrint, Printer, registry::Registry};
 
     /// A macro body used only in tests that accepts an optional identifier, so
     /// an empty invocation such as `test! {}` still parses.
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn test_parenthesized_short() {
         let source = "test!(foo);";
-        let result = crate::pretty_print_str(&registry(), source);
+        let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test!(foo);");
     }
@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn test_parenthesized_long() {
         let source = "test!(this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed);";
-        let result = crate::pretty_print_str(&registry(), source);
+        let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_braced_short() {
         let source = "test! { foo }";
-        let result = crate::pretty_print_str(&registry(), source);
+        let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test! { foo }");
     }
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn test_braced_empty() {
         let source = "test! {}";
-        let result = crate::pretty_print_str(&registry(), source);
+        let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test! {}");
     }
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn test_braced_empty_collapses_whitespace() {
         let source = "test! {   }";
-        let result = crate::pretty_print_str(&registry(), source);
+        let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test! {}");
     }
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn test_braced_empty_keeps_comment() {
         let source = "test! { /* keep me */ }";
-        let result = crate::pretty_print_str(&registry(), source);
+        let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test! { /* keep me */ }");
     }
@@ -225,7 +225,7 @@ fn f() {
     );
 }
 ";
-        let result = crate::pretty_print_str(&registry(), source).unwrap();
+        let result = crate::pretty::pretty_print_str(&registry(), source).unwrap();
         assert!(
             result.contains(
                 "        test! {\n            this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_printed\n        },"
@@ -237,7 +237,7 @@ fn f() {
     #[test]
     fn test_braced_long() {
         let source = "test! { this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed }";
-        let result = crate::pretty_print_str(&registry(), source);
+        let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
@@ -250,7 +250,7 @@ fn f() {
     #[test]
     fn test_bracketed_short() {
         let source = "test![foo];";
-        let result = crate::pretty_print_str(&registry(), source);
+        let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test![foo];");
     }
@@ -258,7 +258,7 @@ fn f() {
     #[test]
     fn test_bracketed_long() {
         let source = "test![this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed];";
-        let result = crate::pretty_print_str(&registry(), source);
+        let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),

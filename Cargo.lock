@@ -2649,8 +2649,8 @@ dependencies = [
  "topcoat",
  "topcoat-asset",
  "topcoat-core",
+ "topcoat-core-grammar",
  "topcoat-font-grammar",
- "topcoat-pretty",
  "topcoat-ui",
  "topcoat-view-grammar",
 ]
@@ -2686,6 +2686,7 @@ dependencies = [
 name = "topcoat-core-grammar"
 version = "0.0.1"
 dependencies = [
+ "prettyplease",
  "proc-macro-crate",
  "proc-macro2",
  "quote",
@@ -2731,7 +2732,6 @@ dependencies = [
  "syn",
  "topcoat-core-grammar",
  "topcoat-font",
- "topcoat-pretty",
 ]
 
 [[package]]
@@ -2793,17 +2793,6 @@ dependencies = [
  "syn",
  "topcoat",
  "topcoat-icon-grammar",
-]
-
-[[package]]
-name = "topcoat-pretty"
-version = "0.0.1"
-dependencies = [
- "prettyplease",
- "proc-macro2",
- "quote",
- "syn",
- "topcoat",
 ]
 
 [[package]]
@@ -2951,7 +2940,6 @@ dependencies = [
  "quote",
  "syn",
  "topcoat-core-grammar",
- "topcoat-pretty",
  "topcoat-view",
 ]
 

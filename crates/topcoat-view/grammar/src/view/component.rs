@@ -62,8 +62,9 @@ impl ToTokens for NamedArgValue {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for NamedArgValue {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for NamedArgValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         match self {
             Self::Expr(inner) => inner.pretty_print(printer),
             Self::Runtime(inner) => inner.pretty_print(printer),
@@ -162,9 +163,10 @@ impl ParseOption for Component {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for Component {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
-        printer.scan_begin(topcoat_pretty::BreakMode::Consistent);
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Component {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_core_grammar::pretty::BreakMode::Consistent);
         self.path.pretty_print(printer);
         "(".pretty_print(printer);
         let total = self.named_args.len() + self.children.len();

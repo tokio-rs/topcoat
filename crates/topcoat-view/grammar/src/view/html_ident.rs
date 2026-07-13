@@ -164,8 +164,9 @@ impl ToTokens for HtmlIdent {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for HtmlIdent {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for HtmlIdent {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.first.pretty_print(printer);
         for segment in &self.rest {
             match &segment.separator {

@@ -48,8 +48,9 @@ impl ToTokens for FontSources {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontSources {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontSources {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -75,8 +76,9 @@ impl ParseOption for FontSourcesKey {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontSourcesKey {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontSourcesKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.src_kw.span().start());
         "src".pretty_print(printer);
@@ -111,9 +113,10 @@ impl ToTokens for FontSourcesValue {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontSourcesValue {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
-        use topcoat_pretty::BreakMode;
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontSourcesValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::BreakMode;
 
         match self {
             Self::Expr(inner) => inner.pretty_print(printer),
@@ -209,10 +212,11 @@ impl ToTokens for FontSource {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontSource {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontSource {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
-        use topcoat_pretty::Delim;
+        use topcoat_core_grammar::pretty::Delim;
 
         match self {
             Self::Url {

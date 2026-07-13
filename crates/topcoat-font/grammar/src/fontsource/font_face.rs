@@ -225,14 +225,15 @@ impl Parse for FontsourceFontFace {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontsourceFontFace {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontsourceFontFace {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
 
         // The descriptors live in fixed fields, so recover their written order
         // from their spans to keep the output faithful and idempotent. `weight`
         // and `style` are required; the rest are optional.
-        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_pretty::PrettyPrint)> = vec![
+        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_core_grammar::pretty::PrettyPrint)> = vec![
             (self.weight.key.weight_kw.span().start(), &self.weight),
             (self.style.key.style_kw.span().start(), &self.style),
         ];
@@ -255,12 +256,13 @@ impl topcoat_pretty::PrettyPrint for FontsourceFontFace {
 /// family name literal followed by each descriptor in written order. The list
 /// stays on one line when it fits and otherwise breaks with one argument per line
 /// and a trailing comma.
+#[cfg(feature = "pretty")]
 pub(crate) fn pretty_print_arguments(
-    printer: &mut topcoat_pretty::Printer<'_>,
+    printer: &mut topcoat_core_grammar::pretty::Printer<'_>,
     family: &FamilyName,
-    descriptors: &[(proc_macro2::LineColumn, &dyn topcoat_pretty::PrettyPrint)],
+    descriptors: &[(proc_macro2::LineColumn, &dyn topcoat_core_grammar::pretty::PrettyPrint)],
 ) {
-    use topcoat_pretty::{PrettyPrint, TextMode};
+    use topcoat_core_grammar::pretty::{PrettyPrint, TextMode};
 
     family.pretty_print(printer);
     for (_, descriptor) in descriptors {

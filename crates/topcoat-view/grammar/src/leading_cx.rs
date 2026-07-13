@@ -48,8 +48,9 @@ impl ToTokens for LeadingCx {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for LeadingCx {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for LeadingCx {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.cx.pretty_print(printer);
         " =>".pretty_print(printer);
         // Break after the `cx =>` argument just like between sibling items, so

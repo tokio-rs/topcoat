@@ -145,13 +145,14 @@ impl ToTokens for FontFace {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontFace {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontFace {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
 
         // The descriptors are stored in fixed fields, so recover their written
         // order from their spans to keep the output faithful and idempotent.
-        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_pretty::PrettyPrint)> =
+        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_core_grammar::pretty::PrettyPrint)> =
             vec![(self.src.key.src_kw.span().start(), &self.src)];
         if let Some(family) = &self.family {
             descriptors.push((family.key.font_kw.span().start(), family));
@@ -183,7 +184,7 @@ impl topcoat_pretty::PrettyPrint for FontFace {
                 // A trailing semicolon is only rendered when the block breaks
                 // across lines, which it always does when it has more than the
                 // required two descriptors on separate lines.
-                printer.scan_text(";".into(), topcoat_pretty::TextMode::Break);
+                printer.scan_text(";".into(), topcoat_core_grammar::pretty::TextMode::Break);
                 printer.advance_cursor(";");
             }
         }

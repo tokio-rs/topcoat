@@ -42,8 +42,9 @@ impl ToTokens for FontFamily {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontFamily {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontFamily {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -73,8 +74,9 @@ impl ParseOption for FontFamilyKey {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontFamilyKey {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontFamilyKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.font_kw.span().start());
         "font-family".pretty_print(printer);
@@ -103,8 +105,9 @@ impl ToTokens for FontFamilyValue {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontFamilyValue {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontFamilyValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

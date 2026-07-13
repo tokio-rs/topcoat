@@ -167,9 +167,10 @@ impl ParseOption for Element {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for Element {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
-        printer.scan_begin(topcoat_pretty::BreakMode::Consistent);
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Element {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_core_grammar::pretty::BreakMode::Consistent);
         match self {
             Self::Normal {
                 opening_tag,

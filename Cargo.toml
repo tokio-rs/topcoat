@@ -15,7 +15,6 @@ members = [
     "crates/topcoat-icon",
     "crates/topcoat-icon/grammar",
     "crates/topcoat-icon/macro",
-    "crates/topcoat-pretty",
     "crates/topcoat-router",
     "crates/topcoat-router/grammar",
     "crates/topcoat-router/macro",
@@ -103,7 +102,6 @@ topcoat-htmx = { version = "0.0.1", path = "crates/topcoat-htmx" }
 topcoat-icon = { version = "0.0.1", path = "crates/topcoat-icon" }
 topcoat-icon-grammar = { version = "0.0.1", path = "crates/topcoat-icon/grammar" }
 topcoat-icon-macro = { version = "0.0.1", path = "crates/topcoat-icon/macro" }
-topcoat-pretty = { version = "0.0.1", path = "crates/topcoat-pretty" }
 topcoat-router = { version = "0.0.1", path = "crates/topcoat-router" }
 topcoat-router-grammar = { version = "0.0.1", path = "crates/topcoat-router/grammar" }
 topcoat-router-macro = { version = "0.0.1", path = "crates/topcoat-router/macro" }

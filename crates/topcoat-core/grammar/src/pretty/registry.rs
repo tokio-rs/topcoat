@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use syn::parse::Parse;
 
-use crate::{Lexer, Macro, MacroSnippet, PrettyPrint, Printer};
+use crate::pretty::{Lexer, Macro, MacroSnippet, PrettyPrint, Printer};
 
 type MacroPrettyPrintFn = fn(&Registry, &MacroSnippet) -> syn::Result<String>;
 

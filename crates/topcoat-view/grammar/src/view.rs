@@ -77,8 +77,9 @@ impl ToTokens for View {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for View {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for View {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         if let Some(cx) = &self.cx {
             cx.pretty_print(printer);
         }

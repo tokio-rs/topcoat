@@ -1,6 +1,6 @@
 use proc_macro2::extra::DelimSpan;
 
-use crate::{BreakMode, PrettyPrint, Printer};
+use crate::pretty::{BreakMode, PrettyPrint, Printer};
 
 /// A balanced pair of delimiters (`()`, `[]` or `{}`) that wraps a body of
 /// content. The default `pretty_print` implementation handles the open/close

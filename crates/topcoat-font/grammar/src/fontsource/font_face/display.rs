@@ -41,8 +41,9 @@ impl ParseOption for Display {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for Display {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Display {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -68,8 +69,9 @@ impl ParseOption for DisplayKey {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for DisplayKey {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for DisplayKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.display_kw.span().start());
         "display".pretty_print(printer);
@@ -107,8 +109,9 @@ impl ToTokens for DisplayValue {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for DisplayValue {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for DisplayValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

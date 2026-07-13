@@ -8,14 +8,13 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable e
 
 `crates/topcoat` is the user-facing **facade** crate. It re-exports everything through feature-gated modules. Application code depends on this crate only; everything below is an implementation detail reached through it.
 
-- `topcoat-core` (+ `macro/`): foundations shared by the other crates: the `Error`/`Result` types and the request context (`Cx`, `app_context`, `request_context`). Its macro crate provides `#[memoize]`.
+- `topcoat-core` (+ `macro/`): foundations shared by the other crates: the `Error`/`Result` types and the request context (`Cx`, `app_context`, `request_context`). Its macro crate provides `#[memoize]`, and its `grammar/` crate holds the pretty-printer backing `topcoat fmt`'s macro-body formatting (behind the `pretty` feature).
 - `topcoat-view` (+ `macro/`): the `view!`, `attributes!`, and `class!` macros, the `#[component]` macro, and the runtime `View`/`Attributes`/`Class` types.
 - `topcoat-router` (+ `macro/`): `Router`, the `#[page]`/`#[layout]`/`#[route]` macros, `module_router!`, and `#[path_param]`/`#[query_params]`.
 - `topcoat-runtime` (+ `macro/`): the client-side interactive runtime (signals, event handlers, bind attributes, the `expr!` macro) and the injected browser script.
 - `topcoat-asset`: the `asset!` macro and `AssetBundle` for declaring and serving content-hashed static files.
 - `topcoat-cookie`: the cookie jar, `cookie!` macro, signed/private jars, and `CookieStore<T>`.
 - `topcoat-tailwind`: the build-script wrapper around the standalone Tailwind CLI.
-- `topcoat-pretty`: the pretty-printer backing `topcoat fmt`'s macro-body formatting.
 - `topcoat-cli`: the `topcoat` binary (`dev`, `fmt`, `asset` subcommands).
 
 The domain crates that back proc-macros follow a common split: an `ast` module (behind the `parsing` feature, used at compile time by the sibling `macro/` crate) and a `runtime` module (the code the generated output calls into at run time).

@@ -3,7 +3,7 @@
 mod error;
 
 use std::{collections::BTreeSet, io::Read, path::PathBuf, time::Instant};
-use topcoat_pretty::{Registry, pretty_print_str};
+use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
 
 use clap::Args;
 

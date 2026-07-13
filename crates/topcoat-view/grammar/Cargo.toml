@@ -10,9 +10,11 @@ keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
 
+[features]
+pretty = ["topcoat-core-grammar/pretty"]
+
 [dependencies]
 topcoat-core-grammar.workspace = true
-topcoat-pretty.workspace = true
 topcoat-view.workspace = true
 
 heck.workspace = true
@@ -22,6 +24,7 @@ syn = { workspace = true, features = ["full", "extra-traits", "visit-mut"] }
 
 [[test]]
 name = "pretty"
+required-features = ["pretty"]
 
 [lints]
 workspace = true

@@ -59,8 +59,9 @@ impl<T: Parse> ParseOption for TemplateIf<T> {
     }
 }
 
-impl<T: topcoat_pretty::PrettyPrint> topcoat_pretty::PrettyPrint for TemplateIf<T> {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint for TemplateIf<T> {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.if_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.cond.pretty_print(printer);
@@ -123,8 +124,9 @@ impl<T: Parse> ParseOption for TemplateElse<T> {
     }
 }
 
-impl<T: topcoat_pretty::PrettyPrint> topcoat_pretty::PrettyPrint for TemplateElse<T> {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint for TemplateElse<T> {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         match self {
             Self::ElseIf {
                 else_token,

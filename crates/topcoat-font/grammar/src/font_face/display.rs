@@ -48,8 +48,9 @@ impl ToTokens for FontDisplay {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontDisplay {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontDisplay {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -79,8 +80,9 @@ impl ParseOption for FontDisplayKey {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontDisplayKey {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontDisplayKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.font_kw.span().start());
         "font-display".pretty_print(printer);
@@ -112,8 +114,9 @@ impl ToTokens for FontDisplayValue {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontDisplayValue {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontDisplayValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         match self {
             Self::Css(kind) => kind.pretty_print(printer),
             Self::Expr(inner) => inner.pretty_print(printer),
@@ -173,8 +176,9 @@ impl ToTokens for FontDisplayKind {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontDisplayKind {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontDisplayKind {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         let (span, keyword) = match self {
             Self::Auto(kw) => (kw.span(), "auto"),

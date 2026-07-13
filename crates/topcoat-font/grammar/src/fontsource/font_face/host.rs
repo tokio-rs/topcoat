@@ -51,8 +51,9 @@ impl ToTokens for Host {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for Host {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Host {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -78,8 +79,9 @@ impl ParseOption for HostKey {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for HostKey {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for HostKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.host_kw.span().start());
         "host".pretty_print(printer);
@@ -130,8 +132,9 @@ impl ToTokens for HostValue {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for HostValue {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for HostValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

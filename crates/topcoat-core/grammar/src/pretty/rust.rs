@@ -1,7 +1,7 @@
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
-use crate::pretty_print_str;
+use crate::pretty::pretty_print_str;
 
 use super::{PrettyPrint, Printer, TextMode};
 

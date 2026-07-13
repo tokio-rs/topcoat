@@ -1,4 +1,4 @@
-use crate::{Printer, TextMode};
+use crate::pretty::{Printer, TextMode};
 
 /// Implemented by anything that knows how to emit itself as formatted text
 /// through a [`Printer`]. The printer takes care of line breaking and

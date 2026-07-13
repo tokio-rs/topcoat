@@ -17,11 +17,11 @@ fontsource = [
 asset = [
 	"topcoat-font/asset",
 ]
+pretty = ["topcoat-core-grammar/pretty"]
 
 [dependencies]
 topcoat-core-grammar.workspace = true
 topcoat-font.workspace = true
-topcoat-pretty.workspace = true
 
 proc-macro2.workspace = true
 quote.workspace = true
@@ -29,10 +29,11 @@ syn = { workspace = true, features = ["full"] }
 
 [[test]]
 name = "pretty"
+required-features = ["pretty"]
 
 [[test]]
 name = "fontsource_pretty"
-required-features = ["fontsource"]
+required-features = ["fontsource", "pretty"]
 
 [lints]
 workspace = true

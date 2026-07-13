@@ -57,8 +57,9 @@ impl<T: Parse> ParseOption for TemplateForLoop<T> {
     }
 }
 
-impl<T: topcoat_pretty::PrettyPrint> topcoat_pretty::PrettyPrint for TemplateForLoop<T> {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint for TemplateForLoop<T> {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.for_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.pat.pretty_print(printer);
@@ -107,8 +108,9 @@ impl ParseOption for TemplateContinue {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for TemplateContinue {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for TemplateContinue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use quote::ToTokens;
 
         self.expr_continue
@@ -155,8 +157,9 @@ impl ParseOption for TemplateBreak {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for TemplateBreak {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for TemplateBreak {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use quote::ToTokens;
 
         self.expr_break

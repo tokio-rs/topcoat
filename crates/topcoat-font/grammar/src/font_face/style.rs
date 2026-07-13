@@ -46,8 +46,9 @@ impl ToTokens for FontStyle {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontStyle {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontStyle {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -77,8 +78,9 @@ impl ParseOption for FontStyleKey {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontStyleKey {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.font_kw.span().start());
         "font-style".pretty_print(printer);
@@ -110,8 +112,9 @@ impl ToTokens for FontStyleValue {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontStyleValue {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         match self {
             Self::Css(kind) => kind.pretty_print(printer),
             Self::Expr(inner) => inner.pretty_print(printer),
@@ -162,8 +165,9 @@ impl ToTokens for FontStyleKind {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontStyleKind {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleKind {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         match self {
             Self::Normal(normal_kw) => {
@@ -300,8 +304,9 @@ impl ToTokens for ObliqueAngle {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for ObliqueAngle {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ObliqueAngle {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         if let Some(minus_token) = &self.minus_token {
             minus_token.pretty_print(printer);
         }

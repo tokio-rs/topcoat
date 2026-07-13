@@ -44,8 +44,9 @@ impl ToTokens for TemplateOrRuntimeExpr {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for TemplateOrRuntimeExpr {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for TemplateOrRuntimeExpr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         match self {
             Self::Template(inner) => inner.pretty_print(printer),
             Self::Runtime(inner) => inner.pretty_print(printer),

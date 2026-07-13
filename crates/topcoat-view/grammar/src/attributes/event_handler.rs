@@ -44,8 +44,9 @@ impl ToTokens for EventHandlerValue {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for EventHandlerValue {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for EventHandlerValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         match self {
             Self::Expr(inner) => inner.pretty_print(printer),
             Self::LitStr(inner) => inner.pretty_print(printer),
@@ -136,8 +137,9 @@ impl ParseOption for EventHandler {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for EventHandler {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for EventHandler {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.at.pretty_print(printer);
         self.key.pretty_print(printer);
         self.eq.pretty_print(printer);

@@ -59,8 +59,9 @@ impl ToTokens for Class {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for Class {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Class {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         for (index, segment) in self.segments.iter().enumerate() {
             segment.pretty_print(printer);
             if index < self.segments.len() - 1 {
@@ -72,7 +73,7 @@ impl topcoat_pretty::PrettyPrint for Class {
             } else {
                 // A trailing comma is rendered only when the list breaks across
                 // multiple lines, and vanishes when it stays on one line.
-                printer.scan_text(",".into(), topcoat_pretty::TextMode::Break);
+                printer.scan_text(",".into(), topcoat_core_grammar::pretty::TextMode::Break);
                 printer.advance_cursor(",");
             }
         }
@@ -160,8 +161,9 @@ impl Parse for ClassSegment {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for ClassSegment {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ClassSegment {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.value.pretty_print(printer);
         if let Some(condition) = &self.condition {
             " if ".pretty_print(printer);

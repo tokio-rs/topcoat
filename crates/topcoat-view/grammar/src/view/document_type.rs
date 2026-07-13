@@ -47,8 +47,9 @@ impl ParseOption for DocumentType {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for DocumentType {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for DocumentType {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.lt_token.pretty_print(printer);
         self.exclamation_mark_token.pretty_print(printer);
         "DOCTYPE html".pretty_print(printer);

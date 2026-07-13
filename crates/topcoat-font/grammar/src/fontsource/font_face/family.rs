@@ -44,8 +44,9 @@ impl ToTokens for FamilyName {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FamilyName {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FamilyName {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

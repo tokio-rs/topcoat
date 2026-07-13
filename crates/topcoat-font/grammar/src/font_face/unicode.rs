@@ -45,8 +45,9 @@ impl ToTokens for UnicodeRanges {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for UnicodeRanges {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeRanges {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -76,8 +77,9 @@ impl ParseOption for UnicodeRangesKey {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for UnicodeRangesKey {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeRangesKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.unicode_kw.span().start());
         "unicode-range".pretty_print(printer);
@@ -114,9 +116,10 @@ impl ToTokens for UnicodeRangesValue {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for UnicodeRangesValue {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
-        use topcoat_pretty::BreakMode;
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeRangesValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::BreakMode;
 
         match self {
             Self::Css(ranges) => {
@@ -164,8 +167,9 @@ impl ToTokens for UnicodeRange {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for UnicodeRange {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeRange {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.u_token.span().start());
         "U".pretty_print(printer);
@@ -204,8 +208,9 @@ impl ToTokens for UnicodeRangeEnd {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for UnicodeRangeEnd {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeRangeEnd {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.dash_token.pretty_print(printer);
         self.code_point.pretty_print(printer);
     }
@@ -254,8 +259,9 @@ impl ToTokens for UnicodeCodePoint {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for UnicodeCodePoint {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeCodePoint {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         // Preserve the written hexadecimal digits (e.g. `0041`, `D800`).
         printer.move_cursor(self.span.start());
         let source = self

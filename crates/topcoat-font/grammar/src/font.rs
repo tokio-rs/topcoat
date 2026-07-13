@@ -127,8 +127,9 @@ impl Parse for FontFaceBlock {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for Font {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Font {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.family.pretty_print(printer);
         ",".pretty_print(printer);
         printer.scan_same_line_trivia();
@@ -151,10 +152,11 @@ impl topcoat_pretty::PrettyPrint for Font {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for FontFaceBlock {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FontFaceBlock {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
-        use topcoat_pretty::{BreakMode, Delim};
+        use topcoat_core_grammar::pretty::{BreakMode, Delim};
 
         printer.move_cursor(self.at_token.span().start());
         "@font-face".pretty_print(printer);

@@ -72,8 +72,9 @@ impl ParseOption for Attribute {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for Attribute {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Attribute {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.eq.pretty_print(printer);
         self.value.pretty_print(printer);

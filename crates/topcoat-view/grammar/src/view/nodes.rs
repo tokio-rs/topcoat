@@ -47,8 +47,9 @@ impl WriteView for Nodes {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for Nodes {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Nodes {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         for (index, node) in self.iter().enumerate() {
             node.pretty_print(printer);
             if index < self.len() - 1 {

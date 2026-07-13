@@ -26,9 +26,10 @@ impl Parse for OpeningTag {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for OpeningTag {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
-        printer.scan_begin(topcoat_pretty::BreakMode::Consistent);
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for OpeningTag {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_core_grammar::pretty::BreakMode::Consistent);
         self.lt.pretty_print(printer);
         self.name.pretty_print(printer);
         if !self.attributes.is_empty() {
@@ -65,9 +66,10 @@ impl Parse for SelfClosingTag {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for SelfClosingTag {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
-        printer.scan_begin(topcoat_pretty::BreakMode::Consistent);
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for SelfClosingTag {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_core_grammar::pretty::BreakMode::Consistent);
         self.lt.pretty_print(printer);
         self.name.pretty_print(printer);
         if !self.attributes.is_empty() {
@@ -141,8 +143,9 @@ impl ParseOption for ClosingTag {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for ClosingTag {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ClosingTag {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.lt.pretty_print(printer);
         self.slash.pretty_print(printer);
         self.name.pretty_print(printer);

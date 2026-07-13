@@ -70,8 +70,9 @@ impl ParseOption for BindAttribute {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for BindAttribute {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for BindAttribute {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.colon.pretty_print(printer);
         self.key.pretty_print(printer);
         self.eq.pretty_print(printer);

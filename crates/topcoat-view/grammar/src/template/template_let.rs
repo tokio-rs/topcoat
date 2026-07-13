@@ -45,8 +45,9 @@ impl ParseOption for TemplateLet {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for TemplateLet {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for TemplateLet {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.expr_let.pretty_print(printer);
         self.semi_token.pretty_print(printer);
     }

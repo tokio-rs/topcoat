@@ -45,8 +45,9 @@ impl ToTokens for TemplateExpr {
     }
 }
 
-impl topcoat_pretty::PrettyPrint for TemplateExpr {
-    fn pretty_print(&self, printer: &mut topcoat_pretty::Printer<'_>) {
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for TemplateExpr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         "(".pretty_print(printer);
         self.expr.pretty_print(printer);
         ")".pretty_print(printer);
