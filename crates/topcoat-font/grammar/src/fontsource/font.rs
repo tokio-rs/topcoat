@@ -218,8 +218,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontsourceFont {
         // The axes live in fixed fields, so recover their written order from
         // their spans to keep the output faithful and idempotent. Every axis is
         // optional.
-        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_core_grammar::pretty::PrettyPrint)> =
-            Vec::new();
+        let mut descriptors: Vec<(
+            proc_macro2::LineColumn,
+            &dyn topcoat_core_grammar::pretty::PrettyPrint,
+        )> = Vec::new();
         if let Some(weight) = &self.weight {
             descriptors.push((weight.key.weight_kw.span().start(), weight));
         }

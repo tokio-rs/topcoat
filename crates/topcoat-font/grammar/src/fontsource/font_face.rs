@@ -233,7 +233,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontsourceFontFace {
         // The descriptors live in fixed fields, so recover their written order
         // from their spans to keep the output faithful and idempotent. `weight`
         // and `style` are required; the rest are optional.
-        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_core_grammar::pretty::PrettyPrint)> = vec![
+        let mut descriptors: Vec<(
+            proc_macro2::LineColumn,
+            &dyn topcoat_core_grammar::pretty::PrettyPrint,
+        )> = vec![
             (self.weight.key.weight_kw.span().start(), &self.weight),
             (self.style.key.style_kw.span().start(), &self.style),
         ];
@@ -260,7 +263,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontsourceFontFace {
 pub(crate) fn pretty_print_arguments(
     printer: &mut topcoat_core_grammar::pretty::Printer<'_>,
     family: &FamilyName,
-    descriptors: &[(proc_macro2::LineColumn, &dyn topcoat_core_grammar::pretty::PrettyPrint)],
+    descriptors: &[(
+        proc_macro2::LineColumn,
+        &dyn topcoat_core_grammar::pretty::PrettyPrint,
+    )],
 ) {
     use topcoat_core_grammar::pretty::{PrettyPrint, TextMode};
 

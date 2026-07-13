@@ -58,7 +58,9 @@ impl<T: Parse> ParseOption for TemplateForLoop<T> {
 }
 
 #[cfg(feature = "pretty")]
-impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint for TemplateForLoop<T> {
+impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint
+    for TemplateForLoop<T>
+{
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.for_token.pretty_print(printer);
         " ".pretty_print(printer);

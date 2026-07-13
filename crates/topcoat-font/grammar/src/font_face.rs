@@ -152,8 +152,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFace {
 
         // The descriptors are stored in fixed fields, so recover their written
         // order from their spans to keep the output faithful and idempotent.
-        let mut descriptors: Vec<(proc_macro2::LineColumn, &dyn topcoat_core_grammar::pretty::PrettyPrint)> =
-            vec![(self.src.key.src_kw.span().start(), &self.src)];
+        let mut descriptors: Vec<(
+            proc_macro2::LineColumn,
+            &dyn topcoat_core_grammar::pretty::PrettyPrint,
+        )> = vec![(self.src.key.src_kw.span().start(), &self.src)];
         if let Some(family) = &self.family {
             descriptors.push((family.key.font_kw.span().start(), family));
         }

@@ -48,7 +48,9 @@ impl<T: Parse> ParseOption for TemplateBlock<T> {
 }
 
 #[cfg(feature = "pretty")]
-impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint for TemplateBlock<T> {
+impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint
+    for TemplateBlock<T>
+{
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         use topcoat_core_grammar::pretty::Delim;
 
