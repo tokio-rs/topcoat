@@ -63,7 +63,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: rustup update nightly && rustup default nightly
+      # `cargo-udeps` needs nightly for `-Z binary-dep-depinfo`. The `+nightly`
+      # override outranks the `stable` pin in `rust-toolchain.toml`, and cargo
+      # passes its own toolchain to `cargo-udeps`' child builds via `$CARGO`.
+      - run: rustup toolchain install nightly
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-udeps
-      - run: cargo udeps --workspace --all-targets --all-features --locked
+      - run: cargo +nightly udeps --workspace --all-targets --all-features --locked
