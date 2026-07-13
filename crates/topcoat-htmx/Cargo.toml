@@ -2,6 +2,10 @@
 name = "topcoat-htmx"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 topcoat-core.workspace = true

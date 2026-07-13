@@ -61,6 +61,11 @@ exclude = [
 [workspace.package]
 version = "0.0.1"
 edition = "2024"
+authors = ["Julien Scholz <hello@julien-scholz.dev>"]
+license = "MIT"
+description = "A modular, batteries-included Rust web framework for server-rendered apps."
+repository = "https://github.com/tokio-rs/topcoat"
+homepage = "https://github.com/tokio-rs/topcoat"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
