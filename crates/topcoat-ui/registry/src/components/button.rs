@@ -30,24 +30,31 @@ impl ButtonVariant {
     /// overrides. Every variant with a resting fill or border casts the
     /// theme's control shadow; `Ghost` is flat until hovered, so it casts
     /// none.
+    ///
+    /// Each variant sets its own border color rather than inheriting a
+    /// transparent one from [`BASE`]: with two border-color classes on the
+    /// same element, stylesheet order (not class order) would decide the
+    /// winner.
     fn classes(self) -> &'static str {
         match self {
             Self::Primary => {
-                "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 \
-                 active:bg-primary/80"
+                "border-transparent bg-primary text-primary-foreground shadow-xs \
+                 hover:bg-primary/90 active:bg-primary/80"
             }
             Self::Secondary => {
-                "bg-foreground/5 text-foreground shadow-xs hover:bg-foreground/10 \
-                 active:bg-foreground/15"
+                "border-transparent bg-foreground/5 text-foreground shadow-xs \
+                 hover:bg-foreground/10 active:bg-foreground/15"
             }
             Self::Outline => {
                 "border-border text-foreground shadow-xs hover:bg-foreground/5 \
                  active:bg-foreground/10"
             }
-            Self::Ghost => "text-foreground hover:bg-foreground/5 active:bg-foreground/10",
+            Self::Ghost => {
+                "border-transparent text-foreground hover:bg-foreground/5 active:bg-foreground/10"
+            }
             Self::Destructive => {
-                "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90 \
-                 active:bg-destructive/80"
+                "border-transparent bg-destructive text-destructive-foreground shadow-xs \
+                 hover:bg-destructive/90 active:bg-destructive/80"
             }
         }
     }
@@ -87,9 +94,9 @@ impl ButtonSize {
 
 /// The classes shared by every button, regardless of variant or size.
 ///
-/// Every button carries a transparent border so that the `Outline` variant,
-/// which only recolors it, does not change the button's dimensions.
-const BASE: &str = "inline-flex shrink-0 items-center justify-center border border-transparent \
+/// Every button carries a border (colored per variant) so that the `Outline`
+/// variant, which only recolors it, does not change the button's dimensions.
+const BASE: &str = "inline-flex shrink-0 items-center justify-center border \
     font-medium whitespace-nowrap transition-colors outline-none select-none \
     focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
     focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";

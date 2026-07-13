@@ -5,11 +5,11 @@ components_dir = "src/components"
 [theme]
 name = "neutral"
 registry = "topcoat"
-hash = "sha256:0e87209c2c62b4a7bd091afc24f9635887d9fda2c90f4471534b1c26e9baa3ce"
+hash = "sha256:c7bdcb5ea4ff757611ba616e92178169b262be98155c06dfa2407584d51e7459"
 file = "styles.css"
 
 [registries.topcoat.components.button]
-hash = "sha256:db42b8405ca43e7bc857e9edeb78a115c4de5d4bee7d5085c357579ae2aaf01c"
+hash = "sha256:b7885ffcd75843ea22cf4fe496f666ef414d9d1f8fd5648a6b6d6de81550810c"
 file = "src/components/button.rs"
 
 [registries.topcoat.components.card]

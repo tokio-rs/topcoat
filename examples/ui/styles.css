@@ -60,9 +60,10 @@
   --destructive-foreground: oklch(0.99 0.012 27);
   --border: oklch(0.9 0.008 260);
   --ring: oklch(0.62 0.06 260);
-  --shadow-xs: 0 1px 2px oklch(0.24 0.02 260 / 7%);
+  --shadow-xs: 0 1px 2px oklch(0.24 0.02 260 / 12%);
   --shadow-sm:
-    0 1px 2px oklch(0.24 0.02 260 / 7%), 0 2px 8px -2px oklch(0.24 0.02 260 / 6%);
+    0 1px 2px oklch(0.24 0.02 260 / 10%),
+    0 2px 8px -2px oklch(0.24 0.02 260 / 9%);
 }
 
 .dark {
