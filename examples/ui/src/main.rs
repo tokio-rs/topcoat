@@ -39,7 +39,7 @@ async fn home() -> Result {
             <head>
                 <title>"Topcoat UI"</title>
                 topcoat::dev::script()
-                topcoat::font::link(font: fontsource_font!(LEXEND, host: Asset))
+                topcoat::font::link(font: fontsource_font!(GEIST, host: Asset))
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
             </head>
             // The body's background, text color, and font come from the

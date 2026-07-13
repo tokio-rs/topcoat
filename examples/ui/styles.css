@@ -1,4 +1,4 @@
-/* Neutral, the built-in Topcoat theme: a graphite palette set in Lexend.
+/* Neutral, the built-in Topcoat theme.
 
    The theme is a small set of design tokens. Components refer to tokens only,
    never to raw colors, so a project restyles itself by editing the values in
@@ -20,7 +20,7 @@
    derive them by applying the fill or foreground color at reduced opacity,
    which adapts to both color schemes automatically.
 
-   The Lexend font is not bundled here; provide it with topcoat-font. */
+   The Geist font is not bundled here; provide it with topcoat-font. */
 
 @import "tailwindcss";
 
@@ -36,7 +36,7 @@
    `border-border`, ...). The indirection through plain variables on `:root`
    and `.dark` is what lets the values swap when the color scheme changes. */
 @theme inline {
-  --font-sans: "Lexend", sans-serif;
+  --font-sans: "Geist", sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted-foreground: var(--muted-foreground);

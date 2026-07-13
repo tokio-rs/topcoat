@@ -72,13 +72,13 @@ impl InitCommand {
             .dim(),
         );
 
-        // The theme's `--font-sans` expects the Lexend family to be available.
+        // The theme's `--font-sans` expects the Geist family to be available.
         // Point the user at topcoat-font to provide it.
         println!();
         println!(
             "{} This theme uses the {} font. Set it up with topcoat-font:",
             style("!").yellow(),
-            style("Lexend").bold(),
+            style("Geist").bold(),
         );
         println!(
             "  {} enable topcoat's {} feature",
@@ -88,7 +88,7 @@ impl InitCommand {
         println!("  {} load it in your page's <head>:", style("-").dim());
         println!(
             "{}",
-            style("      topcoat::font::link(font: fontsource_font!(LEXEND))").dim(),
+            style("      topcoat::font::link(font: fontsource_font!(GEIST))").dim(),
         );
         Ok(())
     }
