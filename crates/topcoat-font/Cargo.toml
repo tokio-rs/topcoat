@@ -60,3 +60,8 @@ topcoat = { workspace = true, features = ["view", "asset", "font-fontsource"] }
 
 [lints]
 workspace = true
+
+# `topcoat` (the facade) is used only in doc-tests, which `cargo-udeps` cannot
+# analyze, so it is ignored here to avoid a false positive.
+[package.metadata.cargo-udeps.ignore]
+development = ["topcoat"]

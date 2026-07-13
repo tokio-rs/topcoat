@@ -17,8 +17,5 @@ sha2.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 
-[dev-dependencies]
-topcoat.workspace = true
-
 [lints]
 workspace = true
