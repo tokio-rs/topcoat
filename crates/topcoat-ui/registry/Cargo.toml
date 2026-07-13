@@ -17,18 +17,11 @@ rust-version.workspace = true
 [package.metadata.topcoat-ui]
 registry = "."
 
-# `topcoat` is a dev-dependency, not a normal one: the `topcoat` facade pulls
-# this registry in under its `ui` feature, so a normal dependency back on
-# `topcoat` would form a cycle. As a dev-dependency it is available when the
-# component sources are compiled (under `cfg(test)`) without creating one.
 [dev-dependencies]
 topcoat = { workspace = true, features = ["icon-iconify"] }
 
 [build-dependencies]
-# The staging API is used directly rather than through the `topcoat` facade:
-# a build-dependency on the facade would close the dependency cycle that the
-# dev-dependency above avoids.
-topcoat-icon = { path = "../../topcoat-icon", features = ["iconify-build"] }
+topcoat-icon = { workspace = true, features = ["iconify-build"] }
 
 [lints]
 workspace = true
