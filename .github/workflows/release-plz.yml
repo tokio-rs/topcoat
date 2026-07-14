@@ -25,13 +25,65 @@ jobs:
           token: ${{ secrets.RELEASE_PLZ_TOKEN }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+      # First publish attempt. Allowed to fail: crates.io throttles publishing
+      # to a burst of 30 new versions and then refills one publish per minute,
+      # and neither cargo nor release-plz retries the resulting HTTP 429. Once
+      # the workspace grows past ~30 crates this step can't publish them all in
+      # one go, so the loop below resumes it. The action also installs the
+      # `release-plz` binary onto PATH, which that loop reuses.
       - name: Run release-plz
         uses: release-plz/action@v0.5
+        continue-on-error: true
         with:
           command: release
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # Resume publishing across the crates.io rate limit. release-plz is
+      # idempotent (it skips versions already on crates.io and tags/releases
+      # that already exist — the same property that makes it a no-op on
+      # ordinary pushes), so we just re-run it, sleeping a little over a minute
+      # between attempts to let the token bucket refill. On the happy path
+      # (<=30 crates) the step above already published everything and the first
+      # iteration here is a cheap no-op. Non-rate-limit failures are surfaced
+      # immediately rather than retried.
+      - name: Resume release-plz through crates.io rate limits
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -uo pipefail
+
+          max_attempts=50
+          cooldown_seconds=70   # bucket refills ~1/min; the margin avoids racing it
+          log="$(mktemp)"
+
+          for attempt in $(seq 1 "$max_attempts"); do
+            echo "::group::release-plz release (attempt ${attempt}/${max_attempts})"
+            release-plz release 2>&1 | tee "$log"
+            status="${PIPESTATUS[0]}"
+            echo "::endgroup::"
+
+            if [ "$status" -eq 0 ]; then
+              echo "release-plz completed; nothing left to publish."
+              exit 0
+            fi
+
+            if ! grep -qiE 'status 429|too many (requests|crates)' "$log"; then
+              echo "release-plz failed for a non-rate-limit reason; not retrying." >&2
+              exit "$status"
+            fi
+
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              echo "Hit the crates.io publish rate limit. Sleeping ${cooldown_seconds}s for the token bucket to refill, then resuming."
+              sleep "$cooldown_seconds"
+            fi
+          done
+
+          echo "Still rate-limited after ${max_attempts} attempts; giving up." >&2
+          exit 1
 
   # Maintains a draft "Release PR" containing the pending version bumps and
   # changelog updates. Force-pushed on every merge to main.
