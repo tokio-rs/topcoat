@@ -11,14 +11,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Other
 
-- Work around release-plz bug
-- Use dotted topcoat paths
-- Release plz ([#92](https://github.com/tokio-rs/topcoat/pull/92))
-- Share version and edition across workspace
-- Refactor ast/runtime split crates into grammar crates ([#83](https://github.com/tokio-rs/topcoat/pull/83))
-- Add CxBuilder and CxTestBuilder ([#75](https://github.com/tokio-rs/topcoat/pull/75))
-- Purge special characters ([#61](https://github.com/tokio-rs/topcoat/pull/61))
-- Remove README headlines
-- Move tests to their respective crates ([#38](https://github.com/tokio-rs/topcoat/pull/38))
-- Better docs ([#37](https://github.com/tokio-rs/topcoat/pull/37))
-- Merge develop ([#11](https://github.com/tokio-rs/topcoat/pull/11))
+- initial release

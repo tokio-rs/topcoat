@@ -11,5 +11,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Other
 
-- add udeps workflow ([#96](https://github.com/tokio-rs/topcoat/pull/96))
-- Merge crates ([#94](https://github.com/tokio-rs/topcoat/pull/94))
+- initial release
