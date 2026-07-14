@@ -3,6 +3,18 @@ git_release_draft = true
 pr_draft = true
 pr_labels = ["release"]
 release_always = false
+
+# Skip cargo's pre-upload verification build. Several sub-crates carry a
+# dev-dependency on the `topcoat` facade (which in turn depends on them), so
+# cargo's verify step tries to resolve e.g. `topcoat = "^X.Y.Z"` against
+# crates.io before the facade's new version exists there — impossible during a
+# release, since the sub-crates must publish *before* the facade. crates.io
+# itself does not require dev-dependencies to already be published, so skipping
+# verification lets the whole set upload; the cycle resolves once every crate is
+# up. (This is the publish-time face of the same facade<->sub-crate dev-dep
+# cycle the `release = false` default below works around at planning time.)
+publish_no_verify = true
+
 # Default to NOT releasing. Each publishable crate opts in with `release = true`
 # below. This is deliberate: release-plz's release-order pass runs over *all*
 # workspace members (including the `publish = false` examples/benchmarks) and its
