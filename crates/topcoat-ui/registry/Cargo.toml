@@ -17,11 +17,18 @@ rust-version.workspace = true
 [package.metadata.topcoat-ui]
 registry = "."
 
+# Stages the Feather icon set at build time. Off by default so ordinary builds
+# and docs.rs never hit the network; enable it (CI does, via `--all-features`)
+# to compile the `#[cfg(test)]` component sources, whose `iconify_icon!`
+# references read the staged set.
+[features]
+stage-icons = ["dep:topcoat-icon"]
+
 [dev-dependencies]
 topcoat = { workspace = true, features = ["icon-iconify"] }
 
 [build-dependencies]
-topcoat-icon = { workspace = true, features = ["iconify-build"] }
+topcoat-icon = { workspace = true, features = ["iconify-build"], optional = true }
 
 [lints]
 workspace = true
