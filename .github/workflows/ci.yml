@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+# release-plz pushes two commits to its release branch in quick succession (the
+# version bump, then the docs-version sync), which would otherwise start two CI
+# runs on the same PR. Cancel a superseded run when a newer push lands — but
+# only for PRs, so a rapid second push to `main` never cancels a run that
+# Release-plz gates on via `workflow_run`.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -Dwarnings

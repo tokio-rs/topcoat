@@ -7,6 +7,13 @@ on:
       - edited
       - synchronize
 
+# Each push to a PR branch re-runs this check; release-plz's two-commit release
+# PR would trigger it twice. Cancel the superseded run (safe: this only ever
+# runs on PRs).
+concurrency:
+  group: semantic-pr-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   pull-requests: read
 
