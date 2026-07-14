@@ -56,7 +56,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-hack
       - run: cargo fetch --locked
-      - run: cargo hack clippy --workspace --each-feature --no-dev-deps --offline -- -D warnings
+      # `stage-icons` only affects the build script's network fetch, which this
+      # offline job must not trigger; it adds no lib coverage, so skip it.
+      - run: cargo hack clippy --workspace --each-feature --exclude-features stage-icons --no-dev-deps --offline -- -D warnings
 
   udeps:
     name: udeps
