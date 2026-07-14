@@ -103,27 +103,27 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [Source code formatting](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-cli/docs/fmt.md): `topcoat fmt` for macro bodies.
 
 **Rendering**
-- [The `view!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/view.md): templating syntax, control flow, conditional attributes.
-- [The `#[component]` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/component.md): async functions as components, with child content.
-- [The `attributes!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/attributes.md): reusable runtime attribute fragments.
-- [The `class!` macro](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-view/macro/docs/class.md): space-separated class lists from static and conditional entries.
+- [The `view!` macro](https://docs.rs/topcoat/latest/topcoat/view/index.html): templating syntax, control flow, conditional attributes.
+- [The `#[component]` macro](https://docs.rs/topcoat/latest/topcoat/view/attr.component.html): async functions as components, with child content.
+- [The `attributes!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html): reusable runtime attribute fragments.
+- [The `class!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.class.html): space-separated class lists from static and conditional entries.
 
 **Routing**
-- [Router](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/router.md): pages, layouts, and API routes; manual and auto-discovered.
-- [Module-based routing](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-router/docs/module_router.md): derive the route table from your module tree.
+- [Router](https://docs.rs/topcoat/latest/topcoat/router/index.html): pages, layouts, and API routes; manual and auto-discovered.
+- [Module-based routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html): derive the route table from your module tree.
 
 **Working with requests**
-- [Request context (`Cx`)](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/context.md): the value pages, layouts, and components read from.
+- [Request context (`Cx`)](https://docs.rs/topcoat/latest/topcoat/context/index.html): the value pages, layouts, and components read from.
 - [App context](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/app_context.md): share long-lived values across requests, keyed by type.
-- [Cookies](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/cookie.md): read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
-- [Memoization](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-core/macro/docs/memoization.md): `#[memoize]` for per-request caching and fan-out dedup.
-- [Functions, not middlewares](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/functions_not_middlewares.md): the recommended way to model auth and other request-scoped concerns.
+- [Cookies](https://docs.rs/topcoat/latest/topcoat/cookie/index.html): read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
+- [Memoization](https://docs.rs/topcoat/latest/topcoat/context/attr.memoize.html): `#[memoize]` for per-request caching and fan-out dedup.
+- [Functions, not middlewares](https://docs.rs/topcoat/latest/topcoat/context/index.html#functions-not-middlewares): the recommended way to model auth and other request-scoped concerns.
 
 **Asset system**
-- [Assets](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/asset.md): declare assets in Rust, serve them with content-hashed URLs.
-- [Fonts](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/font.md): bundle and serve web fonts.
-- [Icons](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/icon.md): download Iconify icon sets or declare your own.
+- [Assets](https://docs.rs/topcoat/latest/topcoat/asset/index.html): declare assets in Rust, serve them with content-hashed URLs.
+- [Fonts](https://docs.rs/topcoat/latest/topcoat/font/index.html): bundle and serve web fonts.
+- [Icons](https://docs.rs/topcoat/latest/topcoat/icon/index.html): download Iconify icon sets or declare your own.
 
 **Third-party integrations**
-- [Tailwind](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/tailwind.md): Tailwind CSS without Node, wired into the asset pipeline.
-- [htmx](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/htmx.md): drive partial HTML swaps from the server with request/response header helpers.
+- [Tailwind](https://docs.rs/topcoat/latest/topcoat/tailwind/index.html): Tailwind CSS without Node, wired into the asset pipeline.
+- [htmx](https://docs.rs/topcoat/latest/topcoat/htmx/index.html): drive partial HTML swaps from the server with request/response header helpers.
