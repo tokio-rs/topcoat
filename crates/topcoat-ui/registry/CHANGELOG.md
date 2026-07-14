@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.0.1...topcoat-ui-registry-v0.0.2) - 2026-07-14
+
+### Other
+
+- fix UI registry docs.rs build failure ([#97](https://github.com/tokio-rs/topcoat/pull/97))
+
 ## [0.0.1](https://github.com/tokio-rs/topcoat/releases/tag/topcoat-ui-registry-v0.0.1) - 2026-07-14
 
 ### Other
