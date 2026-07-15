@@ -278,9 +278,9 @@ impl std::error::Error for TowerNextError {}
 /// layer can downcast to it to map specific middleware failures onto
 /// responses; unmapped, the router renders it as a 500.
 #[derive(Debug)]
-pub struct MiddlewareError(BoxError);
+pub struct TowerLayerError(BoxError);
 
-impl MiddlewareError {
+impl TowerLayerError {
     /// Returns a reference to the middleware's underlying error.
     #[must_use]
     pub fn get_ref(&self) -> &BoxError {
@@ -294,13 +294,13 @@ impl MiddlewareError {
     }
 }
 
-impl Display for MiddlewareError {
+impl Display for TowerLayerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("tower middleware error")
+        f.write_str("tower layer error")
     }
 }
 
-impl std::error::Error for MiddlewareError {
+impl std::error::Error for TowerLayerError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(self.0.as_ref())
     }
@@ -349,7 +349,7 @@ fn recover(error: BoxError) -> Error {
             Repr::Tunneled(error) => error,
             repr => TowerNextError { repr }.into(),
         },
-        Err(error) => MiddlewareError(error).into(),
+        Err(error) => TowerLayerError(error).into(),
     }
 }
 
@@ -795,7 +795,7 @@ mod tests {
         // in flight, which requires the middleware to stay polled.
         let error = run(&layer, &mut cx, &route).unwrap_err();
 
-        let middleware = error.downcast_ref::<MiddlewareError>().unwrap();
+        let middleware = error.downcast_ref::<TowerLayerError>().unwrap();
         assert!(middleware.get_ref().is::<tower::timeout::error::Elapsed>());
     }
 
