@@ -1,9 +1,10 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
     FnArg, ItemFn, Pat, ReturnType, Type,
     parse::{Parse, ParseStream},
     parse_quote,
+    spanned::Spanned,
 };
 
 use crate::paths::{topcoat_context, topcoat_internal};
@@ -97,7 +98,8 @@ impl ToTokens for Memoize {
             if let Pat::Ident(pi) = &*pat_type.pat
                 && pi.ident == "cx"
             {
-                new_inputs.push(quote! { cx: &'__cx Cx });
+                let span = pi.span();
+                new_inputs.push(quote_spanned! {span=> cx: &'__cx Cx });
                 continue;
             }
             let ty = &pat_type.ty;

@@ -1,25 +1,27 @@
-use std::ops::Deref;
+mod hash;
+mod store;
+
+pub use hash::*;
+pub use store::*;
 
 use sha2::Digest;
-use topcoat_core::context::{Cx, app_context};
+use topcoat_core::context::Cx;
 use topcoat_core_macro::memoize;
 
-use crate::session_config;
-
 #[derive(Clone)]
-pub struct SessionToken([u8; 32]);
+pub struct Token([u8; 32]);
 
-impl SessionToken {
+impl Token {
     #[must_use]
     pub fn random() -> Self {
         Self(rand::random())
     }
 
     #[must_use]
-    pub fn hash(&self) -> SessionTokenHash {
+    pub fn hash(&self) -> TokenHash {
         let mut hasher = sha2::Sha256::new();
         hasher.update(self.0);
-        SessionTokenHash(hasher.finalize().0)
+        TokenHash::new(hasher.finalize().0)
     }
 
     #[must_use]
@@ -28,38 +30,13 @@ impl SessionToken {
     }
 }
 
-impl std::fmt::Debug for SessionToken {
+impl std::fmt::Debug for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SessionToken").finish()
+        f.debug_struct(stringify!(Token)).finish()
     }
 }
 
 #[memoize]
-pub fn session_token(cx: &Cx) -> Option<SessionToken> {
-    None
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SessionTokenHash([u8; 32]);
-
-impl Deref for SessionTokenHash {
-    type Target = [u8; 32];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[memoize]
-pub fn session_token_hash(cx: &Cx) -> Option<SessionTokenHash> {
-    session_token(cx).map(SessionToken::hash)
-}
-
-pub trait SessionTokenStore: Send + Sync {
-    fn get(&self, cx: &Cx) -> Option<SessionToken>;
-    fn set(&self, cx: &Cx, token: SessionToken);
-}
-
-pub fn session_token_store(cx: &Cx) -> &dyn SessionTokenStore {
-    session_config(cx)
+pub fn token(cx: &Cx) -> Option<Token> {
+    token_store(cx).get(cx)
 }

@@ -1,11 +1,11 @@
 use topcoat_core::context::{Cx, app_context};
 
-use crate::SessionTokenStore;
+use crate::TokenStore;
 
-pub struct SessionConfig {
-    token_store: Box<dyn SessionTokenStore>,
+pub struct Config {
+    pub(crate) token_store: Box<dyn TokenStore>,
 }
 
-pub fn session_config(cx: &Cx) -> &SessionConfig {
+pub fn config(cx: &Cx) -> &Config {
     app_context(cx)
 }
