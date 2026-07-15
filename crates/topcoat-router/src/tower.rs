@@ -988,7 +988,10 @@ mod tests {
             .route(RouteFn::new(Method::GET, path("/x"), hang))
             .layer(TowerLayer::new(
                 Path::new("/"),
-                tower_http::timeout::TimeoutLayer::new(Duration::from_millis(10)),
+                tower_http::timeout::TimeoutLayer::with_status_code(
+                    StatusCode::REQUEST_TIMEOUT,
+                    Duration::from_millis(10),
+                ),
             ))
             .build();
 

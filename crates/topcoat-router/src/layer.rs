@@ -137,9 +137,9 @@ impl Layers {
         ids
     }
 
-    /// Selects the layers whose start with the endpoint `path`, ordered least- to
-    /// most-specific so the outermost layer runs first. Among layers that share a
-    /// path, the most recently registered runs first.
+    /// Selects the layers whose path is a prefix of the endpoint `path`, ordered
+    /// least- to most-specific so the outermost layer runs first. Among layers
+    /// that share a path, the most recently registered runs first.
     pub(crate) fn for_endpoint(&self, path: &Path) -> Vec<LayerId> {
         let mut ids: Vec<LayerId> = (0..self.layers.len())
             .map(LayerId)
@@ -371,6 +371,43 @@ mod tests {
     }
 
     #[test]
+    fn match_path_tolerates_trailing_slash() {
+        let mut layers = Layers::default();
+        let admin = layers.push(layer_at("/admin"));
+        assert_eq!(layers.match_path("/admin/"), vec![admin]);
+        assert_eq!(layers.match_path("/admin/users/"), vec![admin]);
+    }
+
+    #[test]
+    fn match_path_rejects_partial_segments() {
+        let mut layers = Layers::default();
+        let root = layers.push(layer_at("/"));
+        let _admin = layers.push(layer_at("/admin"));
+        // `/admin` is a string prefix of the URL, but not a whole segment.
+        assert_eq!(layers.match_path("/administrator"), vec![root]);
+    }
+
+    #[test]
+    fn match_path_ignores_group_segments() {
+        let mut layers = Layers::default();
+        let panel = layers.push(layer_at("/(admin)/panel"));
+        let auth = layers.push(layer_at("/(auth)"));
+        // Groups never appear in URLs, so a layer matches the stripped path...
+        assert_eq!(layers.match_path("/panel/settings"), vec![auth, panel]);
+        // ...and a group-only layer matches every URL, like the root.
+        assert_eq!(layers.match_path("/elsewhere"), vec![auth]);
+    }
+
+    #[test]
+    fn match_path_requires_param_segments_to_be_nonempty() {
+        let mut layers = Layers::default();
+        let user = layers.push(layer_at("/users/{id}"));
+        assert_eq!(layers.match_path("/users/42/posts"), vec![user]);
+        // An empty `{id}` segment never routes, so the layer does not match.
+        assert!(layers.match_path("/users//posts").is_empty());
+    }
+
+    #[test]
     fn for_endpoint_orders_prefix_layers_least_to_most_specific() {
         let mut layers = Layers::default();
         let root = layers.push(layer_at("/"));
@@ -392,6 +429,39 @@ mod tests {
         assert_eq!(
             layers.for_endpoint(Path::new("/admin/users")),
             vec![second, first],
+        );
+    }
+
+    #[test]
+    fn for_endpoint_rejects_partial_segments() {
+        let mut layers = Layers::default();
+        let _admin = layers.push(layer_at("/admin"));
+        assert!(layers.for_endpoint(Path::new("/administrator")).is_empty());
+    }
+
+    #[test]
+    fn for_endpoint_includes_group_segments() {
+        let mut layers = Layers::default();
+        let auth = layers.push(layer_at("/(auth)"));
+        let _dashboard = layers.push(layer_at("/dashboard"));
+        // Groups are part of the logical path: the layer inside `(auth)` wraps
+        // the endpoint, while the URL-lookalike `/dashboard` layer does not.
+        assert_eq!(
+            layers.for_endpoint(Path::new("/(auth)/dashboard")),
+            vec![auth],
+        );
+    }
+
+    #[test]
+    fn for_endpoint_distinguishes_param_names() {
+        let mut layers = Layers::default();
+        let id = layers.push(layer_at("/users/{id}"));
+        let _user_id = layers.push(layer_at("/users/{user_id}"));
+        // Prefix matching compares segments, so `{id}` only wraps endpoints
+        // spelled with the same parameter name.
+        assert_eq!(
+            layers.for_endpoint(Path::new("/users/{id}/posts")),
+            vec![id]
         );
     }
 

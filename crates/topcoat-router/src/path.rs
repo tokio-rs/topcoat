@@ -208,7 +208,7 @@ impl Path {
     ///
     /// Each segment is matched against the corresponding URL segment:
     /// - **`Static`** segments must equal the URL segment.
-    /// - **`Param`** segments match any single URL segment.
+    /// - **`Param`** segments match any single non-empty URL segment.
     /// - **`CatchAll`** segments match the remaining URL (including any `/` separators) and require
     ///   at least one segment to be present.
     /// - **`Group`** segments are ignored, as they are not part of the URL.
@@ -287,9 +287,11 @@ impl Path {
                     Some((head, tail)) if head == expected => rest = tail,
                     _ => return false,
                 },
+                // A parameter matches any single non-empty segment. An empty
+                // one (as in `/users//`) never routes, so reject it here too.
                 PathSegment::Param(_) => match first_segment(rest) {
-                    Some((_, tail)) => rest = tail,
-                    None => return false,
+                    Some((head, tail)) if !head.is_empty() => rest = tail,
+                    _ => return false,
                 },
                 // A catch-all swallows the whole remainder, so nothing can
                 // follow it and there is never leftover URL to reject.
@@ -771,6 +773,29 @@ mod tests {
     }
 
     #[test]
+    fn path_starts_with_rejects_partial_segment() {
+        // `/admin` is a string prefix of `/administrator`, but not a whole
+        // segment, so it must not count as a path prefix.
+        assert!(!Path::new("/administrator").starts_with(Path::new("/admin")));
+    }
+
+    #[test]
+    fn path_starts_with_includes_groups() {
+        let path = Path::new("/(auth)/dashboard");
+        assert!(path.starts_with(Path::new("/(auth)")));
+        // Groups are part of the logical path, so `/dashboard` is not a prefix
+        // of `/(auth)/dashboard` even though both serve the URL `/dashboard`.
+        assert!(!path.starts_with(Path::new("/dashboard")));
+    }
+
+    #[test]
+    fn path_starts_with_distinguishes_param_names() {
+        let path = Path::new("/users/{id}/posts");
+        assert!(path.starts_with(Path::new("/users/{id}")));
+        assert!(!path.starts_with(Path::new("/users/{user_id}")));
+    }
+
+    #[test]
     fn path_display() {
         let path = Path::new("/users/{id}");
         assert_eq!(path.to_string(), "/users/{id}");
@@ -786,6 +811,33 @@ mod tests {
     #[test]
     fn matches_static_mismatch() {
         assert!(!Path::new("/users/list").matches("/users/all"));
+    }
+
+    #[test]
+    fn matches_rejects_partial_segment() {
+        assert!(!Path::new("/admin").matches("/administrator"));
+        assert!(!Path::new("/administrator").matches("/admin"));
+    }
+
+    #[test]
+    fn matches_is_case_sensitive() {
+        assert!(!Path::new("/admin").matches("/Admin"));
+    }
+
+    #[test]
+    fn matches_rejects_empty_segments() {
+        // Doubled slashes produce empty URL segments, which never route.
+        assert!(!Path::new("/admin").matches("//admin"));
+        assert!(!Path::new("/users/{id}").matches("/users//"));
+        assert!(!Path::new("/users/{id}/posts").matches("/users//posts"));
+    }
+
+    #[test]
+    fn matches_treats_percent_encoding_as_opaque() {
+        // Matching happens on the raw URL, where `%2F` is an ordinary part of
+        // a segment, not a separator.
+        assert!(!Path::new("/admin/users").matches("/admin%2Fusers"));
+        assert!(Path::new("/{page}").matches("/admin%2Fusers"));
     }
 
     #[test]
@@ -842,6 +894,12 @@ mod tests {
     }
 
     #[test]
+    fn matches_catch_all_swallows_empty_segments() {
+        // The remainder after `/files/` is `/`, a non-empty capture.
+        assert!(Path::new("/files/{*rest}").matches("/files//"));
+    }
+
+    #[test]
     fn matches_start_allows_trailing_segments() {
         let path = Path::new("/settings");
         assert!(path.matches_start("/settings"));
@@ -852,6 +910,53 @@ mod tests {
     #[test]
     fn matches_start_mismatch() {
         assert!(!Path::new("/settings").matches_start("/dashboard"));
+    }
+
+    #[test]
+    fn matches_start_tolerates_trailing_slash() {
+        assert!(Path::new("/admin").matches_start("/admin/"));
+        assert!(Path::new("/users/{id}").matches_start("/users/42/"));
+    }
+
+    #[test]
+    fn matches_start_rejects_partial_segment() {
+        assert!(!Path::new("/admin").matches_start("/administrator"));
+    }
+
+    #[test]
+    fn matches_start_rejects_empty_segments() {
+        assert!(!Path::new("/admin").matches_start("//admin"));
+        assert!(!Path::new("/users/{id}").matches_start("/users//edit"));
+    }
+
+    #[test]
+    fn matches_start_ignores_groups() {
+        // A path inside a group matches the URL with the group stripped, plus
+        // anything nested below it.
+        assert!(Path::new("/(admin)/panel").matches_start("/panel"));
+        assert!(Path::new("/(admin)/panel").matches_start("/panel/settings"));
+        assert!(!Path::new("/(admin)/panel").matches_start("/other"));
+        // A group-only path is URL-equivalent to the root and matches any URL.
+        assert!(Path::new("/(auth)").matches_start("/anything"));
+    }
+
+    #[test]
+    fn matches_start_catch_all() {
+        let path = Path::new("/files/{*rest}");
+        assert!(path.matches_start("/files/a/b"));
+        // The catch-all itself requires at least one segment.
+        assert!(!path.matches_start("/files"));
+        assert!(!path.matches_start("/files/"));
+    }
+
+    #[test]
+    fn matches_start_non_origin_form_urls() {
+        // An asterisk-form request (`OPTIONS *`) or an empty authority-form
+        // path still falls under the root, but under no other path.
+        assert!(Path::new("/").matches_start("*"));
+        assert!(Path::new("/").matches_start(""));
+        assert!(!Path::new("/admin").matches_start("*"));
+        assert!(!Path::new("/admin").matches_start(""));
     }
 
     #[test]
