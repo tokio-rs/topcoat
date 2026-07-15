@@ -97,7 +97,7 @@ impl ToTokens for Memoize {
             if let Pat::Ident(pi) = &*pat_type.pat
                 && pi.ident == "cx"
             {
-                new_inputs.push(quote! { cx: &'__cx #topcoat_context::Cx });
+                new_inputs.push(quote! { cx: &'__cx Cx });
                 continue;
             }
             let ty = &pat_type.ty;
