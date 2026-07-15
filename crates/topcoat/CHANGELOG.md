@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.4](https://github.com/tokio-rs/topcoat/compare/topcoat-v0.0.3...topcoat-v0.0.4) - 2026-07-15
+
+### Added
+
+- tower layers ([#103](https://github.com/tokio-rs/topcoat/pull/103))
+
 ## [0.0.3](https://github.com/tokio-rs/topcoat/compare/topcoat-v0.0.2...topcoat-v0.0.3) - 2026-07-14
 
 ### Other
