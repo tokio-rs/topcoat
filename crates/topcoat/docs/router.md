@@ -201,6 +201,26 @@ async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Respon
 
 Layer path matching follows the same prefix rule as layouts. A layer at `/` wraps everything, while a layer at `/admin` wraps only routes under `/admin`. Layers at different paths nest from least specific (outermost) to most specific (innermost). If you manually register multiple layers at the same path, the most recently registered layer runs first.
 
+## Tower layers
+
+With the `tower` feature enabled, `TowerLayer` runs middleware from the tower ecosystem (a timeout, a rate limit, CORS, compression) as a layer. It wraps the routes under its path in the middleware a `tower::Layer` builds and registers like any other layer:
+
+```rust,ignore
+use std::time::Duration;
+
+use topcoat::router::{Path, Router, TowerLayer};
+use tower::timeout::TimeoutLayer;
+
+let router = Router::builder()
+    .layer(TowerLayer::new(
+        Path::new("/api"),
+        TimeoutLayer::new(Duration::from_secs(5)),
+    ))
+    .build();
+```
+
+See the `TowerLayer` API documentation for the middleware's requirements and error semantics.
+
 # Errors
 
 Every page, layout, layer, and route handler returns a [`Result`](crate::Result). An `Err` becomes the response: the router maps each of its own error types onto an HTTP status code and turns anything else into a 500.

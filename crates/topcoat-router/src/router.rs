@@ -356,6 +356,12 @@ impl RouterBuilder {
     ///
     /// Panics if two routes resolve to the same path and HTTP method, since the
     /// router would have no way to choose between them.
+    ///
+    /// Also panics if two routes resolve to the same path but different layers
+    /// wrap them (possible when their group segments differ, e.g. `/(a)/x` and
+    /// `/(b)/x` with a layer at `/(a)`): every route at a path shares one layer
+    /// stack, so the divergence is rejected rather than resolved by
+    /// registration order.
     #[must_use]
     pub fn build(self) -> Router {
         let RouterBuilder {
@@ -381,20 +387,22 @@ impl RouterBuilder {
         // Group routes that share a path into a single endpoint first, since
         // matchit rejects inserting the same path twice. Two routes that resolve
         // to the same path *and* method are ambiguous, so reject them here.
-        // Remember each group's first route path (with its group segments
-        // intact, which `to_matchit_path` strips) to select the endpoint's
-        // layers below.
-        let mut grouped: HashMap<Cow<'static, str>, Endpoint> = HashMap::new();
+        // Remember each group's first route index to name it in the layer
+        // divergence panic below.
+        let mut grouped: HashMap<Cow<'static, str>, (usize, Endpoint)> = HashMap::new();
         let mut interned_path_params: HashMap<&str, Arc<str>> = HashMap::new();
         for (index, route) in routes.iter().enumerate() {
-            let endpoint = grouped
+            let layer_stack = layers.for_endpoint(route.path());
+            let (first, endpoint) = grouped
                 .entry(route.path().to_matchit_path())
                 .or_insert_with(|| {
                     let path_params = route
                         .path()
                         .segments()
                         .filter_map(|segment| match segment {
-                            PathSegment::Param(param) => {
+                            // A catch-all is captured by matchit like a param,
+                            // so it needs a key here too.
+                            PathSegment::Param(param) | PathSegment::CatchAll(param) => {
                                 let interned =
                                     interned_path_params.entry(param).or_insert_with(|| {
                                         Arc::from(param.to_owned().into_boxed_str())
@@ -404,9 +412,21 @@ impl RouterBuilder {
                             _ => None,
                         })
                         .collect();
-                    let layers = layers.for_endpoint(route.path()).into_boxed_slice();
-                    Endpoint::new(path_params, layers)
+                    let endpoint =
+                        Endpoint::new(path_params, layer_stack.clone().into_boxed_slice());
+                    (index, endpoint)
                 });
+
+            // Every route grouped at a path shares the endpoint's layer stack
+            // (the 405 fallback included), so their full paths -- group
+            // segments and all -- must select the same layers. Reject a
+            // divergence rather than let registration order pick a winner.
+            assert!(
+                layer_stack == endpoint.layers(),
+                "routes `{}` and `{}` serve the same URL path but select different layers",
+                routes[*first].path(),
+                route.path(),
+            );
 
             let method = route.method();
             assert!(
@@ -420,7 +440,7 @@ impl RouterBuilder {
         // Precompute the layer stack wrapping each endpoint once, so dispatch
         // only has to index into it rather than filter and sort per request.
         let mut endpoints = matchit::Router::new();
-        for (path, mut endpoint) in grouped {
+        for (path, (_, mut endpoint)) in grouped {
             endpoint.alias_head_to_get();
             endpoints
                 .insert(path.clone(), endpoint)
@@ -534,6 +554,13 @@ mod tests {
     fn trace_admin<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("admin");
+            next.run(cx, body).await
+        })
+    }
+
+    fn trace_auth<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        Box::pin(async move {
+            app_context::<Arc<Trace>>(cx).lock().unwrap().push("auth");
             next.run(cx, body).await
         })
     }
@@ -676,6 +703,20 @@ mod tests {
     }
 
     #[test]
+    fn captures_catch_all_params() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/files/{*rest}"),
+                echo_params,
+            ))
+            .build();
+        // The catch-all captures the remainder of the URL, slashes included.
+        let (_, _, body) = send(&router, Method::GET, "/files/a/b/c");
+        assert_eq!(&body[..], b"rest=a/b/c");
+    }
+
+    #[test]
     fn app_context_is_available_to_handlers() {
         let router = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/hi"), say_greeting))
@@ -744,6 +785,141 @@ mod tests {
         );
         let (status, _, _) = send(&router, Method::POST, "/x");
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(*trace.lock().unwrap(), vec!["root"]);
+    }
+
+    #[test]
+    fn layers_run_for_trailing_slash_urls() {
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
+                .layer(LayerFn::new(path("/admin"), trace_admin))
+                .layer(LayerFn::new(path("/"), trace_root)),
+        );
+
+        // A trailing slash is a different URL: the route does not match, but
+        // the layers wrapping the path still run around the 404.
+        let (status, _, _) = send(&router, Method::GET, "/admin/x/");
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(*trace.lock().unwrap(), vec!["root", "admin"]);
+    }
+
+    #[test]
+    fn layers_do_not_run_for_lookalike_prefixes() {
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
+                .layer(LayerFn::new(path("/admin"), trace_admin))
+                .layer(LayerFn::new(path("/"), trace_root)),
+        );
+
+        // `/admin` prefixes the string `/administrator` but not its segments,
+        // so only the root layer wraps the 404.
+        let (status, _, _) = send(&router, Method::GET, "/administrator");
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(*trace.lock().unwrap(), vec!["root"]);
+    }
+
+    #[test]
+    fn layer_selection_ignores_query_strings() {
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
+                .layer(LayerFn::new(path("/admin"), trace_admin)),
+        );
+
+        let (status, _, _) = send(&router, Method::GET, "/admin/x?tab=users");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(*trace.lock().unwrap(), vec!["admin"]);
+
+        // The same holds on the 404 path, which selects layers by URL.
+        trace.lock().unwrap().clear();
+        let (status, _, _) = send(&router, Method::GET, "/admin/missing?tab=users");
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(*trace.lock().unwrap(), vec!["admin"]);
+    }
+
+    #[test]
+    fn layers_wrap_percent_encoded_param_urls() {
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/admin/{id}"), say_route))
+                .layer(LayerFn::new(path("/admin"), trace_admin)),
+        );
+        let (status, _, _) = send(&router, Method::GET, "/admin/a%20b");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(*trace.lock().unwrap(), vec!["admin"]);
+    }
+
+    #[test]
+    fn layers_wrap_catch_all_routes() {
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/admin/{*rest}"), say_route))
+                .layer(LayerFn::new(path("/admin"), trace_admin)),
+        );
+        let (status, _, _) = send(&router, Method::GET, "/admin/a/b/c");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(*trace.lock().unwrap(), vec!["admin"]);
+    }
+
+    #[test]
+    fn group_layers_wrap_routes_at_their_stripped_url() {
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(
+                    Method::GET,
+                    path("/(auth)/dashboard"),
+                    say_route,
+                ))
+                .layer(LayerFn::new(path("/(auth)"), trace_auth)),
+        );
+
+        // The route serves `/dashboard` (the group is stripped from the URL),
+        // and the group's layer wraps it there.
+        let (status, _, body) = send(&router, Method::GET, "/dashboard");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"route");
+        assert_eq!(*trace.lock().unwrap(), vec!["auth"]);
+    }
+
+    #[test]
+    fn group_layers_wrap_not_found_urls_anywhere() {
+        let (router, trace) =
+            trace_router(RouterBuilder::new().layer(LayerFn::new(path("/(auth)"), trace_auth)));
+
+        // A 404 URL cannot be attributed to a group, and a group-only path is
+        // URL-equivalent to the root, so the layer wraps every unmatched URL.
+        let (status, _, _) = send(&router, Method::GET, "/missing");
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(*trace.lock().unwrap(), vec!["auth"]);
+    }
+
+    #[test]
+    #[should_panic(expected = "select different layers")]
+    fn routes_sharing_a_url_with_different_layers_panic() {
+        // Both routes serve `/x` (groups are stripped from the URL), but only
+        // the `(a)` route is wrapped by the `/(a)` layer. The endpoint's layer
+        // stack is shared, so the build rejects the divergence.
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/(a)/x"), say_route))
+            .route(RouteFn::new(Method::POST, path("/(b)/x"), say_posted))
+            .layer(LayerFn::new(path("/(a)"), trace_auth))
+            .build();
+    }
+
+    #[test]
+    fn routes_sharing_a_url_with_the_same_layers_build() {
+        // Different group spellings are fine as long as the same layers apply.
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/(a)/x"), say_route))
+                .route(RouteFn::new(Method::POST, path("/(b)/x"), say_posted))
+                .layer(LayerFn::new(path("/"), trace_root)),
+        );
+        let (status, _, body) = send(&router, Method::POST, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"posted");
         assert_eq!(*trace.lock().unwrap(), vec!["root"]);
     }
 
