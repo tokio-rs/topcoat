@@ -15,33 +15,23 @@ use crate::{Body, BoxError, Layer, LayerFuture, Next, Path, Request, Response};
 /// A [`Layer`] that wraps the routes nested under its path in a
 /// [`tower::Layer`]'s middleware.
 ///
-/// The tower layer is applied once, at construction, to a [`TowerNext`]
-/// service standing in for the rest of the chain, so middleware state (a
-/// concurrency-limit semaphore, a rate-limit window) is shared across requests
-/// just like in a plain tower stack. Each request then runs on a clone of the
-/// composed service, which must be `Clone`, `Send`, and `Sync` (wrap a service
-/// that is not `Sync` in `tower::buffer`, whose handle is).
+/// This adapter runs middleware from the tower ecosystem (a timeout, a rate
+/// limit, CORS, compression) inside a topcoat router. The middleware behaves
+/// as it would in a plain tower stack: its state (a concurrency-limit
+/// semaphore, a rate-limit window) is shared across requests, and changes it
+/// makes to the request are seen by the layers and route it wraps.
 ///
-/// The middleware sees the request as an [`http::Request`] carrying [`Body`],
-/// reassembled from the parts stored on the request context. Modifications the
-/// middleware makes to the request (added headers, a rewritten URI, new
-/// extensions) are written back to the context before the wrapped chain runs,
-/// so inner layers and the route observe them.
+/// The middleware's service must be `Clone`, `Send`, and `Sync`; wrap a
+/// service that is not `Sync` in `tower::buffer`. To run several tower
+/// layers, compose them first (for example with [`tower::ServiceBuilder`])
+/// and wrap the result in a single `TowerLayer`. Middleware that calls its
+/// inner service more than once per request (like `tower::retry`) is not
+/// supported.
 ///
-/// Errors keep their topcoat semantics: an `Err` produced by the wrapped chain
-/// (a 404, a handler error) tunnels through the tower stack inside a
-/// [`TowerNextError`] and is unwrapped on the way out, so layers outside the
-/// adapter observe the original [`Error`] value. An error produced by the
+/// An error produced by the wrapped routes (a 404, a handler error) leaves
+/// the layer as the original [`Error`] value, while an error produced by the
 /// middleware itself (a timeout elapsing, a load-shed rejection) surfaces as
 /// an `Err` wrapping a [`TowerLayerError`].
-///
-/// To run several tower layers, compose them first (for example with
-/// [`tower::ServiceBuilder`], whose `into_inner` returns the composed layer
-/// stack) and wrap the result in a single `TowerLayer`. Middleware that spawns
-/// its inner service (like `tower::buffer`) works, since [`TowerNext`] and its
-/// futures are `'static`. Middleware that calls its inner service more than
-/// once per request (like `tower::retry`) does not: the wrapped chain runs at
-/// most once, and a repeated call resolves to an error.
 ///
 /// Register the adapter with
 /// [`RouterBuilder::layer`](crate::RouterBuilder::layer).
@@ -71,8 +61,8 @@ pub struct TowerLayer<S> {
 impl<S> TowerLayer<S> {
     /// Wraps the routes under `path` in the middleware `layer` builds.
     ///
-    /// Applies `layer` to a [`TowerNext`] immediately; the resulting service
-    /// handles every request passing through this adapter.
+    /// The middleware is built immediately and shared by every request
+    /// passing through this layer.
     #[must_use]
     pub fn new<L>(path: impl Into<Cow<'static, Path>>, layer: L) -> Self
     where
@@ -152,14 +142,12 @@ where
     }
 }
 
-/// The tower service standing in for the wrapped chain inside a
-/// [`TowerLayer`]'s middleware stack.
+/// The inner service a [`TowerLayer`]'s middleware wraps.
 ///
-/// [`TowerLayer::new`] hands this service to the given [`tower::Layer`], so
-/// the middleware it builds wraps the inner topcoat layers and the route.
-/// Calling the service forwards the request to that chain and resolves with
-/// the chain's response. The chain behind a request runs at most once: a
-/// middleware that calls the service again (like a retry) receives a
+/// [`TowerLayer::new`] hands this service to the given [`tower::Layer`].
+/// Calling it forwards the request to the layers and route the `TowerLayer`
+/// wraps and resolves with their response. It can be called at most once per
+/// request; a repeated call (like a retry's) resolves to a
 /// [`TowerNextError`].
 #[derive(Clone, Debug)]
 pub struct TowerNext {
@@ -203,11 +191,11 @@ impl tower::Service<Request> for TowerNext {
 
 /// The error type [`TowerNext`] returns.
 ///
-/// An `Err` produced by the wrapped chain crosses the tower stack inside this
-/// type, and the enclosing [`TowerLayer`] unwraps it on the way out, so layers
-/// outside the adapter observe the original [`Error`]. The remaining cases,
-/// which surface as-is, are misuse (calling the chain twice, or from a request
-/// that no longer carries the adapter's relay) and cancellation.
+/// Middleware should let this error pass through unchanged: the enclosing
+/// [`TowerLayer`] restores an error produced by the wrapped routes to the
+/// original [`Error`] value. The other cases are misuse (calling the service
+/// a second time, or from a request that lost the original request's
+/// extensions) and the request being cancelled.
 #[derive(Debug)]
 pub struct TowerNextError {
     repr: Repr,
@@ -275,12 +263,12 @@ impl Display for TowerNextError {
 impl std::error::Error for TowerNextError {}
 
 /// An error a [`TowerLayer`]'s middleware produced itself, as opposed to one
-/// tunneled through it from the wrapped chain.
+/// that passed through it from the wrapped routes.
 ///
-/// The adapter wraps middleware failures (a timeout elapsing, a load-shed
-/// rejection) in this type before surfacing them as an [`Error`]. An outer
-/// layer can downcast to it to map specific middleware failures onto
-/// responses; unmapped, the router renders it as a 500.
+/// Middleware failures (a timeout elapsing, a load-shed rejection) surface
+/// from the layer as an [`Error`] wrapping this type. An outer layer can
+/// downcast to it to map specific failures onto responses; unmapped, the
+/// router renders it as a 500.
 #[derive(Debug)]
 pub struct TowerLayerError(BoxError);
 
