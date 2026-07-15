@@ -333,6 +333,12 @@ impl ToOwned for Path {
     }
 }
 
+impl<'a> From<&'a Path> for Cow<'a, Path> {
+    fn from(value: &'a Path) -> Self {
+        Self::Borrowed(value)
+    }
+}
+
 /// The reason a string could not be parsed into a [`Path`] by
 /// [`Path::from_str`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -414,6 +420,12 @@ impl Borrow<Path> for PathBuf {
     fn borrow(&self) -> &Path {
         // A `PathBuf` only ever holds a valid path, so skip re-validation.
         Path::new_unchecked(&self.inner)
+    }
+}
+
+impl From<PathBuf> for Cow<'static, Path> {
+    fn from(value: PathBuf) -> Self {
+        Self::Owned(value)
     }
 }
 

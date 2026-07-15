@@ -15,6 +15,8 @@ mod route;
 mod router;
 mod serve;
 mod service;
+#[cfg(feature = "tower")]
+mod tower;
 
 pub use body::*;
 pub use content::*;
@@ -33,5 +35,7 @@ pub use route::*;
 pub use router::*;
 pub use serve::*;
 pub use service::*;
+#[cfg(feature = "tower")]
+pub use tower::*;
 
 pub use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};

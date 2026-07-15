@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt::{self, Display};
 use std::future::Future;
 use std::pin::{Pin, pin};
@@ -62,7 +63,7 @@ use crate::{Body, BoxError, Layer, LayerFuture, Next, Path, Request, Response};
 /// ```
 pub struct TowerLayer<S> {
     /// The URL path prefix whose routes this layer wraps.
-    path: &'static Path,
+    path: Cow<'static, Path>,
     /// The composed tower service, built once and cloned per request. The
     /// mutex only guards the clone; it is never held across a call.
     service: Mutex<S>,
@@ -74,12 +75,12 @@ impl<S> TowerLayer<S> {
     /// Applies `layer` to a [`TowerNext`] immediately; the resulting service
     /// handles every request passing through this adapter.
     #[must_use]
-    pub fn new<L>(path: &'static Path, layer: L) -> Self
+    pub fn new<L>(path: impl Into<Cow<'static, Path>>, layer: L) -> Self
     where
         L: tower::Layer<TowerNext, Service = S>,
     {
         Self {
-            path,
+            path: path.into(),
             service: Mutex::new(layer.layer(TowerNext::new())),
         }
     }
@@ -94,7 +95,7 @@ where
     ResBody::Error: Into<BoxError>,
 {
     fn path(&self) -> &Path {
-        self.path
+        &self.path
     }
 
     fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -733,7 +734,12 @@ mod tests {
         let result = block_on(layer.handle(&mut cx, Body::empty(), next));
 
         // The 404 comes back out as the original typed error, not a response.
-        assert!(result.unwrap_err().downcast_ref::<NotFoundError>().is_some());
+        assert!(
+            result
+                .unwrap_err()
+                .downcast_ref::<NotFoundError>()
+                .is_some()
+        );
     }
 
     #[test]
@@ -750,7 +756,12 @@ mod tests {
         let next = Next::new(&layers, &[], Terminal::NotFound);
         let result = block_on(layer.handle(&mut cx, Body::empty(), next));
 
-        assert!(result.unwrap_err().downcast_ref::<NotFoundError>().is_some());
+        assert!(
+            result
+                .unwrap_err()
+                .downcast_ref::<NotFoundError>()
+                .is_some()
+        );
     }
 
     #[test]
