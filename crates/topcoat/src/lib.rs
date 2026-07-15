@@ -44,6 +44,9 @@ pub use serve::{serve, start};
 #[cfg(feature = "runtime")]
 pub mod runtime;
 
+#[cfg(feature = "session")]
+pub mod session;
+
 #[cfg(feature = "tailwind")]
 pub mod tailwind;
 

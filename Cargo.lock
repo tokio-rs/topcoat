@@ -2604,6 +2604,7 @@ dependencies = [
  "topcoat-router-macro",
  "topcoat-runtime",
  "topcoat-runtime-macro",
+ "topcoat-session",
  "topcoat-tailwind",
  "topcoat-ui-registry",
  "topcoat-view",
@@ -2885,6 +2886,15 @@ dependencies = [
  "quote",
  "syn",
  "topcoat-runtime-grammar",
+]
+
+[[package]]
+name = "topcoat-session"
+version = "0.0.3"
+dependencies = [
+ "topcoat",
+ "topcoat-core",
+ "topcoat-view",
 ]
 
 [[package]]

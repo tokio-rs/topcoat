@@ -21,6 +21,7 @@ members = [
     "crates/topcoat-runtime",
     "crates/topcoat-runtime/grammar",
     "crates/topcoat-runtime/macro",
+    "crates/topcoat-session",
     "crates/topcoat-tailwind",
     "crates/topcoat-ui",
     "crates/topcoat-ui/registry",
@@ -115,6 +116,7 @@ topcoat-router-macro = { version = "0.0.3", path = "crates/topcoat-router/macro"
 topcoat-runtime = { version = "0.0.3", path = "crates/topcoat-runtime" }
 topcoat-runtime-grammar = { version = "0.0.3", path = "crates/topcoat-runtime/grammar" }
 topcoat-runtime-macro = { version = "0.0.3", path = "crates/topcoat-runtime/macro" }
+topcoat-session = { version = "0.0.3", path = "crates/topcoat-session" }
 topcoat-tailwind = { version = "0.0.3", path = "crates/topcoat-tailwind" }
 topcoat-ui = { version = "0.0.3", path = "crates/topcoat-ui" }
 topcoat-ui-registry = { version = "0.0.3", path = "crates/topcoat-ui/registry" }

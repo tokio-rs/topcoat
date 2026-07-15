@@ -34,6 +34,7 @@ full = [
 	"multipart",
 	"router",
 	"runtime",
+	"session",
 	"tailwind",
 	"ui",
 	"view",
@@ -97,6 +98,9 @@ runtime = [
 	"dep:topcoat-runtime",
 	"dep:topcoat-runtime-macro",
 ]
+session = [
+	"dep:topcoat-session",
+]
 tailwind = [
 	"dep:topcoat-tailwind",
 ]
@@ -124,6 +128,7 @@ topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }
 topcoat-runtime-macro = { workspace = true, optional = true }
+topcoat-session = { workspace = true, optional = true }
 topcoat-tailwind = { workspace = true, optional = true }
 topcoat-ui-registry = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
