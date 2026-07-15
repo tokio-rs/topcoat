@@ -13,8 +13,10 @@ rust-version.workspace = true
 [dependencies]
 topcoat-core.workspace = true
 
+itoa.workspace = true
 memchr.workspace = true
 smallvec.workspace = true
+zmij.workspace = true
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["view"] }

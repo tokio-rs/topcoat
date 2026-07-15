@@ -2922,10 +2922,12 @@ name = "topcoat-view"
 version = "0.0.3"
 dependencies = [
  "criterion",
+ "itoa",
  "memchr",
  "smallvec",
  "topcoat",
  "topcoat-core",
+ "zmij",
 ]
 
 [[package]]

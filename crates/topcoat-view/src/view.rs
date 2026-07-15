@@ -176,7 +176,8 @@ impl ViewPart {
     /// Writes the part into `f`, escaped or validated for the context each
     /// piece of text was written in.
     pub(crate) fn render(&self, cx: &Cx, f: &mut Formatter<'_>) {
-        use std::fmt::Write;
+        let mut int_buffer = itoa::Buffer::new();
+        let mut float_buffer = zmij::Buffer::new();
 
         match self {
             Self::Empty => {}
@@ -184,48 +185,20 @@ impl ViewPart {
             // The `Display` output of the numeric types consists of digits,
             // signs, and plain letters, none of which are significant in any
             // HTML context, so they write verbatim.
-            Self::I8(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::I16(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::I32(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::I64(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::I128(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::Isize(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::U8(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::U16(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::U32(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::U64(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::U128(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::Usize(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::F32(inner) => {
-                let _ = write!(f, "{inner}");
-            }
-            Self::F64(inner) => {
-                let _ = write!(f, "{inner}");
-            }
+            Self::I8(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::I16(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::I32(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::I64(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::I128(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::Isize(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::U8(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::U16(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::U32(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::U64(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::U128(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::Usize(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::F32(inner) => f.write_str(float_buffer.format(*inner)),
+            Self::F64(inner) => f.write_str(float_buffer.format(*inner)),
             Self::Char { value, context } => context.writer(f).write_char(*value),
             Self::Str { value, context } => context.writer(f).write_str(value),
             Self::BoxDyn { inner, context, .. } => inner.render(cx, &mut context.writer(f)),
