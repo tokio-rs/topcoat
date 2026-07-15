@@ -5,7 +5,6 @@ use std::pin::{Pin, pin};
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use http::request::Parts;
 use tokio::sync::{mpsc, oneshot};
 use topcoat_core::context::CxBuilder;
 use topcoat_core::error::{Error, Result};
@@ -34,7 +33,7 @@ use crate::{Body, BoxError, Layer, LayerFuture, Next, Path, Request, Response};
 /// [`TowerNextError`] and is unwrapped on the way out, so layers outside the
 /// adapter observe the original [`Error`] value. An error produced by the
 /// middleware itself (a timeout elapsing, a load-shed rejection) surfaces as
-/// an `Err` wrapping a [`MiddlewareError`].
+/// an `Err` wrapping a [`TowerLayerError`].
 ///
 /// To run several tower layers, compose them first (for example with
 /// [`tower::ServiceBuilder`], whose `into_inner` returns the composed layer
@@ -372,7 +371,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        Bytes, IntoResponse, Layers, Method, NotFoundError, RouteFn, RouteFuture, Terminal,
+        Bytes, IntoResponse, Layers, Method, NotFoundError, RouteFn, RouteFuture, Router, Terminal,
         to_bytes,
     };
 
@@ -435,6 +434,21 @@ mod tests {
     /// A route that never resolves, for racing against a timeout middleware.
     fn hang(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(std::future::pending())
+    }
+
+    /// A route whose body is long enough to clear tower-http's compression
+    /// size threshold.
+    fn long_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { "route ".repeat(64).into_response(cx) })
+    }
+
+    /// Dispatches a GET request for `uri` through a full router.
+    fn send(router: &Router, uri: &str) -> Response {
+        let request = http::Request::builder()
+            .uri(uri)
+            .body(Body::empty())
+            .unwrap();
+        block_on(router.handle(request))
     }
 
     /// A middleware that stamps an `x-tower` header onto the request.
@@ -822,5 +836,176 @@ mod tests {
 
         let error = run(&layer, &mut cx, &route).unwrap_err();
         assert!(error.downcast_ref::<TowerNextError>().is_some());
+    }
+
+    // -- Ecosystem middleware, registered through the router --
+
+    #[test]
+    fn works_with_tower_concurrency_limit() {
+        let router = Router::builder()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .layer(TowerLayer::new(
+                Path::new("/"),
+                tower::limit::ConcurrencyLimitLayer::new(1),
+            ))
+            .build();
+
+        // The permit taken for the first request is released for the second.
+        for _ in 0..2 {
+            let response = send(&router, "/x");
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(&body_bytes(response)[..], b"route");
+        }
+    }
+
+    #[test]
+    fn works_with_tower_buffer_and_rate_limit() {
+        // `RateLimit` is not `Clone`; the documented pattern wraps it in
+        // `tower::buffer`, whose handle is. `Buffer` spawns its worker task, so
+        // the adapter must be built inside a runtime.
+        block_on(async {
+            let router = Router::builder()
+                .route(RouteFn::new(Method::GET, path("/x"), say_route))
+                .layer(TowerLayer::new(
+                    Path::new("/"),
+                    tower::ServiceBuilder::new()
+                        .buffer::<Request>(8)
+                        .rate_limit(100, Duration::from_secs(1))
+                        .into_inner(),
+                ))
+                .build();
+
+            for _ in 0..2 {
+                let request = http::Request::builder()
+                    .uri("/x")
+                    .body(Body::empty())
+                    .unwrap();
+                let response = router.handle(request).await;
+                assert_eq!(response.status(), StatusCode::OK);
+            }
+        });
+    }
+
+    #[test]
+    fn works_with_tower_http_set_response_header() {
+        let router = Router::builder()
+            .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
+            .route(RouteFn::new(Method::GET, path("/public"), say_route))
+            .layer(TowerLayer::new(
+                Path::new("/admin"),
+                tower_http::set_header::SetResponseHeaderLayer::if_not_present(
+                    http::header::HeaderName::from_static("x-tower"),
+                    HeaderValue::from_static("marked"),
+                ),
+            ))
+            .build();
+
+        let response = send(&router, "/admin/x");
+        assert_eq!(response.headers().get("x-tower").unwrap(), "marked");
+
+        // The middleware only wraps routes under its path.
+        let response = send(&router, "/public");
+        assert!(!response.headers().contains_key("x-tower"));
+    }
+
+    #[test]
+    fn works_with_tower_http_cors() {
+        let router = Router::builder()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .layer(TowerLayer::new(
+                Path::new("/"),
+                tower_http::cors::CorsLayer::permissive(),
+            ))
+            .build();
+
+        // The middleware answers a preflight request itself; without it the
+        // router would return a 405 for OPTIONS.
+        let request = http::Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/x")
+            .header(http::header::ORIGIN, "https://example.com")
+            .header(http::header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
+            .body(Body::empty())
+            .unwrap();
+        let response = block_on(router.handle(request));
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(
+            response
+                .headers()
+                .contains_key(http::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        );
+
+        // A plain request flows through to the route, with CORS headers added.
+        let response = send(&router, "/x");
+        assert!(
+            response
+                .headers()
+                .contains_key(http::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        );
+        assert_eq!(&body_bytes(response)[..], b"route");
+    }
+
+    #[test]
+    fn works_with_tower_http_compression() {
+        let router = Router::builder()
+            .route(RouteFn::new(Method::GET, path("/x"), long_route))
+            .layer(TowerLayer::new(
+                Path::new("/"),
+                tower_http::compression::CompressionLayer::new(),
+            ))
+            .build();
+
+        let request = http::Request::builder()
+            .uri("/x")
+            .header(http::header::ACCEPT_ENCODING, "gzip")
+            .body(Body::empty())
+            .unwrap();
+        let response = block_on(router.handle(request));
+
+        // The middleware's wrapped body type crossed back through the adapter.
+        assert_eq!(
+            response
+                .headers()
+                .get(http::header::CONTENT_ENCODING)
+                .unwrap(),
+            "gzip"
+        );
+        let compressed = body_bytes(response);
+        assert!(!compressed.is_empty());
+        assert!(compressed.len() < "route ".repeat(64).len());
+    }
+
+    #[test]
+    fn works_with_tower_http_trace() {
+        let router = Router::builder()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .layer(TowerLayer::new(
+                Path::new("/"),
+                tower_http::trace::TraceLayer::new_for_http(),
+            ))
+            .build();
+
+        let response = send(&router, "/x");
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // A tunneled 404 satisfies the classifier's error bounds and still
+        // renders at the router's edge.
+        let response = send(&router, "/missing");
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn works_with_tower_http_timeout() {
+        let router = Router::builder()
+            .route(RouteFn::new(Method::GET, path("/x"), hang))
+            .layer(TowerLayer::new(
+                Path::new("/"),
+                tower_http::timeout::TimeoutLayer::new(Duration::from_millis(10)),
+            ))
+            .build();
+
+        // Unlike tower's timeout, tower-http's renders a 408 response.
+        let response = send(&router, "/x");
+        assert_eq!(response.status(), StatusCode::REQUEST_TIMEOUT);
     }
 }
