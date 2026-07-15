@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::fmt::{self, Display};
 use std::future::Future;
 use std::pin::{Pin, pin};
-use std::sync::{Mutex, PoisonError};
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
@@ -20,7 +19,8 @@ use crate::{Body, BoxError, Layer, LayerFuture, Next, Path, Request, Response};
 /// service standing in for the rest of the chain, so middleware state (a
 /// concurrency-limit semaphore, a rate-limit window) is shared across requests
 /// just like in a plain tower stack. Each request then runs on a clone of the
-/// composed service.
+/// composed service, which must be `Clone`, `Send`, and `Sync` (wrap a service
+/// that is not `Sync` in `tower::buffer`, whose handle is).
 ///
 /// The middleware sees the request as an [`http::Request`] carrying [`Body`],
 /// reassembled from the parts stored on the request context. Modifications the
@@ -64,9 +64,8 @@ use crate::{Body, BoxError, Layer, LayerFuture, Next, Path, Request, Response};
 pub struct TowerLayer<S> {
     /// The URL path prefix whose routes this layer wraps.
     path: Cow<'static, Path>,
-    /// The composed tower service, built once and cloned per request. The
-    /// mutex only guards the clone; it is never held across a call.
-    service: Mutex<S>,
+    /// The composed tower service, built once and cloned per request.
+    service: S,
 }
 
 impl<S> TowerLayer<S> {
@@ -81,15 +80,15 @@ impl<S> TowerLayer<S> {
     {
         Self {
             path: path.into(),
-            service: Mutex::new(layer.layer(TowerNext::new())),
+            service: layer.layer(TowerNext::new()),
         }
     }
 }
 
 impl<S, ResBody> Layer for TowerLayer<S>
 where
-    S: tower::Service<Request, Response = http::Response<ResBody>> + Clone + Send + 'static,
-    S::Error: Into<BoxError>,
+    S: tower::Service<Request, Response = http::Response<ResBody>> + Clone + Send + Sync + 'static,
+    S::Error: Into<BoxError> + Send,
     S::Future: Send,
     ResBody: http_body::Body<Data = Bytes> + Send + 'static,
     ResBody::Error: Into<BoxError>,
@@ -100,13 +99,8 @@ where
 
     fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         // Clones of a tower service share its cross-request state (semaphores,
-        // rate-limit windows) through the service's internal handles. Poison is
-        // harmless here since the lock only ever guards this clone.
-        let service = self
-            .service
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone();
+        // rate-limit windows) through the service's internal handles.
+        let service = self.service.clone();
         Box::pin(async move {
             // Reassemble the http request the middleware operates on from the
             // parts stored on the context, and slip it the relay over which
