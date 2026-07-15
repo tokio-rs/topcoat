@@ -35,6 +35,7 @@ full = [
 	"router",
 	"runtime",
 	"tailwind",
+	"tower",
 	"ui",
 	"view",
 ]
@@ -99,6 +100,10 @@ runtime = [
 ]
 tailwind = [
 	"dep:topcoat-tailwind",
+]
+tower = [
+	"router",
+	"topcoat-router/tower",
 ]
 ui = [
 	"dep:topcoat-ui-registry",

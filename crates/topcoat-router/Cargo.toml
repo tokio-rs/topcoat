@@ -18,6 +18,11 @@ multipart = [
 	"dep:futures-util",
 	"dep:multer",
 ]
+tower = [
+	"dep:tower",
+	"tokio/macros",
+	"tokio/sync",
+]
 
 [dependencies]
 topcoat-core.workspace = true
@@ -43,10 +48,12 @@ serde_json.workspace = true
 serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
 tokio = { workspace = true, features = ["net", "rt"] }
+tower = { workspace = true, optional = true, features = ["util"] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["router"] }
-tokio = { workspace = true, features = ["macros", "rt"] }
+topcoat = { workspace = true, features = ["router", "tower"] }
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
+tower = { workspace = true, features = ["util", "timeout"] }
 
 [lints]
 workspace = true
