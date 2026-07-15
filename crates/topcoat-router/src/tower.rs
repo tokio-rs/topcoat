@@ -5,6 +5,7 @@ use std::pin::{Pin, pin};
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
+use http::request::Parts;
 use tokio::sync::{mpsc, oneshot};
 use topcoat_core::context::CxBuilder;
 use topcoat_core::error::{Error, Result};
@@ -102,10 +103,14 @@ where
         // rate-limit windows) through the service's internal handles.
         let service = self.service.clone();
         Box::pin(async move {
+            // Swap out existing parts with empty ones to avoid cloning headers etc.
+            let parts = cx
+                .insert(http::Request::new(()).into_parts().0)
+                .expect("router context contains parts");
             // Reassemble the http request the middleware operates on from the
             // parts stored on the context, and slip it the relay over which
             // `TowerNext` calls back into this chain.
-            let mut request = Request::from_parts(crate::parts(cx).clone(), body);
+            let mut request = Request::from_parts(parts, body);
             let (relay, mut chain_calls) = relay_channel();
             request.extensions_mut().insert(relay);
 
@@ -342,7 +347,7 @@ where
 /// Maps an error surfacing from a tower stack back onto a topcoat [`Error`]:
 /// an error tunneled from the wrapped chain is unwrapped to its original
 /// value, while an error the middleware produced itself is wrapped in a
-/// [`MiddlewareError`].
+/// [`TowerLayerError`].
 fn recover(error: BoxError) -> Error {
     match error.downcast::<TowerNextError>() {
         Ok(error) => match error.repr {
@@ -742,7 +747,7 @@ mod tests {
         // still be recovered on the way out.
         let layer = TowerLayer::new(
             Path::new("/"),
-            tower::timeout::TimeoutLayer::new(Duration::from_secs(60)),
+            tower::timeout::TimeoutLayer::new(Duration::from_mins(1)),
         );
         let layers = Layers::default();
         let mut cx = cx_for("/missing");

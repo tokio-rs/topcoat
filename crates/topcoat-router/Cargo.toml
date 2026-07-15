@@ -53,7 +53,14 @@ tower = { workspace = true, optional = true, features = ["util"] }
 [dev-dependencies]
 topcoat = { workspace = true, features = ["router", "tower"] }
 tokio = { workspace = true, features = ["macros", "rt", "time"] }
-tower = { workspace = true, features = ["util", "timeout"] }
+tower = { workspace = true, features = ["buffer", "limit", "timeout", "util"] }
+tower-http = { workspace = true, features = [
+	"compression-gzip",
+	"cors",
+	"set-header",
+	"timeout",
+	"trace",
+] }
 
 [lints]
 workspace = true
