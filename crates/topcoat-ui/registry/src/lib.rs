@@ -15,5 +15,5 @@
 //!
 //! [`topcoat_ui::DEFAULT_REGISTRY_CRATE`]: https://docs.rs/topcoat-ui
 
-#[cfg(test)]
+#[cfg(feature = "stage-icons")]
 pub mod components;
