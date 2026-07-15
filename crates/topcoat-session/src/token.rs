@@ -13,8 +13,35 @@ pub struct Token([u8; 32]);
 
 impl Token {
     #[must_use]
+    pub fn new(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    #[must_use]
     pub fn random() -> Self {
-        Self(rand::random())
+        Self::new(rand::random())
+    }
+
+    #[must_use]
+    pub fn decode(s: &str) -> Result<Self, DecodeError> {
+        use base64::{DecodeSliceError, Engine as _, engine::general_purpose::URL_SAFE};
+        let mut bytes = [0u8; 32];
+        let num_bytes = URL_SAFE
+            .decode_slice(s, &mut bytes)
+            .map_err(|error| match error {
+                DecodeSliceError::OutputSliceTooSmall => DecodeError::Length,
+                DecodeSliceError::DecodeError(error) => error.into(),
+            })?;
+        if num_bytes != bytes.len() {
+            return Err(DecodeError::Length);
+        }
+        Ok(Self::new(bytes))
+    }
+
+    #[must_use]
+    pub(crate) fn encode(&self) -> String {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+        URL_SAFE.encode(self.0)
     }
 
     #[must_use]
@@ -34,6 +61,14 @@ impl std::fmt::Debug for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(stringify!(Token)).finish()
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum DecodeError {
+    #[error("base64 decoding failed")]
+    Base64(#[from] base64::DecodeError),
+    #[error("invalid number of bytes in token")]
+    Length,
 }
 
 #[memoize]

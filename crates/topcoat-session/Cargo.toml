@@ -11,19 +11,23 @@ categories.workspace = true
 rust-version.workspace = true
 
 [features]
-default = []
-
+cookie = [
+	"dep:topcoat-cookie",
+]
 view = [
 	"dep:topcoat-view",
 ]
 
 [dependencies]
+topcoat-cookie = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-core-macro.workspace = true
 topcoat-view = { workspace = true, optional = true }
 
+base64.workspace = true
 rand.workspace = true
 sha2.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["session"] }

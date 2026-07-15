@@ -127,6 +127,7 @@ topcoat-view-macro = { version = "0.0.3", path = "crates/topcoat-view/macro" }
 anyhow = "1.0"
 anymap3 = "1.0"
 axum = "0.8.8"
+base64 = "0.22"
 boxcar = "0.2"
 bytes = "1"
 clap = "4.6.0"

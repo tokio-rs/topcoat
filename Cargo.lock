@@ -2892,9 +2892,12 @@ dependencies = [
 name = "topcoat-session"
 version = "0.0.3"
 dependencies = [
+ "base64",
  "rand 0.10.2",
  "sha2 0.11.0",
+ "thiserror",
  "topcoat",
+ "topcoat-cookie",
  "topcoat-core",
  "topcoat-core-macro",
  "topcoat-view",
