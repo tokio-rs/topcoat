@@ -30,11 +30,15 @@ impl ViewBox {
 
 impl Display for ViewBox {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {}",
-            self.min_x, self.min_y, self.width, self.height
-        )
+        let mut buffer = zmij::Buffer::new();
+        f.write_str(buffer.format(self.min_x))?;
+        f.write_char(' ');
+        f.write_str(buffer.format(self.min_y))?;
+        f.write_char(' ');
+        f.write_str(buffer.format(self.width))?;
+        f.write_char(' ');
+        f.write_str(buffer.format(self.height))?;
+        Ok(())
     }
 }
 
