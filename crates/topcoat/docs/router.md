@@ -203,7 +203,7 @@ Layer path matching follows the same prefix rule as layouts. A layer at `/` wrap
 
 ## Tower layers
 
-With the `tower` feature enabled, [`TowerLayer`] runs middleware from the tower ecosystem (a timeout, a rate limit, CORS, compression) as a layer. It wraps the routes under its path in the middleware a `tower::Layer` builds and registers like any other layer:
+With the `tower` feature enabled, `TowerLayer` runs middleware from the tower ecosystem (a timeout, a rate limit, CORS, compression) as a layer. It wraps the routes under its path in the middleware a `tower::Layer` builds and registers like any other layer:
 
 ```rust,ignore
 use std::time::Duration;
@@ -219,7 +219,7 @@ let router = Router::builder()
     .build();
 ```
 
-See [`TowerLayer`] for the middleware's requirements and error semantics.
+See the `TowerLayer` API documentation for the middleware's requirements and error semantics.
 
 # Errors
 
