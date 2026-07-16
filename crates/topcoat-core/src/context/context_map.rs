@@ -4,14 +4,40 @@
 //! Each [`Cx`] carries two of them:
 //!
 //! - **App context** is registered once at startup and shared across every request handled by the
-//!   router. Within a request, [`app_context`] retrieves a reference to a registered value by its
-//!   type.
+//!   router. Within a request, [`app_context`] retrieves a required value and [`try_app_context`]
+//!   retrieves an optional value by its type.
 //! - **Request context** is scoped to a single request and dropped when the request ends. Within a
-//!   request, [`request_context`] retrieves a reference to a registered value by its type.
+//!   request, [`request_context`] retrieves a required value and [`try_request_context`] retrieves
+//!   an optional value by its type.
 
 use std::any::{Any, type_name};
 
 use crate::context::Cx;
+
+/// Returns a reference to the app context value of type `T` registered on the
+/// router, or `None` if no such value has been registered.
+///
+/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may
+/// have at most one registered value.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::context::{Cx, try_app_context};
+///
+/// struct FeatureConfig;
+///
+/// fn feature_config(cx: &Cx) -> Option<&FeatureConfig> {
+///     try_app_context(cx)
+/// }
+/// ```
+#[must_use]
+pub fn try_app_context<T>(cx: &Cx) -> Option<&T>
+where
+    T: Any + Send + Sync,
+{
+    cx.app_context.get::<T>()
+}
 
 /// Returns a reference to the app context value of type `T` registered on the
 /// router.
@@ -43,13 +69,40 @@ pub fn app_context<T>(cx: &Cx) -> &T
 where
     T: Any + Send + Sync,
 {
-    match cx.app_context.get::<T>() {
+    match try_app_context(cx) {
         Some(value) => value,
         None => panic!(
             "attempted to access app context of type `{:?}`, but this type was not registered for this context",
             type_name::<T>()
         ),
     }
+}
+
+/// Returns a reference to the request context value of type `T` registered on
+/// the current request's [`Cx`], or `None` if no such value has been registered.
+///
+/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may
+/// have at most one registered value per request. Request context lives only
+/// for the duration of the request that owns it; once the request completes,
+/// every value is dropped.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::context::{Cx, try_request_context};
+///
+/// struct Customer;
+///
+/// fn current_customer(cx: &Cx) -> Option<&Customer> {
+///     try_request_context(cx)
+/// }
+/// ```
+#[must_use]
+pub fn try_request_context<T>(cx: &Cx) -> Option<&T>
+where
+    T: Any + Send + Sync,
+{
+    cx.request_context.get::<T>()
 }
 
 /// Returns a reference to the request context value of type `T` registered on
@@ -80,7 +133,7 @@ pub fn request_context<T>(cx: &Cx) -> &T
 where
     T: Any + Send + Sync,
 {
-    match cx.request_context.get::<T>() {
+    match try_request_context(cx) {
         Some(value) => value,
         None => panic!(
             "attempted to access request context of type `{:?}`, but this type was not registered for this context",
@@ -94,7 +147,8 @@ where
 /// Each registered value is stored under its [`TypeId`](std::any::TypeId), so a given type can
 /// only be registered once per `ContextMap`. Used by [`Cx`] to hold both the
 /// router-wide app context and the per-request request context; values are
-/// retrieved within a request via [`app_context`] or [`request_context`].
+/// retrieved within a request via [`app_context`], [`try_app_context`],
+/// [`request_context`], or [`try_request_context`].
 #[derive(Default, Debug)]
 pub struct ContextMap {
     entries: anymap3::Map<dyn Any + Send + Sync>,
@@ -227,6 +281,21 @@ mod tests {
     }
 
     #[test]
+    fn try_app_context_returns_registered_value() {
+        let cx = CxTestBuilder::new()
+            .app_context(Database("primary"))
+            .build();
+
+        assert_eq!(try_app_context::<Database>(&cx), Some(&Database("primary")));
+    }
+
+    #[test]
+    fn try_app_context_returns_none_for_unregistered_type() {
+        let cx = Cx::default();
+        assert_eq!(try_app_context::<Database>(&cx), None);
+    }
+
+    #[test]
     #[should_panic(expected = "attempted to access app context")]
     fn app_context_panics_for_unregistered_type() {
         let cx = Cx::default();
@@ -241,6 +310,24 @@ mod tests {
 
         let db: &Database = request_context(&cx);
         assert_eq!(db, &Database("primary"));
+    }
+
+    #[test]
+    fn try_request_context_returns_registered_value() {
+        let cx = CxTestBuilder::new()
+            .request_context(Database("primary"))
+            .build();
+
+        assert_eq!(
+            try_request_context::<Database>(&cx),
+            Some(&Database("primary"))
+        );
+    }
+
+    #[test]
+    fn try_request_context_returns_none_for_unregistered_type() {
+        let cx = Cx::default();
+        assert_eq!(try_request_context::<Database>(&cx), None);
     }
 
     #[test]

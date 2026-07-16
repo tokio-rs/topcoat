@@ -12,8 +12,9 @@ use crate::{abort::AbortStore, memoize::MemoizeCache};
 ///
 /// Pages, layouts, components, and routes can take `cx: &Cx` as an optional
 /// parameter when they need request-scoped information; Topcoat passes it
-/// automatically. Use it to read values registered for the request with
-/// [`app_context`] and [`request_context`].
+/// automatically. Use it to read values registered for the request with the
+/// app and request context helpers, such as [`app_context`] and
+/// [`request_context`].
 #[derive(Debug, Default)]
 pub struct Cx {
     id: CxId,
@@ -48,8 +49,8 @@ impl Cx {
 /// `&mut CxBuilder` through the layers wrapping the matched route so each can
 /// register request-scoped values with [`insert`](Self::insert) before the
 /// route runs. Because a `CxBuilder` dereferences to the [`Cx`] it is building,
-/// app and request context can be read through it (with [`app_context`] and
-/// [`request_context`]) while it is still being assembled.
+/// app and request context can be read through it (with helpers such as
+/// [`app_context`] and [`request_context`]) while it is still being assembled.
 #[derive(Debug, Default)]
 pub struct CxBuilder {
     cx: Cx,

@@ -94,8 +94,10 @@ This means your params are available anywhere you have access to a `cx`. See the
 
 This module exposes typed context accessors:
 
-- [`app_context::<T>(cx)`](app_context) reads values registered on the router with `.app_context(value)`.
-- [`request_context::<T>(cx)`](request_context) reads typed values attached to the current request.
+- [`app_context::<T>(cx)`](app_context) reads a required value registered on the router with `.app_context(value)`.
+- [`try_app_context::<T>(cx)`](try_app_context) reads an optional value registered on the router.
+- [`request_context::<T>(cx)`](request_context) reads a required typed value attached to the current request.
+- [`try_request_context::<T>(cx)`](try_request_context) reads an optional typed value attached to the current request.
 
 ```rust
 use topcoat::context::{Cx, app_context};
@@ -107,7 +109,19 @@ fn db(cx: &Cx) -> &Database {
 }
 ```
 
-Values are keyed by Rust type. Asking for a type that was not registered panics, so these helpers are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or `current_tenant(cx)`.
+Values are keyed by Rust type. The required helpers panic when the requested type was not registered, so they are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or `current_tenant(cx)`.
+
+Use the `try_` helpers when a value is intentionally optional on some requests:
+
+```rust
+use topcoat::context::{Cx, try_request_context};
+#
+# struct Customer;
+
+fn current_customer(cx: &Cx) -> Option<&Customer> {
+    try_request_context(cx)
+}
+```
 
 # Memoization
 

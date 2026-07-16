@@ -52,7 +52,19 @@ async fn user_profile(cx: &Cx) -> Result {
 }
 ```
 
-The lookup is keyed by `T`'s `TypeId`, so the type you ask for must exactly match the type you registered. Asking for a type that wasn't registered panics: this is a startup-time bug, not a runtime one.
+The lookup is keyed by `T`'s `TypeId`, so the type you ask for must exactly match the type you registered. Asking `app_context` for a type that wasn't registered panics: this is usually a startup-time bug.
+
+When an app context value is intentionally optional, use `try_app_context::<T>(cx)` instead. It returns `None` when the type was not registered:
+
+```rust
+use topcoat::context::{Cx, try_app_context};
+#
+# struct FeatureConfig;
+
+fn feature_config(cx: &Cx) -> Option<&FeatureConfig> {
+    try_app_context(cx)
+}
+```
 
 ## Requirements
 
