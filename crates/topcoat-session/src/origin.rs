@@ -34,6 +34,8 @@ pub fn verify_origin(cx: &Cx) -> Result<(), ForbiddenError> {
     let origin = headers
         .get(header::ORIGIN)
         .and_then(|value| value.to_str().ok());
+    // `Authority::as_str` is not nameable here without a direct `http` dependency.
+    #[allow(clippy::redundant_closure_for_method_calls)]
     let host = headers
         .get(header::HOST)
         .and_then(|value| value.to_str().ok())
