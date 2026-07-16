@@ -49,6 +49,7 @@ asset = [
 ]
 cookie = [
 	"dep:topcoat-cookie",
+	"topcoat-session?/cookie",
 ]
 discover = [
 	"dep:inventory",

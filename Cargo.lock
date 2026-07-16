@@ -2936,12 +2936,11 @@ dependencies = [
  "rand 0.10.2",
  "sha2 0.11.0",
  "thiserror",
+ "tokio",
  "topcoat",
  "topcoat-cookie",
  "topcoat-core",
- "topcoat-core-macro",
  "topcoat-router",
- "topcoat-view",
 ]
 
 [[package]]
