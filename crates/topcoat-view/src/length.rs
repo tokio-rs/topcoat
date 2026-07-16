@@ -512,7 +512,10 @@ impl Length {
 
 impl Display for Length {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}{}", self.value, self.unit.as_str())
+        let mut buffer = zmij::Buffer::new();
+        f.write_str(buffer.format(self.value))?;
+        f.write_str(self.unit.as_str())?;
+        Ok(())
     }
 }
 
@@ -549,55 +552,55 @@ mod tests {
     /// Every unit constructor paired with its rendered form. The numeric value
     /// is the same across cases so each assertion focuses on the unit suffix.
     const UNITS: &[(Length, &str)] = &[
-        (Length::px(2.0), "2px"),
-        (Length::cm(2.0), "2cm"),
-        (Length::mm(2.0), "2mm"),
-        (Length::q(2.0), "2Q"),
-        (Length::r#in(2.0), "2in"),
-        (Length::pc(2.0), "2pc"),
-        (Length::pt(2.0), "2pt"),
-        (Length::em(2.0), "2em"),
-        (Length::rem(2.0), "2rem"),
-        (Length::ex(2.0), "2ex"),
-        (Length::rex(2.0), "2rex"),
-        (Length::cap(2.0), "2cap"),
-        (Length::rcap(2.0), "2rcap"),
-        (Length::ch(2.0), "2ch"),
-        (Length::rch(2.0), "2rch"),
-        (Length::ic(2.0), "2ic"),
-        (Length::ric(2.0), "2ric"),
-        (Length::lh(2.0), "2lh"),
-        (Length::rlh(2.0), "2rlh"),
-        (Length::vw(2.0), "2vw"),
-        (Length::vh(2.0), "2vh"),
-        (Length::vi(2.0), "2vi"),
-        (Length::vb(2.0), "2vb"),
-        (Length::vmin(2.0), "2vmin"),
-        (Length::vmax(2.0), "2vmax"),
-        (Length::svw(2.0), "2svw"),
-        (Length::svh(2.0), "2svh"),
-        (Length::svi(2.0), "2svi"),
-        (Length::svb(2.0), "2svb"),
-        (Length::svmin(2.0), "2svmin"),
-        (Length::svmax(2.0), "2svmax"),
-        (Length::lvw(2.0), "2lvw"),
-        (Length::lvh(2.0), "2lvh"),
-        (Length::lvi(2.0), "2lvi"),
-        (Length::lvb(2.0), "2lvb"),
-        (Length::lvmin(2.0), "2lvmin"),
-        (Length::lvmax(2.0), "2lvmax"),
-        (Length::dvw(2.0), "2dvw"),
-        (Length::dvh(2.0), "2dvh"),
-        (Length::dvi(2.0), "2dvi"),
-        (Length::dvb(2.0), "2dvb"),
-        (Length::dvmin(2.0), "2dvmin"),
-        (Length::dvmax(2.0), "2dvmax"),
-        (Length::cqw(2.0), "2cqw"),
-        (Length::cqh(2.0), "2cqh"),
-        (Length::cqi(2.0), "2cqi"),
-        (Length::cqb(2.0), "2cqb"),
-        (Length::cqmin(2.0), "2cqmin"),
-        (Length::cqmax(2.0), "2cqmax"),
+        (Length::px(2.0), "2.0px"),
+        (Length::cm(2.0), "2.0cm"),
+        (Length::mm(2.0), "2.0mm"),
+        (Length::q(2.0), "2.0Q"),
+        (Length::r#in(2.0), "2.0in"),
+        (Length::pc(2.0), "2.0pc"),
+        (Length::pt(2.0), "2.0pt"),
+        (Length::em(2.0), "2.0em"),
+        (Length::rem(2.0), "2.0rem"),
+        (Length::ex(2.0), "2.0ex"),
+        (Length::rex(2.0), "2.0rex"),
+        (Length::cap(2.0), "2.0cap"),
+        (Length::rcap(2.0), "2.0rcap"),
+        (Length::ch(2.0), "2.0ch"),
+        (Length::rch(2.0), "2.0rch"),
+        (Length::ic(2.0), "2.0ic"),
+        (Length::ric(2.0), "2.0ric"),
+        (Length::lh(2.0), "2.0lh"),
+        (Length::rlh(2.0), "2.0rlh"),
+        (Length::vw(2.0), "2.0vw"),
+        (Length::vh(2.0), "2.0vh"),
+        (Length::vi(2.0), "2.0vi"),
+        (Length::vb(2.0), "2.0vb"),
+        (Length::vmin(2.0), "2.0vmin"),
+        (Length::vmax(2.0), "2.0vmax"),
+        (Length::svw(2.0), "2.0svw"),
+        (Length::svh(2.0), "2.0svh"),
+        (Length::svi(2.0), "2.0svi"),
+        (Length::svb(2.0), "2.0svb"),
+        (Length::svmin(2.0), "2.0svmin"),
+        (Length::svmax(2.0), "2.0svmax"),
+        (Length::lvw(2.0), "2.0lvw"),
+        (Length::lvh(2.0), "2.0lvh"),
+        (Length::lvi(2.0), "2.0lvi"),
+        (Length::lvb(2.0), "2.0lvb"),
+        (Length::lvmin(2.0), "2.0lvmin"),
+        (Length::lvmax(2.0), "2.0lvmax"),
+        (Length::dvw(2.0), "2.0dvw"),
+        (Length::dvh(2.0), "2.0dvh"),
+        (Length::dvi(2.0), "2.0dvi"),
+        (Length::dvb(2.0), "2.0dvb"),
+        (Length::dvmin(2.0), "2.0dvmin"),
+        (Length::dvmax(2.0), "2.0dvmax"),
+        (Length::cqw(2.0), "2.0cqw"),
+        (Length::cqh(2.0), "2.0cqh"),
+        (Length::cqi(2.0), "2.0cqi"),
+        (Length::cqb(2.0), "2.0cqb"),
+        (Length::cqmin(2.0), "2.0cqmin"),
+        (Length::cqmax(2.0), "2.0cqmax"),
     ];
 
     fn render(value: impl AttributeValueViewParts) -> String {
@@ -647,8 +650,8 @@ mod tests {
         assert_eq!(render(Length::px(1.5)), "1.5px");
         assert_eq!(Length::em(-0.5).to_string(), "-0.5em");
         assert_eq!(render(Length::em(-0.5)), "-0.5em");
-        assert_eq!(Length::rem(0.0).to_string(), "0rem");
-        assert_eq!(render(Length::rem(0.0)), "0rem");
+        assert_eq!(Length::rem(0.0).to_string(), "0.0rem");
+        assert_eq!(render(Length::rem(0.0)), "0.0rem");
     }
 
     #[test]

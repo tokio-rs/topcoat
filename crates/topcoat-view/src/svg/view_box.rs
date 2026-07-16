@@ -30,11 +30,15 @@ impl ViewBox {
 
 impl Display for ViewBox {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {}",
-            self.min_x, self.min_y, self.width, self.height
-        )
+        let mut buffer = zmij::Buffer::new();
+        f.write_str(buffer.format(self.min_x))?;
+        f.write_str(" ")?;
+        f.write_str(buffer.format(self.min_y))?;
+        f.write_str(" ")?;
+        f.write_str(buffer.format(self.width))?;
+        f.write_str(" ")?;
+        f.write_str(buffer.format(self.height))?;
+        Ok(())
     }
 }
 
@@ -72,19 +76,25 @@ mod tests {
 
     #[test]
     fn displays_as_svg_view_box_value() {
-        assert_eq!(ViewBox::new(0.0, 0.0, 24.0, 24.0).to_string(), "0 0 24 24");
+        assert_eq!(
+            ViewBox::new(0.0, 0.0, 24.0, 24.0).to_string(),
+            "0.0 0.0 24.0 24.0"
+        );
         assert_eq!(
             ViewBox::new(0.0, -0.5, 16.5, 16.0).to_string(),
-            "0 -0.5 16.5 16"
+            "0.0 -0.5 16.5 16.0"
         );
     }
 
     #[test]
     fn renders_view_parts_as_space_separated_value() {
-        assert_eq!(render(ViewBox::new(0.0, 0.0, 24.0, 24.0)), "0 0 24 24");
+        assert_eq!(
+            render(ViewBox::new(0.0, 0.0, 24.0, 24.0)),
+            "0.0 0.0 24.0 24.0"
+        );
         assert_eq!(
             render(ViewBox::new(0.0, -0.5, 16.5, 16.0)),
-            "0 -0.5 16.5 16"
+            "0.0 -0.5 16.5 16.0"
         );
     }
 

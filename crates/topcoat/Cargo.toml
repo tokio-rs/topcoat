@@ -36,6 +36,7 @@ full = [
 	"runtime",
 	"session",
 	"tailwind",
+	"tower",
 	"ui",
 	"view",
 ]
@@ -103,6 +104,10 @@ session = [
 ]
 tailwind = [
 	"dep:topcoat-tailwind",
+]
+tower = [
+	"router",
+	"topcoat-router/tower",
 ]
 ui = [
 	"dep:topcoat-ui-registry",
