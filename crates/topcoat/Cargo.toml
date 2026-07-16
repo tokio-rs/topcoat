@@ -19,6 +19,7 @@ default = [
 	"icon",
 	"router",
 	"runtime",
+	"session",
 	"view",
 	"discover",
 ]
@@ -34,6 +35,7 @@ full = [
 	"multipart",
 	"router",
 	"runtime",
+	"session",
 	"tailwind",
 	"tower",
 	"ui",
@@ -47,6 +49,7 @@ asset = [
 ]
 cookie = [
 	"dep:topcoat-cookie",
+	"topcoat-session?/cookie",
 ]
 discover = [
 	"dep:inventory",
@@ -93,10 +96,14 @@ router = [
 	"topcoat-cookie?/router",
 	"topcoat-font?/router",
 	"topcoat-runtime?/router",
+	"topcoat-session?/router",
 ]
 runtime = [
 	"dep:topcoat-runtime",
 	"dep:topcoat-runtime-macro",
+]
+session = [
+	"dep:topcoat-session",
 ]
 tailwind = [
 	"dep:topcoat-tailwind",
@@ -129,6 +136,7 @@ topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }
 topcoat-runtime-macro = { workspace = true, optional = true }
+topcoat-session = { workspace = true, optional = true }
 topcoat-tailwind = { workspace = true, optional = true }
 topcoat-ui-registry = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }

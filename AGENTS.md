@@ -46,6 +46,7 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 - [`crates/topcoat-core/macro/docs/memoization.md`](crates/topcoat-core/macro/docs/memoization.md): `#[memoize]` for per-request caching of function results keyed by arguments.
 - [`crates/topcoat/docs/functions_not_middlewares.md`](crates/topcoat/docs/functions_not_middlewares.md): The framework's philosophy: prefer composable `cx: &Cx` functions over middleware/extractors for auth and request-scoped data.
 - [`crates/topcoat/docs/cookie.md`](crates/topcoat/docs/cookie.md): Cookies: the request-scoped jar (`cookies(cx)`), the `cookie!` macro, attribute defaults, name prefixes, signed/private cookies, and typed `CookieStore<T>`.
+- [`crates/topcoat/docs/session.md`](crates/topcoat/docs/session.md): Sessions: bring-your-own-storage session authentication -- the token/hash model, the `start`/`stop` lifecycle, sliding expiration and rotation, and custom token stores.
 
 ### Assets and styling
 
