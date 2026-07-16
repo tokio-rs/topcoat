@@ -99,7 +99,7 @@ impl ToTokens for Memoize {
                 && pi.ident == "cx"
             {
                 let span = pi.span();
-                new_inputs.push(quote_spanned! {span=> cx: &'__cx Cx });
+                new_inputs.push(quote_spanned! {span=> cx: &'__cx #topcoat_context::Cx });
                 continue;
             }
             let ty = &pat_type.ty;
