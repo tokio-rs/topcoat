@@ -12,11 +12,11 @@ use topcoat_core::context::Cx;
 
 pub fn start(cx: &Cx) -> TokenHash {
     let token = Token::random();
-    token.hash()
+    let hash = token.hash();
+    token_store(cx).write(cx, token);
+    hash
 }
 
-pub fn stop(cx: &Cx) {}
-
-pub fn session_token(cx: &Cx) -> Option<TokenHash> {
-    None
+pub fn stop(cx: &Cx) {
+    token_store(cx).delete(cx);
 }

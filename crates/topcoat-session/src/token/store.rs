@@ -3,8 +3,9 @@ use topcoat_core::context::Cx;
 use crate::{Token, config};
 
 pub trait TokenStore: Send + Sync {
-    fn get(&self, cx: &Cx) -> Option<Token>;
-    fn set(&self, cx: &Cx, token: Token);
+    fn read(&self, cx: &Cx) -> Option<Token>;
+    fn write(&self, cx: &Cx, token: Token);
+    fn delete(&self, cx: &Cx);
 }
 
 pub fn token_store(cx: &Cx) -> &dyn TokenStore {
@@ -33,13 +34,17 @@ pub mod cookie {
     pub struct CookieTokenStore {}
 
     impl TokenStore for CookieTokenStore {
-        fn get(&self, cx: &Cx) -> Option<Token> {
+        fn read(&self, cx: &Cx) -> Option<Token> {
             let cookie = cookies(cx).get(SESSION_COOKIE_NAME)?;
             Token::decode(cookie.value_trimmed()).ok()
         }
 
-        fn set(&self, cx: &Cx, token: Token) {
+        fn write(&self, cx: &Cx, token: Token) {
             cookies(cx).add(Cookie::new(SESSION_COOKIE_NAME, token.encode()));
+        }
+
+        fn delete(&self, cx: &Cx) {
+            cookies(cx).remove(Cookie::new(SESSION_COOKIE_NAME, ""));
         }
     }
 }

@@ -73,5 +73,5 @@ pub enum DecodeError {
 
 #[memoize]
 pub fn token(cx: &Cx) -> Option<Token> {
-    token_store(cx).get(cx)
+    token_store(cx).read(cx)
 }
