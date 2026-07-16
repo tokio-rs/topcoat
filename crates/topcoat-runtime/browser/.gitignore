@@ -1,5 +1,6 @@
 # Build output
-dist
+dist/*
+!dist/index.js
 
 # Node.js
 node_modules
