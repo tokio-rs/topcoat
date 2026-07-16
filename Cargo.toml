@@ -43,6 +43,7 @@ members = [
     "examples/procedure",
     "examples/request-response",
     "examples/runtime",
+    "examples/session",
     "examples/shard",
     "examples/tailwind",
     "examples/toasty-todo",

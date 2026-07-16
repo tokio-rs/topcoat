@@ -19,6 +19,7 @@ default = [
 	"icon",
 	"router",
 	"runtime",
+	"session",
 	"view",
 	"discover",
 ]

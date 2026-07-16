@@ -1,0 +1,13 @@
+[package]
+name = "session"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+topcoat.workspace = true
+
+[lints]
+workspace = true
