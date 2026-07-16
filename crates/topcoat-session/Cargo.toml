@@ -14,6 +14,9 @@ rust-version.workspace = true
 cookie = [
 	"dep:topcoat-cookie",
 ]
+router = [
+	"dep:topcoat-router",
+]
 view = [
 	"dep:topcoat-view",
 ]
@@ -22,6 +25,7 @@ view = [
 topcoat-cookie = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-core-macro.workspace = true
+topcoat-router = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
 
 base64.workspace = true

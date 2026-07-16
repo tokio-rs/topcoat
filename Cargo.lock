@@ -2921,7 +2921,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-session"
-version = "0.0.3"
+version = "0.1.0"
 dependencies = [
  "base64",
  "rand 0.10.2",
@@ -2931,6 +2931,7 @@ dependencies = [
  "topcoat-cookie",
  "topcoat-core",
  "topcoat-core-macro",
+ "topcoat-router",
  "topcoat-view",
 ]
 

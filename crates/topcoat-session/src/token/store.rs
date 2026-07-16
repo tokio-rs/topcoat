@@ -29,6 +29,7 @@ pub mod cookie {
 
     pub const SESSION_COOKIE_NAME: &str = "session";
 
+    #[derive(Default)]
     pub struct CookieTokenStore {}
 
     impl TokenStore for CookieTokenStore {

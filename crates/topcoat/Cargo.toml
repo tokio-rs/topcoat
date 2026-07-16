@@ -94,6 +94,7 @@ router = [
 	"topcoat-cookie?/router",
 	"topcoat-font?/router",
 	"topcoat-runtime?/router",
+	"topcoat-session?/router",
 ]
 runtime = [
 	"dep:topcoat-runtime",
