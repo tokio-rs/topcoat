@@ -174,6 +174,22 @@ let config = Config::new(CookieTokenStore::new().name("id"))
 
 The lifetime becomes both the `Max-Age` of the issued cookie and the `expires_at` handed to you by [`start`], [`refresh`], and [`rotate`], so the client's cookie and your record expire together.
 
+# Cross-origin request protection
+
+`.sessions()` also registers the [`OriginLayer`], which rejects state-changing cross-origin requests with `403 Forbidden` before they reach a route. This closes the cross-site request forgery (CSRF) gaps that the session cookie's `SameSite=Lax` leaves open, such as requests forged from a sibling subdomain.
+
+For every request whose method is not `GET`, `HEAD`, or `OPTIONS`, the layer requires the browser-provided `Sec-Fetch-Site` header to be `same-origin` or `none` (a direct navigation). For older browsers that do not send it, the `Origin` header's host is compared against the request's own host instead. Requests carrying neither header pass: they come from non-browser clients like `curl` or server-to-server calls, which do not attach cookies ambiently and so cannot be forged through a victim's browser.
+
+If a page on another origin legitimately POSTs to your app (an OAuth `form_post` callback, for example), trust that origin explicitly:
+
+```rust
+use topcoat::session::Config;
+
+let config = Config::default().trust_origin("https://accounts.example.com");
+```
+
+The check is also available as a plain function, [`verify_origin`], for flows outside the layer. [`Config::dangerous_disable_origin_verification`] turns the layer off entirely; only do so if the application enforces its own CSRF defense.
+
 # Custom token stores
 
 A [`TokenStore`] is the client-side transport for the token; it is *not* the session database. Implement it to carry the token somewhere other than the default cookie, for example an `Authorization` header for API clients:
@@ -225,5 +241,5 @@ Serialize the raw token with [`Token::encode`] and parse it back with [`Token::d
 # Security notes
 
 - The default cookie is as locked down as a session cookie can be: `__Host-` prefixed, `Secure`, `HttpOnly`, `SameSite=Lax`, and scoped to `/`. It is invisible to scripts and never sent cross-site on subresource or scripted requests.
-- `SameSite=Lax` still sends the cookie on top-level cross-site navigations, so keep every state-changing route on `POST` (or another non-`GET` method), as the examples above do.
+- `SameSite=Lax` still sends the cookie on top-level cross-site navigations, so keep every state-changing route on `POST` (or another non-`GET` method), as the examples above do. The [`OriginLayer`] then rejects any such request that does arrive cross-origin; safe methods are deliberately not checked, so a state-changing `GET` remains unprotected.
 - Compare sessions by looking the hash up in your storage; never store or log the raw token server-side.
