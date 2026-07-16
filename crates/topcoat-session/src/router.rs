@@ -32,7 +32,7 @@ pub trait RouterBuilderSessionExt {
     /// Registers the session `config` on the app context, the root session
     /// layer, and the [`OriginLayer`] rejecting state-changing cross-origin
     /// requests (unless disabled with
-    /// [`Config::dangerous_disable_origin_verification`]).
+    /// [`ConfigBuilder::dangerous_disable_origin_verification`](crate::ConfigBuilder::dangerous_disable_origin_verification)).
     ///
     /// The default cookie token store also needs the cookie layer, registered
     /// with the cookie crate's `cookies` extension method.

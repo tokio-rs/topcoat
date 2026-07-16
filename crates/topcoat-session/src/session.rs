@@ -66,7 +66,7 @@ pub async fn stop(cx: &Cx) -> Result<Option<TokenHash>> {
 
 /// Extends the current session's lifetime without changing its token.
 ///
-/// Re-issues the presented token with a full [`Config::lifetime`](crate::Config::lifetime)
+/// Re-issues the presented token with a full [`lifetime`](crate::ConfigBuilder::lifetime)
 /// ahead of it, implementing sliding expiration. Returns the session with its
 /// new expiry so the application can update its record, or `None` when the
 /// request carried no session.

@@ -130,7 +130,7 @@ Note that [`stop`] only ends the session the request presented. Revoking *other*
 
 # Refreshing and rotating
 
-A session expires a fixed [`Config::lifetime`] after it was started. For **sliding expiration** -- sessions that stay alive while they are used -- call [`refresh`] when you resolve a valid session and push the expiry of your record forward:
+A session expires a fixed [`lifetime`](ConfigBuilder::lifetime) after it was started. For **sliding expiration** -- sessions that stay alive while they are used -- call [`refresh`] when you resolve a valid session and push the expiry of your record forward:
 
 ```rust
 use topcoat::{Result, context::Cx, session};
@@ -161,15 +161,17 @@ async fn escalate(cx: &Cx) -> Result<()> {
 
 # Configuration
 
-[`Config`] holds the token store and the session lifetime (30 days unless overridden). The default cookie store can be renamed if the `session` cookie name does not suit:
+[`Config`] holds the token store and the session lifetime (30 days unless overridden), and is assembled with [`Config::builder`]. The default cookie store can be renamed if the `session` cookie name does not suit:
 
 ```rust
 use std::time::Duration;
 
 use topcoat::session::{Config, cookie::CookieTokenStore};
 
-let config = Config::new(CookieTokenStore::new().name("id"))
-    .lifetime(Duration::from_hours(24 * 14));
+let config = Config::builder()
+    .token_store(CookieTokenStore::new().name("id"))
+    .lifetime(Duration::from_hours(24 * 14))
+    .build();
 ```
 
 The lifetime becomes both the `Max-Age` of the issued cookie and the `expires_at` handed to you by [`start`], [`refresh`], and [`rotate`], so the client's cookie and your record expire together.
@@ -185,10 +187,12 @@ If a page on another origin legitimately POSTs to your app (an OAuth `form_post`
 ```rust
 use topcoat::session::Config;
 
-let config = Config::default().trust_origin("https://accounts.example.com");
+let config = Config::builder()
+    .trust_origin("https://accounts.example.com")
+    .build();
 ```
 
-The check is also available as a plain function, [`verify_origin`], for flows outside the layer. [`Config::dangerous_disable_origin_verification`] turns the layer off entirely; only do so if the application enforces its own CSRF defense.
+The check is also available as a plain function, [`verify_origin`], for flows outside the layer. [`ConfigBuilder::dangerous_disable_origin_verification`] turns the layer off entirely; only do so if the application enforces its own CSRF defense.
 
 # Custom token stores
 
