@@ -63,36 +63,40 @@ async fn hello(name: &str) -> Result {
 
 ## What makes Topcoat different
 
-### Hassle-free client reactivity
+### Client reactivity without a client build
 
-In Topcoat, all markup is rendered on the server. This means your components can be async, access the database and do not require you to maintain an API. However, that does not mean you need to sacrifice user experience through high latency. Use type-safe Rust expressions running in the browser to instantly update your UI:
+Topcoat renders all markup on the server: components can be async, query the database directly, and never need a separate API layer. Interactivity does not have to cost a round-trip, though. A `$(...)` expression is ordinary type-checked Rust that Topcoat evaluates on the server for the initial render and also translates to JavaScript, so it re-runs instantly in the browser. No wasm bundle, no client build step:
 
 ```rust,ignore
 view! {
     signal open = false;
 
-    // Click to reveal the answer.
-    <h3 @click=$(|_e| open.set(!open.get()))>"What is Topcoat?"</h3>
+    // Runs entirely in the browser; no server round-trip.
+    <button @click=$(|_e| open.set(!open.get()))>"What is Topcoat?"</button>
     <p :hidden=$(!open.get())>"A fullstack Rust framework."</p>
 }
 ```
 
-Or, rerender parts of the page on interaction:
+When an update does need the server, like fresh search results, mark the component as a `#[shard]`. Topcoat re-renders it on the server whenever one of its `$(...)` arguments changes and swaps the new HTML in place:
 
 ```rust,ignore
-view! {
-    signal query = String::new();
+#[component]
+async fn search() -> Result {
+    view! {
+        signal query = String::new();
 
-    <input @input=$(|e: Event| query.set(e.target.value))>
+        <input @input=$(|e: Event| query.set(e.target.value))>
 
-    // Search results HTML updates every time the user's text input changes.
-    search_results(query: $(query.get()))
+        // Updates as the user types.
+        search_results(query: $(query.get()))
+    }
 }
 
 #[shard]
 async fn search_results(cx: &Cx, query: String) -> Result {
     view! {
         <ul>
+            // Your own server-side code, like a database query:
             for product in search_products(cx, &query).await? {
                 <li>(product.name)</li>
             }

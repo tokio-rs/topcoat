@@ -14,7 +14,7 @@ async fn show() -> Result {
             })
         </button>
 
-        <div :style=$((!show.get()).then_some("display: none"))>
+        <div :hidden=$(!show.get())>
             "hello world!"
         </div>
     }
