@@ -29,3 +29,6 @@ source = "src/components/label.rs"
 
 [components.select]
 source = "src/components/select.rs"
+
+[components.spinner]
+source = "src/components/spinner.rs"

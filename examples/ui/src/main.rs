@@ -13,6 +13,7 @@ use components::dropdown_menu::{
 use components::input::input;
 use components::label::label;
 use components::select::select;
+use components::spinner::spinner;
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
@@ -198,7 +199,11 @@ async fn buttons_card() -> Result {
                             variant: ButtonVariant::Outline,
                             icon(data: iconify_icon!("feather:plus"), label: "Add item")
                         )
-                        button(attrs: attributes! { disabled=(true) }, "Saving...")
+                        button(
+                            attrs: attributes! { disabled=(true) },
+                            spinner()
+                            "Saving..."
+                        )
                     </div>
                 </div>
             )
@@ -427,6 +432,15 @@ async fn status_card() -> Result {
                             badge(variant: variant, (status))
                         </div>
                     }
+                    <div class="flex items-center justify-between gap-4">
+                        <p class="truncate font-mono text-sm">"preview/pr-143"</p>
+                        <p
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            spinner()
+                            "Deploying..."
+                        </p>
+                    </div>
                 </div>
             )
             card_footer(
