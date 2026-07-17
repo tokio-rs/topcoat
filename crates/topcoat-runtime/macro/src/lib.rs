@@ -11,6 +11,7 @@ pub fn expr(tokens: TokenStream) -> TokenStream {
     }
 }
 
+#[doc = include_str!("../docs/procedure.md")]
 #[proc_macro_attribute]
 pub fn procedure(attr: TokenStream, item: TokenStream) -> TokenStream {
     match topcoat_runtime_grammar::procedure::Procedure::parse(attr.into(), item.into()) {
