@@ -1,6 +1,6 @@
 Topcoat's runtime makes server-rendered pages interactive without a wasm bundle, a client build step, or a separate frontend. Reactive state and expressions are written inline in [`view!`], type-checked as ordinary Rust, and compiled to JavaScript that ships with the page.
 
-The runtime is **highly experimental** and fairly limited today: expressions support only a small vocabulary of types and methods, and some patterns have no ergonomic answer yet. It will improve in future releases; expect both additions and breaking changes.
+The runtime is **highly experimental** and fairly limited today: expressions support only a small vocabulary of types and methods, and many patterns have no ergonomic answer yet. It will improve in future releases; expect both additions and breaking changes.
 
 # Setup
 
@@ -39,27 +39,29 @@ pub fn router() -> Router {
 
 `.discover()` also registers the server endpoints behind [procedures](#procedures) and [shards](#shards), covered later in this guide.
 
-# Signals
+# Runtime expressions
 
-A **signal** is a piece of state that lives in the browser. Declare one with a `signal` statement inside a [`view!`] body:
+A `$(...)` block is a **runtime expression** and can stand wherever a view node can:
 
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
 # async fn example() -> Result {
 view! {
-    signal count = 0.0;
+    <p>"The answer: " $(1.0 + 2.0)</p>
 }
 # }
 ```
 
-The initial value is an ordinary Rust expression, evaluated once during the server render and serialized into the page; the browser picks it up as reactive state.
+The expression is type-checked Rust, but it is compiled twice: the server evaluates it once for the initial HTML, and an equivalent JavaScript translation ships with the page, where it can run again without any help from the server.
 
-On its own a signal does nothing. Its value is read with `.get()` and replaced with `.set(...)`, but only inside runtime expressions, introduced next; the rest of the view's Rust code cannot touch it. When a signal changes in the browser, everything that read it updates automatically.
+Because a runtime expression must behave identically in both languages, only a subset of Rust is supported: a small vocabulary of types and methods. `$(...)` is syntactic sugar for the [`expr!`] macro, which documents that vocabulary, how captured variables behave, and the `raw!` escape hatch to hand-written JavaScript.
 
-# Runtime expressions
+So far the browser has no reason to run `1.0 + 2.0` a second time; the answer stays `3`. Expressions become useful when they read state that changes: signals.
 
-A **runtime expression** is written `$(...)` and can stand wherever a view node can:
+# Signals
+
+A **signal** is a piece of state that lives in the browser. Declare one with a `signal` statement inside a [`view!`] body, and read it in a runtime expression with `.get()`:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -73,9 +75,9 @@ view! {
 # }
 ```
 
-The expression is type-checked Rust, but it is compiled twice: the server evaluates it once for the initial HTML, and an equivalent JavaScript translation ships with the page. In the browser it re-runs whenever a signal it reads changes -- the text above updates the moment `count` does, with no server round-trip. Nothing changes `count` yet; that is what event handlers are for.
+The signal's initial value is an ordinary Rust expression, evaluated once during the server render and serialized into the page; the browser picks it up as reactive state.
 
-Because a runtime expression must behave identically in both languages, only a subset of Rust is supported: a small vocabulary of types and methods. The [`expr!`] macro documents that vocabulary, how captured variables behave, and the `raw!` escape hatch to hand-written JavaScript.
+In the browser, a runtime expression re-runs whenever a signal it read changes -- the text above updates the moment `count` does, with no server round-trip. Signals can only be read (using `.get()`) and modified (using `.set(...)`) inside expressions. Nothing changes `count` yet, though; that is what event handlers are for.
 
 # Event handlers
 
