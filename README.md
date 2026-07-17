@@ -20,6 +20,8 @@
 
 [crates-badge]: https://img.shields.io/crates/v/topcoat.svg?style=flat-square
 [crates-url]: https://crates.io/crates/topcoat
+[docs-badge]: https://img.shields.io/badge/docs/v/topcoat.svg?style=flat-square
+[docs-url]: https://docs.rs/topcoat/latest/topcoat
 [mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square
 [mit-url]: https://github.com/tokio-rs/topcoat/blob/main/LICENSE
 [actions-badge]: https://img.shields.io/github/actions/workflow/status/tokio-rs/topcoat/ci.yml?branch=main&style=flat-square
