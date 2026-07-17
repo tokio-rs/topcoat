@@ -57,7 +57,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 authors = ["Julien Scholz <hello@julien-scholz.dev>"]
 license = "MIT"
@@ -100,31 +100,31 @@ debug = false
 # before the facade does. Path-only dev-dependencies are dropped from the published
 # manifest, sidestepping the facade<->sub-crate cycle. Do not add a version here.
 topcoat = { path = "crates/topcoat" }
-topcoat-asset = { version = "0.1.1", path = "crates/topcoat-asset" }
-topcoat-cookie = { version = "0.1.1", path = "crates/topcoat-cookie" }
-topcoat-core = { version = "0.1.1", path = "crates/topcoat-core" }
-topcoat-core-grammar = { version = "0.1.1", path = "crates/topcoat-core/grammar" }
-topcoat-core-macro = { version = "0.1.1", path = "crates/topcoat-core/macro" }
-topcoat-font = { version = "0.1.1", path = "crates/topcoat-font" }
-topcoat-font-grammar = { version = "0.1.1", path = "crates/topcoat-font/grammar" }
-topcoat-font-macro = { version = "0.1.1", path = "crates/topcoat-font/macro" }
-topcoat-htmx = { version = "0.1.1", path = "crates/topcoat-htmx" }
-topcoat-icon = { version = "0.1.1", path = "crates/topcoat-icon" }
-topcoat-icon-grammar = { version = "0.1.1", path = "crates/topcoat-icon/grammar" }
-topcoat-icon-macro = { version = "0.1.1", path = "crates/topcoat-icon/macro" }
-topcoat-router = { version = "0.1.1", path = "crates/topcoat-router" }
-topcoat-router-grammar = { version = "0.1.1", path = "crates/topcoat-router/grammar" }
-topcoat-router-macro = { version = "0.1.1", path = "crates/topcoat-router/macro" }
-topcoat-runtime = { version = "0.1.1", path = "crates/topcoat-runtime" }
-topcoat-runtime-grammar = { version = "0.1.1", path = "crates/topcoat-runtime/grammar" }
-topcoat-runtime-macro = { version = "0.1.1", path = "crates/topcoat-runtime/macro" }
-topcoat-session = { version = "0.1.1", path = "crates/topcoat-session" }
-topcoat-tailwind = { version = "0.1.1", path = "crates/topcoat-tailwind" }
-topcoat-ui = { version = "0.1.1", path = "crates/topcoat-ui" }
-topcoat-ui-registry = { version = "0.1.1", path = "crates/topcoat-ui/registry" }
-topcoat-view = { version = "0.1.1", path = "crates/topcoat-view" }
-topcoat-view-grammar = { version = "0.1.1", path = "crates/topcoat-view/grammar" }
-topcoat-view-macro = { version = "0.1.1", path = "crates/topcoat-view/macro" }
+topcoat-asset = { version = "0.1.2", path = "crates/topcoat-asset" }
+topcoat-cookie = { version = "0.1.2", path = "crates/topcoat-cookie" }
+topcoat-core = { version = "0.1.2", path = "crates/topcoat-core" }
+topcoat-core-grammar = { version = "0.1.2", path = "crates/topcoat-core/grammar" }
+topcoat-core-macro = { version = "0.1.2", path = "crates/topcoat-core/macro" }
+topcoat-font = { version = "0.1.2", path = "crates/topcoat-font" }
+topcoat-font-grammar = { version = "0.1.2", path = "crates/topcoat-font/grammar" }
+topcoat-font-macro = { version = "0.1.2", path = "crates/topcoat-font/macro" }
+topcoat-htmx = { version = "0.1.2", path = "crates/topcoat-htmx" }
+topcoat-icon = { version = "0.1.2", path = "crates/topcoat-icon" }
+topcoat-icon-grammar = { version = "0.1.2", path = "crates/topcoat-icon/grammar" }
+topcoat-icon-macro = { version = "0.1.2", path = "crates/topcoat-icon/macro" }
+topcoat-router = { version = "0.1.2", path = "crates/topcoat-router" }
+topcoat-router-grammar = { version = "0.1.2", path = "crates/topcoat-router/grammar" }
+topcoat-router-macro = { version = "0.1.2", path = "crates/topcoat-router/macro" }
+topcoat-runtime = { version = "0.1.2", path = "crates/topcoat-runtime" }
+topcoat-runtime-grammar = { version = "0.1.2", path = "crates/topcoat-runtime/grammar" }
+topcoat-runtime-macro = { version = "0.1.2", path = "crates/topcoat-runtime/macro" }
+topcoat-session = { version = "0.1.2", path = "crates/topcoat-session" }
+topcoat-tailwind = { version = "0.1.2", path = "crates/topcoat-tailwind" }
+topcoat-ui = { version = "0.1.2", path = "crates/topcoat-ui" }
+topcoat-ui-registry = { version = "0.1.2", path = "crates/topcoat-ui/registry" }
+topcoat-view = { version = "0.1.2", path = "crates/topcoat-view" }
+topcoat-view-grammar = { version = "0.1.2", path = "crates/topcoat-view/grammar" }
+topcoat-view-macro = { version = "0.1.2", path = "crates/topcoat-view/macro" }
 
 anyhow = "1.0"
 anymap3 = "1.0"
