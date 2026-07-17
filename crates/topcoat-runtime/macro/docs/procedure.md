@@ -26,7 +26,7 @@ view! {
         @click=$(async |_e| {
             let doubled = double(count.get()).await;
             count.set(doubled);
-        }))
+        })
     >
         "double it"
     </button>
