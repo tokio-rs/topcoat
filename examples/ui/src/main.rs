@@ -10,6 +10,7 @@ use components::dropdown_menu::{
     dropdown_menu_sub_trigger, dropdown_menu_trigger,
 };
 use components::input::input;
+use components::label::label;
 use components::select::select;
 use topcoat::{
     Result,
@@ -176,14 +177,14 @@ async fn buttons_card() -> Result {
             card_content(
                 <div class="flex flex-col gap-3">
                     <div class="flex flex-wrap items-center gap-2">
-                        for (variant, label) in [
+                        for (variant, name) in [
                             (ButtonVariant::Primary, "Primary"),
                             (ButtonVariant::Secondary, "Secondary"),
                             (ButtonVariant::Outline, "Outline"),
                             (ButtonVariant::Ghost, "Ghost"),
                             (ButtonVariant::Destructive, "Destructive"),
                         ] {
-                            button(size: ButtonSize::Sm, variant: variant, (label))
+                            button(size: ButtonSize::Sm, variant: variant, (name))
                         }
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -214,16 +215,16 @@ async fn sign_in_card() -> Result {
             )
             card_content(
                 <form class="flex flex-col gap-4">
-                    <label class="flex flex-col gap-2">
-                        <span class="text-sm font-medium">"Email"</span>
+                    <div class="flex flex-col gap-2">
+                        label(attrs: attributes! { for="email" }, "Email")
                         input(
-                            attrs: attributes! { type="email" placeholder="you@example.com" }
+                            attrs: attributes! { id="email" type="email" placeholder="you@example.com" }
                         )
-                    </label>
-                    <label class="flex flex-col gap-2">
-                        <span class="text-sm font-medium">"Password"</span>
-                        input(attrs: attributes! { type="password" })
-                    </label>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        label(attrs: attributes! { for="password" }, "Password")
+                        input(attrs: attributes! { id="password" type="password" })
+                    </div>
                 </form>
             )
             card_footer(button(attrs: attributes! { class="w-full" }, "Sign in"))
@@ -242,18 +243,21 @@ async fn project_card() -> Result {
             )
             card_content(
                 <form class="flex flex-col gap-4">
-                    <label class="flex flex-col gap-2">
-                        <span class="text-sm font-medium">"Name"</span>
-                        input(attrs: attributes! { placeholder="my-app" })
-                    </label>
-                    <label class="flex flex-col gap-2">
-                        <span class="text-sm font-medium">"Region"</span>
+                    <div class="flex flex-col gap-2">
+                        label(attrs: attributes! { for="project-name" }, "Name")
+                        input(
+                            attrs: attributes! { id="project-name" placeholder="my-app" }
+                        )
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        label(attrs: attributes! { for="region" }, "Region")
                         select(
+                            attrs: attributes! { id="region" },
                             <option>"eu-central-1"</option>
                             <option>"us-east-1"</option>
                             <option>"ap-southeast-2"</option>
                         )
-                    </label>
+                    </div>
                 </form>
             )
             card_footer(

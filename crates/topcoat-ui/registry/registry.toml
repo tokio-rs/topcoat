@@ -21,5 +21,8 @@ source = "src/components/dropdown_menu.rs"
 [components.input]
 source = "src/components/input.rs"
 
+[components.label]
+source = "src/components/label.rs"
+
 [components.select]
 source = "src/components/select.rs"
