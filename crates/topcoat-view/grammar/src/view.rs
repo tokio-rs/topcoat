@@ -35,10 +35,10 @@ use crate::leading_cx::LeadingCx;
 pub struct View {
     /// The request context binding supplied by a leading `cx =>` argument.
     ///
-    /// Inside a `#[component]`, `#[page]`, or `#[layout]`, the context is
-    /// available implicitly, so this is [`None`]. Anywhere else (for example a
-    /// `#[route]` handler), the caller names it explicitly as `view! { cx => ... }`
-    /// and the rest of the view renders against it.
+    /// Inside a `#[component]`, `#[page]`, `#[layout]`, or `#[shard]`, the
+    /// context is available implicitly, so this is [`None`]. Anywhere else
+    /// (for example a `#[route]` handler), the caller names it explicitly as
+    /// `view! { cx => ... }` and the rest of the view renders against it.
     pub cx: Option<LeadingCx>,
     pub nodes: Nodes,
 }

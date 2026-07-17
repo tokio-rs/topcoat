@@ -9,9 +9,9 @@ use topcoat_core_grammar::paths::topcoat_context;
 /// The leading `cx =>` argument naming the request context a macro body
 /// renders against.
 ///
-/// Inside a `#[component]`, `#[page]`, or `#[layout]`, the context is
-/// available implicitly and the argument is omitted. Anywhere else the caller
-/// names it explicitly, as in `view! { cx => ... }`.
+/// Inside a `#[component]`, `#[page]`, `#[layout]`, or `#[shard]`, the
+/// context is available implicitly and the argument is omitted. Anywhere else
+/// the caller names it explicitly, as in `view! { cx => ... }`.
 ///
 /// An identifier followed by `=>` can never begin an expression or markup, so
 /// the argument only assigns meaning to input that would otherwise be

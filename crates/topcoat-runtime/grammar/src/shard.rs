@@ -75,8 +75,8 @@ impl ToTokens for Shard {
             .map(|id| format_ident!("__topcoat_js_{}", id))
             .collect();
 
-        // Arguments forwarded to the hidden implementation: `cx` (when present)
-        // followed by the value parameters.
+        // Arguments forwarded to the hidden implementation after the implicit
+        // `__cx` context: `cx` (when present) followed by the value parameters.
         let call_args = has_cx
             .then(|| quote!(cx))
             .into_iter()
@@ -100,9 +100,11 @@ impl ToTokens for Shard {
 
         quote! {
             // The user's real body. Shared by the component's initial render and
-            // the server endpoint that re-renders the shard.
+            // the server endpoint that re-renders the shard. The leading `__cx`
+            // parameter makes the request context implicitly available to macros
+            // in the body (like `view!`), just as inside a `#[component]`.
             #[doc(hidden)]
-            async fn #impl_ident(#inputs) #output #block
+            async fn #impl_ident(__cx: &#topcoat_context::Cx, #inputs) #output #block
 
             // Component face: renders the shard inline, splitting each `Expr<T>`
             // into its evaluated value (for the initial server render) and its
@@ -112,7 +114,7 @@ impl ToTokens for Shard {
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
-                let __placeholder = #impl_ident(#(#call_args),*).await?;
+                let __placeholder = #impl_ident(__cx, #(#call_args),*).await?;
                 let __scope = #topcoat_runtime::ReactiveScope::new(
                     #topcoat_runtime::ShardId::new(#id),
                     ::std::vec![#(#js_idents),*],
@@ -142,7 +144,7 @@ impl ToTokens for Shard {
                                 ::from_request(cx, body).await?;
                         let (#(#value_idents,)*) =
                             #topcoat_runtime::Surrogate::into_real(__args);
-                        let __view = #impl_ident(#(#call_args),*).await?;
+                        let __view = #impl_ident(cx, #(#call_args),*).await?;
                         #topcoat_error::Result::Ok(__view)
                     }),
                 );
