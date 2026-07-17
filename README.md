@@ -3,7 +3,7 @@
 </div>
 
 <div align="center">
-  <h3>The full fullstack framework for Rust</h3>
+  <h3>The full full-stack framework for Rust</h3>
 </div>
 
 <div align="center">
