@@ -20,6 +20,7 @@ pub fn procedure(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
+#[doc = include_str!("../docs/shard.md")]
 #[proc_macro_attribute]
 pub fn shard(attr: TokenStream, item: TokenStream) -> TokenStream {
     match topcoat_runtime_grammar::shard::Shard::parse(attr.into(), item.into()) {
