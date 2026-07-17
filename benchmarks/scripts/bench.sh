@@ -2,7 +2,7 @@
 # Runs the load benchmark for one or more frameworks and renders a comparison
 # table. Usage:
 #
-#   bench.sh [topcoat|nextjs|leptos ...]     (default: all three)
+#   bench.sh [topcoat|nextjs|leptos|axum_maud ...]     (default: all four)
 #
 # Tunables (environment variables):
 #
@@ -22,7 +22,7 @@ RUNS="${RUNS:-3}"
 
 FRAMEWORKS=("$@")
 if [ ${#FRAMEWORKS[@]} -eq 0 ]; then
-    FRAMEWORKS=(topcoat nextjs leptos)
+    FRAMEWORKS=(topcoat nextjs leptos axum_maud)
 fi
 
 require_cmd oha "brew install oha"

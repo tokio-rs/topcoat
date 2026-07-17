@@ -1,7 +1,8 @@
 # Benchmarks
 
-Server-rendering performance comparison between **Topcoat**, **Next.js**, and
-**Leptos** on a realistic storefront app, plus the harness to run it.
+Server-rendering performance comparison between **Topcoat**, **Next.js**,
+**Leptos**, and a hand-written **Axum + Maud** app on a realistic storefront
+app, plus the harness to run it.
 
 ## What is measured
 
@@ -20,8 +21,8 @@ time-to-full-HTML-document, not time-to-interactive, and no subresources
 
 ## The demo app
 
-The same storefront is implemented three times, in `topcoat/`, `nextjs/`, and
-`leptos/`. All three:
+The same storefront is implemented four times, in `topcoat/`, `nextjs/`,
+`leptos/`, and `axum-maud/`. All four:
 
 - render the identical component tree (nav, footer, product cards, rating
   stars, pagination, spec table, review list, breadcrumbs) with identical
@@ -47,10 +48,10 @@ after touching any of the apps.
   `rustup target add wasm32-unknown-unknown`
 - `jq` and `curl`
 
-The first Topcoat and Leptos builds download the standalone Tailwind CLI and
-need network access. Topcoat pins 4.3.2; cargo-leptos prefers a `tailwindcss`
-found on `PATH` (e.g. from Homebrew) and only honors
-`LEPTOS_TAILWIND_VERSION=v4.3.2` when none is installed. Any Tailwind v4
+The first Topcoat, Leptos, and Axum + Maud builds download the standalone
+Tailwind CLI and need network access. Topcoat and Axum + Maud pin 4.3.2;
+cargo-leptos prefers a `tailwindcss` found on `PATH` (e.g. from Homebrew) and
+only honors `LEPTOS_TAILWIND_VERSION=v4.3.2` when none is installed. Any Tailwind v4
 produces the same rules for the utility classes this app uses;
 `verify_parity.sh` plus a visual spot-check cover the difference.
 
@@ -109,13 +110,17 @@ cd benchmarks/nextjs && pnpm install && pnpm build && pnpm start
 cd benchmarks/leptos && LEPTOS_TAILWIND_VERSION=v4.3.2 cargo leptos build --release
 cd benchmarks/leptos && LEPTOS_SITE_ADDR=127.0.0.1:8090 LEPTOS_SITE_ROOT=target/site \
     ./target/release/storefront-leptos
+
+# Axum + Maud:
+cd benchmarks/axum-maud && cargo build --release
+cd benchmarks/axum-maud && PORT=8090 ./target/release/storefront-axum-maud
 ```
 
 ## Fairness notes
 
-- **Response sizes intentionally differ.** Topcoat ships plain HTML with zero
-  JavaScript. Next.js embeds its RSC payload and script tags; Leptos embeds
-  hydration data and the wasm loader. That is each framework's realistic
+- **Response sizes intentionally differ.** Topcoat and Axum + Maud ship plain
+  HTML with zero JavaScript. Next.js embeds its RSC payload and script tags;
+  Leptos embeds hydration data and the wasm loader. That is each framework's realistic
   production output for this app, and the `bytes/resp` column keeps the
   difference visible. Larger documents cost real time to render and transfer,
   so this is part of the comparison, not noise in it.
@@ -124,7 +129,13 @@ cd benchmarks/leptos && LEPTOS_SITE_ADDR=127.0.0.1:8090 LEPTOS_SITE_ROOT=target/
   dynamic and responses carry `Cache-Control: ... no-store` (asserted by
   `verify_parity.sh`).
 - **Leptos uses `SsrMode::Async`**, so each response is one complete document
-  (comparable to the other two), not an out-of-order stream.
+  (comparable to the others), not an out-of-order stream.
+- **Axum + Maud is the hand-written baseline.** It renders the same component
+  tree as plain functions returning `maud` compile-time templates, with axum
+  doing the routing and query parsing; there is no framework layer on top.
+  Its stylesheet is generated at build time by the same pinned standalone
+  Tailwind CLI the Topcoat app uses (a build-script dependency only; nothing
+  from Topcoat is linked into the server binary).
 - **Stock release profiles.** Both Rust apps build with an untuned
   `cargo --release` (no LTO or codegen tweaks); Next.js uses a plain
   `next build`.
@@ -138,7 +149,7 @@ cd benchmarks/leptos && LEPTOS_SITE_ADDR=127.0.0.1:8090 LEPTOS_SITE_ROOT=target/
   `next start` is a single Node process, so JS rendering is effectively
   single-threaded. Real Node deployments scale by running multiple instances;
   read the default Next.js rows as per-instance numbers. For an apples-to-apples
-  one-core comparison, run with `SINGLE_THREAD=1`: it pins Topcoat and Leptos to
+  one-core comparison, run with `SINGLE_THREAD=1`: it pins the Rust servers to
   a single Tokio worker thread (`TOKIO_WORKER_THREADS=1`), matching the one
   Node process, and the rendered table is labelled `single-threaded`. (This
   caps the async runtime's worker threads; the OS still schedules that thread
@@ -157,6 +168,7 @@ data/       seeded product data set + generator (single source of truth)
 topcoat/    Topcoat app (workspace member `storefront-topcoat`)
 nextjs/     Next.js 15 App Router app
 leptos/     Leptos 0.8 + Axum app (own cargo workspace, excluded from the root)
+axum-maud/  Axum 0.8 + Maud app (own cargo workspace, excluded from the root)
 scripts/    bench.sh, compare.sh, verify_parity.sh, helpers
 results/    benchmark output (gitignored)
 ```

@@ -9,10 +9,11 @@ BENCH="$ROOT/benchmarks"
 PORT="${PORT:-8090}"
 BASE="http://127.0.0.1:${PORT}"
 
-# When SINGLE_THREAD is set, the Rust servers (Topcoat, Leptos) run with a
-# single Tokio worker thread, so their request handling is single-threaded like
-# next start's one Node process. Next.js is already single-process and is not
-# affected. Empty otherwise, so the Rust servers use every core.
+# When SINGLE_THREAD is set, the Rust servers (Topcoat, Leptos, Axum + Maud)
+# run with a single Tokio worker thread, so their request handling is
+# single-threaded like next start's one Node process. Next.js is already
+# single-process and is not affected. Empty otherwise, so the Rust servers use
+# every core.
 if [ -n "${SINGLE_THREAD:-}" ]; then
     RUST_SERVER_ENV="TOKIO_WORKER_THREADS=1"
 else
@@ -97,6 +98,18 @@ start_nextjs() {
 
 build_leptos() {
     (cd "$BENCH/leptos" && LEPTOS_TAILWIND_VERSION=v4.3.2 cargo leptos build --release)
+}
+
+build_axum_maud() {
+    (cd "$BENCH/axum-maud" && cargo build --release)
+}
+
+start_axum_maud() {
+    (
+        cd "$BENCH/axum-maud" &&
+            exec env $RUST_SERVER_ENV PORT="$PORT" target/release/storefront-axum-maud
+    ) >"$LOG_FILE" 2>&1 &
+    SERVER_PID=$!
 }
 
 start_leptos() {

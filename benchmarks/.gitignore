@@ -4,3 +4,4 @@ nextjs/node_modules/
 nextjs/.next/
 nextjs/next-env.d.ts
 leptos/target/
+axum-maud/target/

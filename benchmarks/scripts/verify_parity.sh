@@ -3,7 +3,7 @@
 # starts each framework in turn, fetches a set of routes, reduces the HTML to
 # normalized text, and diffs everything against the Topcoat rendering. Usage:
 #
-#   verify_parity.sh [topcoat|nextjs|leptos ...]     (default: all three)
+#   verify_parity.sh [topcoat|nextjs|leptos|axum_maud ...]     (default: all four)
 
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
@@ -21,7 +21,7 @@ PARITY_PATHS=(
 
 FRAMEWORKS=("$@")
 if [ ${#FRAMEWORKS[@]} -eq 0 ]; then
-    FRAMEWORKS=(topcoat nextjs leptos)
+    FRAMEWORKS=(topcoat nextjs leptos axum_maud)
 fi
 
 require_cmd node "brew install node"

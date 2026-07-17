@@ -45,7 +45,7 @@ median() {
         label="${ROUTE_LABELS[$i]}"
         path="${ROUTE_PATHS[$i]}"
         base_rps=""
-        for framework in topcoat nextjs leptos; do
+        for framework in topcoat nextjs leptos axum_maud; do
             tput_files=("$RESULTS_DIR/${framework}_${label}_tput_"*.json)
             rate_files=("$RESULTS_DIR/${framework}_${label}_rate_"*.json)
             [ -f "${tput_files[0]}" ] || continue
