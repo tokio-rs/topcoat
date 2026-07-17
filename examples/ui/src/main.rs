@@ -15,6 +15,7 @@ use components::input::input;
 use components::label::label;
 use components::select::select;
 use components::spinner::spinner;
+use components::switch::switch;
 use components::textarea::textarea;
 use topcoat::{
     Result,
@@ -518,6 +519,24 @@ async fn settings_card() -> Result {
                             attrs: attributes! { for="notify-digest" class="opacity-50" },
                             "Weekly digest (managed by your org)"
                         )
+                    </div>
+                    <div class="flex flex-col gap-3 border-t border-border pt-4">
+                        <div class="flex items-center justify-between gap-4">
+                            label(
+                                attrs: attributes! { for="notify-push" },
+                                "Push notifications"
+                            )
+                            switch(
+                                attrs: attributes! { id="notify-push" checked=(true) }
+                            )
+                        </div>
+                        <div class="flex items-center justify-between gap-4">
+                            label(
+                                attrs: attributes! { for="notify-quiet" },
+                                "Quiet hours"
+                            )
+                            switch(attrs: attributes! { id="notify-quiet" })
+                        </div>
                     </div>
                 </div>
             )

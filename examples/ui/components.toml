@@ -44,6 +44,10 @@ file = "src/components/select.rs"
 hash = "sha256:d88c5c715832ba0eca485dea1a4964ea725b98c74119461ecb5e093ba7ca3bb3"
 file = "src/components/spinner.rs"
 
+[registries.topcoat.components.switch]
+hash = "sha256:6f8b32da0ae50deb48e95a997ce7dd7008a8637266d0212178d739d7ddb910c5"
+file = "src/components/switch.rs"
+
 [registries.topcoat.components.textarea]
 hash = "sha256:49952715ff3cfc1b8c0372a70745c33a81521a46422695d7a62206e1a3d4b626"
 file = "src/components/textarea.rs"

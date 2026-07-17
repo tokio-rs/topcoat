@@ -36,5 +36,8 @@ source = "src/components/select.rs"
 [components.spinner]
 source = "src/components/spinner.rs"
 
+[components.switch]
+source = "src/components/switch.rs"
+
 [components.textarea]
 source = "src/components/textarea.rs"
