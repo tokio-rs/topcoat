@@ -63,9 +63,9 @@ async fn hello(name: &str) -> Result {
 
 ## What makes Topcoat different
 
-### Client reactivity without a client build
+### Client reactivity without the boilerplate
 
-Topcoat renders all markup on the server: components can be async, query the database directly, and never need a separate API layer. Interactivity does not have to cost a round-trip, though. A `$(...)` expression is ordinary type-checked Rust that Topcoat evaluates on the server for the initial render and also translates to JavaScript, so it re-runs instantly in the browser. No wasm bundle, no client build step:
+Topcoat renders all markup on the server: components can be async, query the database directly, and never need a separate API layer. This elminates all the boilerplate needed to glue your server's data with the client. Interactivity does not have to cost a round-trip, though. A `$(...)` expression is ordinary type-checked Rust that Topcoat evaluates on the server for the initial render and also translates to JavaScript, so it re-runs instantly in the browser. No wasm bundle, no client build step:
 
 ```rust,ignore
 view! {
