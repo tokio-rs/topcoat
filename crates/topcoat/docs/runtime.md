@@ -131,7 +131,24 @@ view! {
 # }
 ```
 
-A `bool` expression toggles the attribute's presence, like `hidden` above. Other values set the attribute's value; form state like `value` and `checked` is applied as the live DOM property, so `:value` on an input does what you expect.
+Combining a bind attribute with an event handler syncs an element and a signal in both directions: `:value` keeps the input showing the signal, and `@input` writes every keystroke back into it:
+
+```rust
+# use topcoat::{Result, view::*, runtime::Event};
+# #[component]
+# async fn example() -> Result {
+view! {
+    signal name = String::new();
+
+    <input
+        :value=$(name.get())
+        @input=$(|e: Event| name.set(e.target.value))
+    >
+
+    <p>"Hello, " $(name.get()) "!"</p>
+}
+# }
+```
 
 # Procedures
 
@@ -159,7 +176,7 @@ view! {
 # }
 ```
 
-The call is an HTTP request under the hood: the arguments travel to the server, the function runs there, and the `.await` resolves to its result. See [`#[procedure]`][procedure] for the details: argument and return types, the `cx` parameter, error handling, and registration.
+The call is an HTTP request under the hood: the arguments travel to the server, the function runs there, and the `.await` resolves to its result. That also means every procedure is exposed as an API endpoint from your server; anyone can call it with any arguments, so inputs can be spoofed and **must not be trusted**. See [`#[procedure]`][procedure] for the details: argument and return types, the `cx` parameter, error handling, and registration.
 
 # Shards
 
@@ -190,7 +207,7 @@ view! {
 # }
 ```
 
-A shard body is ordinary server code, like any component. See [`#[shard]`][shard] for the details: how re-renders behave, shard state, and registration.
+A shard body is ordinary server code, like any component. The re-renders are served by an API endpoint exposed from your server, so a shard's arguments can be spoofed just like a procedure's and **must not be trusted**. See [`#[shard]`][shard] for the details: how re-renders behave, shard state, and registration.
 
 [`Event`]: struct.Event.html
 [`expr!`]: macro.expr.html

@@ -1,4 +1,4 @@
-A shard is a special type of component that can re-run whenever its arguments change in the browser. Arguments are runtime [expressions](macro.expr.html): the browser tracks the signals they read, and when one changes it requests a fresh render from the server and swaps the result into the DOM. Shards are exposed as API endpoints from your server; arguments **must not be trused**.
+A shard is a special type of component that can re-run whenever its arguments change in the browser. Arguments are runtime [expressions](macro.expr.html): the browser tracks the signals they read, and when one changes it requests a fresh render from the server and swaps the result into the DOM. Shards are exposed as API endpoints from your server; arguments **must not be trusted**.
 
 ```rust
 use topcoat::{Result, context::Cx, runtime::shard, view::view};
