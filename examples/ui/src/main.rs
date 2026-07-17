@@ -1,5 +1,6 @@
 mod components;
 
+use components::badge::{BadgeVariant, badge, badge_variants};
 use components::button::{ButtonSize, ButtonVariant, button, button_variants};
 use components::card::{
     card, card_content, card_description, card_footer, card_header, card_title,
@@ -90,6 +91,7 @@ async fn home() -> Result {
                         demo(deploy_card())
                         coming_soon(name: "Tabs")
                         demo(delete_card())
+                        demo(status_card())
                         demo(branches_card())
                         demo(share_card())
                         coming_soon(name: "Switch")
@@ -398,6 +400,42 @@ async fn delete_card() -> Result {
                 attrs: attributes! { class="justify-end" },
                 button(variant: ButtonVariant::Ghost, "Cancel")
                 button(variant: ButtonVariant::Destructive, "Delete workspace")
+            )
+        )
+    }
+}
+
+/// Environment statuses told through the badge variants.
+#[component]
+async fn status_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Deployment status")
+                card_description("Every environment at a glance.")
+            )
+            card_content(
+                <div class="flex flex-col gap-3">
+                    for (env, status, variant) in [
+                        ("production", "Live", BadgeVariant::Primary),
+                        ("staging", "Building", BadgeVariant::Secondary),
+                        ("preview/pr-142", "Queued", BadgeVariant::Outline),
+                        ("legacy-api", "Failed", BadgeVariant::Destructive),
+                    ] {
+                        <div class="flex items-center justify-between gap-4">
+                            <p class="truncate font-mono text-sm">(env)</p>
+                            badge(variant: variant, (status))
+                        </div>
+                    }
+                </div>
+            )
+            card_footer(
+                <p class="text-sm text-muted-foreground">"Rolled out with"</p>
+                // Anything can borrow a badge's looks: `badge_variants`
+                // returns the class string for a variant.
+                <a href="#changelog" class=(badge_variants(BadgeVariant::Outline))>
+                    "v2.0.4"
+                </a>
             )
         )
     }

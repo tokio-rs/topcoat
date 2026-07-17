@@ -9,6 +9,9 @@ version = 1
 [themes.neutral]
 source = "themes/neutral.css"
 
+[components.badge]
+source = "src/components/badge.rs"
+
 [components.button]
 source = "src/components/button.rs"
 
