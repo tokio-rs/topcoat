@@ -1,5 +1,9 @@
+#[cfg(feature = "http")]
+use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use topcoat_core::context::Cx;
 
+#[cfg(feature = "http")]
+use crate::ViewPart;
 use crate::{PartsWriter, Unescaped, View};
 
 /// Converts a value used in node position into view parts.
@@ -93,6 +97,48 @@ impl NodeViewParts for &String {
     #[inline]
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         self.as_str().into_view_parts(cx, parts);
+    }
+}
+
+/// Sets the response status code; renders no content.
+///
+/// Competing status codes resolve by render order: the first one rendered
+/// wins. Place a status code before nested content to override whatever the
+/// content declares, or after it to provide a fallback. To display a status
+/// code as text instead, render one of its accessors, such as
+/// [`as_u16`](StatusCode::as_u16).
+#[cfg(feature = "http")]
+impl NodeViewParts for StatusCode {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_part(ViewPart::StatusCode(self));
+    }
+}
+
+/// Adds response headers; renders no content.
+///
+/// Competing headers resolve by render order: the first part that mentions a
+/// header name provides all of that name's values. Place headers before
+/// nested content to override the entries the content declares, or after it
+/// to provide fallbacks.
+#[cfg(feature = "http")]
+impl NodeViewParts for HeaderMap {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_part(ViewPart::Headers(Box::new(self)));
+    }
+}
+
+/// Adds a single response header; renders no content.
+///
+/// Equivalent to a [`HeaderMap`] holding just this entry.
+#[cfg(feature = "http")]
+impl NodeViewParts for (HeaderName, HeaderValue) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        let (name, value) = self;
+        let mut headers = HeaderMap::with_capacity(1);
+        headers.insert(name, value);
+        headers.into_view_parts(cx, parts);
     }
 }
 

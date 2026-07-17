@@ -389,6 +389,43 @@ For reusable runtime attribute collections, use the [`attributes!`] macro. It ha
 
 To assemble a `class` attribute value from static and conditional parts, use the [`class!`] macro. It builds a [`topcoat::view::Class`] value whose entries join with single spaces, and the attribute is omitted entirely when no entry is present.
 
+# Status Codes And Response Headers
+
+A view can declare the status code and headers of the HTTP response it renders into. A [`StatusCode`] in node position sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. None of them render any content.
+
+```rust
+# use topcoat::{Result, view::*};
+# use topcoat::router::{StatusCode, HeaderValue, header};
+# #[component]
+# async fn example() -> Result {
+view! {
+    (StatusCode::NOT_FOUND)
+    ((header::CACHE_CONTROL, HeaderValue::from_static("no-store")))
+    <h1>"Page not found"</h1>
+}
+# }
+```
+
+Competing declarations resolve by render order: the first status code rendered wins, and for each header name the first part that mentions it provides all of that name's values. Placement therefore decides precedence between a layout and the pages it wraps. A declaration placed before the layout's slot overrides whatever the page declares; placed after the slot it is a fallback the page can override:
+
+```rust
+# use topcoat::{Result, view::*};
+# use topcoat::router::{HeaderValue, Slot, header, layout};
+#[layout("/docs")]
+async fn docs_layout(slot: Slot<'_>) -> Result {
+    view! {
+        <main>(slot.await?)</main>
+        ((header::CACHE_CONTROL, HeaderValue::from_static("max-age=60")))
+    }
+}
+```
+
+Every page under `/docs` now gets `Cache-Control: max-age=60` unless it declares its own `Cache-Control`.
+
+A status code in node position never renders text. To display one, render one of its accessors instead, such as `(status.as_u16())`.
+
+These declarations require the `router` feature (or the `topcoat-view` crate's `http` feature) and take effect when the rendered view becomes a response; rendering a view to a plain string discards them.
+
 # Rendering Outside A Component
 
 Inside a [`component`], `#[page]`, or `#[layout]`, the request context is in scope implicitly, so `view!` can render components and reactive markup with no ceremony. In a plain function you need to pass it at the start of the `view!` macro explicitely:
@@ -481,3 +518,5 @@ view! {
 [`topcoat::view::Attributes`]: struct.Attributes.html
 [`topcoat::view::Class`]: struct.Class.html
 [`view!`]: macro.view.html
+[`StatusCode`]: https://docs.rs/http/latest/http/status/struct.StatusCode.html
+[`HeaderMap`]: https://docs.rs/http/latest/http/header/struct.HeaderMap.html

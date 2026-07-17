@@ -1,6 +1,8 @@
 use core::fmt;
 use std::borrow::Cow;
 
+#[cfg(feature = "http")]
+use http::{HeaderMap, StatusCode};
 use smallvec::SmallVec;
 use topcoat_core::context::Cx;
 
@@ -54,6 +56,12 @@ impl View {
     }
 
     /// Renders the view into an HTML string.
+    #[cfg_attr(
+        feature = "http",
+        doc = "",
+        doc = "Status codes and headers declared in the view are discarded;",
+        doc = "[`render_response`](Self::render_response) collects them."
+    )]
     pub fn render(&self, cx: &Cx) -> String {
         let mut buf = String::with_capacity(self.part.size_hint());
         let mut f = Formatter::new(&mut buf);
@@ -61,11 +69,53 @@ impl View {
         buf
     }
 
+    /// Renders the view into HTML together with the status code and response
+    /// headers declared in it.
+    ///
+    /// A view declares response metadata by placing an
+    /// [`http::StatusCode`](StatusCode), an [`http::HeaderMap`](HeaderMap),
+    /// or a single `(HeaderName, HeaderValue)` pair in the node position of
+    /// the `view!` macro. Competing declarations resolve by render order:
+    /// the first status code rendered wins, and the first part that mentions
+    /// a header name provides all of that name's values.
+    #[cfg(feature = "http")]
+    #[must_use]
+    pub fn render_response(&self, cx: &Cx) -> RenderedResponse {
+        let mut html = String::with_capacity(self.part.size_hint());
+        let mut f = Formatter::new(&mut html);
+        self.part.render(cx, &mut f);
+        let (status_code, headers) = f.into_recorded();
+        RenderedResponse {
+            html,
+            status_code,
+            headers,
+        }
+    }
+
     /// Unwraps the view into its root part.
     #[inline]
     pub(crate) fn into_part(self) -> ViewPart {
         self.part
     }
+}
+
+/// The output of rendering a [`View`] for an HTTP response.
+///
+/// Returned by [`View::render_response`]: the rendered HTML alongside the
+/// status code and headers the view declared.
+#[cfg(feature = "http")]
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct RenderedResponse {
+    /// The rendered HTML.
+    pub html: String,
+    /// The first status code the render encountered, if any.
+    pub status_code: Option<StatusCode>,
+    /// The collected response headers.
+    ///
+    /// Each name carries the values of the first render part that mentioned
+    /// it.
+    pub headers: HeaderMap,
 }
 
 /// A renderable value stored in a [`View`].
@@ -146,6 +196,14 @@ pub enum ViewPart {
         inner: Box<[ViewPart]>,
         size_hint: usize,
     },
+    /// A response status code recorded at render time; renders no content.
+    #[cfg(feature = "http")]
+    #[non_exhaustive]
+    StatusCode(StatusCode),
+    /// Response headers recorded at render time; renders no content.
+    #[cfg(feature = "http")]
+    #[non_exhaustive]
+    Headers(Box<HeaderMap>),
 }
 
 impl ViewPart {
@@ -207,6 +265,10 @@ impl ViewPart {
                     part.render(cx, f);
                 }
             }
+            #[cfg(feature = "http")]
+            Self::StatusCode(status_code) => f.record_status_code(*status_code),
+            #[cfg(feature = "http")]
+            Self::Headers(headers) => f.record_headers(headers),
         }
     }
 
@@ -248,6 +310,8 @@ impl ViewPart {
                 _ => value.len() + value.len() / 8,
             },
             Self::BoxDyn { size_hint, .. } | Self::BoxSlice { size_hint, .. } => *size_hint,
+            #[cfg(feature = "http")]
+            Self::StatusCode(_) | Self::Headers(_) => 0,
         }
     }
 }
@@ -556,5 +620,131 @@ mod tests {
     fn size_hint_is_exact_for_unescaped_strings() {
         let view = View::unescaped_unchecked("<b>raw</b>");
         assert_eq!(view.part.size_hint(), 10);
+    }
+
+    #[cfg(feature = "http")]
+    mod response {
+        use http::header::{CACHE_CONTROL, SET_COOKIE};
+        use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
+
+        use super::*;
+        use crate::NodeViewParts;
+
+        fn push_node(parts: &mut ViewParts, value: impl NodeViewParts) {
+            value.into_view_parts(
+                &Cx::default(),
+                &mut PartsWriter::new(parts, HtmlContext::Text),
+            );
+        }
+
+        fn push_text(parts: &mut ViewParts, text: &'static str) {
+            PartsWriter::new(parts, HtmlContext::Text).push_str(text);
+        }
+
+        #[test]
+        fn status_code_is_recorded_and_renders_nothing() {
+            let mut parts = ViewParts::new();
+            push_text(&mut parts, "a");
+            push_node(&mut parts, StatusCode::NOT_FOUND);
+            push_text(&mut parts, "b");
+
+            let rendered = View::new(parts).render_response(&Cx::default());
+            assert_eq!(rendered.html, "ab");
+            assert_eq!(rendered.status_code, Some(StatusCode::NOT_FOUND));
+            assert!(rendered.headers.is_empty());
+        }
+
+        #[test]
+        fn render_response_without_declarations_is_empty() {
+            let mut parts = ViewParts::new();
+            push_text(&mut parts, "a");
+
+            let rendered = View::new(parts).render_response(&Cx::default());
+            assert_eq!(rendered.html, "a");
+            assert_eq!(rendered.status_code, None);
+            assert!(rendered.headers.is_empty());
+        }
+
+        #[test]
+        fn render_discards_declarations() {
+            let mut parts = ViewParts::new();
+            push_node(&mut parts, StatusCode::NOT_FOUND);
+            push_node(
+                &mut parts,
+                (CACHE_CONTROL, HeaderValue::from_static("no-store")),
+            );
+            push_text(&mut parts, "a");
+
+            assert_eq!(View::new(parts).render(&Cx::default()), "a");
+        }
+
+        #[test]
+        fn first_status_code_wins() {
+            let mut parts = ViewParts::new();
+            push_node(&mut parts, StatusCode::NOT_FOUND);
+            push_node(&mut parts, StatusCode::OK);
+
+            let rendered = View::new(parts).render_response(&Cx::default());
+            assert_eq!(rendered.status_code, Some(StatusCode::NOT_FOUND));
+        }
+
+        #[test]
+        fn first_mention_of_a_header_name_wins() {
+            let mut parts = ViewParts::new();
+            push_node(
+                &mut parts,
+                (CACHE_CONTROL, HeaderValue::from_static("no-store")),
+            );
+            let mut later = HeaderMap::new();
+            later.insert(CACHE_CONTROL, HeaderValue::from_static("max-age=60"));
+            later.insert(
+                HeaderName::from_static("x-extra"),
+                HeaderValue::from_static("1"),
+            );
+            push_node(&mut parts, later);
+
+            let rendered = View::new(parts).render_response(&Cx::default());
+            assert_eq!(rendered.headers[CACHE_CONTROL], "no-store");
+            assert_eq!(rendered.headers["x-extra"], "1");
+        }
+
+        #[test]
+        fn one_map_keeps_all_values_for_a_name() {
+            let mut first = HeaderMap::new();
+            first.append(SET_COOKIE, HeaderValue::from_static("a=1"));
+            first.append(SET_COOKIE, HeaderValue::from_static("b=2"));
+            let mut later = HeaderMap::new();
+            later.insert(SET_COOKIE, HeaderValue::from_static("c=3"));
+
+            let mut parts = ViewParts::new();
+            push_node(&mut parts, first);
+            push_node(&mut parts, later);
+
+            let rendered = View::new(parts).render_response(&Cx::default());
+            let cookies: Vec<_> = rendered.headers.get_all(SET_COOKIE).iter().collect();
+            assert_eq!(cookies, ["a=1", "b=2"]);
+        }
+
+        #[test]
+        fn placement_decides_precedence_across_nested_views() {
+            let mut inner_parts = ViewParts::new();
+            push_node(&mut inner_parts, StatusCode::NOT_FOUND);
+            push_text(&mut inner_parts, "inner");
+            let inner = View::new(inner_parts);
+
+            // A status code before the nested view overrides it.
+            let mut outer_parts = ViewParts::new();
+            push_node(&mut outer_parts, StatusCode::FORBIDDEN);
+            outer_parts.push_view(inner.clone());
+            let rendered = View::new(outer_parts).render_response(&Cx::default());
+            assert_eq!(rendered.status_code, Some(StatusCode::FORBIDDEN));
+
+            // A status code after the nested view is only a fallback.
+            let mut outer_parts = ViewParts::new();
+            outer_parts.push_view(inner);
+            push_node(&mut outer_parts, StatusCode::FORBIDDEN);
+            let rendered = View::new(outer_parts).render_response(&Cx::default());
+            assert_eq!(rendered.status_code, Some(StatusCode::NOT_FOUND));
+        }
     }
 }

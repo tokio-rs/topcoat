@@ -10,9 +10,15 @@ keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
 
+[features]
+http = [
+	"dep:http",
+]
+
 [dependencies]
 topcoat-core.workspace = true
 
+http = { workspace = true, optional = true }
 itoa.workspace = true
 memchr.workspace = true
 smallvec.workspace = true

@@ -1,3 +1,6 @@
+#[cfg(feature = "http")]
+use http::{HeaderMap, StatusCode};
+
 /// A plain string writer that render output accumulates into.
 ///
 /// `Formatter` is escaping-agnostic: [`write_str`](Self::write_str) and
@@ -7,13 +10,23 @@
 /// [`HtmlContext`](crate::HtmlContext) instead.
 pub struct Formatter<'a> {
     buf: &'a mut String,
+    #[cfg(feature = "http")]
+    status_code: Option<StatusCode>,
+    #[cfg(feature = "http")]
+    headers: HeaderMap,
 }
 
 impl<'a> Formatter<'a> {
     /// Creates a new `Formatter` that writes into the given destination.
     #[inline]
     pub fn new(buf: &'a mut String) -> Self {
-        Self { buf }
+        Self {
+            buf,
+            #[cfg(feature = "http")]
+            status_code: None,
+            #[cfg(feature = "http")]
+            headers: HeaderMap::new(),
+        }
     }
 
     /// Writes a string verbatim.
@@ -26,6 +39,39 @@ impl<'a> Formatter<'a> {
     #[inline]
     pub fn write_char(&mut self, c: char) {
         self.buf.push(c);
+    }
+
+    /// Records a response status code, keeping an earlier one if already
+    /// recorded: the first status code rendered wins.
+    #[cfg(feature = "http")]
+    #[inline]
+    pub(crate) fn record_status_code(&mut self, status_code: StatusCode) {
+        self.status_code.get_or_insert(status_code);
+    }
+
+    /// Records response headers, keeping earlier values for names already
+    /// recorded: the first render part that mentions a header name provides
+    /// all of that name's values.
+    #[cfg(feature = "http")]
+    pub(crate) fn record_headers(&mut self, headers: &HeaderMap) {
+        if self.headers.is_empty() {
+            self.headers = headers.clone();
+            return;
+        }
+        for name in headers.keys() {
+            if !self.headers.contains_key(name) {
+                for value in headers.get_all(name) {
+                    self.headers.append(name.clone(), value.clone());
+                }
+            }
+        }
+    }
+
+    /// Consumes the formatter, returning the recorded status code and
+    /// headers.
+    #[cfg(feature = "http")]
+    pub(crate) fn into_recorded(self) -> (Option<StatusCode>, HeaderMap) {
+        (self.status_code, self.headers)
     }
 }
 

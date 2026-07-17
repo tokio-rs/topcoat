@@ -224,9 +224,17 @@ impl IntoResponse for Parts {
     }
 }
 
+/// Renders the view to HTML and applies the status code and headers it
+/// declares; a declared `Content-Type` replaces the default `text/html`.
 impl IntoResponse for View {
     fn into_response(self, cx: &Cx) -> Result<Response> {
-        Html(self.render(cx)).into_response(cx)
+        let rendered = self.render_response(cx);
+        let mut response = Html(rendered.html).into_response(cx)?;
+        if let Some(status_code) = rendered.status_code {
+            *response.status_mut() = status_code;
+        }
+        response.headers_mut().extend(rendered.headers);
+        Ok(response)
     }
 }
 
@@ -406,6 +414,7 @@ impl_into_response_tuples!(
 #[cfg(test)]
 mod tests {
     use http_body_util::Full;
+    use topcoat_view::{HtmlContext, NodeViewParts, PartsWriter, ViewParts};
 
     use super::*;
     use crate::to_bytes;
@@ -522,6 +531,59 @@ mod tests {
         assert_eq!(parts.status, StatusCode::ACCEPTED);
         assert_eq!(header(&parts, "x-test"), "1");
         assert_eq!(&body[..], b"yo");
+    }
+
+    // -- views --
+
+    /// Builds a view whose parts are pushed by `build` through a text-context
+    /// [`PartsWriter`].
+    fn view(build: impl FnOnce(&Cx, &mut PartsWriter<'_>)) -> View {
+        let mut parts = ViewParts::new();
+        build(
+            &Cx::default(),
+            &mut PartsWriter::new(&mut parts, HtmlContext::Text),
+        );
+        View::new(parts)
+    }
+
+    #[test]
+    fn view_is_an_html_response() {
+        let (parts, body) = run(view(|_cx, writer| {
+            writer.push_str("hi");
+        }));
+        assert_eq!(parts.status, StatusCode::OK);
+        assert_eq!(header(&parts, "content-type"), "text/html; charset=utf-8");
+        assert_eq!(&body[..], b"hi");
+    }
+
+    #[test]
+    fn view_applies_declared_status_and_headers() {
+        let (parts, body) = run(view(|cx, writer| {
+            StatusCode::IM_A_TEAPOT.into_view_parts(cx, writer);
+            (
+                HeaderName::from_static("x-test"),
+                HeaderValue::from_static("1"),
+            )
+                .into_view_parts(cx, writer);
+            writer.push_str("hi");
+        }));
+        assert_eq!(parts.status, StatusCode::IM_A_TEAPOT);
+        assert_eq!(header(&parts, "content-type"), "text/html; charset=utf-8");
+        assert_eq!(header(&parts, "x-test"), "1");
+        assert_eq!(&body[..], b"hi");
+    }
+
+    #[test]
+    fn view_declared_content_type_replaces_the_html_default() {
+        let (parts, _) = run(view(|cx, writer| {
+            (
+                CONTENT_TYPE,
+                HeaderValue::from_static("application/xhtml+xml"),
+            )
+                .into_view_parts(cx, writer);
+            writer.push_str("hi");
+        }));
+        assert_eq!(header(&parts, "content-type"), "application/xhtml+xml");
     }
 
     // -- header arrays --

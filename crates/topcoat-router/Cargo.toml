@@ -26,7 +26,7 @@ tower = [
 
 [dependencies]
 topcoat-core.workspace = true
-topcoat-view.workspace = true
+topcoat-view = { workspace = true, features = ["http"] }
 
 bytes.workspace = true
 form_urlencoded.workspace = true

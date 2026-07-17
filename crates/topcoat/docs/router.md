@@ -267,6 +267,46 @@ async fn dashboard(cx: &Cx) -> Result {
 
 The methods cover the same statuses: [`ok_or_not_found`](RouterErrorExt::ok_or_not_found), [`ok_or_unauthorized`](RouterErrorExt::ok_or_unauthorized), [`ok_or_forbidden`](RouterErrorExt::ok_or_forbidden), [`ok_or_bad_request`](RouterErrorExt::ok_or_bad_request), [`ok_or_redirect`](RouterErrorExt::ok_or_redirect), and [`ok_or_redirect_permanent`](RouterErrorExt::ok_or_redirect_permanent). A failed [`#[path_param]`](macro@path_param) parse feeds the same machinery through its `error = ...` option.
 
+# Status codes and headers
+
+A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. This pairs with error handling. A layout can catch a page's [`NotFoundError`] and replace it with a branded not-found page:
+
+```rust
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{NotFoundError, RouterErrorExt, Slot, StatusCode, layout, page},
+    view::view,
+};
+
+# struct Post { title: String }
+# async fn find_post(_cx: &Cx) -> Option<Post> { None }
+#[page("/posts/{id}")]
+async fn post(cx: &Cx) -> Result {
+    let post = find_post(cx).await.ok_or_not_found()?;
+    view! { <h1>(post.title)</h1> }
+}
+
+#[layout("/")]
+async fn root_layout(slot: Slot<'_>) -> Result {
+    let content = match slot.await {
+        Err(error) if error.downcast_ref::<NotFoundError>().is_some() => view! {
+            (StatusCode::NOT_FOUND)
+            <h1>"Page not found"</h1>
+        },
+        content => content,
+    }?;
+
+    view! {
+        <html>
+            <body>(content)</body>
+        </html>
+    }
+}
+```
+
+See the [`view!`](crate::view::view!) macro docs for the full placement and precedence rules.
+
 # Manual registration
 
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
