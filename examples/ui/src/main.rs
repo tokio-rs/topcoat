@@ -13,6 +13,7 @@ use components::dropdown_menu::{
 };
 use components::input::input;
 use components::label::label;
+use components::progress::progress;
 use components::select::select;
 use components::spinner::spinner;
 use components::switch::switch;
@@ -444,6 +445,15 @@ async fn status_card() -> Result {
                             spinner()
                             "Deploying..."
                         </p>
+                    </div>
+                    <div class="flex flex-col gap-2 border-t border-border pt-4">
+                        <div class="flex items-center justify-between gap-4">
+                            <p class="text-sm text-muted-foreground">
+                                "Rolling out to production"
+                            </p>
+                            <p class="text-sm font-medium">"62%"</p>
+                        </div>
+                        progress(value: 62.0)
                     </div>
                 </div>
             )

@@ -5,6 +5,7 @@ pub mod checkbox;
 pub mod dropdown_menu;
 pub mod input;
 pub mod label;
+pub mod progress;
 pub mod select;
 pub mod spinner;
 pub mod switch;

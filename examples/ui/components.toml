@@ -36,6 +36,10 @@ file = "src/components/input.rs"
 hash = "sha256:0c6abee97e703be494e26f346a4695b9a0268db5296f3185056356f0c886dd85"
 file = "src/components/label.rs"
 
+[registries.topcoat.components.progress]
+hash = "sha256:e7cad637573b09ca119535ab29e2a6ed6307473947722aca8c13ba45732f221f"
+file = "src/components/progress.rs"
+
 [registries.topcoat.components.select]
 hash = "sha256:19d7779d8e7e75a2db78904232fa3db11f8e0e49cfca8a1852c4dcd686ac2d69"
 file = "src/components/select.rs"

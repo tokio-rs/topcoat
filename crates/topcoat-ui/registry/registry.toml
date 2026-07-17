@@ -30,6 +30,9 @@ source = "src/components/input.rs"
 [components.label]
 source = "src/components/label.rs"
 
+[components.progress]
+source = "src/components/progress.rs"
+
 [components.select]
 source = "src/components/select.rs"
 
