@@ -1,8 +1,36 @@
-# Topcoat
+<div align="center">
+  <h1>Topcoat</h1>
+</div>
+
+<div align="center">
+  <h3>A modular, batteries-included Rust web framework for server-rendered apps</h3>
+  <a href="https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md">Get started</a> •
+  <a href="https://docs.rs/topcoat">Docs</a> •
+  <a href="https://crates.io/crates/topcoat">Crates.io</a> •
+  <a href="https://discord.gg/tokio">Discord</a>
+</div>
+
+<br/>
+
+<div align="center">
+
+[![Crates.io][crates-badge]][crates-url]
+[![MIT licensed][mit-badge]][mit-url]
+[![Build Status][actions-badge]][actions-url]
+[![Discord chat][discord-badge]][discord-url]
+
+</div>
+
+[crates-badge]: https://img.shields.io/crates/v/topcoat.svg
+[crates-url]: https://crates.io/crates/topcoat
+[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
+[mit-url]: https://github.com/tokio-rs/topcoat/blob/main/LICENSE
+[actions-badge]: https://github.com/tokio-rs/topcoat/workflows/CI/badge.svg
+[actions-url]: https://github.com/tokio-rs/topcoat/actions?query=workflow%3ACI+branch%3Amain
+[discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
+[discord-url]: https://discord.gg/tokio
 
 > Early-stage and experimental. Expect breaking changes.
-
-A modular, batteries-included Rust web framework for server-rendered apps.
 
 See the [Getting started guide](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md) to set up a new project.
 
