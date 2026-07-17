@@ -14,6 +14,7 @@ use components::input::input;
 use components::label::label;
 use components::select::select;
 use components::spinner::spinner;
+use components::textarea::textarea;
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
@@ -97,6 +98,7 @@ async fn home() -> Result {
                         demo(share_card())
                         coming_soon(name: "Switch")
                         demo(project_card())
+                        demo(feedback_card())
                         demo(notifications_card())
                         coming_soon(name: "Dialog")
                         coming_soon(name: "Avatar")
@@ -478,6 +480,35 @@ async fn share_card() -> Result {
                         icon(data: iconify_icon!("feather:copy"), label: "Copy link")
                     )
                 </div>
+            )
+        )
+    }
+}
+
+/// A feedback form pairing a labeled textarea with a submit action.
+#[component]
+async fn feedback_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Send feedback")
+                card_description("What should we improve next?")
+            )
+            card_content(
+                <form class="flex flex-col gap-2">
+                    label(attrs: attributes! { for="feedback" }, "Your feedback")
+                    textarea(
+                        attrs: attributes! {
+                            id="feedback"
+                            name="feedback"
+                            placeholder="The dropdown menu could..."
+                        }
+                    )
+                </form>
+            )
+            card_footer(
+                attrs: attributes! { class="justify-end" },
+                button("Send feedback")
             )
         )
     }

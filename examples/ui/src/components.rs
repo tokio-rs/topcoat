@@ -6,3 +6,4 @@ pub mod input;
 pub mod label;
 pub mod select;
 pub mod spinner;
+pub mod textarea;
