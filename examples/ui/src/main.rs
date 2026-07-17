@@ -5,6 +5,7 @@ use components::button::{ButtonSize, ButtonVariant, button, button_variants};
 use components::card::{
     card, card_content, card_description, card_footer, card_header, card_title,
 };
+use components::checkbox::checkbox;
 use components::dropdown_menu::{
     dropdown_menu, dropdown_menu_content, dropdown_menu_item, dropdown_menu_label,
     dropdown_menu_separator, dropdown_menu_sub, dropdown_menu_sub_content,
@@ -96,7 +97,7 @@ async fn home() -> Result {
                         demo(status_card())
                         demo(branches_card())
                         demo(share_card())
-                        coming_soon(name: "Switch")
+                        demo(settings_card())
                         demo(project_card())
                         demo(feedback_card())
                         demo(notifications_card())
@@ -479,6 +480,45 @@ async fn share_card() -> Result {
                         variant: ButtonVariant::Outline,
                         icon(data: iconify_icon!("feather:copy"), label: "Copy link")
                     )
+                </div>
+            )
+        )
+    }
+}
+
+/// Notification settings mixing unchecked, checked, and disabled checkboxes.
+#[component]
+async fn settings_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Notification settings")
+                card_description("Pick what lands in your inbox.")
+            )
+            card_content(
+                <div class="flex flex-col gap-3">
+                    <div class="flex items-center gap-2">
+                        checkbox(
+                            attrs: attributes! { id="notify-deploys" checked=(true) }
+                        )
+                        label(
+                            attrs: attributes! { for="notify-deploys" },
+                            "Deploy results"
+                        )
+                    </div>
+                    <div class="flex items-center gap-2">
+                        checkbox(attrs: attributes! { id="notify-mentions" })
+                        label(attrs: attributes! { for="notify-mentions" }, "Mentions")
+                    </div>
+                    <div class="flex items-center gap-2">
+                        checkbox(
+                            attrs: attributes! { id="notify-digest" checked=(true) disabled=(true) }
+                        )
+                        label(
+                            attrs: attributes! { for="notify-digest" class="opacity-50" },
+                            "Weekly digest (managed by your org)"
+                        )
+                    </div>
                 </div>
             )
         )

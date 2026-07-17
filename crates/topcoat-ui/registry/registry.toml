@@ -18,6 +18,9 @@ source = "src/components/button.rs"
 [components.card]
 source = "src/components/card.rs"
 
+[components.checkbox]
+source = "src/components/checkbox.rs"
+
 [components.dropdown_menu]
 source = "src/components/dropdown_menu.rs"
 

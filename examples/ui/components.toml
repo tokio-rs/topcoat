@@ -20,6 +20,10 @@ file = "src/components/button.rs"
 hash = "sha256:45cbe0f5a790e7359ff72ecda4fbf40fb6c7bc8c4928593d1352813a86543a01"
 file = "src/components/card.rs"
 
+[registries.topcoat.components.checkbox]
+hash = "sha256:c2fabc4fb809b0a91cbd6ffa03e7d3cbd0006cc88ba59a15eddee155803a6a04"
+file = "src/components/checkbox.rs"
+
 [registries.topcoat.components.dropdown_menu]
 hash = "sha256:9e2a7e6f4992b8d38de3439bda5b1d92a8bd1dc6db1e579eb90601992c315a1a"
 file = "src/components/dropdown_menu.rs"
