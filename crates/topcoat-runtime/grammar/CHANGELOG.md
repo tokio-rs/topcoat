@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-grammar-v0.1.2...topcoat-runtime-grammar-v0.1.3) - 2026-07-17
+
+### Fixed
+
+- shards no longer need cx =>
+
 ## [0.0.1](https://github.com/tokio-rs/topcoat/releases/tag/topcoat-runtime-grammar-v0.0.1) - 2026-07-14
 
 ### Other
