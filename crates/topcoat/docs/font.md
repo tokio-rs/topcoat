@@ -78,7 +78,7 @@ Local files work similarly with the asset system: `url(asset!("./fonts/inter-400
 Fontsource support lives behind the `font-fontsource` feature:
 
 ```toml
-topcoat = { version = "0.1.1", features = ["font-fontsource"] }
+topcoat = { version = "0.1.2", features = ["font-fontsource"] }
 ```
 
 Then specify which font from the [`families`] module you would like to use. By default, this will include every weight and style the font ships, only in its default character subset, loaded by the browser from the [jsDelivr] CDN:

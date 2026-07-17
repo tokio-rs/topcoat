@@ -7,7 +7,7 @@ Everything below is re-exported from `topcoat::htmx` and gated behind the `htmx`
 ```toml
 # Cargo.toml
 [dependencies]
-topcoat = { version = "0.1.1", features = ["htmx"] }
+topcoat = { version = "0.1.2", features = ["htmx"] }
 ```
 
 # Loading the htmx script
