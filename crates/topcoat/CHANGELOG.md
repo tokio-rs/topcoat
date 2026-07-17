@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/tokio-rs/topcoat/compare/topcoat-v0.1.2...topcoat-v0.1.3) - 2026-07-17
+
+### Other
+
+- add reactivity guide ([#123](https://github.com/tokio-rs/topcoat/pull/123))
+- fullstack -> full-stack ([#122](https://github.com/tokio-rs/topcoat/pull/122))
+- readme client reactivity section
+- readme client reactivity section
+- client reactivity in readme
+- readme client reactivity section
+- improve view macro example
+
 ## [0.1.2](https://github.com/tokio-rs/topcoat/compare/topcoat-v0.1.1...topcoat-v0.1.2) - 2026-07-17
 
 ### Added
