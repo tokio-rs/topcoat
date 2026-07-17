@@ -39,6 +39,13 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 - [`crates/topcoat-view/macro/docs/attributes.md`](crates/topcoat-view/macro/docs/attributes.md): The `attributes!` macro and the runtime `Attributes` value for building/forwarding attribute collections.
 - [`crates/topcoat-view/macro/docs/class.md`](crates/topcoat-view/macro/docs/class.md): The `class!` macro: assembling a space-separated class list from static and conditional entries.
 
+### Client reactivity
+
+- [`crates/topcoat/docs/runtime.md`](crates/topcoat/docs/runtime.md): The runtime guide: signals, runtime expressions, `@` event handlers, `:` bind attributes, and how procedures and shards fit in.
+- [`crates/topcoat-runtime/macro/docs/expr.md`](crates/topcoat-runtime/macro/docs/expr.md): The `expr!` macro: the dual Rust/JavaScript expression language, its shared vocabulary, captured variables, and `raw!`.
+- [`crates/topcoat-runtime/macro/docs/procedure.md`](crates/topcoat-runtime/macro/docs/procedure.md): The `#[procedure]` macro: async server functions callable from runtime expressions.
+- [`crates/topcoat-runtime/macro/docs/shard.md`](crates/topcoat-runtime/macro/docs/shard.md): The `#[shard]` macro: components that re-render on the server when their runtime expression arguments change.
+
 ### Request context and state
 
 - [`crates/topcoat/docs/context.md`](crates/topcoat/docs/context.md): The request context `Cx`: router request helpers, path/query helpers, state accessors, and request body parsing.

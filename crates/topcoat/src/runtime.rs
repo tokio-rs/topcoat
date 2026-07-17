@@ -1,3 +1,5 @@
+#![doc = include_str!("../docs/runtime.md")]
+
 pub use topcoat_runtime::*;
 pub use topcoat_runtime_macro::*;
 
