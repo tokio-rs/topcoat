@@ -4,10 +4,6 @@
 
 <div align="center">
   <h3>A modular, batteries-included Rust web framework for server-rendered apps</h3>
-  <a href="https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md">Get started</a> •
-  <a href="https://docs.rs/topcoat">Docs</a> •
-  <a href="https://crates.io/crates/topcoat">Crates.io</a> •
-  <a href="https://discord.gg/tokio">Discord</a>
 </div>
 
 <br/>
@@ -15,6 +11,7 @@
 <div align="center">
 
 [![Crates.io][crates-badge]][crates-url]
+[![Docs.rs][docs-badge]][docs-url]
 [![MIT licensed][mit-badge]][mit-url]
 [![Build Status][actions-badge]][actions-url]
 [![Discord chat][discord-badge]][discord-url]
@@ -32,7 +29,7 @@
 
 > Early-stage and experimental. Expect breaking changes.
 
-Topcoat makes building web apps in Rust simple and productive, giving you a complete framework instead of a stack of crates to assemble yourself.
+Topcoat makes building web apps in Rust simple and productive, giving you a complete framework instead of a stack of crates to assemble yourself. See the [Getting started guide](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md) to set up a new project.
 
 ```rust,ignore
 use topcoat::{
