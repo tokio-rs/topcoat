@@ -1,6 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
+#[doc = include_str!("../docs/expr.md")]
 #[proc_macro]
 pub fn expr(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse_macro_input!(tokens as topcoat_runtime_grammar::expr::Expr);

@@ -2925,6 +2925,7 @@ version = "0.1.2"
 dependencies = [
  "quote",
  "syn",
+ "topcoat",
  "topcoat-runtime-grammar",
 ]
 

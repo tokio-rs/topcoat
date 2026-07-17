@@ -24,5 +24,8 @@ topcoat-runtime-grammar.workspace = true
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
+[dev-dependencies]
+topcoat = { workspace = true, features = ["runtime", "view"] }
+
 [lints]
 workspace = true
