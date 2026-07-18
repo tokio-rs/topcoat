@@ -2,6 +2,8 @@ import type { AttributeValueViewParts, NodeViewParts } from "../view";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
 
+const TEXT_ENCODER = new TextEncoder();
+
 export class Str implements AttributeValueViewParts, NodeViewParts {
 	constructor(protected readonly v: string) {}
 
@@ -38,7 +40,7 @@ export class Str implements AttributeValueViewParts, NodeViewParts {
 	}
 
 	len(): F64 {
-		return new F64(this.v.length);
+		return new F64(TEXT_ENCODER.encode(this.v).length);
 	}
 
 	trim(): Str {

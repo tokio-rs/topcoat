@@ -3,7 +3,8 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"build": "tsup && tsc"
+		"build": "tsup && tsc",
+		"test": "tsup test/string.test.ts --format esm --platform node --target es2022 --out-dir ../../../target/topcoat-runtime-browser-test --clean && node ../../../target/topcoat-runtime-browser-test/string.test.js"
 	},
 	"dependencies": {
 		"@maverick-js/signals": "^6.0.0"

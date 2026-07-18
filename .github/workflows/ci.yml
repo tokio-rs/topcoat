@@ -21,6 +21,25 @@ env:
   RUSTDOCFLAGS: -Dwarnings
 
 jobs:
+  browser:
+    name: browser
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/topcoat-runtime/browser
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: crates/topcoat-runtime/browser/yarn.lock
+      - run: corepack enable
+      - run: yarn install --frozen-lockfile
+      - run: yarn build
+      - run: git diff --exit-code -- dist/index.js
+      - run: yarn test
+
   test:
     name: test
     runs-on: ubuntu-latest
