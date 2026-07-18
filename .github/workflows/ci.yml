@@ -52,9 +52,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: rustup update stable && rustup default stable
+      - run: rustup update nightly && rustup default nightly
       - uses: Swatinem/rust-cache@v2
       - run: cargo doc --workspace --all-features --no-deps --locked
+        env:
+          RUSTFLAGS: --cfg docsrs
+          RUSTDOCFLAGS: --cfg docsrs
 
   features:
     name: features
