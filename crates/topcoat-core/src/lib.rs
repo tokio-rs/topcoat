@@ -1,5 +1,8 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 pub mod abort;
 #[cfg(feature = "build")]
+#[cfg_attr(docsrs, doc(cfg(feature = "build")))]
 pub mod cache;
 pub mod context;
 pub mod cursor;

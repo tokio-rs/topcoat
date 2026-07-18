@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 mod jar;
 mod macros;
 mod map;
@@ -13,6 +15,7 @@ pub use map::*;
 pub use prefix::*;
 pub use private::*;
 #[cfg(feature = "router")]
+#[cfg_attr(docsrs, doc(cfg(feature = "router")))]
 pub use router::*;
 pub use signed::*;
 pub use store::*;

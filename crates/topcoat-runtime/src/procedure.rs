@@ -147,6 +147,7 @@ pub trait RouterBuilderProcedureExt {
 
     /// Registers every procedure linked into the binary.
     #[cfg(feature = "discover")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "discover")))]
     #[must_use]
     fn discover_procedures(self) -> Self;
 }

@@ -84,6 +84,7 @@ pub trait RouterBuilderFontExt {
     fn font(self, font: Font) -> Self;
 
     #[cfg(feature = "discover")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "discover")))]
     #[must_use]
     fn discover_fonts(self) -> Self;
 }

@@ -170,6 +170,7 @@ impl RouterBuilder {
     /// Registers every route annotated with `#[route]` and collected at link
     /// time.
     #[cfg(feature = "discover")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "discover")))]
     #[must_use]
     pub fn discover_routes(mut self) -> Self {
         for route in inventory::iter::<crate::RouteFn>().cloned() {
@@ -190,6 +191,7 @@ impl RouterBuilder {
     /// Registers every [`PageFn`] annotated with `#[page]` and collected at
     /// link time.
     #[cfg(feature = "discover")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "discover")))]
     #[must_use]
     pub fn discover_pages(mut self) -> Self {
         for page in inventory::iter::<PageFn>().cloned() {
@@ -261,6 +263,7 @@ impl RouterBuilder {
     ///
     /// Panics if two discovered layers share the same path.
     #[cfg(feature = "discover")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "discover")))]
     #[must_use]
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::<crate::PathBuf>::new();

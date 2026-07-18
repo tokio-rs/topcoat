@@ -34,6 +34,7 @@ impl Config {
 /// Builds the all-defaults configuration, like [`Config::builder`] with an
 /// immediate [`build`](ConfigBuilder::build).
 #[cfg(feature = "cookie")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cookie")))]
 impl Default for Config {
     fn default() -> Self {
         Self::builder().build()
@@ -77,6 +78,7 @@ impl ConfigBuilder {
     /// the full serialized origin: scheme, host, and any non-default port
     /// (`"https://accounts.example.com"`), with no trailing slash.
     #[cfg(feature = "router")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "router")))]
     #[must_use]
     pub fn trust_origin(mut self, origin: impl Into<String>) -> Self {
         self.trusted_origins.push(origin.into());
@@ -90,6 +92,7 @@ impl ConfigBuilder {
     /// requests; only disable it if the application enforces its own defense
     /// against cross-site request forgery.
     #[cfg(feature = "router")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "router")))]
     #[must_use]
     pub fn dangerous_disable_origin_verification(mut self) -> Self {
         self.verify_origin = false;

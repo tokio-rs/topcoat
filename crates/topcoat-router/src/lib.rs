@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 mod body;
 mod content;
 mod context;
@@ -36,6 +38,7 @@ pub use router::*;
 pub use serve::*;
 pub use service::*;
 #[cfg(feature = "tower")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tower")))]
 pub use tower::*;
 
 pub use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};

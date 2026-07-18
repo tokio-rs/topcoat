@@ -34,6 +34,7 @@ pub(crate) fn token_store(cx: &Cx) -> &dyn TokenStore {
 }
 
 #[cfg(feature = "cookie")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cookie")))]
 pub mod cookie {
     use std::{borrow::Cow, time::Duration};
 

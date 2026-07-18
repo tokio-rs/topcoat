@@ -4,12 +4,14 @@ pub use topcoat_router::*;
 pub use topcoat_router_macro::*;
 
 #[cfg(feature = "discover")]
+#[cfg_attr(docsrs, doc(cfg(feature = "discover")))]
 pub trait RouterBuilderDiscoverExt {
     #[must_use]
     fn discover(self) -> Self;
 }
 
 #[cfg(feature = "discover")]
+#[cfg_attr(docsrs, doc(cfg(feature = "discover")))]
 impl RouterBuilderDiscoverExt for RouterBuilder {
     fn discover(mut self) -> Self {
         self = self.discover_routes();
@@ -17,11 +19,13 @@ impl RouterBuilderDiscoverExt for RouterBuilder {
         self = self.discover_layouts();
         self = self.discover_layers();
         #[cfg(feature = "font")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "font")))]
         {
             use topcoat_font::RouterBuilderFontExt;
             self = self.discover_fonts();
         }
         #[cfg(feature = "runtime")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
         {
             use topcoat_runtime::{RouterBuilderProcedureExt, RouterBuilderShardExt};
             self = self.discover_procedures();

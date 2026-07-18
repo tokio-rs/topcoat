@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 mod asset;
 mod bundle;
 mod error;
@@ -17,16 +19,21 @@ pub use source::*;
 pub use topcoat_core::cursor::{ConstReader, ConstWriter};
 
 #[cfg(feature = "bundler")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bundler")))]
 mod bundler;
 
 #[cfg(feature = "bundler")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bundler")))]
 pub use bundler::*;
 
 #[cfg(feature = "router")]
+#[cfg_attr(docsrs, doc(cfg(feature = "router")))]
 mod router;
 
 #[cfg(feature = "router")]
+#[cfg_attr(docsrs, doc(cfg(feature = "router")))]
 pub use router::*;
 
 #[cfg(feature = "view")]
+#[cfg_attr(docsrs, doc(cfg(feature = "view")))]
 mod view;

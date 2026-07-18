@@ -18,6 +18,7 @@ pub enum FontSourceUrl {
     Str(String),
     /// A bundled [`Asset`](topcoat_asset::Asset), resolved to its hosted URL.
     #[cfg(feature = "asset")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "asset")))]
     Asset(topcoat_asset::Asset),
 }
 
@@ -70,6 +71,7 @@ impl FontSourceUrl {
     /// [`Asset`]: FontSourceUrl::Asset
     #[must_use]
     #[cfg(feature = "asset")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "asset")))]
     pub fn is_asset(&self) -> bool {
         matches!(self, Self::Asset(..))
     }
@@ -79,6 +81,7 @@ impl FontSourceUrl {
     /// [`Asset`]: FontSourceUrl::Asset
     #[must_use]
     #[cfg(feature = "asset")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "asset")))]
     pub fn as_asset(&self) -> Option<&topcoat_asset::Asset> {
         match self {
             Self::Asset(v) => Some(v),
@@ -113,6 +116,7 @@ impl From<String> for FontSourceUrl {
 }
 
 #[cfg(feature = "asset")]
+#[cfg_attr(docsrs, doc(cfg(feature = "asset")))]
 impl From<topcoat_asset::Asset> for FontSourceUrl {
     fn from(v: topcoat_asset::Asset) -> Self {
         Self::Asset(v)
@@ -120,6 +124,7 @@ impl From<topcoat_asset::Asset> for FontSourceUrl {
 }
 
 #[cfg(feature = "view")]
+#[cfg_attr(docsrs, doc(cfg(feature = "view")))]
 impl topcoat_view::AttributeValueViewParts for FontSourceUrl {
     fn attribute_present(&self) -> bool {
         true

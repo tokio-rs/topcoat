@@ -108,6 +108,7 @@ pub trait RouterBuilderShardExt {
 
     /// Registers every shard linked into the binary.
     #[cfg(feature = "discover")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "discover")))]
     #[must_use]
     fn discover_shards(self) -> Self;
 }

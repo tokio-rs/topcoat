@@ -108,6 +108,7 @@ impl NodeViewParts for &String {
 /// code as text instead, render one of its accessors, such as
 /// [`as_u16`](StatusCode::as_u16).
 #[cfg(feature = "http")]
+#[cfg_attr(docsrs, doc(cfg(feature = "http")))]
 impl NodeViewParts for StatusCode {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
@@ -122,6 +123,7 @@ impl NodeViewParts for StatusCode {
 /// nested content to override the entries the content declares, or after it
 /// to provide fallbacks.
 #[cfg(feature = "http")]
+#[cfg_attr(docsrs, doc(cfg(feature = "http")))]
 impl NodeViewParts for HeaderMap {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
@@ -133,6 +135,7 @@ impl NodeViewParts for HeaderMap {
 ///
 /// Equivalent to a [`HeaderMap`] holding just this entry.
 #[cfg(feature = "http")]
+#[cfg_attr(docsrs, doc(cfg(feature = "http")))]
 impl NodeViewParts for (HeaderName, HeaderValue) {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         let (name, value) = self;
