@@ -15,14 +15,12 @@ mod format;
 pub mod internal;
 mod resolver;
 #[cfg(feature = "router")]
-#[cfg_attr(docsrs, doc(cfg(feature = "router")))]
 mod router;
 mod source;
 mod style;
 mod tech;
 mod unicode;
 #[cfg(feature = "view")]
-#[cfg_attr(docsrs, doc(cfg(feature = "view")))]
 mod view;
 mod weight;
 

@@ -19,7 +19,6 @@ pub use source::*;
 pub use topcoat_core::cursor::{ConstReader, ConstWriter};
 
 #[cfg(feature = "bundler")]
-#[cfg_attr(docsrs, doc(cfg(feature = "bundler")))]
 mod bundler;
 
 #[cfg(feature = "bundler")]
@@ -27,7 +26,6 @@ mod bundler;
 pub use bundler::*;
 
 #[cfg(feature = "router")]
-#[cfg_attr(docsrs, doc(cfg(feature = "router")))]
 mod router;
 
 #[cfg(feature = "router")]
@@ -35,5 +33,4 @@ mod router;
 pub use router::*;
 
 #[cfg(feature = "view")]
-#[cfg_attr(docsrs, doc(cfg(feature = "view")))]
 mod view;
