@@ -39,6 +39,10 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 - [`crates/topcoat-view/macro/docs/attributes.md`](crates/topcoat-view/macro/docs/attributes.md): The `attributes!` macro and the runtime `Attributes` value for building/forwarding attribute collections.
 - [`crates/topcoat-view/macro/docs/class.md`](crates/topcoat-view/macro/docs/class.md): The `class!` macro: assembling a space-separated class list from static and conditional entries.
 
+### UI components
+
+- [`crates/topcoat/docs/ui.md`](crates/topcoat/docs/ui.md): The `topcoat ui` workflow: initializing a package with a theme, adding, updating, and removing vendored components, and writing custom registries.
+
 ### Client reactivity
 
 - [`crates/topcoat/docs/runtime.md`](crates/topcoat/docs/runtime.md): The runtime guide: signals, runtime expressions, `@` event handlers, `:` bind attributes, and how procedures and shards fit in.

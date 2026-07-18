@@ -207,3 +207,6 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 **Third-party integrations**
 - [Tailwind](https://docs.rs/topcoat/latest/topcoat/tailwind/index.html): Tailwind CSS without Node, wired into the asset pipeline.
 - [htmx](https://docs.rs/topcoat/latest/topcoat/htmx/index.html): drive partial HTML swaps from the server with request/response header helpers.
+
+**UI components**
+- [Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/ui.md): premade, themeable components vendored into your project with `topcoat ui add`.
