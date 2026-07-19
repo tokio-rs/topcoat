@@ -29,7 +29,7 @@
 
 Topcoat is a modular, batteries-included Rust framework for building fullstack apps. It prioritizes simplicity and productivity. See [Learn Topcoat](#learn-topcoat) to get started, or the [Roadmap](#roadmap) for what's coming next.
 
-> Early-stage and experimental. Expect breaking changes.
+**Early-stage and experimental. Expect breaking changes.**
 
 ```rust,ignore
 use topcoat::{
