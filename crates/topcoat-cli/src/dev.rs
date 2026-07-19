@@ -5,15 +5,17 @@
 //!
 //! - [`broadcast_server`]: a long-lived local WebSocket server that browsers connect to; it
 //!   broadcasts a reload message whenever a freshly started application reports ready.
-//! - [`watch`]: watches the workspace's source directories and coalesces bursts of filesystem
-//!   events into single change notifications.
+//! - [`watch`]: watches every local package -- workspace members and path dependencies alike --
+//!   and coalesces bursts of filesystem events into single change notifications.
 //! - [`keyboard`]: reports the `r` keypress that triggers a manual rebuild.
 //! - [`build`]: compiles the application and bundles its assets in a cancellable background task.
 //! - [`app_server`]: the application process itself.
 //!
 //! The loop's core policy is that the running application is only ever
 //! replaced by a *successful* build: while a rebuild is in flight, and after
-//! a failed one, the previous process keeps serving.
+//! a failed one, the previous process keeps serving. A successful build that
+//! produced the very same binary also leaves the running process (and its
+//! browsers) undisturbed, unless the rebuild was requested manually.
 
 mod app_server;
 mod broadcast_server;
@@ -32,9 +34,9 @@ use broadcast_server::{Event, EventBus};
 use build::{BuildKind, BuildTask};
 use keyboard::Keyboard;
 use spinner::Spinner;
-use watch::SourceWatcher;
+use watch::{Change, SourceWatcher};
 
-use crate::cargo::{BuildFlags, BuildOpts};
+use crate::cargo::{BuildFlags, BuildOpts, BuildStamp};
 
 #[derive(Args)]
 pub struct DevCommand {
@@ -80,6 +82,13 @@ impl DevCommand {
 
         let mut build: Option<BuildTask> = Some(BuildTask::spawn(BuildKind::Initial, opts.clone()));
         let mut server: Option<AppServer> = None;
+        // The stamp of the executable the running server was started from,
+        // used to skip the restart when a rebuild changed nothing.
+        let mut last_build: Option<BuildStamp> = None;
+        // Set when the pending rebuild was requested with the `r` key: a
+        // manual reload restarts the application even when the binary comes
+        // out unchanged.
+        let mut force_restart = false;
         events.publish(Event::Rebuilding);
 
         loop {
@@ -104,12 +113,27 @@ impl DevCommand {
                 exe = async { build.as_mut().unwrap().finished().await }, if build.is_some() => {
                     build = None;
                     if let Some(exe) = exe {
-                        // The new process binds the same address as the old
-                        // one, so the old one must be stopped first.
-                        if let Some(old) = server.take() {
-                            old.shutdown().await;
+                        let stamp = BuildStamp::of(&exe);
+                        if !std::mem::take(&mut force_restart)
+                            && server.is_some()
+                            && stamp.is_some()
+                            && stamp == last_build
+                        {
+                            // Cargo found nothing to relink: the binary that
+                            // is already running. Leave the process and its
+                            // browsers undisturbed.
+                            events.publish(Event::UpToDate);
+                            eprintln!("  {}", style("no changes; application up to date").dim());
+                            eprintln!();
+                        } else {
+                            last_build = stamp;
+                            // The new process binds the same address as the
+                            // old one, so the old one must be stopped first.
+                            if let Some(old) = server.take() {
+                                old.shutdown().await;
+                            }
+                            server = start_app(&exe, &dev_url, &events);
                         }
-                        server = start_app(&exe, &dev_url, &events);
                     } else {
                         // The failure is already on the terminal; keep the
                         // previous process serving while the user fixes it.
@@ -130,14 +154,21 @@ impl DevCommand {
                     report_waiting(false);
                 }
 
-                () = watcher.changed() => {
+                change = watcher.changed() => {
+                    // A manifest change can add or remove local packages, so
+                    // the watched directories are re-derived before building.
+                    if change == Change::Manifest {
+                        watcher = SourceWatcher::start().await;
+                    }
                     rebuild(&mut build, &opts, &events).await;
                 }
 
                 () = keyboard.reload_requested() => {
-                    // A manual reload is handled exactly like a file change:
-                    // the running application keeps serving until the fresh
-                    // build is ready.
+                    // A manual reload is handled like a file change (the
+                    // running application keeps serving until the fresh
+                    // build is ready), but always restarts the application:
+                    // the point of pressing `r` is a fresh process.
+                    force_restart = true;
                     rebuild(&mut build, &opts, &events).await;
                 }
             }

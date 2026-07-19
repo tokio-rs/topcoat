@@ -1,7 +1,8 @@
 use std::fmt;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::time::SystemTime;
 
 use clap::Args;
 use console::style;
@@ -11,8 +12,20 @@ use tokio::process::Command;
 /// Run `cargo metadata --no-deps` for the current workspace and parse its
 /// output. Returns `None` when cargo cannot be spawned or reports an error.
 pub async fn metadata() -> Option<serde_json::Value> {
+    run_metadata(&["--no-deps"]).await
+}
+
+/// Run `cargo metadata` with the dependency graph resolved, so the output
+/// also lists path dependencies living outside the workspace. Returns `None`
+/// when cargo cannot be spawned or reports an error.
+pub async fn full_metadata() -> Option<serde_json::Value> {
+    run_metadata(&[]).await
+}
+
+async fn run_metadata(extra_args: &[&str]) -> Option<serde_json::Value> {
     let output = Command::new("cargo")
-        .args(["metadata", "--no-deps", "--format-version=1"])
+        .args(["metadata", "--format-version=1"])
+        .args(extra_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
@@ -254,6 +267,29 @@ pub async fn build_and_read(
     let path = build(opts, on_progress).await?;
     let bytes = std::fs::read(&path).map_err(BuildError::Read)?;
     Ok((path, bytes))
+}
+
+/// Identity of a built executable: enough to tell whether a rebuild actually
+/// produced a new binary. Cargo leaves the executable untouched when nothing
+/// needed relinking, so an unchanged stamp means an unchanged application.
+#[derive(PartialEq)]
+pub struct BuildStamp {
+    path: PathBuf,
+    modified: SystemTime,
+    len: u64,
+}
+
+impl BuildStamp {
+    /// Read the stamp of the executable at `path`, or `None` when it cannot
+    /// be inspected.
+    pub fn of(path: &Path) -> Option<Self> {
+        let metadata = std::fs::metadata(path).ok()?;
+        Some(Self {
+            path: path.to_path_buf(),
+            modified: metadata.modified().ok()?,
+            len: metadata.len(),
+        })
+    }
 }
 
 fn scan_last_progress(bytes: &[u8]) -> Option<(u64, u64)> {

@@ -193,6 +193,8 @@
     "rebuilding": () => showStatus("rebuilding", false),
     "build-failed": () => showStatus("build failed", true),
     "app-exited": () => showStatus("app exited", true),
+    // The rebuild produced the same binary; the page is already current.
+    "up-to-date": hideStatus,
   };
 
   function connect() {

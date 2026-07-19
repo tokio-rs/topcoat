@@ -32,6 +32,9 @@ pub enum Event {
     AppExited,
     /// A fresh build is serving; pages should reload.
     Reload,
+    /// A rebuild finished without producing a new binary; the running
+    /// application is still current.
+    UpToDate,
 }
 
 impl Event {
@@ -42,6 +45,7 @@ impl Event {
             Self::BuildFailed => "build-failed",
             Self::AppExited => "app-exited",
             Self::Reload => "reload",
+            Self::UpToDate => "up-to-date",
         }
     }
 }
@@ -67,11 +71,11 @@ impl EventBus {
 
     /// Send `event` to every connected browser.
     pub fn publish(&self, event: Event) {
-        // A reload means a fresh build is serving: nothing to report.
-        *self.status.lock().unwrap() = if matches!(event, Event::Reload) {
-            None
-        } else {
-            Some(event)
+        // A reload or an unchanged rebuild means the serving build is
+        // current: nothing to report.
+        *self.status.lock().unwrap() = match event {
+            Event::Reload | Event::UpToDate => None,
+            event => Some(event),
         };
         let _ = self.tx.send(event);
     }
