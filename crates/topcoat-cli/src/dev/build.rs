@@ -93,7 +93,13 @@ async fn build(kind: BuildKind, opts: BuildOpts) -> Option<PathBuf> {
     };
 
     let spinner = Spinner::new("bundling assets");
-    let bundled = crate::asset::run_bundle(&bytes, None).await;
+    let progress = spinner.bar();
+    let bundled = crate::asset::run_bundle(&bytes, None, move |event| {
+        if let topcoat_asset::FetchEvent::Downloaded { uri, .. } = event {
+            progress.set_message(format!("bundling assets ({uri})"));
+        }
+    })
+    .await;
     drop(spinner);
 
     if let Err(error) = bundled {

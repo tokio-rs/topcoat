@@ -21,7 +21,7 @@ mod app_server;
 mod broadcast_server;
 mod build;
 mod keyboard;
-mod spinner;
+pub(crate) mod spinner;
 mod watch;
 
 use std::path::Path;

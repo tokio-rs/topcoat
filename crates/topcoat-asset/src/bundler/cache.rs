@@ -15,14 +15,17 @@ impl Cache {
         Self { dir, agent }
     }
 
-    /// Return the local path of `uri`'s cached contents, downloading first if needed.
-    ///
-    /// Performs a blocking HTTP request when the asset isn't already cached.
-    pub fn fetch(&self, uri: &Uri) -> Result<PathBuf, BundleError> {
+    /// Return the local path of `uri`'s cached contents, if present.
+    pub fn lookup(&self, uri: &Uri) -> Option<PathBuf> {
         let path = self.cached_path(uri);
-        if path.exists() {
-            return Ok(path);
-        }
+        path.exists().then_some(path)
+    }
+
+    /// Download `uri` into the cache and return the local path of its contents.
+    ///
+    /// Performs a blocking HTTP request.
+    pub fn download(&self, uri: &Uri) -> Result<PathBuf, BundleError> {
+        let path = self.cached_path(uri);
 
         fs::create_dir_all(&self.dir).map_err(|source| BundleError::CacheIo {
             path: self.dir.clone(),
@@ -41,8 +44,9 @@ impl Cache {
         let mut reader = body.as_reader();
 
         // Stream to a sibling tempfile then rename so a partial download can't be mistaken for a
-        // hit.
-        let tmp = path.with_extension("download");
+        // hit. The tempfile name includes the process id so another bundler process downloading
+        // the same URI can't interleave writes with ours; whichever renames last wins atomically.
+        let tmp = path.with_extension(format!("download.{}", std::process::id()));
         let mut file = fs::File::create(&tmp).map_err(|source| BundleError::CacheIo {
             path: tmp.clone(),
             source,
