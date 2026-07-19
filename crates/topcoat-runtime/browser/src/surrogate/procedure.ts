@@ -15,9 +15,11 @@ export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify(
-						args.map((arg) =>
-							(arg as { dehydrate: () => unknown }).dehydrate(),
-						),
+						args.length === 0
+							? null
+							: args.map((arg) =>
+									(arg as { dehydrate: () => unknown }).dehydrate(),
+								),
 					),
 				},
 			);

@@ -20,16 +20,15 @@ export * from "./result";
 export * from "./signal";
 
 export type DehydratedSurrogate =
+	| null
 	| boolean
 	| number
 	| { t: "i32"; v: number }
 	| { t: "str"; v: string }
 	| string
 	| { t: "Option"; v: DehydratedSurrogate | null }
-	| {
-			t: "Result";
-			v: { ok: DehydratedSurrogate } | { err: DehydratedSurrogate };
-	  }
+	| { t: "Result"; ok: DehydratedSurrogate }
+	| { t: "Result"; err: DehydratedSurrogate }
 	| { t: "Signal"; id: SignalId; v?: DehydratedSurrogate }
 	| { t: "Procedure"; id: string };
 
@@ -37,6 +36,8 @@ export function hydrateSurrogate(
 	value: DehydratedSurrogate,
 	cx: Context,
 ): unknown {
+	if (value === null) return undefined;
+
 	switch (typeof value) {
 		case "string":
 			return new String(value);
@@ -58,9 +59,9 @@ export function hydrateSurrogate(
 						? Option.none()
 						: Option.some(hydrateSurrogate(value.v, cx));
 				case "Result":
-					return "ok" in value.v
-						? Result.from_ok(hydrateSurrogate(value.v.ok, cx))
-						: Result.from_err(hydrateSurrogate(value.v.err, cx));
+					return "ok" in value
+						? Result.from_ok(hydrateSurrogate(value.ok, cx))
+						: Result.from_err(hydrateSurrogate(value.err, cx));
 				case "Signal":
 					return new RuntimeWriteSignal(
 						value.id,
