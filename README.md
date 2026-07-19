@@ -27,9 +27,9 @@
 [discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
 [discord-url]: https://discord.gg/tokio
 
-Topcoat is a modular, batteries-included Rust framework for building fullstack apps. It prioritizes simplicity and productivity. See the [Getting started guide](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md) to set up a new project.
+Topcoat is a modular, batteries-included Rust framework for building fullstack apps. It prioritizes simplicity and productivity. See [Learn Topcoat](#learn-topcoat) to get started, or the [Roadmap](#roadmap) for what's coming next.
 
-> Early-stage and experimental. Expect breaking changes.
+**Early-stage and experimental. Expect breaking changes.**
 
 ```rust,ignore
 use topcoat::{
@@ -148,6 +148,31 @@ src/
         `-- health.rs   -> GET /api/health
 ```
 
+### Premade components you can edit
+
+Topcoat UI is a component library based on [Tailwind](https://tailwindcss.com/) inspired by [shadcn/ui](https://ui.shadcn.com/). Components are copied into your project via the `topcoat ui` CLI command, meaning you can freely change their design and functionality to fit your use case:
+
+```rust,ignore
+#[component]
+async fn delete_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Delete workspace")
+                card_description(
+                    "This permanently removes the workspace and all of its data."
+                )
+            )
+            card_footer(
+                attrs: attributes! { class="justify-end" },
+                button(variant: ButtonVariant::Ghost, "Cancel")
+                button(variant: ButtonVariant::Destructive, "Delete workspace")
+            )
+        )
+    }
+}
+```
+
 ### Asset bundling
 
 The bundler scans your compiled binary for `asset!` calls, copies (or even downloads) every file into a local asset directory, and allows Topcoat to serve them efficiently with aggressive browser caching.
@@ -163,7 +188,7 @@ Topcoat also ships with utilities for web fonts and icons, as well as easy integ
 
 ### Built-in Tailwind support
 
-Enabled the `tailwind` feature to integrate Tailwind into your project effortlessly:
+Enabled the `tailwind` feature to integrate [Tailwind](https://tailwindcss.com/) into your project effortlessly:
 
 ```rust,ignore
 view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
@@ -204,9 +229,33 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [Procedures](https://docs.rs/topcoat/latest/topcoat/runtime/attr.procedure.html): async server functions callable from the browser.
 - [Shards](https://docs.rs/topcoat/latest/topcoat/runtime/attr.shard.html): components that re-render on the server when their arguments change.
 
+**UI components**
+- [Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/ui.md): premade components vendored into your project for you to edit.
+
 **Third-party integrations**
 - [Tailwind](https://docs.rs/topcoat/latest/topcoat/tailwind/index.html): Tailwind CSS without Node, wired into the asset pipeline.
 - [htmx](https://docs.rs/topcoat/latest/topcoat/htmx/index.html): drive partial HTML swaps from the server with request/response header helpers.
 
-**UI components**
-- [Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/ui.md): premade, themeable components vendored into your project with `topcoat ui add`.
+## Roadmap
+
+Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](https://github.com/tokio-rs/topcoat/issues).
+
+- [ ] `topcoat new` CLI command to bootstrap pre-configured projects
+- [ ] Static export
+- [ ] (More) reactivity (`topcoat-runtime`)
+- [ ] More Topcoat UI components, full "blocks" e.g. sign-in form
+- [ ] Emailing
+- [ ] Better [Toasty](https://github.com/tokio-rs/toasty) integration (safely create/update records from forms without listing out all the fields)
+- [ ] Validations
+- [ ] `OpenAPI` endpoints
+- [ ] Docs for how to deploy Topcoat
+- [ ] Pre-rendering for static pages
+- [ ] Streaming SSR / Suspense
+- [ ] Client-side navigation + prefetching
+- [ ] `WebSockets`
+- [ ] Server-sent events
+- [ ] Image optimization / resizing
+- [ ] Easier-to-use middlewares like rate-limiting, compression, etc.
+- [ ] Authentication
+- [ ] Background jobs
+- [ ] Islands
