@@ -8,7 +8,7 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-leptos = { version = "0.8" }
+leptos = { version = "0.8", features = ["islands"] }
 leptos_meta = { version = "0.8" }
 leptos_router = { version = "0.8" }
 leptos_axum = { version = "0.8", optional = true }

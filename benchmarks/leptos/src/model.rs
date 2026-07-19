@@ -1,6 +1,7 @@
-//! Serializable DTOs shared between the server renderer and the hydrating
-//! client. Pages receive these from server functions, so all rendering inputs
-//! serialize into the document and hydration reproduces the exact markup.
+//! DTOs returned by the `#[server]` functions the pages call. The `Serialize`
+//! and `Deserialize` derives satisfy the server-function transport. In islands
+//! mode the page shell renders entirely on the server and is never hydrated, so
+//! these values are not embedded in the document.
 
 use serde::{Deserialize, Serialize};
 
