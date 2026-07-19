@@ -96,11 +96,11 @@ impl WriteView for Component {
             ExprKind::View,
             quote_spanned! {self.paren_token.span.span()=>
                 {
-                    // The marker is built via `Default` so the same construction
-                    // works for both unit-struct and generic (`PhantomData`) markers.
-                    #![allow(clippy::default_constructed_unit_structs)]
                     use #topcoat_view::Component;
                     let props = #name::props_builder()#(#setters)*#child.build();
+                    // The marker is built via `Default` so the same construction
+                    // works for both unit-struct and generic (`PhantomData`) markers.
+                    #[allow(clippy::default_constructed_unit_structs)]
                     Component::render(
                         #name::default(),
                         __cx,

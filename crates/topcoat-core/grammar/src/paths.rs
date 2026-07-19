@@ -28,9 +28,6 @@
 //! }
 //! ```
 
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
-
 use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::TokenStream;
 use quote::ToTokens;
@@ -128,21 +125,18 @@ fn join(base: &str, submodule: &str) -> String {
 /// `extern crate self as topcoat_...;` alias so that this same extern name also
 /// resolves within its own non-doctest builds. See the [module docs](self).
 ///
-/// One `rustc` process compiles one crate, so the answer is fixed for the whole
-/// compilation; it is resolved once per package and cached.
-fn crate_base(package: &'static str) -> Option<String> {
-    static CACHE: OnceLock<Mutex<HashMap<&'static str, Option<String>>>> = OnceLock::new();
-    CACHE
-        .get_or_init(Mutex::default)
-        .lock()
-        .expect("crate path cache is not poisoned")
-        .entry(package)
-        .or_insert_with(|| match crate_name(package) {
-            Ok(FoundCrate::Itself) => Some(format!("::{}", package.replace('-', "_"))),
-            Ok(FoundCrate::Name(name)) => Some(format!("::{name}")),
-            Err(_) => None,
-        })
-        .clone()
+/// The lookup runs on every call rather than being cached per package: under
+/// rust-analyzer, a single long-lived proc-macro server process expands macros
+/// for every crate in the workspace, so the answer depends on which crate's
+/// call site is currently being expanded (`CARGO_MANIFEST_DIR`). `crate_name`
+/// caches the parsed manifest per `CARGO_MANIFEST_DIR` itself, keeping repeated
+/// lookups cheap.
+fn crate_base(package: &str) -> Option<String> {
+    match crate_name(package) {
+        Ok(FoundCrate::Itself) => Some(format!("::{}", package.replace('-', "_"))),
+        Ok(FoundCrate::Name(name)) => Some(format!("::{name}")),
+        Err(_) => None,
+    }
 }
 
 /// `::topcoat::asset`, or `topcoat_asset` standalone.
