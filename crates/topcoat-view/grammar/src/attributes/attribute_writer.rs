@@ -93,7 +93,7 @@ impl AttributeWriter {
                         tokens.to_tokens(&mut output);
                     }
                     Chunk::Local { pat, expr } => {
-                        quote! { let #pat = #expr; }.to_tokens(&mut output)
+                        quote! { let #pat = #expr; }.to_tokens(&mut output);
                     }
                     Chunk::For { pat, expr, body } => {
                         let body = build_parts(&body.chunks);
