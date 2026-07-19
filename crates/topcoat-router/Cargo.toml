@@ -47,12 +47,12 @@ serde.workspace = true
 serde_json.workspace = true
 serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
-tokio = { workspace = true, features = ["net", "rt"] }
+tokio = { workspace = true, features = ["macros", "net", "rt", "sync", "time"] }
 tower = { workspace = true, optional = true, features = ["util"] }
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["router", "tower"] }
-tokio = { workspace = true, features = ["macros", "rt", "time"] }
+tokio = { workspace = true, features = ["io-util", "macros", "rt", "time"] }
 tower = { workspace = true, features = ["buffer", "limit", "timeout", "util"] }
 tower-http = { workspace = true, features = [
 	"compression-gzip",

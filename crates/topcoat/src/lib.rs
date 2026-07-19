@@ -40,7 +40,7 @@ pub mod router;
 pub mod view;
 
 #[cfg(feature = "router")]
-pub use serve::{serve, start};
+pub use serve::{serve, serve_until, start};
 
 #[cfg(feature = "runtime")]
 pub mod runtime;

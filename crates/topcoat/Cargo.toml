@@ -146,7 +146,7 @@ futures-util = { workspace = true, optional = true }
 inventory = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_urlencoded.workspace = true
-tokio = { workspace = true, optional = true, features = ["net"] }
+tokio = { workspace = true, optional = true, features = ["macros", "net", "signal"] }
 tokio-tungstenite = { workspace = true, optional = true }
 
 [dev-dependencies]
