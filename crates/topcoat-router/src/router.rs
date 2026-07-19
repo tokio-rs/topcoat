@@ -41,6 +41,9 @@ pub struct Router {
     /// The values shared by every request, read back via
     /// [`app_context`](topcoat_core::context::app_context).
     app_context: Arc<ContextMap>,
+    /// The compression applied to responses on their way out.
+    #[cfg(feature = "compression")]
+    compression: crate::Compression,
 }
 
 impl Router {
@@ -94,7 +97,18 @@ impl Router {
 
         let next = Next::new(&self.layers, layers, terminal);
         let response = next.run(&mut cx, body).await;
-        respond(&cx, response)
+        let response = respond(&cx, response);
+
+        // Compression runs outside every layer, so layers see uncompressed
+        // bodies. The negotiation reads the request headers as the layers
+        // left them.
+        #[cfg(feature = "compression")]
+        let response = match cx.get::<http::request::Parts>() {
+            Some(parts) => self.compression.compress(&parts.headers, response).await,
+            None => response,
+        };
+
+        response
     }
 }
 
@@ -135,6 +149,8 @@ pub struct RouterBuilder {
     layouts: Vec<LayoutFn>,
     layers: Layers,
     context: ContextMap,
+    #[cfg(feature = "compression")]
+    compression: crate::Compression,
 }
 
 impl RouterBuilder {
@@ -150,6 +166,8 @@ impl RouterBuilder {
             layouts: Vec::new(),
             layers: Layers::default(),
             context,
+            #[cfg(feature = "compression")]
+            compression: crate::Compression::new(),
         }
     }
 
@@ -275,6 +293,28 @@ impl RouterBuilder {
         self
     }
 
+    /// Configures the compression applied to responses.
+    ///
+    /// By default the router compresses each response with the algorithm
+    /// negotiated from the request's `Accept-Encoding` header. Pass
+    /// [`Compression::off`](crate::Compression::off) to disable compression
+    /// (say, behind a reverse proxy that compresses already), or a tuned
+    /// [`Compression`](crate::Compression) value to adjust it.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use topcoat::router::{Compression, Router};
+    ///
+    /// let router = Router::builder().compression(Compression::off()).build();
+    /// ```
+    #[cfg(feature = "compression")]
+    #[must_use]
+    pub fn compression(mut self, compression: crate::Compression) -> Self {
+        self.compression = compression;
+        self
+    }
+
     /// Registers a unique value that is accessible to every request sent to
     /// this router by its type `T`. The top-level
     /// [`app_context`](topcoat_core::context::app_context) function can be used to
@@ -370,6 +410,8 @@ impl RouterBuilder {
             layouts,
             layers,
             context,
+            #[cfg(feature = "compression")]
+            compression,
         } = self;
 
         // Wire each page to the layouts whose path is a prefix of the page's,
@@ -452,6 +494,8 @@ impl RouterBuilder {
             endpoints,
             layers,
             app_context: Arc::new(context),
+            #[cfg(feature = "compression")]
+            compression,
         }
     }
 }

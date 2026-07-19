@@ -11,6 +11,10 @@ categories.workspace = true
 rust-version.workspace = true
 
 [features]
+compression = [
+	"dep:tower",
+	"dep:tower-http",
+]
 discover = [
 	"dep:inventory",
 ]
@@ -49,9 +53,13 @@ serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
 tokio = { workspace = true, features = ["macros", "net", "rt", "sync", "time"] }
 tower = { workspace = true, optional = true, features = ["util"] }
+tower-http = { workspace = true, optional = true, features = [
+	"compression-br",
+	"compression-gzip",
+] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["router", "tower"] }
+topcoat = { workspace = true, features = ["compression", "router", "tower"] }
 tokio = { workspace = true, features = ["io-util", "macros", "rt", "time"] }
 tower = { workspace = true, features = ["buffer", "limit", "timeout", "util"] }
 tower-http = { workspace = true, features = [

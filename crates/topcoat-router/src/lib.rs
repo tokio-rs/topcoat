@@ -1,6 +1,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod body;
+#[cfg(feature = "compression")]
+mod compression;
 mod content;
 mod context;
 mod endpoint;
@@ -21,6 +23,8 @@ mod service;
 mod tower;
 
 pub use body::*;
+#[cfg(feature = "compression")]
+pub use compression::*;
 pub use content::*;
 pub use context::*;
 pub(crate) use endpoint::Endpoint;

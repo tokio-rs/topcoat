@@ -14,6 +14,7 @@ readme = "README.md"
 [features]
 default = [
 	"asset",
+	"compression",
 	"cookie",
 	"font",
 	"icon",
@@ -25,6 +26,7 @@ default = [
 ]
 full = [
 	"asset",
+	"compression",
 	"cookie",
 	"discover",
 	"font",
@@ -46,6 +48,10 @@ asset = [
 	"dep:topcoat-asset",
 	"topcoat-font?/asset",
 	"topcoat-font-macro?/asset",
+]
+compression = [
+	"router",
+	"topcoat-router/compression",
 ]
 cookie = [
 	"dep:topcoat-cookie",
