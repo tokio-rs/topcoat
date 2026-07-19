@@ -129,7 +129,8 @@ cd benchmarks/axum-maud && PORT=8090 ./target/release/storefront-axum-maud
   per-response CPU cost buys a many-times-smaller transfer.
 - **Response sizes intentionally differ.** Topcoat and Axum + Maud ship plain
   HTML with zero JavaScript. Next.js embeds its RSC payload and script tags;
-  Leptos embeds hydration data and the wasm loader. That is each framework's realistic
+  Leptos runs in islands mode, so it ships the wasm loader but no serialized
+  page data. That is each framework's realistic
   production output for this app, and the `bytes/resp` column keeps the
   difference visible. Larger documents cost real time to render and transfer,
   so this is part of the comparison, not noise in it.
@@ -137,8 +138,10 @@ cd benchmarks/axum-maud && PORT=8090 ./target/release/storefront-axum-maud
   `export const dynamic = "force-dynamic"`; the build output lists them as
   dynamic and responses carry `Cache-Control: ... no-store` (asserted by
   `verify_parity.sh`).
-- **Leptos uses `SsrMode::Async`**, so each response is one complete document
-  (comparable to the others), not an out-of-order stream.
+- **Leptos runs in islands mode.** The storefront has no interactive islands,
+  so the page renders entirely on the server and ships no serialized hydration
+  data, only the wasm loader. Routes still use `SsrMode::Async`, so each response
+  is one complete document (comparable to the others), not an out-of-order stream.
 - **Axum + Maud is the hand-written baseline.** It renders the same component
   tree as plain functions returning `maud` compile-time templates, with axum
   doing the routing and query parsing; there is no framework layer on top.
