@@ -70,9 +70,9 @@ impl ViewWriter {
         self.chunks.push(Chunk::Expr { kind, tokens });
     }
 
-    pub fn let_binding(&mut self, pat: &Pat, expr: &Expr) {
+    pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
         self.flush();
-        self.chunks.push(Chunk::Let {
+        self.chunks.push(Chunk::Local {
             pat: pat.clone(),
             expr: Box::new(expr.clone()),
         });
@@ -144,7 +144,7 @@ impl ViewWriter {
                                 let helper = kind.helper();
                                 quote! { #helper(__cx, &mut __parts, #tokens); }
                             }
-                            Chunk::Let { pat, expr } => {
+                            Chunk::Local { pat, expr } => {
                                 quote! { let #pat = #expr; }
                             }
                             Chunk::Statement { tokens } => {
@@ -255,7 +255,7 @@ enum Chunk {
         kind: ExprKind,
         tokens: TokenStream,
     },
-    Let {
+    Local {
         pat: Pat,
         expr: Box<Expr>,
     },
@@ -421,9 +421,9 @@ mod tests {
     }
 
     #[test]
-    fn let_binding_emits_let_statement() {
+    fn local_binding_emits_let_statement() {
         let mut writer = ViewWriter::new();
-        writer.let_binding(&syn::parse_quote!(x), &syn::parse_quote!(value));
+        writer.local_binding(&syn::parse_quote!(x), &syn::parse_quote!(value));
         writer.write_str_unescaped("ok");
         let out = rendered(writer);
         assert!(out.contains("let x = value"));

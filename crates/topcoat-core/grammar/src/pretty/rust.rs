@@ -57,6 +57,16 @@ impl PrettyPrint for syn::Expr {
 
 impl PrettyPrint for syn::Pat {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
+        // A type-ascribed pattern (`x: f64`) only appears in `let` and argument
+        // position, so `matches!` can't wrap it; print the parts directly.
+        if let syn::Pat::Type(pat_type) = self {
+            pat_type.pat.pretty_print(printer);
+            pat_type.colon_token.pretty_print(printer);
+            " ".pretty_print(printer);
+            pat_type.ty.pretty_print(printer);
+            return;
+        }
+
         let source_text = self
             .span()
             .source_text()
@@ -72,16 +82,19 @@ impl PrettyPrint for syn::Pat {
     }
 }
 
-impl PrettyPrint for syn::ExprLet {
+impl PrettyPrint for syn::Local {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
         self.let_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.pat.pretty_print(printer);
-        " ".pretty_print(printer);
-        self.eq_token.pretty_print(printer);
-        " ".pretty_print(printer);
-        self.expr.pretty_print(printer);
+        if let Some(init) = &self.init {
+            " ".pretty_print(printer);
+            init.eq_token.pretty_print(printer);
+            " ".pretty_print(printer);
+            init.expr.pretty_print(printer);
+        }
+        self.semi_token.pretty_print(printer);
     }
 }
 

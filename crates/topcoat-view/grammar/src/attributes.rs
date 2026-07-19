@@ -340,7 +340,7 @@ mod tests {
             "#,
         );
         assert_eq!(attrs.items.len(), 4);
-        assert!(matches!(attrs.items[0], AttributeNode::Let(_)));
+        assert!(matches!(attrs.items[0], AttributeNode::Local(_)));
         assert!(matches!(attrs.items[1], AttributeNode::If(_)));
         assert!(matches!(attrs.items[2], AttributeNode::ForLoop(_)));
         assert!(matches!(attrs.items[3], AttributeNode::Match(_)));
@@ -385,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn generates_static_view_with_let_binding() {
+    fn generates_static_view_with_local_binding() {
         // A `let` introduces no key, so surrounding static keys remain provable.
         assert!(!is_dynamic(r#"let cls = "x"; class=(cls)"#));
     }

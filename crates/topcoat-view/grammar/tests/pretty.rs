@@ -126,9 +126,10 @@ fixture_test!(explicit_cx_multiline);
 fixture_test!(class_macro_short);
 fixture_test!(class_macro_long);
 
-// -- Let bindings ------------------------------------------------------------
+// -- Local bindings ------------------------------------------------------------
 
-fixture_test!(let_binding);
+fixture_test!(local_binding);
+fixture_test!(local_binding_typed);
 
 // -- DOCTYPE -----------------------------------------------------------------
 
