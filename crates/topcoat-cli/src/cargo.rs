@@ -144,24 +144,55 @@ impl BuildError {
     }
 }
 
+/// Whether `key` is stripped from the environment of the inner `cargo build`.
+///
+/// The goal is for the inner build to have the same fingerprint as a plain
+/// `cargo build` the user would run by hand. When the CLI itself runs under
+/// `cargo run`, the outer cargo injects variables (`CARGO`,
+/// `CARGO_MANIFEST_DIR`, `CARGO_PKG_*`, `RUSTUP_TOOLCHAIN`, ...) that a
+/// hand-run build would not see; left in place they shift the rustc/profile
+/// fingerprint hashes and force cache-busting rebuilds. Those injected
+/// variables are stripped by name.
+///
+/// User configuration must survive the sweep: a hand-run build in an
+/// environment with a non-default `CARGO_HOME` (e.g. the official rust Docker
+/// images set `CARGO_HOME=/usr/local/cargo`) or `CARGO_TARGET_DIR`,
+/// `CARGO_NET_*`, `CARGO_REGISTRIES_*`, etc. sees those variables too, so
+/// stripping them would defeat the goal -- losing `CARGO_HOME` in particular
+/// silently sends the inner build to `~/.cargo`, re-downloading the registry
+/// and recompiling every dependency from scratch.
+fn should_strip_env(key: &str) -> bool {
+    // The variables cargo sets for child processes, per "Environment
+    // variables Cargo sets for crates" in the cargo book. `CARGO_HOME` is
+    // also on that list but is deliberately kept: cargo injects it with the
+    // same value a hand-run build resolves, and the inner build needs it to
+    // find the registry cache.
+    matches!(
+        key,
+        "CARGO"
+            | "CARGO_MANIFEST_DIR"
+            | "CARGO_MANIFEST_PATH"
+            | "CARGO_CRATE_NAME"
+            | "CARGO_BIN_NAME"
+            | "CARGO_PRIMARY_PACKAGE"
+            | "CARGO_TARGET_TMPDIR"
+            | "CARGO_MAKEFLAGS"
+            | "RUSTC"
+            | "RUSTC_WRAPPER"
+            | "RUSTC_WORKSPACE_WRAPPER"
+            | "RUSTUP_TOOLCHAIN"
+            | "RUSTFLAGS"
+    ) || key.starts_with("CARGO_PKG_")
+        || key.starts_with("CARGO_BIN_EXE_")
+}
+
 pub async fn build(
     opts: &BuildOpts,
     mut on_progress: impl FnMut(u64, u64) + Send + 'static,
 ) -> Result<PathBuf, BuildError> {
     let mut cmd = Command::new("cargo");
-    // Strip env vars inherited from the outer `cargo run` that invoked us, so
-    // the inner build has the same fingerprint as a plain `cargo build` the
-    // user would run by hand. Otherwise CARGO/RUSTC/RUSTC_WRAPPER/etc. shift
-    // the rustc/profile fingerprint hashes and force cache-busting rebuilds.
     for (k, _) in std::env::vars_os() {
-        let key = k.to_string_lossy();
-        if key.starts_with("CARGO")
-            || key == "RUSTC"
-            || key == "RUSTC_WRAPPER"
-            || key == "RUSTC_WORKSPACE_WRAPPER"
-            || key == "RUSTUP_TOOLCHAIN"
-            || key == "RUSTFLAGS"
-        {
+        if should_strip_env(&k.to_string_lossy()) {
             cmd.env_remove(&k);
         }
     }
@@ -330,4 +361,48 @@ fn scan_last_progress(bytes: &[u8]) -> Option<(u64, u64)> {
         }
     }
     last
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_strip_env;
+
+    #[test]
+    fn strips_cargo_injected_vars() {
+        for key in [
+            "CARGO",
+            "CARGO_MANIFEST_DIR",
+            "CARGO_MANIFEST_PATH",
+            "CARGO_PKG_NAME",
+            "CARGO_PKG_VERSION_MAJOR",
+            "CARGO_BIN_EXE_topcoat",
+            "CARGO_CRATE_NAME",
+            "CARGO_PRIMARY_PACKAGE",
+            "RUSTC",
+            "RUSTC_WRAPPER",
+            "RUSTC_WORKSPACE_WRAPPER",
+            "RUSTUP_TOOLCHAIN",
+            "RUSTFLAGS",
+        ] {
+            assert!(should_strip_env(key), "{key} should be stripped");
+        }
+    }
+
+    #[test]
+    fn keeps_user_configuration() {
+        for key in [
+            "CARGO_HOME",
+            "CARGO_TARGET_DIR",
+            "CARGO_BUILD_JOBS",
+            "CARGO_NET_OFFLINE",
+            "CARGO_REGISTRIES_MY_REGISTRY_TOKEN",
+            "CARGO_TERM_COLOR",
+            "CARGO_INCREMENTAL",
+            "CARGO_PROFILE_RELEASE_LTO",
+            "RUSTUP_HOME",
+            "PATH",
+        ] {
+            assert!(!should_strip_env(key), "{key} should be kept");
+        }
+    }
 }
