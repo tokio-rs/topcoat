@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-macro-v0.2.0...topcoat-view-macro-v0.3.0) - 2026-07-19
+
+### Fixed
+
+- view macro using ExprLet instead of Local ([#142](https://github.com/tokio-rs/topcoat/pull/142))
+
 ## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-macro-v0.1.3...topcoat-view-macro-v0.2.0) - 2026-07-19
 
 ### Other

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-v0.2.0...topcoat-runtime-v0.3.0) - 2026-07-19
+
+### Fixed
+
+- handle procedure wire edge cases ([#139](https://github.com/tokio-rs/topcoat/pull/139))
+
+### Other
+
+- add runtime tests and build diff check ([#141](https://github.com/tokio-rs/topcoat/pull/141))
+
 ## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-v0.1.3...topcoat-runtime-v0.2.0) - 2026-07-19
 
 ### Fixed
