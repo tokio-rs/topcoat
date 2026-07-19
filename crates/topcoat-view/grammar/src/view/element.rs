@@ -89,7 +89,8 @@ impl WriteView for Element {
                 writer.write_str_unescaped("<");
                 match (name_ident.as_ref(), name_expr) {
                     (Some(ident), Some(expr)) => {
-                        writer.let_binding(&syn::parse_quote!(#ident), &syn::parse_quote!(&#expr));
+                        writer
+                            .local_binding(&syn::parse_quote!(#ident), &syn::parse_quote!(&#expr));
                         writer.write_expr(ExprKind::ElementName, quote! { #ident });
                     }
                     _ => opening_tag.name.write(writer),

@@ -207,7 +207,7 @@ async fn match_in_attribute_list_emits_attribute_per_arm() {
 }
 
 #[tokio::test]
-async fn let_binding_introduces_variable_for_following_nodes() {
+async fn local_binding_introduces_variable_for_following_nodes() {
     let cx = &Cx::default();
     let html = r(view! {
         cx =>
@@ -223,7 +223,33 @@ async fn let_binding_introduces_variable_for_following_nodes() {
 }
 
 #[tokio::test]
-async fn let_binding_in_attribute_list_is_in_scope_for_later_attributes() {
+async fn local_binding_initializer_accepts_low_precedence_operators() {
+    let admin = true;
+    let active = false;
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <article>
+            let both = admin && active;
+            let either = admin || active;
+            let ratio: f64 = 1.0 / 2.0;
+            let range = 0..3;
+
+            <p>(both)</p>
+            <p>(either)</p>
+            <p>(ratio)</p>
+            <p>(range.len())</p>
+        </article>
+    });
+
+    assert_eq!(
+        html,
+        "<article><p>false</p><p>true</p><p>0.5</p><p>3</p></article>",
+    );
+}
+
+#[tokio::test]
+async fn local_binding_in_attribute_list_is_in_scope_for_later_attributes() {
     let cx = &Cx::default();
     let html = r(view! {
         cx =>

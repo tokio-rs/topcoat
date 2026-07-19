@@ -1,0 +1,4 @@
+view! {
+    let ratio: f64 = numerator / denominator;
+    <p>(ratio)</p>
+}

@@ -9,7 +9,7 @@ use crate::{
     },
     template::{
         MatchArmBody, TemplateBlock, TemplateBreak, TemplateContinue, TemplateForLoop, TemplateIf,
-        TemplateLet, TemplateMatch,
+        TemplateLocal, TemplateMatch,
     },
     view::{ViewWriter, WriteView},
 };
@@ -22,7 +22,7 @@ pub enum AttributeNode {
     BindAttribute(Box<BindAttribute>),
     EventHandler(EventHandler),
     If(Box<TemplateIf<AttributeNodes>>),
-    Let(TemplateLet),
+    Local(TemplateLocal),
     ForLoop(TemplateForLoop<AttributeNodes>),
     Continue(TemplateContinue),
     Break(TemplateBreak),
@@ -44,7 +44,7 @@ impl WriteView for AttributeNode {
             Self::BindAttribute(inner) => WriteView::write(inner.as_ref(), writer),
             Self::EventHandler(inner) => WriteView::write(inner, writer),
             Self::If(inner) => WriteView::write(inner.as_ref(), writer),
-            Self::Let(inner) => WriteView::write(inner, writer),
+            Self::Local(inner) => WriteView::write(inner, writer),
             Self::ForLoop(inner) => WriteView::write(inner, writer),
             Self::Continue(inner) => WriteView::write(inner, writer),
             Self::Break(inner) => WriteView::write(inner, writer),
@@ -62,7 +62,7 @@ impl WriteAttribute for AttributeNode {
             Self::BindAttribute(inner) => WriteAttribute::write(inner.as_ref(), writer),
             Self::EventHandler(inner) => WriteAttribute::write(inner, writer),
             Self::If(inner) => WriteAttribute::write(inner.as_ref(), writer),
-            Self::Let(inner) => WriteAttribute::write(inner, writer),
+            Self::Local(inner) => WriteAttribute::write(inner, writer),
             Self::ForLoop(inner) => WriteAttribute::write(inner, writer),
             Self::Continue(inner) => WriteAttribute::write(inner, writer),
             Self::Break(inner) => WriteAttribute::write(inner, writer),
@@ -76,8 +76,8 @@ impl Parse for AttributeNode {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let result = if TemplateIf::<AttributeNodes>::peek(input) {
             Self::If(input.parse()?)
-        } else if TemplateLet::peek(input) {
-            Self::Let(input.parse()?)
+        } else if TemplateLocal::peek(input) {
+            Self::Local(input.parse()?)
         } else if TemplateForLoop::<AttributeNodes>::peek(input) {
             Self::ForLoop(input.parse()?)
         } else if TemplateContinue::peek(input) {
@@ -111,7 +111,7 @@ impl ParseOption for AttributeNode {
             || BindAttribute::peek(input)
             || EventHandler::peek(input)
             || TemplateIf::<AttributeNodes>::peek(input)
-            || TemplateLet::peek(input)
+            || TemplateLocal::peek(input)
             || TemplateForLoop::<AttributeNodes>::peek(input)
             || TemplateContinue::peek(input)
             || TemplateBreak::peek(input)
@@ -129,7 +129,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for AttributeNode {
             Self::BindAttribute(inner) => inner.pretty_print(printer),
             Self::EventHandler(inner) => inner.pretty_print(printer),
             Self::If(inner) => inner.pretty_print(printer),
-            Self::Let(inner) => inner.pretty_print(printer),
+            Self::Local(inner) => inner.pretty_print(printer),
             Self::ForLoop(inner) => inner.pretty_print(printer),
             Self::Continue(inner) => inner.pretty_print(printer),
             Self::Break(inner) => inner.pretty_print(printer),
@@ -174,7 +174,7 @@ mod tests {
             parse(r#"if cond { foo="bar" }"#),
             AttributeNode::If(_),
         ));
-        assert!(matches!(parse("let a = 1;"), AttributeNode::Let(_)));
+        assert!(matches!(parse("let a = 1;"), AttributeNode::Local(_)));
         assert!(matches!(
             parse(r#"for x in xs { foo="bar" }"#),
             AttributeNode::ForLoop(_),

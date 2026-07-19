@@ -39,8 +39,8 @@ impl AttributeWriter {
         self.chunks.push(Chunk::Insert { tokens, capacity });
     }
 
-    pub fn let_binding(&mut self, pat: &Pat, expr: &Expr) {
-        self.chunks.push(Chunk::Let {
+    pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
+        self.chunks.push(Chunk::Local {
             pat: pat.clone(),
             expr: Box::new(expr.clone()),
         });
@@ -92,7 +92,9 @@ impl AttributeWriter {
                     Chunk::Insert { tokens, .. } | Chunk::Statement { tokens } => {
                         tokens.to_tokens(&mut output);
                     }
-                    Chunk::Let { pat, expr } => quote! { let #pat = #expr; }.to_tokens(&mut output),
+                    Chunk::Local { pat, expr } => {
+                        quote! { let #pat = #expr; }.to_tokens(&mut output);
+                    }
                     Chunk::For { pat, expr, body } => {
                         let body = build_parts(&body.chunks);
                         quote! {
@@ -154,7 +156,7 @@ pub(super) enum Chunk {
         tokens: TokenStream,
         capacity: usize,
     },
-    Let {
+    Local {
         pat: Pat,
         expr: Box<Expr>,
     },
@@ -185,7 +187,7 @@ impl Chunk {
     fn capacity(&self) -> usize {
         match self {
             Chunk::Insert { capacity, .. } => *capacity,
-            Chunk::Let { .. } | Chunk::Statement { .. } | Chunk::For { .. } => 0,
+            Chunk::Local { .. } | Chunk::Statement { .. } | Chunk::For { .. } => 0,
             Chunk::If {
                 then_branch,
                 else_branch,
@@ -313,7 +315,7 @@ mod tests {
     #[test]
     fn let_and_statement_are_emitted_verbatim() {
         let mut writer = AttributeWriter::new();
-        writer.let_binding(&syn::parse_quote!(x), &syn::parse_quote!(value));
+        writer.local_binding(&syn::parse_quote!(x), &syn::parse_quote!(value));
         writer.statement(quote! { break; });
         let out = rendered(writer);
         assert!(out.contains("let x = value"));

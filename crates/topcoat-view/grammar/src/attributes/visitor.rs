@@ -1,6 +1,6 @@
 use crate::template::{
     TemplateBlock, TemplateBreak, TemplateContinue, TemplateElse, TemplateForLoop, TemplateIf,
-    TemplateLet, TemplateMatch,
+    TemplateLocal, TemplateMatch,
 };
 
 use super::{
@@ -36,8 +36,8 @@ pub trait Visit<'ast> {
         visit_else(self, node);
     }
 
-    fn visit_let(&mut self, node: &'ast TemplateLet) {
-        visit_let(self, node);
+    fn visit_local(&mut self, node: &'ast TemplateLocal) {
+        visit_local(self, node);
     }
 
     fn visit_for_loop(&mut self, node: &'ast TemplateForLoop<AttributeNodes>) {
@@ -68,7 +68,7 @@ pub fn visit_node<'ast>(visit: &mut (impl Visit<'ast> + ?Sized), node: &'ast Att
         AttributeNode::BindAttribute(inner) => visit.visit_bind_attribute(inner),
         AttributeNode::EventHandler(inner) => visit.visit_event_handler(inner),
         AttributeNode::If(inner) => visit.visit_if(inner),
-        AttributeNode::Let(inner) => visit.visit_let(inner),
+        AttributeNode::Local(inner) => visit.visit_local(inner),
         AttributeNode::ForLoop(inner) => visit.visit_for_loop(inner),
         AttributeNode::Continue(inner) => visit.visit_continue(inner),
         AttributeNode::Break(inner) => visit.visit_break(inner),
@@ -115,7 +115,7 @@ pub fn visit_else<'ast>(
     }
 }
 
-pub fn visit_let<'ast>(_visit: &mut (impl Visit<'ast> + ?Sized), _node: &'ast TemplateLet) {}
+pub fn visit_local<'ast>(_visit: &mut (impl Visit<'ast> + ?Sized), _node: &'ast TemplateLocal) {}
 
 pub fn visit_for_loop<'ast>(
     visit: &mut (impl Visit<'ast> + ?Sized),

@@ -9,7 +9,7 @@ use topcoat_core_grammar::ParseOption;
 use crate::{
     template::{
         MatchArmBody, RuntimeExpr, TemplateBlock, TemplateBreak, TemplateContinue, TemplateExpr,
-        TemplateForLoop, TemplateIf, TemplateLet, TemplateMatch,
+        TemplateForLoop, TemplateIf, TemplateLocal, TemplateMatch,
     },
     view::{
         Component, DocumentType, Element, Nodes, ReactiveScope, SignalDeclaration, ViewWriter,
@@ -27,7 +27,7 @@ pub enum Node {
     Expr(TemplateExpr),
     RuntimeExpr(RuntimeExpr),
     If(TemplateIf<Nodes>),
-    Let(TemplateLet),
+    Local(TemplateLocal),
     ForLoop(TemplateForLoop<Nodes>),
     Continue(TemplateContinue),
     Break(TemplateBreak),
@@ -63,7 +63,7 @@ impl WriteView for Node {
             Self::Expr(inner) => inner.write(writer),
             Self::RuntimeExpr(inner) => inner.write(writer),
             Self::If(inner) => inner.write(writer),
-            Self::Let(inner) => inner.write(writer),
+            Self::Local(inner) => inner.write(writer),
             Self::ForLoop(inner) => inner.write(writer),
             Self::Continue(inner) => inner.write(writer),
             Self::Break(inner) => inner.write(writer),
@@ -89,8 +89,8 @@ impl Parse for Node {
             Self::RuntimeExpr(input.parse()?)
         } else if TemplateIf::<Nodes>::peek(input) {
             Self::If(input.parse()?)
-        } else if TemplateLet::peek(input) {
-            Self::Let(input.parse()?)
+        } else if TemplateLocal::peek(input) {
+            Self::Local(input.parse()?)
         } else if TemplateForLoop::<Nodes>::peek(input) {
             Self::ForLoop(input.parse()?)
         } else if TemplateContinue::peek(input) {
@@ -136,7 +136,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Node {
             Self::Expr(inner) => inner.pretty_print(printer),
             Self::RuntimeExpr(inner) => inner.pretty_print(printer),
             Self::If(inner) => inner.pretty_print(printer),
-            Self::Let(inner) => inner.pretty_print(printer),
+            Self::Local(inner) => inner.pretty_print(printer),
             Self::ForLoop(inner) => inner.pretty_print(printer),
             Self::Continue(inner) => inner.pretty_print(printer),
             Self::Break(inner) => inner.pretty_print(printer),
@@ -171,7 +171,7 @@ mod tests {
         assert!(matches!(parse("foo()"), Node::Component(_)));
         assert!(matches!(parse("(value)"), Node::Expr(_)));
         assert!(matches!(parse(r#"if a { "x" }"#), Node::If(_)));
-        assert!(matches!(parse(r"let a = 1;"), Node::Let(_)));
+        assert!(matches!(parse(r"let a = 1;"), Node::Local(_)));
         assert!(matches!(parse(r"for x in xs { (x) }"), Node::ForLoop(_)));
         assert!(matches!(parse(r#"match v { _ => "x", }"#), Node::Match(_)));
         assert!(matches!(parse(r#"{ "x" }"#), Node::Block(_)));
