@@ -31,5 +31,9 @@ topcoat = { workspace = true, features = ["icon-iconify"] }
 [lints]
 workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [package.metadata.cargo-udeps.ignore]
 development = ["topcoat"]

@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 #[cfg(feature = "iconify")]
 use proc_macro::TokenStream;
 #[cfg(feature = "iconify")]

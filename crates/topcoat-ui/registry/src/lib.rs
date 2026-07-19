@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
 //! The default Topcoat UI component registry.
 //!
 //! This crate is the built-in registry that backs `topcoat ui`: its

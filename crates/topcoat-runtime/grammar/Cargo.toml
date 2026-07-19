@@ -27,3 +27,7 @@ uuid = { workspace = true, features = ["v4"] }
 
 [lints]
 workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

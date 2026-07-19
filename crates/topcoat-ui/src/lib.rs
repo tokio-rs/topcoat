@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
 //! Premade UI components for Topcoat applications.
 //!
 //! In the spirit of [shadcn/ui](https://ui.shadcn.com), components are not

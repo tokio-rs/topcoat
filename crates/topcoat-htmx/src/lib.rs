@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
 //! [htmx](https://htmx.org) support for Topcoat.
 //!
 //! This crate provides two halves of htmx integration, both built on Topcoat's

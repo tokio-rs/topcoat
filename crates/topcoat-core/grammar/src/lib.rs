@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 pub mod memoize;
 pub mod parse_option;
 pub mod paths;
