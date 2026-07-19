@@ -56,8 +56,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo +nightly doc --workspace --all-features --no-deps --locked
         env:
-          RUSTFLAGS: --cfg docsrs
-          RUSTDOCFLAGS: --cfg docsrs
+          RUSTDOCFLAGS: --cfg docsrs -Dwarnings
 
   features:
     name: features

@@ -16,13 +16,10 @@ pub use bind_attribute::*;
 pub use event_handler::*;
 pub use expr::*;
 #[cfg(feature = "router")]
-#[cfg_attr(docsrs, doc(cfg(feature = "router")))]
 pub use procedure::*;
 #[cfg(feature = "router")]
-#[cfg_attr(docsrs, doc(cfg(feature = "router")))]
 pub use reactive_scope::*;
 #[cfg(feature = "router")]
-#[cfg_attr(docsrs, doc(cfg(feature = "router")))]
 pub use shard::*;
 pub use signal::*;
 pub use surrogate::*;

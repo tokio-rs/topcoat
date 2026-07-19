@@ -10,5 +10,4 @@ pub use form::*;
 pub use html::*;
 pub use json::*;
 #[cfg(feature = "multipart")]
-#[cfg_attr(docsrs, doc(cfg(feature = "multipart")))]
 pub use multipart::*;

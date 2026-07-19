@@ -3,7 +3,6 @@
 mod component;
 mod data;
 #[cfg(feature = "iconify")]
-#[cfg_attr(docsrs, doc(cfg(feature = "iconify")))]
 pub mod iconify;
 
 pub use component::*;

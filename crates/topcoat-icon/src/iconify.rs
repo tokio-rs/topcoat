@@ -5,9 +5,7 @@ mod error;
 mod set;
 
 #[cfg(feature = "iconify-build")]
-#[cfg_attr(docsrs, doc(cfg(feature = "iconify-build")))]
 pub use config::*;
 #[cfg(feature = "iconify-build")]
-#[cfg_attr(docsrs, doc(cfg(feature = "iconify-build")))]
 pub use error::*;
 pub use set::*;

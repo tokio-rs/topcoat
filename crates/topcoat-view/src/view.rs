@@ -79,7 +79,6 @@ impl View {
     /// the first status code rendered wins, and the first part that mentions
     /// a header name provides all of that name's values.
     #[cfg(feature = "http")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "http")))]
     #[must_use]
     pub fn render_response(&self, cx: &Cx) -> RenderedResponse {
         let mut html = String::with_capacity(self.part.size_hint());
@@ -105,7 +104,6 @@ impl View {
 /// Returned by [`View::render_response`]: the rendered HTML alongside the
 /// status code and headers the view declared.
 #[cfg(feature = "http")]
-#[cfg_attr(docsrs, doc(cfg(feature = "http")))]
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct RenderedResponse {
@@ -200,12 +198,10 @@ pub enum ViewPart {
     },
     /// A response status code recorded at render time; renders no content.
     #[cfg(feature = "http")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "http")))]
     #[non_exhaustive]
     StatusCode(StatusCode),
     /// Response headers recorded at render time; renders no content.
     #[cfg(feature = "http")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "http")))]
     #[non_exhaustive]
     Headers(Box<HeaderMap>),
 }

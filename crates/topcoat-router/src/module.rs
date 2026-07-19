@@ -12,7 +12,6 @@ pub use segment::*;
 
 #[doc = include_str!("../docs/module_router.md")]
 #[cfg(feature = "discover")]
-#[cfg_attr(docsrs, doc(cfg(feature = "discover")))]
 #[macro_export]
 macro_rules! module_router {
     () => {

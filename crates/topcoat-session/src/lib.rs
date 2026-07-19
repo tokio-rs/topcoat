@@ -11,10 +11,8 @@ mod token;
 
 pub use config::*;
 #[cfg(feature = "router")]
-#[cfg_attr(docsrs, doc(cfg(feature = "router")))]
 pub use origin::*;
 #[cfg(feature = "router")]
-#[cfg_attr(docsrs, doc(cfg(feature = "router")))]
 pub use router::*;
 pub use session::*;
 pub use state::*;
