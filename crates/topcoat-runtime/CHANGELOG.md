@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-v0.1.3...topcoat-runtime-v0.2.0) - 2026-07-19
+
+### Fixed
+
+- count browser string length in UTF-8 bytes ([#126](https://github.com/tokio-rs/topcoat/pull/126))
+
+### Other
+
+- add annotations to show feature flags in docs.rs ([#127](https://github.com/tokio-rs/topcoat/pull/127))
+
 ## [0.1.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-v0.0.4...topcoat-runtime-v0.1.0) - 2026-07-16
 
 ### Fixed

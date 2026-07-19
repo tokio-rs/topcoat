@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-v0.1.3...topcoat-v0.2.0) - 2026-07-19
+
+### Added
+
+- [**breaking**] compression ([#133](https://github.com/tokio-rs/topcoat/pull/133))
+- [**breaking**] graceful shutdown ([#132](https://github.com/tokio-rs/topcoat/pull/132))
+
+### Other
+
+- add annotations to show feature flags in docs.rs ([#127](https://github.com/tokio-rs/topcoat/pull/127))
+- add documentation for topcoat-ui ([#130](https://github.com/tokio-rs/topcoat/pull/130))
+
 ## [0.1.3](https://github.com/tokio-rs/topcoat/compare/topcoat-v0.1.2...topcoat-v0.1.3) - 2026-07-17
 
 ### Other
