@@ -5,8 +5,8 @@
 //!
 //! - [`broadcast_server`]: a long-lived local WebSocket server that browsers connect to; it
 //!   broadcasts a reload message whenever a freshly started application reports ready.
-//! - [`watch`]: watches every local package -- workspace members and path dependencies alike --
-//!   and coalesces bursts of filesystem events into single change notifications.
+//! - [`watch`]: watches every local package -- workspace members and path dependencies alike -- and
+//!   coalesces bursts of filesystem events into single change notifications.
 //! - [`keyboard`]: reports the `r` keypress that triggers a manual rebuild.
 //! - [`build`]: compiles the application and bundles its assets in a cancellable background task.
 //! - [`app_server`]: the application process itself.
