@@ -53,8 +53,9 @@ pub struct Compression {
 }
 
 impl Compression {
-    /// Creates the default configuration: gzip and brotli enabled at each
-    /// algorithm's default level, skipping bodies smaller than 32 bytes.
+    /// Creates the default configuration: gzip and brotli enabled at the
+    /// [`Balanced`](CompressionLevel::Balanced) level, skipping bodies
+    /// smaller than 32 bytes.
     #[must_use]
     pub fn new() -> Self {
         /// Below this size the compressed framing tends to outweigh the
@@ -173,10 +174,15 @@ impl Default for Compression {
 pub enum CompressionLevel {
     /// The fastest quality, usually producing the biggest output.
     Fastest,
-    /// Each algorithm's own default quality.
+    /// A speed-leaning quality suited to compressing responses on the fly.
+    ///
+    /// This is deliberately not each algorithm's own default: brotli's is its
+    /// highest quality, tuned for compressing assets ahead of time, and far
+    /// too slow to run per response.
     #[default]
-    Default,
-    /// The best quality, usually producing the smallest output.
+    Balanced,
+    /// The best quality, usually producing the smallest output. With brotli
+    /// this is expensive; prefer it for payloads compressed once and cached.
     Best,
     /// A numeric quality interpreted by each algorithm, clamped to the
     /// algorithm's maximum.
@@ -186,9 +192,14 @@ pub enum CompressionLevel {
 impl CompressionLevel {
     /// Maps the level onto the middleware's equivalent.
     fn into_tower(self) -> tower_http::CompressionLevel {
+        /// The quality [`CompressionLevel::Balanced`] encodes with: level 4
+        /// for both gzip (of 0-9) and brotli (of 0-11) compresses at
+        /// rendering speed while brotli still beats gzip's best ratio.
+        const BALANCED_QUALITY: i32 = 4;
+
         match self {
             Self::Fastest => tower_http::CompressionLevel::Fastest,
-            Self::Default => tower_http::CompressionLevel::Default,
+            Self::Balanced => tower_http::CompressionLevel::Precise(BALANCED_QUALITY),
             Self::Best => tower_http::CompressionLevel::Best,
             Self::Precise(quality) => tower_http::CompressionLevel::Precise(quality),
         }

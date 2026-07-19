@@ -5,7 +5,7 @@ use topcoat::{
     Result,
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset},
     context::{Cx, app_context},
-    router::{Router, Slot, layout, page},
+    router::{Compression, Router, Slot, layout, page},
     view::view,
 };
 
@@ -20,6 +20,9 @@ pub fn router() -> Router {
     topcoat::router::module_router!()
         .app_context(Catalog::load())
         .assets(AssetBundle::load().expect("asset bundle loads; run `topcoat asset bundle`"))
+        // Off in every benchmarked framework: the benchmark measures the
+        // frameworks, not a compression codec (see the fairness notes).
+        .compression(Compression::off())
         .build()
 }
 

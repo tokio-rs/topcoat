@@ -118,6 +118,15 @@ cd benchmarks/axum-maud && PORT=8090 ./target/release/storefront-axum-maud
 
 ## Fairness notes
 
+- **Compression is disabled in every server.** The benchmark measures raw
+  framework rendering and serving performance, not the throughput of a
+  compression codec: these servers render a page faster than any codec
+  compresses it, so with compression on the comparison mostly measures the
+  codec. Topcoat's default response compression is switched off
+  (`Compression::off()`), Next.js sets `compress: false` in `next.config.ts`
+  (`next start` gzips by default), and Leptos and Axum + Maud add no
+  compression middleware. Real deployments should leave compression on; the
+  per-response CPU cost buys a many-times-smaller transfer.
 - **Response sizes intentionally differ.** Topcoat and Axum + Maud ship plain
   HTML with zero JavaScript. Next.js embeds its RSC payload and script tags;
   Leptos embeds hydration data and the wasm loader. That is each framework's realistic
@@ -139,12 +148,6 @@ cd benchmarks/axum-maud && PORT=8090 ./target/release/storefront-axum-maud
 - **Stock release profiles.** Both Rust apps build with an untuned
   `cargo --release` (no LTO or codegen tweaks); Next.js uses a plain
   `next build`.
-- **Next.js gzips responses by default.** `next start` compresses every
-  response, so its `bytes/resp` is the compressed size (the true document is
-  several times larger) and part of its CPU time is compression. Topcoat and
-  Leptos serve uncompressed documents. That is each framework's default
-  production behavior; set `compress: false` in `next.config.ts` if you want
-  to isolate rendering cost.
 - **Process models differ.** By default the Rust servers use every core, while
   `next start` is a single Node process, so JS rendering is effectively
   single-threaded. Real Node deployments scale by running multiple instances;
