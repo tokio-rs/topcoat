@@ -76,7 +76,7 @@ From the project root:
 topcoat dev
 ```
 
-This command builds the app, bundles assets, and starts the server. It watches your source directories and rebuilds, rebundles, and restarts the app on changes. Pages that include `topcoat::dev::script()` reload automatically once the new build is ready.
+This command builds the app, bundles assets, and starts the server. It watches your source directories and rebuilds, rebundles, and restarts the app on changes. Pages that include `topcoat::dev::script()` reload automatically once the new build is ready. Press `r` in the terminal to trigger a rebuild manually.
 
 Open <http://127.0.0.1:3000> and you should see **Hello, World!**.
 

@@ -1,12 +1,13 @@
 //! The `topcoat dev` command: an auto-rebuilding development server.
 //!
-//! Four pieces cooperate, tied together by the event loop in
+//! Five pieces cooperate, tied together by the event loop in
 //! [`DevCommand::run`]:
 //!
 //! - [`broadcast_server`]: a long-lived local WebSocket server that browsers connect to; it
 //!   broadcasts a reload message whenever a freshly started application reports ready.
 //! - [`watch`]: watches the workspace's source directories and coalesces bursts of filesystem
 //!   events into single change notifications.
+//! - [`keyboard`]: reports the `r` keypress that triggers a manual rebuild.
 //! - [`build`]: compiles the application and bundles its assets in a cancellable background task.
 //! - [`app_server`]: the application process itself.
 //!
@@ -17,6 +18,7 @@
 mod app_server;
 mod broadcast_server;
 mod build;
+mod keyboard;
 mod spinner;
 mod watch;
 
@@ -28,6 +30,7 @@ use console::style;
 use app_server::AppServer;
 use broadcast_server::{Event, EventBus};
 use build::{BuildKind, BuildTask};
+use keyboard::Keyboard;
 use spinner::Spinner;
 use watch::SourceWatcher;
 
@@ -63,7 +66,16 @@ impl DevCommand {
         }
         eprintln!();
         let mut watcher = SourceWatcher::start().await;
+        let mut keyboard = Keyboard::start();
         eprintln!("  {}", style("watching for file changes...").dim());
+        if keyboard.is_listening() {
+            eprintln!(
+                "  {} {} {}",
+                style("press").dim(),
+                style("r").green().bold(),
+                style("to reload").dim()
+            );
+        }
         eprintln!();
 
         let mut build: Option<BuildTask> = Some(BuildTask::spawn(BuildKind::Initial, opts.clone()));
@@ -119,19 +131,29 @@ impl DevCommand {
                 }
 
                 () = watcher.changed() => {
-                    // Rebuild, but leave the running application untouched:
-                    // it keeps serving until the new build is ready. A stale
-                    // in-flight build compiles sources that just changed
-                    // again, so cancel it rather than wait for it.
-                    if let Some(stale) = build.take() {
-                        stale.cancel().await;
-                    }
-                    build = Some(BuildTask::spawn(BuildKind::Rebuild, opts.clone()));
-                    events.publish(Event::Rebuilding);
+                    rebuild(&mut build, &opts, &events).await;
+                }
+
+                () = keyboard.reload_requested() => {
+                    // A manual reload is handled exactly like a file change:
+                    // the running application keeps serving until the fresh
+                    // build is ready.
+                    rebuild(&mut build, &opts, &events).await;
                 }
             }
         }
     }
+}
+
+/// Start a rebuild, leaving the running application untouched: it keeps
+/// serving until the new build is ready. A stale in-flight build compiles
+/// sources that just changed again, so cancel it rather than wait for it.
+async fn rebuild(build: &mut Option<BuildTask>, opts: &BuildOpts, events: &EventBus) {
+    if let Some(stale) = build.take() {
+        stale.cancel().await;
+    }
+    *build = Some(BuildTask::spawn(BuildKind::Rebuild, opts.clone()));
+    events.publish(Event::Rebuilding);
 }
 
 /// Start the built executable, reporting a failure to the terminal and to
