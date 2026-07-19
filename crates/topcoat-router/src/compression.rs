@@ -194,3 +194,149 @@ impl CompressionLevel {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+    use std::future::Future;
+
+    use http::HeaderValue;
+    use http::header::{CONTENT_ENCODING, VARY};
+    use topcoat_core::context::Cx;
+
+    use super::*;
+    use crate::{
+        Bytes, HeaderMap, IntoResponse, Method, Path, RouteFn, RouteFuture, RouteHandlerFn, Router,
+        to_bytes,
+    };
+
+    // -- Test helpers --
+
+    fn block_on<F: Future>(future: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+            .block_on(future)
+    }
+
+    /// Builds a router with `handler` under `GET /x` and the given
+    /// compression configuration.
+    fn router_with(handler: RouteHandlerFn, compression: Compression) -> Router {
+        Router::builder()
+            .route(RouteFn::new(
+                Method::GET,
+                Cow::Borrowed(Path::new("/x")),
+                handler,
+            ))
+            .compression(compression)
+            .build()
+    }
+
+    /// Dispatches a GET request for `/x`, optionally with an
+    /// `Accept-Encoding` header, and reads the full response.
+    fn send(router: &Router, accept_encoding: Option<&str>) -> (HeaderMap, Bytes) {
+        let mut request = http::Request::builder().uri("/x");
+        if let Some(value) = accept_encoding {
+            request = request.header(ACCEPT_ENCODING, value);
+        }
+        let response = block_on(router.handle(request.body(Body::empty()).unwrap()));
+        let (parts, body) = response.into_parts();
+        let bytes = block_on(to_bytes(body, usize::MAX)).unwrap();
+        (parts.headers, bytes)
+    }
+
+    /// A body long enough to clear the default compression size threshold.
+    fn long_body() -> String {
+        "route ".repeat(64)
+    }
+
+    fn long_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { long_body().into_response(cx) })
+    }
+
+    /// A route whose body stays below the default size threshold.
+    fn short_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { "route".into_response(cx) })
+    }
+
+    /// A route that marks its (uncompressed) response as already encoded.
+    fn encoded_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            let mut response = long_body().into_response(cx)?;
+            response
+                .headers_mut()
+                .insert(CONTENT_ENCODING, HeaderValue::from_static("br"));
+            Ok(response)
+        })
+    }
+
+    // -- Compression through the router --
+
+    #[test]
+    fn compresses_with_the_negotiated_algorithm() {
+        let router = router_with(long_route, Compression::new());
+
+        let (headers, body) = send(&router, Some("gzip"));
+        assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "gzip");
+        assert_eq!(headers.get(VARY).unwrap(), "accept-encoding");
+        assert!(!body.is_empty());
+        assert!(body.len() < long_body().len());
+
+        let (headers, _) = send(&router, Some("br"));
+        assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "br");
+    }
+
+    #[test]
+    fn passes_through_without_accept_encoding() {
+        let router = router_with(long_route, Compression::new());
+        let (headers, body) = send(&router, None);
+        assert!(!headers.contains_key(CONTENT_ENCODING));
+        assert_eq!(body, long_body());
+    }
+
+    #[test]
+    fn off_disables_compression() {
+        let router = router_with(long_route, Compression::off());
+        let (headers, body) = send(&router, Some("gzip, br"));
+        assert!(!headers.contains_key(CONTENT_ENCODING));
+        assert_eq!(body, long_body());
+    }
+
+    #[test]
+    fn disabled_algorithms_are_not_offered() {
+        let router = router_with(long_route, Compression::new().gzip(false));
+
+        // The client only accepts the disabled algorithm.
+        let (headers, body) = send(&router, Some("gzip"));
+        assert!(!headers.contains_key(CONTENT_ENCODING));
+        assert_eq!(body, long_body());
+
+        // The other algorithm is still negotiated.
+        let (headers, _) = send(&router, Some("gzip, br"));
+        assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "br");
+    }
+
+    #[test]
+    fn small_bodies_are_not_compressed() {
+        let router = router_with(short_route, Compression::new());
+        let (headers, body) = send(&router, Some("gzip"));
+        assert!(!headers.contains_key(CONTENT_ENCODING));
+        assert_eq!(&body[..], b"route");
+    }
+
+    #[test]
+    fn min_size_lowers_the_compression_threshold() {
+        let router = router_with(short_route, Compression::new().min_size(0));
+        let (headers, _) = send(&router, Some("gzip"));
+        assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "gzip");
+    }
+
+    #[test]
+    fn already_encoded_responses_pass_through() {
+        let router = router_with(encoded_route, Compression::new());
+        let (headers, body) = send(&router, Some("gzip"));
+        // The route's own encoding wins; the body is not compressed again.
+        assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "br");
+        assert_eq!(body, long_body());
+    }
+}
