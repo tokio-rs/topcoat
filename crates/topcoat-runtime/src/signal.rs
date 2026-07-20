@@ -99,9 +99,13 @@ where
         let json = serde_json::to_string(&payload)
             .expect("failed to serialize signal declaration payload");
 
-        parts.push_str_unescaped("<!-- ::topcoat::signal(");
-        parts.push_str_unescaped(json);
-        parts.push_str_unescaped(") -->");
+        parts.push_comment(|comment| {
+            // `json` is untrusted application data and must be escaped to prevent XSS attacks.
+            comment
+                .push_str_unescaped("::topcoat::signal(")
+                .push_str(json)
+                .push_str_unescaped(")");
+        });
     }
 }
 
@@ -210,5 +214,33 @@ pub struct EncodedSignals(String);
 impl EncodedSignals {
     pub fn new(inner: impl Into<String>) -> Self {
         Self(inner.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use topcoat_view::{HtmlContext, PartsWriter, View, ViewParts};
+
+    use super::*;
+
+    #[test]
+    fn payload_cannot_terminate_the_comment() {
+        // A value carrying `-->`, a quote, and an ampersand: the characters
+        // that could break out of the comment or corrupt its JSON payload.
+        let signal = Signal::new(String::from("a-->b\"c&d"));
+
+        let cx = Cx::default();
+        let mut parts = ViewParts::new();
+        SignalDeclaration::new(&signal)
+            .into_view_parts(&cx, &mut PartsWriter::new(&mut parts, HtmlContext::Text));
+        let html = View::new(parts).render(&cx);
+
+        // The comment context escaped `>`, so the only `-->` left is the
+        // marker's own terminator; the payload cannot end the comment early.
+        assert_eq!(html.matches("-->").count(), 1);
+        assert!(html.ends_with(") -->"));
+        assert!(html.contains("--&gt;"));
+        // The JSON's own quotes round-trip as entities the client decodes.
+        assert!(html.contains("&quot;"));
     }
 }

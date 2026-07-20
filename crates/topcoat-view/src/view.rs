@@ -448,9 +448,10 @@ impl<'a> PartsWriter<'a> {
 
     /// Returns a writer over the same buffer for a different context.
     ///
-    /// This is how in-crate compositions such as
-    /// [`Attribute`](crate::Attribute) transition between the
-    /// positions they span.
+    /// In-crate compositions that span more than one position use this to
+    /// transition between the positions they cover, such as
+    /// [`Attribute`](crate::Attribute) moving from a key to a value or
+    /// [`push_comment`](Self::push_comment) sealing a comment body.
     #[inline]
     pub(crate) fn with_context(&mut self, context: HtmlContext) -> PartsWriter<'_> {
         PartsWriter {
@@ -480,6 +481,31 @@ impl<'a> PartsWriter<'a> {
             value: value.into(),
             context: HtmlContext::Unescaped,
         });
+        self
+    }
+
+    /// Appends an HTML comment whose body is built through `build`.
+    ///
+    /// The `<!-- ` and ` -->` delimiters are written verbatim, while the
+    /// writer handed to `build` seals everything pushed into it for the
+    /// [`Comment`](HtmlContext::Comment) context. Because that context
+    /// escapes `>`, the body can never contain `-->` and terminate the
+    /// comment, so a marker can be built from untrusted data with
+    /// [`push_str`](Self::push_str) and no separate escaping step.
+    ///
+    /// # Panics
+    ///
+    /// Panics if used in a non-text HTML context.
+    #[inline]
+    pub fn push_comment(&mut self, build: impl FnOnce(&mut PartsWriter<'_>)) -> &mut Self {
+        assert!(
+            self.context == HtmlContext::Text,
+            "tried to push comment in html context {:?}",
+            self.context,
+        );
+        self.push_str_unescaped("<!-- ");
+        build(&mut self.with_context(HtmlContext::Comment));
+        self.push_str_unescaped(" -->");
         self
     }
 
