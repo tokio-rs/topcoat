@@ -307,3 +307,462 @@ struct Prepared {
     entry: ManifestEntry,
     written: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{env, path::PathBuf};
+
+    use crate::{AssetOptions, ENCODED_ASSET_SIZE};
+
+    use super::*;
+
+    /// A fresh directory under the system temp directory.
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = env::temp_dir().join(format!("topcoat-asset-bundler-{name}"));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn sha256(contents: &str) -> String {
+        let digest = Sha256::digest(contents.as_bytes());
+        let mut hash = String::with_capacity(digest.len() * 2);
+        for b in &digest {
+            let _ = write!(hash, "{b:02x}");
+        }
+        hash
+    }
+
+    /// A scratch project: source files on disk, plus the encoded declarations a
+    /// compiled binary would carry for them.
+    struct Fixture {
+        root: PathBuf,
+        binary: Vec<u8>,
+    }
+
+    impl Fixture {
+        fn new(name: &str) -> Self {
+            Self {
+                root: temp_dir(name),
+                binary: Vec::new(),
+            }
+        }
+
+        fn out(&self) -> PathBuf {
+            self.root.join("out")
+        }
+
+        /// Write `contents` to `name` and declare it as an asset.
+        fn declare(&mut self, name: &str, contents: &str) -> Asset {
+            self.declare_with(name, contents, &AssetOptions::NONE)
+        }
+
+        fn declare_with(&mut self, name: &str, contents: &str, options: &AssetOptions) -> Asset {
+            let src = self.root.join("src");
+            fs::create_dir_all(&src).unwrap();
+            let path = src.join(name);
+            fs::write(&path, contents).unwrap();
+            self.declare_path(path.to_str().unwrap(), options)
+        }
+
+        /// Declare an asset without creating the file it points at.
+        fn declare_missing(&mut self, name: &str) -> Asset {
+            let path = self.root.join("src").join(name);
+            self.declare_path(&path.to_str().unwrap().to_owned(), &AssetOptions::NONE)
+        }
+
+        fn declare_path(&mut self, path: &str, options: &AssetOptions) -> Asset {
+            let id = Asset::new("test", "src/lib.rs", path, options);
+            self.binary.extend_from_slice(&RawAsset::encode(
+                id,
+                path,
+                "test",
+                "/test",
+                "src/lib.rs",
+                options,
+            ));
+            id
+        }
+
+        /// Drop every declaration past the first `count`, as if the assets had
+        /// been deleted from the source and the binary rebuilt.
+        fn keep_declarations(&mut self, count: usize) {
+            self.binary.truncate(count * ENCODED_ASSET_SIZE);
+        }
+
+        fn bundle(&self, out: &Path, parallelism: usize) -> (BundleResult, Vec<BundleEvent>) {
+            let (config, events) = BundlerConfig::new()
+                .cache_dir(self.root.join("cache"))
+                .parallelism(parallelism)
+                .event_channel();
+
+            // Both the config and the bundler hold senders; the receiver only
+            // disconnects once every one of them is dropped.
+            let result = Bundler::new(&config).bundle(&self.binary, out);
+            drop(config);
+
+            (result, events.into_iter().collect())
+        }
+
+        fn manifest(&self, out: &Path) -> Manifest {
+            Manifest::load(out.join(MANIFEST_NAME)).unwrap()
+        }
+    }
+
+    #[test]
+    fn manifest_follows_declaration_order_under_parallelism() {
+        let mut fixture = Fixture::new("declaration-order");
+        for i in 0..32 {
+            fixture.declare(&format!("file-{i}.txt"), &format!("contents {i}"));
+        }
+
+        let out = fixture.out();
+        let (result, _) = fixture.bundle(&out, 8);
+        result.unwrap();
+
+        let manifest = fixture.manifest(&out);
+        assert_eq!(manifest.assets.len(), 32);
+        for (i, entry) in manifest.assets.iter().enumerate() {
+            assert!(
+                entry.file.starts_with(&format!("file-{i}-")),
+                "entry {i} is out of order: {}",
+                entry.file
+            );
+            assert_eq!(
+                fs::read_to_string(out.join(&entry.file)).unwrap(),
+                format!("contents {i}")
+            );
+        }
+    }
+
+    #[test]
+    fn parallelism_does_not_change_the_output() {
+        let mut fixture = Fixture::new("parallelism-agnostic");
+        for i in 0..16 {
+            fixture.declare(&format!("file-{i}.txt"), &format!("contents {i}"));
+        }
+
+        let sequential = fixture.root.join("sequential");
+        let parallel = fixture.root.join("parallel");
+        fixture.bundle(&sequential, 1).0.unwrap();
+        fixture.bundle(&parallel, 8).0.unwrap();
+
+        let sequential = fixture.manifest(&sequential);
+        let parallel = fixture.manifest(&parallel);
+        assert_eq!(sequential.assets.len(), parallel.assets.len());
+        for (a, b) in sequential.assets.iter().zip(&parallel.assets) {
+            assert_eq!(a.id, b.id);
+            assert_eq!(a.file, b.file);
+            assert_eq!(a.hash, b.hash);
+            assert_eq!(a.content_type, b.content_type);
+        }
+    }
+
+    #[test]
+    fn more_workers_than_assets_is_harmless() {
+        let mut fixture = Fixture::new("excess-workers");
+        fixture.declare("only.txt", "just the one");
+
+        let out = fixture.out();
+        let (result, events) = fixture.bundle(&out, 64);
+        result.unwrap();
+
+        assert_eq!(fixture.manifest(&out).assets.len(), 1);
+        assert!(matches!(
+            events.last(),
+            Some(BundleEvent::Finished { bundled: 1, .. })
+        ));
+    }
+
+    #[test]
+    fn an_empty_binary_produces_an_empty_manifest() {
+        let fixture = Fixture::new("empty");
+
+        let out = fixture.out();
+        let (result, events) = fixture.bundle(&out, 8);
+        result.unwrap();
+
+        assert!(fixture.manifest(&out).assets.is_empty());
+        assert!(matches!(
+            events.first(),
+            Some(BundleEvent::Scanned { count: 0 })
+        ));
+        assert!(matches!(
+            events.last(),
+            Some(BundleEvent::Finished {
+                bundled: 0,
+                unchanged: 0,
+                removed: 0,
+            })
+        ));
+    }
+
+    #[test]
+    fn a_second_run_leaves_everything_unchanged() {
+        let mut fixture = Fixture::new("unchanged");
+        for i in 0..8 {
+            fixture.declare(&format!("file-{i}.txt"), &format!("contents {i}"));
+        }
+
+        let out = fixture.out();
+        fixture.bundle(&out, 4).0.unwrap();
+        let (result, events) = fixture.bundle(&out, 4);
+        result.unwrap();
+
+        assert!(matches!(
+            events.last(),
+            Some(BundleEvent::Finished {
+                bundled: 0,
+                unchanged: 8,
+                removed: 0,
+            })
+        ));
+    }
+
+    #[test]
+    fn a_deleted_output_file_is_written_again() {
+        let mut fixture = Fixture::new("restore-deleted");
+        fixture.declare("kept.txt", "kept");
+        fixture.declare("deleted.txt", "deleted");
+
+        let out = fixture.out();
+        fixture.bundle(&out, 2).0.unwrap();
+
+        let deleted = fixture
+            .manifest(&out)
+            .assets
+            .into_iter()
+            .find(|entry| entry.file.starts_with("deleted-"))
+            .unwrap();
+        fs::remove_file(out.join(&deleted.file)).unwrap();
+
+        let (result, events) = fixture.bundle(&out, 2);
+        result.unwrap();
+
+        assert!(out.join(&deleted.file).exists());
+        assert!(matches!(
+            events.last(),
+            Some(BundleEvent::Finished {
+                bundled: 1,
+                unchanged: 1,
+                removed: 0,
+            })
+        ));
+    }
+
+    #[test]
+    fn undeclared_files_are_removed() {
+        let mut fixture = Fixture::new("remove-stale");
+        fixture.declare("kept.txt", "kept");
+        fixture.declare("stale.txt", "stale");
+
+        let out = fixture.out();
+        fixture.bundle(&out, 2).0.unwrap();
+        let stale = fixture
+            .manifest(&out)
+            .assets
+            .into_iter()
+            .find(|entry| entry.file.starts_with("stale-"))
+            .unwrap();
+
+        fixture.keep_declarations(1);
+        let (result, events) = fixture.bundle(&out, 2);
+        result.unwrap();
+
+        assert!(!out.join(&stale.file).exists());
+        assert_eq!(fixture.manifest(&out).assets.len(), 1);
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, BundleEvent::Removed { file } if *file == stale.file))
+        );
+        assert!(matches!(
+            events.last(),
+            Some(BundleEvent::Finished { removed: 1, .. })
+        ));
+    }
+
+    #[test]
+    fn a_matching_checksum_is_accepted() {
+        let mut fixture = Fixture::new("checksum-match");
+        let contents = "verified contents";
+        fixture.declare_with(
+            "verified.txt",
+            contents,
+            &AssetOptions {
+                checksum: Some(format!("sha256:{}", sha256(contents)).into()),
+                ..AssetOptions::NONE
+            },
+        );
+
+        let out = fixture.out();
+        fixture.bundle(&out, 1).0.unwrap();
+        assert_eq!(fixture.manifest(&out).assets.len(), 1);
+    }
+
+    #[test]
+    fn a_mismatched_checksum_is_rejected() {
+        let mut fixture = Fixture::new("checksum-mismatch");
+        fixture.declare_with(
+            "tampered.txt",
+            "actual contents",
+            &AssetOptions {
+                checksum: Some(format!("sha256:{}", sha256("expected contents")).into()),
+                ..AssetOptions::NONE
+            },
+        );
+
+        let out = fixture.out();
+        let error = fixture.bundle(&out, 1).0.unwrap_err();
+        assert!(
+            matches!(
+                error,
+                BundleError::Asset(AssetError::ChecksumMismatch { .. })
+            ),
+            "expected a checksum mismatch, got {error:?}"
+        );
+    }
+
+    #[test]
+    fn an_unsupported_checksum_algorithm_is_rejected() {
+        let mut fixture = Fixture::new("checksum-algorithm");
+        fixture.declare_with(
+            "asset.txt",
+            "contents",
+            &AssetOptions {
+                checksum: Some("md5:d41d8cd98f00b204e9800998ecf8427e".into()),
+                ..AssetOptions::NONE
+            },
+        );
+
+        let out = fixture.out();
+        let error = fixture.bundle(&out, 1).0.unwrap_err();
+        assert!(
+            matches!(
+                error,
+                BundleError::Asset(AssetError::UnsupportedChecksum { .. })
+            ),
+            "expected an unsupported checksum, got {error:?}"
+        );
+    }
+
+    #[test]
+    fn rename_and_extension_shape_the_output_filename() {
+        let mut fixture = Fixture::new("filename-options");
+        fixture.declare_with(
+            "source.txt",
+            "renamed",
+            &AssetOptions {
+                rename: Some("styles".into()),
+                extension: Some("css".into()),
+                ..AssetOptions::NONE
+            },
+        );
+        fixture.declare_with(
+            "hashed.txt",
+            "no stem",
+            &AssetOptions {
+                rename: Some("".into()),
+                ..AssetOptions::NONE
+            },
+        );
+
+        let out = fixture.out();
+        fixture.bundle(&out, 2).0.unwrap();
+
+        let manifest = fixture.manifest(&out);
+        let renamed = &manifest.assets[0];
+        assert_eq!(renamed.file, format!("styles-{}.css", &renamed.hash[..16]));
+        assert_eq!(renamed.content_type, "text/css");
+
+        let hashed = &manifest.assets[1];
+        assert_eq!(hashed.file, format!("{}.txt", &hashed.hash[..16]));
+    }
+
+    #[test]
+    fn content_type_is_guessed_unless_overridden() {
+        let mut fixture = Fixture::new("content-type");
+        fixture.declare("guessed.css", "body {}");
+        fixture.declare_with(
+            "overridden.txt",
+            "contents",
+            &AssetOptions {
+                content_type: Some("application/x-custom".into()),
+                ..AssetOptions::NONE
+            },
+        );
+
+        let out = fixture.out();
+        fixture.bundle(&out, 2).0.unwrap();
+
+        let manifest = fixture.manifest(&out);
+        assert_eq!(manifest.assets[0].content_type, "text/css");
+        assert_eq!(manifest.assets[1].content_type, "application/x-custom");
+    }
+
+    #[test]
+    fn the_earliest_declared_failure_is_reported() {
+        let mut fixture = Fixture::new("earliest-failure");
+        fixture.declare("present.txt", "fine");
+        fixture.declare_missing("missing-first.txt");
+        fixture.declare_missing("missing-second.txt");
+
+        let out = fixture.out();
+        let error = fixture.bundle(&out, 4).0.unwrap_err();
+        match error {
+            BundleError::Asset(AssetError::AssetIo { asset, .. }) => assert!(
+                asset.source().to_string().ends_with("missing-first.txt"),
+                "reported the wrong asset: {}",
+                asset.source()
+            ),
+            other => panic!("expected an asset io error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_failed_run_leaves_the_manifest_alone() {
+        let mut fixture = Fixture::new("failure-keeps-manifest");
+        fixture.declare("present.txt", "fine");
+
+        let out = fixture.out();
+        fixture.bundle(&out, 1).0.unwrap();
+        let before = fixture.manifest(&out).assets.len();
+
+        fixture.declare_missing("missing.txt");
+        fixture.bundle(&out, 2).0.unwrap_err();
+
+        assert_eq!(fixture.manifest(&out).assets.len(), before);
+    }
+
+    #[test]
+    fn events_open_with_a_scan_and_close_with_a_summary() {
+        let mut fixture = Fixture::new("event-order");
+        for i in 0..4 {
+            fixture.declare(&format!("file-{i}.txt"), &format!("contents {i}"));
+        }
+
+        let out = fixture.out();
+        let (result, events) = fixture.bundle(&out, 2);
+        result.unwrap();
+
+        assert!(matches!(
+            events.first(),
+            Some(BundleEvent::Scanned { count: 4 })
+        ));
+        assert!(matches!(
+            events.last(),
+            Some(BundleEvent::Finished {
+                bundled: 4,
+                unchanged: 0,
+                removed: 0,
+            })
+        ));
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| matches!(event, BundleEvent::Bundled { .. }))
+                .count(),
+            4
+        );
+    }
+}

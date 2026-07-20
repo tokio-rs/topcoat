@@ -100,3 +100,103 @@ impl BundleEvents {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use super::*;
+
+    /// A subscriber that records the events it is handed.
+    #[derive(Clone, Default)]
+    struct Recorder(Arc<Mutex<Vec<String>>>);
+
+    impl Recorder {
+        fn recorded(&self) -> Vec<String> {
+            self.0.lock().unwrap().clone()
+        }
+    }
+
+    impl BundleSubscriber for Recorder {
+        fn handle(&self, event: &BundleEvent) {
+            self.0.lock().unwrap().push(event.to_string());
+        }
+    }
+
+    #[test]
+    fn every_subscriber_sees_every_event() {
+        let first = Recorder::default();
+        let second = Recorder::default();
+
+        let mut events = BundleEvents::default();
+        events.push(first.clone());
+        events.push(second.clone());
+
+        events.emit(&BundleEvent::Scanned { count: 2 });
+        events.emit(&BundleEvent::Removed {
+            file: "stale.css".to_owned(),
+        });
+
+        assert_eq!(first.recorded(), ["found 2 assets", "removed stale.css"]);
+        assert_eq!(first.recorded(), second.recorded());
+    }
+
+    #[test]
+    fn a_closure_is_a_subscriber() {
+        let recorder = Recorder::default();
+
+        let mut events = BundleEvents::default();
+        let sink = recorder.clone();
+        events.push(move |event: &BundleEvent| sink.handle(event));
+        events.emit(&BundleEvent::Scanned { count: 1 });
+
+        assert_eq!(recorder.recorded(), ["found 1 assets"]);
+    }
+
+    #[test]
+    fn emitting_without_subscribers_is_a_no_op() {
+        BundleEvents::default().emit(&BundleEvent::Scanned { count: 0 });
+    }
+
+    #[test]
+    fn events_describe_themselves() {
+        let path = PathBuf::from("/cache/abc.css");
+        let uri = Uri::from_static("https://example.com/app.css");
+
+        assert_eq!(
+            BundleEvent::CacheHit {
+                uri: uri.clone(),
+                path: path.clone(),
+            }
+            .to_string(),
+            "cached https://example.com/app.css"
+        );
+        assert_eq!(
+            BundleEvent::Downloaded {
+                uri,
+                path,
+                bytes: 1024,
+            }
+            .to_string(),
+            "downloaded https://example.com/app.css (1024 bytes)"
+        );
+        assert_eq!(
+            BundleEvent::Bundled {
+                id: Asset::new("test", "src/lib.rs", "app.css", &crate::AssetOptions::NONE),
+                file: "app-0123456789abcdef.css".to_owned(),
+                bytes: 12,
+            }
+            .to_string(),
+            "bundled app-0123456789abcdef.css (12 bytes)"
+        );
+        assert_eq!(
+            BundleEvent::Finished {
+                bundled: 3,
+                unchanged: 4,
+                removed: 1,
+            }
+            .to_string(),
+            "bundled 3 assets (4 unchanged, 1 removed)"
+        );
+    }
+}

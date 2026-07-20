@@ -172,3 +172,94 @@ impl BundlerConfig {
         &self.events
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    use super::*;
+
+    #[test]
+    fn parallelism_defaults_and_overrides() {
+        assert_eq!(
+            BundlerConfig::new().resolve_parallelism(),
+            DEFAULT_PARALLELISM
+        );
+        assert_eq!(BundlerConfig::new().parallelism(3).resolve_parallelism(), 3);
+    }
+
+    #[test]
+    fn no_parallelism_still_leaves_one_worker() {
+        assert_eq!(BundlerConfig::new().parallelism(0).resolve_parallelism(), 1);
+    }
+
+    #[test]
+    fn the_configured_cache_dir_wins() {
+        let dir = PathBuf::from("/tmp/topcoat-asset-cache");
+        assert_eq!(
+            BundlerConfig::new().cache_dir(dir.clone()).resolve_cache_dir(),
+            dir
+        );
+    }
+
+    #[test]
+    fn the_built_in_agent_identifies_itself() {
+        let agent = BundlerConfig::new().resolve_agent();
+        let user_agent = format!("{:?}", agent.config().user_agent());
+        assert!(
+            user_agent.contains("topcoat-asset/"),
+            "unexpected user agent: {user_agent}"
+        );
+    }
+
+    #[test]
+    fn a_supplied_agent_is_used_as_is() {
+        let agent: ureq::Agent = ureq::Agent::config_builder()
+            .user_agent("custom-agent/1.0")
+            .build()
+            .into();
+
+        let resolved = BundlerConfig::new()
+            .agent(agent)
+            .timeout(Duration::from_secs(1))
+            .resolve_agent();
+
+        let user_agent = format!("{:?}", resolved.config().user_agent());
+        assert!(
+            user_agent.contains("custom-agent/1.0"),
+            "the supplied agent was replaced: {user_agent}"
+        );
+    }
+
+    #[test]
+    fn subscribers_receive_emitted_events() {
+        let count = Arc::new(AtomicUsize::new(0));
+
+        let seen = Arc::clone(&count);
+        let config = BundlerConfig::new()
+            .subscribe(move |_: &BundleEvent| {
+                seen.fetch_add(1, Ordering::Relaxed);
+            })
+            .subscribe(|_: &BundleEvent| {});
+
+        config.events().emit(&BundleEvent::Scanned { count: 1 });
+        assert_eq!(count.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn each_event_channel_receives_every_event() {
+        let (config, first) = BundlerConfig::new().event_channel();
+        let (config, second) = config.event_channel();
+
+        config.events().emit(&BundleEvent::Scanned { count: 7 });
+        drop(config);
+
+        let first: Vec<_> = first.into_iter().map(|event| event.to_string()).collect();
+        let second: Vec<_> = second.into_iter().map(|event| event.to_string()).collect();
+        assert_eq!(first, ["found 7 assets"]);
+        assert_eq!(first, second);
+    }
+}
