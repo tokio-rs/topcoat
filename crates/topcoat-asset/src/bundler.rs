@@ -1,11 +1,13 @@
 mod cache;
+mod config;
 mod error;
+mod event;
 
 use std::{
     collections::{HashMap, HashSet},
     fmt::Write as _,
     fs, io,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use sha2::{Digest, Sha256};
@@ -14,8 +16,10 @@ use crate::{
     AssetError, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset, Source,
 };
 
-use self::cache::Cache;
-pub use self::error::{BundleError, BundleResult};
+use cache::Cache;
+pub use config::*;
+pub use error::*;
+pub use event::*;
 
 /// Scans a built binary for [`asset!`](crate::asset) declarations and
 /// writes the referenced files into a bundle directory.
@@ -26,24 +30,16 @@ pub use self::error::{BundleError, BundleResult};
 /// [`Manifest`].
 pub struct Bundler {
     cache: Cache,
+    parallelism: usize,
 }
 
 impl Bundler {
     /// Create a bundler with a default [`ureq::Agent`] configured with
     /// this crate's user agent.
-    pub fn new(cache_dir: impl Into<PathBuf>) -> Self {
-        let agent = ureq::Agent::config_builder()
-            .user_agent(concat!("topcoat-asset/", env!("CARGO_PKG_VERSION")))
-            .build()
-            .into();
-        Self::with_agent(cache_dir, agent)
-    }
-
-    /// Like [`Bundler::new`], but with a caller-supplied [`ureq::Agent`]
-    /// (for custom timeouts, proxies, auth, etc.).
-    pub fn with_agent(cache_dir: impl Into<PathBuf>, agent: ureq::Agent) -> Self {
+    pub fn new(config: &BundlerConfig) -> Self {
         Self {
-            cache: Cache::new(cache_dir.into(), agent),
+            cache: Cache::new(config),
+            parallelism: config.resolve_parallelism(),
         }
     }
 
