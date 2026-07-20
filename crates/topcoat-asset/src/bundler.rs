@@ -7,8 +7,8 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Write as _,
     fs, io,
-    panic::resume_unwind,
     path::Path,
+    sync::atomic::{AtomicUsize, Ordering},
     thread,
 };
 
@@ -153,9 +153,10 @@ impl Bundler {
     /// Run [`Bundler::prepare`] over every asset, returning the results in
     /// declaration order.
     ///
-    /// Each worker takes an even slice of the assets. Since a slice is claimed
-    /// up front, one slow download holds up only the assets behind it, and a
-    /// failing asset doesn't stop the others from finishing.
+    /// Workers pull the next asset off a shared cursor as they go free, so a
+    /// slow download only ever holds up its own worker. Each keeps its results
+    /// local, tagged with the asset's position, and the tags put them back in
+    /// order at the end.
     fn prepare_all(
         &self,
         assets: &[RawAsset],
@@ -170,24 +171,31 @@ impl Bundler {
                 .collect();
         }
 
-        thread::scope(|scope| {
-            let workers: Vec<_> = assets
-                .chunks(assets.len().div_ceil(workers))
-                .map(|chunk| {
-                    scope.spawn(move || {
-                        chunk
-                            .iter()
-                            .map(|asset| self.prepare(asset, existing, out_dir))
-                            .collect::<Vec<_>>()
+        let next = AtomicUsize::new(0);
+        let mut results: Vec<_> = thread::scope(|scope| {
+            let workers: Vec<_> = (0..workers)
+                .map(|_| {
+                    scope.spawn(|| {
+                        let mut results = Vec::new();
+                        loop {
+                            let index = next.fetch_add(1, Ordering::Relaxed);
+                            let Some(asset) = assets.get(index) else {
+                                return results;
+                            };
+                            results.push((index, self.prepare(asset, existing, out_dir)));
+                        }
                     })
                 })
                 .collect();
 
             workers
                 .into_iter()
-                .flat_map(|worker| worker.join().unwrap_or_else(|panic| resume_unwind(panic)))
+                .flat_map(|worker| worker.join().expect("bundler worker panicked"))
                 .collect()
-        })
+        });
+
+        results.sort_unstable_by_key(|(index, _)| *index);
+        results.into_iter().map(|(_, result)| result).collect()
     }
 
     /// Resolve one asset to its manifest entry, writing it into `out_dir`
@@ -214,13 +222,12 @@ impl Bundler {
         }
 
         if let Some(expected) = asset.options().checksum() {
-            let expected_digest =
-                expected
-                    .strip_prefix("sha256:")
-                    .ok_or_else(|| AssetError::UnsupportedChecksum {
-                        asset: Box::new(asset.clone()),
-                        checksum: expected.to_owned(),
-                    })?;
+            let expected_digest = expected.strip_prefix("sha256:").ok_or_else(|| {
+                AssetError::UnsupportedChecksum {
+                    asset: Box::new(asset.clone()),
+                    checksum: expected.to_owned(),
+                }
+            })?;
             if expected_digest != hash {
                 return Err(AssetError::ChecksumMismatch {
                     asset: Box::new(asset.clone()),
