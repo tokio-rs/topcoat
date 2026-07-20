@@ -72,25 +72,19 @@ mod tests {
 
     #[test]
     fn displays_as_svg_view_box_value() {
-        assert_eq!(
-            ViewBox::new(0.0, 0.0, 24.0, 24.0).to_string(),
-            "0.0 0.0 24.0 24.0"
-        );
+        assert_eq!(ViewBox::new(0.0, 0.0, 24.0, 24.0).to_string(), "0 0 24 24");
         assert_eq!(
             ViewBox::new(0.0, -0.5, 16.5, 16.0).to_string(),
-            "0.0 -0.5 16.5 16.0"
+            "0 -0.5 16.5 16"
         );
     }
 
     #[test]
     fn renders_view_parts_as_space_separated_value() {
-        assert_eq!(
-            render(ViewBox::new(0.0, 0.0, 24.0, 24.0)),
-            "0.0 0.0 24.0 24.0"
-        );
+        assert_eq!(render(ViewBox::new(0.0, 0.0, 24.0, 24.0)), "0 0 24 24");
         assert_eq!(
             render(ViewBox::new(0.0, -0.5, 16.5, 16.0)),
-            "0.0 -0.5 16.5 16.0"
+            "0 -0.5 16.5 16"
         );
     }
 
