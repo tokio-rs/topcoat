@@ -8,10 +8,10 @@ You need the [`topcoat` CLI](https://github.com/tokio-rs/topcoat/blob/main/crate
 
 ```toml
 [dependencies]
-topcoat = { version = "0.3.0", features = ["font-fontsource", "tailwind", "ui"] }
+topcoat = { version = "0.3.1", features = ["font-fontsource", "tailwind", "ui"] }
 
 [build-dependencies]
-topcoat = { version = "0.3.0", default-features = false, features = ["tailwind"] }
+topcoat = { version = "0.3.1", default-features = false, features = ["tailwind"] }
 ```
 
 ## Initialize the package
