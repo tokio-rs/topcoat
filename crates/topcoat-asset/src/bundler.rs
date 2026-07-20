@@ -368,7 +368,8 @@ mod tests {
         /// Declare an asset without creating the file it points at.
         fn declare_missing(&mut self, name: &str) -> Asset {
             let path = self.root.join("src").join(name);
-            self.declare_path(&path.to_str().unwrap().to_owned(), &AssetOptions::NONE)
+            let path = path.to_str().unwrap().to_owned();
+            self.declare_path(&path, &AssetOptions::NONE)
         }
 
         fn declare_path(&mut self, path: &str, options: &AssetOptions) -> Asset {
@@ -404,7 +405,7 @@ mod tests {
             (result, events.into_iter().collect())
         }
 
-        fn manifest(&self, out: &Path) -> Manifest {
+        fn manifest(out: &Path) -> Manifest {
             Manifest::load(out.join(MANIFEST_NAME)).unwrap()
         }
     }
@@ -420,7 +421,7 @@ mod tests {
         let (result, _) = fixture.bundle(&out, 8);
         result.unwrap();
 
-        let manifest = fixture.manifest(&out);
+        let manifest = Fixture::manifest(&out);
         assert_eq!(manifest.assets.len(), 32);
         for (i, entry) in manifest.assets.iter().enumerate() {
             assert!(
@@ -447,8 +448,8 @@ mod tests {
         fixture.bundle(&sequential, 1).0.unwrap();
         fixture.bundle(&parallel, 8).0.unwrap();
 
-        let sequential = fixture.manifest(&sequential);
-        let parallel = fixture.manifest(&parallel);
+        let sequential = Fixture::manifest(&sequential);
+        let parallel = Fixture::manifest(&parallel);
         assert_eq!(sequential.assets.len(), parallel.assets.len());
         for (a, b) in sequential.assets.iter().zip(&parallel.assets) {
             assert_eq!(a.id, b.id);
@@ -467,7 +468,7 @@ mod tests {
         let (result, events) = fixture.bundle(&out, 64);
         result.unwrap();
 
-        assert_eq!(fixture.manifest(&out).assets.len(), 1);
+        assert_eq!(Fixture::manifest(&out).assets.len(), 1);
         assert!(matches!(
             events.last(),
             Some(BundleEvent::Finished { bundled: 1, .. })
@@ -482,7 +483,7 @@ mod tests {
         let (result, events) = fixture.bundle(&out, 8);
         result.unwrap();
 
-        assert!(fixture.manifest(&out).assets.is_empty());
+        assert!(Fixture::manifest(&out).assets.is_empty());
         assert!(matches!(
             events.first(),
             Some(BundleEvent::Scanned { count: 0 })
@@ -570,7 +571,7 @@ mod tests {
         result.unwrap();
 
         assert!(!out.join(&stale.file).exists());
-        assert_eq!(fixture.manifest(&out).assets.len(), 1);
+        assert_eq!(Fixture::manifest(&out).assets.len(), 1);
         assert!(
             events
                 .iter()
@@ -597,7 +598,7 @@ mod tests {
 
         let out = fixture.out();
         fixture.bundle(&out, 1).0.unwrap();
-        assert_eq!(fixture.manifest(&out).assets.len(), 1);
+        assert_eq!(Fixture::manifest(&out).assets.len(), 1);
     }
 
     #[test]
@@ -670,7 +671,7 @@ mod tests {
         let out = fixture.out();
         fixture.bundle(&out, 2).0.unwrap();
 
-        let manifest = fixture.manifest(&out);
+        let manifest = Fixture::manifest(&out);
         let renamed = &manifest.assets[0];
         assert_eq!(renamed.file, format!("styles-{}.css", &renamed.hash[..16]));
         assert_eq!(renamed.content_type, "text/css");
@@ -695,7 +696,7 @@ mod tests {
         let out = fixture.out();
         fixture.bundle(&out, 2).0.unwrap();
 
-        let manifest = fixture.manifest(&out);
+        let manifest = Fixture::manifest(&out);
         assert_eq!(manifest.assets[0].content_type, "text/css");
         assert_eq!(manifest.assets[1].content_type, "application/x-custom");
     }
@@ -726,12 +727,12 @@ mod tests {
 
         let out = fixture.out();
         fixture.bundle(&out, 1).0.unwrap();
-        let before = fixture.manifest(&out).assets.len();
+        let before = Fixture::manifest(&out).assets.len();
 
         fixture.declare_missing("missing.txt");
         fixture.bundle(&out, 2).0.unwrap_err();
 
-        assert_eq!(fixture.manifest(&out).assets.len(), before);
+        assert_eq!(Fixture::manifest(&out).assets.len(), before);
     }
 
     #[test]
