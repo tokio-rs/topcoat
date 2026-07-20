@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/tokio-rs/topcoat/compare/topcoat-session-v0.3.0...topcoat-session-v0.3.1) - 2026-07-20
+
+### Other
+
+- token encode and decode behavior ([#153](https://github.com/tokio-rs/topcoat/pull/153))
+
 ## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-session-v0.1.3...topcoat-session-v0.2.0) - 2026-07-19
 
 ### Other
