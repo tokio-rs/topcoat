@@ -7,13 +7,15 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Write as _,
     fs, io,
+    panic::resume_unwind,
     path::Path,
+    thread,
 };
 
 use sha2::{Digest, Sha256};
 
 use crate::{
-    AssetError, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset, Source,
+    Asset, AssetError, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset, Source,
 };
 
 use cache::Cache;
@@ -31,15 +33,17 @@ pub use event::*;
 pub struct Bundler {
     cache: Cache,
     parallelism: usize,
+    events: BundleEvents,
 }
 
 impl Bundler {
-    /// Create a bundler with a default [`ureq::Agent`] configured with
-    /// this crate's user agent.
+    /// Create a bundler from a [`BundlerConfig`].
+    #[must_use]
     pub fn new(config: &BundlerConfig) -> Self {
         Self {
             cache: Cache::new(config),
             parallelism: config.resolve_parallelism(),
+            events: config.events().clone(),
         }
     }
 
@@ -51,6 +55,9 @@ impl Bundler {
     /// new one are removed. Remote (http/https) assets are downloaded into
     /// the bundler's cache directory and then treated like local files.
     ///
+    /// Up to [`BundlerConfig::parallelism`] assets are processed at once.
+    /// The manifest lists them in declaration order regardless.
+    ///
     /// This blocks on filesystem and network I/O; call it from a blocking
     /// context (e.g. [`tokio::task::spawn_blocking`]) when running inside an
     /// async runtime.
@@ -60,7 +67,8 @@ impl Bundler {
     /// Returns a [`BundleError`] for any I/O failure while creating or
     /// reading `out_dir` and its manifest, downloading a remote asset, or
     /// reading/writing a bundled file; and for a checksum mismatch between a
-    /// declared asset and its configured `checksum`.
+    /// declared asset and its configured `checksum`. When several assets
+    /// fail, the one declared earliest is reported.
     pub fn bundle(&self, binary: &[u8], out_dir: impl AsRef<Path>) -> BundleResult {
         let out_dir = out_dir.as_ref();
         fs::create_dir_all(out_dir).map_err(|source| AssetError::ManifestIo {
@@ -86,97 +94,36 @@ impl Bundler {
         };
 
         let assets = RawAsset::find_in_binary(binary);
+        self.events.emit(&BundleEvent::Scanned {
+            count: assets.len(),
+        });
+
         let mut entries = Vec::with_capacity(assets.len());
         let mut kept_files = HashSet::with_capacity(assets.len());
-
-        for asset in assets {
-            let source = asset.source();
-            let src = match &source {
-                Source::Path(p) => p.clone(),
-                Source::Url(uri) => self.cache.fetch(uri)?,
-            };
-            let bytes = fs::read(&src).map_err(|source| AssetError::AssetIo {
-                asset: Box::new(asset.clone()),
-                source,
-            })?;
-            let digest = Sha256::digest(&bytes);
-            let mut hash = String::with_capacity(digest.len() * 2);
-            for b in &digest {
-                let _ = write!(hash, "{b:02x}");
+        let mut bundled = 0;
+        let mut unchanged = 0;
+        for prepared in self.prepare_all(&assets, &existing, out_dir) {
+            let prepared = prepared?;
+            if prepared.written {
+                bundled += 1;
+            } else {
+                unchanged += 1;
             }
-
-            if let Some(expected) = asset.options().checksum() {
-                let expected_digest = expected.strip_prefix("sha256:").ok_or_else(|| {
-                    AssetError::UnsupportedChecksum {
-                        asset: Box::new(asset.clone()),
-                        checksum: expected.to_owned(),
-                    }
-                })?;
-                if expected_digest != hash {
-                    return Err(AssetError::ChecksumMismatch {
-                        asset: Box::new(asset.clone()),
-                        expected: expected.to_owned(),
-                        actual: format!("sha256:{hash}"),
-                    }
-                    .into());
-                }
-            }
-
-            let short_hash = &hash[..16];
-
-            let name = source.display_name();
-            let name_path = Path::new(&name);
-            let derived_stem = name_path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("asset");
-            let derived_ext = name_path.extension().and_then(|e| e.to_str());
-            let options = asset.options();
-            let stem = options.rename().unwrap_or(derived_stem);
-            let ext = options.extension().or(derived_ext);
-            let file = match (stem.is_empty(), ext) {
-                (true, Some(ext)) if !ext.is_empty() => format!("{short_hash}.{ext}"),
-                (true, _) => short_hash.to_string(),
-                (false, Some(ext)) if !ext.is_empty() => format!("{stem}-{short_hash}.{ext}"),
-                (false, _) => format!("{stem}.{short_hash}"),
-            };
-
-            let content_type = options.content_type().map_or_else(
-                || {
-                    mime_guess::from_path(&file)
-                        .first_or_octet_stream()
-                        .to_string()
-                },
-                str::to_owned,
-            );
-
-            let id = asset.id();
-            let dst = out_dir.join(&file);
-            let unchanged = existing
-                .get(&id)
-                .is_some_and(|prev| prev.hash == hash && prev.file == file);
-
-            if !unchanged || !dst.exists() {
-                fs::write(&dst, &bytes).map_err(|source| AssetError::AssetIo {
-                    asset: Box::new(asset.clone()),
-                    source,
-                })?;
-            }
-
-            kept_files.insert(file.clone());
-            entries.push(ManifestEntry {
-                id,
-                file,
-                hash,
-                content_type,
-            });
+            kept_files.insert(prepared.entry.file.clone());
+            entries.push(prepared.entry);
         }
 
+        let mut removed = 0;
         for entry in existing.values() {
             if !kept_files.contains(&entry.file) {
                 let path = out_dir.join(&entry.file);
                 match fs::remove_file(&path) {
-                    Ok(()) => {}
+                    Ok(()) => {
+                        removed += 1;
+                        self.events.emit(&BundleEvent::Removed {
+                            file: entry.file.clone(),
+                        });
+                    }
                     Err(e) if e.kind() == io::ErrorKind::NotFound => {}
                     Err(source) => return Err(AssetError::ManifestIo { path, source }.into()),
                 }
@@ -194,6 +141,162 @@ impl Bundler {
                 source,
             })?;
 
+        self.events.emit(&BundleEvent::Finished {
+            bundled,
+            unchanged,
+            removed,
+        });
+
         Ok(())
     }
+
+    /// Run [`Bundler::prepare`] over every asset, returning the results in
+    /// declaration order.
+    ///
+    /// Each worker takes an even slice of the assets. Since a slice is claimed
+    /// up front, one slow download holds up only the assets behind it, and a
+    /// failing asset doesn't stop the others from finishing.
+    fn prepare_all(
+        &self,
+        assets: &[RawAsset],
+        existing: &HashMap<Asset, ManifestEntry>,
+        out_dir: &Path,
+    ) -> Vec<Result<Prepared, BundleError>> {
+        let workers = self.parallelism.min(assets.len());
+        if workers <= 1 {
+            return assets
+                .iter()
+                .map(|asset| self.prepare(asset, existing, out_dir))
+                .collect();
+        }
+
+        thread::scope(|scope| {
+            let workers: Vec<_> = assets
+                .chunks(assets.len().div_ceil(workers))
+                .map(|chunk| {
+                    scope.spawn(move || {
+                        chunk
+                            .iter()
+                            .map(|asset| self.prepare(asset, existing, out_dir))
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect();
+
+            workers
+                .into_iter()
+                .flat_map(|worker| worker.join().unwrap_or_else(|panic| resume_unwind(panic)))
+                .collect()
+        })
+    }
+
+    /// Resolve one asset to its manifest entry, writing it into `out_dir`
+    /// unless an identical copy is already there.
+    fn prepare(
+        &self,
+        asset: &RawAsset,
+        existing: &HashMap<Asset, ManifestEntry>,
+        out_dir: &Path,
+    ) -> Result<Prepared, BundleError> {
+        let source = asset.source();
+        let src = match &source {
+            Source::Path(p) => p.clone(),
+            Source::Url(uri) => self.cache.fetch(uri)?,
+        };
+        let bytes = fs::read(&src).map_err(|source| AssetError::AssetIo {
+            asset: Box::new(asset.clone()),
+            source,
+        })?;
+        let digest = Sha256::digest(&bytes);
+        let mut hash = String::with_capacity(digest.len() * 2);
+        for b in &digest {
+            let _ = write!(hash, "{b:02x}");
+        }
+
+        if let Some(expected) = asset.options().checksum() {
+            let expected_digest =
+                expected
+                    .strip_prefix("sha256:")
+                    .ok_or_else(|| AssetError::UnsupportedChecksum {
+                        asset: Box::new(asset.clone()),
+                        checksum: expected.to_owned(),
+                    })?;
+            if expected_digest != hash {
+                return Err(AssetError::ChecksumMismatch {
+                    asset: Box::new(asset.clone()),
+                    expected: expected.to_owned(),
+                    actual: format!("sha256:{hash}"),
+                }
+                .into());
+            }
+        }
+
+        let short_hash = &hash[..16];
+
+        let name = source.display_name();
+        let name_path = Path::new(&name);
+        let derived_stem = name_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("asset");
+        let derived_ext = name_path.extension().and_then(|e| e.to_str());
+        let options = asset.options();
+        let stem = options.rename().unwrap_or(derived_stem);
+        let ext = options.extension().or(derived_ext);
+        let file = match (stem.is_empty(), ext) {
+            (true, Some(ext)) if !ext.is_empty() => format!("{short_hash}.{ext}"),
+            (true, _) => short_hash.to_string(),
+            (false, Some(ext)) if !ext.is_empty() => format!("{stem}-{short_hash}.{ext}"),
+            (false, _) => format!("{stem}.{short_hash}"),
+        };
+
+        let content_type = options.content_type().map_or_else(
+            || {
+                mime_guess::from_path(&file)
+                    .first_or_octet_stream()
+                    .to_string()
+            },
+            str::to_owned,
+        );
+
+        let id = asset.id();
+        let dst = out_dir.join(&file);
+        let unchanged = existing
+            .get(&id)
+            .is_some_and(|prev| prev.hash == hash && prev.file == file);
+
+        let written = !unchanged || !dst.exists();
+        if written {
+            fs::write(&dst, &bytes).map_err(|source| AssetError::AssetIo {
+                asset: Box::new(asset.clone()),
+                source,
+            })?;
+            self.events.emit(&BundleEvent::Bundled {
+                id,
+                file: file.clone(),
+                bytes: bytes.len(),
+            });
+        } else {
+            self.events.emit(&BundleEvent::Unchanged {
+                id,
+                file: file.clone(),
+            });
+        }
+
+        Ok(Prepared {
+            entry: ManifestEntry {
+                id,
+                file,
+                hash,
+                content_type,
+            },
+            written,
+        })
+    }
+}
+
+/// One asset's manifest entry, plus whether it had to be written.
+struct Prepared {
+    entry: ManifestEntry,
+    written: bool,
 }

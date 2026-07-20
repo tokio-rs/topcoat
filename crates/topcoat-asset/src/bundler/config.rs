@@ -8,7 +8,7 @@ pub const DEFAULT_PARALLELISM: usize = 8;
 
 /// Wall-clock limit for a single download when
 /// [`timeout`](BundlerConfig::timeout) is unset.
-pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_mins(1);
 
 /// Limit for establishing a connection when
 /// [`connect_timeout`](BundlerConfig::connect_timeout) is unset.

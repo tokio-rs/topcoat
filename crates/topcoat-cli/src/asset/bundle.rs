@@ -50,7 +50,8 @@ pub(crate) async fn run_bundle(
     let bytes = bytes.to_vec();
     let bundle_dir = out_dir.clone();
     tokio::task::spawn_blocking(move || {
-        topcoat_asset::Bundler::new(cache_dir).bundle(&bytes, &bundle_dir)
+        let config = topcoat_asset::BundlerConfig::new().cache_dir(cache_dir);
+        topcoat_asset::Bundler::new(&config).bundle(&bytes, &bundle_dir)
     })
     .await??;
     Ok(out_dir)
