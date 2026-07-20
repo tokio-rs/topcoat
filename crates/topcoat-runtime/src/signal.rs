@@ -100,9 +100,26 @@ where
             .expect("failed to serialize signal declaration payload");
 
         parts.push_str_unescaped("<!-- ::topcoat::signal(");
-        parts.push_str_unescaped(json);
+        parts.push_str_unescaped(escape_for_html_comment(&json));
         parts.push_str_unescaped(") -->");
     }
+}
+
+/// Rewrites the HTML-significant characters in a serialized JSON payload as
+/// JSON `\uXXXX` escapes so the payload cannot terminate the HTML comment it is
+/// embedded in.
+///
+/// The client reads this marker back with `JSON.parse` (see the browser
+/// runtime's `comment.ts`), which decodes `\uXXXX` escapes, so the value is
+/// byte-identical after the round trip. `serde_json` does not escape `<`, `>`,
+/// or `&`, so without this a signal value containing `-->` would close the
+/// comment early and drop the browser back into live HTML parsing -- an XSS
+/// vector. `"` is already emitted as `\"` by `serde_json`, so structural quotes
+/// are left untouched.
+fn escape_for_html_comment(json: &str) -> String {
+    json.replace('<', "\\u003c")
+        .replace('>', "\\u003e")
+        .replace('&', "\\u0026")
 }
 
 #[derive(Debug, Clone)]
@@ -210,5 +227,47 @@ pub struct EncodedSignals(String);
 impl EncodedSignals {
     pub fn new(inner: impl Into<String>) -> Self {
         Self(inner.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use topcoat_view::{HtmlContext, NodeViewParts, PartsWriter, View, ViewParts};
+
+    use super::*;
+
+    fn render_signal(value: &str) -> String {
+        let signal = Signal::new(value.to_string());
+        let mut parts = ViewParts::new();
+        SignalDeclaration::new(&signal).into_view_parts(
+            &Cx::default(),
+            &mut PartsWriter::new(&mut parts, HtmlContext::Text),
+        );
+        View::new(parts).render(&Cx::default())
+    }
+
+    #[test]
+    fn signal_payload_cannot_terminate_the_comment() {
+        let rendered = render_signal("--><img src=x onerror=alert(1)>");
+        // The only "-->" is the marker's own closing delimiter.
+        assert_eq!(rendered.matches("-->").count(), 1);
+        assert!(rendered.trim_end().ends_with(") -->"));
+        assert!(!rendered.contains("<img"));
+    }
+
+    #[test]
+    fn signal_payload_round_trips_through_json() {
+        let value = "--></script> a < b && \"quoted\"";
+        let rendered = render_signal(value);
+        let payload = rendered
+            .split_once("::topcoat::signal(")
+            .and_then(|(_, rest)| rest.rsplit_once(") -->"))
+            .map(|(json, _)| json.trim())
+            .expect("rendered marker has the expected shape");
+        // The client parses this payload verbatim with JSON.parse, so it must
+        // be valid JSON that decodes back to the original value unchanged.
+        let parsed: serde_json::Value =
+            serde_json::from_str(payload).expect("payload is valid JSON");
+        assert_eq!(parsed["v"], value);
     }
 }
