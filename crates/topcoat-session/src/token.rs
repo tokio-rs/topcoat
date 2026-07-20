@@ -36,17 +36,9 @@ impl Token {
     /// Returns a [`DecodeError`] when `s` is not valid base64 or does not
     /// decode to exactly 32 bytes.
     pub fn decode(s: &str) -> Result<Self, DecodeError> {
-        use base64::{DecodeSliceError, Engine as _, engine::general_purpose::URL_SAFE};
-        let mut bytes = [0u8; 32];
-        let num_bytes = URL_SAFE
-            .decode_slice(s, &mut bytes)
-            .map_err(|error| match error {
-                DecodeSliceError::OutputSliceTooSmall => DecodeError::Length,
-                DecodeSliceError::DecodeError(error) => error.into(),
-            })?;
-        if num_bytes != bytes.len() {
-            return Err(DecodeError::Length);
-        }
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+        let bytes = URL_SAFE.decode(s)?;
+        let bytes: [u8; 32] = bytes.try_into().map_err(|_| DecodeError::Length)?;
         Ok(Self::new(bytes))
     }
 
@@ -90,4 +82,33 @@ pub enum DecodeError {
     Base64(#[from] base64::DecodeError),
     #[error("invalid number of bytes in token")]
     Length,
+}
+
+#[cfg(test)]
+mod tests {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+
+    use super::*;
+
+    #[test]
+    fn encode_then_decode_round_trips() {
+        let token = Token::random();
+        let decoded = Token::decode(&token.encode()).expect("an encoded token decodes back");
+        assert_eq!(decoded.dangerous_as_array(), token.dangerous_as_array());
+    }
+
+    #[test]
+    fn decode_rejects_wrong_length() {
+        // A valid base64 string that decodes to 16 bytes, not the required 32.
+        let encoded = URL_SAFE.encode([0u8; 16]);
+        assert!(matches!(Token::decode(&encoded), Err(DecodeError::Length)));
+    }
+
+    #[test]
+    fn decode_rejects_invalid_base64() {
+        assert!(matches!(
+            Token::decode("not*valid*base64"),
+            Err(DecodeError::Base64(_))
+        ));
+    }
 }
