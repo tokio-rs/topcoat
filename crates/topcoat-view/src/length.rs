@@ -512,8 +512,7 @@ impl Length {
 
 impl Display for Length {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut buffer = zmij::Buffer::new();
-        f.write_str(buffer.format(self.value))?;
+        write!(f, "{}", self.value)?;
         f.write_str(self.unit.as_str())?;
         Ok(())
     }

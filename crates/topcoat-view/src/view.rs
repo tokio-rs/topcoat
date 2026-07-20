@@ -1,4 +1,5 @@
 use core::fmt;
+use core::fmt::Write as _;
 use std::borrow::Cow;
 
 #[cfg(feature = "http")]
@@ -235,7 +236,6 @@ impl ViewPart {
     /// piece of text was written in.
     pub(crate) fn render(&self, cx: &Cx, f: &mut Formatter<'_>) {
         let mut int_buffer = itoa::Buffer::new();
-        let mut float_buffer = zmij::Buffer::new();
 
         match self {
             Self::Empty => {}
@@ -255,8 +255,8 @@ impl ViewPart {
             Self::U64(inner) => f.write_str(int_buffer.format(*inner)),
             Self::U128(inner) => f.write_str(int_buffer.format(*inner)),
             Self::Usize(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::F32(inner) => f.write_str(float_buffer.format(*inner)),
-            Self::F64(inner) => f.write_str(float_buffer.format(*inner)),
+            Self::F32(inner) => write!(f, "{inner}").unwrap(),
+            Self::F64(inner) => write!(f, "{inner}").unwrap(),
             Self::Char { value, context } => context.writer(f).write_char(*value),
             Self::Str { value, context } => context.writer(f).write_str(value),
             Self::BoxDyn { inner, context, .. } => inner.render(cx, &mut context.writer(f)),

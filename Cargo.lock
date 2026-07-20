@@ -3062,7 +3062,6 @@ dependencies = [
  "smallvec",
  "topcoat",
  "topcoat-core",
- "zmij",
 ]
 
 [[package]]
