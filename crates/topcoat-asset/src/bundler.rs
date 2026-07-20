@@ -529,8 +529,7 @@ mod tests {
         let out = fixture.out();
         fixture.bundle(&out, 2).0.unwrap();
 
-        let deleted = fixture
-            .manifest(&out)
+        let deleted = Fixture::manifest(&out)
             .assets
             .into_iter()
             .find(|entry| entry.file.starts_with("deleted-"))
@@ -559,8 +558,7 @@ mod tests {
 
         let out = fixture.out();
         fixture.bundle(&out, 2).0.unwrap();
-        let stale = fixture
-            .manifest(&out)
+        let stale = Fixture::manifest(&out)
             .assets
             .into_iter()
             .find(|entry| entry.file.starts_with("stale-"))
