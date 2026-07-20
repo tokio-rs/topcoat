@@ -91,3 +91,46 @@ pub enum DecodeError {
     #[error("invalid number of bytes in token")]
     Length,
 }
+
+#[cfg(test)]
+mod tests {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+
+    use super::*;
+
+    #[test]
+    fn encode_then_decode_round_trips() {
+        let token = Token::random();
+        let decoded = Token::decode(&token.encode()).expect("an encoded token decodes back");
+        assert_eq!(decoded.dangerous_as_array(), token.dangerous_as_array());
+    }
+
+    #[test]
+    fn decode_accept_correct_length() {
+        let encoded = URL_SAFE.encode([0u8; 32]);
+        assert_eq!(
+            Token::decode(&encoded).unwrap().dangerous_as_array(),
+            &[0u8; 32]
+        );
+    }
+
+    #[test]
+    fn decode_rejects_length_too_short() {
+        let encoded = URL_SAFE.encode([0u8; 31]);
+        assert!(matches!(Token::decode(&encoded), Err(DecodeError::Length)));
+    }
+
+    #[test]
+    fn decode_rejects_length_too_long() {
+        let encoded = URL_SAFE.encode([0u8; 33]);
+        assert!(matches!(Token::decode(&encoded), Err(DecodeError::Length)));
+    }
+
+    #[test]
+    fn decode_rejects_invalid_base64() {
+        assert!(matches!(
+            Token::decode("not*valid*base64"),
+            Err(DecodeError::Base64(_))
+        ));
+    }
+}
