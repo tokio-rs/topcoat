@@ -28,7 +28,7 @@ pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 ///     .timeout(Duration::from_secs(30))
 ///     .subscribe(|event: &BundleEvent| println!("{event}"));
 ///
-/// let bundler = Bundler::with_config("target/asset-cache", config);
+/// let bundler = Bundler::new(&config);
 /// ```
 #[derive(Clone, Default)]
 pub struct BundlerConfig {
@@ -126,7 +126,7 @@ impl BundlerConfig {
     ///     }
     /// });
     ///
-    /// let bundler = Bundler::with_config("target/asset-cache", config);
+    /// let bundler = Bundler::new(&config);
     /// ```
     #[must_use]
     pub fn event_channel(self) -> (Self, mpsc::Receiver<BundleEvent>) {
