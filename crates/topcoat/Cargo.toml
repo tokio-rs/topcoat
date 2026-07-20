@@ -25,6 +25,7 @@ default = [
 	"discover",
 ]
 full = [
+	"alpine-ajax",
 	"asset",
 	"compression",
 	"cookie",
@@ -44,6 +45,9 @@ full = [
 	"view",
 ]
 
+alpine-ajax = [
+	"dep:topcoat-alpine-ajax",
+]
 asset = [
 	"dep:topcoat-asset",
 	"topcoat-font?/asset",
@@ -129,6 +133,7 @@ view = [
 ]
 
 [dependencies]
+topcoat-alpine-ajax = { workspace = true, optional = true }
 topcoat-asset = { workspace = true, optional = true }
 topcoat-cookie = { workspace = true, optional = true }
 topcoat-core.workspace = true

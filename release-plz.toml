@@ -19,6 +19,11 @@ release = true
 version_group = "topcoat"
 
 [[package]]
+name = "topcoat-alpine-ajax"
+release = true
+version_group = "topcoat"
+
+[[package]]
 name = "topcoat-asset"
 release = true
 version_group = "topcoat"

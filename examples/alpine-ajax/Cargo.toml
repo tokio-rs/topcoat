@@ -1,0 +1,12 @@
+[package]
+name = "alpine-ajax"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+topcoat = { workspace = true, features = ["alpine-ajax"] }
+
+[lints]
+workspace = true

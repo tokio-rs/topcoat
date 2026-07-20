@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/topcoat",
+    "crates/topcoat-alpine-ajax",
     "crates/topcoat-asset",
     "crates/topcoat-cli",
     "crates/topcoat-cookie",
@@ -29,6 +30,7 @@ members = [
     "crates/topcoat-view/grammar",
     "crates/topcoat-view/macro",
 
+    "examples/alpine-ajax",
     "examples/app-context",
     "examples/asset",
     "examples/context",
@@ -100,6 +102,7 @@ debug = false
 # before the facade does. Path-only dev-dependencies are dropped from the published
 # manifest, sidestepping the facade<->sub-crate cycle. Do not add a version here.
 topcoat = { path = "crates/topcoat" }
+topcoat-alpine-ajax = { version = "0.3.1", path = "crates/topcoat-alpine-ajax" }
 topcoat-asset = { version = "0.3.1", path = "crates/topcoat-asset" }
 topcoat-cookie = { version = "0.3.1", path = "crates/topcoat-cookie" }
 topcoat-core = { version = "0.3.1", path = "crates/topcoat-core" }

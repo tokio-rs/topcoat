@@ -83,6 +83,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "alpine-ajax"
+version = "0.3.1"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "anes"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2705,6 +2713,7 @@ dependencies = [
  "serde_urlencoded",
  "tokio",
  "tokio-tungstenite 0.29.0",
+ "topcoat-alpine-ajax",
  "topcoat-asset",
  "topcoat-cookie",
  "topcoat-core",
@@ -2724,6 +2733,16 @@ dependencies = [
  "topcoat-view",
  "topcoat-view-macro",
  "uuid",
+]
+
+[[package]]
+name = "topcoat-alpine-ajax"
+version = "0.3.1"
+dependencies = [
+ "http",
+ "tokio",
+ "topcoat",
+ "topcoat-core",
 ]
 
 [[package]]
