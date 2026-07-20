@@ -200,7 +200,9 @@ mod tests {
     fn the_configured_cache_dir_wins() {
         let dir = PathBuf::from("/tmp/topcoat-asset-cache");
         assert_eq!(
-            BundlerConfig::new().cache_dir(dir.clone()).resolve_cache_dir(),
+            BundlerConfig::new()
+                .cache_dir(dir.clone())
+                .resolve_cache_dir(),
             dir
         );
     }

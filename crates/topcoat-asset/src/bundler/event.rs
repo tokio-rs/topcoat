@@ -22,7 +22,11 @@ pub enum BundleEvent {
     /// A remote asset finished downloading into the cache.
     Downloaded { uri: Uri, path: PathBuf, bytes: u64 },
     /// An asset was written into the bundle directory.
-    Bundled { id: Asset, file: String, bytes: usize },
+    Bundled {
+        id: Asset,
+        file: String,
+        bytes: usize,
+    },
     /// An asset was already in the bundle directory with the same
     /// contents, so it was left alone.
     Unchanged { id: Asset, file: String },
