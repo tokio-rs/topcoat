@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Write};
 use proc_macro2::{LineColumn, Span, TokenStream};
 use quote::ToTokens;
 use syn::{
-    Ident, Token,
+    Ident, LitInt, Token,
     ext::IdentExt,
     parse::{Parse, ParseStream},
     spanned::Spanned,
@@ -21,21 +21,6 @@ pub struct HtmlIdent {
     pub rest: Vec<HtmlIdentSegment>,
 }
 
-/// A trailing `<sep><ident>` segment of an [`HtmlIdent`].
-#[derive(Debug, PartialEq)]
-pub struct HtmlIdentSegment {
-    pub separator: HtmlIdentSeparator,
-    pub ident: Ident,
-}
-
-/// The character joining two segments of an [`HtmlIdent`].
-#[derive(Debug, PartialEq)]
-pub enum HtmlIdentSeparator {
-    Dash(Token![-]),
-    Colon(Token![:]),
-    Dot(Token![.]),
-}
-
 impl HtmlIdent {
     /// The source span covering the identifier. Falls back to the first
     /// segment's span when the underlying [`Span::join`] is unavailable (i.e.
@@ -44,7 +29,7 @@ impl HtmlIdent {
     pub fn span(&self) -> Span {
         let first = self.first.span();
         match self.rest.last() {
-            Some(segment) => first.join(segment.ident.span()).unwrap_or(first),
+            Some(segment) => first.join(segment.part.span()).unwrap_or(first),
             None => first,
         }
     }
@@ -92,20 +77,35 @@ impl HtmlIdent {
                 ));
             }
 
-            let ident = Ident::parse_any(input)?;
-            if !is_adjacent(separator_span.end(), ident.span().start()) {
+            let part = HtmlIdentPart::parse(input)?;
+            if !is_adjacent(separator_span.end(), part.span().start()) {
                 return Err(syn::Error::new(
-                    ident.span(),
+                    part.span(),
                     "whitespace is not allowed inside an HTML identifier",
                 ));
             }
 
-            prev_end = ident.span().end();
-            rest.push(HtmlIdentSegment { separator, ident });
+            prev_end = part.span().end();
+            rest.push(HtmlIdentSegment { separator, part });
         }
 
         Ok(Self { first, rest })
     }
+}
+
+/// A trailing `<sep><part>` segment of an [`HtmlIdent`].
+#[derive(Debug, PartialEq)]
+pub struct HtmlIdentSegment {
+    pub separator: HtmlIdentSeparator,
+    pub part: HtmlIdentPart,
+}
+
+/// The character joining two segments of an [`HtmlIdent`].
+#[derive(Debug, PartialEq)]
+pub enum HtmlIdentSeparator {
+    Dash(Token![-]),
+    Colon(Token![:]),
+    Dot(Token![.]),
 }
 
 impl HtmlIdentSeparator {
@@ -127,12 +127,75 @@ impl HtmlIdentSeparator {
     }
 }
 
+/// The identifier portion of an [`HtmlIdentSegment`]. Usually a Rust-style
+/// identifier, but HTML attribute names may also carry a bare number such as
+/// Alpine AJAX's `x-target.422` status-code modifiers -- including wildcard
+/// forms like `4xx` -- which are not valid Rust identifiers.
+#[derive(Debug, PartialEq)]
+pub enum HtmlIdentPart {
+    Ident(Ident),
+    Int(LitInt),
+}
+
+impl HtmlIdentPart {
+    /// Parses a segment identifier: either a Rust identifier (including
+    /// keywords) or an integer literal, which the Rust lexer produces for
+    /// segments that begin with a digit such as `422` or `4xx`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input begins with neither of those.
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if input.peek(LitInt) {
+            Ok(Self::Int(input.parse()?))
+        } else {
+            Ok(Self::Ident(Ident::parse_any(input)?))
+        }
+    }
+
+    #[must_use]
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Ident(ident) => ident.span(),
+            Self::Int(int) => int.span(),
+        }
+    }
+}
+
+impl Display for HtmlIdentPart {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ident(ident) => Display::fmt(ident, f),
+            Self::Int(int) => Display::fmt(int, f),
+        }
+    }
+}
+
+impl ToTokens for HtmlIdentPart {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Ident(ident) => ident.to_tokens(tokens),
+            Self::Int(int) => int.to_tokens(tokens),
+        }
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for HtmlIdentPart {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        match self {
+            Self::Ident(ident) => ident.pretty_print(printer),
+            Self::Int(int) => int.pretty_print(printer),
+        }
+    }
+}
+
 impl Display for HtmlIdent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Display::fmt(&self.first, f)?;
         for segment in &self.rest {
             f.write_char(segment.separator.as_char())?;
-            Display::fmt(&segment.ident, f)?;
+            Display::fmt(&segment.part, f)?;
         }
         Ok(())
     }
@@ -159,7 +222,7 @@ impl ToTokens for HtmlIdent {
                 HtmlIdentSeparator::Colon(t) => t.to_tokens(tokens),
                 HtmlIdentSeparator::Dot(t) => t.to_tokens(tokens),
             }
-            segment.ident.to_tokens(tokens);
+            segment.part.to_tokens(tokens);
         }
     }
 }
@@ -174,7 +237,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for HtmlIdent {
                 HtmlIdentSeparator::Colon(token) => token.pretty_print(printer),
                 HtmlIdentSeparator::Dot(token) => token.pretty_print(printer),
             }
-            segment.ident.pretty_print(printer);
+            segment.part.pretty_print(printer);
         }
     }
 }
@@ -224,6 +287,27 @@ mod tests {
     #[test]
     fn parses_dot_separated_ident() {
         assert_eq!(parse("class.active").to_string(), "class.active");
+    }
+
+    #[test]
+    fn parses_numeric_segment() {
+        // Alpine AJAX status-code modifiers: a segment may be a bare number.
+        assert_eq!(parse("x-target.422").to_string(), "x-target.422");
+    }
+
+    #[test]
+    fn parses_wildcard_status_segment() {
+        // `4xx`/`5xx` lex as integer literals with an identifier suffix.
+        assert_eq!(parse("x-target.4xx").to_string(), "x-target.4xx");
+        assert_eq!(parse("x-target.5xx").to_string(), "x-target.5xx");
+    }
+
+    #[test]
+    fn whitespace_around_numeric_segment_is_rejected() {
+        assert!(
+            parse_err("x-target. 422")
+                .contains("whitespace is not allowed inside an HTML identifier")
+        );
     }
 
     #[test]
