@@ -39,13 +39,13 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
                 // initializing before `<body>` exists and silently skip
                 // binding directives on the page's first render.
                 <script
-                    defer=(true)
+                    defer=""
                     src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"
                 >
 
                 </script>
                 <script
-                    defer=(true)
+                    defer=""
                     src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"
                 >
 

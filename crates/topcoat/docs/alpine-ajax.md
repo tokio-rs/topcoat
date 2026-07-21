@@ -27,8 +27,8 @@ async fn root(slot: Slot<'_>) -> Result {
         <!DOCTYPE html>
         <html>
             <head>
-                <script defer=(true) src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"></script>
-                <script defer=(true) src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"></script>
+                <script defer="" src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"></script>
+                <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"></script>
             </head>
             <body>(slot.await?)</body>
         </html>
@@ -121,12 +121,12 @@ async fn create_comment(cx: &Cx /* , Form(input): Form<NewComment> */) -> Result
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
             view! {
-                <form id="comment_form" x-target="comment_form comments" ("x-target.422")="comment_form">
+                <form id="comment_form" x-target="comment_form comments" x-target.422="comment_form">
                     <textarea name="body"></textarea>
                     <p class="error">(message)</p>
                     <button type="submit">"Post"</button>
                 </form>
-                <div id="alert" x-sync=(true) role="status">
+                <div id="alert" x-sync="" role="status">
                     <p>(message)</p>
                 </div>
             }?,
