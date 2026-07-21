@@ -27,7 +27,7 @@
 [discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
 [discord-url]: https://discord.gg/tokio
 
-Topcoat is a modular, batteries-included Rust framework for building fullstack apps. It prioritizes simplicity and productivity. See [Learn Topcoat](#learn-topcoat) to get started, or the [Roadmap](#roadmap) for what's coming next.
+Topcoat is a modular, batteries-included Rust framework for building full-stack apps. It prioritizes simplicity and productivity. See [Learn Topcoat](#learn-topcoat) to get started, or the [Roadmap](#roadmap) for what's coming next.
 
 **Early-stage and experimental. Expect breaking changes.**
 
@@ -73,7 +73,7 @@ view! {
 
     // Runs entirely in the browser; no server round-trip.
     <button @click=$(|_e| open.set(!open.get()))>"What is Topcoat?"</button>
-    <p :hidden=$(!open.get())>"A fullstack Rust framework."</p>
+    <p :hidden=$(!open.get())>"A full-stack Rust framework."</p>
 }
 ```
 
