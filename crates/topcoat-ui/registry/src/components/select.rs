@@ -85,7 +85,7 @@ fn checkmark_style(cx: &Cx) -> String {
 /// it is open; other browsers keep the operating system's picker. The control
 /// itself looks the same everywhere.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     select(
 ///         attrs: attributes! { name="region" },

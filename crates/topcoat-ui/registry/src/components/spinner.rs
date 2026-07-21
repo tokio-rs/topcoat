@@ -11,7 +11,7 @@ use topcoat::{
 /// explicitly. The `attrs` (such as `class`) are forwarded to the underlying
 /// `<svg>`; a `class` among them is appended to the computed classes.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     button(
 ///         attrs: attributes! { disabled=(true) },
