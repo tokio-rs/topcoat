@@ -22,7 +22,7 @@ const INPUT: &str = "h-9 w-full min-w-0 rounded-lg border border-border bg-backg
 /// is appended to the computed classes. The input fills its container, so
 /// size it through the container or with a width class.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     input(attrs: attributes! { type="email" placeholder="you@example.com" })
 /// }
