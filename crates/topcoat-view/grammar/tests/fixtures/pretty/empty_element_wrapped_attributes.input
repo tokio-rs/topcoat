@@ -1,0 +1,1 @@
+view! { <script defer="" src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"></script> <span class="a" id="b"></span> }

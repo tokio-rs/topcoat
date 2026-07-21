@@ -238,6 +238,23 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether an as-yet-unemitted comment (line or block) begins before the
+    /// given source position. Lets an otherwise-empty construct tell an interior
+    /// comment apart from plain whitespace and decide whether it still needs to
+    /// break its content onto separate lines.
+    #[must_use]
+    pub fn has_comment_before(&self, pos: LineColumn) -> bool {
+        for trivia in self.trivia {
+            if trivia.span.start() >= pos {
+                break;
+            }
+            if !matches!(trivia.kind, TriviaKind::Whitespace) {
+                return true;
+            }
+        }
+        false
+    }
+
     fn ready_trivia(&mut self) -> Option<&'a Trivia<'a>> {
         if let Some(trivia) = self.trivia.first()
             && trivia.span.start() <= self.cursor

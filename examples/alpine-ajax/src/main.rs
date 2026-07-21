@@ -41,15 +41,13 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
                 <script
                     defer=""
                     src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"
-                >
+                ></script>
 
-                </script>
                 <script
                     defer=""
                     src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"
-                >
+                ></script>
 
-                </script>
                 topcoat::dev::script()
             </head>
             <body>(slot.await?)</body>

@@ -179,14 +179,25 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Element {
                 closing_tag,
             } => {
                 opening_tag.pretty_print(printer);
-                printer.scan_indent(1);
-                printer.scan_break();
-                printer.scan_trivia(false, true);
-                children.pretty_print(printer);
-                printer.scan_same_line_trivia();
-                printer.scan_trivia(true, false);
-                printer.scan_indent(-1);
-                printer.scan_break();
+                // Break the content onto its own lines when there is something
+                // to show -- child nodes or an interior comment. A completely
+                // empty element instead keeps `</tag>` right after the opening
+                // tag's `>`, so wrapping the opening tag's attributes never
+                // leaves a blank line between them.
+                let has_children = !children.is_empty();
+                if has_children || printer.has_comment_before(closing_tag.name.span().start()) {
+                    printer.scan_indent(1);
+                    printer.scan_break();
+                    // Only preserve a blank line after a leading comment when a
+                    // child actually follows it; with no children that trailing
+                    // break would land against the closing tag as a blank line.
+                    printer.scan_trivia(false, has_children);
+                    children.pretty_print(printer);
+                    printer.scan_same_line_trivia();
+                    printer.scan_trivia(true, false);
+                    printer.scan_indent(-1);
+                    printer.scan_break();
+                }
                 closing_tag.pretty_print(printer);
             }
             Self::SelfClosing { tag } => tag.pretty_print(printer),

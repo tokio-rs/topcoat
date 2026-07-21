@@ -85,6 +85,8 @@ fixture_test!(single_element);
 fixture_test!(void_elements);
 fixture_test!(nested_elements);
 fixture_test!(element_with_text);
+fixture_test!(empty_element_wrapped_attributes);
+fixture_test!(empty_element_interior_comment);
 
 // -- Attributes --------------------------------------------------------------
 
