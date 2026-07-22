@@ -127,8 +127,8 @@ pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Layouts as components
 ///
-/// A layout doubles as a [component](../view/attr.component.html): calling it inside
-/// [`view!`](../view/macro.view.html) wraps a child view, passed as the `slot` prop.
+/// A layout doubles as a [component](../view/attr.component.html), taking a `Result<View>`
+/// as its `slot` property:
 ///
 /// ```rust
 /// # use topcoat::{Result, router::{layout, page}, view::view};
@@ -140,7 +140,7 @@ pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// async fn standalone() -> Result {
 ///     let content = view! { <p>"content"</p> }?;
 ///     view! {
-///         root_layout(slot: content)
+///         root_layout(slot: Ok(content))
 ///     }
 /// }
 /// ```

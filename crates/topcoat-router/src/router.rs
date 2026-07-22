@@ -623,7 +623,7 @@ mod tests {
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
-    fn layout_root<'cx>(_cx: &'cx Cx, slot: Result<View>) -> ViewFuture<'cx> {
+    fn layout_root(_cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
             let mut parts = ViewParts::new();
@@ -635,7 +635,7 @@ mod tests {
     }
 
     /// Wraps the child content in `A[ ... ]`.
-    fn layout_admin<'cx>(_cx: &'cx Cx, slot: Result<View>) -> ViewFuture<'cx> {
+    fn layout_admin(_cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
             let mut parts = ViewParts::new();
