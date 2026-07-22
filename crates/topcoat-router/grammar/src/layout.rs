@@ -131,13 +131,11 @@ impl ToTokens for Layout {
         // directly in `router.layout(...)`.
         let component_args = args.iter().map(|arg| match arg {
             LayoutArg::Cx => quote! { cx },
-            LayoutArg::Slot => quote! {
-                #topcoat_error::Result::Ok(slot)
-            },
+            LayoutArg::Slot => quote! { slot },
         });
         quote! {
             #[#topcoat_view_macro::component]
-            #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_view::View) #output {
+            #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_error::Result<#topcoat_view::View>) #output {
                 #ident::handler(cx #(, #component_args)*).await
             }
         }
@@ -237,20 +235,15 @@ mod tests {
 
     #[test]
     fn accepts_a_slot_parameter() {
-        syn::parse_str::<LayoutItem>("async fn shell(slot: Result) -> Result { todo!() }")
-            .unwrap();
+        syn::parse_str::<LayoutItem>("async fn shell(slot: Result) -> Result { todo!() }").unwrap();
     }
 
     #[test]
     fn accepts_cx_and_slot_in_any_order() {
-        syn::parse_str::<LayoutItem>(
-            "async fn shell(cx: &Cx, slot: Result) -> Result { todo!() }",
-        )
-        .unwrap();
-        syn::parse_str::<LayoutItem>(
-            "async fn shell(slot: Result, cx: &Cx) -> Result { todo!() }",
-        )
-        .unwrap();
+        syn::parse_str::<LayoutItem>("async fn shell(cx: &Cx, slot: Result) -> Result { todo!() }")
+            .unwrap();
+        syn::parse_str::<LayoutItem>("async fn shell(slot: Result, cx: &Cx) -> Result { todo!() }")
+            .unwrap();
     }
 
     #[test]

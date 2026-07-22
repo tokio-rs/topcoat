@@ -109,11 +109,7 @@ pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::{
-///     Result,
-///     router::layout,
-///     view::view,
-/// };
+/// use topcoat::{Result, router::layout, view::view};
 ///
 /// #[layout("/")]
 /// async fn root_layout(slot: Result) -> Result {
