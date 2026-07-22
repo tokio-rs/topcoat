@@ -519,7 +519,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, Bytes, IntoResponse, LayerFn, LayerFuture, Method, Path, RouteFn, RouteFuture, Slot,
+        Body, Bytes, IntoResponse, LayerFn, LayerFuture, Method, Path, RouteFn, RouteFuture,
         to_bytes,
     };
 
@@ -623,9 +623,9 @@ mod tests {
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
-    fn layout_root<'cx>(_cx: &'cx Cx, slot: Slot<'cx>) -> ViewFuture<'cx> {
+    fn layout_root<'cx>(_cx: &'cx Cx, slot: Result<View>) -> ViewFuture<'cx> {
         Box::pin(async move {
-            let inner = slot.await?;
+            let inner = slot?;
             let mut parts = ViewParts::new();
             PartsWriter::new(&mut parts, HtmlContext::Text).push_str("R[");
             parts.push_view(inner);
@@ -635,9 +635,9 @@ mod tests {
     }
 
     /// Wraps the child content in `A[ ... ]`.
-    fn layout_admin<'cx>(_cx: &'cx Cx, slot: Slot<'cx>) -> ViewFuture<'cx> {
+    fn layout_admin<'cx>(_cx: &'cx Cx, slot: Result<View>) -> ViewFuture<'cx> {
         Box::pin(async move {
-            let inner = slot.await?;
+            let inner = slot?;
             let mut parts = ViewParts::new();
             PartsWriter::new(&mut parts, HtmlContext::Text).push_str("A[");
             parts.push_view(inner);

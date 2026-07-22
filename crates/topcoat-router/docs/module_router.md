@@ -30,12 +30,12 @@ Each module's path relative to the root module determines its URL. Module names 
 A `#[page]` defines a page handler. A `#[layout]` wraps all pages in the same module and its submodules.
 
 ```rust
-# use topcoat::{Result, router::{Slot, layout, page}, view::view};
+# use topcoat::{Result, router::{layout, page}, view::view};
 // src/app.rs: layout at "/" wraps all pages
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result {
+async fn root_layout(slot: Result) -> Result {
     view! {
-        <html><body>(slot.await?)</body></html>
+        <html><body>(slot?)</body></html>
     }
 }
 
@@ -91,7 +91,7 @@ Module-derived paths and explicit paths can be mixed in the same route tree. `#[
 # use topcoat::{
 #     Result,
 #     context::CxBuilder,
-#     router::{Body, Next, Response, Slot, layer, layout, page, route},
+#     router::{Body, Next, Response, layer, layout, page, route},
 #     view::view,
 # };
 #[page("/")]
@@ -100,8 +100,8 @@ async fn home() -> Result {
 }
 
 #[layout("/admin")]
-async fn admin_layout(slot: Slot<'_>) -> Result {
-    view! { <main>(slot.await?)</main> }
+async fn admin_layout(slot: Result) -> Result {
+    view! { <main>(slot?)</main> }
 }
 
 #[layer("/admin")]

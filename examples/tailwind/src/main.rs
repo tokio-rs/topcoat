@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{Router, Slot, layout, page},
+    router::{Router, layout, page},
     tailwind,
     view::view,
 };
@@ -18,7 +18,7 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result {
+async fn root_layout(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -29,7 +29,7 @@ async fn root_layout(slot: Slot<'_>) -> Result {
             <body
                 class="flex min-h-screen items-center justify-center bg-slate-100 font-sans"
             >
-                (slot.await?)
+                (slot?)
             </body>
         </html>
     }

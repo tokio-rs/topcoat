@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    router::{Router, Slot, layout, page, route},
+    router::{Router, layout, page, route},
     view::view,
 };
 
@@ -35,7 +35,7 @@ fn router() -> Router {
 
 // The root layout wraps every page because every path starts with "/".
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result {
+async fn root_layout(slot: Result) -> Result {
     view! {
         <html>
             <head>topcoat::dev::script()</head>
@@ -50,7 +50,7 @@ async fn root_layout(slot: Slot<'_>) -> Result {
                     <a href="/docs/install">"install"</a>
                 </nav>
                 <hr>
-                (slot.await?)
+                (slot?)
             </body>
         </html>
     }
@@ -58,11 +58,11 @@ async fn root_layout(slot: Slot<'_>) -> Result {
 
 // This layout wraps /docs and /docs/install.
 #[layout("/docs")]
-async fn docs_layout(slot: Slot<'_>) -> Result {
+async fn docs_layout(slot: Result) -> Result {
     view! {
         <section>
             <p>"docs layout"</p>
-            (slot.await?)
+            (slot?)
         </section>
     }
 }

@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Router, RouterBuilderDiscoverExt, Slot, layout, page, path_param, query_params},
+    router::{Router, RouterBuilderDiscoverExt, layout, page, path_param, query_params},
     view::view,
 };
 
@@ -16,12 +16,12 @@ async fn main() {
 
 // The root layout wraps every page because every path starts with "/".
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result {
+async fn root_layout(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
             <head>topcoat::dev::script()</head>
-            <body>(slot.await?)</body>
+            <body>(slot?)</body>
         </html>
     }
 }

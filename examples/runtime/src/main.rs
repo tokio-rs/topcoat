@@ -4,7 +4,7 @@ mod show;
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{RouterBuilderDiscoverExt, Slot, layout, module_router, page, redirect},
+    router::{RouterBuilderDiscoverExt, layout, module_router, page, redirect},
     view::view,
 };
 
@@ -26,7 +26,7 @@ async fn home() -> Result {
 }
 
 #[layout]
-async fn layout(slot: Slot<'_>) -> Result {
+async fn layout(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -44,7 +44,7 @@ async fn layout(slot: Slot<'_>) -> Result {
                 <hr>
                 <br>
 
-                (slot.await?)
+                (slot?)
             </body>
         </html>
     }

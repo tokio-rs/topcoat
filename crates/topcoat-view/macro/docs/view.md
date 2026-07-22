@@ -410,11 +410,11 @@ Competing declarations resolve by render order: the first status code rendered w
 
 ```rust
 # use topcoat::{Result, view::*};
-# use topcoat::router::{HeaderValue, Slot, header, layout};
+# use topcoat::router::{HeaderValue, header, layout};
 #[layout("/docs")]
-async fn docs_layout(slot: Slot<'_>) -> Result {
+async fn docs_layout(slot: Result) -> Result {
     view! {
-        <main>(slot.await?)</main>
+        <main>(slot?)</main>
         ((header::CACHE_CONTROL, HeaderValue::from_static("max-age=60")))
     }
 }

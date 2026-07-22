@@ -50,13 +50,13 @@ Link the generated stylesheet from your root layout, as with any Tailwind setup.
 use topcoat::{
     Result,
     font::fontsource::fontsource_font,
-    router::{Slot, layout},
+    router::layout,
     tailwind,
     view::view,
 };
 
 #[layout]
-async fn layout(slot: Slot<'_>) -> Result {
+async fn layout(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -65,7 +65,7 @@ async fn layout(slot: Slot<'_>) -> Result {
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
             </head>
             <body>
-                (slot.await?)
+                (slot?)
             </body>
         </html>
     }

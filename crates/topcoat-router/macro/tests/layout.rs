@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Router, Slot, layout, page, uri},
+    router::{Router, layout, page, uri},
     view::view,
 };
 
@@ -9,13 +9,13 @@ mod common;
 use common::send;
 
 #[layout("/")]
-async fn shell(slot: Slot<'_>) -> Result {
-    view! { <main>(slot.await?)</main> }
+async fn shell(slot: Result) -> Result {
+    view! { <main>(slot?)</main> }
 }
 
 #[layout("/nested")]
-async fn section_layout(cx: &Cx, slot: Slot<'_>) -> Result {
-    view! { <section data-path=(uri(cx).path())>(slot.await?)</section> }
+async fn section_layout(cx: &Cx, slot: Result) -> Result {
+    view! { <section data-path=(uri(cx).path())>(slot?)</section> }
 }
 
 #[page("/nested/inner")]
