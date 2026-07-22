@@ -2988,6 +2988,7 @@ name = "topcoat-mail"
 version = "0.4.0"
 dependencies = [
  "lettre",
+ "thiserror",
  "topcoat-core",
  "topcoat-view",
 ]

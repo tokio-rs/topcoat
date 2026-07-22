@@ -15,6 +15,7 @@ topcoat-core.workspace = true
 topcoat-view.workspace = true
 
 lettre = { workspace = true, features = ["builder"] }
+thiserror.workspace = true
 
 [lints]
 workspace = true

@@ -4,7 +4,7 @@ use std::time::SystemTime;
 
 use topcoat_view::View;
 
-use crate::{Attachment, MailAddress};
+use crate::{Attachment, Mailbox};
 
 /// A mail message: addresses, subject, bodies, and attachments.
 ///
@@ -13,21 +13,22 @@ use crate::{Attachment, MailAddress};
 /// Build one with [`Mail::builder`]:
 ///
 /// ```
-/// use topcoat_mail::Mail;
+/// use topcoat_mail::{Mail, Mailbox};
 ///
 /// let mail = Mail::builder()
-///     .to(("Ada Lovelace", "ada@example.com"))
+///     .to(Mailbox::named("Ada Lovelace", "ada@example.com")?)
 ///     .subject("Analytical engines")
 ///     .text("The engine weaves algebraic patterns.")
 ///     .build();
+/// # Ok::<(), topcoat_mail::AddressError>(())
 /// ```
 #[derive(Clone, Debug, Default)]
 pub struct Mail {
-    from: Option<MailAddress>,
-    to: Vec<MailAddress>,
-    cc: Vec<MailAddress>,
-    bcc: Vec<MailAddress>,
-    reply_to: Vec<MailAddress>,
+    from: Option<Mailbox>,
+    to: Vec<Mailbox>,
+    cc: Vec<Mailbox>,
+    bcc: Vec<Mailbox>,
+    reply_to: Vec<Mailbox>,
     subject: String,
     html: Option<View>,
     text: Option<String>,
@@ -48,31 +49,31 @@ impl Mail {
 
     /// The `From` address, if one was set.
     #[must_use]
-    pub fn from(&self) -> Option<&MailAddress> {
+    pub fn from(&self) -> Option<&Mailbox> {
         self.from.as_ref()
     }
 
     /// The `To` recipients.
     #[must_use]
-    pub fn to(&self) -> &[MailAddress] {
+    pub fn to(&self) -> &[Mailbox] {
         &self.to
     }
 
     /// The `Cc` recipients.
     #[must_use]
-    pub fn cc(&self) -> &[MailAddress] {
+    pub fn cc(&self) -> &[Mailbox] {
         &self.cc
     }
 
     /// The `Bcc` recipients.
     #[must_use]
-    pub fn bcc(&self) -> &[MailAddress] {
+    pub fn bcc(&self) -> &[Mailbox] {
         &self.bcc
     }
 
     /// The `Reply-To` addresses.
     #[must_use]
-    pub fn reply_to(&self) -> &[MailAddress] {
+    pub fn reply_to(&self) -> &[Mailbox] {
         &self.reply_to
     }
 
@@ -133,9 +134,10 @@ impl Mail {
 
 /// Assembles a [`Mail`], created by [`Mail::builder`].
 ///
-/// Address setters accept anything `Into<MailAddress>`, and the recipient
+/// Address setters accept anything `Into<Mailbox>`, and the recipient
 /// setters (`to`, `cc`, `bcc`, `reply_to`) append on every call. Building
-/// never fails; addresses and content are validated when the mail is sent.
+/// never fails; addresses are validated when they are constructed, and
+/// remaining wire concerns when the mail is sent.
 #[derive(Clone, Debug, Default)]
 pub struct MailBuilder {
     mail: Mail,
@@ -144,21 +146,21 @@ pub struct MailBuilder {
 impl MailBuilder {
     /// Sets the `From` address.
     #[must_use]
-    pub fn from(mut self, from: impl Into<MailAddress>) -> Self {
+    pub fn from(mut self, from: impl Into<Mailbox>) -> Self {
         self.mail.from = Some(from.into());
         self
     }
 
     /// Adds a `To` recipient.
     #[must_use]
-    pub fn to(mut self, to: impl Into<MailAddress>) -> Self {
+    pub fn to(mut self, to: impl Into<Mailbox>) -> Self {
         self.mail.to.push(to.into());
         self
     }
 
     /// Adds a `Cc` recipient.
     #[must_use]
-    pub fn cc(mut self, cc: impl Into<MailAddress>) -> Self {
+    pub fn cc(mut self, cc: impl Into<Mailbox>) -> Self {
         self.mail.cc.push(cc.into());
         self
     }
@@ -166,7 +168,7 @@ impl MailBuilder {
     /// Adds a `Bcc` recipient, who receives the mail without appearing in
     /// its headers.
     #[must_use]
-    pub fn bcc(mut self, bcc: impl Into<MailAddress>) -> Self {
+    pub fn bcc(mut self, bcc: impl Into<Mailbox>) -> Self {
         self.mail.bcc.push(bcc.into());
         self
     }
@@ -174,7 +176,7 @@ impl MailBuilder {
     /// Adds a `Reply-To` address, where replies are directed instead of the
     /// `From` address.
     #[must_use]
-    pub fn reply_to(mut self, reply_to: impl Into<MailAddress>) -> Self {
+    pub fn reply_to(mut self, reply_to: impl Into<Mailbox>) -> Self {
         self.mail.reply_to.push(reply_to.into());
         self
     }
@@ -257,16 +259,17 @@ impl MailBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::AddressError;
 
     #[test]
-    fn collects_every_field() {
+    fn collects_every_field() -> Result<(), AddressError> {
         let mail = Mail::builder()
-            .from(("Ada", "ada@example.com"))
-            .to("bob@example.com")
-            .to(("Grace Hopper", "grace@example.com"))
-            .cc("carol@example.com")
-            .bcc("dan@example.com")
-            .reply_to("replies@example.com")
+            .from(Mailbox::named("Ada", "ada@example.com")?)
+            .to(Mailbox::new("bob@example.com")?)
+            .to(Mailbox::named("Grace Hopper", "grace@example.com")?)
+            .cc(Mailbox::new("carol@example.com")?)
+            .bcc(Mailbox::new("dan@example.com")?)
+            .reply_to(Mailbox::new("replies@example.com")?)
             .subject("Hello")
             .html(View::empty())
             .text("Hello there")
@@ -280,18 +283,18 @@ mod tests {
 
         assert_eq!(
             mail.from(),
-            Some(&MailAddress::named("Ada", "ada@example.com"))
+            Some(&Mailbox::named("Ada", "ada@example.com")?)
         );
         assert_eq!(
             mail.to(),
             [
-                MailAddress::new("bob@example.com"),
-                MailAddress::named("Grace Hopper", "grace@example.com"),
+                Mailbox::new("bob@example.com")?,
+                Mailbox::named("Grace Hopper", "grace@example.com")?,
             ]
         );
-        assert_eq!(mail.cc(), [MailAddress::new("carol@example.com")]);
-        assert_eq!(mail.bcc(), [MailAddress::new("dan@example.com")]);
-        assert_eq!(mail.reply_to(), [MailAddress::new("replies@example.com")]);
+        assert_eq!(mail.cc(), [Mailbox::new("carol@example.com")?]);
+        assert_eq!(mail.bcc(), [Mailbox::new("dan@example.com")?]);
+        assert_eq!(mail.reply_to(), [Mailbox::new("replies@example.com")?]);
         assert_eq!(mail.subject(), "Hello");
         assert!(mail.html().is_some());
         assert_eq!(mail.text(), Some("Hello there"));
@@ -307,6 +310,8 @@ mod tests {
         assert_eq!(mail.references(), Some("<earlier@example.com>"));
         assert_eq!(mail.date(), Some(SystemTime::UNIX_EPOCH));
         assert_eq!(mail.message_id(), Some("<mail@example.com>"));
+
+        Ok(())
     }
 
     #[test]
