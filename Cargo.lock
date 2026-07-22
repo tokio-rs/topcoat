@@ -2931,6 +2931,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "topcoat-mail"
+version = "0.4.0"
+dependencies = [
+ "topcoat-core",
+]
+
+[[package]]
+name = "topcoat-mail-grammar"
+version = "0.4.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "topcoat-core-grammar",
+ "topcoat-mail",
+]
+
+[[package]]
+name = "topcoat-mail-macro"
+version = "0.4.0"
+dependencies = [
+ "quote",
+ "syn",
+ "topcoat-mail-grammar",
+]
+
+[[package]]
 name = "topcoat-router"
 version = "0.4.0"
 dependencies = [

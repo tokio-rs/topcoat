@@ -89,6 +89,21 @@ release = true
 version_group = "topcoat"
 
 [[package]]
+name = "topcoat-mail"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-mail-grammar"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-mail-macro"
+release = true
+version_group = "topcoat"
+
+[[package]]
 name = "topcoat-router"
 release = true
 version_group = "topcoat"
