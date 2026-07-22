@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{
-        Form, Router, RouterBuilderDiscoverExt, SeeOther, Slot, layout, page, path_param, route,
+        Form, Router, RouterBuilderDiscoverExt, SeeOther, layout, page, path_param, route,
         see_other,
     },
     view::{component, view},
@@ -45,7 +45,7 @@ struct Todo {
 }
 
 #[layout("/")]
-async fn root(slot: Slot<'_>) -> Result {
+async fn root(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -53,7 +53,7 @@ async fn root(slot: Slot<'_>) -> Result {
                 <title>"Toasty Todos"</title>
                 topcoat::dev::script()
             </head>
-            <body>(slot.await?)</body>
+            <body>(slot?)</body>
         </html>
     }
 }

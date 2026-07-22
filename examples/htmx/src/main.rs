@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     htmx::{HxResponseTrigger, hx_request},
-    router::{Router, RouterBuilderDiscoverExt, Slot, layout, page, route},
+    router::{Router, RouterBuilderDiscoverExt, layout, page, route},
     view::{View, view},
 };
 
@@ -21,11 +21,11 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
+async fn root(cx: &Cx, slot: Result) -> Result {
     // For client-side navigations we don't need to return the full HTML shell again.
     // htmx automatically swaps out just the body.
     if hx_request(cx) {
-        return slot.await;
+        return slot;
     }
 
     view! {
@@ -39,7 +39,7 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
                 </script>
                 topcoat::dev::script()
             </head>
-            <body hx-boost="true">(slot.await?)</body>
+            <body hx-boost="true">(slot?)</body>
         </html>
     }
 }

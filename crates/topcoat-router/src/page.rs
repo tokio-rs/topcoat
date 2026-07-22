@@ -53,17 +53,12 @@ impl PageFn {
 #[cfg(feature = "discover")]
 inventory::collect!(PageFn);
 
-/// The async render function backing a [`LayoutFn`], receiving a [`Slot`] for child content.
+/// The async render function backing a [`LayoutFn`], receiving the rendered child content as a
+/// [`Result`]`<`[`View`]`>`.
 pub type LayoutRenderFn = for<'cx> fn(
     cx: &'cx Cx,
-    slot: Slot<'cx>,
+    slot: Result<View>,
 ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
-
-/// A future that resolves to the inner page (or nested layout) [`Result`].
-///
-/// Every layout render function receives a `Slot` and `.await`s it to embed
-/// the child content at the desired location.
-pub type Slot<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
 
 /// A layout handler, backed by a plain render function, that wraps pages whose
 /// path starts with the layout's path prefix.
@@ -75,7 +70,7 @@ pub type Slot<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
 pub struct LayoutFn {
     /// The path prefix this layout applies to.
     path: Cow<'static, Path>,
-    /// The async render function that wraps child content via a [`Slot`].
+    /// The async render function that wraps the child content [`Result`]`<`[`View`]`>`.
     render: LayoutRenderFn,
 }
 
@@ -91,11 +86,11 @@ impl LayoutFn {
         &self.path
     }
 
-    /// Renders the layout, embedding the given [`Slot`] as child content.
+    /// Renders the layout, embedding the given child content [`Result`]`<`[`View`]`>` as its slot.
     pub fn render<'cx>(
         &self,
         cx: &'cx Cx,
-        slot: Slot<'cx>,
+        slot: Result<View>,
     ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>> {
         (self.render)(cx, slot)
     }
@@ -133,12 +128,11 @@ impl Route for PageWithLayouts {
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
         Box::pin(async move {
-            let mut render = self.page.render(cx, body);
+            let mut slot = self.page.render(cx, body).await;
             for layout in self.layouts.iter().rev() {
-                render = layout.render(cx, render);
+                slot = layout.render(cx, slot).await;
             }
-            let view = render.await?;
-            view.into_response(cx)
+            slot.into_response(cx)
         })
     }
 }

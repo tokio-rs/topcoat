@@ -9,9 +9,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     cookie::RouterBuilderCookieExt,
-    router::{
-        Form, Router, RouterBuilderDiscoverExt, SeeOther, Slot, layout, page, route, see_other,
-    },
+    router::{Form, Router, RouterBuilderDiscoverExt, SeeOther, layout, page, route, see_other},
     session::{self, RouterBuilderSessionExt, TokenHash},
     view::view,
 };
@@ -31,7 +29,7 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(slot: Slot<'_>) -> Result {
+async fn root(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -39,7 +37,7 @@ async fn root(slot: Slot<'_>) -> Result {
                 <title>"Sessions"</title>
                 topcoat::dev::script()
             </head>
-            <body>(slot.await?)</body>
+            <body>(slot?)</body>
         </html>
     }
 }

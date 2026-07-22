@@ -5,8 +5,7 @@ use topcoat::{
     alpine_ajax::ajax_request,
     context::{Cx, app_context},
     router::{
-        IntoResponse, Response, Router, RouterBuilderDiscoverExt, Slot, layout, page, route,
-        see_other,
+        IntoResponse, Response, Router, RouterBuilderDiscoverExt, layout, page, route, see_other,
     },
     view::view,
 };
@@ -24,11 +23,11 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
+async fn root(cx: &Cx, slot: Result) -> Result {
     // For client-side navigations we don't need to return the full HTML shell again.
     // Alpine AJAX automatically merges just the targeted content.
     if ajax_request(cx) {
-        return slot.await;
+        return slot;
     }
 
     view! {
@@ -50,7 +49,7 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
 
                 topcoat::dev::script()
             </head>
-            <body>(slot.await?)</body>
+            <body>(slot?)</body>
         </html>
     }
 }

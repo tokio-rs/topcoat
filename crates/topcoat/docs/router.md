@@ -122,17 +122,17 @@ async fn docs_page() -> Result {
 
 # Layouts
 
-A layout wraps pages. It receives a [`Slot`]: a future that resolves to the inner page or layout. Annotate it with [`#[layout]`](layout) and an explicit path:
+A layout wraps pages. It receives the rendered inner page (or nested layout) as a `Result<View>`, to embed in its own view. Annotate it with [`#[layout]`](layout) and an explicit path:
 
 ```rust
 use topcoat::{
     Result,
-    router::{Slot, layout},
+    router::layout,
     view::view,
 };
 
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result {
+async fn root_layout(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -141,7 +141,7 @@ async fn root_layout(slot: Slot<'_>) -> Result {
                     <a href="/">"Home"</a>
                     <a href="/about">"About"</a>
                 </nav>
-                (slot.await?)
+                (slot?)
             </body>
         </html>
     }
@@ -155,18 +155,18 @@ A layout applies to every page whose path starts with the layout's path. A layou
 When multiple layouts match a page, they nest from least specific (outermost) to most specific (innermost):
 
 ```rust
-# use topcoat::{Result, router::{Slot, layout, page}, view::view};
+# use topcoat::{Result, router::{layout, page}, view::view};
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result {
-    view! { <html><body>(slot.await?)</body></html> }
+async fn root_layout(slot: Result) -> Result {
+    view! { <html><body>(slot?)</body></html> }
 }
 
 #[layout("/settings")]
-async fn settings_layout(slot: Slot<'_>) -> Result {
+async fn settings_layout(slot: Result) -> Result {
     view! {
         <div class="settings-shell">
             <nav>"Settings nav"</nav>
-            (slot.await?)
+            (slot?)
         </div>
     }
 }
@@ -275,7 +275,7 @@ A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap
 use topcoat::{
     Result,
     context::Cx,
-    router::{NotFoundError, RouterErrorExt, Slot, StatusCode, layout, page},
+    router::{NotFoundError, RouterErrorExt, StatusCode, layout, page},
     view::view,
 };
 
@@ -288,8 +288,8 @@ async fn post(cx: &Cx) -> Result {
 }
 
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result {
-    let content = match slot.await {
+async fn root_layout(slot: Result) -> Result {
+    let content = match slot {
         Err(error) if error.downcast_ref::<NotFoundError>().is_some() => view! {
             (StatusCode::NOT_FOUND)
             <h1>"Page not found"</h1>
@@ -312,9 +312,9 @@ See the [`view!`](crate::view::view!) macro docs for the full placement and prec
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
 
 ```rust
-# use topcoat::{Result, context::CxBuilder, router::{Body, Next, Response, Slot, layer, layout, page, route}, view::view};
-# #[layout("/")] async fn root_layout(slot: Slot<'_>) -> Result { view! { (slot.await?) } }
-# #[layout("/settings")] async fn settings_layout(slot: Slot<'_>) -> Result { view! { (slot.await?) } }
+# use topcoat::{Result, context::CxBuilder, router::{Body, Next, Response, layer, layout, page, route}, view::view};
+# #[layout("/")] async fn root_layout(slot: Result) -> Result { view! { (slot?) } }
+# #[layout("/settings")] async fn settings_layout(slot: Result) -> Result { view! { (slot?) } }
 # #[layer("/")] async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
 # #[page("/")] async fn home() -> Result { view! { <h1>"Home"</h1> } }
 # #[page("/about")] async fn about() -> Result { view! { <h1>"About"</h1> } }
@@ -375,7 +375,7 @@ async fn main() {
 use topcoat::{
     Result,
     context::CxBuilder,
-    router::{Body, Json, Next, Response, Router, Slot, layer, layout, page, route},
+    router::{Body, Json, Next, Response, Router, layer, layout, page, route},
     view::view,
 };
 
@@ -385,7 +385,7 @@ struct NewUser {
 }
 
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result {
+async fn root_layout(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -394,7 +394,7 @@ async fn root_layout(slot: Slot<'_>) -> Result {
                     <a href="/">"Home"</a>
                     <a href="/users">"Users"</a>
                 </nav>
-                (slot.await?)
+                (slot?)
             </body>
         </html>
     }

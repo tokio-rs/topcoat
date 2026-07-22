@@ -18,19 +18,19 @@ htmx is a client-side script the browser must load before any `hx-*` attribute d
 use topcoat::{
     Result,
     asset::asset,
-    router::{Slot, layout},
+    router::layout,
     view::view,
 };
 
 #[layout]
-async fn root(slot: Slot<'_>) -> Result {
+async fn root(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
             <head>
                 <script src=(asset!("https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"))></script>
             </head>
-            <body>(slot.await?)</body>
+            <body>(slot?)</body>
         </html>
     }
 }
@@ -47,16 +47,16 @@ use topcoat::{
     Result,
     context::Cx,
     htmx::hx_request,
-    router::{Slot, layout},
+    router::layout,
     view::view,
 };
 
 #[layout]
-async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
+async fn root(cx: &Cx, slot: Result) -> Result {
     // htmx only swaps out the target element, so we do not need to return
     // the full layout shell. Just the page's content are enough.
     if hx_request(cx) {
-        return slot.await;
+        return slot;
     }
 
     // Non-htmx requests require a full page render including the layout shell.
@@ -64,7 +64,7 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
         <html>
             <body>
                 <nav> /* persistent navigation */ </nav>
-                <main>(slot.await?)</main>
+                <main>(slot?)</main>
             </body>
         </html>
     }

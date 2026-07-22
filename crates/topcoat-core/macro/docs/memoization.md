@@ -128,7 +128,7 @@ It is *not* a substitute for a long-lived cache (Redis, an LRU, etc.). Cross-req
 use topcoat::{
     context::{Cx, memoize},
     Result,
-    router::{Slot, layout, page},
+    router::{layout, page},
     view::view,
 };
 
@@ -138,7 +138,7 @@ async fn current_user(cx: &Cx) -> Option<User> {
 }
 
 #[layout]
-async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
+async fn root(cx: &Cx, slot: Result) -> Result {
     let user = current_user(cx).await; // computes once
     view! {
         <header>
@@ -149,7 +149,7 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result {
                 None => <a href="/login">"Sign in"</a>,
             }
         </header>
-        (slot.await?)
+        (slot?)
     }
 }
 

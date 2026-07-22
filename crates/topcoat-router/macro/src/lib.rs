@@ -101,28 +101,24 @@ pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Handler signature
 ///
-/// The function is `async` and returns [`Result`](../type.Result.html). One parameter must be a
-/// [`Slot<'_>`](../router/struct.Slot.html): a future that resolves to the inner page's rendered
-/// output, expected to be `.await`ed somewhere in the layout's view. The function may also take
-/// [`cx: &Cx`](../context/struct.Cx.html).
+/// The function is `async` and returns [`Result`](../type.Result.html). It takes one parameter,
+/// `slot`, of type [`Result`](../type.Result.html)`<`[`View`](../view/struct.View.html)`>`: the
+/// inner page's rendered output, embedded (with `?`) somewhere in the layout's view. The function
+/// may also take [`cx: &Cx`](../context/struct.Cx.html).
 ///
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::{
-///     Result,
-///     router::{Slot, layout},
-///     view::view,
-/// };
+/// use topcoat::{Result, router::layout, view::view};
 ///
 /// #[layout("/")]
-/// async fn root_layout(slot: Slot<'_>) -> Result {
+/// async fn root_layout(slot: Result) -> Result {
 ///     view! {
 ///         <!DOCTYPE html>
 ///         <html>
 ///             <body>
 ///                 <nav><a href="/">"Home"</a></nav>
-///                 (slot.await?)
+///                 (slot?)
 ///             </body>
 ///         </html>
 ///     }
@@ -131,20 +127,20 @@ pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Layouts as components
 ///
-/// A layout doubles as a [component](../view/attr.component.html): calling it inside
-/// [`view!`](../view/macro.view.html) wraps a child view, passed as the `slot` prop.
+/// A layout doubles as a [component](../view/attr.component.html), taking a `Result<View>`
+/// as its `slot` property:
 ///
 /// ```rust
-/// # use topcoat::{Result, router::{Slot, layout, page}, view::view};
+/// # use topcoat::{Result, router::{layout, page}, view::view};
 /// # #[layout("/")]
-/// # async fn root_layout(slot: Slot<'_>) -> Result {
-/// #     view! { <body>(slot.await?)</body> }
+/// # async fn root_layout(slot: Result) -> Result {
+/// #     view! { <body>(slot?)</body> }
 /// # }
 /// #[page("/standalone")]
 /// async fn standalone() -> Result {
 ///     let content = view! { <p>"content"</p> }?;
 ///     view! {
-///         root_layout(slot: content)
+///         root_layout(slot: Ok(content))
 ///     }
 /// }
 /// ```

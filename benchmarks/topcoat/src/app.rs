@@ -5,7 +5,7 @@ use topcoat::{
     Result,
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset},
     context::{Cx, app_context},
-    router::{Compression, Router, Slot, layout, page},
+    router::{Compression, Router, layout, page},
     view::view,
 };
 
@@ -27,7 +27,7 @@ pub fn router() -> Router {
 }
 
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result {
+async fn root_layout(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html lang="en">
@@ -40,7 +40,7 @@ async fn root_layout(slot: Slot<'_>) -> Result {
             <body class="flex min-h-screen flex-col bg-slate-50 text-slate-900">
                 site_nav()
                 <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-                    (slot.await?)
+                    (slot?)
                 </main>
                 site_footer()
             </body>

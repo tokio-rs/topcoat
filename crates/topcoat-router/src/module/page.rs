@@ -51,7 +51,8 @@ inventory::collect!(ModulePageFn);
 pub struct ModuleLayoutFn {
     /// Module path where `#[layout]` was declared, used to derive the URL path.
     module_path: &'static str,
-    /// The layout's async render function, receiving a [`Slot`] and returning a [`Result`].
+    /// The layout's async render function, receiving the child content as a [`Result`] and
+    /// returning a new [`Result`].
     render: LayoutRenderFn,
 }
 

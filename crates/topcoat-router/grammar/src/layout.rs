@@ -27,7 +27,7 @@ impl Parse for LayoutAttr {
 enum LayoutArg {
     /// The `cx: &Cx` request context parameter.
     Cx,
-    /// The `slot: Slot<'_>` child content parameter.
+    /// The `slot: Result` child content parameter.
     Slot,
 }
 
@@ -77,7 +77,7 @@ impl Parse for LayoutItem {
                     _ => {
                         return Err(syn::Error::new_spanned(
                             pat_type,
-                            "layout functions only accept a `slot: Slot<'_>` and an optional `cx: &Cx` parameter",
+                            "layout functions only accept a `slot: Result` and an optional `cx: &Cx` parameter",
                         ));
                     }
                 },
@@ -86,7 +86,7 @@ impl Parse for LayoutItem {
         if !args.iter().any(|arg| matches!(arg, LayoutArg::Slot)) {
             return Err(syn::Error::new_spanned(
                 &item.sig,
-                "layout functions must take a `slot: Slot<'_>` parameter",
+                "layout functions must take a `slot: Result` parameter",
             ));
         }
 
@@ -126,18 +126,16 @@ impl ToTokens for Layout {
         // Component face: wraps a child view inline from `view!`. It always
         // takes `cx` (feeding the handler's injected context parameter), and
         // the child is already rendered, so it is passed as the `slot` prop
-        // and handed to the handler as a ready future. The marker struct this
+        // and handed to the handler as an `Ok` result. The marker struct this
         // expands to is a unit struct, so `#ident` stays a value usable
         // directly in `router.layout(...)`.
         let component_args = args.iter().map(|arg| match arg {
             LayoutArg::Cx => quote! { cx },
-            LayoutArg::Slot => quote! {
-                ::std::boxed::Box::pin(::std::future::ready(#topcoat_error::Result::Ok(slot)))
-            },
+            LayoutArg::Slot => quote! { slot },
         });
         quote! {
             #[#topcoat_view_macro::component]
-            #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_view::View) #output {
+            #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_error::Result<#topcoat_view::View>) #output {
                 #ident::handler(cx #(, #component_args)*).await
             }
         }
@@ -165,9 +163,9 @@ impl ToTokens for Layout {
             .attrs
             .push(parse_quote! { #[allow(clippy::unused_async)] });
 
-        // The render function backing the registered layout passes the real
-        // slot future through untouched, preserving the streaming order
-        // between the layout body and the inner page.
+        // The render function backing the registered layout passes the
+        // already-rendered slot result through untouched, so the layout body
+        // wraps the inner page's output.
         let render_args = args.iter().map(|arg| match arg {
             LayoutArg::Cx => quote! { cx },
             LayoutArg::Slot => quote! { slot },
@@ -237,33 +235,28 @@ mod tests {
 
     #[test]
     fn accepts_a_slot_parameter() {
-        syn::parse_str::<LayoutItem>("async fn shell(slot: Slot<'_>) -> Result { todo!() }")
-            .unwrap();
+        syn::parse_str::<LayoutItem>("async fn shell(slot: Result) -> Result { todo!() }").unwrap();
     }
 
     #[test]
     fn accepts_cx_and_slot_in_any_order() {
-        syn::parse_str::<LayoutItem>(
-            "async fn shell(cx: &Cx, slot: Slot<'_>) -> Result { todo!() }",
-        )
-        .unwrap();
-        syn::parse_str::<LayoutItem>(
-            "async fn shell(slot: Slot<'_>, cx: &Cx) -> Result { todo!() }",
-        )
-        .unwrap();
+        syn::parse_str::<LayoutItem>("async fn shell(cx: &Cx, slot: Result) -> Result { todo!() }")
+            .unwrap();
+        syn::parse_str::<LayoutItem>("async fn shell(slot: Result, cx: &Cx) -> Result { todo!() }")
+            .unwrap();
     }
 
     #[test]
     fn rejects_non_async_fn() {
         assert!(
-            parse_err("fn shell(slot: Slot<'_>) -> Result { todo!() }").contains("must be async")
+            parse_err("fn shell(slot: Result) -> Result { todo!() }").contains("must be async")
         );
     }
 
     #[test]
     fn rejects_missing_return_type() {
         assert!(
-            parse_err("async fn shell(slot: Slot<'_>) {}").contains("must declare a return type")
+            parse_err("async fn shell(slot: Result) {}").contains("must declare a return type")
         );
     }
 
@@ -271,25 +264,25 @@ mod tests {
     fn rejects_missing_slot() {
         assert!(
             parse_err("async fn shell(cx: &Cx) -> Result { todo!() }")
-                .contains("must take a `slot: Slot<'_>` parameter")
+                .contains("must take a `slot: Result` parameter")
         );
     }
 
     #[test]
     fn rejects_self_receiver() {
-        let err = parse_err("async fn shell(&self, slot: Slot<'_>) -> Result { todo!() }");
+        let err = parse_err("async fn shell(&self, slot: Result) -> Result { todo!() }");
         assert!(err.contains("cannot take a `self` receiver"));
     }
 
     #[test]
     fn rejects_unknown_parameter_names() {
-        let err = parse_err("async fn shell(slot: Slot<'_>, body: Form<A>) -> Result { todo!() }");
+        let err = parse_err("async fn shell(slot: Result, body: Form<A>) -> Result { todo!() }");
         assert!(err.contains("only accept"));
     }
 
     #[test]
     fn rejects_duplicate_slot_parameters() {
-        let err = parse_err("async fn shell(slot: Slot<'_>, slot: Slot<'_>) -> Result { todo!() }");
+        let err = parse_err("async fn shell(slot: Result, slot: Result) -> Result { todo!() }");
         assert!(err.contains("only accept"));
     }
 }

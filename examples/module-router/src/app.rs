@@ -4,7 +4,7 @@ mod docs;
 
 use topcoat::{
     Result,
-    router::{Slot, layout, page},
+    router::{layout, page},
     view::view,
 };
 
@@ -16,7 +16,7 @@ pub fn router() -> topcoat::router::Router {
 
 // A layout in the root app module wraps every page.
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result {
+async fn root_layout(slot: Result) -> Result {
     view! {
         <html>
             <head>topcoat::dev::script()</head>
@@ -33,7 +33,7 @@ async fn root_layout(slot: Slot<'_>) -> Result {
                     <a href="/pricing">"pricing"</a>
                 </nav>
                 <hr>
-                (slot.await?)
+                (slot?)
             </body>
         </html>
     }
