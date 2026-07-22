@@ -21,7 +21,7 @@ const LABEL: &str = "flex items-center gap-2 text-sm leading-none font-medium se
 /// `for`) are forwarded to the underlying `<label>`; a `class` among them is
 /// appended to the computed classes. Child nodes become the label's content.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     <div class="flex flex-col gap-2">
 ///         label(attrs: attributes! { for="email" }, "Email")

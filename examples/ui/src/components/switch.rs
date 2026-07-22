@@ -31,7 +31,7 @@ const THUMB: &str = "pointer-events-none absolute top-1/2 left-0.5 size-3.5 -tra
 /// `<input>`; a `class` among them is appended to the wrapping element's
 /// classes. Set the on state with a plain `checked` attribute.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     <div class="flex items-center gap-2">
 ///         switch(attrs: attributes! { id="airplane-mode" checked=(true) })

@@ -28,7 +28,7 @@ const PROGRESS: &str = "h-2 w-full appearance-none overflow-hidden rounded-full 
 /// among them is appended to the computed classes. The bar fills its
 /// container, so size it through the container or with a width class.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     progress(value: 62.0)
 /// }

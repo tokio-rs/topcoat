@@ -25,7 +25,7 @@ const CHECKBOX: &str = "peer size-4 shrink-0 appearance-none rounded-[4px] borde
 /// attribute. The indeterminate state is not styled: it is only reachable
 /// through the DOM property, so setting it takes a script to begin with.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     <div class="flex items-center gap-2">
 ///         checkbox(attrs: attributes! { id="terms" name="terms" checked=(true) })

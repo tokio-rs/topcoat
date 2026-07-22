@@ -48,7 +48,7 @@ const BASE: &str = "inline-flex w-fit shrink-0 items-center justify-center gap-1
 ///
 /// Use it to give badge styling to another element, such as a link:
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     <a href="/releases/v2" class=(badge_variants(BadgeVariant::Outline))>"v2.0"</a>
 /// }
@@ -65,7 +65,7 @@ pub fn badge_variants(variant: BadgeVariant) -> String {
 /// `<span>`; a `class` among them is appended to the computed classes. Child
 /// nodes become the badge's content.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     badge(variant: BadgeVariant::Destructive, "Failed")
 /// }

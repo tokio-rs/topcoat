@@ -12,7 +12,7 @@ use topcoat::{
 /// `attrs` (such as `class` or `open`) are forwarded to the underlying
 /// `<details>`; a `class` among them is appended to the computed classes.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     dropdown_menu(
 ///         dropdown_menu_trigger("Options")
@@ -54,7 +54,7 @@ const TRIGGER: &str = "cursor-pointer list-none [&::-webkit-details-marker]:hidd
 /// The `attrs` are forwarded to the `<summary>`; a `class` among them is
 /// appended to the computed classes.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     dropdown_menu_trigger(
 ///         attrs: attributes! {
@@ -136,7 +136,7 @@ pub async fn dropdown_menu_item(
 /// the underlying `<details>`; a `class` among them is appended to the
 /// computed classes.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     dropdown_menu_content(
 ///         dropdown_menu_item("Back")

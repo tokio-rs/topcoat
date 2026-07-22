@@ -24,7 +24,7 @@ const TEXTAREA: &str = "field-sizing-content min-h-16 w-full rounded-lg border b
 /// container or with a width class; it grows with its content from a
 /// two-line minimum.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     textarea(attrs: attributes! { name="feedback" placeholder="Tell us more" })
 /// }

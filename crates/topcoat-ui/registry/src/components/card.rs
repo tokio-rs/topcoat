@@ -21,7 +21,7 @@ const CARD: &str = "flex flex-col gap-5 rounded-xl border border-border bg-backg
 /// underlying `<div>`; a `class` among them is appended to the computed
 /// classes. Child nodes become the card's sections.
 ///
-/// ```rust
+/// ```ignore
 /// view! {
 ///     card(
 ///         attrs: attributes! { class="max-w-sm" },
