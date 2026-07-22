@@ -12,6 +12,9 @@ rust-version.workspace = true
 
 [dependencies]
 topcoat-core.workspace = true
+topcoat-view.workspace = true
+
+lettre = { workspace = true, features = ["builder"] }
 
 [lints]
 workspace = true
