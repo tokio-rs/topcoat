@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/tokio-rs/topcoat/compare/topcoat-asset-v0.3.1...topcoat-asset-v0.4.0) - 2026-07-22
+
+### Added
+
+- bundler prallelism ([#157](https://github.com/tokio-rs/topcoat/pull/157))
+
 ## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-asset-v0.1.3...topcoat-asset-v0.2.0) - 2026-07-19
 
 ### Other

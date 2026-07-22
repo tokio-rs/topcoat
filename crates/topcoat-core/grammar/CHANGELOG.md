@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-grammar-v0.3.1...topcoat-core-grammar-v0.4.0) - 2026-07-22
+
+### Fixed
+
+- pretty printer forcing newline in empty html elements ([#161](https://github.com/tokio-rs/topcoat/pull/161))
+
 ## [0.3.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-grammar-v0.2.0...topcoat-core-grammar-v0.3.0) - 2026-07-19
 
 ### Fixed
