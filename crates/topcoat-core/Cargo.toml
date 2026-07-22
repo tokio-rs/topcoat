@@ -19,7 +19,9 @@ anyhow.workspace = true
 anymap3.workspace = true
 boxcar.workspace = true
 hashbrown.workspace = true
+http.workspace = true
 pin-project-lite.workspace = true
+thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]

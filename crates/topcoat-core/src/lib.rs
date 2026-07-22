@@ -1,6 +1,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod abort;
+pub mod base_url;
 #[cfg(feature = "build")]
 pub mod cache;
 pub mod context;

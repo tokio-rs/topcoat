@@ -1,8 +1,10 @@
 use std::any::{Any, type_name};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::Arc;
 
+use topcoat_core::base_url::BaseUrl;
 use topcoat_core::context::{ContextMap, CxBuilder};
 
 use crate::{
@@ -315,6 +317,42 @@ impl RouterBuilder {
         self
     }
 
+    /// Registers the base URL the application is publicly reachable at, like
+    /// `https://example.com`.
+    ///
+    /// Relative URLs work anywhere within the site, but rendered content
+    /// that leaves it (e.g. links and images in emails, feeds, or sitemaps)
+    /// needs the absolute form. The base URL is stored on the app context;
+    /// read it back with [`base_url`](topcoat_core::base_url::base_url) (or
+    /// [`try_base_url`](topcoat_core::base_url::try_base_url)) and resolve
+    /// paths against it with
+    /// [`BaseUrl::join`](topcoat_core::base_url::BaseUrl::join).
+    ///
+    /// Accepts anything convertible into a [`BaseUrl`]. A string is parsed,
+    /// so it must be an absolute `http` or `https` URL without a query or
+    /// fragment, with an optional path prefix for applications mounted
+    /// under one.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not a valid base URL, or if a base URL has
+    /// already been registered.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use topcoat::router::Router;
+    ///
+    /// let router = Router::builder().base_url("https://example.com").build();
+    /// ```
+    #[must_use]
+    pub fn base_url(self, base_url: impl TryInto<BaseUrl, Error: fmt::Display>) -> Self {
+        match base_url.try_into() {
+            Ok(base_url) => self.app_context(base_url),
+            Err(error) => panic!("{error}"),
+        }
+    }
+
     /// Registers a unique value that is accessible to every request sent to
     /// this router by its type `T`. The top-level
     /// [`app_context`](topcoat_core::context::app_context) function can be used to
@@ -584,6 +622,16 @@ mod tests {
         Box::pin(async move { app_context::<Greeting>(cx).0.into_response(cx) })
     }
 
+    /// Reads the registered base URL and returns it as the body.
+    fn say_base_url(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            topcoat_core::base_url::base_url(cx)
+                .as_str()
+                .to_owned()
+                .into_response(cx)
+        })
+    }
+
     // Layers that record their label in a shared trace before continuing, so a
     // test can observe the order layers run in.
     type Trace = Mutex<Vec<&'static str>>;
@@ -769,6 +817,23 @@ mod tests {
         let (status, _, body) = send(&router, Method::GET, "/hi");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"hello");
+    }
+
+    #[test]
+    fn base_url_is_available_to_handlers() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), say_base_url))
+            .base_url("https://example.com")
+            .build();
+        let (status, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"https://example.com");
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid base URL")]
+    fn invalid_base_url_panics_at_registration() {
+        let _ = RouterBuilder::new().base_url("not a url");
     }
 
     // -- Router::handle: layers --

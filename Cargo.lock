@@ -2865,7 +2865,9 @@ dependencies = [
  "anymap3",
  "boxcar",
  "hashbrown 0.17.0",
+ "http",
  "pin-project-lite",
+ "thiserror",
  "tokio",
  "topcoat",
 ]
