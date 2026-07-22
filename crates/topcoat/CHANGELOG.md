@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/tokio-rs/topcoat/compare/topcoat-v0.3.1...topcoat-v0.4.0) - 2026-07-22
+
+### Added
+
+- add Alpine AJAX integration and example ([#158](https://github.com/tokio-rs/topcoat/pull/158))
+
+### Other
+
+- fix hyphenation in 'fullstack' to 'full-stack' ([#163](https://github.com/tokio-rs/topcoat/pull/163))
+- add WebTransport to roadmap ([#160](https://github.com/tokio-rs/topcoat/pull/160))
+
 ## [0.3.1](https://github.com/tokio-rs/topcoat/compare/topcoat-v0.3.0...topcoat-v0.3.1) - 2026-07-20
 
 ### Other
