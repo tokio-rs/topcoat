@@ -141,6 +141,39 @@ async fn current_path(cx: &Cx) -> Result {
 }
 ```
 
+
+# Recursive Components
+
+A component calling itself, either directly or indirectly, causes a dependency cycle in the created `Future`. To fix the issue, use `#[component(boxed)]` on one of the components in the cycle:
+
+```rust
+use topcoat::{
+    Result,
+    view::{component, view},
+};
+
+struct Comment {
+    body: String,
+    replies: Vec<Comment>,
+}
+
+#[component(boxed)]
+async fn comment_thread(comment: &Comment) -> Result {
+    view! {
+        <li>
+            (&comment.body)
+            if !comment.replies.is_empty() {
+                <ul>
+                    for reply in &comment.replies {
+                        comment_thread(comment: reply)
+                    }
+                </ul>
+            }
+        </li>
+    }
+}
+```
+
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html
 [`View`]: struct.View.html
