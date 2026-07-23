@@ -64,12 +64,7 @@ async fn home(cx: &Cx) -> Result {
         <h1>"Toasty Todos"</h1>
 
         <form method="post" action="/todos">
-            <input
-                type="text"
-                name="title"
-                placeholder="What needs doing?"
-                required=(true)
-            >
+            <input type="text" name="title" placeholder="What needs doing?" required="">
             <button type="submit">"Add"</button>
         </form>
 

@@ -205,7 +205,7 @@ async fn buttons_card() -> Result {
                             icon(data: iconify_icon!("feather:plus"), label: "Add item")
                         )
                         button(
-                            attrs: attributes! { disabled=(true) },
+                            attrs: attributes! { disabled="" },
                             spinner()
                             "Saving..."
                         )
@@ -292,7 +292,7 @@ async fn branches_card() -> Result {
             )
             card_content(
                 dropdown_menu(
-                    attrs: attributes! { open=(true) },
+                    attrs: attributes! { open="" },
                     // The trigger takes any content; this one borrows the
                     // outline button's looks and adds a flipping chevron.
                     dropdown_menu_trigger(
@@ -317,7 +317,7 @@ async fn branches_card() -> Result {
                         // A submenu opens its own panel beside this row; it is
                         // rendered open here so the page shows it.
                         dropdown_menu_sub(
-                            attrs: attributes! { open=(true) },
+                            attrs: attributes! { open="" },
                             dropdown_menu_sub_trigger("Checkout tag")
                             dropdown_menu_sub_content(
                                 dropdown_menu_item("v1.2.0")
@@ -509,9 +509,7 @@ async fn settings_card() -> Result {
             card_content(
                 <div class="flex flex-col gap-3">
                     <div class="flex items-center gap-2">
-                        checkbox(
-                            attrs: attributes! { id="notify-deploys" checked=(true) }
-                        )
+                        checkbox(attrs: attributes! { id="notify-deploys" checked="" })
                         label(
                             attrs: attributes! { for="notify-deploys" },
                             "Deploy results"
@@ -523,7 +521,7 @@ async fn settings_card() -> Result {
                     </div>
                     <div class="flex items-center gap-2">
                         checkbox(
-                            attrs: attributes! { id="notify-digest" checked=(true) disabled=(true) }
+                            attrs: attributes! { id="notify-digest" checked="" disabled="" }
                         )
                         label(
                             attrs: attributes! { for="notify-digest" class="opacity-50" },
@@ -536,9 +534,7 @@ async fn settings_card() -> Result {
                                 attrs: attributes! { for="notify-push" },
                                 "Push notifications"
                             )
-                            switch(
-                                attrs: attributes! { id="notify-push" checked=(true) }
-                            )
+                            switch(attrs: attributes! { id="notify-push" checked="" })
                         </div>
                         <div class="flex items-center justify-between gap-4">
                             label(

@@ -14,7 +14,7 @@ use topcoat::{
 /// ```ignore
 /// view! {
 ///     button(
-///         attrs: attributes! { disabled=(true) },
+///         attrs: attributes! { disabled="" },
 ///         spinner()
 ///         "Saving..."
 ///     )

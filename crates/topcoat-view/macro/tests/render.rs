@@ -115,11 +115,11 @@ async fn conditional_attribute_false_omits_attribute() {
 }
 
 #[tokio::test]
-async fn conditional_attribute_true_keeps_attribute() {
+async fn conditional_attribute_true_renders_empty_value() {
     let disabled = true;
     let cx = &Cx::default();
     let html = r(view! { cx => <button disabled=(disabled)>"go"</button> });
-    assert!(html.contains("disabled"));
+    assert_eq!(html, r#"<button disabled="">go</button>"#);
 }
 
 #[tokio::test]

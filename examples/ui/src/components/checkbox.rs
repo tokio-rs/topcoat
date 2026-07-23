@@ -28,7 +28,7 @@ const CHECKBOX: &str = "peer size-4 shrink-0 appearance-none rounded-[4px] borde
 /// ```ignore
 /// view! {
 ///     <div class="flex items-center gap-2">
-///         checkbox(attrs: attributes! { id="terms" name="terms" checked=(true) })
+///         checkbox(attrs: attributes! { id="terms" name="terms" checked="" })
 ///         label(attrs: attributes! { for="terms" }, "Accept terms")
 ///     </div>
 /// }

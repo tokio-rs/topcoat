@@ -80,7 +80,14 @@ impl Attributes {
                 cx,
                 &mut PartsWriter::new(&mut view_parts, HtmlContext::AttributeValue),
             );
-            self.map.insert(k.into(), view_parts.into())
+            // `ViewPart::Empty` is the absent marker, so a present value that
+            // produced no parts (a `true` boolean) is stored as an empty
+            // string part to keep the attribute rendered.
+            let part = match ViewPart::from(view_parts) {
+                ViewPart::Empty => ViewPart::unescaped(""),
+                part => part,
+            };
+            self.map.insert(k.into(), part)
         } else {
             self.map.insert(k.into(), ViewPart::empty())
         }
@@ -262,7 +269,7 @@ mod tests {
     fn renders_true_boolean_attribute() {
         let mut attrs = Attributes::new();
         attrs.insert(&Cx::default(), "disabled", true);
-        assert_eq!(render(attrs), " disabled=\"true\"");
+        assert_eq!(render(attrs), " disabled=\"\"");
     }
 
     #[test]
