@@ -133,6 +133,10 @@ fixture_test!(class_macro_long);
 fixture_test!(local_binding);
 fixture_test!(local_binding_typed);
 
+// -- Signals -----------------------------------------------------------------
+
+fixture_test!(signal_declaration);
+
 // -- DOCTYPE -----------------------------------------------------------------
 
 fixture_test!(doctype);

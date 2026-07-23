@@ -1,0 +1,4 @@
+view! {
+    signal count = 0.0;
+    <p>(count)</p>
+}

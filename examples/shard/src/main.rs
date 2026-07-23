@@ -30,9 +30,7 @@ async fn home() -> Result {
                 topcoat::dev::script()
                 topcoat::runtime::script()
             </head>
-            <body>
-                combobox()
-            </body>
+            <body>combobox()</body>
         </html>
     }
 }
@@ -43,10 +41,7 @@ async fn combobox() -> Result {
         signal input = String::new();
 
         <div>
-            <input
-                :value=$(input.get())
-                @input=$(|e: Event| input.set(e.target.value))
-            >
+            <input :value=$(input.get()) @input=$(|e: Event| input.set(e.target.value))>
 
             combobox_content(input: $(input.get()))
         </div>

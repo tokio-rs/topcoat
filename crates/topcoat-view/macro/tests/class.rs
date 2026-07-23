@@ -122,9 +122,7 @@ async fn more_than_twelve_entries_flatten() {
                 (e),
                 (e),
             ))
-        >
-
-        </p>
+        ></p>
     });
     assert_eq!(html, r#"<p class="e e e e e e e e e e e e e e"></p>"#);
 }
