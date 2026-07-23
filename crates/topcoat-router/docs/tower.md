@@ -4,7 +4,7 @@ The [tower](https://docs.rs/tower) ecosystem shares one service abstraction acro
 
 # Mounting a service as a route
 
-[`TowerRoute`] forwards its requests to a tower service (an axum router, a hyper service, a reverse proxy). Registered at a catch-all path with `Methods::Any`, it hands an entire URL subtree to the service -- the typical setup when migrating an existing application to topcoat one route at a time. The service receives each request with its original URI; nothing is stripped or rewritten.
+[`TowerRoute`] forwards its requests to a tower service (an axum router, a hyper service, a reverse proxy). Registered at a catch-all path with `Methods::Any`, it hands an entire URL subtree to the service. This is the typical setup when migrating an existing application to topcoat one route at a time. The service receives each request with its original URI; nothing is stripped or rewritten.
 
 ```rust,ignore
 use topcoat::router::{Methods, Path, Router, tower::TowerRoute};
@@ -43,7 +43,7 @@ let router = Router::builder()
 
 # Errors
 
-An error produced by wrapped topcoat routes (a 404, a handler error) passes through a [`TowerLayer`]'s middleware and leaves it as the original error value, so outer layers and layouts can still catch it by type. An error a tower service produces itself -- middleware timing out, a mounted service failing -- surfaces as a [`TowerServiceError`]; unmapped, the router renders it as a 500.
+An error produced by wrapped topcoat routes (a 404, a handler error) passes through a [`TowerLayer`]'s middleware and leaves it as the original error value, so outer layers and layouts can still catch it by type. An error a tower service produces itself (middleware timing out, a mounted service failing) surfaces as a [`TowerServiceError`]; unmapped, the router renders it as a 500.
 
 # Requirements
 
