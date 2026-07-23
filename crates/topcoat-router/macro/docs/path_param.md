@@ -12,7 +12,7 @@ struct PostId(uuid::Uuid);
 
 [`path_param::<T>(cx)`](fn.path_param.html) returns the parameter. The return type follows the inner type:
 
-- **`str`**: returns the raw segment as a `&str` borrowed from the request (no parsing, cannot fail).
+- **`str`**: returns the percent-decoded segment as a `&str` borrowed from the request (no parsing, cannot fail).
 - **Anything else**: parses the segment with [`FromStr`](core::str::FromStr) and returns `Result<&T, &<T as FromStr>::Err>`: a reference to the parsed value, or to the parse error.
 
 Parsing runs at most once per request; the result is then memoized.
@@ -61,7 +61,11 @@ The parameter's name has to line up with a `{name}` segment in the route's URL. 
 
 - **Explicit path**: write the placeholder yourself, so `PostId` must appear as `{post_id}`:
   `#[page("/posts/{post_id}")]`.
-- **[`module_router!`](../router/macro.module_router.html)**: defining a `#[path_param]` inside a module turns that module's own segment into the parameter, so there is no placeholder to write. A `PostId` in `src/app/posts/id.rs` makes the `id` module render as `{post_id}`.
+- **[`module_router!`](../router/macro.module_router.html)**: defining a `#[path_param]` inside a non-root route module turns that module's own segment into the parameter, so there is no placeholder to write. A `PostId` in `src/app/posts/id.rs` makes the `id` module render as `{post_id}`.
+
+A module contributes one path segment, so it can contain one `#[path_param]`. Put additional parameters in descendant modules. Pages and layouts in those descendants can read parameters from ancestor modules when the parameter types are visible through normal Rust module visibility.
+
+`module_router!()` discovers handlers without explicit paths. If a page uses an explicit path, register it by name on the returned builder or call `RouterBuilderDiscoverExt::discover`; see the module-router documentation.
 
 # Examples
 
@@ -91,7 +95,7 @@ async fn post_page(cx: &Cx) -> Result {
 
 ```rust
 # use topcoat::{context::Cx, Result, router::{page, path_param}, view::view};
-// A `str` inner type skips parsing and borrows the raw segment.
+// A `str` inner type skips FromStr parsing and borrows the decoded segment.
 #[path_param]
 struct Slug(str);
 

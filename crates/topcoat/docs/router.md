@@ -7,11 +7,11 @@ Handlers register in two ways: **manually**, listing each item on the builder, o
 Explicit route paths use Topcoat's [`Path`] syntax:
 
 - `/users` for static segments.
-- `/users/{id}` for dynamic parameters.
-- `/docs/{*path}` for wildcard tails.
+- `/users/{id}` for a dynamic parameter that matches one non-empty segment.
+- `/docs/{*path}` for a catch-all parameter that matches one or more remaining segments.
 - `/(marketing)/pricing` for groups. Groups participate in layout and layer matching but are stripped from the served URL, so this example serves `/pricing`.
 
-The root path is `/`. Non-root paths must start with `/` and may not contain empty segments.
+The root path is `/`. Non-root paths must start with `/` and may not contain empty segments. Parameter and group names must start with an ASCII letter or `_` and contain only ASCII letters, digits, and underscores. Captured parameter values are percent-decoded after the router matches the path.
 
 # Pages
 
@@ -128,38 +128,65 @@ The context and the body parameter are both optional and may appear in either or
 
 # Path and query parameters
 
-Two attribute macros declare typed structs for reading values out of a request. You declare a struct, then read it with a free function from any handler that has a `cx`:
+Path and query values are read from [`Cx`](crate::context::Cx), not injected as handler arguments. This keeps the handler signature limited to request context and body parsing, while allowing helper functions and layouts to read the same parameters.
 
-- [`#[path_param]`](macro@path_param): one dynamic path segment (like the `{post_id}` in `/posts/{post_id}`), read with [`path_param::<T>(cx)`](fn@path_param).
-- [`#[query_params]`](macro@query_params): the request's query string deserialized into a struct, read with [`query_params::<T>(cx)`](fn@query_params).
+## Path parameters
 
-Both parse lazily and memoize the result for the rest of the request.
+Apply [`#[path_param]`](macro@path_param) to a tuple struct with one field. The snake-cased struct name is the parameter name, so `PostId` reads `{post_id}`. The inner type controls parsing:
+
+- `str` returns the percent-decoded segment as `&str`.
+- Any other type is parsed with [`FromStr`](std::str::FromStr). The default return type is `Result<&T, &T::Err>`.
+- `error = bad_request`, `not_found`, `unauthorized`, `forbidden`, `redirect(...)`, or `redirect_permanent(...)` maps a parse failure to that router error.
 
 ```rust
 use topcoat::{
     Result,
     context::Cx,
-    router::{page, path_param, query_params},
+    router::{page, path_param},
     view::view,
 };
 
 #[path_param(error = bad_request)]
-struct PostId(uuid::Uuid);
-
-#[query_params(error = bad_request)]
-struct PostQuery {
-    preview: Option<bool>,
-}
+struct PostId(u64);
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
     let post_id = path_param::<PostId>(cx)?;
-    let query = query_params::<PostQuery>(cx)?;
-    view! { /* ... */ }
+    view! { <h1>"Post " (post_id)</h1> }
 }
 ```
 
-See [`#[path_param]`](macro@path_param) and [`#[query_params]`](macro@query_params) for details.
+Parsing occurs once per request and the result is memoized. With [`module_router!`], declaring `#[path_param]` inside a non-root route module also changes that module's segment to the parameter. See [`module_router!`] for module structure, nested parameters, and catch-all parameters.
+
+## Query parameters
+
+Apply [`#[query_params]`](macro@query_params) to a struct with named fields. The macro derives `serde::Deserialize`, and [`query_params::<T>(cx)`](fn@query_params) deserializes the request query string into that struct. Use `Option<T>` for keys that may be absent.
+
+```rust
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{page, query_params},
+    view::view,
+};
+
+#[query_params(error = bad_request)]
+struct PostsQuery {
+    page: Option<u32>,
+    q: Option<String>,
+}
+
+#[page("/posts")]
+async fn posts(cx: &Cx) -> Result {
+    let query = query_params::<PostsQuery>(cx)?;
+    view! {
+        <p>"page: " (query.page.unwrap_or(1))</p>
+        <p>"search: " (query.q.as_deref().unwrap_or(""))</p>
+    }
+}
+```
+
+Query parsing also occurs once per request and returns a reference to the memoized value. A query struct is independent of the matched route, so any handler with `cx: &Cx` can read it. See [`#[query_params]`](macro@query_params) for error handling and redirecting after invalid input.
 
 # Errors
 
