@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 use std::pin::Pin;
 
-use http::Method;
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::View;
 
-use crate::{Body, IntoResponse, Methods, Path, Route, RouteFuture};
+use crate::{Body, IntoResponse, Methods, OwnedMethods, Path, Route, RouteFuture};
 
 /// The async render function backing a [`PageFn`].
 pub type PageRenderFn = for<'cx> fn(
@@ -20,8 +19,13 @@ pub type PageRenderFn = for<'cx> fn(
 /// (which derives the path from the module tree). Registered into a
 /// [`RouterBuilder`](crate::RouterBuilder) alongside [`LayoutFn`]s, which wrap
 /// it when their path is a prefix of the page's.
+///
+/// A page serves `GET` unless it declares other methods, either in the macro
+/// (`#[page(POST "/path")]`) or through [`PageFn::new`].
 #[derive(Debug, Clone)]
 pub struct PageFn {
+    /// The HTTP methods this page responds to.
+    methods: OwnedMethods,
     /// The URL path this page handles.
     path: Cow<'static, Path>,
     /// The async render function that produces the page [`View`].
@@ -29,9 +33,36 @@ pub struct PageFn {
 }
 
 impl PageFn {
-    /// Creates a new page with an explicit path and render function.
-    pub const fn new(path: Cow<'static, Path>, render: PageRenderFn) -> Self {
-        Self { path, render }
+    /// Creates a new page with explicit methods, path, and render function.
+    ///
+    /// The methods are anything convertible into [`OwnedMethods`]: a single
+    /// [`Method`](crate::Method), a `&'static [Method]`, a `Vec<Method>`, or
+    /// [`Methods::Any`] to respond to every method.
+    pub fn new(
+        methods: impl Into<OwnedMethods>,
+        path: Cow<'static, Path>,
+        render: PageRenderFn,
+    ) -> Self {
+        Self::const_new(methods.into(), path, render)
+    }
+
+    /// Const-context constructor used by macro-generated code.
+    pub const fn const_new(
+        methods: OwnedMethods,
+        path: Cow<'static, Path>,
+        render: PageRenderFn,
+    ) -> Self {
+        Self {
+            methods,
+            path,
+            render,
+        }
+    }
+
+    /// Returns the HTTP methods this page responds to.
+    #[must_use]
+    pub fn methods(&self) -> Methods<'_> {
+        self.methods.as_methods()
     }
 
     /// Returns the URL path this page handles.
@@ -119,7 +150,7 @@ impl PageWithLayouts {
 
 impl Route for PageWithLayouts {
     fn methods(&self) -> Methods<'_> {
-        Methods::Only(&[Method::GET])
+        self.page.methods()
     }
 
     fn path(&self) -> &Path {

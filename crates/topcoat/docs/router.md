@@ -31,6 +31,8 @@ async fn user_profile() -> Result {
 }
 ```
 
+A page serves `GET` by default; naming methods before the path (`#[page(POST "/signup")]`) overrides that, with the same method forms as [`#[route]`](route).
+
 See [`#[page]`](page) for the handler signature, module-derived paths, and using pages as components.
 
 # Layouts

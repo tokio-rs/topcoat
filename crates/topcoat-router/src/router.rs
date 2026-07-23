@@ -205,6 +205,9 @@ impl RouterBuilder {
     /// Registers a page: anything convertible into a [`PageFn`], like the
     /// marker `#[page]` generates. Order doesn't matter: layout matching is
     /// based on path prefixes, not registration order.
+    ///
+    /// A page serves the methods its [`PageFn`] declares (`GET` unless the
+    /// page opts into others).
     #[must_use]
     pub fn page(mut self, page: impl Into<PageFn>) -> Self {
         self.pages.push(page.into());
@@ -1094,7 +1097,7 @@ mod tests {
     #[test]
     fn page_renders_as_html() {
         let router = RouterBuilder::new()
-            .page(PageFn::new(path("/p"), render_page))
+            .page(PageFn::new(Method::GET, path("/p"), render_page))
             .build();
         let (status, headers, body) = send(&router, Method::GET, "/p");
         assert_eq!(status, StatusCode::OK);
@@ -1106,9 +1109,21 @@ mod tests {
     }
 
     #[test]
+    fn a_page_serves_only_its_declared_methods() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::POST, path("/p"), render_page))
+            .build();
+        let (status, _, body) = send(&router, Method::POST, "/p");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"page");
+        let (status, _, _) = send(&router, Method::GET, "/p");
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
     fn matching_layouts_wrap_a_page_outermost_first() {
         let router = RouterBuilder::new()
-            .page(PageFn::new(path("/admin/p"), render_page))
+            .page(PageFn::new(Method::GET, path("/admin/p"), render_page))
             .layout(LayoutFn::new(path("/admin"), layout_admin))
             .layout(LayoutFn::new(path("/"), layout_root))
             .build();
@@ -1122,7 +1137,7 @@ mod tests {
     #[test]
     fn layout_only_wraps_pages_under_its_path() {
         let router = RouterBuilder::new()
-            .page(PageFn::new(path("/p"), render_page))
+            .page(PageFn::new(Method::GET, path("/p"), render_page))
             .layout(LayoutFn::new(path("/admin"), layout_admin))
             .build();
         // The `/admin` layout does not apply to a page at `/p`.

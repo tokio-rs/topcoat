@@ -6,19 +6,24 @@ use syn::{
     parse_quote,
     spanned::Spanned,
 };
+use topcoat_core_grammar::ParseOption;
 use topcoat_core_grammar::paths::{
     topcoat_context, topcoat_inventory, topcoat_router, topcoat_view_macro,
 };
 
 use super::handler_args::{HandlerArg, HandlerArgs, request_ident};
+use super::method::Methods;
 
 pub struct PageAttr {
+    /// The declared HTTP methods; the page serves `GET` when omitted.
+    methods: Option<Methods>,
     path: Option<LitStr>,
 }
 
 impl Parse for PageAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
+            methods: Methods::parse_option(input)?,
             path: input.peek(LitStr).then(|| input.parse()).transpose()?,
         })
     }
@@ -147,9 +152,14 @@ impl ToTokens for Page {
         // both the `From` impl (backing manual `router.page(#ident)`
         // registration) and the discovery submission (which expands to a
         // `static`, requiring a const initializer).
+        let methods = match attr.methods.as_ref() {
+            Some(methods) => methods.to_token_stream(),
+            None => quote! { #topcoat_router::OwnedMethods::One(#topcoat_router::Method::GET) },
+        };
         let erased = if let Some(path) = attr.path.as_ref() {
             quote! {
-                const ERASED: #topcoat_router::PageFn = #topcoat_router::PageFn::new(
+                const ERASED: #topcoat_router::PageFn = #topcoat_router::PageFn::const_new(
+                    #methods,
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );
@@ -163,7 +173,7 @@ impl ToTokens for Page {
         } else {
             quote! {
                 const ERASED: #topcoat_router::ModulePageFn =
-                    #topcoat_router::ModulePageFn::new(module_path!(), #render);
+                    #topcoat_router::ModulePageFn::new(#methods, module_path!(), #render);
 
                 impl ::core::convert::From<#ident> for #topcoat_router::ModulePageFn {
                     fn from(_: #ident) -> Self {
@@ -199,6 +209,33 @@ mod tests {
         match syn::parse_str::<PageItem>(source) {
             Ok(_) => panic!("expected parse error for `{source}`"),
             Err(err) => err.to_string(),
+        }
+    }
+
+    #[test]
+    fn attr_without_methods_leaves_them_unset() {
+        let attr: PageAttr = syn::parse_str("\"/about\"").unwrap();
+        assert!(attr.methods.is_none());
+        assert!(attr.path.is_some());
+
+        let attr: PageAttr = syn::parse_str("").unwrap();
+        assert!(attr.methods.is_none());
+        assert!(attr.path.is_none());
+    }
+
+    #[test]
+    fn attr_accepts_methods_before_the_path() {
+        let attr: PageAttr = syn::parse_str("POST \"/submit\"").unwrap();
+        assert!(attr.methods.is_some());
+        assert!(attr.path.is_some());
+    }
+
+    #[test]
+    fn attr_accepts_methods_without_a_path() {
+        for source in ["POST", "[GET, POST]", "*"] {
+            let attr: PageAttr = syn::parse_str(source).unwrap();
+            assert!(attr.methods.is_some());
+            assert!(attr.path.is_none());
         }
     }
 
