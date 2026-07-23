@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-v0.4.0...topcoat-runtime-v0.5.0) - 2026-07-23
+
+### Fixed
+
+- return Bool surrogates from boolean event fields ([#168](https://github.com/tokio-rs/topcoat/pull/168))
+
 ## [0.3.1](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-v0.3.0...topcoat-runtime-v0.3.1) - 2026-07-20
 
 ### Fixed
