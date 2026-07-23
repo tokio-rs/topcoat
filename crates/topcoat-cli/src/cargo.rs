@@ -165,6 +165,14 @@ pub async fn build(
             cmd.env_remove(&k);
         }
     }
+    // MSVC's linker strips the `#[used]` statics that carry the embedded
+    // asset declarations (see `topcoat-asset`), so on Windows the bundler
+    // finds no assets and every page panics resolving them. /OPT:NOREF keeps
+    // unreferenced data alive. RUSTFLAGS was stripped above, so this sets a
+    // deterministic value rather than appending to user state.
+    if cfg!(all(windows, target_env = "msvc")) {
+        cmd.env("RUSTFLAGS", "-C link-arg=/OPT:NOREF");
+    }
     cmd.args(["build", "--message-format=json-diagnostic-rendered-ansi"]);
     cmd.env("CARGO_TERM_PROGRESS_WHEN", "always");
     cmd.env("CARGO_TERM_PROGRESS_WIDTH", "80");
