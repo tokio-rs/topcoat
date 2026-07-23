@@ -11,10 +11,7 @@ use crate::{
         MatchArmBody, RuntimeExpr, TemplateBlock, TemplateBreak, TemplateContinue, TemplateExpr,
         TemplateForLoop, TemplateIf, TemplateLocal, TemplateMatch,
     },
-    view::{
-        Component, DocumentType, Element, Nodes, ReactiveScope, SignalDeclaration, ViewWriter,
-        WriteView,
-    },
+    view::{Component, DocumentType, Element, Nodes, SignalDeclaration, ViewWriter, WriteView},
 };
 
 /// A single child within a [`View`](super::View): the union of every construct
@@ -34,7 +31,6 @@ pub enum Node {
     Match(TemplateMatch<Node>),
     Block(TemplateBlock<Nodes>),
     SignalDecaration(SignalDeclaration),
-    ReactiveScope(ReactiveScope),
 }
 
 impl Node {
@@ -70,7 +66,6 @@ impl WriteView for Node {
             Self::Match(inner) => inner.write(writer),
             Self::Block(inner) => inner.write(writer),
             Self::SignalDecaration(inner) => inner.write(writer),
-            Self::ReactiveScope(inner) => inner.write(writer),
         }
     }
 }
@@ -103,8 +98,6 @@ impl Parse for Node {
             Self::Block(input.parse()?)
         } else if SignalDeclaration::peek(input) {
             Self::SignalDecaration(input.parse()?)
-        } else if ReactiveScope::peek(input) {
-            Self::ReactiveScope(input.parse()?)
         } else if Component::peek(input) {
             Self::Component(input.parse()?)
         } else {
@@ -143,7 +136,6 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Node {
             Self::Match(inner) => inner.pretty_print(printer),
             Self::Block(inner) => inner.pretty_print(printer),
             Self::SignalDecaration(inner) => inner.pretty_print(printer),
-            Self::ReactiveScope(inner) => inner.pretty_print(printer),
         }
     }
 }

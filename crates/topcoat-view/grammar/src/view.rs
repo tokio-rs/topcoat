@@ -6,7 +6,6 @@ mod element_tag;
 mod html_ident;
 mod node;
 mod nodes;
-mod reactive_scope;
 mod signal_declaration;
 mod view_writer;
 
@@ -18,7 +17,6 @@ pub use element_tag::*;
 pub use html_ident::*;
 pub use node::*;
 pub use nodes::*;
-pub use reactive_scope::*;
 pub use signal_declaration::*;
 pub(crate) use view_writer::*;
 
@@ -61,9 +59,9 @@ impl ToTokens for View {
         let view = writer.into_token_stream();
 
         // When an explicit context is named, bind it to the `__cx` identifier
-        // the generated code (component invocations, reactive scopes) reads
-        // from. Inside a component/page/layout this binding is already in scope,
-        // so we emit the view untouched.
+        // the generated code (component invocations) reads from. Inside a
+        // component/page/layout this binding is already in scope, so we emit
+        // the view untouched.
         match &self.cx {
             Some(cx) => quote! {
                 {

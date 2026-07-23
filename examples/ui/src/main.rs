@@ -602,9 +602,8 @@ async fn notifications_card() -> Result {
                         <div class="flex items-start gap-3">
                             <span
                                 class="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
-                            >
+                            ></span>
 
-                            </span>
                             <div class="min-w-0">
                                 <p class="text-sm">(title)</p>
                                 <p class="text-xs text-muted-foreground">(time)</p>

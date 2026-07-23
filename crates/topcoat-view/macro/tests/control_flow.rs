@@ -118,9 +118,7 @@ async fn for_loop_in_attribute_list_emits_attributes_per_item() {
             for (name, value) in extras {
                 (name)=(value)
             }
-        >
-
-        </div>
+        ></div>
     });
 
     assert!(html.contains(r#"data-a="1""#));
@@ -198,9 +196,7 @@ async fn match_in_attribute_list_emits_attribute_per_arm() {
                 Status::Published => class="published",
                 Status::Archived => class="archived",
             }
-        >
-
-        </article>
+        ></article>
     });
 
     assert_eq!(html, r#"<article class="draft"></article>"#);
