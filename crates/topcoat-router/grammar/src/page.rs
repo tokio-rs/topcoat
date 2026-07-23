@@ -152,10 +152,10 @@ impl ToTokens for Page {
         // both the `From` impl (backing manual `router.page(#ident)`
         // registration) and the discovery submission (which expands to a
         // `static`, requiring a const initializer).
-        let methods = match attr.methods.as_ref() {
-            Some(methods) => methods.to_token_stream(),
-            None => quote! { #topcoat_router::OwnedMethods::One(#topcoat_router::Method::GET) },
-        };
+        let methods = attr.methods.as_ref().map_or_else(
+            || quote! { #topcoat_router::OwnedMethods::One(#topcoat_router::Method::GET) },
+            ToTokens::to_token_stream,
+        );
         let erased = if let Some(path) = attr.path.as_ref() {
             quote! {
                 const ERASED: #topcoat_router::PageFn = #topcoat_router::PageFn::const_new(
