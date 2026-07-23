@@ -27,7 +27,7 @@ Each module's path relative to the root module determines its URL. Module names 
 
 # Pages, layouts, layers, and API routes
 
-A `#[page]` defines a page handler. A `#[layout]` wraps all pages in the same module and its submodules.
+A `#[page]` defines a page handler, serving `GET` unless the attribute names other methods (`#[page(POST)]`). A `#[layout]` wraps all pages in the same module and its submodules.
 
 ```rust
 # use topcoat::{Result, router::{layout, page}, view::view};

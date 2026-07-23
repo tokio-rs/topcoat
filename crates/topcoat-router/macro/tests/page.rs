@@ -2,12 +2,25 @@ use serde::Deserialize;
 use topcoat::{
     Result,
     context::Cx,
-    router::{Form, Router, page, uri},
+    router::{Body, Form, Router, page, to_bytes, uri},
     view::view,
 };
 
 mod common;
 use common::send;
+
+/// Like [`send`], but with an explicit request method.
+async fn send_as(router: &Router, method: &str, path: &str) -> (u16, String) {
+    let request = http::Request::builder()
+        .method(method)
+        .uri(path)
+        .body(Body::empty())
+        .unwrap();
+    let response = router.handle(request).await;
+    let status = response.status().as_u16();
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    (status, String::from_utf8(bytes.to_vec()).unwrap())
+}
 
 #[page("/")]
 async fn home() -> Result {
@@ -57,12 +70,66 @@ async fn composed() -> Result {
     }
 }
 
+// A page serving a method other than the default `GET`.
+#[page(POST "/submit")]
+async fn submit() -> Result {
+    view! { <p>"submitted"</p> }
+}
+
+// A page serving several methods at one path.
+#[page([GET, POST] "/either")]
+async fn either() -> Result {
+    view! { <p>"either"</p> }
+}
+
+// A page serving every method.
+#[page(* "/anything")]
+async fn anything() -> Result {
+    view! { <p>"anything"</p> }
+}
+
 #[tokio::test]
 async fn renders_a_page_registered_by_name() {
     let router = Router::builder().page(home).build();
     let (status, body) = send(&router, "/").await;
     assert_eq!(status, 200);
     assert_eq!(body, "<h1>home</h1>");
+}
+
+#[tokio::test]
+async fn a_page_serves_get_by_default() {
+    let router = Router::builder().page(home).build();
+    assert_eq!(send_as(&router, "POST", "/").await.0, 405);
+}
+
+#[tokio::test]
+async fn a_page_can_declare_another_method() {
+    let router = Router::builder().page(submit).build();
+    let (status, body) = send_as(&router, "POST", "/submit").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "<p>submitted</p>");
+    assert_eq!(send_as(&router, "GET", "/submit").await.0, 405);
+}
+
+#[tokio::test]
+async fn a_page_can_declare_a_method_list() {
+    let router = Router::builder().page(either).build();
+    for method in ["GET", "POST"] {
+        let (status, body) = send_as(&router, method, "/either").await;
+        assert_eq!(status, 200);
+        assert_eq!(body, "<p>either</p>");
+    }
+}
+
+#[tokio::test]
+async fn a_star_page_serves_every_method() {
+    let router = Router::builder().page(anything).build();
+    for method in ["GET", "POST", "PUT", "DELETE", "PATCH"] {
+        assert_eq!(
+            send_as(&router, method, "/anything").await,
+            (200, "<p>anything</p>".into())
+        );
+    }
 }
 
 #[tokio::test]

@@ -308,7 +308,7 @@ mod tests {
     use topcoat_view::View;
 
     use super::*;
-    use crate::{Body, ModulePageFn};
+    use crate::{Body, Method, ModulePageFn, OwnedMethods};
 
     /// A `ModulePageFn` whose render function is never invoked; used to exercise
     /// registration and path computation without running a page.
@@ -319,7 +319,7 @@ mod tests {
         ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>> {
             Box::pin(async { unreachable!("test render function is never called") })
         }
-        ModulePageFn::new(module_path, render)
+        ModulePageFn::new(OwnedMethods::One(Method::GET), module_path, render)
     }
 
     fn builder() -> ModuleRouterBuilder {

@@ -2,6 +2,8 @@ Declares a page handler.
 
 The page's URL is the path string given to the attribute (`#[page("/about")]`). When no path is given, the URL is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). Both forms register into the same router, so explicit and module-derived paths can be mixed freely in one app.
 
+A page serves `GET` by default. To serve other methods, name them before the path, using the same forms as [`#[route]`](attr.route.html): a single method (`#[page(POST "/signup")]`), a bracketed list (`[GET, POST]`), or `*` for every method.
+
 Path strings are Topcoat [`Path`](struct.Path.html)s: literal segments (`users`), `{name}` for dynamic parameters, `{*name}` for wildcard tails, and `(name)` for groups (which participate in layout and layer matching but are stripped from the served URL).
 
 A page registers like any other handler: pass the function name to [`RouterBuilder::page`](struct.RouterBuilder.html#method.page), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
@@ -29,6 +31,19 @@ Module-derived path (in `src/app/about.rs` under `module_router!()`, this serves
 #[page]
 async fn about() -> Result {
     view! { <h1>"About"</h1> }
+}
+```
+
+Declaring a method (a form submission answered with a rendered view):
+
+```rust
+# use topcoat::{Result, router::{Form, page}, view::view};
+# use serde::Deserialize;
+# #[derive(Deserialize)]
+# struct Signup { email: String }
+#[page(POST "/signup")]
+async fn signup(Form(input): Form<Signup>) -> Result {
+    view! { <h1>"Welcome, " (input.email)</h1> }
 }
 ```
 
