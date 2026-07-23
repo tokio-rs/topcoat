@@ -118,6 +118,8 @@ async fn health() -> Result<&'static str> {
 }
 ```
 
+The method can also be a bracketed list (`#[route([GET, POST] "/form")]`) registering the handler for each listed method, or `*` (`#[route(* "/webhook")]`) registering it for every method. A route declaring a specific method takes precedence over a `*` route at the same path.
+
 See [`#[route]`](route) for the handler signature and how return values convert into responses.
 
 # Request and response bodies

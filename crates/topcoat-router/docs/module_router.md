@@ -54,7 +54,7 @@ async fn about() -> Result {
 }
 ```
 
-API routes use `#[route]` with an explicit HTTP method. Like pages and layouts, method-only routes derive their URL from the module path:
+API routes use `#[route]` with explicit HTTP methods: a single method, a `[GET, POST]` list, or `*` for every method. Like pages and layouts, routes without a path string derive their URL from the module path:
 
 ```rust
 # use topcoat::{Result, router::route};

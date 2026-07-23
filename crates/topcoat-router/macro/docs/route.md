@@ -1,6 +1,12 @@
 Declares an API route handler.
 
-A route always declares an HTTP method as its first argument (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, or `OPTIONS`). An optional path string follows the method (`#[route(GET "/api/health")]`); when omitted, the URL is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). Both forms register into the same router and can be mixed.
+A route always declares its HTTP methods as the first argument:
+
+- a single method (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, or `OPTIONS`),
+- a bracketed list (`[GET, POST]`) responding to each listed method, or
+- `*`, responding to every method. A route declaring a specific method takes precedence over a `*` route at the same path.
+
+An optional path string follows the methods (`#[route(GET "/api/health")]`); when omitted, the URL is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). Both forms register into the same router and can be mixed.
 
 A route registers like any other handler: pass the function name to [`RouterBuilder::route`](struct.RouterBuilder.html#method.route), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
 
@@ -41,5 +47,20 @@ Module-derived path (in `src/app/api/health.rs` under `module_router!()`, this s
 #[route(GET)]
 async fn health() -> Result<&'static str> {
     Ok("ok")
+}
+```
+
+A method list, and a `*` route answering every method (say, a webhook endpoint probed with both `GET` and `POST`):
+
+```rust
+# use topcoat::{Result, router::route};
+#[route([GET, POST] "/form")]
+async fn form() -> Result<&'static str> {
+    Ok("form")
+}
+
+#[route(* "/webhook")]
+async fn webhook() -> Result<&'static str> {
+    Ok("received")
 }
 ```

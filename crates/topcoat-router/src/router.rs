@@ -178,8 +178,13 @@ impl RouterBuilder {
         self.routes.is_empty() && self.pages.is_empty() && self.layouts.is_empty()
     }
 
-    /// Registers a [`Route`], an HTTP handler bound to a specific method and
+    /// Registers a [`Route`], an HTTP handler bound to a set of methods and a
     /// path.
+    ///
+    /// A route responds to the methods its [`Route::methods`] declares: one or
+    /// more specific methods, or every method via [`Methods::Any`]. Specific-
+    /// method routes and one any-method route can share a path; the specific
+    /// method wins at dispatch.
     #[must_use]
     pub fn route(mut self, route: impl Route) -> Self {
         self.routes.push(Box::new(route));
@@ -395,8 +400,10 @@ impl RouterBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if two routes resolve to the same path and HTTP method, since the
-    /// router would have no way to choose between them.
+    /// Panics if two routes resolve to the same path and HTTP method (or both
+    /// respond to every method at the same path), since the router would have
+    /// no way to choose between them, and if a route declares an empty method
+    /// set, since it could never be dispatched to.
     ///
     /// Also panics if two routes resolve to the same path but different layers
     /// wrap them (possible when their group segments differ, e.g. `/(a)/x` and
