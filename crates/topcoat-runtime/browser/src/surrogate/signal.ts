@@ -17,7 +17,8 @@ export class WriteSignal<T> {
 	}
 
 	get(): T {
-		return (this.read().deref() as { clone: () => T }).clone();
+		const value = this.read().deref() as { clone?: () => T };
+		return typeof value?.clone === "function" ? value.clone() : (value as T);
 	}
 
 	set(v: T): void {
