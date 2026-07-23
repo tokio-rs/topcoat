@@ -345,11 +345,23 @@ view! {
 
 See how to define components in the [`component`] macro guide.
 
-# Conditional Attributes
+# Boolean And Conditional Attributes
 
-Expression attributes can remove themselves from the rendered markup.
+[Boolean HTML attributes](https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML) such as `disabled`, `required`, and `checked` are true when the attribute is present and false when it is absent. HTML expects a present boolean attribute to have an empty value.
 
-When an attribute value evaluates to [`false`] or [`None`], the whole attribute is omitted; a [`true`] value renders the attribute with an empty value. This matches the required [boolean HTML attributes](https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML) behavior.
+When the value is known where the view is written, prefer the literal form `disabled=""` over the expression form `disabled=(true)`. Both render as `disabled=""`, but the literal is static markup that the macro folds into the pre-rendered parts of the template, while `(true)` is a Rust expression evaluated on every render.
+
+```rust
+# use topcoat::{Result, view::*};
+# #[component]
+# async fn example() -> Result {
+view! {
+    <input type="email" required="" disabled="">
+}
+# }
+```
+
+When the value is only known at run time, pass an expression. Expression attributes can remove themselves from the rendered markup: when the value evaluates to [`false`] or [`None`], the whole attribute is omitted, while a [`true`] value renders the attribute with an empty value. A [`bool`] expression therefore gives a boolean attribute exactly the presence behavior HTML expects, and [`Some`]/[`None`] extend the same logic to attributes that carry values:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -385,39 +397,6 @@ view! {
 # }
 ```
 
-For reusable runtime attribute collections, use the [`attributes!`] macro. It has the same attribute syntax as the [`view!`] macro but generates an [`topcoat::view::Attributes`] value that can be passed around and inserted into an element as an attribute fragment.
-
-To assemble a `class` attribute value from static and conditional parts, use the [`class!`] macro. It builds a [`topcoat::view::Class`] value whose entries join with single spaces, and the attribute is omitted entirely when no entry is present.
-
-# Boolean Attributes
-
-[Boolean HTML attributes](https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML) such as `disabled`, `required`, and `checked` are true when the attribute is present and false when it is absent. HTML expects a present boolean attribute to have an empty value.
-
-When the value is known where the view is written, prefer the literal form `disabled=""` over the expression form `disabled=(true)`. Both render as `disabled=""`, but the literal is static markup that the macro folds into the pre-rendered parts of the template, while `(true)` is a Rust expression evaluated on every render.
-
-```rust
-# use topcoat::{Result, view::*};
-# #[component]
-# async fn example() -> Result {
-view! {
-    <input type="email" required="" disabled="">
-}
-# }
-```
-
-When the value is only known at run time, pass a [`bool`] expression. As described in [Conditional Attributes](#conditional-attributes), the attribute renders with an empty value for [`true`] and is omitted for [`false`]:
-
-```rust
-# use topcoat::{Result, view::*};
-# #[component]
-# async fn example() -> Result {
-# let is_saving = true;
-view! {
-    <button disabled=(is_saving)>"Save"</button>
-}
-# }
-```
-
 Attributes that take the literal strings `"true"` and `"false"` as values, such as `aria-expanded` or `contenteditable`, are enumerated attributes, not boolean attributes. For them, `"false"` means something different than omitting the attribute, so pass strings instead of booleans:
 
 ```rust
@@ -430,6 +409,13 @@ view! {
 }
 # }
 ```
+
+# Attribute Collections And Class Lists
+
+Two companion macros build attribute values outside a view:
+
+- [`attributes!`] uses the same attribute syntax as [`view!`] to build a reusable [`topcoat::view::Attributes`] collection that inserts into an element as an attribute fragment.
+- [`class!`] assembles a `class` attribute value from static and conditional entries into a [`topcoat::view::Class`], which joins its entries with single spaces and omits the attribute entirely when no entry is present.
 
 # Status Codes And Response Headers
 
