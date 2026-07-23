@@ -42,7 +42,7 @@ The methods mirror the constructors: [`ok_or_not_found`](RouterErrorExt::ok_or_n
 
 # Catching an error
 
-An error keeps its type on the way out, so an outer handler can pick it up with `downcast_ref` and respond with a view instead. A layout can replace a page's [`NotFoundError`] with a branded not-found page:
+An error keeps its type on the way out, so an outer handler can pick it up with `downcast_ref` and respond with a view instead. For example, a layout can replace a page's [`NotFoundError`] with a branded not-found page:
 
 ```rust
 use topcoat::{
