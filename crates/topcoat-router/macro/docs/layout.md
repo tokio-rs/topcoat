@@ -1,6 +1,6 @@
 Declares a layout that wraps inner pages.
 
-A layout wraps every page whose URL begins with the layout's URL. The layout's URL is the path string given to the attribute (`#[layout("/settings")]`). When no path is given, it is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). When several layouts match a page, they nest from least specific (outermost) to most specific (innermost).
+A layout wraps every page whose URL begins with the layout's URL. The layout's URL is the path string given to the attribute (`#[layout("/settings")]`). When no path is given, it is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html).
 
 A layout registers like any other handler: pass the function name to [`RouterBuilder::layout`](struct.RouterBuilder.html#method.layout), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
 
@@ -45,6 +45,35 @@ async fn settings_layout(slot: Result) -> Result {
     }
 }
 ```
+
+# Nested layouts
+
+When several layouts match a page, they nest from least specific (outermost) to most specific (innermost):
+
+```rust
+# use topcoat::{Result, router::{layout, page}, view::view};
+#[layout("/")]
+async fn root_layout(slot: Result) -> Result {
+    view! { <html><body>(slot?)</body></html> }
+}
+
+#[layout("/settings")]
+async fn settings_layout(slot: Result) -> Result {
+    view! {
+        <div class="settings-shell">
+            <nav>"Settings nav"</nav>
+            (slot?)
+        </div>
+    }
+}
+
+#[page("/settings/profile")]
+async fn profile() -> Result {
+    view! { <h1>"Profile"</h1> }
+}
+```
+
+A request to `/settings/profile` renders `root_layout` > `settings_layout` > `profile`.
 
 # Layouts as components
 
