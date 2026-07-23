@@ -359,8 +359,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Bytes, IntoResponse, Layers, Method, NotFoundError, RouteFn, RouteFuture, Router, Terminal,
-        to_bytes,
+        Bytes, IntoResponse, Layers, Method, RouteFn, RouteFuture, Router, Terminal,
+        error::NotFoundError, to_bytes,
     };
 
     // -- Test helpers --

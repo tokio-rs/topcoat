@@ -66,7 +66,7 @@ impl ToTokens for QueryParams {
             Some(error) => (
                 error.ty(),
                 error.map_err(quote! {
-                    |error| #topcoat_router::bad_request_at(
+                    |error| #topcoat_router::error::bad_request_at(
                         error.path(),
                         format!("invalid query value: {}", error.inner()),
                     )

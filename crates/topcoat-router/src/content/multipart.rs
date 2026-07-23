@@ -10,7 +10,8 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, FromRequest, OptionalFromRequest, bad_request, content_type, internal_server_error,
+    Body, FromRequest, OptionalFromRequest, content_type,
+    error::{bad_request, internal_server_error},
 };
 
 /// `multipart/form-data` request extractor, commonly used for file uploads.
@@ -220,7 +221,7 @@ mod tests {
     use topcoat_core::context::{Cx, CxTestBuilder};
 
     use super::*;
-    use crate::{BadRequestError, Body, FromRequest, OptionalFromRequest};
+    use crate::{Body, FromRequest, OptionalFromRequest, error::BadRequestError};
 
     const BOUNDARY: &str = "X-TOPCOAT-BOUNDARY";
 

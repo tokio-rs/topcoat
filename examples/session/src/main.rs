@@ -9,7 +9,11 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     cookie::RouterBuilderCookieExt,
-    router::{Form, Router, RouterBuilderDiscoverExt, SeeOther, layout, page, route, see_other},
+    router::{
+        Form, Router, RouterBuilderDiscoverExt,
+        error::{SeeOther, see_other},
+        layout, page, route,
+    },
     session::{self, RouterBuilderSessionExt, TokenHash},
     view::view,
 };

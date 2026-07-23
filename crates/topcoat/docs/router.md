@@ -183,39 +183,12 @@ See [`#[path_param]`](macro@path_param) and [`#[query_params]`](macro@query_para
 
 # Errors
 
-Every page, layout, layer, and route handler returns a [`Result`](crate::Result). An `Err` becomes the response: the router maps each of its own error types onto an HTTP status code and turns anything else into a 500.
+Every page, layout, layer, and route handler returns a [`Result`](crate::Result). An `Err` becomes the response: the router maps its own error types onto HTTP status codes and turns anything else into a 500.
 
-Each status has a constructor:
-
-- [`not_found()`](not_found) responds 404 with [`NotFoundError`].
-- [`unauthorized()`](unauthorized) responds 401 with [`UnauthorizedError`].
-- [`forbidden()`](forbidden) responds 403 with [`ForbiddenError`].
-- [`bad_request(description)`](bad_request) responds 400 with [`BadRequestError`] and a client-safe `description`.
-- [`method_not_allowed(methods)`](method_not_allowed) responds 405 with [`MethodNotAllowedError`] and an `Allow` header. The router raises this one itself when a path matches but its method does not.
-- [`internal_server_error(error)`](internal_server_error) responds 500 with [`InternalServerError`], wrapping an unexpected error without leaking it to the client.
-- [`redirect(uri)`](redirect) and [`redirect_permanent(uri)`](redirect_permanent) respond 307 and 308 with [`RedirectError`].
-
-Each returns a concrete error type that converts into the handler's error, so bubble it up with `?`:
+The [`error`](mod@error) module has a constructor for each response, like [`not_found()`](error::not_found) or [`redirect(uri)`](error::redirect), and the [`RouterErrorExt`](error::RouterErrorExt) methods that turn an `Option` or `Result` into one:
 
 ```rust
-use topcoat::{Result, context::Cx, router::{not_found, page}, view::view};
-# struct Post;
-# async fn find_post(_cx: &Cx) -> Option<Post> { None }
-#[page("/posts/{id}")]
-async fn post(cx: &Cx) -> Result {
-    let Some(_post) = find_post(cx).await else {
-        return Err(not_found().into());
-    };
-    view! { <h1>"Post"</h1> }
-}
-```
-
-## From an `Option` or `Result`
-
-Usually the failing value is the condition. [`RouterErrorExt`] adds `ok_or_*` methods to [`Option`] and [`core::result::Result`] that replace `None` (or any `Err`) with a router error, ready for `?`:
-
-```rust
-# use topcoat::{Result, context::Cx, router::{RouterErrorExt, page}, view::view};
+# use topcoat::{Result, context::Cx, router::{error::RouterErrorExt, page}, view::view};
 # struct User;
 # async fn current_session(_cx: &Cx) -> Option<User> { None }
 #[page("/dashboard")]
@@ -225,17 +198,21 @@ async fn dashboard(cx: &Cx) -> Result {
 }
 ```
 
-The methods cover the same statuses: [`ok_or_not_found`](RouterErrorExt::ok_or_not_found), [`ok_or_unauthorized`](RouterErrorExt::ok_or_unauthorized), [`ok_or_forbidden`](RouterErrorExt::ok_or_forbidden), [`ok_or_bad_request`](RouterErrorExt::ok_or_bad_request), [`ok_or_redirect`](RouterErrorExt::ok_or_redirect), and [`ok_or_redirect_permanent`](RouterErrorExt::ok_or_redirect_permanent). A failed [`#[path_param]`](macro@path_param) parse feeds the same machinery through its `error = ...` option.
+See the [`error`](mod@error) module docs for how to raise, convert, and catch these errors.
 
 # Status codes and headers
 
-A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. This pairs with error handling. A layout can catch a page's [`NotFoundError`] and replace it with a branded not-found page:
+A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. This pairs with error handling. A layout can catch a page's [`NotFoundError`](error::NotFoundError) and replace it with a branded not-found page:
 
 ```rust
 use topcoat::{
     Result,
     context::Cx,
-    router::{NotFoundError, RouterErrorExt, StatusCode, layout, page},
+    router::{
+        StatusCode,
+        error::{NotFoundError, RouterErrorExt},
+        layout, page,
+    },
     view::view,
 };
 

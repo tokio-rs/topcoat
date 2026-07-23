@@ -13,7 +13,7 @@ use crate::{IntoResponse, Response};
 /// # async fn lookup(_cx: &Cx, _id: u64) -> Option<User> { None }
 /// use topcoat::Result;
 /// use topcoat::context::Cx;
-/// use topcoat::router::redirect;
+/// use topcoat::router::error::redirect;
 ///
 /// async fn fetch_user(cx: &Cx, id: u64) -> Result<User> {
 ///     let Some(user) = lookup(cx, id).await else {
@@ -37,7 +37,7 @@ pub fn redirect(uri: &str) -> RedirectError {
 /// ```rust
 /// use topcoat::Result;
 /// use topcoat::context::Cx;
-/// use topcoat::router::{page, redirect_permanent};
+/// use topcoat::router::{error::redirect_permanent, page};
 ///
 /// #[page]
 /// async fn legacy_profile(cx: &Cx) -> Result {
@@ -52,7 +52,7 @@ pub fn redirect_permanent(uri: &str) -> RedirectError {
 /// A redirect response carried as the `Err` variant of a handler `Result`.
 ///
 /// Construct one with [`redirect`] or [`redirect_permanent`], or derive one
-/// from an `Option` / `Result` via [`RouterErrorExt`](crate::RouterErrorExt).
+/// from an `Option` / `Result` via [`RouterErrorExt`](crate::error::RouterErrorExt).
 /// For the Post/Redirect/Get pattern, where the redirect is a *successful*
 /// response returned through `Ok`, reach for [`see_other`] instead.
 #[derive(Debug)]
@@ -102,7 +102,10 @@ impl IntoResponse for RedirectError {
 /// ```rust
 /// use topcoat::Result;
 /// use topcoat::context::Cx;
-/// use topcoat::router::{SeeOther, route, see_other};
+/// use topcoat::router::{
+///     error::{SeeOther, see_other},
+///     route,
+/// };
 ///
 /// #[route(POST "/logout")]
 /// async fn logout(cx: &Cx) -> Result<SeeOther> {
