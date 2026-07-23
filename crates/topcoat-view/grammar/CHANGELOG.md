@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-grammar-v0.4.0...topcoat-view-grammar-v0.5.0) - 2026-07-23
+
+### Added
+
+- boxed components for cyclic component definition ([#176](https://github.com/tokio-rs/topcoat/pull/176))
+
+### Fixed
+
+- topcoat formatter breaking at signal syntax ([#172](https://github.com/tokio-rs/topcoat/pull/172))
+
 ## [0.4.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-grammar-v0.3.1...topcoat-view-grammar-v0.4.0) - 2026-07-22
 
 ### Added

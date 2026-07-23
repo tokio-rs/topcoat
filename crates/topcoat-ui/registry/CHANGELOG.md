@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.4.0...topcoat-ui-registry-v0.5.0) - 2026-07-23
+
+### Added
+
+- [**breaking**] improve boolean attribute behavior and docs ([#179](https://github.com/tokio-rs/topcoat/pull/179))
+
+### Fixed
+
+- topcoat formatter breaking at signal syntax ([#172](https://github.com/tokio-rs/topcoat/pull/172))
+
 ## [0.4.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.3.1...topcoat-ui-registry-v0.4.0) - 2026-07-22
 
 ### Fixed

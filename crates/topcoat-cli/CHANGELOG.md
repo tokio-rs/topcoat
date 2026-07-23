@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.4.0...topcoat-cli-v0.5.0) - 2026-07-23
+
+### Fixed
+
+- keep embedded asset declarations alive on MSVC builds ([#170](https://github.com/tokio-rs/topcoat/pull/170))
+- topcoat dev hot reload never succeeds on Windows (exe file lock) ([#169](https://github.com/tokio-rs/topcoat/pull/169))
+
 ## [0.4.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.3.1...topcoat-cli-v0.4.0) - 2026-07-22
 
 ### Added
