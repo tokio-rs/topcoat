@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-v0.4.0...topcoat-view-v0.5.0) - 2026-07-23
+
+### Added
+
+- [**breaking**] improve boolean attribute behavior and docs ([#179](https://github.com/tokio-rs/topcoat/pull/179))
+- boxed components for cyclic component definition ([#176](https://github.com/tokio-rs/topcoat/pull/176))
+
+### Other
+
+- improve view macro docs
+
 ## [0.4.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-v0.3.1...topcoat-view-v0.4.0) - 2026-07-22
 
 ### Added
