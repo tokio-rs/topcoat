@@ -1,8 +1,6 @@
 A [`Router`] handles incoming requests. Build one with [`Router::builder`], register pages, layouts, layers, and API routes, call [`build`](RouterBuilder::build), then pass it to [`start`](crate::start).
 
-For most apps, the recommended way to define routes is the [`module_router!`] macro. It derives the routing table from your module tree instead of defining each URL path by hand.
-
-You can register handlers in two ways: **manually** or with **auto-discovery** (the `discover` feature collects annotated items automatically).
+Handlers register in two ways: **manually**, listing each item on the builder, or with **auto-discovery** (the `discover` feature collects annotated items at link time). For most apps, the recommended way to define routes is the [`module_router!`] macro, which builds on discovery and derives each URL from the module tree instead of a path string.
 
 # Paths
 
@@ -15,9 +13,101 @@ Explicit route paths use Topcoat's [`Path`] syntax:
 
 The root path is `/`. Non-root paths must start with `/` and may not contain empty segments.
 
+# Pages
+
+A page is an async function annotated with [`#[page]`](page) and a path, returning a rendered view:
+
+```rust
+use topcoat::{Result, router::page, view::view};
+
+#[page("/")]
+async fn home() -> Result {
+    view! { <h1>"Home"</h1> }
+}
+
+#[page("/users/{id}")]
+async fn user_profile() -> Result {
+    view! { <h1>"User profile"</h1> }
+}
+```
+
+See [`#[page]`](page) for the handler signature, module-derived paths, and using pages as components.
+
+# Layouts
+
+A layout wraps pages. It receives the rendered inner page (or nested layout) as a `Result<View>`, to embed in its own view. Annotate it with [`#[layout]`](layout):
+
+```rust
+use topcoat::{
+    Result,
+    router::layout,
+    view::view,
+};
+
+#[layout("/")]
+async fn root_layout(slot: Result) -> Result {
+    view! {
+        <!DOCTYPE html>
+        <html>
+            <body>
+                <nav>
+                    <a href="/">"Home"</a>
+                    <a href="/about">"About"</a>
+                </nav>
+                (slot?)
+            </body>
+        </html>
+    }
+}
+```
+
+A layout applies to every page whose path starts with the layout's path: a layout at `/` wraps all pages, while a layout at `/settings` wraps `/settings`, `/settings/profile`, `/settings/billing`, and so on. When multiple layouts match a page, they nest from least specific (outermost) to most specific (innermost). See [`#[layout]`](layout) for the handler signature, nested layouts, and using layouts as components.
+
+# Layers
+
+A layer wraps request handling under its path prefix. It receives a mutable request context, the request body, and [`Next`], which represents the remaining layers and the handler:
+
+```rust
+use topcoat::{
+    Result,
+    context::CxBuilder,
+    router::{Body, Next, Response, layer},
+};
+
+#[layer("/")]
+async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
+    let start = std::time::Instant::now();
+    let response = next.run(cx, body).await?;
+    println!("handled in {:?}", start.elapsed());
+    Ok(response)
+}
+```
+
+Layers follow the same prefix rule as layouts and nest from least specific (outermost) to most specific (innermost). See [`#[layer]`](layer) for the exact matching and ordering rules.
+
+## Tower layers
+
+With the `tower` feature enabled, `TowerLayer` runs middleware from the tower ecosystem (a timeout, a rate limit, CORS, compression) as a layer. It wraps the routes under its path in the middleware a `tower::Layer` builds and registers like any other layer:
+
+```rust,ignore
+use std::time::Duration;
+
+use topcoat::router::{Path, Router, TowerLayer};
+use tower::timeout::TimeoutLayer;
+
+let router = Router::builder()
+    .layer(TowerLayer::new(
+        Path::new("/api"),
+        TimeoutLayer::new(Duration::from_secs(5)),
+    ))
+    .build();
+```
+
+See the `TowerLayer` API documentation for the middleware's requirements and error semantics.
+
 # API routes
 
-An API route is an async function annotated with [`#[route]`](route) and an explicit HTTP method and path:
+An API route is an async function annotated with [`#[route]`](route) and an explicit HTTP method:
 
 ```rust
 use topcoat::{Result, router::route};
@@ -28,7 +118,7 @@ async fn health() -> Result<&'static str> {
 }
 ```
 
-Route handlers can also read request bodies and return structured responses, the same way for explicit and module-router paths: see [Request and response bodies](#request-and-response-bodies).
+See [`#[route]`](route) for the handler signature and how return values convert into responses.
 
 # Request and response bodies
 
@@ -50,7 +140,7 @@ async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User
 }
 ```
 
-The context and the body parameter are both optional and may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once. Pages use the same [`FromRequest`] parsing, but return a rendered view rather than an [`IntoResponse`] value.
+The context and the body parameter are both optional and may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once. Pages use the same [`FromRequest`] parsing, but return a rendered view rather than an [`IntoResponse`] value. See [`FromRequest`] and [`IntoResponse`] for the implementing types.
 
 # Path and query parameters
 
@@ -86,140 +176,6 @@ async fn post(cx: &Cx) -> Result {
 ```
 
 See [`#[path_param]`](macro@path_param) and [`#[query_params]`](macro@query_params) for details.
-
-# Pages
-
-A page is an async function annotated with [`#[page]`](page) and an explicit path:
-
-```rust
-use topcoat::{Result, router::page, view::view};
-
-#[page("/")]
-async fn home() -> Result {
-    view! { <h1>"Home"</h1> }
-}
-
-#[page("/about")]
-async fn about() -> Result {
-    view! { <h1>"About"</h1> }
-}
-```
-
-Dynamic and wildcard paths work the same way:
-
-```rust
-# use topcoat::{Result, router::page, view::view};
-#[page("/users/{id}")]
-async fn user_profile() -> Result {
-    view! { <h1>"User profile"</h1> }
-}
-
-#[page("/docs/{*path}")]
-async fn docs_page() -> Result {
-    view! { <h1>"Documentation"</h1> }
-}
-```
-
-# Layouts
-
-A layout wraps pages. It receives the rendered inner page (or nested layout) as a `Result<View>`, to embed in its own view. Annotate it with [`#[layout]`](layout) and an explicit path:
-
-```rust
-use topcoat::{
-    Result,
-    router::layout,
-    view::view,
-};
-
-#[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    view! {
-        <!DOCTYPE html>
-        <html>
-            <body>
-                <nav>
-                    <a href="/">"Home"</a>
-                    <a href="/about">"About"</a>
-                </nav>
-                (slot?)
-            </body>
-        </html>
-    }
-}
-```
-
-A layout applies to every page whose path starts with the layout's path. A layout at `/` wraps all pages. A layout at `/settings` wraps `/settings`, `/settings/profile`, `/settings/billing`, and so on.
-
-## Nested layouts
-
-When multiple layouts match a page, they nest from least specific (outermost) to most specific (innermost):
-
-```rust
-# use topcoat::{Result, router::{layout, page}, view::view};
-#[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    view! { <html><body>(slot?)</body></html> }
-}
-
-#[layout("/settings")]
-async fn settings_layout(slot: Result) -> Result {
-    view! {
-        <div class="settings-shell">
-            <nav>"Settings nav"</nav>
-            (slot?)
-        </div>
-    }
-}
-
-#[page("/settings/profile")]
-async fn profile() -> Result {
-    view! { <h1>"Profile"</h1> }
-}
-```
-
-A request to `/settings/profile` renders: `root_layout` > `settings_layout` > `profile`.
-
-# Layers
-
-A layer wraps matched routes under its path prefix. It receives a mutable request context, the request body, and [`Next`], which represents the remaining layers and the route handler.
-
-```rust
-use topcoat::{
-    Result,
-    context::CxBuilder,
-    router::{Body, Next, Response, layer},
-};
-
-#[layer("/")]
-async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
-    let start = std::time::Instant::now();
-    let response = next.run(cx, body).await?;
-    println!("handled in {:?}", start.elapsed());
-    Ok(response)
-}
-```
-
-Layer path matching follows the same prefix rule as layouts. A layer at `/` wraps everything, while a layer at `/admin` wraps only routes under `/admin`. Layers at different paths nest from least specific (outermost) to most specific (innermost). If you manually register multiple layers at the same path, the most recently registered layer runs first.
-
-## Tower layers
-
-With the `tower` feature enabled, `TowerLayer` runs middleware from the tower ecosystem (a timeout, a rate limit, CORS, compression) as a layer. It wraps the routes under its path in the middleware a `tower::Layer` builds and registers like any other layer:
-
-```rust,ignore
-use std::time::Duration;
-
-use topcoat::router::{Path, Router, TowerLayer};
-use tower::timeout::TimeoutLayer;
-
-let router = Router::builder()
-    .layer(TowerLayer::new(
-        Path::new("/api"),
-        TimeoutLayer::new(Duration::from_secs(5)),
-    ))
-    .build();
-```
-
-See the `TowerLayer` API documentation for the middleware's requirements and error semantics.
 
 # Errors
 
@@ -335,7 +291,7 @@ pub fn router() -> Router {
 }
 ```
 
-Layout-to-page matching is based on path prefixes, not registration order. Layer order is also path-based except when multiple explicitly registered layers share the same path; among those, the last registered layer is outermost and runs first.
+Layout and layer matching is based on path prefixes, not registration order; see [`#[layout]`](layout) and [`#[layer]`](layer) for the ordering rules.
 
 # Auto-discovery with `discover()`
 
