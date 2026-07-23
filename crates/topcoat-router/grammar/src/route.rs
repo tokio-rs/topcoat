@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    Ident, ItemFn, LitStr,
+    ItemFn, LitStr,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
@@ -9,25 +9,17 @@ use syn::{
 use topcoat_core_grammar::paths::{topcoat_context, topcoat_inventory, topcoat_router};
 
 use super::handler_args::{HandlerArgs, request_ident};
+use super::method::Methods;
 
 pub struct RouteAttr {
-    method: Ident,
+    methods: Methods,
     path: Option<LitStr>,
 }
 
 impl Parse for RouteAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            method: input
-                .peek(Ident)
-                .then(|| input.parse())
-                .transpose()?
-                .ok_or_else(|| {
-                    syn::Error::new(
-                        input.span(),
-                        "route attributes must start with an HTTP method",
-                    )
-                })?,
+            methods: input.parse()?,
             path: input.peek(LitStr).then(|| input.parse()).transpose()?,
         })
     }
@@ -94,22 +86,21 @@ impl ToTokens for Route {
             }
         };
 
+        let methods = &attr.methods;
         if let Some(path) = attr.path.as_ref() {
-            let method = &attr.method;
             quote! {
                 #[allow(non_upper_case_globals)]
                 const #ident: #topcoat_router::RouteFn = #topcoat_router::RouteFn::const_new(
-                    #topcoat_router::OwnedMethods::One(#topcoat_router::Method::#method),
+                    #methods,
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );
             }
         } else {
-            let method = &attr.method;
             quote! {
                 #[allow(non_upper_case_globals)]
                 const #ident: #topcoat_router::ModuleRouteFn = #topcoat_router::ModuleRouteFn::new(
-                    #topcoat_router::Method::#method,
+                    #methods,
                     module_path!(),
                     #render,
                 );
