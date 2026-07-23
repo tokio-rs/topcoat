@@ -3,7 +3,7 @@ use std::path::PathBuf as FsPathBuf;
 use http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use http::{HeaderValue, Method, StatusCode};
 use topcoat_core::context::Cx;
-use topcoat_router::{Body, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder};
+use topcoat_router::{Body, Methods, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder};
 
 use crate::{AssetBundle, AssetRouteResolver, BundledAsset};
 
@@ -57,8 +57,8 @@ impl AssetRoute {
 }
 
 impl Route for AssetRoute {
-    fn method(&self) -> Method {
-        Method::GET
+    fn methods(&self) -> Methods<'_> {
+        Methods::Only(&[Method::GET])
     }
 
     fn path(&self) -> &Path {

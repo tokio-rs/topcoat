@@ -6,8 +6,8 @@ use std::sync::Arc;
 use topcoat_core::context::{ContextMap, CxBuilder};
 
 use crate::{
-    Endpoint, Layer, LayerId, Layers, LayoutFn, Next, PageFn, PageWithLayouts, PathSegment,
-    RawPathParams, Request, Response, Route, Terminal, respond,
+    Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, Next, PageFn, PageWithLayouts,
+    PathSegment, RawPathParams, Request, Response, Route, Terminal, respond,
 };
 
 /// A finalized Topcoat routing table.
@@ -56,9 +56,10 @@ impl Router {
     /// Dispatches a request to the route registered for its path and method,
     /// producing a response.
     ///
-    /// Returns `404 Not Found` when no route matches the path, or
-    /// `405 Method Not Allowed` (with an `Allow` header) when the path matches
-    /// but the method does not.
+    /// A route registered for the request's specific method wins over an
+    /// any-method route at the same path. Returns `404 Not Found` when no
+    /// route matches the path, or `405 Method Not Allowed` (with an `Allow`
+    /// header) when the path matches but no route accepts the method.
     pub async fn handle(&self, request: Request) -> Response {
         let (parts, body) = request.into_parts();
 
@@ -77,7 +78,7 @@ impl Router {
                     let values = matched.params.iter().map(|(_, value)| value);
                     RawPathParams::from_pairs(keys.zip(values))
                 };
-                let terminal = match endpoint.get(&parts.method) {
+                let terminal = match endpoint.get(&parts.method).or_else(|| endpoint.any()) {
                     Some(index) => Terminal::Route(&*self.routes[index]),
                     None => Terminal::MethodNotAllowed(matched.value),
                 };
@@ -470,13 +471,34 @@ impl RouterBuilder {
                 route.path(),
             );
 
-            let method = route.method();
-            assert!(
-                endpoint.get(&method).is_none(),
-                "duplicate route registered for `{method} {}`",
-                route.path().to_matchit_path()
-            );
-            endpoint.insert(method, index);
+            // An any-method route shares its path with specific-method routes
+            // (which win at dispatch), so the two kinds are checked for
+            // duplicates independently.
+            match route.methods() {
+                Methods::Any => {
+                    assert!(
+                        endpoint.any().is_none(),
+                        "duplicate any-method route registered for `{}`",
+                        route.path().to_matchit_path()
+                    );
+                    endpoint.insert_any(index);
+                }
+                Methods::Only(methods) => {
+                    assert!(
+                        !methods.is_empty(),
+                        "route `{}` registers no methods",
+                        route.path()
+                    );
+                    for method in methods {
+                        assert!(
+                            endpoint.get(method).is_none(),
+                            "duplicate route registered for `{method} {}`",
+                            route.path().to_matchit_path()
+                        );
+                        endpoint.insert(method.clone(), index);
+                    }
+                }
+            }
         }
 
         // Precompute the layer stack wrapping each endpoint once, so dispatch
@@ -758,6 +780,99 @@ mod tests {
         // The catch-all captures the remainder of the URL, slashes included.
         let (_, _, body) = send(&router, Method::GET, "/files/a/b/c");
         assert_eq!(&body[..], b"rest=a/b/c");
+    }
+
+    // -- Router::handle: method sets --
+
+    fn say_any(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { "any".into_response(cx) })
+    }
+
+    #[test]
+    fn any_method_route_serves_every_method() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Methods::Any, path("/x"), say_any))
+            .build();
+
+        let purge = Method::from_bytes(b"PURGE").unwrap();
+        for method in [Method::GET, Method::POST, Method::DELETE, purge] {
+            let (status, _, body) = send(&router, method, "/x");
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(&body[..], b"any");
+        }
+    }
+
+    #[test]
+    fn specific_method_route_wins_over_any() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .route(RouteFn::new(Methods::Any, path("/x"), say_any))
+            .build();
+
+        let (_, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(&body[..], b"route");
+        let (_, _, body) = send(&router, Method::POST, "/x");
+        assert_eq!(&body[..], b"any");
+    }
+
+    #[test]
+    fn multi_method_route_serves_each_of_its_methods() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                &[Method::GET, Method::POST],
+                path("/form"),
+                say_route,
+            ))
+            .build();
+
+        let (status, _, _) = send(&router, Method::GET, "/form");
+        assert_eq!(status, StatusCode::OK);
+        let (status, _, _) = send(&router, Method::POST, "/form");
+        assert_eq!(status, StatusCode::OK);
+
+        // Methods outside the set still resolve to a 405.
+        let (status, _, _) = send(&router, Method::DELETE, "/form");
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn head_falls_back_to_an_any_method_route() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Methods::Any, path("/x"), say_any))
+            .build();
+        let (status, _, body) = send(&router, Method::HEAD, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"any");
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate any-method route")]
+    fn duplicate_any_method_routes_panic_on_build() {
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Methods::Any, path("/x"), say_any))
+            .route(RouteFn::new(Methods::Any, path("/x"), say_any))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate route")]
+    fn overlapping_method_sets_panic_on_build() {
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(
+                &[Method::GET, Method::POST],
+                path("/x"),
+                say_route,
+            ))
+            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "registers no methods")]
+    fn route_without_methods_panics_on_build() {
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Vec::<Method>::new(), path("/x"), say_route))
+            .build();
     }
 
     #[test]

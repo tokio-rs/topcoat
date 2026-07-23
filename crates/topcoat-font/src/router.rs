@@ -2,7 +2,7 @@ use std::sync::OnceLock;
 
 use topcoat_core::context::Cx;
 use topcoat_router::{
-    Body, HeaderValue, Method, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder,
+    Body, HeaderValue, Method, Methods, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder,
     header::{CACHE_CONTROL, CONTENT_TYPE},
 };
 
@@ -50,8 +50,8 @@ impl FontRoute {
 }
 
 impl Route for FontRoute {
-    fn method(&self) -> Method {
-        Method::GET
+    fn methods(&self) -> Methods<'_> {
+        Methods::Only(&[Method::GET])
     }
 
     fn path(&self) -> &Path {

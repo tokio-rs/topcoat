@@ -3,7 +3,9 @@ use std::{hash::Hash, marker::PhantomData, pin::Pin};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_router::{Body, Method, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder};
+use topcoat_router::{
+    Body, Method, Methods, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder,
+};
 
 use crate::Surrogated;
 
@@ -126,8 +128,8 @@ impl ProcedureRoute {
 }
 
 impl Route for ProcedureRoute {
-    fn method(&self) -> Method {
-        Method::POST
+    fn methods(&self) -> Methods<'_> {
+        Methods::Only(&[Method::POST])
     }
 
     fn path(&self) -> &Path {

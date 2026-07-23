@@ -98,8 +98,8 @@ impl ToTokens for Route {
             let method = &attr.method;
             quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_router::RouteFn = #topcoat_router::RouteFn::new(
-                    #topcoat_router::Method::#method,
+                const #ident: #topcoat_router::RouteFn = #topcoat_router::RouteFn::const_new(
+                    #topcoat_router::OwnedMethods::One(#topcoat_router::Method::#method),
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );

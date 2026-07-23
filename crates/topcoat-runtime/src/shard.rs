@@ -6,7 +6,7 @@ use topcoat_core::{
 };
 
 use topcoat_router::{
-    Body, IntoResponse, Method, Path, PathBuf, Route, RouteFuture, RouterBuilder,
+    Body, IntoResponse, Method, Methods, Path, PathBuf, Route, RouteFuture, RouterBuilder,
 };
 use topcoat_view::View;
 
@@ -83,9 +83,9 @@ impl ShardRoute {
 }
 
 impl Route for ShardRoute {
-    fn method(&self) -> Method {
+    fn methods(&self) -> Methods<'_> {
         // Avoids URL length limits for large parameters.
-        Method::POST
+        Methods::Only(&[Method::POST])
     }
 
     fn path(&self) -> &Path {

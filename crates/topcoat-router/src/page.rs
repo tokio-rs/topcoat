@@ -5,7 +5,7 @@ use http::Method;
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::View;
 
-use crate::{Body, IntoResponse, Path, Route, RouteFuture};
+use crate::{Body, IntoResponse, Methods, Path, Route, RouteFuture};
 
 /// The async render function backing a [`PageFn`].
 pub type PageRenderFn = for<'cx> fn(
@@ -118,8 +118,8 @@ impl PageWithLayouts {
 }
 
 impl Route for PageWithLayouts {
-    fn method(&self) -> Method {
-        Method::GET
+    fn methods(&self) -> Methods<'_> {
+        Methods::Only(&[Method::GET])
     }
 
     fn path(&self) -> &Path {
