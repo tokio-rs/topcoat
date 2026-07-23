@@ -8,8 +8,9 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, FromRequest, IntoResponse, OptionalFromRequest, Response, bad_request, bad_request_at,
-    content_type, to_bytes,
+    Body, FromRequest, IntoResponse, OptionalFromRequest, Response, content_type,
+    error::{bad_request, bad_request_at},
+    to_bytes,
 };
 
 /// JSON request extractor and response wrapper.
@@ -192,7 +193,7 @@ mod tests {
     use topcoat_core::context::{Cx, CxTestBuilder};
 
     use super::*;
-    use crate::{BadRequestError, Body, FromRequest, OptionalFromRequest, to_bytes};
+    use crate::{Body, FromRequest, OptionalFromRequest, error::BadRequestError, to_bytes};
 
     /// Builds a `Cx` carrying request `Parts` with the given `Content-Type`
     /// header, or no header at all when `content_type` is [`None`].

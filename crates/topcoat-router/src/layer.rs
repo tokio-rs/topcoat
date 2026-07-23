@@ -4,7 +4,10 @@ use std::pin::Pin;
 
 use topcoat_core::{context::CxBuilder, error::Result};
 
-use crate::{Body, Endpoint, Path, Response, Route, method_not_allowed, not_found};
+use crate::{
+    Body, Endpoint, Path, Response, Route,
+    error::{method_not_allowed, not_found},
+};
 
 /// The future returned by [`Layer::handle`] and [`Next::run`]: a boxed, `Send`
 /// future borrowing the chain and the request context.
@@ -238,7 +241,7 @@ mod tests {
     use topcoat_core::context::{ContextMap, Cx, CxBuilder, app_context};
 
     use super::*;
-    use crate::{Bytes, IntoResponse, Method, RouteFn, RouteFuture, respond, to_bytes};
+    use crate::{Bytes, IntoResponse, Method, RouteFn, RouteFuture, error::respond, to_bytes};
 
     // -- Test helpers --
 

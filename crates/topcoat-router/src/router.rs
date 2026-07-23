@@ -7,7 +7,7 @@ use topcoat_core::context::{ContextMap, CxBuilder};
 
 use crate::{
     Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, Next, PageFn, PageWithLayouts,
-    PathSegment, RawPathParams, Request, Response, Route, Terminal, respond,
+    PathSegment, RawPathParams, Request, Response, Route, Terminal, error::respond,
 };
 
 /// A finalized Topcoat routing table.

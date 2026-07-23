@@ -1,3 +1,5 @@
+#![doc = include_str!("../docs/error.md")]
+
 mod bad_request;
 mod forbidden;
 mod internal_server;
@@ -96,7 +98,7 @@ impl IntoResponse for Error {
 /// # async fn lookup(_cx: &Cx, _id: u64) -> Option<User> { None }
 /// use topcoat::Result;
 /// use topcoat::context::Cx;
-/// use topcoat::router::RouterErrorExt;
+/// use topcoat::router::error::RouterErrorExt;
 ///
 /// async fn fetch_user(cx: &Cx, id: u64) -> Result<User> {
 ///     let user = lookup(cx, id).await.ok_or_redirect("/users")?;

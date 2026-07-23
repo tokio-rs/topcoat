@@ -2,8 +2,8 @@ use http::header::{CONTENT_TYPE, HeaderValue};
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    Body, FromRequest, IntoResponse, OptionalFromRequest, Response, bad_request, content_type,
-    to_bytes,
+    Body, FromRequest, IntoResponse, OptionalFromRequest, Response, content_type,
+    error::bad_request, to_bytes,
 };
 
 /// CSS request extractor and response wrapper.
@@ -87,7 +87,7 @@ mod tests {
     use topcoat_core::context::{Cx, CxTestBuilder};
 
     use super::*;
-    use crate::BadRequestError;
+    use crate::error::BadRequestError;
 
     /// Builds a `Cx` carrying request `Parts` with the given `Content-Type`
     /// header, or no header at all when `content_type` is [`None`].

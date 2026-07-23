@@ -83,7 +83,7 @@ Write composable request functions instead. Each function adds one small piece o
 ```rust
 use topcoat::{
     context::{app_context, memoize, Cx},
-    router::{headers, RouterErrorExt, UnauthorizedError},
+    router::{error::{RouterErrorExt, UnauthorizedError}, headers},
     Result,
 };
 
@@ -134,9 +134,9 @@ use topcoat::{
     Result,
 };
 
-# use topcoat::router::UnauthorizedError;
+# use topcoat::router::error::UnauthorizedError;
 # struct User { avatar_url: &'static str, name: &'static str }
-# async fn require_auth(_: &Cx) -> Result<&User, UnauthorizedError> { Err(topcoat::router::unauthorized()) }
+# async fn require_auth(_: &Cx) -> Result<&User, UnauthorizedError> { Err(topcoat::router::error::unauthorized()) }
 #
 /// Renders the current user's avatar and requires authentication wherever it is used.
 #[component]
@@ -168,12 +168,12 @@ Use several focused helpers instead of one large auth function:
 That keeps each function reusable. Public UI can call `fetch_current_user(cx)` and render a signed-out state. Private UI can call `require_auth(cx).await?` and fail closed. Admin UI can build on the same pattern:
 
 ```rust
-use topcoat::{context::Cx, router::RouterErrorExt, Result};
+use topcoat::{context::Cx, router::error::RouterErrorExt, Result};
 
-# use topcoat::router::UnauthorizedError;
+# use topcoat::router::error::UnauthorizedError;
 # struct User;
 # impl User { fn is_admin(&self) -> bool { false } }
-# async fn require_auth(_: &Cx) -> Result<&User, UnauthorizedError> { Err(topcoat::router::unauthorized()) }
+# async fn require_auth(_: &Cx) -> Result<&User, UnauthorizedError> { Err(topcoat::router::error::unauthorized()) }
 #
 /// Returns the current user if they have admin permissions.
 async fn require_admin(cx: &Cx) -> Result<&User> {

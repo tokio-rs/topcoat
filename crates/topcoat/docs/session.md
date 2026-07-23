@@ -43,7 +43,7 @@ Authenticate the user however your application does, then call [`start`] and rec
 use topcoat::{
     Result,
     context::Cx,
-    router::{SeeOther, route, see_other},
+    router::{error::{SeeOther, see_other}, route},
     session,
 };
 # struct User;
@@ -89,7 +89,7 @@ Guard pages by combining it with the router's error helpers:
 use topcoat::{
     Result,
     context::Cx,
-    router::{RouterErrorExt, page},
+    router::{error::RouterErrorExt, page},
     view::view,
 };
 # #[derive(Clone)] struct User { name: String }
@@ -112,7 +112,7 @@ async fn account(cx: &Cx) -> Result {
 use topcoat::{
     Result,
     context::Cx,
-    router::{SeeOther, route, see_other},
+    router::{error::{SeeOther, see_other}, route},
     session,
 };
 # async fn delete_session(_cx: &Cx, _hash: &session::TokenHash) -> Result<()> { Ok(()) }

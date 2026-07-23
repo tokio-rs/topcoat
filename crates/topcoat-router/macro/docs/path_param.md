@@ -36,16 +36,16 @@ async fn post_page(cx: &Cx) -> Result {
 
 The forms mirror the router's error constructors:
 
-- `error = not_found` responds 404 with [`NotFoundError`](struct.NotFoundError.html).
-- `error = unauthorized` responds 401 with [`UnauthorizedError`](struct.UnauthorizedError.html).
-- `error = forbidden` responds 403 with [`ForbiddenError`](struct.ForbiddenError.html).
-- `error = bad_request` responds 400 with [`BadRequestError`](struct.BadRequestError.html). The description defaults to `invalid value for path parameter "post_id"`; pass your own with `error = bad_request("no such post")`.
-- `error = redirect("/posts")` and `error = redirect_permanent("/posts")` send the client to the given URI with [`RedirectError`](struct.RedirectError.html).
+- `error = not_found` responds 404 with [`NotFoundError`](error/struct.NotFoundError.html).
+- `error = unauthorized` responds 401 with [`UnauthorizedError`](error/struct.UnauthorizedError.html).
+- `error = forbidden` responds 403 with [`ForbiddenError`](error/struct.ForbiddenError.html).
+- `error = bad_request` responds 400 with [`BadRequestError`](error/struct.BadRequestError.html). The description defaults to `invalid value for path parameter "post_id"`; pass your own with `error = bad_request("no such post")`.
+- `error = redirect("/posts")` and `error = redirect_permanent("/posts")` send the client to the given URI with [`RedirectError`](error/struct.RedirectError.html).
 
-Without `error = ...`, the same conversions are available per call site through [`RouterErrorExt`](trait.RouterErrorExt.html), which also suits handlers that want different responses for the same parameter:
+Without `error = ...`, the same conversions are available per call site through [`RouterErrorExt`](error/trait.RouterErrorExt.html), which also suits handlers that want different responses for the same parameter:
 
 ```rust
-# use topcoat::{context::Cx, Result, router::{RouterErrorExt, page, path_param}, view::view};
+# use topcoat::{context::Cx, Result, router::{error::RouterErrorExt, page, path_param}, view::view};
 # #[path_param]
 # struct PostId(uuid::Uuid);
 # #[page("/posts/{post_id}")]

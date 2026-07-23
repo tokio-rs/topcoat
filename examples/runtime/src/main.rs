@@ -4,7 +4,7 @@ mod show;
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{RouterBuilderDiscoverExt, layout, module_router, page, redirect},
+    router::{RouterBuilderDiscoverExt, error::redirect, layout, module_router, page},
     view::view,
 };
 
