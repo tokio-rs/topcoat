@@ -1,4 +1,7 @@
 #![doc = include_str!("../docs/router.md")]
+// Without the `tower` feature the docs' links into the `tower` module cannot
+// resolve; they degrade to plain text instead of failing the build.
+#![cfg_attr(not(feature = "tower"), allow(rustdoc::broken_intra_doc_links))]
 
 pub use topcoat_router::*;
 pub use topcoat_router_macro::*;

@@ -21,7 +21,7 @@ mod router;
 mod serve;
 mod service;
 #[cfg(feature = "tower")]
-mod tower;
+pub mod tower;
 
 pub use body::*;
 #[cfg(feature = "compression")]
@@ -42,7 +42,5 @@ pub use route::*;
 pub use router::*;
 pub use serve::*;
 pub use service::*;
-#[cfg(feature = "tower")]
-pub use tower::*;
 
 pub use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};
