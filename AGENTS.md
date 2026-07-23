@@ -32,6 +32,7 @@ The `docs/` directory contains the framework's user-facing guides. Consult the r
 - [`crates/topcoat/docs/router.md`](crates/topcoat/docs/router.md): The `Router` primitive: registering `#[page]`, `#[layout]`, and `#[route]` items manually or via `.discover()`, and how layouts nest by path prefix.
 - [`crates/topcoat-router/docs/module_router.md`](crates/topcoat-router/docs/module_router.md): `module_router!`, which derives routes from the module tree (kebab-cased segments, `segment!` overrides, `_`-prefixed groups).
 - [`crates/topcoat-router/docs/error.md`](crates/topcoat-router/docs/error.md): Router errors: the status-code constructors, the `RouterErrorExt` conversions from `Option`/`Result`, and catching an error in an outer handler.
+- [`crates/topcoat-router/docs/tower.md`](crates/topcoat-router/docs/tower.md): The tower bridge: `TowerRoute` for mounting a tower service as a route and `TowerLayer` for running tower middleware as a layer.
 
 ### Views and components
 

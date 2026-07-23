@@ -1,3 +1,5 @@
+#![doc = include_str!("../docs/tower.md")]
+
 use std::borrow::Cow;
 use std::fmt::{self, Display};
 use std::future::Future;
@@ -6,11 +8,119 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use tokio::sync::{mpsc, oneshot};
-use topcoat_core::context::CxBuilder;
+use topcoat_core::context::{Cx, CxBuilder};
 use topcoat_core::error::{Error, Result};
 use tower::ServiceExt;
 
-use crate::{Body, BoxError, Layer, LayerFuture, Next, Path, Request, Response};
+use crate::{
+    Body, BoxError, Layer, LayerFuture, Methods, Next, OwnedMethods, Path, Request, Response,
+    Route, RouteFuture, parts,
+};
+
+/// A [`Route`] that forwards its requests to a tower service.
+///
+/// This adapter mounts a whole tower application (an axum router, a hyper
+/// service, a reverse proxy) as a route in a topcoat router, typically while
+/// migrating an existing application to topcoat one route at a time.
+/// Registered at a catch-all path with [`Methods::Any`], it hands an entire
+/// URL subtree to the service. The service receives each request with its
+/// original URI; nothing is stripped or rewritten. A catch-all segment does
+/// not match the bare prefix itself, so register a second `TowerRoute` for
+/// the prefix if the service also serves that URL.
+///
+/// The service must be `Clone`, `Send`, and `Sync`; wrap a service that is
+/// not `Sync` in `tower::buffer`. Its per-request clones share cross-request
+/// state through the service's internal handles.
+///
+/// An error the mounted service returns surfaces as an [`Error`] wrapping a
+/// [`TowerServiceError`]; unmapped, the router renders it as a 500. Layers
+/// wrapping the route's path apply as they would to any other route.
+///
+/// Register the adapter with
+/// [`RouterBuilder::route`](crate::RouterBuilder::route).
+///
+/// # Examples
+///
+/// ```rust
+/// use std::convert::Infallible;
+///
+/// use topcoat::router::{Body, Methods, Path, Request, Response, Router, tower::TowerRoute};
+/// use tower::service_fn;
+///
+/// // Stands in for a legacy tower application, like an axum router.
+/// let legacy = service_fn(|_request: Request| async {
+///     Ok::<_, Infallible>(Response::new(Body::from("legacy")))
+/// });
+///
+/// let router = Router::builder()
+///     .route(TowerRoute::new(
+///         Methods::Any,
+///         Path::new("/legacy/{*rest}"),
+///         legacy,
+///     ))
+///     .build();
+/// ```
+pub struct TowerRoute<S> {
+    /// The HTTP methods this route responds to.
+    methods: OwnedMethods,
+    /// The URL path this route handles.
+    path: Cow<'static, Path>,
+    /// The mounted tower service, cloned per request.
+    service: S,
+}
+
+impl<S> TowerRoute<S> {
+    /// Mounts `service` at `path`, responding to `methods`.
+    ///
+    /// The methods are anything convertible into [`OwnedMethods`]: a single
+    /// [`Method`](crate::Method), a `&'static [Method]`, a `Vec<Method>`, or
+    /// [`Methods::Any`] to respond to every method. A route registered for a
+    /// specific method takes precedence over an any-method route at the same
+    /// path.
+    #[must_use]
+    pub fn new(
+        methods: impl Into<OwnedMethods>,
+        path: impl Into<Cow<'static, Path>>,
+        service: S,
+    ) -> Self {
+        Self {
+            methods: methods.into(),
+            path: path.into(),
+            service,
+        }
+    }
+}
+
+impl<S, ResBody> Route for TowerRoute<S>
+where
+    S: tower::Service<Request, Response = http::Response<ResBody>> + Clone + Send + Sync + 'static,
+    S::Error: Into<BoxError> + Send,
+    S::Future: Send,
+    ResBody: http_body::Body<Data = Bytes> + Send + 'static,
+    ResBody::Error: Into<BoxError>,
+{
+    fn methods(&self) -> Methods<'_> {
+        self.methods.as_methods()
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
+        let service = self.service.clone();
+        Box::pin(async move {
+            // Reassemble the http request the service consumes from a copy of
+            // the parts on the context; the originals stay available to outer
+            // layers and error rendering.
+            let request = Request::from_parts(parts(cx).clone(), body);
+            match service.oneshot(request).await {
+                Ok(response) => Ok(response.map(Body::new)),
+                Err(error) => Err(TowerServiceError(error.into()).into()),
+            }
+        })
+    }
+}
 
 /// A [`Layer`] that wraps the routes nested under its path in a
 /// [`tower::Layer`]'s middleware.
@@ -31,7 +141,7 @@ use crate::{Body, BoxError, Layer, LayerFuture, Next, Path, Request, Response};
 /// An error produced by the wrapped routes (a 404, a handler error) leaves
 /// the layer as the original [`Error`] value, while an error produced by the
 /// middleware itself (a timeout elapsing, a load-shed rejection) surfaces as
-/// an `Err` wrapping a [`TowerLayerError`].
+/// an `Err` wrapping a [`TowerServiceError`].
 ///
 /// Register the adapter with
 /// [`RouterBuilder::layer`](crate::RouterBuilder::layer).
@@ -41,7 +151,7 @@ use crate::{Body, BoxError, Layer, LayerFuture, Next, Path, Request, Response};
 /// ```rust
 /// use std::time::Duration;
 ///
-/// use topcoat::router::{Path, Router, TowerLayer};
+/// use topcoat::router::{Path, Router, tower::TowerLayer};
 /// use tower::timeout::TimeoutLayer;
 ///
 /// let router = Router::builder()
@@ -262,37 +372,38 @@ impl Display for TowerNextError {
 
 impl std::error::Error for TowerNextError {}
 
-/// An error a [`TowerLayer`]'s middleware produced itself, as opposed to one
-/// that passed through it from the wrapped routes.
+/// An error a tower service produced itself, as opposed to one that passed
+/// through it from wrapped routes.
 ///
-/// Middleware failures (a timeout elapsing, a load-shed rejection) surface
-/// from the layer as an [`Error`] wrapping this type. An outer layer can
-/// downcast to it to map specific failures onto responses; unmapped, the
-/// router renders it as a 500.
+/// Both adapters surface it: a [`TowerLayer`] wraps a failure of its
+/// middleware (a timeout elapsing, a load-shed rejection), and a
+/// [`TowerRoute`] wraps an error returned by its mounted service. An outer
+/// layer can downcast to it to map specific failures onto responses;
+/// unmapped, the router renders it as a 500.
 #[derive(Debug)]
-pub struct TowerLayerError(BoxError);
+pub struct TowerServiceError(BoxError);
 
-impl TowerLayerError {
-    /// Returns a reference to the middleware's underlying error.
+impl TowerServiceError {
+    /// Returns a reference to the underlying error.
     #[must_use]
     pub fn get_ref(&self) -> &BoxError {
         &self.0
     }
 
-    /// Consumes the wrapper, returning the middleware's underlying error.
+    /// Consumes the wrapper, returning the underlying error.
     #[must_use]
     pub fn into_inner(self) -> BoxError {
         self.0
     }
 }
 
-impl Display for TowerLayerError {
+impl Display for TowerServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("tower layer error")
+        f.write_str("tower service error")
     }
 }
 
-impl std::error::Error for TowerLayerError {
+impl std::error::Error for TowerServiceError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(self.0.as_ref())
     }
@@ -334,14 +445,14 @@ where
 /// Maps an error surfacing from a tower stack back onto a topcoat [`Error`]:
 /// an error tunneled from the wrapped chain is unwrapped to its original
 /// value, while an error the middleware produced itself is wrapped in a
-/// [`TowerLayerError`].
+/// [`TowerServiceError`].
 fn recover(error: BoxError) -> Error {
     match error.downcast::<TowerNextError>() {
         Ok(error) => match error.repr {
             Repr::Tunneled(error) => error,
             repr => TowerNextError { repr }.into(),
         },
-        Err(error) => TowerLayerError(error).into(),
+        Err(error) => TowerServiceError(error).into(),
     }
 }
 
@@ -428,6 +539,20 @@ mod tests {
     /// size threshold.
     fn long_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { "route ".repeat(64).into_response(cx) })
+    }
+
+    /// A mountable service echoing the request's method, URI, and body, to
+    /// observe exactly what crosses a [`TowerRoute`].
+    async fn echo_service(request: Request) -> Result<Response, Infallible> {
+        let (parts, body) = request.into_parts();
+        let bytes = to_bytes(body, usize::MAX).await.unwrap();
+        let reply = format!(
+            "{} {} {}",
+            parts.method,
+            parts.uri,
+            String::from_utf8_lossy(&bytes)
+        );
+        Ok(Response::new(Body::from(reply)))
     }
 
     /// Dispatches a GET request for `uri` through a full router.
@@ -802,7 +927,7 @@ mod tests {
         // in flight, which requires the middleware to stay polled.
         let error = run(&layer, &mut cx, &route).unwrap_err();
 
-        let middleware = error.downcast_ref::<TowerLayerError>().unwrap();
+        let middleware = error.downcast_ref::<TowerServiceError>().unwrap();
         assert!(middleware.get_ref().is::<tower::timeout::error::Elapsed>());
     }
 
@@ -998,5 +1123,108 @@ mod tests {
         // Unlike tower's timeout, tower-http's renders a 408 response.
         let response = send(&router, "/x");
         assert_eq!(response.status(), StatusCode::REQUEST_TIMEOUT);
+    }
+
+    // -- TowerRoute --
+
+    #[test]
+    fn tower_route_exposes_its_methods_and_path() {
+        let route = TowerRoute::new(
+            Method::POST,
+            Path::new("/legacy"),
+            tower::service_fn(echo_service),
+        );
+        assert_eq!(route.methods(), Methods::Only(&[Method::POST]));
+        assert_eq!(route.path(), Path::new("/legacy"));
+
+        let route = TowerRoute::new(
+            Methods::Any,
+            Path::new("/legacy"),
+            tower::service_fn(echo_service),
+        );
+        assert_eq!(route.methods(), Methods::Any);
+    }
+
+    #[test]
+    fn mounts_a_service_at_a_catch_all_path() {
+        let router = Router::builder()
+            .route(TowerRoute::new(
+                Methods::Any,
+                Path::new("/legacy/{*rest}"),
+                tower::service_fn(echo_service),
+            ))
+            .build();
+
+        // The service sees the original method, URI, and body: nothing is
+        // stripped or rewritten on the way in.
+        let request = http::Request::builder()
+            .method(Method::POST)
+            .uri("/legacy/users/7?page=2")
+            .body(Body::from("payload"))
+            .unwrap();
+        let response = block_on(router.handle(request));
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            &body_bytes(response)[..],
+            b"POST /legacy/users/7?page=2 payload"
+        );
+    }
+
+    #[test]
+    fn a_tower_route_serves_only_its_declared_methods() {
+        let router = Router::builder()
+            .route(TowerRoute::new(
+                Method::POST,
+                Path::new("/legacy"),
+                tower::service_fn(echo_service),
+            ))
+            .build();
+
+        let request = http::Request::builder()
+            .method(Method::POST)
+            .uri("/legacy")
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(block_on(router.handle(request)).status(), StatusCode::OK);
+
+        let response = send(&router, "/legacy");
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn layers_wrap_a_mounted_service() {
+        let router = Router::builder()
+            .route(TowerRoute::new(
+                Methods::Any,
+                Path::new("/legacy/{*rest}"),
+                tower::service_fn(echo_service),
+            ))
+            .layer(TowerLayer::new(
+                Path::new("/legacy"),
+                tower_http::set_header::SetResponseHeaderLayer::if_not_present(
+                    http::header::HeaderName::from_static("x-tower"),
+                    HeaderValue::from_static("marked"),
+                ),
+            ))
+            .build();
+
+        let response = send(&router, "/legacy/x");
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers().get("x-tower").unwrap(), "marked");
+    }
+
+    #[test]
+    fn a_mounted_service_error_surfaces_as_a_tower_service_error() {
+        let failing = tower::service_fn(|_request: Request| async {
+            Err::<Response, _>(std::io::Error::other("legacy failure"))
+        });
+        let route = TowerRoute::new(Methods::Any, Path::new("/legacy"), failing);
+        let cx = cx_for("/legacy");
+
+        let error = block_on(route.handle(&cx, Body::empty())).unwrap_err();
+
+        let route_error = error.downcast_ref::<TowerServiceError>().unwrap();
+        assert!(route_error.get_ref().is::<std::io::Error>());
     }
 }

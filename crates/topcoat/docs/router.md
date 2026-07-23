@@ -87,26 +87,6 @@ async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Respon
 
 Layers follow the same prefix rule as layouts and nest from least specific (outermost) to most specific (innermost). See [`#[layer]`](layer) for the exact matching and ordering rules.
 
-## Tower layers
-
-With the `tower` feature enabled, `TowerLayer` runs middleware from the tower ecosystem (a timeout, a rate limit, CORS, compression) as a layer. It wraps the routes under its path in the middleware a `tower::Layer` builds and registers like any other layer:
-
-```rust,ignore
-use std::time::Duration;
-
-use topcoat::router::{Path, Router, TowerLayer};
-use tower::timeout::TimeoutLayer;
-
-let router = Router::builder()
-    .layer(TowerLayer::new(
-        Path::new("/api"),
-        TimeoutLayer::new(Duration::from_secs(5)),
-    ))
-    .build();
-```
-
-See the `TowerLayer` API documentation for the middleware's requirements and error semantics.
-
 # API routes
 
 An API route is an async function annotated with [`#[route]`](route) and an explicit HTTP method:
@@ -305,6 +285,10 @@ async fn main() {
 ```
 
 [`start`](crate::start) binds to `HOST` and `PORT`, defaulting to `127.0.0.1:3000`. Use [`serve`](crate::serve) when you want to bind the `TcpListener` yourself.
+
+# Tower services
+
+With the `tower` feature enabled, the [`tower`](mod@tower) module bridges the tower ecosystem: [`TowerRoute`](tower::TowerRoute) mounts a tower service (like an axum router) as a route, and [`TowerLayer`](tower::TowerLayer) runs tower middleware as a layer. See the [`tower`](mod@tower) module docs for details.
 
 # Example: full manual setup
 
