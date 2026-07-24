@@ -12,48 +12,48 @@ pub(crate) enum Host {
 /// Asset configuration, registered on the router (with the router's `assets`
 /// extension method).
 ///
-/// Assemble one with [`Config::builder`]; `Config::default()` is the
+/// Assemble one with [`AssetConfig::builder`]; `AssetConfig::default()` is the
 /// all-defaults configuration, loading the bundle from a conventional
 /// location (see [`AssetBundle::load`]) and serving it from the application.
 /// An [`AssetBundle`] converts into the configuration hosting that bundle
 /// with the defaults, so an explicitly loaded bundle registers directly as
 /// `.assets(bundle)`.
-pub struct Config {
+pub struct AssetConfig {
     pub(crate) bundle: AssetBundle,
     pub(crate) host: Host,
 }
 
-impl Config {
+impl AssetConfig {
     /// Creates a builder for an asset configuration.
     #[must_use]
-    pub fn builder() -> ConfigBuilder {
-        ConfigBuilder::default()
+    pub fn builder() -> AssetConfigBuilder {
+        AssetConfigBuilder::default()
     }
 }
 
-/// Builds the all-defaults configuration, like [`Config::builder`] with an
-/// immediate [`build`](ConfigBuilder::build).
-impl Default for Config {
+/// Builds the all-defaults configuration, like [`AssetConfig::builder`] with an
+/// immediate [`build`](AssetConfigBuilder::build).
+impl Default for AssetConfig {
     fn default() -> Self {
         Self::builder().build()
     }
 }
 
 /// Converts a bundle into the configuration hosting it with the defaults.
-impl From<AssetBundle> for Config {
+impl From<AssetBundle> for AssetConfig {
     fn from(bundle: AssetBundle) -> Self {
-        Config::builder().bundle(bundle).build()
+        AssetConfig::builder().bundle(bundle).build()
     }
 }
 
-/// Assembles a [`Config`]. Created with [`Config::builder`].
+/// Assembles an [`AssetConfig`]. Created with [`AssetConfig::builder`].
 #[derive(Default)]
-pub struct ConfigBuilder {
+pub struct AssetConfigBuilder {
     bundle: Option<AssetBundle>,
     host: Option<Host>,
 }
 
-impl ConfigBuilder {
+impl AssetConfigBuilder {
     /// Sets the asset bundle, instead of loading it from a conventional
     /// location (see [`AssetBundle::load`]) when the configuration is built.
     #[must_use]
@@ -81,7 +81,7 @@ impl ConfigBuilder {
         self
     }
 
-    /// Consumes the builder, returning the finished [`Config`].
+    /// Consumes the builder, returning the finished [`AssetConfig`].
     ///
     /// # Panics
     ///
@@ -90,8 +90,8 @@ impl ConfigBuilder {
     /// configured and the application cannot serve the assets itself because
     /// the `serve` feature is disabled.
     #[must_use]
-    pub fn build(self) -> Config {
-        Config {
+    pub fn build(self) -> AssetConfig {
+        AssetConfig {
             bundle: self.bundle.unwrap_or_else(default_bundle),
             host: self.host.unwrap_or_else(default_host),
         }
@@ -115,7 +115,7 @@ fn default_host() -> Host {
 #[cfg(not(feature = "serve"))]
 fn default_host() -> Host {
     panic!(
-        "no asset host configured: set one with `ConfigBuilder::hosted_at`, or enable the `serve` feature to serve assets from the application"
+        "no asset host configured: set one with `AssetConfigBuilder::hosted_at`, or enable the `serve` feature to serve assets from the application"
     )
 }
 
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn hosted_at_trims_trailing_slashes() {
-        let config = Config::builder()
+        let config = AssetConfig::builder()
             .bundle(AssetBundle::empty())
             .hosted_at("https://cdn.example.com/assets/")
             .build();

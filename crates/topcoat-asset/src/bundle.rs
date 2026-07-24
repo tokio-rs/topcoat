@@ -175,7 +175,10 @@ impl AssetBundle {
     /// Returns an error if the manifest source cannot be parsed or reports an
     /// unsupported version.
     pub fn from_manifest_str(manifest: &str) -> io::Result<Self> {
-        Ok(Self::from_manifest(Manifest::parse(manifest)?, PathBuf::new()))
+        Ok(Self::from_manifest(
+            Manifest::parse(manifest)?,
+            PathBuf::new(),
+        ))
     }
 
     /// Build a bundle from a parsed manifest, resolving its file names

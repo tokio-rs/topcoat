@@ -20,18 +20,18 @@ Within a request the presented token is read once and cached, and [`start`], [`s
 
 # Setup
 
-Register session support on the router with [`RouterBuilderSessionExt::sessions`]. The default [`Config`] carries the token in a session cookie, which needs cookie support installed as well:
+Register session support on the router with [`RouterBuilderSessionExt::sessions`]. The default [`SessionConfig`] carries the token in a session cookie, which needs cookie support installed as well:
 
 ```rust
 use topcoat::{
     cookie::RouterBuilderCookieExt,
     router::Router,
-    session::{Config, RouterBuilderSessionExt},
+    session::{RouterBuilderSessionExt, SessionConfig},
 };
 
 let router = Router::builder()
     .cookies()
-    .sessions(Config::default())
+    .sessions(SessionConfig::default())
     .build();
 ```
 
@@ -130,7 +130,7 @@ Note that [`stop`] only ends the session the request presented. Revoking *other*
 
 # Refreshing and rotating
 
-A session expires a fixed [`lifetime`](ConfigBuilder::lifetime) after it was started. For **sliding expiration** -- sessions that stay alive while they are used -- call [`refresh`] when you resolve a valid session and push the expiry of your record forward:
+A session expires a fixed [`lifetime`](SessionConfigBuilder::lifetime) after it was started. For **sliding expiration** -- sessions that stay alive while they are used -- call [`refresh`] when you resolve a valid session and push the expiry of your record forward:
 
 ```rust
 use topcoat::{Result, context::Cx, session};
@@ -161,14 +161,14 @@ async fn escalate(cx: &Cx) -> Result<()> {
 
 # Configuration
 
-[`Config`] holds the token store and the session lifetime (30 days unless overridden), and is assembled with [`Config::builder`]. The default cookie store can be renamed if the `session` cookie name does not suit:
+[`SessionConfig`] holds the token store and the session lifetime (30 days unless overridden), and is assembled with [`SessionConfig::builder`]. The default cookie store can be renamed if the `session` cookie name does not suit:
 
 ```rust
 use std::time::Duration;
 
-use topcoat::session::{Config, cookie::CookieTokenStore};
+use topcoat::session::{SessionConfig, cookie::CookieTokenStore};
 
-let config = Config::builder()
+let config = SessionConfig::builder()
     .token_store(CookieTokenStore::new().name("id"))
     .lifetime(Duration::from_hours(24 * 14))
     .build();
@@ -185,14 +185,14 @@ For every request whose method is not `GET`, `HEAD`, or `OPTIONS`, the layer req
 If a page on another origin legitimately POSTs to your app (an OAuth `form_post` callback, for example), trust that origin explicitly:
 
 ```rust
-use topcoat::session::Config;
+use topcoat::session::SessionConfig;
 
-let config = Config::builder()
+let config = SessionConfig::builder()
     .trust_origin("https://accounts.example.com")
     .build();
 ```
 
-The check is also available as a plain function, [`verify_origin`], for flows outside the layer. [`ConfigBuilder::dangerous_disable_origin_verification`] turns the layer off entirely; only do so if the application enforces its own CSRF defense.
+The check is also available as a plain function, [`verify_origin`], for flows outside the layer. [`SessionConfigBuilder::dangerous_disable_origin_verification`] turns the layer off entirely; only do so if the application enforces its own CSRF defense.
 
 # Custom token stores
 

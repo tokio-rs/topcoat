@@ -23,7 +23,7 @@ async fn main() {
     topcoat::start(
         Router::builder()
             .cookies()
-            .sessions(session::Config::default())
+            .sessions(session::SessionConfig::default())
             .app_context(Database::default())
             .discover()
             .build(),

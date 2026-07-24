@@ -24,10 +24,16 @@ topcoat-core.workspace = true
 topcoat-router = { workspace = true, optional = true }
 
 base64.workspace = true
-rand.workspace = true
+getrandom.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
+# `std::time` everywhere but wasm32-unknown-unknown, where the JS host supplies the wall clock.
+web-time.workspace = true
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+# Token randomness on wasm32-unknown-unknown comes from the JS host (`crypto.getRandomValues`).
+getrandom = { workspace = true, features = ["wasm_js"] }
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["session"] }

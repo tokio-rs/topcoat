@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup update stable && rustup default stable && rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check -p topcoat --target wasm32-unknown-unknown --no-default-features --features router,view,runtime,asset,discover,multipart,tower --locked
+      - run: cargo check -p topcoat --target wasm32-unknown-unknown --no-default-features --features router,view,runtime,asset,cookie,session,discover,multipart,tower --locked
 
   runtime:
     name: runtime

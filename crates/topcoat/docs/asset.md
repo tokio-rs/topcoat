@@ -65,12 +65,37 @@ pub fn router() -> Router {
 
 Use [`AssetBundle::load_dir`] when you write the bundle to a custom location.
 
-[`RouterBuilderAssetExt::assets`] does two things:
-
-- mounts the bundle at `/_topcoat/assets`
-- installs the view resolver that turns [`Asset`] values into URLs
+[`RouterBuilderAssetExt::assets`] serves every bundled file from the application under `/_topcoat/assets`, and an [`Asset`] rendered in a view becomes the URL of its bundled file, as shown above.
 
 If a page renders an [`Asset`] that is not present in the loaded bundle, rendering panics. Treat that as a build/deploy mismatch: the binary and asset bundle must come from the same build.
+
+# Hosting assets externally
+
+The application does not have to serve the bundled files itself. Register an [`AssetConfig`] with a base URL ([`AssetConfigBuilder::hosted_at`]) and no asset routes are added; an [`Asset`] in a view then renders as `{base_url}/{bundled-filename}`. Making the files available there, whether on a CDN, an object store, or the reverse proxy in front of the application, becomes part of your deploy:
+
+```rust,no_run
+# use topcoat::{asset::{AssetConfig, RouterBuilderAssetExt}, router::{Router, RouterBuilderDiscoverExt}};
+let router = Router::builder()
+    .discover()
+    .assets(AssetConfig::builder().hosted_at("https://cdn.example.com/assets").build())
+    .build();
+```
+
+For example, `topcoat asset bundle --out dist/assets` writes the bundle to `dist/assets`; sync that directory to the CDN when deploying, and an asset renders as `https://cdn.example.com/assets/ferris-1a2b3c4d5e6f7a8b.png`. Bundled filenames carry a content hash, so the files can be served with long-lived, immutable caching.
+
+On targets without filesystem access, such as WebAssembly, embed the manifest into the binary with [`AssetBundle::from_manifest_str`] and pair the explicit bundle with an external host:
+
+```rust,ignore
+let bundle = AssetBundle::from_manifest_str(include_str!("../dist/assets/manifest.toml"))?;
+let router = Router::builder()
+    .assets(
+        AssetConfig::builder()
+            .bundle(bundle)
+            .hosted_at("https://static.example.com/assets")
+            .build(),
+    )
+    .build();
+```
 
 # Bundling
 

@@ -935,8 +935,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff2abc00be7fca6ebc474524697ae276ad847ad0a6b3faa4bcb027e9a4614ad0"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -958,11 +960,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0de51e6874e94e7bf76d726fc5d13ba782deca734ff60d5bb2fb2607c7406555"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "r-efi 6.0.0",
  "rand_core 0.10.1",
  "wasip2",
  "wasip3",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2795,6 +2799,7 @@ name = "topcoat-cookie"
 version = "0.4.0"
 dependencies = [
  "cookie 0.18.1",
+ "getrandom 0.2.17",
  "http",
  "serde",
  "serde_json",
@@ -3030,7 +3035,7 @@ name = "topcoat-session"
 version = "0.4.0"
 dependencies = [
  "base64",
- "rand 0.10.2",
+ "getrandom 0.4.2",
  "sha2 0.11.0",
  "thiserror",
  "tokio",
@@ -3038,6 +3043,7 @@ dependencies = [
  "topcoat-cookie",
  "topcoat-core",
  "topcoat-router",
+ "web-time",
 ]
 
 [[package]]

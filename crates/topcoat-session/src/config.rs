@@ -7,10 +7,10 @@ use crate::TokenStore;
 /// Session configuration, registered on the app context (with the router's
 /// `sessions` extension method).
 ///
-/// Assemble one with [`Config::builder`]; `Config::default()` is the
+/// Assemble one with [`SessionConfig::builder`]; `SessionConfig::default()` is the
 /// all-defaults configuration, carrying the token in the default cookie
 /// store.
-pub struct Config {
+pub struct SessionConfig {
     pub(crate) token_store: Box<dyn TokenStore>,
     pub(crate) lifetime: Duration,
     #[cfg(feature = "router")]
@@ -20,28 +20,28 @@ pub struct Config {
 }
 
 /// How long a session lives without being refreshed, unless overridden with
-/// [`ConfigBuilder::lifetime`]: 30 days.
+/// [`SessionConfigBuilder::lifetime`]: 30 days.
 pub const DEFAULT_LIFETIME: Duration = Duration::from_hours(24 * 30);
 
-impl Config {
+impl SessionConfig {
     /// Creates a builder for a session configuration.
     #[must_use]
-    pub fn builder() -> ConfigBuilder {
-        ConfigBuilder::default()
+    pub fn builder() -> SessionConfigBuilder {
+        SessionConfigBuilder::default()
     }
 }
 
-/// Builds the all-defaults configuration, like [`Config::builder`] with an
-/// immediate [`build`](ConfigBuilder::build).
+/// Builds the all-defaults configuration, like [`SessionConfig::builder`] with an
+/// immediate [`build`](SessionConfigBuilder::build).
 #[cfg(feature = "cookie")]
-impl Default for Config {
+impl Default for SessionConfig {
     fn default() -> Self {
         Self::builder().build()
     }
 }
 
-/// Assembles a [`Config`]. Created with [`Config::builder`].
-pub struct ConfigBuilder {
+/// Assembles a [`SessionConfig`]. Created with [`SessionConfig::builder`].
+pub struct SessionConfigBuilder {
     token_store: Option<Box<dyn TokenStore>>,
     lifetime: Duration,
     #[cfg(feature = "router")]
@@ -50,7 +50,7 @@ pub struct ConfigBuilder {
     trusted_origins: Vec<String>,
 }
 
-impl ConfigBuilder {
+impl SessionConfigBuilder {
     /// Overrides the [`TokenStore`] carrying the session token between the
     /// client and the server.
     #[must_use]
@@ -96,15 +96,15 @@ impl ConfigBuilder {
         self
     }
 
-    /// Consumes the builder, returning the finished [`Config`].
+    /// Consumes the builder, returning the finished [`SessionConfig`].
     ///
     /// # Panics
     ///
     /// Panics when no token store was set and the default cookie store is
     /// unavailable because the `cookie` feature is disabled.
     #[must_use]
-    pub fn build(self) -> Config {
-        Config {
+    pub fn build(self) -> SessionConfig {
+        SessionConfig {
             token_store: self.token_store.unwrap_or_else(default_token_store),
             lifetime: self.lifetime,
             #[cfg(feature = "router")]
@@ -115,7 +115,7 @@ impl ConfigBuilder {
     }
 }
 
-impl Default for ConfigBuilder {
+impl Default for SessionConfigBuilder {
     fn default() -> Self {
         Self {
             token_store: None,
@@ -136,10 +136,10 @@ fn default_token_store() -> Box<dyn TokenStore> {
 #[cfg(not(feature = "cookie"))]
 fn default_token_store() -> Box<dyn TokenStore> {
     panic!(
-        "no token store configured: set one with `ConfigBuilder::token_store` or enable the `cookie` feature for the default cookie store"
+        "no token store configured: set one with `SessionConfigBuilder::token_store` or enable the `cookie` feature for the default cookie store"
     )
 }
 
-pub(crate) fn config(cx: &Cx) -> &Config {
+pub(crate) fn config(cx: &Cx) -> &SessionConfig {
     app_context(cx)
 }

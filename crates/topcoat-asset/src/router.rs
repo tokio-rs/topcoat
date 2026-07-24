@@ -5,14 +5,14 @@ use crate::AssetRoute;
 use crate::config::Host;
 #[cfg(feature = "serve")]
 use crate::serve::ASSET_ROUTE_PREFIX;
-use crate::{AssetRouteResolver, Config};
+use crate::{AssetConfig, AssetRouteResolver};
 
 /// Registers assets on a [`RouterBuilder`].
 ///
 /// Implemented for [`RouterBuilder`] so it is in scope wherever a router is
 /// being built, enabling the [`assets`](Self::assets) method.
 pub trait RouterBuilderAssetExt {
-    /// Registers an asset [`Config`] on the router.
+    /// Registers an [`AssetConfig`] on the router.
     ///
     /// The configuration's bundle is registered with the app context, allowing
     /// access through [`asset_bundle`](crate::asset_bundle) and
@@ -23,12 +23,12 @@ pub trait RouterBuilderAssetExt {
     /// With the default hosting, each asset in the bundle is also added as an
     /// HTTP route and served by the application itself. A configuration hosted
     /// externally (see
-    /// [`ConfigBuilder::hosted_at`](crate::ConfigBuilder::hosted_at)) adds no
+    /// [`AssetConfigBuilder::hosted_at`](crate::AssetConfigBuilder::hosted_at)) adds no
     /// routes; the bundled files must be hosted at the configured base URL by
     /// other means.
     ///
-    /// Anything convertible into a [`Config`] is accepted: an [`AssetBundle`]
-    /// registers that bundle with the default hosting.
+    /// Anything convertible into an [`AssetConfig`] is accepted: an
+    /// [`AssetBundle`] registers that bundle with the default hosting.
     ///
     /// # Examples
     ///
@@ -48,24 +48,28 @@ pub trait RouterBuilderAssetExt {
     /// Hosting the bundled files on a CDN instead of serving them:
     ///
     /// ```rust
-    /// use topcoat::asset::{Config, RouterBuilderAssetExt};
+    /// use topcoat::asset::{AssetConfig, RouterBuilderAssetExt};
     /// use topcoat::router::Router;
     ///
     /// pub fn router() -> Router {
     ///     Router::builder()
-    ///         .assets(Config::builder().hosted_at("https://cdn.example.com/assets").build())
+    ///         .assets(
+    ///             AssetConfig::builder()
+    ///                 .hosted_at("https://cdn.example.com/assets")
+    ///                 .build(),
+    ///         )
     ///         .build()
     /// }
     /// ```
     ///
     /// [`AssetBundle`]: crate::AssetBundle
     #[must_use]
-    fn assets(self, config: impl Into<Config>) -> Self;
+    fn assets(self, config: impl Into<AssetConfig>) -> Self;
 }
 
 impl RouterBuilderAssetExt for RouterBuilder {
-    fn assets(mut self, config: impl Into<Config>) -> Self {
-        let Config { bundle, host } = config.into();
+    fn assets(mut self, config: impl Into<AssetConfig>) -> Self {
+        let AssetConfig { bundle, host } = config.into();
 
         let base_url = match host {
             #[cfg(feature = "serve")]
