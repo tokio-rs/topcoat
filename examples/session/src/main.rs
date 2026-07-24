@@ -14,7 +14,7 @@ use topcoat::{
         error::{SeeOther, see_other},
         layout, page, route,
     },
-    session::{self, RouterBuilderSessionExt, TokenHash},
+    session::{self, RouterBuilderSessionExt, SessionConfig, TokenHash},
     view::view,
 };
 
@@ -23,7 +23,7 @@ async fn main() {
     topcoat::start(
         Router::builder()
             .cookies()
-            .sessions(session::SessionConfig::default())
+            .sessions(SessionConfig::default())
             .app_context(Database::default())
             .discover()
             .build(),
