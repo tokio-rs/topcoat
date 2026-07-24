@@ -35,6 +35,7 @@ members = [
     "examples/asset",
     "examples/context",
     "examples/cookie",
+    "examples/dynamic-signals",
     "examples/font",
     "examples/hello-world",
     "examples/htmx",

@@ -703,6 +703,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "dynamic-signals"
+version = "0.4.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "either"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -150,6 +150,57 @@ view! {
 # }
 ```
 
+# Dynamic signals
+
+The `signal` statement declares one binding, which fits state the component knows about while it is written. Markup rendered from data — table rows, form builders, filter panels — needs one signal *per item*, and the number of items is only known at run time.
+
+[`Signal`] is an ordinary value, so signals can also be created programmatically: build one per item with [`Signal::new`], and announce each to the browser by rendering a [`SignalDeclaration`] node — the value-level form of what the `signal` statement does:
+
+```rust
+# use topcoat::{Result, view::*, runtime::{Signal, SignalDeclaration}};
+# #[component]
+# async fn example() -> Result {
+let rows: Vec<f64> = vec![2.0, 4.0, 1.0];
+let quantities: Vec<Signal<f64>> = rows.iter().map(|&q| Signal::new(q)).collect();
+
+view! {
+    for signal in &quantities {
+        (SignalDeclaration::new(signal))
+    }
+}
+# }
+```
+
+A runtime expression captures signals by name, so give it one: a view-level `let` binds an element of the collection, and the expression uses it like any declared signal:
+
+```rust
+# use topcoat::{Result, view::*, runtime::{Signal, SignalDeclaration}};
+# #[component]
+# async fn example() -> Result {
+# let rows: Vec<f64> = vec![2.0, 4.0, 1.0];
+# let quantities: Vec<Signal<f64>> = rows.iter().map(|&q| Signal::new(q)).collect();
+view! {
+    for signal in &quantities {
+        (SignalDeclaration::new(signal))
+    }
+
+    for index in 0..rows.len() {
+        let quantity = &quantities[index];
+        <button @click=$(|_e| quantity.set(quantity.get() + 1.0))>"+"</button>
+        " " $(quantity.get())
+    }
+
+    let first = &quantities[0];
+    let second = &quantities[1];
+    <p>"Combined: " $(first.get() + second.get())</p>
+}
+# }
+```
+
+Each item's controls update its own signal, and expressions may combine signals from anywhere in the collection — all in the browser, exactly like statement-declared signals. The [dynamic-signals example](https://github.com/tokio-rs/topcoat/tree/main/examples/dynamic-signals) shows a complete order form built this way.
+
+A declaration must be rendered for every dynamic signal an expression captures; without it the browser has no state to bind. Rendering the declarations before the expressions that use them, as above, is the easiest way to keep that true.
+
 # Procedures
 
 Runtime expressions run in the browser, so they cannot query the database or use Rust beyond the shared vocabulary. When an event handler needs the server, it calls a **procedure**: an async server function invoked from a runtime expression like any other async function:
@@ -210,6 +261,9 @@ view! {
 A shard body is ordinary server code, like any component. The re-renders are served by an API endpoint exposed from your server, so a shard's arguments can be spoofed just like a procedure's and **must not be trusted**. See [`#[shard]`][shard] for the details: how re-renders behave, shard state, and registration.
 
 [`Event`]: struct.Event.html
+[`Signal`]: struct.Signal.html
+[`Signal::new`]: struct.Signal.html#method.new
+[`SignalDeclaration`]: struct.SignalDeclaration.html
 [`expr!`]: macro.expr.html
 [`view!`]: ../view/macro.view.html
 [procedure]: attr.procedure.html
