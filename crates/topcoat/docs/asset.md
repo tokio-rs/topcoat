@@ -71,7 +71,7 @@ If a page renders an [`Asset`] that is not present in the loaded bundle, renderi
 
 # Hosting assets externally
 
-The application does not have to serve the bundled files itself. Register an [`AssetConfig`] built with [`AssetConfig::hosted_at`] instead: no asset routes are added, and an [`Asset`] in a view renders as `{base_url}/{bundled-filename}`. It is then up to your deploy to put the files there, for example on a CDN, in an object store, or on the reverse proxy in front of the application:
+The application does not have to serve the bundled files itself. Any static file host works in its place: a CDN, an object store, or the reverse proxy in front of the app. Point Topcoat at it by registering the bundle through [`AssetConfig::hosted_at`]:
 
 ```rust,no_run
 # use topcoat::{asset::{AssetBundle, AssetConfig, RouterBuilderAssetExt}, router::{Router, RouterBuilderDiscoverExt}};
@@ -84,9 +84,11 @@ let router = Router::builder()
     .build();
 ```
 
-For example, `topcoat asset bundle --out dist/assets` writes the bundle to `dist/assets`. Upload that directory to the CDN when deploying, and an asset renders as `https://cdn.example.com/assets/ferris-1a2b3c4d5e6f7a8b.png`. Bundled filenames contain a content hash, so the files can be served with long-lived, immutable caching.
+Registered this way, the router adds no asset routes, and an [`Asset`] in a view renders as the file's URL on the external host, `{base_url}/{bundled-filename}`. The image from earlier becomes `https://cdn.example.com/assets/ferris-1a2b3c4d5e6f7a8b.png`.
 
-External hosting only needs the mapping from asset IDs to bundled filenames (the bundle's [`AssetCatalog`]), not the files themselves. That mapping lives in the bundle's `manifest.toml`. On targets without filesystem access, such as WebAssembly, there is no bundle to load at runtime; embed the manifest into the binary and pass it in place of the bundle:
+Actually putting the files there is your deployment's job: write the bundle with `topcoat asset bundle --out dist/assets` and upload that directory whenever you deploy the binary it was built from. The filenames contain a content hash, so the host can serve them with long-lived, immutable caching.
+
+To resolve these URLs, the application only needs the mapping from asset IDs to bundled filenames, not the files themselves. That mapping is the bundle's [`AssetCatalog`], and it lives in the bundle's `manifest.toml`. On targets without filesystem access, such as WebAssembly, there is no bundle directory to load at runtime; embed the manifest into the binary instead and pass it in place of the bundle:
 
 ```rust,ignore
 let manifest = Manifest::parse(include_str!("../dist/assets/manifest.toml"))?;
