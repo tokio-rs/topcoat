@@ -254,7 +254,6 @@ Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](ht
 - [ ] Pre-rendering for static pages
 - [ ] Streaming SSR / Suspense
 - [ ] Client-side navigation + prefetching
-- [ ] `WebSockets`
 - [ ] `WebTransport`
 - [ ] Server-sent events
 - [ ] Image optimization / resizing
