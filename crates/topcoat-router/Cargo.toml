@@ -38,6 +38,11 @@ tower = [
 	"tokio/macros",
 	"tokio/sync",
 ]
+websocket = [
+	"serve",
+	"dep:futures-sink",
+	"dep:tokio-tungstenite",
+]
 
 [dependencies]
 topcoat-core.workspace = true
@@ -46,6 +51,7 @@ topcoat-view = { workspace = true, features = ["http"] }
 bytes.workspace = true
 form_urlencoded.workspace = true
 futures-core.workspace = true
+futures-sink = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
 heck.workspace = true
 http.workspace = true
@@ -63,6 +69,7 @@ serde_json.workspace = true
 serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
 tokio = { workspace = true, optional = true }
+tokio-tungstenite = { workspace = true, optional = true, features = ["handshake"] }
 tower = { workspace = true, optional = true, features = ["util"] }
 tower-http = { workspace = true, optional = true, features = [
 	"compression-br",
@@ -70,8 +77,10 @@ tower-http = { workspace = true, optional = true, features = [
 ] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["compression", "router", "tower"] }
+topcoat = { workspace = true, features = ["compression", "router", "tower", "websocket"] }
+futures-util = { workspace = true, features = ["sink"] }
 tokio = { workspace = true, features = ["io-util", "macros", "rt", "time"] }
+tokio-tungstenite = { workspace = true, features = ["connect"] }
 tower = { workspace = true, features = ["buffer", "limit", "timeout", "util"] }
 tower-http = { workspace = true, features = [
 	"compression-gzip",

@@ -2942,6 +2942,7 @@ dependencies = [
  "bytes",
  "form_urlencoded",
  "futures-core",
+ "futures-sink",
  "futures-util",
  "heck",
  "http",
@@ -2959,6 +2960,7 @@ dependencies = [
  "serde_path_to_error",
  "serde_urlencoded",
  "tokio",
+ "tokio-tungstenite 0.29.0",
  "topcoat",
  "topcoat-core",
  "topcoat-view",
@@ -3518,6 +3520,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52f5ee44c96cf55f1b349600768e3ece3a8f26010c05265ab73f945bb1a2eb9d"
 dependencies = [
  "rustls-pki-types",
+]
+
+[[package]]
+name = "websocket"
+version = "0.4.0"
+dependencies = [
+ "tokio",
+ "topcoat",
 ]
 
 [[package]]

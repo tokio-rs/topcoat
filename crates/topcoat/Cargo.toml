@@ -45,6 +45,7 @@ full = [
 	"tower",
 	"ui",
 	"view",
+	"websocket",
 ]
 
 alpine-ajax = [
@@ -138,6 +139,10 @@ view = [
 	"topcoat-asset?/view",
 	"topcoat-font?/view",
 ]
+websocket = [
+	"serve",
+	"topcoat-router/websocket",
+]
 
 [dependencies]
 topcoat-alpine-ajax = { workspace = true, optional = true }
@@ -165,7 +170,7 @@ inventory = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_urlencoded.workspace = true
 tokio = { workspace = true, optional = true, features = ["macros", "net", "signal"] }
-tokio-tungstenite = { workspace = true, optional = true }
+tokio-tungstenite = { workspace = true, optional = true, features = ["connect"] }
 
 [dev-dependencies]
 serde_json.workspace = true

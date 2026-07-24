@@ -59,8 +59,10 @@ pub async fn internal_serve(
             // for connections to finish.
             let _done_rx = done_rx;
 
+            // Serving with upgrade support keeps protocol switches (like
+            // WebSockets) working; for ordinary requests it behaves the same.
             let builder = auto::Builder::new(TokioExecutor::new());
-            let mut connection = pin!(builder.serve_connection(io, service));
+            let mut connection = pin!(builder.serve_connection_with_upgrades(io, service));
 
             let result = tokio::select! {
                 result = connection.as_mut() => result,

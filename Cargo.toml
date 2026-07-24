@@ -50,6 +50,7 @@ members = [
     "examples/tailwind",
     "examples/toasty-todo",
     "examples/ui",
+    "examples/websocket",
 
     "benchmarks/topcoat",
 ]
@@ -142,6 +143,7 @@ criterion = "0.8"
 dialoguer = { version = "0.12", default-features = false }
 form_urlencoded = "1"
 futures-core = "0.3"
+futures-sink = "0.3"
 futures-util = "0.3"
 getrandom = "0.4"
 getrandom02 = { package = "getrandom", version = "0.2" }
@@ -180,7 +182,7 @@ thiserror = "2.0.18"
 toasty = "0.7"
 tokio = "1.51.1"
 toml = "1.1.2"
-tokio-tungstenite = "0.29"
+tokio-tungstenite = { version = "0.29", default-features = false }
 tower = "0.5"
 tower-http = "0.7"
 ureq = "3.3"
