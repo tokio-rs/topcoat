@@ -72,7 +72,9 @@ impl Router {
         let (layers, terminal, path_params) =
             if let Ok(matched) = self.endpoints.at(parts.uri.path()) {
                 let endpoint = matched.value;
-                let path_params = {
+                let path_params = if matched.params.is_empty() {
+                    RawPathParams::default()
+                } else {
                     debug_assert_eq!(endpoint.path_params().len(), matched.params.len());
                     let keys = endpoint.path_params().iter().cloned();
                     let values = matched.params.iter().map(|(_, value)| value);
