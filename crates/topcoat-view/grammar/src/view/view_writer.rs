@@ -196,10 +196,11 @@ impl ViewWriter {
                 }
 
                 let statements = build_parts(&self.chunks);
+                let capacity = self.chunks.len();
 
                 quote! {{
                     use #topcoat_view::internal::*;
-                    let mut __parts = #topcoat_view::ViewParts::new();
+                    let mut __parts = #topcoat_view::ViewParts::with_capacity(#capacity);
                     #statements
                     #topcoat_view::View::new(__parts)
                 }}

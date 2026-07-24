@@ -13,7 +13,7 @@ pub struct Formatter<'a> {
     #[cfg(feature = "http")]
     status_code: Option<StatusCode>,
     #[cfg(feature = "http")]
-    headers: HeaderMap,
+    headers: Option<HeaderMap>,
 }
 
 impl<'a> Formatter<'a> {
@@ -25,7 +25,7 @@ impl<'a> Formatter<'a> {
             #[cfg(feature = "http")]
             status_code: None,
             #[cfg(feature = "http")]
-            headers: HeaderMap::new(),
+            headers: None,
         }
     }
 
@@ -54,14 +54,17 @@ impl<'a> Formatter<'a> {
     /// all of that name's values.
     #[cfg(feature = "http")]
     pub(crate) fn record_headers(&mut self, headers: &HeaderMap) {
-        if self.headers.is_empty() {
-            self.headers = headers.clone();
-            return;
-        }
-        for name in headers.keys() {
-            if !self.headers.contains_key(name) {
-                for value in headers.get_all(name) {
-                    self.headers.append(name.clone(), value.clone());
+        match &mut self.headers {
+            None => {
+                self.headers = Some(headers.clone());
+            }
+            Some(existing) => {
+                for name in headers.keys() {
+                    if !existing.contains_key(name) {
+                        for value in headers.get_all(name) {
+                            existing.append(name.clone(), value.clone());
+                        }
+                    }
                 }
             }
         }
@@ -71,7 +74,7 @@ impl<'a> Formatter<'a> {
     /// headers.
     #[cfg(feature = "http")]
     pub(crate) fn into_recorded(self) -> (Option<StatusCode>, HeaderMap) {
-        (self.status_code, self.headers)
+        (self.status_code, self.headers.unwrap_or_default())
     }
 }
 

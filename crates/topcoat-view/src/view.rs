@@ -366,6 +366,15 @@ impl ViewParts {
         Self::default()
     }
 
+    /// Creates a view-parts buffer pre-allocated for `capacity` items.
+    #[inline]
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: SmallVec::with_capacity(capacity),
+        }
+    }
+
     /// Appends a nested view, such as a rendered component.
     #[inline]
     pub fn push_view(&mut self, view: View) -> &mut Self {
