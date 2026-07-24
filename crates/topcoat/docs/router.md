@@ -311,7 +311,19 @@ async fn main() {
 }
 ```
 
-[`start`](crate::start) binds to `HOST` and `PORT`, defaulting to `127.0.0.1:3000`. Use [`serve`](crate::serve) when you want to bind the `TcpListener` yourself.
+[`start`](crate::start) binds to `HOST` and `PORT`, defaulting to `127.0.0.1:3000`. Use [`serve`](crate::serve) when you want to bind the listener yourself. It accepts any [`Listener`]: a `TcpListener` to serve HTTP directly, or on Unix a `UnixListener` to serve behind a reverse proxy (like nginx or Caddy) that forwards requests to a socket path:
+
+```rust,no_run
+# #[cfg(unix)]
+# async fn serve(router: topcoat::router::Router) -> std::io::Result<()> {
+let path = "/run/my-app.sock";
+let _ = std::fs::remove_file(path);
+let listener = tokio::net::UnixListener::bind(path)?;
+topcoat::serve(listener, router).await
+# }
+```
+
+The socket file of a previous run is not removed automatically, so remove any stale file before binding, as above.
 
 # Tower services
 

@@ -3,10 +3,24 @@ use std::{env, io};
 
 use tokio::net::TcpListener;
 
-use crate::router::{RouterService, internal_serve};
+use crate::router::{Listener, RouterService, internal_serve};
 
 /// Serve a Topcoat router, notifying the topcoat dev server once the
 /// application is ready to accept connections.
+///
+/// The listener can be any [`Listener`]: a [`TcpListener`] to serve HTTP
+/// directly, or on Unix a `UnixListener` to serve behind a reverse proxy that
+/// forwards requests to a socket path:
+///
+/// ```no_run
+/// # #[cfg(unix)]
+/// # async fn serve(router: topcoat::router::Router) -> std::io::Result<()> {
+/// let path = "/run/my-app.sock";
+/// let _ = std::fs::remove_file(path);
+/// let listener = tokio::net::UnixListener::bind(path)?;
+/// topcoat::serve(listener, router).await
+/// # }
+/// ```
 ///
 /// The server runs until the process receives a shutdown signal: Ctrl+C, or
 /// `SIGTERM` on Unix. It then shuts down gracefully, giving in-flight
@@ -21,7 +35,7 @@ use crate::router::{RouterService, internal_serve};
 ///
 /// Returns `Err` if accepting a connection on `listener` fails.
 pub async fn serve(
-    listener: TcpListener,
+    listener: impl Listener,
     service: impl Into<RouterService>,
 ) -> Result<(), io::Error> {
     serve_until(listener, service, shutdown_signal()).await
@@ -38,11 +52,11 @@ pub async fn serve(
 ///
 /// Returns `Err` if accepting a connection on `listener` fails.
 pub async fn serve_until(
-    listener: TcpListener,
+    listener: impl Listener,
     service: impl Into<RouterService>,
     signal: impl Future<Output = ()>,
 ) -> Result<(), io::Error> {
-    let addr = listener.local_addr().ok();
+    let addr = listener.tcp_addr();
     crate::dev::notify_ready(addr).await;
     internal_serve(listener, service.into(), signal).await
 }

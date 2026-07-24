@@ -4,12 +4,11 @@ use std::pin::pin;
 
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto;
-use tokio::net::TcpListener;
 use tokio::sync::watch;
 
-use crate::RouterService;
+use crate::{Listener, RouterService};
 
-/// Serves a [`RouterService`] on an already-bound [`TcpListener`] until
+/// Serves a [`RouterService`] on an already-bound [`Listener`] until
 /// `shutdown` completes.
 ///
 /// This is the low-level accept loop, with no dev-server integration: it
@@ -25,7 +24,7 @@ use crate::RouterService;
 /// Returns an I/O error if accepting a connection fails. Connections already
 /// being served are left running on their tasks.
 pub async fn internal_serve(
-    listener: TcpListener,
+    mut listener: impl Listener,
     service: RouterService,
     shutdown: impl Future<Output = ()>,
 ) -> io::Result<()> {
@@ -86,7 +85,8 @@ pub async fn internal_serve(
         });
     }
 
-    // Free the port for a replacement process while connections drain.
+    // Stop listening while connections drain, freeing a TCP port for any
+    // replacement process.
     drop(listener);
 
     // Tell every connection task to begin its graceful shutdown, and give
@@ -114,7 +114,7 @@ mod tests {
     use std::time::Duration;
 
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::TcpStream;
+    use tokio::net::{TcpListener, TcpStream};
     use tokio::sync::oneshot;
     use tokio::task::JoinHandle;
     use topcoat_core::context::Cx;
@@ -195,6 +195,37 @@ mod tests {
 
         // The listener is gone; new connections are refused.
         assert!(TcpStream::connect(addr).await.is_err());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn serves_over_a_unix_socket() {
+        use tokio::net::{UnixListener, UnixStream};
+
+        let service = RouterService::new(router_with(say_route));
+        let path = std::env::temp_dir().join(format!("topcoat-serve-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let listener = UnixListener::bind(&path).unwrap();
+
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let server = tokio::spawn(internal_serve(listener, service, async {
+            let _ = shutdown_rx.await;
+        }));
+
+        let mut stream = UnixStream::connect(&path).await.unwrap();
+        stream
+            .write_all(b"GET /x HTTP/1.1\r\nhost: test\r\nconnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).await.unwrap();
+        assert!(response.contains("200 OK"));
+        assert!(response.ends_with("served"));
+
+        shutdown_tx.send(()).unwrap();
+        shut_down(server).await;
+
+        let _ = std::fs::remove_file(&path);
     }
 
     #[tokio::test]
