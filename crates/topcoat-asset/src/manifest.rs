@@ -25,9 +25,18 @@ impl Manifest {
     /// if its `version` field does not equal [`MANIFEST_VERSION`], and
     /// propagates any I/O error from reading `path`.
     pub fn load(path: impl AsRef<Path>) -> io::Result<Self> {
-        let toml_str = fs::read_to_string(path)?;
+        Self::parse(&fs::read_to_string(path)?)
+    }
+
+    /// Parse a manifest from its TOML source, rejecting unsupported versions.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`io::ErrorKind::InvalidData`] if the source is not valid TOML
+    /// or if its `version` field does not equal [`MANIFEST_VERSION`].
+    pub fn parse(toml_str: &str) -> io::Result<Self> {
         let manifest: Manifest =
-            toml::from_str(&toml_str).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+            toml::from_str(toml_str).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         if manifest.version != MANIFEST_VERSION {
             return Err(io::Error::new(

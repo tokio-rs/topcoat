@@ -22,8 +22,19 @@ multipart = [
 	"dep:futures-util",
 	"dep:multer",
 ]
+serve = [
+	"dep:hyper",
+	"dep:hyper-util",
+	"dep:tokio",
+	"tokio/macros",
+	"tokio/net",
+	"tokio/rt",
+	"tokio/sync",
+	"tokio/time",
+]
 tower = [
 	"dep:tower",
+	"dep:tokio",
 	"tokio/macros",
 	"tokio/sync",
 ]
@@ -40,8 +51,8 @@ heck.workspace = true
 http.workspace = true
 http-body.workspace = true
 http-body-util.workspace = true
-hyper = { workspace = true, features = ["server", "http1", "http2"] }
-hyper-util = { workspace = true, features = ["server-auto", "tokio"] }
+hyper = { workspace = true, optional = true, features = ["server", "http1", "http2"] }
+hyper-util = { workspace = true, optional = true, features = ["server-auto", "tokio"] }
 matchit.workspace = true
 percent-encoding.workspace = true
 inventory = { workspace = true, optional = true }
@@ -51,7 +62,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
-tokio = { workspace = true, features = ["macros", "net", "rt", "sync", "time"] }
+tokio = { workspace = true, optional = true }
 tower = { workspace = true, optional = true, features = ["util"] }
 tower-http = { workspace = true, optional = true, features = [
 	"compression-br",

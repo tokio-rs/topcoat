@@ -21,6 +21,9 @@ bundler = [
 router = [
 	"view",
 	"dep:topcoat-router",
+]
+serve = [
+	"router",
 	"dep:tokio",
 ]
 view = [

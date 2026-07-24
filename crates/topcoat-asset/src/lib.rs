@@ -2,6 +2,7 @@
 
 mod asset;
 mod bundle;
+mod config;
 mod error;
 mod manifest;
 mod options;
@@ -10,6 +11,7 @@ mod source;
 
 pub use asset::*;
 pub use bundle::*;
+pub use config::*;
 pub use error::*;
 pub use manifest::*;
 pub use options::*;
@@ -29,6 +31,12 @@ mod router;
 
 #[cfg(feature = "router")]
 pub use router::*;
+
+#[cfg(feature = "serve")]
+mod serve;
+
+#[cfg(feature = "serve")]
+pub use serve::*;
 
 #[cfg(feature = "view")]
 mod view;

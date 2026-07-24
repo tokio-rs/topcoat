@@ -17,7 +17,9 @@ pub struct BundledAsset {
 }
 
 impl BundledAsset {
-    /// Absolute path to the bundled file on disk.
+    /// Path to the bundled file on disk; just the bundled filename for a
+    /// bundle built from an embedded manifest (see
+    /// [`AssetBundle::from_manifest_str`](crate::AssetBundle::from_manifest_str)).
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
@@ -148,7 +150,37 @@ impl AssetBundle {
     pub fn load_dir(dir: impl AsRef<Path>) -> io::Result<Self> {
         let dir = dir.as_ref().to_path_buf();
         let manifest = Manifest::load(dir.join(MANIFEST_NAME))?;
+        Ok(Self::from_manifest(manifest, dir))
+    }
 
+    /// Build a bundle from the TOML source of its manifest, without touching
+    /// the filesystem.
+    ///
+    /// Useful on targets without filesystem access, such as WebAssembly,
+    /// where the manifest of a bundle built ahead of time is embedded into
+    /// the binary with `include_str!`. The bundle resolves asset IDs and
+    /// bundled filenames as usual, but its files have no on-disk location, so
+    /// it supports URL resolution (e.g. an asset configuration hosted
+    /// externally) and not file serving.
+    ///
+    /// ```
+    /// use topcoat::asset::AssetBundle;
+    ///
+    /// let bundle = AssetBundle::from_manifest_str("version = 1\nassets = []").unwrap();
+    /// assert_eq!(bundle.assets().count(), 0);
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the manifest source cannot be parsed or reports an
+    /// unsupported version.
+    pub fn from_manifest_str(manifest: &str) -> io::Result<Self> {
+        Ok(Self::from_manifest(Manifest::parse(manifest)?, PathBuf::new()))
+    }
+
+    /// Build a bundle from a parsed manifest, resolving its file names
+    /// against `dir`.
+    fn from_manifest(manifest: Manifest, dir: PathBuf) -> Self {
         let bundled_assets = manifest
             .assets
             .into_iter()
@@ -163,13 +195,14 @@ impl AssetBundle {
             })
             .collect();
 
-        Ok(Self {
+        Self {
             dir,
             bundled_assets,
-        })
+        }
     }
 
-    /// Directory the bundle was loaded from.
+    /// Directory the bundle was loaded from; empty for a bundle built from
+    /// an embedded manifest (see [`AssetBundle::from_manifest_str`]).
     #[must_use]
     pub fn dir(&self) -> &Path {
         &self.dir
