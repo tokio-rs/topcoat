@@ -97,7 +97,7 @@ impl From<BuildFlags> for BuildOpts {
 pub enum BuildError {
     Spawn(io::Error),
     Failed { rendered: String },
-    NoExecutable,
+    NoArtifact,
     Multiple(Vec<PathBuf>),
     Read(io::Error),
 }
@@ -107,11 +107,14 @@ impl fmt::Display for BuildError {
         match self {
             Self::Spawn(e) => write!(f, "failed to spawn cargo build: {e}"),
             Self::Failed { .. } => write!(f, "build failed"),
-            Self::NoExecutable => write!(f, "no executable produced by cargo build"),
+            Self::NoArtifact => write!(
+                f,
+                "cargo build produced no executable or library to bundle; the crate must be a `bin`, `cdylib`, or `dylib` target"
+            ),
             Self::Multiple(paths) => {
                 write!(
                     f,
-                    "cargo produced multiple binaries; pass --bin or --package to choose one:"
+                    "cargo produced multiple targets; pass --bin or --package to choose one:"
                 )?;
                 for p in paths {
                     write!(f, "\n  {}", p.display())?;
@@ -250,22 +253,80 @@ pub async fn build(
         return Err(BuildError::Failed { rendered });
     }
 
-    let executables: Vec<PathBuf> = messages
-        .iter()
-        .filter_map(|msg| {
-            if msg.get("reason")?.as_str()? == "compiler-artifact" {
-                msg.get("executable")?.as_str().map(PathBuf::from)
-            } else {
-                None
-            }
-        })
-        .collect();
+    // The bundler scans any linked binary for embedded asset declarations, so
+    // an executable and a cdylib/dylib (e.g. a `wasm32` build, which produces
+    // no executable) are equally valid targets.
+    let artifacts = select_artifacts(&messages);
 
-    match executables.len() {
-        0 => Err(BuildError::NoExecutable),
-        1 => Ok(executables.into_iter().next().unwrap()),
-        _ => Err(BuildError::Multiple(executables)),
+    match artifacts.len() {
+        0 => Err(BuildError::NoArtifact),
+        1 => Ok(artifacts.into_iter().next().unwrap()),
+        _ => Err(BuildError::Multiple(artifacts)),
     }
+}
+
+/// Pick the final linked outputs out of cargo's compiler-artifact messages:
+/// bin executables plus `cdylib`/`dylib` library outputs.
+///
+/// Cargo emits an artifact message for every crate it compiles, but marks the
+/// final outputs itself: `executable` is only set for the requested bin
+/// targets, and only the requested packages' library outputs are uplifted out
+/// of `deps/` into the profile directory. Everything still in `deps/` is an
+/// intermediate dependency and is skipped.
+fn select_artifacts(messages: &[serde_json::Value]) -> Vec<PathBuf> {
+    let mut artifacts = Vec::new();
+    for msg in messages {
+        if msg.get("reason").and_then(|r| r.as_str()) != Some("compiler-artifact") {
+            continue;
+        }
+        if let Some(executable) = msg.get("executable").and_then(|e| e.as_str()) {
+            artifacts.push(PathBuf::from(executable));
+        } else if is_dynamic_library_target(msg) {
+            artifacts.extend(final_library_filenames(msg));
+        }
+    }
+    artifacts
+}
+
+/// Whether `msg` is a compiler-artifact for a `cdylib` or `dylib` target, as
+/// opposed to a plain `lib` or a proc-macro (whose shared object is uplifted
+/// too when it is a requested target, but is not a scannable application).
+fn is_dynamic_library_target(msg: &serde_json::Value) -> bool {
+    msg.get("target")
+        .and_then(|target| target.get("crate_types"))
+        .and_then(|types| types.as_array())
+        .is_some_and(|types| {
+            types
+                .iter()
+                .any(|ty| matches!(ty.as_str(), Some("cdylib" | "dylib")))
+        })
+}
+
+/// The final linked library outputs listed in a compiler-artifact's
+/// `filenames`.
+fn final_library_filenames(msg: &serde_json::Value) -> impl Iterator<Item = PathBuf> + '_ {
+    msg.get("filenames")
+        .and_then(|filenames| filenames.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|filename| filename.as_str())
+        .filter(|filename| is_final_library(filename))
+        .map(PathBuf::from)
+}
+
+/// Whether `path` names a final dynamic-library output: a linked library by
+/// extension (as opposed to an rlib, import library, or dep-info companion in
+/// the same `filenames` list) that cargo uplifted out of the `deps/`
+/// directory, which it only does for the build's requested targets.
+fn is_final_library(path: &str) -> bool {
+    let path = Path::new(path);
+    matches!(
+        path.extension().and_then(|ext| ext.to_str()),
+        Some("wasm" | "so" | "dylib" | "dll")
+    ) && path
+        .parent()
+        .and_then(Path::file_name)
+        .is_none_or(|dir| dir != "deps")
 }
 
 pub async fn build_and_read(
@@ -338,4 +399,102 @@ fn scan_last_progress(bytes: &[u8]) -> Option<(u64, u64)> {
         }
     }
     last
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn artifact(crate_types: &[&str], filenames: &[&str]) -> serde_json::Value {
+        json!({
+            "reason": "compiler-artifact",
+            "target": { "crate_types": crate_types },
+            "executable": null,
+            "filenames": filenames,
+        })
+    }
+
+    #[test]
+    fn executables_are_kept_and_noise_ignored() {
+        let messages = vec![
+            json!({ "reason": "build-script-executed" }),
+            json!({
+                "reason": "compiler-artifact",
+                "target": { "crate_types": ["bin"] },
+                "executable": "/target/debug/app",
+                "filenames": ["/target/debug/app"],
+            }),
+        ];
+        assert_eq!(
+            select_artifacts(&messages),
+            vec![PathBuf::from("/target/debug/app")]
+        );
+    }
+
+    #[test]
+    fn cdylib_output_is_picked_over_its_rlib_companion() {
+        let messages = vec![artifact(
+            &["cdylib", "rlib"],
+            &["/target/wasm/app.wasm", "/target/wasm/libapp.rlib"],
+        )];
+        assert_eq!(
+            select_artifacts(&messages),
+            vec![PathBuf::from("/target/wasm/app.wasm")]
+        );
+    }
+
+    #[test]
+    fn dependency_cdylib_outputs_are_excluded() {
+        // A dependency that declares `cdylib` produces a scannable output
+        // too, but cargo leaves it in `deps/`; only the uplifted output of
+        // the crate being built belongs in the bundle.
+        let messages = vec![
+            artifact(&["cdylib", "rlib"], &["/target/deps/libdep.dylib"]),
+            artifact(&["cdylib"], &["/target/libapp.dylib"]),
+        ];
+        assert_eq!(
+            select_artifacts(&messages),
+            vec![PathBuf::from("/target/libapp.dylib")]
+        );
+    }
+
+    #[test]
+    fn multiple_final_library_outputs_are_all_kept() {
+        let messages = vec![
+            artifact(&["cdylib"], &["/target/liba.dylib"]),
+            artifact(&["cdylib"], &["/target/libb.dylib"]),
+        ];
+        // Building several packages with library outputs at once uplifts each
+        // of them, so `build` reports the ambiguity and asks the user to pass
+        // `--package`.
+        assert_eq!(select_artifacts(&messages).len(), 2);
+    }
+
+    #[test]
+    fn proc_macro_libraries_are_not_scanned() {
+        // A workspace build uplifts the proc-macro members' shared objects
+        // right next to the application's output.
+        let messages = vec![artifact(&["proc-macro"], &["/target/libmacros.dylib"])];
+        assert!(select_artifacts(&messages).is_empty());
+    }
+
+    #[test]
+    fn plain_library_dependencies_are_not_scanned() {
+        let messages = vec![artifact(&["lib"], &["/target/deps/libdep.rlib"])];
+        assert!(select_artifacts(&messages).is_empty());
+    }
+
+    #[test]
+    fn recognizes_final_libraries() {
+        assert!(is_final_library("/t/wasm32-unknown-unknown/debug/app.wasm"));
+        assert!(is_final_library("/t/debug/libapp.so"));
+        assert!(is_final_library("/t/debug/libapp.dylib"));
+        assert!(is_final_library("/t/debug/app.dll"));
+        assert!(!is_final_library("/t/debug/deps/app.wasm"));
+        assert!(!is_final_library("/t/debug/deps/libapp.dylib"));
+        assert!(!is_final_library("/t/debug/libapp.rlib"));
+        assert!(!is_final_library("/t/debug/app.dll.lib"));
+        assert!(!is_final_library("/t/debug/app.d"));
+    }
 }
