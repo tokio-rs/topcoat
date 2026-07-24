@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use topcoat_core::context::{Cx, app_context};
-
 use crate::{Asset, AssetBundle, Manifest};
 
 /// A single entry inside an [`AssetCatalog`].
@@ -30,9 +28,8 @@ impl BundledAsset {
 /// types.
 ///
 /// This is the part of an asset bundle needed to resolve asset URLs, without
-/// the bundled files themselves. The router's `assets` extension method
-/// registers it with the app context, backing [`bundled_asset`] and the
-/// rendering of [`Asset`] values in views.
+/// the bundled files themselves. An [`AssetConfig`](crate::AssetConfig)
+/// carries the catalog its asset URLs resolve through.
 ///
 /// An [`AssetBundle`](crate::AssetBundle) carries the catalog of the bundle
 /// directory it loaded, and a [`Manifest`] converts into the catalog it
@@ -81,30 +78,5 @@ impl From<Manifest> for AssetCatalog {
                 })
                 .collect(),
         }
-    }
-}
-
-/// Returns the [`AssetCatalog`] registered as app context for this context.
-///
-/// # Panics
-///
-/// Panics if no [`AssetCatalog`] was registered.
-#[must_use]
-pub fn asset_catalog(cx: &Cx) -> &AssetCatalog {
-    app_context(cx)
-}
-
-/// Resolves an [`Asset`] ID to its [`BundledAsset`] in the context's
-/// [`AssetCatalog`].
-///
-/// # Panics
-///
-/// Panics if no [`AssetCatalog`] was registered, or if the catalog does not
-/// contain the given asset.
-#[must_use]
-pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
-    match asset_catalog(cx).get(asset) {
-        Some(asset) => asset,
-        None => panic!("failed to resolve asset {asset:?} in app context's asset catalog"),
     }
 }

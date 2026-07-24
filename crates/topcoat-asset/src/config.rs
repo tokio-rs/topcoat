@@ -2,14 +2,20 @@
 // cannot resolve; they degrade to plain text instead of failing the build.
 #![cfg_attr(not(feature = "serve"), allow(rustdoc::broken_intra_doc_links))]
 
+use std::fmt;
 #[cfg(feature = "serve")]
 use std::path::PathBuf;
 
+use topcoat_core::context::{Cx, app_context};
+
 #[cfg(feature = "serve")]
 use crate::AssetBundle;
-use crate::AssetCatalog;
+#[cfg(feature = "serve")]
+use crate::serve::ASSET_ROUTE_PREFIX;
+use crate::{Asset, AssetCatalog, BundledAsset};
 
 /// Where the bundled assets are hosted.
+#[derive(Debug, Clone)]
 pub(crate) enum Host {
     /// Served by the application itself under the internal asset route
     /// prefix, reading files from this bundle directory.
@@ -28,6 +34,13 @@ pub(crate) enum Host {
 /// instead. An [`AssetBundle`](crate::AssetBundle) also converts directly
 /// into its serving configuration, so the common case registers as
 /// `.assets(bundle)`.
+///
+/// Registering places the configuration in the app context, where
+/// [`asset_config`] reads it back: [`get`](Self::get) looks up an asset's
+/// bundled file, and [`resolve`](Self::resolve) forms the URL it is hosted
+/// at. [`Asset`] values rendered in a view resolve their URL through the same
+/// configuration.
+#[derive(Debug, Clone)]
 pub struct AssetConfig {
     pub(crate) catalog: AssetCatalog,
     pub(crate) host: Host,
@@ -82,6 +95,64 @@ impl AssetConfig {
             host: Host::External { base_url },
         }
     }
+
+    /// The catalog mapping [`Asset`] IDs to their bundled files.
+    #[must_use]
+    pub fn catalog(&self) -> &AssetCatalog {
+        &self.catalog
+    }
+
+    /// Look up the bundled file for an [`Asset`] ID in the catalog.
+    #[must_use]
+    pub fn get(&self, id: Asset) -> Option<&BundledAsset> {
+        self.catalog.get(id)
+    }
+
+    /// The base URL asset URLs are formed against: the internal asset route
+    /// prefix for a serving configuration, or the base URL passed to
+    /// [`hosted_at`](Self::hosted_at). Never ends with a `/`.
+    #[must_use]
+    pub fn base_url(&self) -> &str {
+        match &self.host {
+            #[cfg(feature = "serve")]
+            Host::Serve { .. } => ASSET_ROUTE_PREFIX,
+            Host::External { base_url } => base_url,
+        }
+    }
+
+    /// Writes the URL `asset` is hosted at, `{base_url}/{bundled-filename}`,
+    /// into `write`.
+    ///
+    /// This is how [`Asset`] values render in views; [`resolve`](Self::resolve)
+    /// returns the same URL as a `String`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates errors from writing to `write`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the catalog does not contain `asset`.
+    pub fn fmt_url(&self, asset: Asset, write: &mut dyn fmt::Write) -> fmt::Result {
+        let Some(bundled) = self.get(asset) else {
+            panic!("failed to resolve asset {asset:?} in the asset catalog");
+        };
+        write.write_str(self.base_url())?;
+        write.write_str("/")?;
+        write.write_str(bundled.name())
+    }
+
+    /// Returns the URL `asset` is hosted at, `{base_url}/{bundled-filename}`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the catalog does not contain `asset`.
+    #[must_use]
+    pub fn resolve(&self, asset: Asset) -> String {
+        let mut url = String::new();
+        let _ = self.fmt_url(asset, &mut url);
+        url
+    }
 }
 
 /// Converts a bundle into the configuration serving it from the application.
@@ -92,19 +163,65 @@ impl From<AssetBundle> for AssetConfig {
     }
 }
 
+/// Returns the [`AssetConfig`] registered as app context for this context.
+///
+/// # Panics
+///
+/// Panics if no [`AssetConfig`] was registered.
+#[must_use]
+pub fn asset_config(cx: &Cx) -> &AssetConfig {
+    app_context(cx)
+}
+
+/// Resolves an [`Asset`] ID to its [`BundledAsset`] in the context's
+/// registered [`AssetConfig`].
+///
+/// # Panics
+///
+/// Panics if no [`AssetConfig`] was registered, or if its catalog does not
+/// contain the given asset.
+#[must_use]
+pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
+    match asset_config(cx).get(asset) {
+        Some(asset) => asset,
+        None => panic!("failed to resolve asset {asset:?} in app context's asset config"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Manifest;
 
     #[test]
     fn hosted_at_trims_trailing_slashes() {
         let config =
             AssetConfig::hosted_at(AssetCatalog::default(), "https://cdn.example.com/assets///");
 
-        match config.host {
-            Host::External { base_url } => assert_eq!(base_url, "https://cdn.example.com/assets"),
-            #[cfg(feature = "serve")]
-            Host::Serve { .. } => panic!("expected an external host"),
-        }
+        assert_eq!(config.base_url(), "https://cdn.example.com/assets");
+    }
+
+    #[test]
+    fn resolves_urls_against_the_base_url() {
+        let manifest = Manifest::parse(
+            r#"
+version = 1
+
+[[assets]]
+id = 42
+file = "logo-1a2b3c4d5e6f7a8b.png"
+hash = "0"
+content_type = "image/png"
+"#,
+        )
+        .unwrap();
+        let asset = manifest.assets[0].id;
+
+        let config = AssetConfig::hosted_at(manifest, "https://cdn.example.com/assets");
+
+        assert_eq!(
+            config.resolve(asset),
+            "https://cdn.example.com/assets/logo-1a2b3c4d5e6f7a8b.png"
+        );
     }
 }

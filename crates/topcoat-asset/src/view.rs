@@ -1,12 +1,11 @@
-use topcoat_core::context::{Cx, app_context};
+use topcoat_core::context::Cx;
 use topcoat_view::{AttributeValueViewParts, DynViewPart, HtmlWriter, PartsWriter};
 
-use crate::{Asset, AssetRouteResolver, bundled_asset};
+use crate::{Asset, asset_config};
 
 impl DynViewPart for Asset {
     fn render(&self, cx: &Cx, w: &mut HtmlWriter<'_, '_>) {
-        let bundled_asset = bundled_asset(cx, *self);
-        let _ = app_context::<AssetRouteResolver>(cx).resolve(bundled_asset, w);
+        let _ = asset_config(cx).fmt_url(*self, w);
     }
 
     #[inline]

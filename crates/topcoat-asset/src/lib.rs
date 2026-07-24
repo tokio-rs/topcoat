@@ -5,12 +5,10 @@ mod bundle;
 #[cfg(feature = "bundler")]
 mod bundler;
 mod catalog;
-#[cfg(feature = "router")]
 mod config;
 mod error;
 mod manifest;
 mod options;
-mod resolver;
 #[cfg(feature = "router")]
 mod router;
 #[cfg(feature = "serve")]
@@ -24,12 +22,10 @@ pub use bundle::*;
 #[cfg(feature = "bundler")]
 pub use bundler::*;
 pub use catalog::*;
-#[cfg(feature = "router")]
 pub use config::*;
 pub use error::*;
 pub use manifest::*;
 pub use options::*;
-pub use resolver::*;
 #[cfg(feature = "router")]
 pub use router::*;
 #[cfg(feature = "serve")]

@@ -6,10 +6,7 @@ use topcoat_router::RouterBuilder;
 
 #[cfg(feature = "serve")]
 use crate::AssetRoute;
-use crate::config::Host;
-#[cfg(feature = "serve")]
-use crate::serve::ASSET_ROUTE_PREFIX;
-use crate::{AssetConfig, AssetRouteResolver};
+use crate::{AssetConfig, config::Host};
 
 /// Registers assets on a [`RouterBuilder`].
 ///
@@ -18,12 +15,11 @@ use crate::{AssetConfig, AssetRouteResolver};
 pub trait RouterBuilderAssetExt {
     /// Registers an [`AssetConfig`] on the router.
     ///
-    /// The configuration's [`AssetCatalog`](crate::AssetCatalog) is registered
-    /// with the app context, allowing access through
-    /// [`asset_catalog`](crate::asset_catalog) and
-    /// [`bundled_asset`](crate::bundled_asset), and [`Asset`](crate::Asset)
-    /// handles used as attribute values in the `view!` macro get rendered as
-    /// the URL the asset is hosted at.
+    /// The configuration is registered with the app context, where
+    /// [`asset_config`](crate::asset_config) and
+    /// [`bundled_asset`](crate::bundled_asset) read it back, and
+    /// [`Asset`](crate::Asset) handles used as attribute values in the `view!`
+    /// macro get rendered as the URL the asset is hosted at.
     ///
     /// A serving configuration ([`AssetConfig::serve`](crate::AssetConfig::serve))
     /// also adds an HTTP route for each bundled asset, served by the
@@ -71,29 +67,21 @@ pub trait RouterBuilderAssetExt {
 }
 
 impl RouterBuilderAssetExt for RouterBuilder {
-    fn assets(mut self, config: impl Into<AssetConfig>) -> Self {
-        let AssetConfig { catalog, host } = config.into();
+    fn assets(self, config: impl Into<AssetConfig>) -> Self {
+        let config = config.into();
 
-        let base_url = match host {
+        let builder = match &config.host {
             #[cfg(feature = "serve")]
             Host::Serve { dir } => {
-                for asset in catalog.assets() {
-                    self = self.route(AssetRoute::new(&dir, asset));
+                let mut builder = self;
+                for asset in config.catalog.assets() {
+                    builder = builder.route(AssetRoute::new(dir, asset));
                 }
-                ASSET_ROUTE_PREFIX.to_owned()
+                builder
             }
-            Host::External { base_url } => base_url,
+            Host::External { .. } => self,
         };
 
-        self = self.app_context(catalog);
-        self = self.app_context(AssetRouteResolver::new(Box::new(
-            move |bundled_asset, write| {
-                write.write_str(&base_url)?;
-                write.write_str("/")?;
-                write.write_str(bundled_asset.name())
-            },
-        )));
-
-        self
+        builder.app_context(config)
     }
 }
