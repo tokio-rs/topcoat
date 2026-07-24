@@ -4,6 +4,7 @@ mod asset;
 mod bundle;
 #[cfg(feature = "bundler")]
 mod bundler;
+mod catalog;
 #[cfg(feature = "router")]
 mod config;
 mod error;
@@ -22,6 +23,7 @@ pub use asset::*;
 pub use bundle::*;
 #[cfg(feature = "bundler")]
 pub use bundler::*;
+pub use catalog::*;
 #[cfg(feature = "router")]
 pub use config::*;
 pub use error::*;

@@ -32,15 +32,15 @@ pub struct AssetRoute {
 }
 
 impl AssetRoute {
-    /// Builds the route that serves `asset`.
+    /// Builds the route that serves `asset` out of the bundle directory `dir`.
     ///
     /// # Panics
     ///
-    /// Panics if the asset's filename is not valid UTF-8, or if its
-    /// `Content-Type` cannot be converted into a [`HeaderValue`].
+    /// Panics if the asset's `Content-Type` cannot be converted into a
+    /// [`HeaderValue`].
     #[must_use]
-    pub fn new(asset: &BundledAsset) -> Self {
-        let name = asset.name().to_str().expect("asset had non-UTF8 name");
+    pub fn new(dir: &std::path::Path, asset: &BundledAsset) -> Self {
+        let name = asset.name();
         let content_type = HeaderValue::from_str(asset.content_type()).unwrap_or_else(|_| {
             panic!(
                 "asset `{}` has Content-Type \"{}\" that cannot be converted into a header value",
@@ -50,7 +50,7 @@ impl AssetRoute {
         });
         Self {
             path: Path::new(&format!("{ASSET_ROUTE_PREFIX}/{name}")).to_owned(),
-            file: asset.path().to_path_buf(),
+            file: dir.join(name),
             content_type,
         }
     }

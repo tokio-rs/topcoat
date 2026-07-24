@@ -71,29 +71,27 @@ If a page renders an [`Asset`] that is not present in the loaded bundle, renderi
 
 # Hosting assets externally
 
-The application does not have to serve the bundled files itself. Register an [`AssetConfig`] with a base URL ([`AssetConfigBuilder::hosted_at`]) and no asset routes are added; an [`Asset`] in a view then renders as `{base_url}/{bundled-filename}`. Making the files available there, whether on a CDN, an object store, or the reverse proxy in front of the application, becomes part of your deploy:
+The application does not have to serve the bundled files itself. Register an [`AssetConfig`] built with [`AssetConfig::hosted_at`] and no asset routes are added; an [`Asset`] in a view then renders as `{base_url}/{bundled-filename}`. Making the files available there, whether on a CDN, an object store, or the reverse proxy in front of the application, becomes part of your deploy:
 
 ```rust,no_run
-# use topcoat::{asset::{AssetConfig, RouterBuilderAssetExt}, router::{Router, RouterBuilderDiscoverExt}};
+# use topcoat::{asset::{AssetBundle, AssetConfig, RouterBuilderAssetExt}, router::{Router, RouterBuilderDiscoverExt}};
 let router = Router::builder()
     .discover()
-    .assets(AssetConfig::builder().hosted_at("https://cdn.example.com/assets").build())
+    .assets(AssetConfig::hosted_at(
+        AssetBundle::load().unwrap(),
+        "https://cdn.example.com/assets",
+    ))
     .build();
 ```
 
 For example, `topcoat asset bundle --out dist/assets` writes the bundle to `dist/assets`; sync that directory to the CDN when deploying, and an asset renders as `https://cdn.example.com/assets/ferris-1a2b3c4d5e6f7a8b.png`. Bundled filenames carry a content hash, so the files can be served with long-lived, immutable caching.
 
-On targets without filesystem access, such as WebAssembly, embed the manifest into the binary with [`AssetBundle::from_manifest_str`] and pair the explicit bundle with an external host:
+External hosting needs only the mapping from asset IDs to bundled filenames (the bundle's [`AssetCatalog`]), not the files themselves. On targets without filesystem access, such as WebAssembly, there is no bundle to load; embed the manifest into the binary and pass it directly:
 
 ```rust,ignore
-let bundle = AssetBundle::from_manifest_str(include_str!("../dist/assets/manifest.toml"))?;
+let manifest = Manifest::parse(include_str!("../dist/assets/manifest.toml"))?;
 let router = Router::builder()
-    .assets(
-        AssetConfig::builder()
-            .bundle(bundle)
-            .hosted_at("https://static.example.com/assets")
-            .build(),
-    )
+    .assets(AssetConfig::hosted_at(manifest, "https://static.example.com/assets"))
     .build();
 ```
 
@@ -200,9 +198,9 @@ const LOGO: Asset = asset!("assets/logo.png");
 fn main() -> std::io::Result<()> {
     let bundle = AssetBundle::load_dir("target/assets")?;
     let logo = bundle.get(LOGO).expect("logo was bundled");
-    let path = logo.path();
+    let path = bundle.dir().join(logo.name());
     Ok(())
 }
 ```
 
-This returns the path to the bundled file, not the original source path.
+This is the path to the bundled file, not the original source path.

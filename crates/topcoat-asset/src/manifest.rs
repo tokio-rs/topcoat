@@ -26,26 +26,26 @@ impl Manifest {
     /// propagates any I/O error from reading `path`.
     pub fn load(path: impl AsRef<Path>) -> io::Result<Self> {
         Self::parse(&fs::read_to_string(path)?)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
     /// Parse a manifest from its TOML source, rejecting unsupported versions.
     ///
+    /// Useful on targets without filesystem access, such as WebAssembly,
+    /// where the manifest of a bundle built ahead of time is embedded into
+    /// the binary with `include_str!`.
+    ///
     /// # Errors
     ///
-    /// Returns [`io::ErrorKind::InvalidData`] if the source is not valid TOML
-    /// or if its `version` field does not equal [`MANIFEST_VERSION`].
-    pub fn parse(toml_str: &str) -> io::Result<Self> {
-        let manifest: Manifest =
-            toml::from_str(toml_str).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    /// Returns an error if the source is not valid TOML or if its `version`
+    /// field does not equal [`MANIFEST_VERSION`].
+    pub fn parse(toml_str: &str) -> Result<Self, ParseManifestError> {
+        let manifest: Manifest = toml::from_str(toml_str)?;
 
         if manifest.version != MANIFEST_VERSION {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "unsupported manifest version {} (expected {})",
-                    manifest.version, MANIFEST_VERSION
-                ),
-            ));
+            return Err(ParseManifestError::UnsupportedVersion {
+                found: manifest.version,
+            });
         }
 
         Ok(manifest)
@@ -71,4 +71,15 @@ pub struct ManifestEntry {
     pub file: String,
     pub hash: String,
     pub content_type: String,
+}
+
+/// Errors from parsing a [`Manifest`] out of its TOML source.
+#[derive(Debug, thiserror::Error)]
+pub enum ParseManifestError {
+    /// The source is not valid manifest TOML.
+    #[error("invalid manifest TOML: {0}")]
+    Toml(#[from] toml::de::Error),
+    /// The manifest reports a format version this build does not support.
+    #[error("unsupported manifest version {found} (expected {})", MANIFEST_VERSION)]
+    UnsupportedVersion { found: u32 },
 }

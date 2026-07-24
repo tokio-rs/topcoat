@@ -1,70 +1,23 @@
 use std::{
-    collections::HashMap,
     ffi::OsStr,
     io,
     path::{Path, PathBuf},
 };
 
-use topcoat_core::context::{Cx, app_context};
+use crate::{Asset, AssetCatalog, BundledAsset, MANIFEST_NAME, Manifest};
 
-use crate::{Asset, MANIFEST_NAME, Manifest};
-
-/// A single entry inside an [`AssetBundle`].
-#[derive(Debug, Clone)]
-pub struct BundledAsset {
-    path: PathBuf,
-    content_type: String,
-}
-
-impl BundledAsset {
-    /// Path to the bundled file on disk; just the bundled filename for a
-    /// bundle built from an embedded manifest (see
-    /// [`AssetBundle::from_manifest_str`](crate::AssetBundle::from_manifest_str)).
-    #[must_use]
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    /// Bundled filename (typically `stem-<short-hash>.ext`).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the bundled file path has no final component (e.g. it
-    /// resolves to `/`), which should never happen for a bundle built by
-    /// the [`Bundler`](crate::Bundler).
-    #[must_use]
-    pub fn name(&self) -> &OsStr {
-        self.path
-            .file_name()
-            .expect("asset file path must have a name")
-    }
-
-    /// `Content-Type` the asset is served with, resolved when the bundle was
-    /// built.
-    #[must_use]
-    pub fn content_type(&self) -> &str {
-        &self.content_type
-    }
-}
-
-/// A loaded asset bundle: a directory of files plus the mapping from
-/// [`Asset`] IDs to those files.
+/// An asset bundle on disk: a directory of bundled files plus the
+/// [`AssetCatalog`] mapping [`Asset`] IDs to them.
 ///
 /// Built by the [`Bundler`](crate::Bundler) and loaded at runtime via
 /// [`AssetBundle::load`] or [`AssetBundle::load_dir`].
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct AssetBundle {
-    dir: PathBuf,
-    bundled_assets: HashMap<Asset, BundledAsset>,
+    pub(crate) dir: PathBuf,
+    pub(crate) catalog: AssetCatalog,
 }
 
 impl AssetBundle {
-    /// Bundle with no assets and no directory; useful as a placeholder.
-    #[must_use]
-    pub fn empty() -> Self {
-        AssetBundle::default()
-    }
-
     /// Auto-detect and load the bundle from a conventional location.
     ///
     /// Walks up from the current executable, checking each ancestor for an
@@ -150,100 +103,30 @@ impl AssetBundle {
     pub fn load_dir(dir: impl AsRef<Path>) -> io::Result<Self> {
         let dir = dir.as_ref().to_path_buf();
         let manifest = Manifest::load(dir.join(MANIFEST_NAME))?;
-        Ok(Self::from_manifest(manifest, dir))
-    }
-
-    /// Build a bundle from the TOML source of its manifest, without touching
-    /// the filesystem.
-    ///
-    /// Useful on targets without filesystem access, such as WebAssembly,
-    /// where the manifest of a bundle built ahead of time is embedded into
-    /// the binary with `include_str!`. The bundle resolves asset IDs and
-    /// bundled filenames as usual, but its files have no on-disk location, so
-    /// it supports URL resolution (e.g. an asset configuration hosted
-    /// externally) and not file serving.
-    ///
-    /// ```
-    /// use topcoat::asset::AssetBundle;
-    ///
-    /// let bundle = AssetBundle::from_manifest_str("version = 1\nassets = []").unwrap();
-    /// assert_eq!(bundle.assets().count(), 0);
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the manifest source cannot be parsed or reports an
-    /// unsupported version.
-    pub fn from_manifest_str(manifest: &str) -> io::Result<Self> {
-        Ok(Self::from_manifest(
-            Manifest::parse(manifest)?,
-            PathBuf::new(),
-        ))
-    }
-
-    /// Build a bundle from a parsed manifest, resolving its file names
-    /// against `dir`.
-    fn from_manifest(manifest: Manifest, dir: PathBuf) -> Self {
-        let bundled_assets = manifest
-            .assets
-            .into_iter()
-            .map(|entry| {
-                (
-                    entry.id,
-                    BundledAsset {
-                        path: dir.join(entry.file),
-                        content_type: entry.content_type,
-                    },
-                )
-            })
-            .collect();
-
-        Self {
+        Ok(Self {
             dir,
-            bundled_assets,
-        }
+            catalog: manifest.into(),
+        })
     }
 
-    /// Directory the bundle was loaded from; empty for a bundle built from
-    /// an embedded manifest (see [`AssetBundle::from_manifest_str`]).
+    /// Directory the bundle was loaded from.
     #[must_use]
     pub fn dir(&self) -> &Path {
         &self.dir
     }
 
+    /// The catalog mapping [`Asset`] IDs to the files in the bundle directory.
+    #[must_use]
+    pub fn catalog(&self) -> &AssetCatalog {
+        &self.catalog
+    }
+
     /// Look up the bundled file for an [`Asset`] ID.
+    ///
+    /// The returned entry names the file; its on-disk location is that name
+    /// under [`dir`](AssetBundle::dir).
     #[must_use]
     pub fn get(&self, id: Asset) -> Option<&BundledAsset> {
-        self.bundled_assets.get(&id)
-    }
-
-    /// Iterate over every bundled asset in arbitrary order.
-    pub fn assets(&self) -> impl Iterator<Item = &BundledAsset> {
-        self.bundled_assets.values()
-    }
-}
-
-/// Returns the [`AssetBundle`] registered as app context for this context.
-///
-/// # Panics
-///
-/// Panics if no [`AssetBundle`] was registered.
-#[must_use]
-pub fn asset_bundle(cx: &Cx) -> &AssetBundle {
-    app_context(cx)
-}
-
-/// Resolves an [`Asset`] ID to its [`BundledAsset`] in the context's
-/// [`AssetBundle`].
-///
-/// # Panics
-///
-/// Panics if no [`AssetBundle`] was registered, or if the bundle does
-/// not contain the given asset.
-#[must_use]
-pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
-    match asset_bundle(cx).get(asset) {
-        Some(asset) => asset,
-        None => panic!("failed to resolve asset {asset:?} in app context's asset bundle"),
+        self.catalog.get(id)
     }
 }
