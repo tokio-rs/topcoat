@@ -60,10 +60,10 @@ impl AssetConfig {
     /// ignored. Bundled filenames are content-hashed, so the files can be
     /// served with long-lived, immutable caching.
     ///
-    /// `assets` is anything that carries an [`AssetCatalog`]: a loaded
-    /// [`AssetBundle`](crate::AssetBundle), or -- on targets without
-    /// filesystem access, such as WebAssembly -- a
-    /// [`Manifest`](crate::Manifest) embedded into the binary:
+    /// `assets` is anything that converts into an [`AssetCatalog`]: a loaded
+    /// [`AssetBundle`](crate::AssetBundle), or a [`Manifest`](crate::Manifest)
+    /// embedded into the binary on targets without filesystem access, such as
+    /// WebAssembly:
     ///
     /// ```
     /// use topcoat::asset::{AssetConfig, Manifest};

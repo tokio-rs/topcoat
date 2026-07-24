@@ -65,13 +65,13 @@ pub fn router() -> Router {
 
 Use [`AssetBundle::load_dir`] when you write the bundle to a custom location.
 
-[`RouterBuilderAssetExt::assets`] serves every bundled file from the application under `/_topcoat/assets`, and an [`Asset`] rendered in a view becomes the URL of its bundled file, as shown above.
+[`RouterBuilderAssetExt::assets`] serves every bundled file under `/_topcoat/assets` and makes an [`Asset`] in a view render as the URL of its bundled file, as shown above.
 
 If a page renders an [`Asset`] that is not present in the loaded bundle, rendering panics. Treat that as a build/deploy mismatch: the binary and asset bundle must come from the same build.
 
 # Hosting assets externally
 
-The application does not have to serve the bundled files itself. Register an [`AssetConfig`] built with [`AssetConfig::hosted_at`] and no asset routes are added; an [`Asset`] in a view then renders as `{base_url}/{bundled-filename}`. Making the files available there, whether on a CDN, an object store, or the reverse proxy in front of the application, becomes part of your deploy:
+The application does not have to serve the bundled files itself. Register an [`AssetConfig`] built with [`AssetConfig::hosted_at`] instead: no asset routes are added, and an [`Asset`] in a view renders as `{base_url}/{bundled-filename}`. It is then up to your deploy to put the files there, for example on a CDN, in an object store, or on the reverse proxy in front of the application:
 
 ```rust,no_run
 # use topcoat::{asset::{AssetBundle, AssetConfig, RouterBuilderAssetExt}, router::{Router, RouterBuilderDiscoverExt}};
@@ -84,9 +84,9 @@ let router = Router::builder()
     .build();
 ```
 
-For example, `topcoat asset bundle --out dist/assets` writes the bundle to `dist/assets`; sync that directory to the CDN when deploying, and an asset renders as `https://cdn.example.com/assets/ferris-1a2b3c4d5e6f7a8b.png`. Bundled filenames carry a content hash, so the files can be served with long-lived, immutable caching.
+For example, `topcoat asset bundle --out dist/assets` writes the bundle to `dist/assets`. Upload that directory to the CDN when deploying, and an asset renders as `https://cdn.example.com/assets/ferris-1a2b3c4d5e6f7a8b.png`. Bundled filenames contain a content hash, so the files can be served with long-lived, immutable caching.
 
-External hosting needs only the mapping from asset IDs to bundled filenames (the bundle's [`AssetCatalog`]), not the files themselves. On targets without filesystem access, such as WebAssembly, there is no bundle to load; embed the manifest into the binary and pass it directly:
+External hosting only needs the mapping from asset IDs to bundled filenames (the bundle's [`AssetCatalog`]), not the files themselves. That mapping lives in the bundle's `manifest.toml`. On targets without filesystem access, such as WebAssembly, there is no bundle to load at runtime; embed the manifest into the binary and pass it in place of the bundle:
 
 ```rust,ignore
 let manifest = Manifest::parse(include_str!("../dist/assets/manifest.toml"))?;
