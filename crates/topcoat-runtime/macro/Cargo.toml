@@ -28,7 +28,7 @@ syn = { workspace = true, features = ["full"] }
 futures-core.workspace = true
 futures-util.workspace = true
 tokio = { workspace = true, features = ["sync"] }
-topcoat = { workspace = true, features = ["runtime", "view", "websocket"] }
+topcoat = { workspace = true, features = ["runtime", "view"] }
 
 [lints]
 workspace = true

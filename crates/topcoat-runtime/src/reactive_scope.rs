@@ -27,7 +27,6 @@ impl Default for ReactiveScopeId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReactiveScopeTransport {
     Http,
-    #[cfg(feature = "websocket")]
     WebSocket,
 }
 
@@ -35,7 +34,6 @@ impl ReactiveScopeTransport {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Http => "http",
-            #[cfg(feature = "websocket")]
             Self::WebSocket => "ws",
         }
     }
@@ -62,7 +60,6 @@ impl ReactiveScope {
         }
     }
 
-    #[cfg(feature = "websocket")]
     #[inline]
     #[must_use]
     pub fn new_websocket(shard_id: ShardId, exprs: Vec<ViewPart>, placeholder: View) -> Self {
@@ -136,7 +133,6 @@ mod tests {
         assert!(html.contains(", \"http\", []) -->placeholder"), "{html}");
     }
 
-    #[cfg(feature = "websocket")]
     #[test]
     fn websocket_scope_marker_includes_its_transport() {
         let html = render(ReactiveScope::new_websocket(

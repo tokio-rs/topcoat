@@ -14,10 +14,6 @@ rust-version.workspace = true
 discover = ["dep:inventory"]
 router = [
 	"dep:topcoat-router",
-]
-websocket = [
-	"router",
-	"topcoat-router/websocket",
 	"dep:futures-core",
 	"dep:futures-util",
 	"dep:tokio",

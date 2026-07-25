@@ -128,7 +128,7 @@ The context and the body parameter are both optional and may appear in either or
 
 # WebSockets
 
-With the `websocket` feature enabled, a route can serve WebSocket connections. The handler takes a [`WebSocketUpgrade`](websocket::WebSocketUpgrade) parameter and calls [`on_upgrade`](websocket::WebSocketUpgrade::on_upgrade) with a callback that talks to the client. See the [`websocket`](mod@websocket) module docs for more.
+A route can serve WebSocket connections. The handler takes a [`WebSocketUpgrade`](websocket::WebSocketUpgrade) parameter and calls [`on_upgrade`](websocket::WebSocketUpgrade::on_upgrade) with a callback that talks to the client. See the [`websocket`](mod@websocket) module docs for more.
 
 # Path and query parameters
 

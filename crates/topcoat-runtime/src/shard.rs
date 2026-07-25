@@ -1,12 +1,8 @@
 use std::{fmt, hash::Hash, pin::Pin};
 
-#[cfg(feature = "websocket")]
 use futures_core::Stream;
-#[cfg(feature = "websocket")]
 use futures_util::{Sink, SinkExt, StreamExt};
-#[cfg(feature = "websocket")]
 use serde::de::DeserializeOwned;
-#[cfg(feature = "websocket")]
 use tokio::sync::mpsc;
 use topcoat_core::{
     context::Cx,
@@ -15,14 +11,12 @@ use topcoat_core::{
 use topcoat_router::{
     Body, IntoResponse, Method, Methods, Path, PathBuf, Route, RouteFuture, RouterBuilder,
 };
-#[cfg(feature = "websocket")]
 use topcoat_router::{
     FromRequest,
     websocket::{CloseFrame, Message, WebSocket, WebSocketUpgrade, close_code},
 };
 use topcoat_view::View;
 
-#[cfg(feature = "websocket")]
 use crate::{Surrogate, Surrogated};
 
 pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/shards";
@@ -48,14 +42,12 @@ pub type ShardRenderFn =
         body: Body,
     ) -> Pin<Box<dyn Future<Output = Result<View, Error>> + Send + 'cx>>;
 
-#[cfg(feature = "websocket")]
 pub type WebSocketShardFn =
     for<'cx> fn(cx: &'cx Cx, socket: WebSocket) -> Pin<Box<dyn Future<Output = ()> + Send + 'cx>>;
 
 #[derive(Clone, Copy)]
 enum ErasedShardKind {
     Http(ShardRenderFn),
-    #[cfg(feature = "websocket")]
     WebSocket(WebSocketShardFn),
 }
 
@@ -63,7 +55,6 @@ impl fmt::Debug for ErasedShardKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Http(_) => f.write_str("Http"),
-            #[cfg(feature = "websocket")]
             Self::WebSocket(_) => f.write_str("WebSocket"),
         }
     }
@@ -84,7 +75,6 @@ impl ErasedShard {
         }
     }
 
-    #[cfg(feature = "websocket")]
     #[must_use]
     pub const fn new_websocket(id: ShardId, connect: WebSocketShardFn) -> Self {
         Self {
@@ -109,7 +99,6 @@ impl ErasedShard {
     pub async fn render(&self, cx: &Cx, body: Body) -> Result<View> {
         match self.kind {
             ErasedShardKind::Http(render) => render(cx, body).await,
-            #[cfg(feature = "websocket")]
             ErasedShardKind::WebSocket(_) => Err(std::io::Error::other(
                 "a WebSocket shard cannot be rendered from an HTTP body",
             )
@@ -142,7 +131,6 @@ impl Route for ShardRoute {
         match self.shard.kind {
             // Avoids URL length limits for large parameters.
             ErasedShardKind::Http(_) => Methods::Only(&[Method::POST]),
-            #[cfg(feature = "websocket")]
             ErasedShardKind::WebSocket(_) => Methods::Only(&[Method::GET]),
         }
     }
@@ -158,7 +146,6 @@ impl Route for ShardRoute {
                     let view = render(cx, body).await?;
                     view.into_response(cx)
                 }
-                #[cfg(feature = "websocket")]
                 ErasedShardKind::WebSocket(connect) => {
                     let upgrade = WebSocketUpgrade::from_request(cx, body).await?;
                     upgrade.on_upgrade_with_context(move |cx, socket| async move {
@@ -198,7 +185,6 @@ impl RouterBuilderShardExt for RouterBuilder {
 
 /// Seeds the temporary capacity-one channel used for a WebSocket shard's
 /// server-side render.
-#[cfg(feature = "websocket")]
 #[doc(hidden)]
 pub async fn __websocket_shard_seed<A>(argument: A) -> Result<mpsc::Receiver<A>> {
     let (sender, receiver) = mpsc::channel(1);
@@ -211,7 +197,6 @@ pub async fn __websocket_shard_seed<A>(argument: A) -> Result<mpsc::Receiver<A>>
 }
 
 /// Takes the first item from a WebSocket shard's server-side render stream.
-#[cfg(feature = "websocket")]
 #[doc(hidden)]
 pub async fn __websocket_shard_first<S>(stream: S) -> Result<View>
 where
@@ -225,7 +210,6 @@ where
     })?
 }
 
-#[cfg(feature = "websocket")]
 #[derive(Debug, Clone, Copy)]
 enum WebSocketTermination {
     Disconnected,
@@ -235,7 +219,6 @@ enum WebSocketTermination {
 /// Runs a persistent WebSocket shard connection. The `create_stream` future is
 /// polled concurrently with incoming arguments, so it may await its receiver
 /// before returning the output stream.
-#[cfg(feature = "websocket")]
 #[doc(hidden)]
 pub async fn __run_websocket_shard<A, F, Fut, S>(cx: &Cx, socket: WebSocket, create_stream: F)
 where
@@ -268,7 +251,6 @@ where
     finish_websocket(&mut output, termination).await;
 }
 
-#[cfg(feature = "websocket")]
 async fn receive_websocket_inputs<A, S>(
     input: &mut S,
     sender: mpsc::Sender<A>,
@@ -313,7 +295,6 @@ where
     WebSocketTermination::Disconnected
 }
 
-#[cfg(feature = "websocket")]
 async fn send_websocket_outputs<S, O>(
     cx: &Cx,
     output: &mut O,
@@ -340,7 +321,6 @@ where
     }
 }
 
-#[cfg(feature = "websocket")]
 async fn finish_websocket<O>(output: &mut O, termination: WebSocketTermination)
 where
     O: Sink<Message, Error = Error> + Unpin,

@@ -8,7 +8,7 @@ publish = false
 futures-core.workspace = true
 futures-util.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
-topcoat = { workspace = true, features = ["websocket"] }
+topcoat.workspace = true
 
 [lints]
 workspace = true

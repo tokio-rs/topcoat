@@ -45,7 +45,6 @@ full = [
 	"tower",
 	"ui",
 	"view",
-	"websocket",
 ]
 
 alpine-ajax = [
@@ -139,12 +138,6 @@ view = [
 	"topcoat-asset?/view",
 	"topcoat-font?/view",
 ]
-websocket = [
-	"serve",
-	"topcoat-router/websocket",
-	"topcoat-runtime?/websocket",
-]
-
 [dependencies]
 topcoat-alpine-ajax = { workspace = true, optional = true }
 topcoat-asset = { workspace = true, optional = true }

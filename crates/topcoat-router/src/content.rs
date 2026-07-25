@@ -4,7 +4,6 @@ mod html;
 mod json;
 #[cfg(feature = "multipart")]
 mod multipart;
-#[cfg(feature = "websocket")]
 pub mod websocket;
 
 pub use css::*;
