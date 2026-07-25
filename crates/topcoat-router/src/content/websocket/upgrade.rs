@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, header};
 use hyper::upgrade::OnUpgrade;
@@ -15,27 +15,16 @@ use crate::error::{bad_request, method_not_allowed};
 use crate::websocket::WebSocket;
 use crate::{Body, FromRequest, Response, extensions, headers, method};
 
-type ContextualUpgradeCallback = Box<dyn FnOnce(Cx) + Send + 'static>;
-
 /// A contextual WebSocket upgrade waiting for the router to finish the
 /// request and transfer ownership of its context.
 #[doc(hidden)]
 #[derive(Clone)]
-pub struct PendingContextualUpgrade(Arc<Mutex<Option<ContextualUpgradeCallback>>>);
+pub struct PendingContextualUpgrade(Arc<tokio::sync::oneshot::Sender<Cx>>);
 
 impl PendingContextualUpgrade {
-    fn new(callback: impl FnOnce(Cx) + Send + 'static) -> Self {
-        Self(Arc::new(Mutex::new(Some(Box::new(callback)))))
-    }
-
     pub(crate) fn start(self, cx: Cx) {
-        if let Some(callback) = self
-            .0
-            .lock()
-            .expect("upgrade callback lock poisoned")
-            .take()
-        {
-            callback(cx);
+        if let Some(cb) = Arc::into_inner(self.0) {
+            let _ = cb.send(cx);
         }
     }
 }
@@ -197,21 +186,25 @@ impl WebSocketUpgrade {
     {
         let protocol = negotiate_protocol(&self.protocols, self.requested_protocols.as_ref());
         let mut response = handshake_response(&self.key, protocol.as_ref())?;
-        let pending = PendingContextualUpgrade::new(move |cx| {
-            tokio::spawn(async move {
-                if let Some(socket) = upgrade_socket(
-                    self.config,
-                    self.on_upgrade,
-                    self.on_failed_upgrade,
-                    protocol,
-                )
-                .await
-                {
-                    callback(cx, socket).await;
-                }
-            });
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let Ok(cx) = rx.await else {
+                return;
+            };
+            if let Some(socket) = upgrade_socket(
+                self.config,
+                self.on_upgrade,
+                self.on_failed_upgrade,
+                protocol,
+            )
+            .await
+            {
+                callback(cx, socket).await;
+            }
         });
-        response.extensions_mut().insert(pending);
+        response
+            .extensions_mut()
+            .insert(PendingContextualUpgrade(Arc::new(tx)));
         Ok(response)
     }
 }
