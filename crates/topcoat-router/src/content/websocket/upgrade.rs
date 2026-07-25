@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::fmt;
+use std::sync::{Arc, Mutex};
 
 use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, header};
 use hyper::upgrade::OnUpgrade;
@@ -13,6 +14,31 @@ use topcoat_core::error::{Error, Result};
 use crate::error::{bad_request, method_not_allowed};
 use crate::websocket::WebSocket;
 use crate::{Body, FromRequest, Response, extensions, headers, method};
+
+type ContextualUpgradeCallback = Box<dyn FnOnce(Cx) + Send + 'static>;
+
+/// A contextual WebSocket upgrade waiting for the router to finish the
+/// request and transfer ownership of its context.
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct PendingContextualUpgrade(Arc<Mutex<Option<ContextualUpgradeCallback>>>);
+
+impl PendingContextualUpgrade {
+    fn new(callback: impl FnOnce(Cx) + Send + 'static) -> Self {
+        Self(Arc::new(Mutex::new(Some(Box::new(callback)))))
+    }
+
+    pub(crate) fn start(self, cx: Cx) {
+        if let Some(callback) = self
+            .0
+            .lock()
+            .expect("upgrade callback lock poisoned")
+            .take()
+        {
+            callback(cx);
+        }
+    }
+}
 
 /// WebSocket handshake extractor: validates the upgrade request and hands the
 /// connection to a callback.
@@ -143,40 +169,49 @@ impl WebSocketUpgrade {
         F: Future<Output = ()> + Send + 'static,
     {
         let protocol = negotiate_protocol(&self.protocols, self.requested_protocols.as_ref());
+        let response = handshake_response(&self.key, protocol.as_ref())?;
 
-        let config = self.config;
-        let on_upgrade = self.on_upgrade;
-        let on_failed_upgrade = self.on_failed_upgrade;
-        let socket_protocol = protocol.clone();
         tokio::spawn(async move {
-            let upgraded = match on_upgrade.await {
-                Ok(upgraded) => upgraded,
-                Err(error) => {
-                    on_failed_upgrade(error.into());
-                    return;
-                }
-            };
-            let stream = WebSocketStream::from_raw_socket(
-                TokioIo::new(upgraded),
-                Role::Server,
-                Some(config),
+            if let Some(socket) = upgrade_socket(
+                self.config,
+                self.on_upgrade,
+                self.on_failed_upgrade,
+                protocol,
             )
-            .await;
-            callback(WebSocket::new(stream, socket_protocol)).await;
+            .await
+            {
+                callback(socket).await;
+            }
         });
 
-        let mut response = Response::new(Body::empty());
-        *response.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
-        let headers = response.headers_mut();
-        headers.insert(header::CONNECTION, HeaderValue::from_static("upgrade"));
-        headers.insert(header::UPGRADE, HeaderValue::from_static("websocket"));
-        headers.insert(
-            header::SEC_WEBSOCKET_ACCEPT,
-            HeaderValue::try_from(derive_accept_key(self.key.as_bytes()))?,
-        );
-        if let Some(protocol) = protocol {
-            headers.insert(header::SEC_WEBSOCKET_PROTOCOL, protocol);
-        }
+        Ok(response)
+    }
+
+    /// Completes the handshake after the router transfers the finished request
+    /// context into the upgrade task.
+    #[doc(hidden)]
+    pub fn on_upgrade_with_context<C, F>(self, callback: C) -> Result<Response>
+    where
+        C: FnOnce(Cx, WebSocket) -> F + Send + 'static,
+        F: Future<Output = ()> + Send + 'static,
+    {
+        let protocol = negotiate_protocol(&self.protocols, self.requested_protocols.as_ref());
+        let mut response = handshake_response(&self.key, protocol.as_ref())?;
+        let pending = PendingContextualUpgrade::new(move |cx| {
+            tokio::spawn(async move {
+                if let Some(socket) = upgrade_socket(
+                    self.config,
+                    self.on_upgrade,
+                    self.on_failed_upgrade,
+                    protocol,
+                )
+                .await
+                {
+                    callback(cx, socket).await;
+                }
+            });
+        });
+        response.extensions_mut().insert(pending);
         Ok(response)
     }
 }
@@ -230,6 +265,40 @@ impl FromRequest for WebSocketUpgrade {
             on_failed_upgrade: Box::new(|_error| {}),
         })
     }
+}
+
+fn handshake_response(key: &HeaderValue, protocol: Option<&HeaderValue>) -> Result<Response> {
+    let mut response = Response::new(Body::empty());
+    *response.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
+    let headers = response.headers_mut();
+    headers.insert(header::CONNECTION, HeaderValue::from_static("upgrade"));
+    headers.insert(header::UPGRADE, HeaderValue::from_static("websocket"));
+    headers.insert(
+        header::SEC_WEBSOCKET_ACCEPT,
+        HeaderValue::try_from(derive_accept_key(key.as_bytes()))?,
+    );
+    if let Some(protocol) = protocol {
+        headers.insert(header::SEC_WEBSOCKET_PROTOCOL, protocol.clone());
+    }
+    Ok(response)
+}
+
+async fn upgrade_socket(
+    config: WebSocketConfig,
+    on_upgrade: OnUpgrade,
+    on_failed_upgrade: Box<dyn FnOnce(Error) + Send + 'static>,
+    protocol: Option<HeaderValue>,
+) -> Option<WebSocket> {
+    let upgraded = match on_upgrade.await {
+        Ok(upgraded) => upgraded,
+        Err(error) => {
+            on_failed_upgrade(error.into());
+            return None;
+        }
+    };
+    let stream =
+        WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, Some(config)).await;
+    Some(WebSocket::new(stream, protocol))
 }
 
 /// Selects the first of the endpoint's `supported` subprotocols that the

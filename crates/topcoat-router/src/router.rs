@@ -109,6 +109,17 @@ impl Router {
             None => response,
         };
 
+        #[cfg(feature = "websocket")]
+        let mut response = response;
+        #[cfg(feature = "websocket")]
+        if response.status() == http::StatusCode::SWITCHING_PROTOCOLS
+            && let Some(upgrade) = response
+                .extensions_mut()
+                .remove::<crate::websocket::PendingContextualUpgrade>()
+        {
+            upgrade.start(cx.build());
+        }
+
         response
     }
 }

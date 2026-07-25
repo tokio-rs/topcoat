@@ -5,8 +5,10 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
-topcoat.workspace = true
+futures-core.workspace = true
+futures-util.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
+topcoat = { workspace = true, features = ["websocket"] }
 
 [lints]
 workspace = true

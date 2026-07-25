@@ -142,6 +142,7 @@ view = [
 websocket = [
 	"serve",
 	"topcoat-router/websocket",
+	"topcoat-runtime?/websocket",
 ]
 
 [dependencies]
@@ -173,9 +174,10 @@ tokio = { workspace = true, optional = true, features = ["macros", "net", "signa
 tokio-tungstenite = { workspace = true, optional = true, features = ["connect"] }
 
 [dev-dependencies]
+futures-core.workspace = true
 serde_json.workspace = true
 uuid = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
 
 [lints]
 workspace = true

@@ -2198,6 +2198,8 @@ dependencies = [
 name = "shard"
 version = "0.4.0"
 dependencies = [
+ "futures-core",
+ "futures-util",
  "tokio",
  "topcoat",
 ]
@@ -2636,6 +2638,7 @@ checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 name = "topcoat"
 version = "0.4.0"
 dependencies = [
+ "futures-core",
  "futures-util",
  "inventory",
  "serde",
@@ -2923,10 +2926,13 @@ dependencies = [
 name = "topcoat-runtime"
 version = "0.4.0"
 dependencies = [
+ "futures-core",
+ "futures-util",
  "inventory",
  "ref-cast",
  "serde",
  "serde_json",
+ "tokio",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-router",
@@ -2952,8 +2958,11 @@ dependencies = [
 name = "topcoat-runtime-macro"
 version = "0.4.0"
 dependencies = [
+ "futures-core",
+ "futures-util",
  "quote",
  "syn",
+ "tokio",
  "topcoat",
  "topcoat-runtime-grammar",
 ]

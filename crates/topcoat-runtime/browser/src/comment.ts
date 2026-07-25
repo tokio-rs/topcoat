@@ -3,6 +3,7 @@ import { type SignalId, SignalRegistry } from "./signal";
 import type { DehydratedSurrogate } from "./surrogate";
 
 export type ReactiveScopeId = string;
+export type ReactiveScopeTransport = "http" | "ws";
 
 export type CommentMarker =
 	| { kind: "signal"; id: SignalId; value: unknown }
@@ -12,6 +13,7 @@ export type CommentMarker =
 			kind: "scope-start";
 			id: ReactiveScopeId;
 			path: string;
+			transport: ReactiveScopeTransport;
 			exprs: string[];
 	  }
 	| { kind: "scope-end"; id: ReactiveScopeId };
@@ -20,7 +22,7 @@ const SIGNAL_RE = /^\s*::topcoat::signal\(([\s\S]*)\)\s*$/;
 const EXPR_START_RE = /^\s*::topcoat::expr::start\("([^"]*)"\)\s*$/;
 const EXPR_END_RE = /^\s*::topcoat::expr::end\s*$/;
 const SCOPE_START_RE =
-	/^\s*::topcoat::scope::start\(("[^"]+"), ("[^"]*"), (\[[\s\S]*\])\)\s*$/;
+	/^\s*::topcoat::scope::start\(("[^"]+"), ("[^"]*"), ("(?:http|ws)"), (\[[\s\S]*\])\)\s*$/;
 const SCOPE_END_RE = /^\s*::topcoat::scope::end\(("[^"]+")\)\s*$/;
 const QUOTED_RE = /"([^"]*)"/g;
 
@@ -64,15 +66,16 @@ export function parseComment(node: Comment): CommentMarker | null {
 	if (start) {
 		const exprs: string[] = [];
 		QUOTED_RE.lastIndex = 0;
-		let m: RegExpExecArray | null = QUOTED_RE.exec(start[3] ?? "");
+		let m: RegExpExecArray | null = QUOTED_RE.exec(start[4] ?? "");
 		while (m !== null) {
 			exprs.push(decodeHtml(m[1] ?? ""));
-			m = QUOTED_RE.exec(start[3] ?? "");
+			m = QUOTED_RE.exec(start[4] ?? "");
 		}
 		return {
 			kind: "scope-start",
 			id: JSON.parse(start[1] ?? "") as ReactiveScopeId,
 			path: JSON.parse(start[2] ?? "") as string,
+			transport: JSON.parse(start[3] ?? "") as ReactiveScopeTransport,
 			exprs,
 		};
 	}

@@ -102,6 +102,7 @@ function processMarker(
 				current.runtime,
 				marker.id,
 				marker.path,
+				marker.transport,
 				marker.exprs,
 				node,
 			);

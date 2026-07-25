@@ -12,33 +12,34 @@ use topcoat_core_grammar::paths::{
 };
 use uuid::Uuid;
 
-use crate::shard::{ShardAttr, ShardItem};
-
 /// A parsed `#[shard] async fn ...`.
 pub struct Shard {
-    _attr: ShardAttr,
+    attr: ShardAttr,
     item: ShardItem,
 }
 
 impl Shard {
     #[must_use]
     pub fn new(attr: ShardAttr, item: ShardItem) -> Self {
-        Self { _attr: attr, item }
+        Self { attr, item }
     }
 
     /// Parses a `#[shard]` attribute and function item from token streams.
     ///
     /// # Errors
     ///
-    /// Returns an error if either token stream fails to parse as a
-    /// `ShardAttr` or `ShardItem`.
+    /// Returns an error if either token stream fails to parse or if a
+    /// WebSocket shard has an invalid signature.
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
-        Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
+        let attr: ShardAttr = syn::parse2(attr)?;
+        let item: ShardItem = syn::parse2(item)?;
+        if attr.transport() == ShardTransport::WebSocket {
+            item.websocket_signature()?;
+        }
+        Ok(Self::new(attr, item))
     }
-}
 
-impl ToTokens for Shard {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
+    fn to_http_tokens(&self, tokens: &mut TokenStream) {
         let item = self.item.item();
         let vis = &item.vis;
         let ident = &item.sig.ident;
@@ -157,11 +158,156 @@ impl ToTokens for Shard {
         }
         .to_tokens(tokens);
 
+        Self::submit_discovery(&erased_ident, tokens);
+    }
+
+    fn to_websocket_tokens(&self, tokens: &mut TokenStream) {
+        let item = self.item.item();
+        let vis = &item.vis;
+        let ident = &item.sig.ident;
+        let inputs = &item.sig.inputs;
+        let output = &item.sig.output;
+        let block = &item.block;
+        let signature = self
+            .item
+            .websocket_signature()
+            .expect("validated while parsing Shard");
+        let argument_ident = signature.argument_ident;
+        let argument_ty = signature.argument_ty;
+        let has_cx = inputs.iter().any(|input| {
+            matches!(input, syn::FnArg::Typed(pat_type) if matches!(&*pat_type.pat, syn::Pat::Ident(pat_ident) if pat_ident.ident == "cx"))
+        });
+
+        let js_ident = format_ident!("__topcoat_js_{}", argument_ident);
+        let cx_param = has_cx.then(|| quote!(cx: &#topcoat_context::Cx,));
+        let component_params = quote! {
+            #cx_param
+            #argument_ident: #topcoat_runtime::Expr<#argument_ty>,
+        };
+        let impl_context_param = (!has_cx).then(|| quote!(__cx: &#topcoat_context::Cx,));
+        let impl_context_setup = has_cx.then(|| quote!(let __cx = cx;));
+        let ssr_context_arg = if has_cx { quote!(cx,) } else { quote!(__cx,) };
+
+        let impl_ident = format_ident!("__topcoat_shard_impl_{}", ident);
+        let erased_ident = format_ident!("__TOPCOAT_SHARD_ERASED_{}", ident);
+        let id = Uuid::new_v4().to_string();
+
+        quote! {
+            #[doc(hidden)]
+            async fn #impl_ident(#impl_context_param #inputs) #output {
+                #impl_context_setup
+                #block
+            }
+
+            #[#topcoat_view_macro::component]
+            #vis async fn #ident(#component_params) -> #topcoat_error::Result<#topcoat_view::View> {
+                let (#argument_ident, #js_ident) = #argument_ident.into_evaluated_and_js();
+                let __receiver =
+                    #topcoat_runtime::__websocket_shard_seed(#argument_ident).await?;
+                let __stream = #impl_ident(#ssr_context_arg __receiver).await;
+                let __placeholder =
+                    #topcoat_runtime::__websocket_shard_first(__stream).await?;
+                let __scope = #topcoat_runtime::ReactiveScope::new_websocket(
+                    #topcoat_runtime::ShardId::new(#id),
+                    ::std::vec![#js_ident],
+                    __placeholder,
+                );
+                #topcoat_view_macro::view! { (__scope) }
+            }
+        }
+        .to_tokens(tokens);
+
+        quote! {
+            #[doc(hidden)]
+            #[allow(non_upper_case_globals)]
+            const #erased_ident: #topcoat_runtime::ErasedShard =
+                #topcoat_runtime::ErasedShard::new_websocket(
+                    #topcoat_runtime::ShardId::new(#id),
+                    |cx, socket| ::std::boxed::Box::pin(async move {
+                        #topcoat_runtime::__run_websocket_shard(
+                            cx,
+                            socket,
+                            move |__receiver| async move {
+                                #impl_ident(cx, __receiver).await
+                            },
+                        )
+                        .await;
+                    }),
+                );
+
+            impl ::core::convert::From<#ident> for #topcoat_runtime::ErasedShard {
+                fn from(_: #ident) -> Self {
+                    #erased_ident
+                }
+            }
+        }
+        .to_tokens(tokens);
+
+        Self::submit_discovery(&erased_ident, tokens);
+    }
+
+    fn submit_discovery(erased_ident: &syn::Ident, tokens: &mut TokenStream) {
         if cfg!(feature = "discover") {
             quote! {
                 #topcoat_inventory::submit! { #erased_ident }
             }
             .to_tokens(tokens);
         }
+    }
+}
+
+impl ToTokens for Shard {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self.attr.transport() {
+            ShardTransport::Http => self.to_http_tokens(tokens),
+            ShardTransport::WebSocket => self.to_websocket_tokens(tokens),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn websocket_expansion_uses_stream_contract_helpers() {
+        let shard = Shard::parse(
+            quote!(ws),
+            quote! {
+                async fn events(
+                    cx: &Cx,
+                    values: tokio::sync::mpsc::Receiver<String>,
+                ) -> impl futures_core::Stream<Item = Result> {
+                    stream(cx, values)
+                }
+            },
+        )
+        .unwrap();
+        let expanded = quote!(#shard).to_string();
+
+        assert!(expanded.contains("__websocket_shard_seed"));
+        assert!(expanded.contains("__websocket_shard_first"));
+        assert!(expanded.contains("__run_websocket_shard"));
+        assert!(expanded.contains("ErasedShard :: new_websocket"));
+        assert!(expanded.contains("Expr < String >"));
+        assert!(!expanded.contains("Expr < tokio :: sync :: mpsc :: Receiver"));
+    }
+
+    #[test]
+    fn http_expansion_remains_on_the_post_render_path() {
+        let shard = Shard::parse(
+            TokenStream::new(),
+            quote! {
+                async fn events(value: String) -> Result {
+                    render(value)
+                }
+            },
+        )
+        .unwrap();
+        let expanded = quote!(#shard).to_string();
+
+        assert!(expanded.contains("ErasedShard :: new"));
+        assert!(!expanded.contains("new_websocket"));
+        assert!(!expanded.contains("__websocket_shard"));
     }
 }

@@ -15,6 +15,13 @@ discover = ["dep:inventory"]
 router = [
 	"dep:topcoat-router",
 ]
+websocket = [
+	"router",
+	"topcoat-router/websocket",
+	"dep:futures-core",
+	"dep:futures-util",
+	"dep:tokio",
+]
 
 [dependencies]
 topcoat-asset.workspace = true
@@ -22,10 +29,13 @@ topcoat-core.workspace = true
 topcoat-router = { workspace = true, optional = true }
 topcoat-view.workspace = true
 
+futures-core = { workspace = true, optional = true }
+futures-util = { workspace = true, optional = true, features = ["sink"] }
 inventory = { workspace = true, optional = true }
 ref-cast.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio = { workspace = true, optional = true, features = ["sync"] }
 uuid = { workspace = true, features = ["v4", "serde"] }
 
 # On wasm32-unknown-unknown the runtime's random IDs need the JS host

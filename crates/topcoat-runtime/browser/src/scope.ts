@@ -6,7 +6,10 @@ import {
 	untrack,
 } from "@maverick-js/signals";
 
-import type { ReactiveScopeId } from "./comment";
+import type {
+	ReactiveScopeId,
+	ReactiveScopeTransport,
+} from "./comment";
 import type { Context } from "./context";
 import type { Runtime } from "./runtime";
 import { scan } from "./scan";
@@ -59,13 +62,14 @@ export class Scope {
 
 /**
  * A reactive scope: a region delimited by `<!-- ::topcoat::scope::start/end -->`
- * comments whose content is re-fetched from the server whenever any tracked
- * signal changes.
+ * comments whose content is replaced with shard output whenever any tracked
+ * signal changes. HTTP scopes fetch one render per update. WebSocket scopes
+ * keep one connection open and can also receive server-pushed renders.
  *
  * The watch effect lives in the reactive scope itself, persisting across
  * re-renders. The content (bindings, declared signals, nested reactive scopes)
  * lives in a child `contentScope` which is disposed and recreated on each
- * fetch.
+ * replacement.
  */
 export class ReactiveScope extends Scope {
 	contentScope: Scope;
@@ -77,6 +81,7 @@ export class ReactiveScope extends Scope {
 	 */
 	private readonly computes: Compute[];
 	private abortController: AbortController | null = null;
+	private socket: WebSocket | null = null;
 	private flushPending = false;
 
 	constructor(
@@ -84,6 +89,7 @@ export class ReactiveScope extends Scope {
 		runtime: Runtime,
 		readonly scopeId: ReactiveScopeId,
 		readonly path: string,
+		readonly transport: ReactiveScopeTransport,
 		exprs: string[],
 		readonly startNode: Comment,
 	) {
@@ -100,25 +106,65 @@ export class ReactiveScope extends Scope {
 
 	/**
 	 * Starts the watch effect. Must be called after `attachEnd`. The effect
-	 * subscribes to every tracked signal; the first run is the initial
-	 * subscription and does not fetch.
+	 * subscribes to every tracked signal; the first run is represented by the
+	 * server-rendered placeholder. A WebSocket sends those initial values once
+	 * its connection opens.
 	 */
 	startWatching(): void {
+		if (this.transport === "ws") this.openWebSocket();
+
 		const { context } = this.runtime;
 		let first = true;
 		this.run(() => {
 			effect(() => {
 				// Evaluating each parameter inside the effect subscribes to the
-				// signals it reads, so the scope re-fetches when any of them
-				// change. The first run is just the initial subscription.
+				// signals it reads. HTTP's first run is only the initial
+				// subscription; WebSocket sends it from the open callback.
 				for (const compute of this.computes) compute(context);
 				if (first) {
 					first = false;
 					return;
 				}
-				this.scheduleFetch();
+				if (this.transport === "http") {
+					this.scheduleFetch();
+				} else if (this.socket?.readyState === WebSocket.OPEN) {
+					this.scheduleWebSocketSend();
+				}
 			});
 		});
+	}
+
+	override dispose(): void {
+		if (this.isDisposed) return;
+
+		this.abortController?.abort();
+		this.abortController = null;
+
+		const socket = this.socket;
+		this.socket = null;
+		if (socket !== null) {
+			socket.onopen = null;
+			socket.onmessage = null;
+			socket.onclose = null;
+			socket.onerror = null;
+			if (
+				socket.readyState === WebSocket.CONNECTING ||
+				socket.readyState === WebSocket.OPEN
+			) {
+				socket.close(1000, "scope disposed");
+			}
+		}
+
+		super.dispose();
+	}
+
+	private dehydrateArguments(): unknown[] {
+		const { context } = this.runtime;
+		return untrack(() =>
+			this.computes.map((compute) =>
+				(compute(context) as { dehydrate: () => unknown }).dehydrate(),
+			),
+		);
 	}
 
 	private scheduleFetch(): void {
@@ -138,19 +184,12 @@ export class ReactiveScope extends Scope {
 		const ac = new AbortController();
 		this.abortController = ac;
 
-		const { context } = this.runtime;
-		const args = untrack(() =>
-			this.computes.map((compute) =>
-				(compute(context) as { dehydrate: () => unknown }).dehydrate(),
-			),
-		);
-
 		let html: string;
 		try {
 			const res = await fetch(this.path, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(args),
+				body: JSON.stringify(this.dehydrateArguments()),
 				signal: ac.signal,
 			});
 			html = await res.text();
@@ -161,6 +200,56 @@ export class ReactiveScope extends Scope {
 
 		if (this.isDisposed || this.abortController !== ac) return;
 		this.abortController = null;
+		this.replaceContent(html);
+	}
+
+	private openWebSocket(): void {
+		const url = new URL(this.path, window.location.href);
+		url.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+		const socket = new WebSocket(url);
+		this.socket = socket;
+
+		socket.onopen = () => {
+			if (this.isDisposed || this.socket !== socket) {
+				socket.close(1000, "scope disposed");
+				return;
+			}
+			this.sendWebSocketArguments(socket);
+		};
+		socket.onmessage = (event) => {
+			if (
+				this.isDisposed ||
+				this.socket !== socket ||
+				typeof event.data !== "string"
+			) {
+				return;
+			}
+			this.replaceContent(event.data);
+		};
+		socket.onclose = () => {
+			if (this.socket === socket) this.socket = null;
+		};
+	}
+
+	private scheduleWebSocketSend(): void {
+		if (this.flushPending) return;
+		this.flushPending = true;
+		queueMicrotask(() => {
+			this.flushPending = false;
+			if (this.isDisposed) return;
+			const socket = this.socket;
+			if (socket?.readyState === WebSocket.OPEN) {
+				this.sendWebSocketArguments(socket);
+			}
+		});
+	}
+
+	private sendWebSocketArguments(socket: WebSocket): void {
+		socket.send(JSON.stringify(this.dehydrateArguments()));
+	}
+
+	private replaceContent(html: string): void {
+		if (this.isDisposed || this.endNode === null) return;
 
 		const parent = this.startNode.parentNode;
 		const end = this.endNode;
@@ -169,11 +258,11 @@ export class ReactiveScope extends Scope {
 		this.contentScope.dispose();
 		this.contentScope = new Scope(this, this.runtime);
 
-		let n: ChildNode | null = this.startNode.nextSibling;
-		while (n && n !== end) {
-			const next: ChildNode | null = n.nextSibling;
-			parent.removeChild(n);
-			n = next;
+		let node: ChildNode | null = this.startNode.nextSibling;
+		while (node && node !== end) {
+			const next: ChildNode | null = node.nextSibling;
+			parent.removeChild(node);
+			node = next;
 		}
 		const fragment = document.createRange().createContextualFragment(html);
 		parent.insertBefore(fragment, end);

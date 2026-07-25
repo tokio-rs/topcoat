@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use futures_util::stream;
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
@@ -48,17 +49,26 @@ async fn combobox() -> Result {
     }
 }
 
-#[shard]
-async fn combobox_content(cx: &Cx, input: String) -> Result {
-    let results = search_fruit(cx, &input).await;
-    view! {
-        <div>
-            <b>"results:"</b>
-            for item in results {
-                <div>(item)</div>
-            }
-        </div>
-    }
+#[shard(ws)]
+async fn combobox_content(
+    cx: &Cx,
+    input: tokio::sync::mpsc::Receiver<String>,
+) -> impl futures_core::Stream<Item = Result> {
+    stream::unfold((cx, input), move |(cx, mut input)| async move {
+        let query = input.recv().await?;
+        let results = search_fruit(cx, &query).await;
+        Some((
+            view! {
+                <div>
+                    <b>"results:"</b>
+                    for item in results {
+                        <div>(item)</div>
+                    }
+                </div>
+            },
+            (cx, input),
+        ))
+    })
 }
 
 // Example data lookup that can only be done on the server:
