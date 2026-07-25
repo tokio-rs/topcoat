@@ -2,9 +2,9 @@ use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use futures_util::{SinkExt, StreamExt, stream};
+use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
@@ -35,30 +35,16 @@ async fn streaming_shard(
         .unwrap_or("missing")
         .to_owned();
 
-    stream::unfold(
-        (values, prefix, request_marker, None),
-        move |(mut values, prefix, request_marker, pending): (
-            mpsc::Receiver<String>,
-            String,
-            String,
-            Option<String>,
-        )| async move {
-            if let Some(value) = pending {
-                let text = format!("{prefix}:{request_marker}:push:{value}");
-                return Some((
-                    view! { <p>(text)</p> },
-                    (values, prefix, request_marker, None),
-                ));
-            }
-
-            let value = values.recv().await?;
+    async_stream::stream! {
+        let mut values = values;
+        while let Some(value) = values.recv().await {
             let text = format!("{prefix}:{request_marker}:input:{value}");
-            Some((
-                view! { <p>(text)</p> },
-                (values, prefix, request_marker, Some(value)),
-            ))
-        },
-    )
+            yield view! { <p>(text)</p> };
+
+            let text = format!("{prefix}:{request_marker}:push:{value}");
+            yield view! { <p>(text)</p> };
+        }
+    }
 }
 
 fn shard_path(shard: ErasedShard) -> String {

@@ -1,6 +1,6 @@
 WebSocket support for topcoat routes.
 
-A WebSocket starts as an ordinary `GET` request that asks the server to switch protocols. This module (behind the `websocket` feature) handles that handshake and the framing that follows: [`WebSocketUpgrade`] validates the request and completes the upgrade, and the resulting [`WebSocket`] exchanges [`Message`]s with the client for as long as the connection lives.
+A WebSocket starts as an ordinary `GET` request that asks the server to switch protocols. This module handles that handshake and the framing that follows: [`WebSocketUpgrade`] validates the request and completes the upgrade, and the resulting [`WebSocket`] exchanges [`Message`]s with the client for as long as the connection lives.
 
 # Upgrading a request
 

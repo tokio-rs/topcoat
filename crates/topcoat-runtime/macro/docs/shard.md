@@ -41,12 +41,11 @@ When the `query` signal changes, the current argument values are sent to the ser
 
 # WebSocket Shards
 
-Enable Topcoat's `websocket` feature and write `#[shard(ws)]` when one connection should produce more than one render. The application must also depend on Tokio with its `sync` feature and on the stream trait it names, such as `futures-core`; add a stream utility crate such as `futures-util` when needed to construct the stream.
+Write `#[shard(ws)]` when one connection should produce more than one render. WebSocket support is always available when Topcoat's router and runtime are enabled. The application must also depend on Tokio with its `sync` feature and on the stream trait it names, such as `futures-core`; add `async-stream` to construct the stream with its `stream!` macro.
 
 A WebSocket shard takes exactly one non-`cx` parameter. Its declared type is `tokio::sync::mpsc::Receiver<Arg>`, while its component-facing property remains `Expr<Arg>`:
 
 ```rust
-use futures_util::stream;
 use topcoat::{Result, context::Cx, runtime::shard, view::view};
 
 #[shard(ws)]
@@ -54,15 +53,17 @@ async fn search_results(
     cx: &Cx,
     queries: tokio::sync::mpsc::Receiver<String>,
 ) -> impl futures_core::Stream<Item = Result> {
-    stream::unfold((cx, queries), move |(cx, mut queries)| async move {
-        let query = queries.recv().await?;
-        let products = search_products(cx, &query).await;
-        Some((view! {
-            for product in products {
-                <div>(product)</div>
-            }
-        }, (cx, queries)))
-    })
+    async_stream::stream! {
+        let mut queries = queries;
+        while let Some(query) = queries.recv().await {
+            let products = search_products(cx, &query).await;
+            yield view! {
+                for product in products {
+                    <div>(product)</div>
+                }
+            };
+        }
+    }
 }
 # async fn search_products(_cx: &Cx, _query: &str) -> Vec<String> { vec![] }
 ```

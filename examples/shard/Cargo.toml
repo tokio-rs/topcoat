@@ -5,8 +5,8 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+async-stream.workspace = true
 futures-core.workspace = true
-futures-util.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
 topcoat.workspace = true
 

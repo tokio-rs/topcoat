@@ -132,6 +132,7 @@ topcoat-view-macro = { version = "0.4.0", path = "crates/topcoat-view/macro" }
 
 anyhow = "1.0"
 anymap3 = "1.0"
+async-stream = "0.3"
 base64 = "0.22"
 boxcar = "0.2"
 bytes = "1"

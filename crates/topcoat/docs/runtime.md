@@ -209,7 +209,7 @@ view! {
 
 A shard body is ordinary server code, like any component. The re-renders are served by an API endpoint exposed from your server, so a shard's arguments can be spoofed just like a procedure's and **must not be trusted**.
 
-With Topcoat's `websocket` feature, `#[shard(ws)]` keeps a connection open and renders every item from a server stream. It takes exactly one `tokio::sync::mpsc::Receiver<Arg>` argument and declares `impl Stream<Item = Result>`; callers still pass one runtime `Expr<Arg>` property. Browser argument changes are forwarded through the capacity-one receiver, while stream items can also push new markup without an argument change. The connection retains its original request context for its lifetime and does not reconnect automatically after an unexpected close.
+`#[shard(ws)]` keeps a WebSocket connection open and renders every item from a server stream. It takes exactly one `tokio::sync::mpsc::Receiver<Arg>` argument and declares `impl Stream<Item = Result>`; callers still pass one runtime `Expr<Arg>` property. Browser argument changes are forwarded through the capacity-one receiver, while stream items can also push new markup without an argument change. The connection retains its original request context for its lifetime and does not reconnect automatically after an unexpected close.
 
 The initial page render and persistent connection invoke a WebSocket shard separately. Server-side rendering seeds a temporary channel and uses the stream's first item as the placeholder. On hydration the browser opens the socket, invokes a fresh stream, and resends the current argument. State that must span those invocations belongs in shared storage rather than a local variable in the shard function.
 
