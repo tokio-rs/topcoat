@@ -168,7 +168,7 @@ impl WatchPlan {
     /// Derive the plan for the current workspace from cargo metadata, or
     /// fall back to watching `./src` when metadata is unavailable.
     async fn discover() -> Self {
-        let Some(metadata) = crate::cargo::full_metadata().await else {
+        let Some(metadata) = crate::common::cargo::Metadata::full().await else {
             eprintln!(
                 "  {}",
                 style("cargo metadata failed; watching ./src").yellow()
@@ -184,29 +184,20 @@ impl WatchPlan {
             };
         };
 
-        // A package without a `source` is local: a workspace member or a
-        // path dependency, wherever it lives on disk.
-        let mut roots: Vec<PathBuf> = metadata["packages"]
-            .as_array()
+        let mut roots: Vec<PathBuf> = metadata
+            .local_package_dirs()
             .into_iter()
-            .flatten()
-            .filter(|package| package["source"].is_null())
-            .filter_map(|package| {
-                let manifest = Path::new(package["manifest_path"].as_str()?);
-                Some(canonical(manifest.parent()?.to_path_buf()))
-            })
+            .map(canonical)
             .filter(|dir| dir.is_dir())
             .collect();
         // The workspace root holds the root manifest and lockfile, and in a
         // virtual workspace it is not a package of its own.
-        if let Some(root) = metadata["workspace_root"].as_str() {
-            roots.push(canonical(PathBuf::from(root)));
+        if let Some(root) = metadata.workspace_root() {
+            roots.push(canonical(root));
         }
         let roots = dedupe_roots(roots);
 
-        let target_dir = metadata["target_directory"]
-            .as_str()
-            .map(|dir| canonical(PathBuf::from(dir)));
+        let target_dir = metadata.target_dir().map(canonical);
         let matchers = gitignore_matchers(&roots, target_dir.as_deref());
 
         Self {

@@ -13,7 +13,10 @@ pub(super) struct CleanArgs {
 }
 
 pub(super) async fn run(args: CleanArgs) {
-    let Some(target_dir) = crate::cargo::target_dir().await else {
+    let Some(target_dir) = crate::common::cargo::Metadata::workspace()
+        .await
+        .and_then(|metadata| metadata.target_dir())
+    else {
         eprintln!(
             "{}",
             style("could not derive cargo target directory; pass --out").red()

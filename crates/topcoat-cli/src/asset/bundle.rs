@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use clap::Args;
 use console::style;
 
-use crate::cargo::BuildFlags;
+use crate::common::cargo::{BuildFlags, BuildOpts, Metadata};
 
 use super::{CACHE_SCOPE, OUT_SUBDIR};
 
@@ -18,7 +18,8 @@ pub(super) struct BundleArgs {
 }
 
 pub(super) async fn run(args: BundleArgs) {
-    let (_, bytes) = crate::cargo::build_and_read(&args.build.into(), |_, _| {})
+    let (_, bytes) = BuildOpts::from(args.build)
+        .build_and_read(|_, _| {})
         .await
         .unwrap_or_else(|e| e.print_and_exit());
 
@@ -40,8 +41,9 @@ pub(crate) async fn run_bundle(
     bytes: &[u8],
     out_override: Option<PathBuf>,
 ) -> Result<PathBuf, Box<dyn Error + Send + Sync>> {
-    let target_dir = crate::cargo::target_dir()
+    let target_dir = Metadata::workspace()
         .await
+        .and_then(|metadata| metadata.target_dir())
         .ok_or("could not derive cargo target directory")?;
     let out_dir = out_override.unwrap_or_else(|| target_dir.join(OUT_SUBDIR));
     let cache_dir = topcoat_core::cache::cache_dir_in(&target_dir, CACHE_SCOPE);

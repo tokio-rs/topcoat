@@ -1,6 +1,6 @@
 use clap::Args;
 
-use crate::cargo::BuildFlags;
+use crate::common::cargo::{BuildFlags, BuildOpts};
 
 #[derive(Args)]
 pub(super) struct ListArgs {
@@ -9,7 +9,8 @@ pub(super) struct ListArgs {
 }
 
 pub(super) async fn run(args: ListArgs) {
-    let (_, bytes) = crate::cargo::build_and_read(&args.build.into(), |_, _| {})
+    let (_, bytes) = BuildOpts::from(args.build)
+        .build_and_read(|_, _| {})
         .await
         .unwrap_or_else(|e| e.print_and_exit());
 
