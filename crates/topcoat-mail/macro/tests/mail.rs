@@ -104,6 +104,35 @@ async fn html_renders_dynamic_parts_against_the_named_context() -> Result<()> {
 }
 
 #[tokio::test]
+async fn mailboxes_accept_strings_and_pairs() -> Result<()> {
+    let mail = mail! {
+        from: "Ada Lovelace <ada@example.com>",
+        to: ["bob@example.com", ("Grace Hopper", "grace@example.com")],
+        cc: ("Carol", "carol@example.com"),
+    }?;
+
+    assert_eq!(
+        mail.from(),
+        Some(&"Ada Lovelace <ada@example.com>".parse()?)
+    );
+    assert_eq!(
+        mail.to(),
+        [
+            Mailbox::new("bob@example.com")?,
+            Mailbox::named("Grace Hopper", "grace@example.com")?,
+        ]
+    );
+    assert_eq!(mail.cc(), [Mailbox::named("Carol", "carol@example.com")?]);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn invalid_mailbox_strings_fail_the_mail() {
+    assert!(mail! { to: "not an address" }.is_err());
+}
+
+#[tokio::test]
 async fn field_values_can_use_the_question_mark_operator() {
     async fn build() -> Result<Mail> {
         mail! { to: Mailbox::new("not an address")? }

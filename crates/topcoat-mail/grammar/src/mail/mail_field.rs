@@ -6,6 +6,8 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
+use topcoat_core_grammar::paths::topcoat_mail;
+
 use crate::mail::FieldValue;
 
 /// A single `name: value` entry in a `mail!` body.
@@ -73,15 +75,36 @@ impl MailField {
                 quote! { #(#calls)* }
             }
             FieldValue::List(list) => {
-                let calls = list
-                    .values
-                    .iter()
-                    .map(|value| quote! { let __builder = __builder.#method(#value); });
+                let calls = list.values.iter().map(|value| {
+                    let argument = self.argument(value);
+                    quote! { let __builder = __builder.#method(#argument); }
+                });
                 quote! { #(#calls)* }
             }
             FieldValue::Expr(value) if self.name == "headers" => Self::header_call(value),
-            FieldValue::Expr(value) => quote! { let __builder = __builder.#method(#value); },
+            FieldValue::Expr(value) => {
+                let argument = self.argument(value);
+                quote! { let __builder = __builder.#method(#argument); }
+            }
         }
+    }
+
+    /// The argument a value lowers to. A mailbox field's value converts
+    /// through `TryFrom`, so a string or a `(name, address)` pair parses in
+    /// place, with the error propagated by the generated block.
+    fn argument(&self, value: &Expr) -> TokenStream {
+        if self.is_mailbox() {
+            quote! { #topcoat_mail::Mailbox::try_from(#value)? }
+        } else {
+            quote! { #value }
+        }
+    }
+
+    /// Whether the field holds mailboxes.
+    fn is_mailbox(&self) -> bool {
+        ["from", "to", "cc", "bcc", "reply_to"]
+            .iter()
+            .any(|field| self.name == *field)
     }
 
     /// The builder method the field lowers to: the name as written, with the

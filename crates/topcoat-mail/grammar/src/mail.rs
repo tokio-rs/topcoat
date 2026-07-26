@@ -134,6 +134,18 @@ mod tests {
     }
 
     #[test]
+    fn mailbox_values_convert_through_try_from() {
+        let tokens = expand(r#"from: "ada@example.com", to: [bob, ("Grace", "g@example.com")]"#);
+        assert_eq!(tokens.matches("Mailbox :: try_from").count(), 3, "{tokens}");
+    }
+
+    #[test]
+    fn non_mailbox_values_pass_through() {
+        let tokens = expand(r#"subject: "Hello", attachments: [invoice]"#);
+        assert!(!tokens.contains("try_from"), "{tokens}");
+    }
+
+    #[test]
     fn attachments_lower_to_attachment_calls() {
         let tokens = expand("attachments: [a, b]");
         assert_eq!(tokens.matches(". attachment (").count(), 2, "{tokens}");
@@ -190,7 +202,7 @@ mod tests {
     fn field_with_a_dangling_colon_lowers_to_a_bare_access() {
         let tokens = expand("subject: , to: a");
         assert!(tokens.contains("__builder . subject ;"), "{tokens}");
-        assert!(tokens.contains(". to (a)"), "{tokens}");
+        assert!(tokens.contains(". to ("), "{tokens}");
     }
 
     #[test]
