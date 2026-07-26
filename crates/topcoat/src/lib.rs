@@ -36,6 +36,9 @@ pub mod htmx;
 #[cfg(feature = "icon")]
 pub mod icon;
 
+#[cfg(feature = "mail")]
+pub mod mail;
+
 #[cfg(feature = "router")]
 pub mod router;
 

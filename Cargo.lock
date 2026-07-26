@@ -2747,6 +2747,8 @@ dependencies = [
  "topcoat-htmx",
  "topcoat-icon",
  "topcoat-icon-macro",
+ "topcoat-mail",
+ "topcoat-mail-macro",
  "topcoat-router",
  "topcoat-router-macro",
  "topcoat-runtime",
@@ -2979,6 +2981,7 @@ dependencies = [
  "syn",
  "topcoat-core-grammar",
  "topcoat-mail",
+ "topcoat-view-grammar",
 ]
 
 [[package]]
@@ -2987,6 +2990,8 @@ version = "0.4.0"
 dependencies = [
  "quote",
  "syn",
+ "tokio",
+ "topcoat",
  "topcoat-mail-grammar",
 ]
 

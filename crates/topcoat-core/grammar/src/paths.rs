@@ -195,6 +195,10 @@ pub const topcoat_font_fontsource_macro: Crate =
 #[allow(non_upper_case_globals)]
 pub const topcoat_icon: Crate = Crate::new("icon", "topcoat-icon", "");
 
+/// `::topcoat::mail`, or `topcoat_mail` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_mail: Crate = Crate::new("mail", "topcoat-mail", "");
+
 /// `::topcoat::router`, or `topcoat_router` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_router: Crate = Crate::new("router", "topcoat-router", "");
