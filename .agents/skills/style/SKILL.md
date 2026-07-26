@@ -27,6 +27,8 @@ pub use request::*;
 pub use http::Method;
 ```
 
+When a module's submodules are peers that make up a whole (the CLI commands `fmt`, `dev`, `asset`; the macros `expr`, `procedure`, `shard`), put anything shared between them in a `common` submodule so it does not read as another peer.
+
 ## Dependencies
 
 * Declare every dependency in the top-level `Cargo.toml` under `[workspace.dependencies]` with only a version and no features. Crates pull it in with `workspace = true` and opt into features there.
