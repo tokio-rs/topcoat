@@ -5,7 +5,7 @@ description: Always use this skill to verify a change locally before committing 
 
 # Verifying a Change
 
-Keep this file in sync with CI workflows. `unsafe` is not allowed ([`AGENTS.md`](../../../AGENTS.md)).
+Keep this file in sync with CI workflows.
 
 Run these by default:
 
