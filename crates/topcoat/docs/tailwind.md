@@ -96,7 +96,7 @@ The default build does this:
 
 4. Writes the output to `$OUT_DIR/tailwind.css`.
 
-The default Tailwind CLI version is pinned by Topcoat to `4.3.2`. The downloaded binary is cached inside Cargo's build output directory as `tailwindcss-<version>`.
+The default Tailwind CLI version is pinned by Topcoat to `4.3.2`. The downloaded binary is cached under Cargo's target directory, in the shared Topcoat cache at `topcoat/cache/tailwind`, so every package in the workspace reuses one copy across builds.
 
 # CLI executable
 
@@ -159,7 +159,11 @@ Example input:
 
 `BuildConfig::render()` prints no Cargo `rerun-if-*` directives. Cargo therefore applies its default: the build script reruns whenever any non-ignored file in the package changes. That default respects `.gitignore`, always excludes `target/`, and notices created and deleted files, so class changes anywhere in the package, including in new files, regenerate the Tailwind output.
 
-Printing any `rerun-if-*` directive from your build script replaces that default with exactly the paths and variables you list. Keep that in mind when combining the Tailwind build with your own directives; in particular, a directory directive is scanned recursively without respecting `.gitignore`, so never print one for a directory containing `target/`. Two situations require directives of your own:
+Printing any `rerun-if-*` directive from your build script replaces that default with exactly the paths and variables you list. Keep that in mind when combining the Tailwind build with your own directives.
+
+Never point a directory directive at a directory that contains `target/`. Cargo scans directories recursively and ignores `.gitignore` when it does, so the build script would rerun on its own output.
+
+Two situations require directives of your own:
 
 - `executable_env(name)`: print `cargo:rerun-if-env-changed=<name>` if changing the variable should rerun the build script.
 - A `cwd` or `input` outside the package: Cargo's default only tracks package files, so print `cargo:rerun-if-changed` for the external paths.

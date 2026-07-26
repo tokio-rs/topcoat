@@ -28,6 +28,11 @@ serde.workspace = true
 serde_json.workspace = true
 uuid = { workspace = true, features = ["v4", "serde"] }
 
+# On wasm32-unknown-unknown the runtime's random IDs need the JS host
+# (`crypto.getRandomValues`) as their source of randomness.
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+uuid = { workspace = true, features = ["v4", "serde", "js"] }
+
 [lints]
 workspace = true
 

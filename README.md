@@ -188,7 +188,7 @@ Topcoat also ships with utilities for web fonts and icons, as well as easy integ
 
 ### Built-in Tailwind support
 
-Enabled the `tailwind` feature to integrate [Tailwind](https://tailwindcss.com/) into your project effortlessly:
+Enable the `tailwind` feature to integrate [Tailwind](https://tailwindcss.com/) into your project:
 
 ```rust,ignore
 view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
@@ -249,11 +249,11 @@ Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](ht
 - [ ] Better [Toasty](https://github.com/tokio-rs/toasty) integration (safely create/update records from forms without listing out all the fields)
 - [ ] Validations
 - [ ] `OpenAPI` endpoints
+- [ ] Sitemaps
 - [ ] Docs for how to deploy Topcoat
 - [ ] Pre-rendering for static pages
 - [ ] Streaming SSR / Suspense
 - [ ] Client-side navigation + prefetching
-- [ ] `WebSockets`
 - [ ] `WebTransport`
 - [ ] Server-sent events
 - [ ] Image optimization / resizing

@@ -39,9 +39,7 @@ async fn root_layout(slot: Result) -> Result {
             </head>
             <body class="flex min-h-screen flex-col bg-slate-50 text-slate-900">
                 site_nav()
-                <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-                    (slot?)
-                </main>
+                <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-8">(slot?)</main>
                 site_footer()
             </body>
         </html>

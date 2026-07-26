@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Router, RouterErrorExt, page, query_params},
+    router::{Router, error::RouterErrorExt, page, query_params},
     view::view,
 };
 

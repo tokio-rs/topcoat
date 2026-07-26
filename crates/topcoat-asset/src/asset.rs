@@ -233,8 +233,8 @@ fn normalize(path: &Path) -> PathBuf {
 ///
 /// # Options
 ///
-/// Options control how the bundler names the output file and (optionally)
-/// pins its contents. All are optional:
+/// Each named argument sets a field on [`AssetOptions`], which documents
+/// them all. All are optional. The common ones:
 ///
 /// - `rename: "name"`: replace the file stem (everything before the final `.`) with `"name"`.
 /// - `extension: "ext"`: override the output extension (without the leading dot). Useful when the
@@ -244,6 +244,8 @@ fn normalize(path: &Path) -> PathBuf {
 ///   [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's actual hash differs, or
 ///   [`AssetError::UnsupportedChecksum`](crate::AssetError) if the prefix is missing or
 ///   unsupported. Recommended for remote assets.
+/// - `content_type: "text/css"`: set the `Content-Type` the asset is served with, instead of
+///   guessing it from the bundled file's extension.
 ///
 /// Output filenames always include a short content hash so bundles stay
 /// cache-friendly: e.g. `logo-1a2b3c4d5e6f7a8b.png`, or

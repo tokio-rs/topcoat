@@ -4,8 +4,9 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{
-        Form, Router, RouterBuilderDiscoverExt, SeeOther, layout, page, path_param, route,
-        see_other,
+        Form, Router, RouterBuilderDiscoverExt,
+        error::{SeeOther, see_other},
+        layout, page, path_param, route,
     },
     view::{component, view},
 };
@@ -64,12 +65,7 @@ async fn home(cx: &Cx) -> Result {
         <h1>"Toasty Todos"</h1>
 
         <form method="post" action="/todos">
-            <input
-                type="text"
-                name="title"
-                placeholder="What needs doing?"
-                required=(true)
-            >
+            <input type="text" name="title" placeholder="What needs doing?" required="">
             <button type="submit">"Add"</button>
         </form>
 

@@ -60,7 +60,18 @@ impl ParseOption for SignalDeclaration {
 
 #[cfg(feature = "pretty")]
 impl topcoat_core_grammar::pretty::PrettyPrint for SignalDeclaration {
-    fn pretty_print(&self, _printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        todo!();
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+
+        printer.move_cursor(self.signal_kw.span().start());
+        "signal".pretty_print(printer);
+        printer.move_cursor(self.signal_kw.span().end());
+        " ".pretty_print(printer);
+        self.ident.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.eq_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.expr.pretty_print(printer);
+        self.semi_token.pretty_print(printer);
     }
 }

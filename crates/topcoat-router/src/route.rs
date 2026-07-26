@@ -1,21 +1,21 @@
 use std::{borrow::Cow, pin::Pin};
 
-use http::Method;
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{Body, Path, Response};
+use crate::{Body, Methods, OwnedMethods, Path, Response};
 
 /// The future returned by [`Route::handle`]: a boxed, `Send` future borrowing
 /// the route and its request context.
 pub type RouteFuture<'cx> = Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>>;
 
-/// A single routable endpoint: an HTTP method, a URL path, and a handler.
+/// A single routable endpoint: a set of HTTP methods, a URL path, and a
+/// handler.
 ///
 /// This is the core primitive a [`Router`](crate::Router) dispatches to.
 /// Register any `Route` with [`RouterBuilder::route`](crate::RouterBuilder::route).
 pub trait Route: Send + Sync + 'static {
-    /// The HTTP method this route responds to.
-    fn method(&self) -> Method;
+    /// The HTTP methods this route responds to.
+    fn methods(&self) -> Methods<'_>;
 
     /// The URL path this route handles.
     fn path(&self) -> &Path;
@@ -34,8 +34,8 @@ pub type RouteHandlerFn = for<'cx> fn(cx: &'cx Cx, body: Body) -> RouteFuture<'c
 /// [`Router`](crate::Router).
 #[derive(Debug, Clone)]
 pub struct RouteFn {
-    /// The HTTP method this route responds to.
-    method: Method,
+    /// The HTTP methods this route responds to.
+    methods: OwnedMethods,
     /// The URL path this route handles.
     path: Cow<'static, Path>,
     /// The handler function that produces the response.
@@ -43,10 +43,44 @@ pub struct RouteFn {
 }
 
 impl RouteFn {
-    /// Creates a new route with an explicit method, path, and handler function.
-    pub const fn new(method: Method, path: Cow<'static, Path>, handle: RouteHandlerFn) -> Self {
+    /// Creates a new route with explicit methods, path, and handler function.
+    ///
+    /// The methods are anything convertible into [`OwnedMethods`]: a single
+    /// [`Method`](crate::Method), a `&'static [Method]`, a `Vec<Method>`, or
+    /// [`Methods::Any`] to respond to every method.
+    ///
+    /// ```rust
+    /// use std::borrow::Cow;
+    ///
+    /// use topcoat::context::Cx;
+    /// use topcoat::router::{Body, Method, Path, RouteFn, RouteFuture};
+    ///
+    /// fn handler(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+    ///     Box::pin(async move { unimplemented!() })
+    /// }
+    ///
+    /// let form = RouteFn::new(
+    ///     &[Method::GET, Method::POST],
+    ///     Cow::Borrowed(Path::new("/form")),
+    ///     handler,
+    /// );
+    /// ```
+    pub fn new(
+        methods: impl Into<OwnedMethods>,
+        path: Cow<'static, Path>,
+        handle: RouteHandlerFn,
+    ) -> Self {
+        Self::const_new(methods.into(), path, handle)
+    }
+
+    /// Const-context constructor used by macro-generated code.
+    pub const fn const_new(
+        methods: OwnedMethods,
+        path: Cow<'static, Path>,
+        handle: RouteHandlerFn,
+    ) -> Self {
         Self {
-            method,
+            methods,
             path,
             handle,
         }
@@ -54,8 +88,8 @@ impl RouteFn {
 }
 
 impl Route for RouteFn {
-    fn method(&self) -> Method {
-        self.method.clone()
+    fn methods(&self) -> Methods<'_> {
+        self.methods.as_methods()
     }
 
     fn path(&self) -> &Path {

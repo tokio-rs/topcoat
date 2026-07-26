@@ -39,13 +39,13 @@ impl ErrorAttr {
     /// The router error type the constructor produces.
     pub fn ty(&self) -> TokenStream {
         match self.kind {
-            ErrorKind::BadRequest(_) => quote! { #topcoat_router::BadRequestError },
-            ErrorKind::Forbidden(_) => quote! { #topcoat_router::ForbiddenError },
-            ErrorKind::NotFound(_) => quote! { #topcoat_router::NotFoundError },
+            ErrorKind::BadRequest(_) => quote! { #topcoat_router::error::BadRequestError },
+            ErrorKind::Forbidden(_) => quote! { #topcoat_router::error::ForbiddenError },
+            ErrorKind::NotFound(_) => quote! { #topcoat_router::error::NotFoundError },
             ErrorKind::Redirect(_) | ErrorKind::RedirectPermanent(_) => {
-                quote! { #topcoat_router::RedirectError }
+                quote! { #topcoat_router::error::RedirectError }
             }
-            ErrorKind::Unauthorized(_) => quote! { #topcoat_router::UnauthorizedError },
+            ErrorKind::Unauthorized(_) => quote! { #topcoat_router::error::UnauthorizedError },
         }
     }
 
@@ -62,7 +62,7 @@ impl ErrorAttr {
         } else {
             let name = self.kind.keyword();
             let args = &self.args;
-            quote! { |_| #topcoat_router::#name(#(#args),*) }
+            quote! { |_| #topcoat_router::error::#name(#(#args),*) }
         };
         quote! { .map_err(#handler) }
     }

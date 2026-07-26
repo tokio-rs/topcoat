@@ -23,7 +23,7 @@ view! {
 
 The body of [`attributes!`] has the same syntax as attributes inside an element in [`view!`].
 
-That includes literal attributes, expression values, dynamic names, binding attributes, event handlers, and attribute-level control flow:
+So literal attributes, expression values, dynamic names, binding attributes, event handlers, spreads, and attribute-level control flow all work the same way here:
 
 ```rust
 # #[topcoat::view::component]

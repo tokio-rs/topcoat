@@ -22,7 +22,7 @@ fn request_summary(cx: &Cx) -> String {
 }
 ```
 
-Available request helpers:
+The ones you reach for most, all listed in [`topcoat::router`](crate::router):
 
 - [`parts(cx)`](crate::router::parts) returns the current request's `http::request::Parts`.
 - [`method(cx)`](crate::router::method) returns the HTTP method.

@@ -1,4 +1,4 @@
-A procedure is an async server function that the browser can call from inside a runtime [expression](macro.expr.html). Use procedures to run more complex Rust codes that are not supported by runtime expressions, or to use server-only resources like the database. Procedures are exposed as HTTP API endpoints from your server; parameters can be spoofed and **must not be trusted**.
+A procedure is an async server function that the browser can call from inside a runtime [expression](macro.expr.html). Use procedures to run more complex Rust code that runtime expressions do not support, or to reach server-only resources like the database. Procedures are exposed as HTTP API endpoints from your server; parameters can be spoofed and **must not be trusted**.
 
 ```rust
 use topcoat::{Result, runtime::procedure};
@@ -38,7 +38,7 @@ view! {
 
 The call sends the arguments to the server, runs the function there, and resolves to its return value. Since that takes a network round-trip, calls are only possible in an async position, such as the body of an `async` closure.
 
-A procedure call never executes during the server render: the server type-checks the call but the request only happens in the browser. Procedure calls can therefore only appear where the expression never runs server-side, like the closure bodies above.
+A procedure call only runs in the browser. The server type-checks the call, but calling it there panics, so a call has to sit somewhere that never runs during the server render, like the closure bodies above.
 
 # Arguments And Return Type
 

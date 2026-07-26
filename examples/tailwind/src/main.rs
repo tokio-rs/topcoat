@@ -43,7 +43,8 @@ async fn home() -> Result {
         >
             // Tailwind's `hidden` utility removes this warning, so it only
             // appears when the stylesheet is missing.
-            <p class="hidden">"Tailwind is not working: this page should look styled."
+            <p class="hidden">
+                "Tailwind is not working: this page should look styled."
             </p>
             // The opposite: the inline style hides this badge until Tailwind's
             // important `flex!` utility overrides it.

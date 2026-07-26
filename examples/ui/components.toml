@@ -21,7 +21,7 @@ hash = "sha256:45cbe0f5a790e7359ff72ecda4fbf40fb6c7bc8c4928593d1352813a86543a01"
 file = "src/components/card.rs"
 
 [registries.topcoat.components.checkbox]
-hash = "sha256:c2fabc4fb809b0a91cbd6ffa03e7d3cbd0006cc88ba59a15eddee155803a6a04"
+hash = "sha256:dd5a3b9b2a3fa23d5564eb63dcf47a170ead0268a33ca55c99ff56f23ee8110c"
 file = "src/components/checkbox.rs"
 
 [registries.topcoat.components.dropdown_menu]
@@ -45,11 +45,11 @@ hash = "sha256:19d7779d8e7e75a2db78904232fa3db11f8e0e49cfca8a1852c4dcd686ac2d69"
 file = "src/components/select.rs"
 
 [registries.topcoat.components.spinner]
-hash = "sha256:d88c5c715832ba0eca485dea1a4964ea725b98c74119461ecb5e093ba7ca3bb3"
+hash = "sha256:f34fa1b6689a0636cbb43f6b5e7f7fe7fa606bccb5c2941216de0a8ce78e0ea2"
 file = "src/components/spinner.rs"
 
 [registries.topcoat.components.switch]
-hash = "sha256:6f8b32da0ae50deb48e95a997ce7dd7008a8637266d0212178d739d7ddb910c5"
+hash = "sha256:d7c42be61eb024a942c5a0dd967217cd7531266e87f26cb1549be761d7113418"
 file = "src/components/switch.rs"
 
 [registries.topcoat.components.textarea]

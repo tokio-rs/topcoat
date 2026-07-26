@@ -24,9 +24,16 @@ impl Token {
     }
 
     /// Generates a fresh random token.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the platform's source of cryptographically secure
+    /// randomness fails.
     #[must_use]
     pub fn random() -> Self {
-        Self::new(rand::random())
+        let mut bytes = [0u8; 32];
+        getrandom::fill(&mut bytes).expect("the session token randomness source failed");
+        Self::new(bytes)
     }
 
     /// Parses a token from its URL-safe base64 [`encode`](Self::encode)d form.

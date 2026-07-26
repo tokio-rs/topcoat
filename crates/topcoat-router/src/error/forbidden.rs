@@ -17,7 +17,7 @@ use crate::{IntoResponse, Response};
 /// # fn render_admin(_cx: &Cx) -> View { View::default() }
 /// use topcoat::Result;
 /// use topcoat::context::Cx;
-/// use topcoat::router::forbidden;
+/// use topcoat::router::error::forbidden;
 ///
 /// async fn admin_panel(cx: &Cx, user: &User) -> Result<View> {
 ///     if !user.is_admin() {
@@ -34,7 +34,7 @@ pub fn forbidden() -> ForbiddenError {
 /// A forbidden response carried as the `Err` variant of a handler `Result`.
 ///
 /// Construct one with [`forbidden`], or derive one from an `Option` /
-/// `Result` via [`RouterErrorExt`](crate::RouterErrorExt).
+/// `Result` via [`RouterErrorExt`](crate::error::RouterErrorExt).
 #[derive(Debug)]
 pub struct ForbiddenError {
     _priv: (),

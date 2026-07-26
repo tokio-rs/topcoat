@@ -54,7 +54,7 @@ use topcoat::{
 #[layout]
 async fn root(cx: &Cx, slot: Result) -> Result {
     // htmx only swaps out the target element, so we do not need to return
-    // the full layout shell. Just the page's content are enough.
+    // the full layout shell. Just the page's content is enough.
     if hx_request(cx) {
         return slot;
     }

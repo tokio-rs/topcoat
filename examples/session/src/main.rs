@@ -9,8 +9,12 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     cookie::RouterBuilderCookieExt,
-    router::{Form, Router, RouterBuilderDiscoverExt, SeeOther, layout, page, route, see_other},
-    session::{self, RouterBuilderSessionExt, TokenHash},
+    router::{
+        Form, Router, RouterBuilderDiscoverExt,
+        error::{SeeOther, see_other},
+        layout, page, route,
+    },
+    session::{self, RouterBuilderSessionExt, SessionConfig, TokenHash},
     view::view,
 };
 
@@ -19,7 +23,7 @@ async fn main() {
     topcoat::start(
         Router::builder()
             .cookies()
-            .sessions(session::Config::default())
+            .sessions(SessionConfig::default())
             .app_context(Database::default())
             .discover()
             .build(),

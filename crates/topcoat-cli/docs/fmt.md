@@ -26,6 +26,12 @@ topcoat fmt --stdin < src/main.rs > /tmp/main.rs
 
 In stdin mode, the formatted source is written to stdout instead of updating files on disk.
 
+By default the formatter handles every macro it knows about. Pass `--macros` with a comma-separated list to restrict it to a subset, leaving the rest untouched:
+
+```sh
+topcoat fmt --macros view,class
+```
+
 # What It Formats
 
 The formatter parses Rust source, finds macro invocations it knows how to format, and replaces only those macro bodies. The surrounding Rust code is left as-is.

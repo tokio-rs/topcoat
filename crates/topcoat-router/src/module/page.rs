@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{LayoutFn, LayoutRenderFn, PageFn, PageRenderFn, Path};
+use crate::{LayoutFn, LayoutRenderFn, OwnedMethods, PageFn, PageRenderFn, Path};
 
 /// A page discovered by the module router, produced by the `#[page]` macro.
 ///
@@ -10,6 +10,8 @@ use crate::{LayoutFn, LayoutRenderFn, PageFn, PageRenderFn, Path};
 #[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct ModulePageFn {
+    /// The HTTP methods this page responds to.
+    methods: OwnedMethods,
     /// Module path where `#[page]` was declared, used to derive the URL path.
     module_path: &'static str,
     /// The page's async render function, returning a [`Result`].
@@ -18,8 +20,13 @@ pub struct ModulePageFn {
 
 impl ModulePageFn {
     /// Creates a new module page. Called by the expanded `#[page]` macro.
-    pub const fn new(module_path: &'static str, render: PageRenderFn) -> Self {
+    pub const fn new(
+        methods: OwnedMethods,
+        module_path: &'static str,
+        render: PageRenderFn,
+    ) -> Self {
         Self {
+            methods,
             module_path,
             render,
         }
@@ -28,7 +35,7 @@ impl ModulePageFn {
     /// Converts into a [`PageFn`] with the given resolved URL path.
     #[must_use]
     pub fn into_page(self, path: Cow<'static, Path>) -> PageFn {
-        PageFn::new(path, self.render)
+        PageFn::new(self.methods, path, self.render)
     }
 
     /// Returns the module path used to derive the URL.

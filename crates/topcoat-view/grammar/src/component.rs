@@ -28,17 +28,24 @@ use crate::component::{ComponentAttr, ComponentItem};
 /// - a zero-sized marker struct named after the function that implements
 ///   [`topcoat::view::Component`] with a `render` method calling the original function body.
 ///
+/// With the `boxed` argument (`#[component(boxed)]`), `render` returns a
+/// heap-allocated `Pin<Box<dyn Future>>` whose type is spelled out in the
+/// signature, so the compiler never has to infer the future type from the
+/// body. Recursive components need this on at least one component in the
+/// cycle: with only opaque futures, computing any one future type requires
+/// type-checking the body that awaits the next, which loops back around.
+///
 /// [`Props`]: derive.Props.html
 /// [`topcoat::view::Component`]: trait.Component.html
 pub struct Component {
-    _attr: ComponentAttr,
+    attr: ComponentAttr,
     item: ComponentItem,
 }
 
 impl Component {
     #[must_use]
     pub fn new(attr: ComponentAttr, item: ComponentItem) -> Self {
-        Self { _attr: attr, item }
+        Self { attr, item }
     }
 
     /// Parses a `#[component]` attribute and function item from token streams.
@@ -168,6 +175,52 @@ impl ToTokens for Component {
         }
         .to_tokens(tokens);
 
+        // In boxed mode the future type is spelled out in the signature, so
+        // the compiler never has to infer it from the body. That breaks the
+        // inference cycle recursive components would otherwise cause, where
+        // computing one component's opaque future type requires type-checking
+        // the body that awaits the next component's, looping back around.
+        // Refining the trait's opaque return type to the concrete boxed one is
+        // deliberate and invisible to `view!` callers.
+        let render = if self.attr.boxed() {
+            quote! {
+                #[allow(refining_impl_trait)]
+                fn render<'__cx>(
+                    self,
+                    cx: &'__cx #topcoat_context::Cx,
+                    props: Self::Props,
+                ) -> ::core::pin::Pin<::std::boxed::Box<
+                    dyn ::core::future::Future<Output = #return_ty>
+                        + ::core::marker::Send
+                        + '__cx,
+                >>
+                where
+                    Self: '__cx,
+                    Self::Props: '__cx,
+                {
+                    ::std::boxed::Box::pin(async move {
+                        #item
+                        #ident(cx, #(#args),*).await
+                    })
+                }
+            }
+        } else {
+            quote! {
+                async fn render<'__cx>(
+                    self,
+                    cx: &'__cx #topcoat_context::Cx,
+                    props: Self::Props,
+                ) -> #return_ty
+                where
+                    Self: '__cx,
+                    Self::Props: '__cx,
+                {
+                    #item
+                    #ident(cx, #(#args),*).await
+                }
+            }
+        };
+
         quote! {
             impl #impl_generics ::core::default::Default for #ident #ty_generics #where_clause {
                 #[inline]
@@ -179,10 +232,7 @@ impl ToTokens for Component {
             impl #impl_generics #topcoat_view::Component for #ident #ty_generics #where_clause {
                 type Props = #props_ident #ty_generics;
 
-                async fn render(self, cx: &#topcoat_context::Cx, props: Self::Props) -> #return_ty {
-                    #item
-                    #ident(cx, #(#args),*).await
-                }
+                #render
             }
 
             #(#attrs)*

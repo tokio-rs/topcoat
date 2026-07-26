@@ -85,6 +85,9 @@ fn standard_slot(method: &Method) -> Option<usize> {
 pub(crate) struct Endpoint {
     standard: [RouteIndex; STANDARD_METHODS.len()],
     other: HashMap<Method, usize>,
+    /// The route handling every method without a registration of its own.
+    /// Routes registered for a specific method take precedence.
+    any: RouteIndex,
     /// Interned, cheaply clonable path parameter keys for this endpoint.
     path_params: Box<[Arc<str>]>,
     /// The layers wrapping every route at this path, as ids into the router's
@@ -99,17 +102,25 @@ impl Endpoint {
         Self {
             standard: Default::default(),
             other: HashMap::new(),
+            any: RouteIndex::NONE,
             path_params,
             layers,
         }
     }
 
-    /// Returns the route index handling `method`, if any.
+    /// Returns the route index registered specifically for `method`, if any.
+    /// The any-method route is not consulted; read it with [`any`](Self::any).
     pub(crate) fn get(&self, method: &Method) -> Option<usize> {
         match standard_slot(method) {
             Some(slot) => self.standard[slot].get(),
             None => self.other.get(method).copied(),
         }
+    }
+
+    /// Returns the route index handling every unregistered method, if one is
+    /// set.
+    pub(crate) fn any(&self) -> Option<usize> {
+        self.any.get()
     }
 
     /// Registers `index` as the route handling `method`.
@@ -120,6 +131,12 @@ impl Endpoint {
                 self.other.insert(method, index);
             }
         }
+    }
+
+    /// Registers `index` as the route handling every method that has no
+    /// registration of its own.
+    pub(crate) fn insert_any(&mut self, index: usize) {
+        self.any = RouteIndex::new(index);
     }
 
     /// Points the `HEAD` slot at the `GET` route unless a `HEAD` route was
@@ -222,6 +239,26 @@ mod tests {
 
         assert_eq!(endpoint.get(&purge), Some(3));
         assert_eq!(endpoint.get(&Method::GET), None);
+    }
+
+    // -- Endpoint: any-method route --
+
+    #[test]
+    fn any_is_absent_by_default() {
+        let endpoint = Endpoint::default();
+        assert_eq!(endpoint.any(), None);
+    }
+
+    #[test]
+    fn insert_any_does_not_affect_per_method_lookups() {
+        let mut endpoint = Endpoint::default();
+        endpoint.insert_any(7);
+
+        assert_eq!(endpoint.any(), Some(7));
+        // `get` and the `Allow`-header iterator only cover per-method
+        // registrations.
+        assert_eq!(endpoint.get(&Method::GET), None);
+        assert_eq!(endpoint.methods().count(), 0);
     }
 
     // -- Endpoint: HEAD aliasing --

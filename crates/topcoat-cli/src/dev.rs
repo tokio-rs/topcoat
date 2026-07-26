@@ -36,7 +36,7 @@ use keyboard::Keyboard;
 use spinner::Spinner;
 use watch::{Change, SourceWatcher};
 
-use crate::cargo::{BuildFlags, BuildOpts, BuildStamp};
+use crate::common::cargo::{BuildFlags, BuildOpts, BuildStamp};
 
 #[derive(Args)]
 pub struct DevCommand {

@@ -1,7 +1,8 @@
 use topcoat_core::context::{Cx, CxBuilder};
 use topcoat_router::{
-    Body, ForbiddenError, Layer, LayerFuture, Method, Next, Path, forbidden, header, headers,
-    method, uri,
+    Body, Layer, LayerFuture, Method, Next, Path,
+    error::{ForbiddenError, forbidden},
+    header, headers, method, uri,
 };
 
 use crate::config;
@@ -17,10 +18,10 @@ use crate::config;
 /// request's own host instead. Requests carrying neither header pass: they
 /// come from non-browser clients, which do not attach cookies ambiently.
 ///
-/// Origins trusted with [`ConfigBuilder::trust_origin`](crate::ConfigBuilder::trust_origin)
-/// always pass. The [`OriginLayer`] registered by the router's `sessions`
-/// extension method applies this check to every request; call it directly
-/// only where that layer does not.
+/// Origins trusted with
+/// [`SessionConfigBuilder::trust_origin`](crate::SessionConfigBuilder::trust_origin) always pass.
+/// The [`OriginLayer`] registered by the router's `sessions` extension method applies this check to
+/// every request; call it directly only where that layer does not.
 ///
 /// # Errors
 ///
@@ -101,7 +102,7 @@ fn origin_host(origin: &str) -> Option<&str> {
 ///
 /// Every request passing through it is checked with [`verify_origin`].
 /// The router's `sessions` extension method registers it unless
-/// [`ConfigBuilder::dangerous_disable_origin_verification`](crate::ConfigBuilder::dangerous_disable_origin_verification)
+/// [`SessionConfigBuilder::dangerous_disable_origin_verification`](crate::SessionConfigBuilder::dangerous_disable_origin_verification)
 /// is set.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct OriginLayer;

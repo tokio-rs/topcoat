@@ -36,7 +36,7 @@ export function setupBinding(el: Element, attr: Attr, scope: Scope): void {
 
 function write(el: Element, name: string, value: unknown): void {
 	if (PROPERTY_NAMES.has(name)) {
-		(el as unknown as Record<string, unknown>)[name] = value;
+		(el as Element & Record<string, unknown>)[name] = value;
 	}
 	if (isAttributeValueViewParts(value)) {
 		if (!value.isAttributePresent()) {

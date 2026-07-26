@@ -21,7 +21,7 @@ use crate::{PartsWriter, Unescaped, ViewPart};
 /// For [boolean HTML attributes], a false value must be omitted from the markup entirely.
 /// [`attribute_present`](Self::attribute_present) is the hook that makes that decision.
 /// The built-in `bool` and `Option<T>` implementations use this so `false` and `None` omit the
-/// whole attribute.
+/// whole attribute, while `true` renders the attribute with an empty value (`disabled=""`).
 ///
 /// [boolean HTML attributes]: https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML
 pub trait AttributeValueViewParts {
@@ -139,8 +139,9 @@ impl AttributeValueViewParts for bool {
     }
 
     #[inline]
-    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_bool(self);
+    fn into_view_parts(self, _cx: &Cx, _parts: &mut PartsWriter<'_>) {
+        // A true value renders the attribute with an empty value
+        // (`disabled=""`), matching the boolean HTML attribute convention.
     }
 }
 

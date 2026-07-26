@@ -34,9 +34,8 @@ async fn root(cx: &Cx, slot: Result) -> Result {
             <head>
                 <script
                     src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
-                >
+                ></script>
 
-                </script>
                 topcoat::dev::script()
             </head>
             <body hx-boost="true">(slot?)</body>

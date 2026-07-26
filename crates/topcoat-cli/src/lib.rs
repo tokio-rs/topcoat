@@ -1,7 +1,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod asset;
-mod cargo;
+mod common;
 mod dev;
 mod fmt;
 mod ui;

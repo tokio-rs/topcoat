@@ -52,8 +52,6 @@ pub async fn progress(
             value=(value)
             max=(max)
             (attrs)
-        >
-
-        </progress>
+        ></progress>
     }
 }

@@ -22,10 +22,26 @@ multipart = [
 	"dep:futures-util",
 	"dep:multer",
 ]
+serve = [
+	"dep:hyper",
+	"dep:hyper-util",
+	"dep:tokio",
+	"tokio/macros",
+	"tokio/net",
+	"tokio/rt",
+	"tokio/sync",
+	"tokio/time",
+]
 tower = [
 	"dep:tower",
+	"dep:tokio",
 	"tokio/macros",
 	"tokio/sync",
+]
+websocket = [
+	"serve",
+	"dep:futures-sink",
+	"dep:tokio-tungstenite",
 ]
 
 [dependencies]
@@ -35,13 +51,14 @@ topcoat-view = { workspace = true, features = ["http"] }
 bytes.workspace = true
 form_urlencoded.workspace = true
 futures-core.workspace = true
+futures-sink = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
 heck.workspace = true
 http.workspace = true
 http-body.workspace = true
 http-body-util.workspace = true
-hyper = { workspace = true, features = ["server", "http1", "http2"] }
-hyper-util = { workspace = true, features = ["server-auto", "tokio"] }
+hyper = { workspace = true, optional = true, features = ["server", "http1", "http2"] }
+hyper-util = { workspace = true, optional = true, features = ["server-auto", "tokio"] }
 matchit.workspace = true
 percent-encoding.workspace = true
 inventory = { workspace = true, optional = true }
@@ -51,7 +68,8 @@ serde.workspace = true
 serde_json.workspace = true
 serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
-tokio = { workspace = true, features = ["macros", "net", "rt", "sync", "time"] }
+tokio = { workspace = true, optional = true }
+tokio-tungstenite = { workspace = true, optional = true, features = ["handshake"] }
 tower = { workspace = true, optional = true, features = ["util"] }
 tower-http = { workspace = true, optional = true, features = [
 	"compression-br",
@@ -59,8 +77,10 @@ tower-http = { workspace = true, optional = true, features = [
 ] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["compression", "router", "tower"] }
+topcoat = { workspace = true, features = ["compression", "router", "tower", "websocket"] }
+futures-util = { workspace = true, features = ["sink"] }
 tokio = { workspace = true, features = ["io-util", "macros", "rt", "time"] }
+tokio-tungstenite = { workspace = true, features = ["connect"] }
 tower = { workspace = true, features = ["buffer", "limit", "timeout", "util"] }
 tower-http = { workspace = true, features = [
 	"compression-gzip",

@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use web_time::SystemTime;
 
 use topcoat_core::{context::Cx, error::Result};
 
@@ -66,7 +66,7 @@ pub async fn stop(cx: &Cx) -> Result<Option<TokenHash>> {
 
 /// Extends the current session's lifetime without changing its token.
 ///
-/// Re-issues the presented token with a full [`lifetime`](crate::ConfigBuilder::lifetime)
+/// Re-issues the presented token with a full [`lifetime`](crate::SessionConfigBuilder::lifetime)
 /// ahead of it, implementing sliding expiration. Returns the session with its
 /// new expiry so the application can update its record, or `None` when the
 /// request carried no session.

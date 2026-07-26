@@ -20,18 +20,18 @@ Within a request the presented token is read once and cached, and [`start`], [`s
 
 # Setup
 
-Register session support on the router with [`RouterBuilderSessionExt::sessions`]. The default [`Config`] carries the token in a session cookie, which needs cookie support installed as well:
+Register session support on the router with [`RouterBuilderSessionExt::sessions`]. The default [`SessionConfig`] carries the token in a session cookie, which needs cookie support installed as well:
 
 ```rust
 use topcoat::{
     cookie::RouterBuilderCookieExt,
     router::Router,
-    session::{Config, RouterBuilderSessionExt},
+    session::{RouterBuilderSessionExt, SessionConfig},
 };
 
 let router = Router::builder()
     .cookies()
-    .sessions(Config::default())
+    .sessions(SessionConfig::default())
     .build();
 ```
 
@@ -43,7 +43,7 @@ Authenticate the user however your application does, then call [`start`] and rec
 use topcoat::{
     Result,
     context::Cx,
-    router::{SeeOther, route, see_other},
+    router::{error::{SeeOther, see_other}, route},
     session,
 };
 # struct User;
@@ -65,7 +65,7 @@ async fn login(cx: &Cx) -> Result<SeeOther> {
 
 # Resolving the current user
 
-[`token_hash`] gives you the hash for the request's token, or `None` when the request carries no (valid) token. Looking it up is your side of the contract, and the idiomatic shape is a `current_user` function in the spirit of [functions, not middlewares](functions_not_middlewares.md). Treat a hash your storage does not contain, or whose record has expired, as not authenticated:
+[`token_hash`] gives you the hash for the request's token, or `None` when the request carries no (valid) token. Looking it up is your side of the contract, and the idiomatic shape is a `current_user` function in the spirit of [functions, not middlewares](crate::context#functions-not-middlewares). Treat a hash your storage does not contain, or whose record has expired, as not authenticated:
 
 ```rust
 use topcoat::{Result, context::Cx, session};
@@ -81,7 +81,7 @@ async fn current_user(cx: &Cx) -> Result<Option<User>> {
 }
 ```
 
-The token itself is only read once per request, but `current_user`'s database lookup runs on every call; wrap it with [`#[memoize]`](memoization.md) if pages call it repeatedly.
+The token itself is only read once per request, but `current_user`'s database lookup runs on every call; wrap it with [`#[memoize]`](macro@crate::context::memoize) if pages call it repeatedly.
 
 Guard pages by combining it with the router's error helpers:
 
@@ -89,7 +89,7 @@ Guard pages by combining it with the router's error helpers:
 use topcoat::{
     Result,
     context::Cx,
-    router::{RouterErrorExt, page},
+    router::{error::RouterErrorExt, page},
     view::view,
 };
 # #[derive(Clone)] struct User { name: String }
@@ -112,7 +112,7 @@ async fn account(cx: &Cx) -> Result {
 use topcoat::{
     Result,
     context::Cx,
-    router::{SeeOther, route, see_other},
+    router::{error::{SeeOther, see_other}, route},
     session,
 };
 # async fn delete_session(_cx: &Cx, _hash: &session::TokenHash) -> Result<()> { Ok(()) }
@@ -130,7 +130,7 @@ Note that [`stop`] only ends the session the request presented. Revoking *other*
 
 # Refreshing and rotating
 
-A session expires a fixed [`lifetime`](ConfigBuilder::lifetime) after it was started. For **sliding expiration** -- sessions that stay alive while they are used -- call [`refresh`] when you resolve a valid session and push the expiry of your record forward:
+A session expires a fixed [`lifetime`](SessionConfigBuilder::lifetime) after it was started. For **sliding expiration** -- sessions that stay alive while they are used -- call [`refresh`] when you resolve a valid session and push the expiry of your record forward:
 
 ```rust
 use topcoat::{Result, context::Cx, session};
@@ -161,14 +161,14 @@ async fn escalate(cx: &Cx) -> Result<()> {
 
 # Configuration
 
-[`Config`] holds the token store and the session lifetime (30 days unless overridden), and is assembled with [`Config::builder`]. The default cookie store can be renamed if the `session` cookie name does not suit:
+[`SessionConfig`] holds the token store and the session lifetime (30 days unless overridden), and is assembled with [`SessionConfig::builder`]. The default cookie store can be renamed if the `session` cookie name does not suit:
 
 ```rust
 use std::time::Duration;
 
-use topcoat::session::{Config, cookie::CookieTokenStore};
+use topcoat::session::{SessionConfig, cookie::CookieTokenStore};
 
-let config = Config::builder()
+let config = SessionConfig::builder()
     .token_store(CookieTokenStore::new().name("id"))
     .lifetime(Duration::from_hours(24 * 14))
     .build();
@@ -185,14 +185,14 @@ For every request whose method is not `GET`, `HEAD`, or `OPTIONS`, the layer req
 If a page on another origin legitimately POSTs to your app (an OAuth `form_post` callback, for example), trust that origin explicitly:
 
 ```rust
-use topcoat::session::Config;
+use topcoat::session::SessionConfig;
 
-let config = Config::builder()
+let config = SessionConfig::builder()
     .trust_origin("https://accounts.example.com")
     .build();
 ```
 
-The check is also available as a plain function, [`verify_origin`], for flows outside the layer. [`ConfigBuilder::dangerous_disable_origin_verification`] turns the layer off entirely; only do so if the application enforces its own CSRF defense.
+The check is also available as a plain function, [`verify_origin`], for flows outside the layer. [`SessionConfigBuilder::dangerous_disable_origin_verification`] turns the layer off entirely; only do so if the application enforces its own CSRF defense.
 
 # Custom token stores
 

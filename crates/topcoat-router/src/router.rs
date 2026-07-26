@@ -8,8 +8,8 @@ use topcoat_core::base_url::BaseUrl;
 use topcoat_core::context::{ContextMap, CxBuilder};
 
 use crate::{
-    Endpoint, Layer, LayerId, Layers, LayoutFn, Next, PageFn, PageWithLayouts, PathSegment,
-    RawPathParams, Request, Response, Route, Terminal, respond,
+    Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, Next, PageFn, PageWithLayouts,
+    PathSegment, RawPathParams, Request, Response, Route, Terminal, error::respond,
 };
 
 /// A finalized Topcoat routing table.
@@ -58,9 +58,10 @@ impl Router {
     /// Dispatches a request to the route registered for its path and method,
     /// producing a response.
     ///
-    /// Returns `404 Not Found` when no route matches the path, or
-    /// `405 Method Not Allowed` (with an `Allow` header) when the path matches
-    /// but the method does not.
+    /// A route registered for the request's specific method wins over an
+    /// any-method route at the same path. Returns `404 Not Found` when no
+    /// route matches the path, or `405 Method Not Allowed` (with an `Allow`
+    /// header) when the path matches but no route accepts the method.
     pub async fn handle(&self, request: Request) -> Response {
         let (parts, body) = request.into_parts();
 
@@ -79,7 +80,7 @@ impl Router {
                     let values = matched.params.iter().map(|(_, value)| value);
                     RawPathParams::from_pairs(keys.zip(values))
                 };
-                let terminal = match endpoint.get(&parts.method) {
+                let terminal = match endpoint.get(&parts.method).or_else(|| endpoint.any()) {
                     Some(index) => Terminal::Route(&*self.routes[index]),
                     None => Terminal::MethodNotAllowed(matched.value),
                 };
@@ -179,8 +180,13 @@ impl RouterBuilder {
         self.routes.is_empty() && self.pages.is_empty() && self.layouts.is_empty()
     }
 
-    /// Registers a [`Route`], an HTTP handler bound to a specific method and
+    /// Registers a [`Route`], an HTTP handler bound to a set of methods and a
     /// path.
+    ///
+    /// A route responds to the methods its [`Route::methods`] declares: one or
+    /// more specific methods, or every method via [`Methods::Any`]. Specific-
+    /// method routes and one any-method route can share a path; the specific
+    /// method wins at dispatch.
     #[must_use]
     pub fn route(mut self, route: impl Route) -> Self {
         self.routes.push(Box::new(route));
@@ -201,6 +207,9 @@ impl RouterBuilder {
     /// Registers a page: anything convertible into a [`PageFn`], like the
     /// marker `#[page]` generates. Order doesn't matter: layout matching is
     /// based on path prefixes, not registration order.
+    ///
+    /// A page serves the methods its [`PageFn`] declares (`GET` unless the
+    /// page opts into others).
     #[must_use]
     pub fn page(mut self, page: impl Into<PageFn>) -> Self {
         self.pages.push(page.into());
@@ -432,8 +441,10 @@ impl RouterBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if two routes resolve to the same path and HTTP method, since the
-    /// router would have no way to choose between them.
+    /// Panics if two routes resolve to the same path and HTTP method (or both
+    /// respond to every method at the same path), since the router would have
+    /// no way to choose between them, and if a route declares an empty method
+    /// set, since it could never be dispatched to.
     ///
     /// Also panics if two routes resolve to the same path but different layers
     /// wrap them (possible when their group segments differ, e.g. `/(a)/x` and
@@ -508,13 +519,34 @@ impl RouterBuilder {
                 route.path(),
             );
 
-            let method = route.method();
-            assert!(
-                endpoint.get(&method).is_none(),
-                "duplicate route registered for `{method} {}`",
-                route.path().to_matchit_path()
-            );
-            endpoint.insert(method, index);
+            // An any-method route shares its path with specific-method routes
+            // (which win at dispatch), so the two kinds are checked for
+            // duplicates independently.
+            match route.methods() {
+                Methods::Any => {
+                    assert!(
+                        endpoint.any().is_none(),
+                        "duplicate any-method route registered for `{}`",
+                        route.path().to_matchit_path()
+                    );
+                    endpoint.insert_any(index);
+                }
+                Methods::Only(methods) => {
+                    assert!(
+                        !methods.is_empty(),
+                        "route `{}` registers no methods",
+                        route.path()
+                    );
+                    for method in methods {
+                        assert!(
+                            endpoint.get(method).is_none(),
+                            "duplicate route registered for `{method} {}`",
+                            route.path().to_matchit_path()
+                        );
+                        endpoint.insert(method.clone(), index);
+                    }
+                }
+            }
         }
 
         // Precompute the layer stack wrapping each endpoint once, so dispatch
@@ -808,6 +840,99 @@ mod tests {
         assert_eq!(&body[..], b"rest=a/b/c");
     }
 
+    // -- Router::handle: method sets --
+
+    fn say_any(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { "any".into_response(cx) })
+    }
+
+    #[test]
+    fn any_method_route_serves_every_method() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Methods::Any, path("/x"), say_any))
+            .build();
+
+        let purge = Method::from_bytes(b"PURGE").unwrap();
+        for method in [Method::GET, Method::POST, Method::DELETE, purge] {
+            let (status, _, body) = send(&router, method, "/x");
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(&body[..], b"any");
+        }
+    }
+
+    #[test]
+    fn specific_method_route_wins_over_any() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .route(RouteFn::new(Methods::Any, path("/x"), say_any))
+            .build();
+
+        let (_, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(&body[..], b"route");
+        let (_, _, body) = send(&router, Method::POST, "/x");
+        assert_eq!(&body[..], b"any");
+    }
+
+    #[test]
+    fn multi_method_route_serves_each_of_its_methods() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                &[Method::GET, Method::POST],
+                path("/form"),
+                say_route,
+            ))
+            .build();
+
+        let (status, _, _) = send(&router, Method::GET, "/form");
+        assert_eq!(status, StatusCode::OK);
+        let (status, _, _) = send(&router, Method::POST, "/form");
+        assert_eq!(status, StatusCode::OK);
+
+        // Methods outside the set still resolve to a 405.
+        let (status, _, _) = send(&router, Method::DELETE, "/form");
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn head_falls_back_to_an_any_method_route() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Methods::Any, path("/x"), say_any))
+            .build();
+        let (status, _, body) = send(&router, Method::HEAD, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"any");
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate any-method route")]
+    fn duplicate_any_method_routes_panic_on_build() {
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Methods::Any, path("/x"), say_any))
+            .route(RouteFn::new(Methods::Any, path("/x"), say_any))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate route")]
+    fn overlapping_method_sets_panic_on_build() {
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(
+                &[Method::GET, Method::POST],
+                path("/x"),
+                say_route,
+            ))
+            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "registers no methods")]
+    fn route_without_methods_panics_on_build() {
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Vec::<Method>::new(), path("/x"), say_route))
+            .build();
+    }
+
     #[test]
     fn app_context_is_available_to_handlers() {
         let router = RouterBuilder::new()
@@ -1037,7 +1162,7 @@ mod tests {
     #[test]
     fn page_renders_as_html() {
         let router = RouterBuilder::new()
-            .page(PageFn::new(path("/p"), render_page))
+            .page(PageFn::new(Method::GET, path("/p"), render_page))
             .build();
         let (status, headers, body) = send(&router, Method::GET, "/p");
         assert_eq!(status, StatusCode::OK);
@@ -1049,9 +1174,21 @@ mod tests {
     }
 
     #[test]
+    fn a_page_serves_only_its_declared_methods() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::POST, path("/p"), render_page))
+            .build();
+        let (status, _, body) = send(&router, Method::POST, "/p");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"page");
+        let (status, _, _) = send(&router, Method::GET, "/p");
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
     fn matching_layouts_wrap_a_page_outermost_first() {
         let router = RouterBuilder::new()
-            .page(PageFn::new(path("/admin/p"), render_page))
+            .page(PageFn::new(Method::GET, path("/admin/p"), render_page))
             .layout(LayoutFn::new(path("/admin"), layout_admin))
             .layout(LayoutFn::new(path("/"), layout_root))
             .build();
@@ -1065,7 +1202,7 @@ mod tests {
     #[test]
     fn layout_only_wraps_pages_under_its_path() {
         let router = RouterBuilder::new()
-            .page(PageFn::new(path("/p"), render_page))
+            .page(PageFn::new(Method::GET, path("/p"), render_page))
             .layout(LayoutFn::new(path("/admin"), layout_admin))
             .build();
         // The `/admin` layout does not apply to a page at `/p`.

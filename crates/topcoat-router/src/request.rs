@@ -35,7 +35,7 @@ pub type Request<T = Body> = http::Request<T>;
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
-///     router::{Body, FromRequest, bad_request, headers, route, to_bytes},
+///     router::{Body, FromRequest, error::bad_request, headers, route, to_bytes},
 /// };
 ///
 /// struct SignedJson<T>(T);
@@ -70,9 +70,9 @@ pub type Request<T = Body> = http::Request<T>;
 pub trait FromRequest: Sized {
     /// Builds `Self` from the request context and body.
     ///
-    /// Returns an error (typically [`bad_request`]) when the request cannot be
-    /// parsed into `Self`; the error is converted into the response sent to the
-    /// client.
+    /// Returns an error (typically [`bad_request`](crate::error::bad_request))
+    /// when the request cannot be parsed into `Self`; the error is converted
+    /// into the response sent to the client.
     fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> + Send;
 }
 

@@ -179,3 +179,86 @@ async fn generic_component_renders() {
 
     assert_eq!(result.unwrap().render(__cx), "<span>3</span>");
 }
+
+struct TreeNode {
+    label: &'static str,
+    children: Vec<TreeNode>,
+}
+
+#[component(boxed)]
+async fn tree(node: &TreeNode) -> Result {
+    view! {
+        <li>
+            (node.label)
+            if !node.children.is_empty() {
+                <ul>
+                    for child in &node.children {
+                        tree(node: child)
+                    }
+                </ul>
+            }
+        </li>
+    }
+}
+
+#[tokio::test]
+async fn boxed_component_renders_itself_recursively() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let root = TreeNode {
+        label: "root",
+        children: vec![
+            TreeNode {
+                label: "a",
+                children: vec![TreeNode {
+                    label: "a1",
+                    children: vec![],
+                }],
+            },
+            TreeNode {
+                label: "b",
+                children: vec![],
+            },
+        ],
+    };
+    let result: Result = view! { <ul>tree(node: &root)</ul> };
+
+    assert_eq!(
+        result.unwrap().render(__cx),
+        "<ul><li>root<ul><li>a<ul><li>a1</li></ul></li><li>b</li></ul></li></ul>",
+    );
+}
+
+// A cycle only needs one boxed component: `odd_steps` stays a plain
+// `#[component]` because `even_steps` breaks the cycle for both.
+#[component(boxed)]
+async fn even_steps(n: u32) -> Result {
+    view! {
+        <i>(n)</i>
+        if n > 0 {
+            odd_steps(n: n - 1)
+        }
+    }
+}
+
+#[component]
+async fn odd_steps(n: u32) -> Result {
+    view! {
+        <b>(n)</b>
+        if n > 0 {
+            even_steps(n: n - 1)
+        }
+    }
+}
+
+#[tokio::test]
+async fn mutually_recursive_components_need_only_one_boxed() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let result: Result = view! { even_steps(n: 3) };
+
+    assert_eq!(
+        result.unwrap().render(__cx),
+        "<i>3</i><b>2</b><i>1</i><b>0</b>",
+    );
+}

@@ -10,9 +10,13 @@ pub trait Component {
         Self::Props::builder()
     }
 
-    fn render(
+    /// Renders the component to a [`View`].
+    fn render<'cx>(
         self,
-        cx: &Cx,
+        cx: &'cx Cx,
         props: Self::Props,
-    ) -> impl Future<Output = Result<View, Error>> + Send;
+    ) -> impl Future<Output = Result<View, Error>> + Send
+    where
+        Self: 'cx,
+        Self::Props: 'cx;
 }

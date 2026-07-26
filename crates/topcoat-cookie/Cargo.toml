@@ -24,6 +24,10 @@ http.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+# Signed and private jars draw their randomness from the JS host (`crypto.getRandomValues`) on wasm32-unknown-unknown.
+getrandom02 = { workspace = true, features = ["js"] }
+
 [dev-dependencies]
 topcoat = { workspace = true, features = ["cookie"] }
 tokio = { workspace = true, features = ["macros", "rt"] }

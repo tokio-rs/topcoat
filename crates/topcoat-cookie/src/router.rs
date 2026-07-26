@@ -57,15 +57,15 @@ impl RouterBuilderCookieExt for RouterBuilder {
 mod tests {
     use http::{Method, Request, header};
     use topcoat_core::{context::Cx, error::Result};
-    use topcoat_router::{Body, Path, Response, Route, RouteFuture, Router};
+    use topcoat_router::{Body, Methods, Path, Response, Route, RouteFuture, Router};
 
     use crate::{Cookies, RouterBuilderCookieExt, cookies};
 
     struct AddCookie;
 
     impl Route for AddCookie {
-        fn method(&self) -> Method {
-            Method::GET
+        fn methods(&self) -> Methods<'_> {
+            Methods::Only(&[Method::GET])
         }
 
         fn path(&self) -> &Path {

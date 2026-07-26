@@ -4,7 +4,7 @@ use console::style;
 use tokio::task::JoinHandle;
 
 use super::spinner::Spinner;
-use crate::cargo::{BuildError, BuildOpts};
+use crate::common::cargo::{BuildError, BuildOpts};
 
 /// Which kind of build a [`BuildTask`] runs; affects only the progress label.
 #[derive(Clone, Copy)]
@@ -78,10 +78,11 @@ async fn build(kind: BuildKind, opts: BuildOpts) -> Option<PathBuf> {
     let label = kind.label();
     let spinner = Spinner::new(label);
     let progress = spinner.bar();
-    let result = crate::cargo::build_and_read(&opts, move |current, total| {
-        progress.set_message(format!("{label} ({current}/{total})"));
-    })
-    .await;
+    let result = opts
+        .build_and_read(move |current, total| {
+            progress.set_message(format!("{label} ({current}/{total})"));
+        })
+        .await;
     drop(spinner);
 
     let (exe, bytes) = match result {
@@ -113,10 +114,13 @@ async fn build(kind: BuildKind, opts: BuildOpts) -> Option<PathBuf> {
 fn report_build_error(error: &BuildError) {
     eprintln!("  {}", style("build failed").red().bold());
     eprintln!();
-    if let BuildError::Failed { rendered } = error {
-        eprint!("{rendered}");
-    } else {
-        eprintln!("  {}", style(error.to_string()).red());
+    match error {
+        BuildError::Failed { diagnostics } => {
+            if !diagnostics.is_empty() {
+                eprintln!("{diagnostics}");
+            }
+        }
+        _ => eprintln!("  {}", style(error.to_string()).red()),
     }
     eprintln!();
 }

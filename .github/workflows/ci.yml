@@ -71,6 +71,15 @@ jobs:
       # offline job must not trigger; it adds no lib coverage, so skip it.
       - run: cargo hack clippy --workspace --each-feature --exclude-features stage-icons --no-dev-deps --offline -- -D warnings
 
+  wasm:
+    name: wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update stable && rustup default stable && rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check -p topcoat --target wasm32-unknown-unknown --no-default-features --features router,view,runtime,asset,cookie,session,discover,multipart,tower --locked
+
   runtime:
     name: runtime
     runs-on: ubuntu-latest

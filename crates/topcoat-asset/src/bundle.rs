@@ -1,68 +1,23 @@
 use std::{
-    collections::HashMap,
     ffi::OsStr,
     io,
     path::{Path, PathBuf},
 };
 
-use topcoat_core::context::{Cx, app_context};
+use crate::{Asset, AssetCatalog, BundledAsset, MANIFEST_NAME, Manifest};
 
-use crate::{Asset, MANIFEST_NAME, Manifest};
-
-/// A single entry inside an [`AssetBundle`].
-#[derive(Debug, Clone)]
-pub struct BundledAsset {
-    path: PathBuf,
-    content_type: String,
-}
-
-impl BundledAsset {
-    /// Absolute path to the bundled file on disk.
-    #[must_use]
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    /// Bundled filename (typically `stem-<short-hash>.ext`).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the bundled file path has no final component (e.g. it
-    /// resolves to `/`), which should never happen for a bundle built by
-    /// the [`Bundler`](crate::Bundler).
-    #[must_use]
-    pub fn name(&self) -> &OsStr {
-        self.path
-            .file_name()
-            .expect("asset file path must have a name")
-    }
-
-    /// `Content-Type` the asset is served with, resolved when the bundle was
-    /// built.
-    #[must_use]
-    pub fn content_type(&self) -> &str {
-        &self.content_type
-    }
-}
-
-/// A loaded asset bundle: a directory of files plus the mapping from
-/// [`Asset`] IDs to those files.
+/// An asset bundle on disk: a directory of bundled files plus the
+/// [`AssetCatalog`] mapping [`Asset`] IDs to them.
 ///
 /// Built by the [`Bundler`](crate::Bundler) and loaded at runtime via
 /// [`AssetBundle::load`] or [`AssetBundle::load_dir`].
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct AssetBundle {
-    dir: PathBuf,
-    bundled_assets: HashMap<Asset, BundledAsset>,
+    pub(crate) dir: PathBuf,
+    pub(crate) catalog: AssetCatalog,
 }
 
 impl AssetBundle {
-    /// Bundle with no assets and no directory; useful as a placeholder.
-    #[must_use]
-    pub fn empty() -> Self {
-        AssetBundle::default()
-    }
-
     /// Auto-detect and load the bundle from a conventional location.
     ///
     /// Walks up from the current executable, checking each ancestor for an
@@ -148,24 +103,9 @@ impl AssetBundle {
     pub fn load_dir(dir: impl AsRef<Path>) -> io::Result<Self> {
         let dir = dir.as_ref().to_path_buf();
         let manifest = Manifest::load(dir.join(MANIFEST_NAME))?;
-
-        let bundled_assets = manifest
-            .assets
-            .into_iter()
-            .map(|entry| {
-                (
-                    entry.id,
-                    BundledAsset {
-                        path: dir.join(entry.file),
-                        content_type: entry.content_type,
-                    },
-                )
-            })
-            .collect();
-
         Ok(Self {
             dir,
-            bundled_assets,
+            catalog: manifest.into(),
         })
     }
 
@@ -175,39 +115,18 @@ impl AssetBundle {
         &self.dir
     }
 
+    /// The catalog mapping [`Asset`] IDs to the files in the bundle directory.
+    #[must_use]
+    pub fn catalog(&self) -> &AssetCatalog {
+        &self.catalog
+    }
+
     /// Look up the bundled file for an [`Asset`] ID.
+    ///
+    /// The returned entry names the file; its on-disk location is that name
+    /// under [`dir`](AssetBundle::dir).
     #[must_use]
     pub fn get(&self, id: Asset) -> Option<&BundledAsset> {
-        self.bundled_assets.get(&id)
-    }
-
-    /// Iterate over every bundled asset in arbitrary order.
-    pub fn assets(&self) -> impl Iterator<Item = &BundledAsset> {
-        self.bundled_assets.values()
-    }
-}
-
-/// Returns the [`AssetBundle`] registered as app context for this context.
-///
-/// # Panics
-///
-/// Panics if no [`AssetBundle`] was registered.
-#[must_use]
-pub fn asset_bundle(cx: &Cx) -> &AssetBundle {
-    app_context(cx)
-}
-
-/// Resolves an [`Asset`] ID to its [`BundledAsset`] in the context's
-/// [`AssetBundle`].
-///
-/// # Panics
-///
-/// Panics if no [`AssetBundle`] was registered, or if the bundle does
-/// not contain the given asset.
-#[must_use]
-pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
-    match asset_bundle(cx).get(asset) {
-        Some(asset) => asset,
-        None => panic!("failed to resolve asset {asset:?} in app context's asset bundle"),
+        self.catalog.get(id)
     }
 }

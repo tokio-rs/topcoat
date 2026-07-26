@@ -1,3 +1,4 @@
+import { Bool } from "./bool";
 import { F64 } from "./f64";
 import { String as RuntimeString } from "./string";
 
@@ -6,12 +7,12 @@ type EventTargetLike = globalThis.EventTarget | null;
 export class Event {
 	constructor(private readonly inner: globalThis.Event) {}
 
-	get alt_key(): boolean {
+	get alt_key(): Bool {
 		return boolProp(this.inner, "altKey");
 	}
 
-	get bubbles(): boolean {
-		return this.inner.bubbles;
+	get bubbles(): Bool {
+		return new Bool(this.inner.bubbles);
 	}
 
 	get button(): F64 {
@@ -22,8 +23,8 @@ export class Event {
 		return f64Prop(this.inner, "buttons");
 	}
 
-	get cancelable(): boolean {
-		return this.inner.cancelable;
+	get cancelable(): Bool {
+		return new Bool(this.inner.cancelable);
 	}
 
 	get client_x(): F64 {
@@ -38,7 +39,7 @@ export class Event {
 		return stringProp(this.inner, "code");
 	}
 
-	get ctrl_key(): boolean {
+	get ctrl_key(): Bool {
 		return boolProp(this.inner, "ctrlKey");
 	}
 
@@ -50,8 +51,8 @@ export class Event {
 		return stringProp(this.inner, "data");
 	}
 
-	get default_prevented(): boolean {
-		return this.inner.defaultPrevented;
+	get default_prevented(): Bool {
+		return new Bool(this.inner.defaultPrevented);
 	}
 
 	get delta_x(): F64 {
@@ -74,7 +75,7 @@ export class Event {
 		return stringProp(this.inner, "inputType");
 	}
 
-	get is_composing(): boolean {
+	get is_composing(): Bool {
 		return boolProp(this.inner, "isComposing");
 	}
 
@@ -82,7 +83,7 @@ export class Event {
 		return stringProp(this.inner, "key");
 	}
 
-	get meta_key(): boolean {
+	get meta_key(): Bool {
 		return boolProp(this.inner, "metaKey");
 	}
 
@@ -118,7 +119,7 @@ export class Event {
 		return stringProp(this.inner, "pointerType");
 	}
 
-	get repeat(): boolean {
+	get repeat(): Bool {
 		return boolProp(this.inner, "repeat");
 	}
 
@@ -130,7 +131,7 @@ export class Event {
 		return f64Prop(this.inner, "screenY");
 	}
 
-	get shift_key(): boolean {
+	get shift_key(): Bool {
 		return boolProp(this.inner, "shiftKey");
 	}
 
@@ -158,7 +159,7 @@ export class Event {
 export class EventTarget {
 	constructor(private readonly inner: EventTargetLike) {}
 
-	get checked(): boolean {
+	get checked(): Bool {
 		return boolProp(this.inner, "checked");
 	}
 
@@ -181,10 +182,12 @@ export class EventTarget {
 	}
 }
 
-function boolProp(source: unknown, name: string): boolean {
-	return typeof source === "object" && source !== null && name in source
-		? Boolean((source as Record<string, unknown>)[name])
-		: false;
+function boolProp(source: unknown, name: string): Bool {
+	return new Bool(
+		typeof source === "object" && source !== null && name in source
+			? Boolean((source as Record<string, unknown>)[name])
+			: false,
+	);
 }
 
 function f64Prop(source: unknown, name: string): F64 {

@@ -12,7 +12,7 @@ use crate::{Body, IntoResponse, Response};
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::router::{Method, method_not_allowed};
+/// use topcoat::router::{Method, error::method_not_allowed};
 ///
 /// let error = method_not_allowed([Method::GET, Method::POST]);
 /// ```

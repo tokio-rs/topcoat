@@ -148,7 +148,7 @@ impl ToTokens for PathParam {
                     let default = format!("invalid value for path parameter \"{name_string}\"");
                     (
                         error.ty(),
-                        error.map_err(quote! { |_| #topcoat_router::bad_request(#default) }),
+                        error.map_err(quote! { |_| #topcoat_router::error::bad_request(#default) }),
                     )
                 }
                 None => (

@@ -1,20 +1,19 @@
-use axum::{
-    Router,
-    extract::{
-        State, WebSocketUpgrade,
-        ws::{Message, WebSocket},
-    },
-    response::IntoResponse,
-    routing::get,
-};
 use console::style;
 use futures_util::{SinkExt, StreamExt};
 use std::{
+    borrow::Cow,
+    future,
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
+use topcoat_core::context::{Cx, app_context};
+use topcoat_router::{
+    Body, FromRequest, HeaderValue, Method, Path, Response, RouteFn, RouteFuture, Router,
+    RouterService, header, internal_serve,
+    websocket::{Message, WebSocket, WebSocketUpgrade},
+};
 
 const PORT_START: u16 = 59039;
 const PORT_RANGE: u16 = 100;
@@ -110,23 +109,40 @@ pub async fn bind() -> TcpListener {
 /// to every connected client. When an application reports ready over the
 /// WebSocket, its address is printed and a [`Event::Reload`] is published.
 pub async fn run(listener: TcpListener, events: EventBus) {
-    let app = Router::new()
-        .route("/dev.js", get(serve_dev_js))
-        .route("/ws", get(ws_handler))
-        .with_state(events);
+    let router = Router::builder()
+        .app_context(events)
+        .route(RouteFn::new(
+            Method::GET,
+            Cow::Borrowed(Path::new("/dev.js")),
+            serve_dev_js,
+        ))
+        .route(RouteFn::new(
+            Method::GET,
+            Cow::Borrowed(Path::new("/ws")),
+            ws_route,
+        ))
+        .build();
 
-    let _ = axum::serve(listener, app).await;
+    let _ = internal_serve(listener, RouterService::new(router), future::pending()).await;
 }
 
-async fn serve_dev_js() -> impl IntoResponse {
-    (
-        [("content-type", "application/javascript; charset=utf-8")],
-        DEV_JS,
-    )
+fn serve_dev_js(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+    Box::pin(async move {
+        let mut response = Response::new(Body::from(DEV_JS));
+        response.headers_mut().insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/javascript; charset=utf-8"),
+        );
+        Ok(response)
+    })
 }
 
-async fn ws_handler(ws: WebSocketUpgrade, State(events): State<EventBus>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_socket(socket, events))
+fn ws_route(cx: &Cx, body: Body) -> RouteFuture<'_> {
+    Box::pin(async move {
+        let upgrade = WebSocketUpgrade::from_request(cx, body).await?;
+        let events = app_context::<EventBus>(cx).clone();
+        upgrade.on_upgrade(move |socket| handle_socket(socket, events))
+    })
 }
 
 async fn handle_socket(ws: WebSocket, events: EventBus) {
@@ -135,10 +151,7 @@ async fn handle_socket(ws: WebSocket, events: EventBus) {
 
     // Bring a page that connects mid-build (or mid-failure) up to date.
     if let Some(event) = events.status()
-        && sink
-            .send(Message::Text(event.message().into()))
-            .await
-            .is_err()
+        && sink.send(Message::text(event.message())).await.is_err()
     {
         return;
     }
@@ -168,7 +181,7 @@ async fn handle_socket(ws: WebSocket, events: EventBus) {
                     }
             }
             Ok(event) = rx.recv() => {
-                if sink.send(Message::Text(event.message().into())).await.is_err() {
+                if sink.send(Message::text(event.message())).await.is_err() {
                     break;
                 }
             }

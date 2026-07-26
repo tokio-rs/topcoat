@@ -90,8 +90,11 @@ export class Str implements AttributeValueViewParts, NodeViewParts {
 
 // biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
 export class String extends Str {
+	// Mirrors Rust's `Deref<Target = str>`: dereferencing an owned string
+	// yields the borrowed form. Returning a plain `Str` (never `this`) also
+	// keeps ref-unwrapping loops finite (#192).
 	deref(): Str {
-		return this;
+		return new Str(this.v);
 	}
 
 	clone(): String {

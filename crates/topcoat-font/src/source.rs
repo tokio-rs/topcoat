@@ -10,7 +10,7 @@ use crate::{CssString, FontFormat, FontTech};
 /// `@font-face` `src` descriptor.
 ///
 /// A [`Str`](Self::Str) is written verbatim; an [`Asset`](Self::Asset) is
-/// resolved to its hosted router URL when formatted. Either is escaped as a CSS
+/// resolved to its hosted URL when formatted. Either is escaped as a CSS
 /// `<string>` so it is safe between the quotes of `url("...")`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FontSourceUrl {
@@ -34,14 +34,7 @@ impl FontSourceUrl {
         match self {
             Self::Str(inner) => f.write_str(inner),
             #[cfg(feature = "asset")]
-            Self::Asset(inner) => {
-                use topcoat_asset::{AssetRouteResolver, bundled_asset};
-                use topcoat_core::context::app_context;
-
-                let resolver = app_context::<AssetRouteResolver>(cx);
-                let bundled_asset = bundled_asset(cx, *inner);
-                resolver.resolve(bundled_asset, &mut f)
-            }
+            Self::Asset(inner) => topcoat_asset::asset_config(cx).fmt_url(*inner, &mut f),
         }
     }
 

@@ -1,4 +1,11 @@
 #![doc = include_str!("../docs/router.md")]
+// Without the `tower`, `serve`, and `websocket` features the docs' links into
+// the `tower` and `websocket` modules and the serve functions cannot resolve;
+// they degrade to plain text instead of failing the build.
+#![cfg_attr(
+    not(all(feature = "serve", feature = "tower", feature = "websocket")),
+    allow(rustdoc::broken_intra_doc_links)
+)]
 
 pub use topcoat_router::*;
 pub use topcoat_router_macro::*;
