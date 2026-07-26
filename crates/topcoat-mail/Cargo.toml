@@ -10,12 +10,19 @@ keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
 
+[features]
+smtp = ["lettre/smtp-transport", "lettre/tokio1", "lettre/tokio1-rustls-tls", "lettre/pool"]
+
 [dependencies]
 topcoat-core.workspace = true
 topcoat-view.workspace = true
 
-lettre = { workspace = true, features = ["builder"] }
+lettre = { workspace = true, features = ["builder", "hostname"] }
 thiserror.workspace = true
+time = { workspace = true, features = ["formatting", "macros"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
 workspace = true

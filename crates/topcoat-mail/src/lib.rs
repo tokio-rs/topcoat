@@ -3,7 +3,10 @@
 mod attachment;
 mod mail;
 mod mailbox;
+mod mime;
+mod transport;
 
 pub use attachment::*;
 pub use mail::*;
 pub use mailbox::*;
+pub use transport::*;

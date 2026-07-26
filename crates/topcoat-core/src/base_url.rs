@@ -24,7 +24,10 @@ use crate::context::{Cx, try_app_context};
 /// use topcoat::context::BaseUrl;
 ///
 /// let base = BaseUrl::new("https://example.com")?;
-/// assert_eq!(base.join("/assets/logo.png"), "https://example.com/assets/logo.png");
+/// assert_eq!(
+///     base.join("/assets/logo.png"),
+///     "https://example.com/assets/logo.png"
+/// );
 /// # Ok::<(), topcoat::context::BaseUrlError>(())
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -248,7 +251,10 @@ mod tests {
             base.join("assets/logo.png"),
             "https://example.com/assets/logo.png"
         );
-        assert_eq!(base.join("/posts?page=2"), "https://example.com/posts?page=2");
+        assert_eq!(
+            base.join("/posts?page=2"),
+            "https://example.com/posts?page=2"
+        );
         assert_eq!(base.join("/"), "https://example.com/");
 
         let prefixed = BaseUrl::new("https://example.com/app")?;

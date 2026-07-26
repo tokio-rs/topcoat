@@ -71,6 +71,11 @@ impl Mailbox {
     pub fn address(&self) -> &str {
         self.address.as_ref()
     }
+
+    /// Converts into the lettre mailbox used during MIME assembly.
+    pub(crate) fn to_lettre(&self) -> lettre::message::Mailbox {
+        lettre::message::Mailbox::new(self.name.clone(), self.address.clone())
+    }
 }
 
 impl fmt::Display for Mailbox {
