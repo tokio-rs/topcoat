@@ -172,6 +172,7 @@ impl FmtCommand {
             Ok(()) => {}
             Err(error) => {
                 eprintln!("{}", style(error).red());
+                std::process::exit(1);
             }
         }
     }
