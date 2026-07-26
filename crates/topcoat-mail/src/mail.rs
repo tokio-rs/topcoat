@@ -31,7 +31,7 @@ pub struct Mail {
     reply_to: Vec<Mailbox>,
     subject: String,
     html: Option<View>,
-    text: Option<String>,
+    text: TextBody,
     attachments: Vec<Attachment>,
     in_reply_to: Option<String>,
     references: Option<String>,
@@ -89,10 +89,10 @@ impl Mail {
         self.html.as_ref()
     }
 
-    /// The plain-text body, if any.
+    /// The plain-text body: derived, declared, or absent.
     #[must_use]
-    pub fn text(&self) -> Option<&str> {
-        self.text.as_deref()
+    pub fn text(&self) -> &TextBody {
+        &self.text
     }
 
     /// The attachments, downloadable and inline alike.
@@ -195,13 +195,15 @@ impl MailBuilder {
         self
     }
 
-    /// Sets the plain-text body.
-    ///
-    /// Set alongside `html`, it is the fallback for clients that do not
+    /// Sets the plain-text body, the fallback for clients that do not
     /// render HTML.
+    ///
+    /// Accepts the text itself or a [`TextBody`] variant. Without a call,
+    /// the text is derived from the HTML body when the mail is assembled;
+    /// pass [`TextBody::None`] to send the HTML alone.
     #[must_use]
-    pub fn text(mut self, text: impl Into<String>) -> Self {
-        self.mail.text = Some(text.into());
+    pub fn text(mut self, text: impl Into<TextBody>) -> Self {
+        self.mail.text = text.into();
         self
     }
 
@@ -256,6 +258,52 @@ impl MailBuilder {
     }
 }
 
+/// The plain-text body of a mail: derived, declared, or absent.
+///
+/// Mail without a plain-text alternative scores worse with spam filters, so
+/// the default, [`FromHtml`](TextBody::FromHtml), derives one from the
+/// rendered HTML body when the mail is assembled. Declare the text yourself
+/// or opt out through the builder's [`text`](MailBuilder::text) setter:
+///
+/// ```
+/// use topcoat_mail::{Mail, TextBody};
+///
+/// let derived = Mail::builder().build();
+/// let declared = Mail::builder().text("The engine weaves.").build();
+/// let html_alone = Mail::builder().text(TextBody::None).build();
+///
+/// assert_eq!(derived.text(), &TextBody::FromHtml);
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum TextBody {
+    /// Derive the text from the HTML body when the mail is assembled. A
+    /// mail without an HTML body sends no text body.
+    #[default]
+    FromHtml,
+    /// Send no plain-text body.
+    None,
+    /// Send the declared text.
+    Text(String),
+}
+
+impl From<String> for TextBody {
+    fn from(text: String) -> TextBody {
+        TextBody::Text(text)
+    }
+}
+
+impl From<&str> for TextBody {
+    fn from(text: &str) -> TextBody {
+        TextBody::Text(text.to_owned())
+    }
+}
+
+impl From<&String> for TextBody {
+    fn from(text: &String) -> TextBody {
+        TextBody::Text(text.clone())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297,7 +345,7 @@ mod tests {
         assert_eq!(mail.reply_to(), [Mailbox::new("replies@example.com")?]);
         assert_eq!(mail.subject(), "Hello");
         assert!(mail.html().is_some());
-        assert_eq!(mail.text(), Some("Hello there"));
+        assert_eq!(mail.text(), &TextBody::Text("Hello there".to_owned()));
         assert_eq!(mail.attachments().len(), 1);
         assert_eq!(
             mail.headers(),
@@ -325,7 +373,7 @@ mod tests {
         assert!(mail.reply_to().is_empty());
         assert_eq!(mail.subject(), "");
         assert!(mail.html().is_none());
-        assert!(mail.text().is_none());
+        assert_eq!(mail.text(), &TextBody::FromHtml);
         assert!(mail.attachments().is_empty());
         assert!(mail.headers().is_empty());
         assert_eq!(mail.date(), None);

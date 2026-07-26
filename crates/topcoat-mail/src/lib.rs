@@ -4,6 +4,7 @@ mod attachment;
 mod mail;
 mod mailbox;
 mod mime;
+mod text;
 mod transport;
 
 pub use attachment::*;

@@ -6,7 +6,7 @@ use lettre::message::{
 };
 use topcoat_core::context::Cx;
 
-use crate::{Attachment, Mail, SendError};
+use crate::{Attachment, Mail, SendError, TextBody, text::text_from_html};
 
 impl Mail {
     /// Renders the mail into its RFC 5322 wire form.
@@ -15,12 +15,13 @@ impl Mail {
     /// followed by the MIME body tree, with `multipart/alternative` for a
     /// mail with both bodies, `multipart/related` around an HTML body with
     /// inline attachments, and `multipart/mixed` around downloadable
-    /// attachments.
-    /// The HTML body is rendered with `cx`, and a `Date` and `Message-ID`
-    /// are generated for a mail that does not declare them, so two calls
-    /// produce two distinct messages. `Bcc` recipients are omitted, as they
-    /// are on the wire; they only ever appear in the envelope a transport
-    /// derives from the mail itself.
+    /// attachments. The HTML body is rendered with `cx`, the plain-text
+    /// alternative is derived from it unless the mail declares its
+    /// [`TextBody`] otherwise, and a `Date` and `Message-ID` are generated
+    /// for a mail that does not declare them, so two calls produce two
+    /// distinct messages. `Bcc` recipients are omitted, as they are on the
+    /// wire; they only ever appear in the envelope a transport derives from
+    /// the mail itself.
     ///
     /// Transports assemble the mail themselves, so there is no need to call
     /// this before sending. It is for handing the wire form elsewhere: a
@@ -147,32 +148,43 @@ fn body(cx: &Cx, mail: &Mail) -> Result<Content, SendError> {
         .filter(|attachment| attachment.filename().is_some())
         .collect();
 
-    // The HTML body, with its inline attachments alongside it.
-    let html = match mail.html() {
-        None if inline.is_empty() => None,
-        None => return Err(SendError::InlineWithoutHtml),
-        Some(view) => {
-            let part = SinglePart::html(view.render(cx));
-            if inline.is_empty() {
-                Some(Content::Single(part))
-            } else {
-                let mut related = MultiPart::related().singlepart(part);
-                for attachment in inline {
-                    related = related.singlepart(attachment_part(attachment)?);
-                }
-                Some(Content::Multi(related))
-            }
-        }
+    let html = mail.html().map(|view| view.render(cx));
+    if html.is_none() && !inline.is_empty() {
+        return Err(SendError::InlineWithoutHtml);
+    }
+
+    // The text body: declared, derived from the HTML, or absent.
+    let text = match mail.text() {
+        TextBody::Text(text) => Some(text.clone()),
+        TextBody::None => None,
+        TextBody::FromHtml => html
+            .as_deref()
+            .map(text_from_html)
+            .filter(|text| !text.is_empty()),
     };
 
+    // The HTML body, with its inline attachments alongside it.
+    let html = html
+        .map(|html| -> Result<Content, SendError> {
+            let part = SinglePart::html(html);
+            if inline.is_empty() {
+                return Ok(Content::Single(part));
+            }
+            let mut related = MultiPart::related().singlepart(part);
+            for attachment in inline {
+                related = related.singlepart(attachment_part(attachment)?);
+            }
+            Ok(Content::Multi(related))
+        })
+        .transpose()?;
+
     // The text body as the fallback alternative to the HTML body.
-    let content = match (mail.text(), html) {
+    let content = match (text, html) {
         (None, None) => return Err(SendError::MissingBody),
         (None, Some(html)) => html,
-        (Some(text), None) => Content::Single(SinglePart::plain(text.to_owned())),
+        (Some(text), None) => Content::Single(SinglePart::plain(text)),
         (Some(text), Some(html)) => {
-            let alternative =
-                MultiPart::alternative().singlepart(SinglePart::plain(text.to_owned()));
+            let alternative = MultiPart::alternative().singlepart(SinglePart::plain(text));
             Content::Multi(match html {
                 Content::Single(part) => alternative.singlepart(part),
                 Content::Multi(part) => alternative.multipart(part),
@@ -240,14 +252,38 @@ mod tests {
     }
 
     #[test]
-    fn html_only_is_a_single_html_part() {
+    fn html_derives_its_text_alternative_by_default() {
+        let mail = base()
+            .html(View::unescaped_unchecked("<h1>Hi</h1><p>Bye now</p>"))
+            .build();
+        let wire = formatted(&mail);
+
+        assert!(wire.contains("Content-Type: multipart/alternative;"));
+        assert!(wire.contains("Content-Type: text/plain; charset=utf-8\r\n"));
+        assert!(wire.contains("Bye now"));
+    }
+
+    #[test]
+    fn opted_out_text_leaves_a_single_html_part() {
         let mail = base()
             .html(View::unescaped_unchecked("<h1>Hi</h1>"))
+            .text(TextBody::None)
             .build();
         let wire = formatted(&mail);
 
         assert!(wire.contains("Content-Type: text/html; charset=utf-8\r\n"));
         assert!(wire.contains("<h1>Hi</h1>"));
+        assert!(!wire.contains("multipart"));
+    }
+
+    #[test]
+    fn empty_derived_text_is_not_sent() {
+        let mail = base()
+            .html(View::unescaped_unchecked("<img src=\"x.png\">"))
+            .build();
+        let wire = formatted(&mail);
+
+        assert!(!wire.contains("text/plain"));
         assert!(!wire.contains("multipart"));
     }
 
