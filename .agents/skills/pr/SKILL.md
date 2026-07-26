@@ -24,5 +24,6 @@ No template. Keep it short and high-signal:
 
 - **Summary** -- what the change does and why, drawn from the diff.
 - **Testing** -- how you verified it (which checks you ran; see the [`check`](../check/SKILL.md) skill).
+- **Disclaimer** -- if you are an AI agent creating the PR, add a disclaimer about model and AI use in the PR. 
 
 Reviewers already know Topcoat and Rust. Include what they need to evaluate the change, and nothing else.
