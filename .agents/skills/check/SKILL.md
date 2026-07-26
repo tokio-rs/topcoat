@@ -10,8 +10,8 @@ Keep this file in sync with CI workflows.
 Run these by default:
 
 ```
-cargo +nightly fmt --all          # stable fmt is fine if nightly is missing
-cargo topcoat fmt                 # formats Topcoat macros inside source files
+cargo +nightly fmt --all # stable fmt is fine if nightly is missing
+cargo topcoat fmt # formats Topcoat macros inside source files (ignore Leptos errors)
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-features
 RUSTDOCFLAGS="--cfg docsrs -Dwarnings" cargo +nightly doc --workspace --all-features --no-deps --locked

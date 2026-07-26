@@ -1,7 +1,5 @@
 # Agent instructions
 
-Before making code or documentation changes, ensure you have read `./STYLE.md`.
-
 ## Project structure
 
 Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable example apps in `examples/`, and the prose guides in `docs/`.
