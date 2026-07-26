@@ -10,6 +10,7 @@ description: Always use this skill before writing or editing Rust code or docume
 * Keep related code together: a struct is immediately followed by its inherent `impl` and then its trait impls, before the next struct in the file. Unit tests (`#[cfg(test)] mod tests`) go at the very bottom of the file.
 * Free functions are allowed, but first consider whether a more idiomatic Rust grouping onto a struct exists.
 * Unsafe code is not allowed in this project, unless wrapped by a reputable dependency.
+* Avoid needless allocations, it is reasonable to refactor the code a bit to make it faster.
 
 ## Barrel files
 
