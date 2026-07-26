@@ -113,10 +113,13 @@ async fn build(kind: BuildKind, opts: BuildOpts) -> Option<PathBuf> {
 fn report_build_error(error: &BuildError) {
     eprintln!("  {}", style("build failed").red().bold());
     eprintln!();
-    if let BuildError::Failed { rendered } = error {
-        eprint!("{rendered}");
-    } else {
-        eprintln!("  {}", style(error.to_string()).red());
+    match error {
+        BuildError::Failed { diagnostics } => {
+            if !diagnostics.is_empty() {
+                eprintln!("{diagnostics}");
+            }
+        }
+        _ => eprintln!("  {}", style(error.to_string()).red()),
     }
     eprintln!();
 }

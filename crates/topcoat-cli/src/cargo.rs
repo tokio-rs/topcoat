@@ -5,7 +5,7 @@ use std::process::Stdio;
 use std::time::SystemTime;
 
 use clap::Args;
-use console::style;
+use console::{strip_ansi_codes, style};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
@@ -96,7 +96,12 @@ impl From<BuildFlags> for BuildOpts {
 
 pub enum BuildError {
     Spawn(io::Error),
-    Failed { rendered: String },
+    Wait(io::Error),
+    /// Cargo reported a failed build. `diagnostics` is the error output to
+    /// show, from [`failure_diagnostics`].
+    Failed {
+        diagnostics: String,
+    },
     NoArtifact,
     Multiple(Vec<PathBuf>),
     Read(io::Error),
@@ -106,6 +111,7 @@ impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Spawn(e) => write!(f, "failed to spawn cargo build: {e}"),
+            Self::Wait(e) => write!(f, "failed to wait for cargo build: {e}"),
             Self::Failed { .. } => write!(f, "build failed"),
             Self::NoArtifact => write!(
                 f,
@@ -137,15 +143,22 @@ impl std::error::Error for BuildError {}
 impl BuildError {
     pub fn print_and_exit(self) -> ! {
         eprintln!("{}", style(self.to_string()).red().bold());
-        if let Self::Failed { rendered } = &self
-            && !rendered.is_empty()
+        if let Self::Failed { diagnostics } = &self
+            && !diagnostics.is_empty()
         {
             eprintln!();
-            eprint!("{rendered}");
+            eprintln!("{diagnostics}");
         }
         std::process::exit(1);
     }
 }
+
+/// How much of cargo's stderr to keep for reporting a failure.
+///
+/// Cargo redraws its progress bar in place, so most of a long build's stderr
+/// is renders that were immediately overwritten. Keeping only the tail bounds
+/// that without losing the error report, which cargo prints last.
+const STDERR_CAPTURE_LIMIT: usize = 256 * 1024;
 
 pub async fn build(
     opts: &BuildOpts,
@@ -203,12 +216,18 @@ pub async fn build(
 
     let stderr_task = tokio::spawn(async move {
         let mut buf = [0u8; 1024];
+        let mut captured: Vec<u8> = Vec::new();
         let mut tail: Vec<u8> = Vec::with_capacity(512);
         let mut last_emitted: Option<(u64, u64)> = None;
         loop {
             match stderr.read(&mut buf).await {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
+                    captured.extend_from_slice(&buf[..n]);
+                    if captured.len() > STDERR_CAPTURE_LIMIT * 2 {
+                        let drain_to = captured.len() - STDERR_CAPTURE_LIMIT;
+                        captured.drain(..drain_to);
+                    }
                     tail.extend_from_slice(&buf[..n]);
                     if let Some(prog) = scan_last_progress(&tail)
                         && last_emitted != Some(prog)
@@ -223,6 +242,7 @@ pub async fn build(
                 }
             }
         }
+        captured
     });
 
     let stdout_task = tokio::spawn(async move {
@@ -231,9 +251,9 @@ pub async fn build(
         out
     });
 
-    let status = child.wait().await.map_err(BuildError::Spawn)?;
+    let status = child.wait().await.map_err(BuildError::Wait)?;
     let stdout_bytes = stdout_task.await.unwrap_or_default();
-    let _ = stderr_task.await;
+    let stderr_bytes = stderr_task.await.unwrap_or_default();
 
     let stdout_str = String::from_utf8_lossy(&stdout_bytes);
     let messages: Vec<serde_json::Value> = stdout_str
@@ -242,15 +262,10 @@ pub async fn build(
         .collect();
 
     if !status.success() {
-        let rendered: String = messages
-            .iter()
-            .filter_map(|msg| {
-                msg.get("message")
-                    .and_then(|m| m.get("rendered"))
-                    .and_then(|r| r.as_str())
-            })
-            .collect();
-        return Err(BuildError::Failed { rendered });
+        let stderr_str = String::from_utf8_lossy(&stderr_bytes);
+        return Err(BuildError::Failed {
+            diagnostics: failure_diagnostics(&messages, &stderr_str),
+        });
     }
 
     // The bundler scans any linked binary for embedded asset declarations, so
@@ -263,6 +278,86 @@ pub async fn build(
         1 => Ok(artifacts.into_iter().next().unwrap()),
         _ => Err(BuildError::Multiple(artifacts)),
     }
+}
+
+/// The error output to show for a build cargo reported as failed.
+///
+/// rustc reports its diagnostics as JSON on stdout, but cargo's own failures
+/// never reach it: a build script that exits non-zero, an unresolvable
+/// dependency, a malformed manifest, or a `--bin` that names no target are
+/// only ever written to stderr as text, leaving stdout without a single
+/// error-level diagnostic (and often empty altogether). Which stream holds
+/// the failure is therefore decided by whether rustc reported an error at
+/// all, rather than by how the build was invoked.
+fn failure_diagnostics(messages: &[serde_json::Value], stderr: &str) -> String {
+    let diagnostics = if has_compiler_error(messages) {
+        rendered_diagnostics(messages)
+    } else {
+        cargo_error_output(stderr)
+    };
+    diagnostics.trim_end().to_string()
+}
+
+/// Whether rustc reported an error, as opposed to only warnings or nothing at
+/// all. Every level it fails a build with starts with `error`: plain `error`,
+/// and `error: internal compiler error` for an ICE.
+fn has_compiler_error(messages: &[serde_json::Value]) -> bool {
+    messages.iter().any(|msg| {
+        is_compiler_message(msg)
+            && msg
+                .get("message")
+                .and_then(|m| m.get("level"))
+                .and_then(|l| l.as_str())
+                .is_some_and(|level| level.starts_with("error"))
+    })
+}
+
+/// The rendered text of every diagnostic rustc reported, in order. Warnings
+/// are kept alongside the errors, matching what a plain `cargo build` prints.
+fn rendered_diagnostics(messages: &[serde_json::Value]) -> String {
+    messages
+        .iter()
+        .filter(|msg| is_compiler_message(msg))
+        .filter_map(|msg| {
+            msg.get("message")
+                .and_then(|m| m.get("rendered"))
+                .and_then(|r| r.as_str())
+        })
+        .collect()
+}
+
+fn is_compiler_message(msg: &serde_json::Value) -> bool {
+    msg.get("reason").and_then(|r| r.as_str()) == Some("compiler-message")
+}
+
+/// Cargo's own error report, extracted from the stderr it interleaves with
+/// status lines and progress bar renders.
+///
+/// Cargo redraws the progress bar in place with carriage returns rather than
+/// newlines, so only the text after the last `\r` of a line was ever visible;
+/// the report itself runs from the first `error` line to the end of the
+/// stream. When there is no such line the build died without reporting
+/// anything (killed by a signal, say), and the status lines are all there is
+/// to go on.
+fn cargo_error_output(stderr: &str) -> String {
+    let lines: Vec<String> = stderr
+        .split('\n')
+        .map(|line| {
+            let visible = line.rsplit('\r').next().unwrap_or_default();
+            strip_ansi_codes(visible).trim_end().to_string()
+        })
+        .collect();
+
+    let report = match lines.iter().position(|line| line.starts_with("error")) {
+        Some(start) => lines[start..].join("\n"),
+        None => lines
+            .iter()
+            .filter(|line| !line.is_empty())
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n"),
+    };
+    report.trim_end().to_string()
 }
 
 /// Pick the final linked outputs out of cargo's compiler-artifact messages:
@@ -405,6 +500,102 @@ fn scan_last_progress(bytes: &[u8]) -> Option<(u64, u64)> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn diagnostic(level: &str, rendered: &str) -> serde_json::Value {
+        json!({
+            "reason": "compiler-message",
+            "message": { "level": level, "rendered": rendered },
+        })
+    }
+
+    #[test]
+    fn rustc_errors_are_reported_from_the_json_stream() {
+        let messages = vec![
+            diagnostic("warning", "warning: unused variable `x`\n"),
+            diagnostic("error", "error[E0308]: mismatched types\n"),
+        ];
+        assert_eq!(
+            failure_diagnostics(
+                &messages,
+                "   Compiling app v0.1.0\nerror: could not compile `app` (bin \"app\") due to 1 previous error\n"
+            ),
+            "warning: unused variable `x`\nerror[E0308]: mismatched types"
+        );
+    }
+
+    #[test]
+    fn build_script_failures_are_reported_from_cargo_stderr() {
+        // A build script that exits non-zero is cargo's own failure, not
+        // rustc's: stdout carries the build script's artifact and nothing
+        // else, so there is no diagnostic to render.
+        let messages = vec![
+            json!({
+                "reason": "compiler-artifact",
+                "target": { "crate_types": ["bin"] },
+                "executable": null,
+                "filenames": ["/target/debug/build/app-abc/build-script-build"],
+            }),
+            json!({ "reason": "build-finished", "success": false }),
+        ];
+        let stderr = concat!(
+            "   Compiling app v0.1.0 (/app)\n",
+            "    Building [=>     ] 0/3: app(build.rs)  \r",
+            "    Building [====>  ] 1/3: app(build)     \r",
+            "error: failed to run custom build command for `app v0.1.0 (/app)`\n",
+            "\n",
+            "Caused by:\n",
+            "  process didn't exit successfully: `build-script-build` (exit status: 1)\n",
+            "  --- stderr\n",
+            "  something went wrong in the build script\n",
+        );
+        assert_eq!(
+            failure_diagnostics(&messages, stderr),
+            concat!(
+                "error: failed to run custom build command for `app v0.1.0 (/app)`\n",
+                "\n",
+                "Caused by:\n",
+                "  process didn't exit successfully: `build-script-build` (exit status: 1)\n",
+                "  --- stderr\n",
+                "  something went wrong in the build script",
+            )
+        );
+    }
+
+    #[test]
+    fn manifest_errors_are_reported_with_an_empty_json_stream() {
+        // Cargo fails before compiling anything, so stdout stays empty.
+        let stderr = "error: unclosed table, expected `]`\n --> Cargo.toml:8:14\n";
+        assert_eq!(
+            failure_diagnostics(&[], stderr),
+            "error: unclosed table, expected `]`\n --> Cargo.toml:8:14"
+        );
+    }
+
+    #[test]
+    fn warnings_alone_do_not_stand_in_for_a_cargo_failure() {
+        // rustc compiled a dependency with warnings before cargo failed on
+        // its own; reporting only the warnings would bury the error.
+        let messages = vec![diagnostic("warning", "warning: unused import\n")];
+        let stderr = "   Compiling dep v0.1.0\nerror: no bin target named `nope`\n";
+        assert_eq!(
+            failure_diagnostics(&messages, stderr),
+            "error: no bin target named `nope`"
+        );
+    }
+
+    #[test]
+    fn progress_renders_and_color_are_stripped_from_cargo_output() {
+        let stderr = "    Building [==>  ] 1/2: app  \r\u{1b}[1m\u{1b}[31merror\u{1b}[0m: boom\n";
+        assert_eq!(cargo_error_output(stderr), "error: boom");
+    }
+
+    #[test]
+    fn a_build_that_reports_no_error_falls_back_to_status_lines() {
+        // Nothing to key off when cargo is killed outright, so report what it
+        // managed to say rather than nothing at all.
+        let stderr = "   Compiling app v0.1.0 (/app)\n";
+        assert_eq!(cargo_error_output(stderr), "   Compiling app v0.1.0 (/app)");
+    }
 
     fn artifact(crate_types: &[&str], filenames: &[&str]) -> serde_json::Value {
         json!({
