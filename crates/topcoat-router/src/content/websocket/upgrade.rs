@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, header};
 use hyper::upgrade::OnUpgrade;
@@ -19,11 +19,43 @@ use crate::{Body, FromRequest, Response, extensions, headers, method};
 /// request and transfer ownership of its context.
 #[doc(hidden)]
 #[derive(Clone)]
-pub struct PendingContextualUpgrade(Arc<tokio::sync::oneshot::Sender<Cx>>);
+pub struct PendingContextualUpgrade(WeakCloneArc<tokio::sync::oneshot::Sender<Cx>>);
+
+/// a sum type of arc which can only produce 1 strong reference
+enum WeakCloneArc<T> {
+    /// the strong reference
+    Strong(Arc<T>),
+    /// the weak reference
+    Weak(Weak<T>),
+}
+
+impl<T> Clone for WeakCloneArc<T> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Strong(strong) => Self::Weak(Arc::downgrade(strong)),
+            Self::Weak(weak) => Self::Weak(weak.clone()),
+        }
+    }
+}
+
+impl<T> WeakCloneArc<T> {
+    /// create a new instance of Self
+    fn new(val: T) -> Self {
+        Self::Strong(Arc::new(val))
+    }
+
+    /// return the inner T if this is the strong ref
+    fn into_inner(self) -> Option<T> {
+        match self {
+            WeakCloneArc::Strong(strong) => Arc::into_inner(strong),
+            WeakCloneArc::Weak(_weak) => None,
+        }
+    }
+}
 
 impl PendingContextualUpgrade {
     pub(crate) fn start(self, cx: Cx) {
-        if let Some(cb) = Arc::into_inner(self.0) {
+        if let Some(cb) = self.0.into_inner() {
             let _ = cb.send(cx);
         }
     }
@@ -204,7 +236,7 @@ impl WebSocketUpgrade {
         });
         response
             .extensions_mut()
-            .insert(PendingContextualUpgrade(Arc::new(tx)));
+            .insert(PendingContextualUpgrade(WeakCloneArc::new(tx)));
         Ok(response)
     }
 }
