@@ -5,60 +5,31 @@ description: Always use this skill to verify a change locally before committing 
 
 # Verifying a Change
 
-Keep this file in sync with CI workflows.
+Keep this file in sync with CI workflows. `unsafe` is not allowed ([`AGENTS.md`](../../../AGENTS.md)).
 
-## Format
-
-```
-cargo +nightly fmt --all
-cargo topcoat fmt
-```
-
-If the user does not have the nightly formatter installed, that is fine. Use the stable formatter. `topcoat fmt` formats the Topcoat macros inside of the soruce files.
-
-## Lint
+Run these by default:
 
 ```
+cargo +nightly fmt --all          # stable fmt is fine if nightly is missing
+cargo topcoat fmt                 # formats Topcoat macros inside source files
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-```
-
-## Test
-
-```
 cargo test --workspace --all-features
-```
-
-## Docs
-
-Rustdoc builds on nightly with the `docsrs` cfg:
-
-```
 RUSTDOCFLAGS="--cfg docsrs -Dwarnings" cargo +nightly doc --workspace --all-features --no-deps --locked
 ```
 
-## Per-feature lint
-
-CI lints each feature in isolation to catch feature combinations that do not build. This needs `cargo-hack`:
+Only on user request:
 
 ```
+# per-feature lint, catches feature combos that do not build (needs cargo-hack)
 cargo hack clippy --workspace --each-feature --exclude-features stage-icons --no-dev-deps -- -D warnings
-```
 
-Only run on user request.
-
-## Unused dependencies
-
-CI fails on unused dependencies. This needs `cargo-udeps` on nightly:
-
-```
+# unused dependencies, which CI fails on (needs cargo-udeps on nightly)
 cargo +nightly udeps --workspace --all-targets --all-features --locked
 ```
 
-Only run on user request.
-
 ## Runtime browser bundle
 
-Only when you touched `crates/topcoat-runtime/browser`. The runtime crate serves a prebuilt `dist/index.js` via `asset!`, and CI fails if it drifts from source (`git diff --exit-code -- dist/index.js`). Rebuild and commit it:
+Only when you touched `crates/topcoat-runtime/browser`. The crate serves a prebuilt `dist/index.js` via `asset!`, and CI fails if it drifts from source (`git diff --exit-code -- dist/index.js`). Rebuild it and stage the regenerated `dist/index.js` alongside your source change:
 
 ```
 cd crates/topcoat-runtime/browser
@@ -66,9 +37,3 @@ yarn install --frozen-lockfile
 yarn build
 yarn test
 ```
-
-Then stage the regenerated `dist/index.js` alongside your source change.
-
-## Safety
-
-This project uses only safe code; `unsafe` is not allowed ([`AGENTS.md`](../../../AGENTS.md)).
