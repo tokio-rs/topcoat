@@ -7,11 +7,13 @@ description: Always use this skill before writing long form markdown documentati
 
 ## Placement
 
-Put a markdown file into a `docs/` folder for the crate it affects, then link it via `#[doc = include_str!("../docs/file.md")]`. General guides for a feature should go into `crates/topcoat/docs` and then document the re-export module in `src/`.
+Put a markdown file into a `docs/` folder for the crate it affects, then link it via `#[doc = include_str!("../docs/file.md")]`. General guides for a feature should go into `crates/topcoat/docs` and then document the re-export module in `src/`. These should likely also be referenced in the `README.md` and `AGENTS.md`.
 
 ## Structure
 
 When writing a guide, start with a very simple summary of what the guide is about, potentially linking to resources (e.g. Tailwind website). Then carefully introduce basic usage before moving on to more advanced topics.
+
+When a feature is already best explained in detail by another part of the documentation (e.g. another markdown file), explain it at most briefly and then refer the reader to the related docs file via a Rust docs link.
 
 ## General
 

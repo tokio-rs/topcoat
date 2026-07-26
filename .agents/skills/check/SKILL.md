@@ -37,3 +37,7 @@ yarn install --frozen-lockfile
 yarn build
 yarn test
 ```
+
+## New crates
+
+A new crate must be references in the toplevel `Cargo.toml` as well as `release-plz.toml`.
