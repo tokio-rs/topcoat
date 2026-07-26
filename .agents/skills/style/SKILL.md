@@ -35,6 +35,10 @@ When a module's submodules are peers that make up a whole (the CLI commands `fmt
 
 ## Documentation
 
-* Item docs describe what something is/does and how to use it. Avoid implementation details unless relevant to a caller. Describe the current state only; never reference previous iterations ("this used to be A but is now B").
-* Use only ASCII characters in both code and documentation, e.g. `->` instead of unicode arrow or `...` instead of ellipsis character. Avoid em-dashes entirely.
+* Item docs describe what something is/does and how to use it. Avoid implementation details unless relevant to a caller.
+* Describe the current state only; never reference previous iterations ("this used to be A but is now B").
+* Avoid exhaustively listig specific implementations or uses that could evolve over time and go stale. Keep documentation robust to changes.
+* Use only ASCII characters in both code and documentation, e.g. `->` instead of unicode arrow or `...` instead of ellipsis character.
+* Avoid em-dashes entirely. Use colons and semicolons sparingly.
 * Avoid using `ignore` for code snippets to keep them type-checked.
+* Use simple, concise language, no fancy words.
