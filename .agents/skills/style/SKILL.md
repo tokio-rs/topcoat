@@ -31,11 +31,6 @@ pub use http::Method;
 
 * Declare every dependency in the top-level `Cargo.toml` under `[workspace.dependencies]` with only a version and no features. Crates pull it in with `workspace = true` and opt into features there.
 
-## Procedural macros
-
-* In `Parse` impls, parse directly into the `Self { ... }` fields (`Self { x: input.parse()? }`) rather than through `let` bindings. Use a `let` only when a parsed value must be inspected to decide how to parse a later field.
-* To parse keywords, create private `mod kw` with `syn::custom_keyword!` invocations instead of parsing `syn::Ident`.
-
 ## Documentation
 
 * Item docs describe what something is/does and how to use it. Avoid implementation details unless relevant to a caller. Describe the current state only; never reference previous iterations ("this used to be A but is now B").
