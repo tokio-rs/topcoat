@@ -116,6 +116,7 @@ router = [
 	"topcoat-asset?/router",
 	"topcoat-cookie?/router",
 	"topcoat-font?/router",
+	"topcoat-mail?/router",
 	"topcoat-runtime?/router",
 	"topcoat-session?/router",
 ]

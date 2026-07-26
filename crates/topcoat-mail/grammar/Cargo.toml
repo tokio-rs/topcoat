@@ -11,7 +11,7 @@ categories.workspace = true
 rust-version.workspace = true
 
 [features]
-pretty = ["topcoat-core-grammar/pretty"]
+pretty = ["topcoat-core-grammar/pretty", "topcoat-view-grammar/pretty"]
 
 [dependencies]
 topcoat-core-grammar.workspace = true
@@ -21,6 +21,10 @@ topcoat-view-grammar.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }
+
+[[test]]
+name = "pretty"
+required-features = ["pretty"]
 
 [lints]
 workspace = true

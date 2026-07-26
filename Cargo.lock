@@ -2812,6 +2812,7 @@ dependencies = [
  "topcoat-core",
  "topcoat-core-grammar",
  "topcoat-font-grammar",
+ "topcoat-mail-grammar",
  "topcoat-router",
  "topcoat-ui",
  "topcoat-view-grammar",
@@ -2969,6 +2970,7 @@ dependencies = [
  "time",
  "tokio",
  "topcoat-core",
+ "topcoat-router",
  "topcoat-view",
 ]
 

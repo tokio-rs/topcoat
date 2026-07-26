@@ -133,3 +133,15 @@ impl MailField {
         }
     }
 }
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for MailField {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.name.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        if let Some(value) = &self.value {
+            " ".pretty_print(printer);
+            value.pretty_print(printer);
+        }
+    }
+}

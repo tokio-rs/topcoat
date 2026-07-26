@@ -78,3 +78,38 @@ fn is_additive(name: &Ident) -> bool {
         .iter()
         .any(|additive| name == additive)
 }
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FieldValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        match self {
+            Self::Html(html) => html.pretty_print(printer),
+            Self::List(list) => list.pretty_print(printer),
+            Self::Expr(expr) => expr.pretty_print(printer),
+        }
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for HtmlValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+
+        self.brace_token
+            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+                self.view.pretty_print(printer);
+            });
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ListValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+
+        self.bracket_token
+            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+                self.values.pretty_print(printer);
+            });
+    }
+}

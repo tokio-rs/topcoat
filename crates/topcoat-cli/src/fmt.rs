@@ -40,6 +40,7 @@ impl FmtCommand {
                 "font",
                 "fontsource_font_face",
                 "fontsource_font",
+                "mail",
             ];
 
             let mut registry = Registry::new();
@@ -89,6 +90,9 @@ impl FmtCommand {
                 registry.register_macro::<topcoat_font_grammar::fontsource::font::FontsourceFont>(
                     "fontsource_font",
                 );
+            }
+            if selected.contains("mail") {
+                registry.register_macro::<topcoat_mail_grammar::mail::Mail>("mail");
             }
 
             registry

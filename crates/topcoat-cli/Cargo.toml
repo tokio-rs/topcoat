@@ -24,6 +24,7 @@ topcoat-asset = { workspace = true, features = ["bundler"] }
 topcoat-core = { workspace = true, features = ["build"] }
 topcoat-core-grammar = { workspace = true, features = ["pretty"] }
 topcoat-font-grammar = { workspace = true, features = ["fontsource", "pretty"] }
+topcoat-mail-grammar = { workspace = true, features = ["pretty"] }
 topcoat-router = { workspace = true, features = ["websocket"] }
 topcoat-ui.workspace = true
 topcoat-view-grammar = { workspace = true, features = ["pretty"] }

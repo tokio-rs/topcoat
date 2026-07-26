@@ -57,6 +57,13 @@ impl ToTokens for Mail {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Mail {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.fields.pretty_print(printer);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

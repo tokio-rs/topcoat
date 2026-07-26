@@ -92,7 +92,14 @@ async fn html_renders_dynamic_parts_against_the_named_context() -> Result<()> {
     let name = "Ada";
 
     let mail = mail! {
-        html: { cx => <p>"Hello, "(name)"!"</p> },
+        html: {
+            cx =>
+            <p>
+                "Hello, "
+                (name)
+                "!"
+            </p>
+        },
     }?;
 
     assert_eq!(
