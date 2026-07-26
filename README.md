@@ -188,7 +188,7 @@ Topcoat also ships with utilities for web fonts and icons, as well as easy integ
 
 ### Built-in Tailwind support
 
-Enabled the `tailwind` feature to integrate [Tailwind](https://tailwindcss.com/) into your project effortlessly:
+Enable the `tailwind` feature to integrate [Tailwind](https://tailwindcss.com/) into your project:
 
 ```rust,ignore
 view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }

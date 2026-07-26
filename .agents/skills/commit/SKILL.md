@@ -35,7 +35,7 @@ BREAKING CHANGE: <what breaks and how to migrate>
 
 ## Characters
 
-Plain ASCII only, per [`STYLE.md`](../../../STYLE.md): `-`/`--` not an em dash, `->` not a Unicode arrow, `...` not an ellipsis.
+Plain ASCII only, per the [`style`](../style/SKILL.md) skill: `-`/`--` not an em dash, `->` not a Unicode arrow, `...` not an ellipsis.
 
 ## Be succinct
 

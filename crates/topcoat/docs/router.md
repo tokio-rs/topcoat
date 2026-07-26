@@ -1,4 +1,4 @@
-A [`Router`] handles incoming requests. Build one with [`Router::builder`], register pages, layouts, layers, and API routes, call [`build`](RouterBuilder::build), then pass it to [`start`](crate::start).
+A [`Router`] handles incoming requests. Build one with [`Router::builder`] and register your pages, layouts, layers, and API routes on it. Call [`build`](RouterBuilder::build) when you are done, then pass the router to [`start`](crate::start).
 
 Handlers register in two ways: **manually**, listing each item on the builder, or with **auto-discovery** (the `discover` feature collects annotated items at link time). For most apps, the recommended way to define routes is the [`module_router!`] macro, which builds on discovery and derives each URL from the module tree instead of a path string.
 

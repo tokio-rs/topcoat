@@ -1,7 +1,7 @@
 The [`view!`] macro is Topcoat's HTML templating syntax. It tries to be unsurprising by staying close to real HTML instead of inventing a Rust-shaped HTML dialect. That means:
 
 - HTML elements use their real names.
-- HTML void elements, such as `<br>`, `<hr>`, `<img>`, `<input>`, `<meta>`, and `<link>`, are written without closing tags.
+- HTML void elements, such as `<br>`, `<hr>`, and `<img>`, are written without closing tags.
 - Non-void elements need matching closing tags.
 - Attribute names can use HTML separators like `-`, `:`, and `.`: `data-post-id`, `aria-label`, `xmlns:xlink`, `hx-get`, `class.active`.
 - Rust keywords are still valid HTML attribute names, so `type="button"` and `for="email"` work as expected.
@@ -456,7 +456,7 @@ These declarations require the `router` feature (or the `topcoat-view` crate's `
 
 # Rendering Outside A Component
 
-Inside a [`component`], `#[page]`, or `#[layout]`, the request context is in scope implicitly, so `view!` can render components and reactive markup with no ceremony. In a plain function you need to pass it at the start of the `view!` macro explicitely:
+Inside a [`component`], `#[page]`, `#[layout]`, or `#[shard]`, the request context is in scope implicitly, so `view!` can render components and reactive markup with no ceremony. In a plain function you pass it explicitly at the start of the `view!` macro:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*};

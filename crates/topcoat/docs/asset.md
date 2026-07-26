@@ -150,13 +150,14 @@ const RUST_LOGO: Asset = asset!(
 );
 ```
 
-Available options:
+Each named argument sets a field on [`AssetOptions`], which documents them all. The common ones:
 
 | Option | Meaning |
 |---|---|
 | `rename: "name"` | replaces the output file stem |
 | `extension: "ext"` | overrides the output extension, without the leading dot |
-| `checksum: "sha256:<hex>"` | requires the raw source file to match the hash (only `sha256` is supported) |
+| `checksum: "sha256:<hex>"` | requires the raw source file to match the hash |
+| `content_type: "text/css"` | sets the `Content-Type` the asset is served with, instead of guessing it from the extension |
 
 Use `checksum` for remote assets when you want deployments to fail if the remote file changes unexpectedly.
 

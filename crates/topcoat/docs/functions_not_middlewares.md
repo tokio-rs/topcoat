@@ -8,7 +8,7 @@ These functions can be called from anywhere in the component tree without coupli
 
 ## Middleware
 
-Middleware often pushes authentication away from the code that needs the authenticated user. The middleware authenticates the request and stores the user somewhere ambient, while the page assumes the middleware has already run.
+Middleware often pushes authentication away from the code that needs the authenticated user. The middleware authenticates the request and stores the user somewhere the page can find it later, while the page assumes the middleware has already run.
 
 ```rust
 # struct Request { extensions: Extensions }
@@ -74,7 +74,7 @@ async fn user_avatar(user: User) -> Html {
 }
 ```
 
-That is fine for local data flow, but current-user state is usually ambient to the request. Passing it through every layout and component couples unrelated code just so a deeply nested component can ask a simple question.
+That is fine for local data flow, but the current user belongs to the request as a whole. Passing it through every layout and component couples unrelated code just so a deeply nested component can ask a simple question.
 
 # What to do in Topcoat
 

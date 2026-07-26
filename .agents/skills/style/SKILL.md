@@ -11,6 +11,7 @@ description: Always use this skill before writing or editing Rust code or docume
 * Free functions are allowed, but first consider whether a more idiomatic Rust grouping onto a struct exists.
 * Unsafe code is not allowed in this project, unless wrapped by a reputable dependency.
 * Avoid needless allocations, it is reasonable to refactor the code a bit to make it faster.
+* After adding a new feature, check if it makes sense to rewrite unit tests for the entire module instead of adding a few. When rewriting, make sure to keep all tested edge cases intact.
 
 ## Barrel files
 

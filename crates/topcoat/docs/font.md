@@ -1,4 +1,4 @@
-Web fonts are typically loaded through CSS. A set of [`@font-face`] rules declare a font family and tells the browser where to download the font files. With Topcoat, you can programatically create these font faces and host them on your router.
+Web fonts are typically loaded through CSS. A set of [`@font-face`] rules declares a font family and tells the browser where to download the font files. With Topcoat, you can create these font faces in Rust and host them on your router.
 
 # Declaring fonts
 

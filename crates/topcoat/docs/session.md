@@ -65,7 +65,7 @@ async fn login(cx: &Cx) -> Result<SeeOther> {
 
 # Resolving the current user
 
-[`token_hash`] gives you the hash for the request's token, or `None` when the request carries no (valid) token. Looking it up is your side of the contract, and the idiomatic shape is a `current_user` function in the spirit of [functions, not middlewares](functions_not_middlewares.md). Treat a hash your storage does not contain, or whose record has expired, as not authenticated:
+[`token_hash`] gives you the hash for the request's token, or `None` when the request carries no (valid) token. Looking it up is your side of the contract, and the idiomatic shape is a `current_user` function in the spirit of [functions, not middlewares](crate::context#functions-not-middlewares). Treat a hash your storage does not contain, or whose record has expired, as not authenticated:
 
 ```rust
 use topcoat::{Result, context::Cx, session};
@@ -81,7 +81,7 @@ async fn current_user(cx: &Cx) -> Result<Option<User>> {
 }
 ```
 
-The token itself is only read once per request, but `current_user`'s database lookup runs on every call; wrap it with [`#[memoize]`](memoization.md) if pages call it repeatedly.
+The token itself is only read once per request, but `current_user`'s database lookup runs on every call; wrap it with [`#[memoize]`](macro@crate::context::memoize) if pages call it repeatedly.
 
 Guard pages by combining it with the router's error helpers:
 

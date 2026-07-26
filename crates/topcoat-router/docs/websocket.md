@@ -45,4 +45,4 @@ let (mut sender, mut receiver) = socket.split();
 
 # Subprotocols and limits
 
-[`protocols`](WebSocketUpgrade::protocols) declares the subprotocols the endpoint speaks; the first one the client also requested is selected, echoed in the handshake response, and reported by [`WebSocket::protocol`]. The remaining builder methods bound the connection: [`max_message_size`](WebSocketUpgrade::max_message_size) and [`max_frame_size`](WebSocketUpgrade::max_frame_size) protect against oversized input, and [`max_write_buffer_size`](WebSocketUpgrade::max_write_buffer_size) bounds memory when a client stops reading.
+[`protocols`](WebSocketUpgrade::protocols) declares the subprotocols the endpoint speaks; the first one the client also requested is selected, echoed in the handshake response, and reported by [`WebSocket::protocol`]. Further builder methods bound the connection. [`max_message_size`](WebSocketUpgrade::max_message_size) and [`max_frame_size`](WebSocketUpgrade::max_frame_size) protect against oversized input, and [`max_write_buffer_size`](WebSocketUpgrade::max_write_buffer_size) bounds memory when a client stops reading. See [`WebSocketUpgrade`] for the rest.
