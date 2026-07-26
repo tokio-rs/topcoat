@@ -114,8 +114,8 @@ mod tests {
 
         let mail = Mail::builder()
             .from(Mailbox::new("ada@example.com").unwrap())
-            .to(Mailbox::new("bob@example.com").unwrap())
-            .bcc(Mailbox::new("dan@example.com").unwrap())
+            .to([Mailbox::new("bob@example.com").unwrap()])
+            .bcc([Mailbox::new("dan@example.com").unwrap()])
             .subject("Hello")
             .text("Hi Bob")
             .build();

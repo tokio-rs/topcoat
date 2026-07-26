@@ -16,7 +16,7 @@ use crate::{Attachment, Mailbox};
 /// use topcoat_mail::{Mail, Mailbox};
 ///
 /// let mail = Mail::builder()
-///     .to(Mailbox::named("Ada Lovelace", "ada@example.com")?)
+///     .to([Mailbox::named("Ada Lovelace", "ada@example.com")?])
 ///     .subject("Analytical engines")
 ///     .text("The engine weaves algebraic patterns.")
 ///     .build();
@@ -134,10 +134,16 @@ impl Mail {
 
 /// Assembles a [`Mail`], created by [`Mail::builder`].
 ///
-/// Address setters accept anything `Into<Mailbox>`, and the recipient
-/// setters (`to`, `cc`, `bcc`, `reply_to`) append on every call. Building
-/// never fails; addresses are validated when they are constructed, and
-/// remaining wire concerns when the mail is sent.
+/// The `From` setter takes a single address as anything `Into<Mailbox>`.
+/// The recipient setters (`to`, `cc`, `bcc`, `reply_to`) take any
+/// collection convertible into a `Vec<Mailbox>` -- a `Vec`, an array, or a
+/// slice -- and append on every call, as do `attachments` and `headers`.
+/// Building never fails; addresses are validated when they are
+/// constructed, and remaining wire concerns when the mail is sent.
+///
+/// The `mail!` macro builds on this and additionally converts address
+/// strings, `(name, address)` pairs, and single values through
+/// [`TryIntoMailboxes`](crate::TryIntoMailboxes) and its siblings.
 #[derive(Clone, Debug, Default)]
 pub struct MailBuilder {
     mail: Mail,
@@ -151,33 +157,33 @@ impl MailBuilder {
         self
     }
 
-    /// Adds a `To` recipient.
+    /// Adds `To` recipients.
     #[must_use]
-    pub fn to(mut self, to: impl Into<Mailbox>) -> Self {
-        self.mail.to.push(to.into());
+    pub fn to(mut self, to: impl Into<Vec<Mailbox>>) -> Self {
+        self.mail.to.extend(to.into());
         self
     }
 
-    /// Adds a `Cc` recipient.
+    /// Adds `Cc` recipients.
     #[must_use]
-    pub fn cc(mut self, cc: impl Into<Mailbox>) -> Self {
-        self.mail.cc.push(cc.into());
+    pub fn cc(mut self, cc: impl Into<Vec<Mailbox>>) -> Self {
+        self.mail.cc.extend(cc.into());
         self
     }
 
-    /// Adds a `Bcc` recipient, who receives the mail without appearing in
+    /// Adds `Bcc` recipients, who receive the mail without appearing in
     /// its headers.
     #[must_use]
-    pub fn bcc(mut self, bcc: impl Into<Mailbox>) -> Self {
-        self.mail.bcc.push(bcc.into());
+    pub fn bcc(mut self, bcc: impl Into<Vec<Mailbox>>) -> Self {
+        self.mail.bcc.extend(bcc.into());
         self
     }
 
-    /// Adds a `Reply-To` address, where replies are directed instead of the
+    /// Adds `Reply-To` addresses, where replies are directed instead of the
     /// `From` address.
     #[must_use]
-    pub fn reply_to(mut self, reply_to: impl Into<Mailbox>) -> Self {
-        self.mail.reply_to.push(reply_to.into());
+    pub fn reply_to(mut self, reply_to: impl Into<Vec<Mailbox>>) -> Self {
+        self.mail.reply_to.extend(reply_to.into());
         self
     }
 
@@ -207,17 +213,17 @@ impl MailBuilder {
         self
     }
 
-    /// Adds an attachment.
+    /// Adds attachments.
     #[must_use]
-    pub fn attachment(mut self, attachment: Attachment) -> Self {
-        self.mail.attachments.push(attachment);
+    pub fn attachments(mut self, attachments: impl Into<Vec<Attachment>>) -> Self {
+        self.mail.attachments.extend(attachments.into());
         self
     }
 
-    /// Adds a custom header, such as `List-Unsubscribe`.
+    /// Adds custom `(name, value)` headers, such as `List-Unsubscribe`.
     #[must_use]
-    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.mail.headers.push((name.into(), value.into()));
+    pub fn headers(mut self, headers: impl Into<Vec<(String, String)>>) -> Self {
+        self.mail.headers.extend(headers.into());
         self
     }
 
@@ -255,6 +261,60 @@ impl MailBuilder {
     #[must_use]
     pub fn build(self) -> Mail {
         self.mail
+    }
+}
+
+/// One or more custom headers, converted from a single `(name, value)` pair
+/// or a collection of pairs. The `mail!` macro's `headers` field accepts
+/// anything implementing this trait.
+pub trait IntoHeaders {
+    /// Converts into `(name, value)` header pairs.
+    fn into_headers(self) -> Vec<(String, String)>;
+}
+
+impl<N, V> IntoHeaders for (N, V)
+where
+    N: Into<String>,
+    V: Into<String>,
+{
+    fn into_headers(self) -> Vec<(String, String)> {
+        vec![(self.0.into(), self.1.into())]
+    }
+}
+
+impl<N, V> IntoHeaders for Vec<(N, V)>
+where
+    N: Into<String>,
+    V: Into<String>,
+{
+    fn into_headers(self) -> Vec<(String, String)> {
+        self.into_iter()
+            .map(|(name, value)| (name.into(), value.into()))
+            .collect()
+    }
+}
+
+impl<N, V, const M: usize> IntoHeaders for [(N, V); M]
+where
+    N: Into<String>,
+    V: Into<String>,
+{
+    fn into_headers(self) -> Vec<(String, String)> {
+        self.into_iter()
+            .map(|(name, value)| (name.into(), value.into()))
+            .collect()
+    }
+}
+
+impl<N, V> IntoHeaders for &[(N, V)]
+where
+    N: Clone + Into<String>,
+    V: Clone + Into<String>,
+{
+    fn into_headers(self) -> Vec<(String, String)> {
+        self.iter()
+            .map(|(name, value)| (name.clone().into(), value.clone().into()))
+            .collect()
     }
 }
 
@@ -313,16 +373,19 @@ mod tests {
     fn collects_every_field() -> Result<(), AddressError> {
         let mail = Mail::builder()
             .from(Mailbox::named("Ada", "ada@example.com")?)
-            .to(Mailbox::new("bob@example.com")?)
-            .to(Mailbox::named("Grace Hopper", "grace@example.com")?)
-            .cc(Mailbox::new("carol@example.com")?)
-            .bcc(Mailbox::new("dan@example.com")?)
-            .reply_to(Mailbox::new("replies@example.com")?)
+            .to([Mailbox::new("bob@example.com")?])
+            .to(vec![Mailbox::named("Grace Hopper", "grace@example.com")?])
+            .cc([Mailbox::new("carol@example.com")?])
+            .bcc([Mailbox::new("dan@example.com")?])
+            .reply_to([Mailbox::new("replies@example.com")?])
             .subject("Hello")
             .html(View::empty())
             .text("Hello there")
-            .attachment(Attachment::new("invoice.pdf", "application/pdf", b"%PDF-"))
-            .header("List-Unsubscribe", "<mailto:stop@example.com>")
+            .attachments([Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")])
+            .headers([(
+                "List-Unsubscribe".to_owned(),
+                "<mailto:stop@example.com>".to_owned(),
+            )])
             .in_reply_to("<earlier@example.com>")
             .references("<earlier@example.com>")
             .date(SystemTime::UNIX_EPOCH)
@@ -377,5 +440,20 @@ mod tests {
         assert!(mail.attachments().is_empty());
         assert!(mail.headers().is_empty());
         assert_eq!(mail.date(), None);
+    }
+
+    #[test]
+    fn recipient_setters_append_across_calls() -> Result<(), AddressError> {
+        let mail = Mail::builder()
+            .to([Mailbox::new("bob@example.com")?])
+            .to([
+                Mailbox::new("carol@example.com")?,
+                Mailbox::new("dan@example.com")?,
+            ])
+            .build();
+
+        assert_eq!(mail.to().len(), 3);
+
+        Ok(())
     }
 }

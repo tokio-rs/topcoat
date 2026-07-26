@@ -89,6 +89,44 @@ enum Disposition {
     Inline { content_id: String },
 }
 
+/// One or more attachments, converted from a single [`Attachment`] or a
+/// collection. The `mail!` macro's `attachments` field accepts anything
+/// implementing this trait.
+pub trait IntoAttachments {
+    /// Converts into attachments.
+    fn into_attachments(self) -> Vec<Attachment>;
+}
+
+impl IntoAttachments for Attachment {
+    fn into_attachments(self) -> Vec<Attachment> {
+        vec![self]
+    }
+}
+
+impl IntoAttachments for &Attachment {
+    fn into_attachments(self) -> Vec<Attachment> {
+        vec![self.clone()]
+    }
+}
+
+impl IntoAttachments for Vec<Attachment> {
+    fn into_attachments(self) -> Vec<Attachment> {
+        self
+    }
+}
+
+impl<const N: usize> IntoAttachments for [Attachment; N] {
+    fn into_attachments(self) -> Vec<Attachment> {
+        self.into()
+    }
+}
+
+impl IntoAttachments for &[Attachment] {
+    fn into_attachments(self) -> Vec<Attachment> {
+        self.to_vec()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -148,10 +148,122 @@ impl From<&Mailbox> for Mailbox {
     }
 }
 
+/// One or more mailboxes, converted fallibly from a single value or a
+/// collection.
+///
+/// The `mail!` macro's recipient fields accept anything implementing this
+/// trait: a single [`Mailbox`], address string, or `(name, address)` pair,
+/// or a `Vec`, array, or slice of such values. Collection elements convert
+/// through `TryInto<Mailbox>`, so the flavors compose:
+///
+/// ```
+/// use topcoat_mail::{Mailbox, TryIntoMailboxes};
+///
+/// let one = "ada@example.com".try_into_mailboxes()?;
+/// let many = [("Ada", "ada@example.com"), ("Bob", "bob@example.com")].try_into_mailboxes()?;
+///
+/// assert_eq!(one.len(), 1);
+/// assert_eq!(many.len(), 2);
+/// # Ok::<(), topcoat_mail::AddressError>(())
+/// ```
+pub trait TryIntoMailboxes {
+    /// Converts into mailboxes, parsing addresses as needed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AddressError`] if any value is not a valid address.
+    fn try_into_mailboxes(self) -> Result<Vec<Mailbox>, AddressError>;
+}
+
+impl TryIntoMailboxes for Mailbox {
+    fn try_into_mailboxes(self) -> Result<Vec<Mailbox>, AddressError> {
+        Ok(vec![self])
+    }
+}
+
+impl TryIntoMailboxes for &Mailbox {
+    fn try_into_mailboxes(self) -> Result<Vec<Mailbox>, AddressError> {
+        Ok(vec![self.clone()])
+    }
+}
+
+impl TryIntoMailboxes for &str {
+    fn try_into_mailboxes(self) -> Result<Vec<Mailbox>, AddressError> {
+        Ok(vec![self.parse()?])
+    }
+}
+
+impl TryIntoMailboxes for String {
+    fn try_into_mailboxes(self) -> Result<Vec<Mailbox>, AddressError> {
+        Ok(vec![self.parse()?])
+    }
+}
+
+impl TryIntoMailboxes for &String {
+    fn try_into_mailboxes(self) -> Result<Vec<Mailbox>, AddressError> {
+        Ok(vec![self.parse()?])
+    }
+}
+
+impl<N, A> TryIntoMailboxes for (N, A)
+where
+    N: Into<String>,
+    A: AsRef<str>,
+{
+    fn try_into_mailboxes(self) -> Result<Vec<Mailbox>, AddressError> {
+        Ok(vec![self.try_into()?])
+    }
+}
+
+impl<T> TryIntoMailboxes for Vec<T>
+where
+    T: TryInto<Mailbox>,
+    T::Error: Into<AddressError>,
+{
+    fn try_into_mailboxes(self) -> Result<Vec<Mailbox>, AddressError> {
+        self.into_iter()
+            .map(|value| value.try_into().map_err(Into::into))
+            .collect()
+    }
+}
+
+impl<T, const N: usize> TryIntoMailboxes for [T; N]
+where
+    T: TryInto<Mailbox>,
+    T::Error: Into<AddressError>,
+{
+    fn try_into_mailboxes(self) -> Result<Vec<Mailbox>, AddressError> {
+        self.into_iter()
+            .map(|value| value.try_into().map_err(Into::into))
+            .collect()
+    }
+}
+
+impl<T> TryIntoMailboxes for &[T]
+where
+    T: Clone + TryInto<Mailbox>,
+    <T as TryInto<Mailbox>>::Error: Into<AddressError>,
+{
+    fn try_into_mailboxes(self) -> Result<Vec<Mailbox>, AddressError> {
+        self.iter()
+            .cloned()
+            .map(|value| value.try_into().map_err(Into::into))
+            .collect()
+    }
+}
+
 /// The reason a string was rejected as an email address.
-#[derive(Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error)]
 #[error("invalid email address: {0}")]
 pub struct AddressError(lettre::address::AddressError);
+
+/// Lets infallible mailbox conversions (from a [`Mailbox`] itself) satisfy
+/// the fallible element bound of the [`TryIntoMailboxes`] collections.
+impl From<std::convert::Infallible> for AddressError {
+    fn from(infallible: std::convert::Infallible) -> AddressError {
+        match infallible {}
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -177,6 +289,33 @@ mod tests {
         assert_eq!(strs, expected);
         assert_eq!(mixed, expected);
         assert_eq!(refs, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn converts_singles_and_collections_into_mailboxes() -> Result<(), AddressError> {
+        let ada = Mailbox::new("ada@example.com")?;
+        let bob = Mailbox::named("Bob", "bob@example.com")?;
+        let one = std::slice::from_ref(&ada);
+
+        assert_eq!(ada.clone().try_into_mailboxes()?, one);
+        assert_eq!((&ada).try_into_mailboxes()?, one);
+        assert_eq!("ada@example.com".try_into_mailboxes()?, one);
+        assert_eq!(
+            ("Bob", "bob@example.com").try_into_mailboxes()?,
+            std::slice::from_ref(&bob)
+        );
+
+        let both = vec![ada.clone(), bob.clone()];
+        assert_eq!(both.clone().try_into_mailboxes()?, both);
+        assert_eq!(both.as_slice().try_into_mailboxes()?, both);
+        assert_eq!(
+            ["ada@example.com", "bob@example.com"].try_into_mailboxes()?,
+            [ada, Mailbox::new("bob@example.com")?]
+        );
+
+        assert!(["ada@example.com", "nope"].try_into_mailboxes().is_err());
 
         Ok(())
     }

@@ -40,7 +40,7 @@ mod tests {
             Box::pin(async move {
                 let mail = Mail::builder()
                     .from(Mailbox::new("ada@example.com")?)
-                    .to(Mailbox::new("bob@example.com")?)
+                    .to([Mailbox::new("bob@example.com")?])
                     .subject("Hello")
                     .text("Hi")
                     .build();

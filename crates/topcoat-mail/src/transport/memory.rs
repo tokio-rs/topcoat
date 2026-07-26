@@ -25,7 +25,7 @@ use crate::{
 /// # let cx = Cx::default();
 /// # let mail = Mail::builder()
 /// #     .from(topcoat_mail::Mailbox::new("ada@example.com")?)
-/// #     .to(topcoat_mail::Mailbox::new("bob@example.com")?)
+/// #     .to([topcoat_mail::Mailbox::new("bob@example.com")?])
 /// #     .subject("Welcome!")
 /// #     .text("Hi")
 /// #     .build();
@@ -91,7 +91,7 @@ mod tests {
     fn mail() -> Mail {
         Mail::builder()
             .from(Mailbox::new("ada@example.com").unwrap())
-            .to(Mailbox::new("bob@example.com").unwrap())
+            .to([Mailbox::new("bob@example.com").unwrap()])
             .subject("Hello")
             .text("Hi Bob")
             .build()

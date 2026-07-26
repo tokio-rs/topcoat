@@ -129,46 +129,47 @@ mod tests {
     }
 
     #[test]
-    fn additive_field_appends_each_list_value() {
-        let tokens = expand("to: [a, b, c]");
-        assert_eq!(tokens.matches(". to (").count(), 3, "{tokens}");
+    fn from_converts_through_try_from() {
+        let tokens = expand(r#"from: "ada@example.com""#);
+        assert!(tokens.contains("Mailbox :: try_from"), "{tokens}");
     }
 
     #[test]
-    fn additive_field_accepts_a_single_value() {
-        let tokens = expand("cc: carol");
-        assert_eq!(tokens.matches(". cc (").count(), 1, "{tokens}");
-    }
-
-    #[test]
-    fn mailbox_values_convert_through_try_from() {
-        let tokens = expand(r#"from: "ada@example.com", to: [bob, ("Grace", "g@example.com")]"#);
-        assert_eq!(tokens.matches("Mailbox :: try_from").count(), 3, "{tokens}");
+    fn recipients_convert_through_try_into_mailboxes() {
+        let tokens = expand(r#"to: [bob, grace], cc: "carol@example.com""#);
+        assert_eq!(
+            tokens
+                .matches("TryIntoMailboxes :: try_into_mailboxes")
+                .count(),
+            2,
+            "{tokens}"
+        );
+        assert!(tokens.contains(". to ("), "{tokens}");
+        assert!(tokens.contains(". cc ("), "{tokens}");
     }
 
     #[test]
     fn non_mailbox_values_pass_through() {
-        let tokens = expand(r#"subject: "Hello", attachments: [invoice]"#);
+        let tokens = expand(r#"subject: "Hello", text: "Hi""#);
         assert!(!tokens.contains("try_from"), "{tokens}");
+        assert!(!tokens.contains("try_into_mailboxes"), "{tokens}");
     }
 
     #[test]
-    fn attachments_lower_to_attachment_calls() {
+    fn attachments_convert_through_into_attachments() {
         let tokens = expand("attachments: [a, b]");
-        assert_eq!(tokens.matches(". attachment (").count(), 2, "{tokens}");
+        assert!(
+            tokens.contains("IntoAttachments :: into_attachments"),
+            "{tokens}"
+        );
+        assert!(tokens.contains(". attachments ("), "{tokens}");
     }
 
     #[test]
-    fn header_entries_bind_name_and_value_pairs() {
-        let tokens = expand(r#"headers: [("X-One", "1"), pair]"#);
-        assert_eq!(tokens.matches(". header (").count(), 2, "{tokens}");
-        assert!(tokens.contains("let (__name , __value)"), "{tokens}");
-    }
-
-    #[test]
-    fn single_header_binds_a_pair() {
-        let tokens = expand("headers: pair");
-        assert_eq!(tokens.matches(". header (").count(), 1, "{tokens}");
+    fn headers_convert_through_into_headers() {
+        let tokens = expand(r#"headers: [("X-One", "1")]"#);
+        assert!(tokens.contains("IntoHeaders :: into_headers"), "{tokens}");
+        assert!(tokens.contains(". headers ("), "{tokens}");
     }
 
     #[test]

@@ -231,7 +231,7 @@ mod tests {
     fn base() -> crate::MailBuilder {
         Mail::builder()
             .from(Mailbox::named("Ada", "ada@example.com").unwrap())
-            .to(Mailbox::new("bob@example.com").unwrap())
+            .to([Mailbox::new("bob@example.com").unwrap()])
     }
 
     fn formatted(mail: &Mail) -> String {
@@ -307,7 +307,7 @@ mod tests {
         let mail = base()
             .text("Hi Bob")
             .html(View::unescaped_unchecked("<img src=\"cid:logo\">"))
-            .attachment(Attachment::inline("logo", "image/png", b"\x89PNG"))
+            .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
             .build();
         let wire = formatted(&mail);
 
@@ -321,7 +321,7 @@ mod tests {
     fn downloadable_attachments_mix_with_the_bodies() {
         let mail = base()
             .text("Hi Bob")
-            .attachment(Attachment::new("invoice.pdf", "application/pdf", b"%PDF-"))
+            .attachments([Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")])
             .build();
         let wire = formatted(&mail);
 
@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn bcc_recipients_reach_the_envelope_but_not_the_wire() {
         let mail = base()
-            .bcc(Mailbox::new("dan@example.com").unwrap())
+            .bcc([Mailbox::new("dan@example.com").unwrap()])
             .text("Hi")
             .build();
 
@@ -353,7 +353,7 @@ mod tests {
     #[test]
     fn kept_bcc_stays_on_the_wire() {
         let mail = base()
-            .bcc(Mailbox::new("dan@example.com").unwrap())
+            .bcc([Mailbox::new("dan@example.com").unwrap()])
             .text("Hi")
             .build();
 
@@ -389,7 +389,10 @@ mod tests {
     fn custom_headers_are_written() {
         let mail = base()
             .text("Hi")
-            .header("List-Unsubscribe", "<mailto:stop@example.com>")
+            .headers([(
+                "List-Unsubscribe".to_owned(),
+                "<mailto:stop@example.com>".to_owned(),
+            )])
             .build();
         let wire = formatted(&mail);
 
@@ -412,7 +415,7 @@ mod tests {
     #[test]
     fn incomplete_mail_is_rejected() {
         let missing_from = Mail::builder()
-            .to(Mailbox::new("bob@example.com").unwrap())
+            .to([Mailbox::new("bob@example.com").unwrap()])
             .text("Hi")
             .build();
         assert!(matches!(
@@ -437,7 +440,7 @@ mod tests {
 
         let orphan_inline = base()
             .text("Hi")
-            .attachment(Attachment::inline("logo", "image/png", b"\x89PNG"))
+            .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
             .build();
         assert!(matches!(
             orphan_inline.formatted(&Cx::default()),
@@ -449,14 +452,17 @@ mod tests {
     fn invalid_declarations_are_rejected() {
         let content_type = base()
             .text("Hi")
-            .attachment(Attachment::new("a.bin", "not a mime type", b""))
+            .attachments([Attachment::new("a.bin", "not a mime type", b"")])
             .build();
         assert!(matches!(
             content_type.formatted(&Cx::default()),
             Err(SendError::InvalidContentType { .. })
         ));
 
-        let header_name = base().text("Hi").header("Bad Name", "value").build();
+        let header_name = base()
+            .text("Hi")
+            .headers([("Bad Name".to_owned(), "value".to_owned())])
+            .build();
         assert!(matches!(
             header_name.formatted(&Cx::default()),
             Err(SendError::InvalidHeaderName { .. })

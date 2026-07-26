@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
-    Expr, Ident, Token,
+    Ident, Token,
     ext::IdentExt,
     parse::{Parse, ParseStream},
 };
@@ -70,66 +70,33 @@ impl MailField {
                     let __builder = __builder.#method(__html?);
                 }
             }
-            FieldValue::List(list) if self.name == "headers" => {
-                let calls = list.values.iter().map(Self::header_call);
-                quote! { #(#calls)* }
-            }
-            FieldValue::List(list) => {
-                let calls = list.values.iter().map(|value| {
-                    let argument = self.argument(value);
-                    quote! { let __builder = __builder.#method(#argument); }
-                });
-                quote! { #(#calls)* }
-            }
-            FieldValue::Expr(value) if self.name == "headers" => Self::header_call(value),
-            FieldValue::Expr(value) => {
-                let argument = self.argument(value);
-                quote! { let __builder = __builder.#method(#argument); }
-            }
-        }
-    }
-
-    /// The argument a value lowers to. A mailbox field's value converts
-    /// through `TryFrom`, so a string or a `(name, address)` pair parses in
-    /// place, with the error propagated by the generated block.
-    fn argument(&self, value: &Expr) -> TokenStream {
-        if self.is_mailbox() {
-            quote! { #topcoat_mail::Mailbox::try_from(#value)? }
-        } else {
-            quote! { #value }
-        }
-    }
-
-    /// Whether the field holds mailboxes.
-    fn is_mailbox(&self) -> bool {
-        ["from", "to", "cc", "bcc", "reply_to"]
-            .iter()
-            .any(|field| self.name == *field)
-    }
-
-    /// The builder method the field lowers to: the name as written, with the
-    /// plural additive names mapped to their singular append methods, and
-    /// keywords escaped to raw identifiers to keep the expansion parseable.
-    fn method(&self) -> Ident {
-        match self.name.unraw().to_string().as_str() {
-            "attachments" => Ident::new("attachment", self.name.span()),
-            "headers" => Ident::new("header", self.name.span()),
-            name => match syn::parse_str::<Ident>(name) {
-                Ok(_) => self.name.clone(),
-                Err(_) => Ident::new_raw(name, self.name.span()),
+            FieldValue::Expr(value) => match self.name().as_str() {
+                "to" | "cc" | "bcc" | "reply_to" => quote! {
+                    let __builder = __builder
+                        .#method(#topcoat_mail::TryIntoMailboxes::try_into_mailboxes(#value)?);
+                },
+                "from" => quote! {
+                    let __builder = __builder.#method(#topcoat_mail::Mailbox::try_from(#value)?);
+                },
+                "attachments" => quote! {
+                    let __builder = __builder
+                        .#method(#topcoat_mail::IntoAttachments::into_attachments(#value));
+                },
+                "headers" => quote! {
+                    let __builder = __builder
+                        .#method(#topcoat_mail::IntoHeaders::into_headers(#value));
+                },
+                _ => quote! { let __builder = __builder.#method(#value); },
             },
         }
     }
 
-    /// The builder call a header entry lowers to: the entry evaluates to a
-    /// `(name, value)` pair, bound and spread over the two `header`
-    /// arguments.
-    fn header_call(entry: &Expr) -> TokenStream {
-        quote! {
-            let __builder = {
-                let (__name, __value) = #entry;
-                __builder.header(__name, __value)
-            };
+    /// The builder method the field lowers to: the name as written, with
+    /// keywords escaped to raw identifiers to keep the expansion parseable.
+    fn method(&self) -> Ident {
+        match syn::parse_str::<Ident>(&self.name()) {
+            Ok(_) => self.name.clone(),
+            Err(_) => Ident::new_raw(&self.name(), self.name.span()),
         }
     }
 }

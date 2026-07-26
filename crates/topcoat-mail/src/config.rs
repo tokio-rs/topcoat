@@ -25,7 +25,7 @@ use crate::{Mail, Receipt, Transport};
 ///
 /// let mail = Mail::builder()
 ///     .from(Mailbox::new("ada@example.com")?)
-///     .to(Mailbox::new("bob@example.com")?)
+///     .to([Mailbox::new("bob@example.com")?])
 ///     .subject("Analytical engines")
 ///     .text("The engine weaves algebraic patterns.")
 ///     .build();
@@ -100,7 +100,7 @@ mod tests {
     fn mail() -> Result<Mail, AddressError> {
         Ok(Mail::builder()
             .from(Mailbox::new("ada@example.com")?)
-            .to(Mailbox::new("bob@example.com")?)
+            .to([Mailbox::new("bob@example.com")?])
             .subject("Hello")
             .text("Hi")
             .build())
