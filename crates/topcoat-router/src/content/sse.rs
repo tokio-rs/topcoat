@@ -1,4 +1,4 @@
-#![doc = include_str!("../../docs/sse.md")]
+#![doc = include_str!("../../docs/content/sse.md")]
 
 mod event;
 mod keep_alive;

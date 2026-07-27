@@ -1,9 +1,9 @@
 #![doc = include_str!("../docs/router.md")]
-// Without the `tower`, `serve`, and `websocket` features the docs' links into
-// the `tower` and `websocket` modules and the serve functions cannot resolve;
-// they degrade to plain text instead of failing the build.
+// Without the `tower` and `serve` features the docs' links into the `tower`
+// module and the serve functions cannot resolve; they degrade to plain text
+// instead of failing the build.
 #![cfg_attr(
-    not(all(feature = "serve", feature = "tower", feature = "websocket")),
+    not(all(feature = "serve", feature = "tower")),
     allow(rustdoc::broken_intra_doc_links)
 )]
 

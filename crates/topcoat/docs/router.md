@@ -31,7 +31,7 @@ async fn user_profile() -> Result {
 }
 ```
 
-A page serves `GET` by default; naming methods before the path (`#[page(POST "/signup")]`) overrides that, with the same method forms as [`#[route]`](route).
+A page serves `GET` by default; naming methods before the path (e.g., `#[page(POST "/signup")]`) overrides that, with the same method forms as [`#[route]`](route).
 
 See [`#[page]`](page) for the handler signature, module-derived paths, and using pages as components.
 
@@ -106,7 +106,7 @@ See [`#[route]`](route) for the handler signature and how return values convert 
 
 # Request and response bodies
 
-A page or route handler can take the request context as `cx: &`[`Cx`](crate::context::Cx) and, alongside it, a single request body parameter. That parameter can be any type that implements [`FromRequest`]. API routes additionally return `Result<T>` where `T:` [`IntoResponse`].
+A page or route handler can take the request context as `cx: &`[`Cx`](crate::context::Cx) and, alongside it, a single request body parameter, such as a [`Json`](content::Json) body. An API route additionally returns a value that becomes the response.
 
 ```rust
 # #[derive(serde::Deserialize)] struct CreateUser { name: String }
@@ -124,11 +124,7 @@ async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User
 }
 ```
 
-The context and the body parameter are both optional and may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once. Pages use the same [`FromRequest`] parsing, but return a rendered view rather than an [`IntoResponse`] value. See [`FromRequest`] and [`IntoResponse`] for the implementing types.
-
-# WebSockets
-
-With the `websocket` feature enabled, a route can serve WebSocket connections. The handler takes a [`WebSocketUpgrade`](content::websocket::WebSocketUpgrade) parameter and calls [`on_upgrade`](content::websocket::WebSocketUpgrade::on_upgrade) with a callback that talks to the client. See the [`websocket`](mod@content::websocket) module docs for more.
+The context and the body parameter are both optional and may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once. Pages parse bodies the same way, but return a rendered view rather than a response value. See the [`content`](mod@content) module docs for the available extractors and response types, as well as multipart uploads, WebSockets, and server-sent events.
 
 # Path and query parameters
 

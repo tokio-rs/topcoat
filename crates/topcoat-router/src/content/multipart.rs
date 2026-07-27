@@ -1,4 +1,4 @@
-#![doc = include_str!("../../docs/multipart.md")]
+#![doc = include_str!("../../docs/content/multipart.md")]
 
 use std::pin::Pin;
 use std::task::{Context, Poll};

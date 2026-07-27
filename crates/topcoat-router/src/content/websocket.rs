@@ -1,4 +1,4 @@
-#![doc = include_str!("../../docs/websocket.md")]
+#![doc = include_str!("../../docs/content/websocket.md")]
 
 mod message;
 mod socket;
