@@ -2,7 +2,7 @@ use std::{fmt, path::PathBuf, sync::Arc};
 
 use http::Uri;
 
-use crate::Asset;
+use crate::AssetId;
 
 /// A step the [`Bundler`](super::Bundler) took while syncing assets.
 ///
@@ -23,13 +23,13 @@ pub enum BundleEvent {
     Downloaded { uri: Uri, path: PathBuf, bytes: u64 },
     /// An asset was written into the bundle directory.
     Bundled {
-        id: Asset,
+        id: AssetId,
         file: String,
         bytes: usize,
     },
     /// An asset was already in the bundle directory with the same
     /// contents, so it was left alone.
-    Unchanged { id: Asset, file: String },
+    Unchanged { id: AssetId, file: String },
     /// A file that is no longer referenced was deleted from the bundle
     /// directory.
     Removed { file: String },

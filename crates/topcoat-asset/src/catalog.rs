@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{Asset, AssetBundle, Manifest};
+use crate::{AssetBundle, AssetId, Manifest};
 
 /// A single entry inside an [`AssetCatalog`].
 #[derive(Debug, Clone)]
@@ -37,13 +37,13 @@ impl BundledAsset {
 /// into the binary on targets without filesystem access, like WebAssembly).
 #[derive(Debug, Default, Clone)]
 pub struct AssetCatalog {
-    bundled_assets: HashMap<Asset, BundledAsset>,
+    bundled_assets: HashMap<AssetId, BundledAsset>,
 }
 
 impl AssetCatalog {
     /// Look up the bundled asset for an [`Asset`] ID.
     #[must_use]
-    pub fn get(&self, id: Asset) -> Option<&BundledAsset> {
+    pub fn get(&self, id: AssetId) -> Option<&BundledAsset> {
         self.bundled_assets.get(&id)
     }
 

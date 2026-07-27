@@ -86,9 +86,10 @@ impl FontSourceUrl {
                 fnv1a::hash_continue(fnv1a::hash_continue(h, b"s"), inner.as_bytes())
             }
             #[cfg(feature = "asset")]
-            Self::Asset(inner) => {
-                fnv1a::hash_continue(fnv1a::hash_continue(h, b"a"), &inner.as_u64().to_le_bytes())
-            }
+            Self::Asset(inner) => fnv1a::hash_continue(
+                fnv1a::hash_continue(h, b"a"),
+                &inner.id().as_u64().to_le_bytes(),
+            ),
         }
     }
 }

@@ -7,17 +7,51 @@ use topcoat_core::fnv1a;
 
 use crate::{AssetOptions, ConstReader, ConstWriter, Source};
 
-/// Compact identifier for an asset declared via [`asset!`](crate::asset).
+///
 ///
 /// `Asset` values are cheap to copy and store, and stable across runs as
 /// long as the declaring crate name, source file path, and asset path
 /// don't change. Use [`AssetBundle::get`](crate::AssetBundle::get) to
 /// resolve one back to a file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Asset(u64);
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Asset(&'static [u8]);
 
 impl Asset {
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn new(inner: &'static [u8]) -> Self {
+        Self(inner)
+    }
+
+    #[must_use]
+    pub fn id(&self) -> AssetId {
+        // Prevent the optimizer from removing the raw asset bytes from the
+        // executable if they are used.
+        let bytes = core::hint::black_box(self.0);
+        let mut reader = ConstReader::new(bytes);
+        reader.skip(SCRAMBLED_PREFIX.len());
+        AssetId(
+            reader
+                .read_u64_le()
+                .expect("raw asset does not have a valid ID"),
+        )
+    }
+}
+
+impl std::fmt::Debug for Asset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct(stringify!(Asset))
+            .field("id", &self.id())
+            .finish()
+    }
+}
+
+/// Compact identifier for an asset declared via [`asset!`](crate::asset).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct AssetId(u64);
+
+impl AssetId {
     /// Build an `Asset` ID from the same inputs the [`asset!`](crate::asset)
     /// macro uses.
     ///
@@ -56,7 +90,7 @@ impl Asset {
 /// context needed to resolve relative paths back to real files.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RawAsset {
-    id: Asset,
+    id: AssetId,
     path: String,
     crate_name: String,
     manifest_dir: String,
@@ -69,7 +103,7 @@ pub const ENCODED_ASSET_SIZE: usize = 2048;
 impl RawAsset {
     #[must_use]
     pub const fn encode(
-        id: Asset,
+        id: AssetId,
         path: &str,
         crate_name: &str,
         manifest_dir: &str,
@@ -93,7 +127,7 @@ impl RawAsset {
         let mut r = ConstReader::new(buffer);
         r.skip(asset_prefix().len())?;
         Some(Self {
-            id: Asset(r.read_u64_le()?),
+            id: AssetId(r.read_u64_le()?),
             path: r.read_str()?.to_owned(),
             crate_name: r.read_str()?.to_owned(),
             manifest_dir: r.read_str()?.to_owned(),
@@ -119,7 +153,7 @@ impl RawAsset {
     }
 
     #[must_use]
-    pub fn id(&self) -> Asset {
+    pub fn id(&self) -> AssetId {
         self.id
     }
 
@@ -283,9 +317,8 @@ macro_rules! asset {
         const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
         const SOURCE_FILE: &str = file!();
         const OPTIONS: $crate::AssetOptions = $crate::asset_options!($($($ao)*)?);
-        const ID: $crate::Asset = $crate::Asset::new(CRATE_NAME, SOURCE_FILE, PATH, &OPTIONS);
+        const ID: $crate::AssetId = $crate::AssetId::new(CRATE_NAME, SOURCE_FILE, PATH, &OPTIONS);
 
-        #[used]
         pub static ENCODED_ASSET: [u8; $crate::ENCODED_ASSET_SIZE] = $crate::RawAsset::encode(
             ID,
             PATH,
@@ -295,7 +328,7 @@ macro_rules! asset {
             &OPTIONS,
         );
 
-        ID
+        $crate::Asset::new(ENCODED_ASSET.as_slice())
     }};
 }
 

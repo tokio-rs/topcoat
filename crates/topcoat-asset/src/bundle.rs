@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{Asset, AssetCatalog, BundledAsset, MANIFEST_NAME, Manifest};
+use crate::{Asset, AssetCatalog, AssetId, BundledAsset, MANIFEST_NAME, Manifest};
 
 /// An asset bundle on disk: a directory of bundled files plus the
 /// [`AssetCatalog`] mapping [`Asset`] IDs to them.
@@ -126,7 +126,7 @@ impl AssetBundle {
     /// The returned entry names the file; its on-disk location is that name
     /// under [`dir`](AssetBundle::dir).
     #[must_use]
-    pub fn get(&self, id: Asset) -> Option<&BundledAsset> {
+    pub fn get(&self, id: AssetId) -> Option<&BundledAsset> {
         self.catalog.get(id)
     }
 }

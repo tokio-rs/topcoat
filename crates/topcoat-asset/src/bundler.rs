@@ -15,7 +15,8 @@ use std::{
 use sha2::{Digest, Sha256};
 
 use crate::{
-    Asset, AssetError, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset, Source,
+    Asset, AssetError, AssetId, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset,
+    Source,
 };
 
 use cache::Cache;
@@ -160,7 +161,7 @@ impl Bundler {
     fn prepare_all(
         &self,
         assets: &[RawAsset],
-        existing: &HashMap<Asset, ManifestEntry>,
+        existing: &HashMap<AssetId, ManifestEntry>,
         out_dir: &Path,
     ) -> Vec<Result<Prepared, BundleError>> {
         let workers = self.parallelism.min(assets.len());
@@ -203,7 +204,7 @@ impl Bundler {
     fn prepare(
         &self,
         asset: &RawAsset,
-        existing: &HashMap<Asset, ManifestEntry>,
+        existing: &HashMap<AssetId, ManifestEntry>,
         out_dir: &Path,
     ) -> Result<Prepared, BundleError> {
         let source = asset.source();

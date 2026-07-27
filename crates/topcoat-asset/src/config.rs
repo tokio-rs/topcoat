@@ -12,7 +12,7 @@ use topcoat_core::context::{Cx, app_context};
 use crate::AssetBundle;
 #[cfg(feature = "serve")]
 use crate::serve::ASSET_ROUTE_PREFIX;
-use crate::{Asset, AssetCatalog, BundledAsset};
+use crate::{Asset, AssetCatalog, AssetId, BundledAsset};
 
 /// Where the bundled assets are hosted.
 #[derive(Debug, Clone)]
@@ -104,8 +104,8 @@ impl AssetConfig {
 
     /// Look up the bundled file for an [`Asset`] ID in the catalog.
     #[must_use]
-    pub fn get(&self, id: Asset) -> Option<&BundledAsset> {
-        self.catalog.get(id)
+    pub fn get(&self, asset: Asset) -> Option<&BundledAsset> {
+        self.catalog.get(asset.id())
     }
 
     /// The base URL asset URLs are formed against: the internal asset route
