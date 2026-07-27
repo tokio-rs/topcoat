@@ -27,6 +27,9 @@ pub mod cookie;
 
 pub mod context;
 
+#[cfg(feature = "datastar")]
+pub mod datastar;
+
 #[cfg(feature = "font")]
 pub mod font;
 

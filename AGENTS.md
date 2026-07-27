@@ -15,7 +15,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable e
 - `topcoat-asset`: the `asset!` macro and `AssetBundle` for declaring and serving content-hashed static files.
 - `topcoat-cookie`: the cookie jar, `cookie!` macro, signed/private jars, and `CookieStore<T>`.
 - `topcoat-session`: bring-your-own-storage session authentication: the token/hash model, the session lifecycle, and origin checking.
-- `topcoat-htmx` and `topcoat-alpine-ajax`: request and response helpers for those two client libraries.
+- `topcoat-htmx`, `topcoat-alpine-ajax`, and `topcoat-datastar`: request and response helpers for those client libraries.
 - `topcoat-tailwind`: the build-script wrapper around the standalone Tailwind CLI.
 - `topcoat-ui` (+ `registry/`): the component registry behind `topcoat ui`, which copies component source into a project.
 - `topcoat-cli`: the `topcoat` binary. Each subcommand has its own module under `src/`.
@@ -81,6 +81,7 @@ Each crate's `docs/` directory holds the user-facing guides for that crate, embe
 
 - [`crates/topcoat/docs/htmx.md`](crates/topcoat/docs/htmx.md): htmx: reading its request headers and setting its response headers from a handler.
 - [`crates/topcoat/docs/alpine-ajax.md`](crates/topcoat/docs/alpine-ajax.md): Alpine AJAX: reading its request headers to render partial responses.
+- [`crates/topcoat/docs/datastar.md`](crates/topcoat/docs/datastar.md): Datastar: reading the signals sent with a request and patching elements and signals over server-sent events.
 
 ### Tooling
 

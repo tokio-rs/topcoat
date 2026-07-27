@@ -634,6 +634,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
+name = "datastar"
+version = "0.4.0"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "serde",
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "deadpool"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2741,6 +2752,7 @@ checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 name = "topcoat"
 version = "0.4.0"
 dependencies = [
+ "futures-core",
  "futures-util",
  "inventory",
  "serde",
@@ -2753,6 +2765,7 @@ dependencies = [
  "topcoat-cookie",
  "topcoat-core",
  "topcoat-core-macro",
+ "topcoat-datastar",
  "topcoat-font",
  "topcoat-font-macro",
  "topcoat-htmx",
@@ -2881,6 +2894,20 @@ dependencies = [
  "tokio",
  "topcoat",
  "topcoat-core-grammar",
+]
+
+[[package]]
+name = "topcoat-datastar"
+version = "0.4.0"
+dependencies = [
+ "futures-util",
+ "http",
+ "serde",
+ "serde_json",
+ "tokio",
+ "topcoat",
+ "topcoat-core",
+ "topcoat-router",
 ]
 
 [[package]]

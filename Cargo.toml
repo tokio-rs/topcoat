@@ -7,6 +7,7 @@ members = [
     "crates/topcoat-cli",
     "crates/topcoat-cookie",
     "crates/topcoat-core",
+    "crates/topcoat-datastar",
     "crates/topcoat-core/grammar",
     "crates/topcoat-core/macro",
     "crates/topcoat-font",
@@ -38,6 +39,7 @@ members = [
     "examples/asset",
     "examples/context",
     "examples/cookie",
+    "examples/datastar",
     "examples/font",
     "examples/hello-world",
     "examples/htmx",
@@ -113,6 +115,7 @@ topcoat-cookie = { version = "0.4.0", path = "crates/topcoat-cookie" }
 topcoat-core = { version = "0.4.0", path = "crates/topcoat-core" }
 topcoat-core-grammar = { version = "0.4.0", path = "crates/topcoat-core/grammar" }
 topcoat-core-macro = { version = "0.4.0", path = "crates/topcoat-core/macro" }
+topcoat-datastar = { version = "0.4.0", path = "crates/topcoat-datastar" }
 topcoat-font = { version = "0.4.0", path = "crates/topcoat-font" }
 topcoat-font-grammar = { version = "0.4.0", path = "crates/topcoat-font/grammar" }
 topcoat-font-macro = { version = "0.4.0", path = "crates/topcoat-font/macro" }

@@ -54,6 +54,11 @@ release = true
 version_group = "topcoat"
 
 [[package]]
+name = "topcoat-datastar"
+release = true
+version_group = "topcoat"
+
+[[package]]
 name = "topcoat-font"
 release = true
 version_group = "topcoat"

@@ -30,6 +30,7 @@ full = [
 	"asset",
 	"compression",
 	"cookie",
+	"datastar",
 	"discover",
 	"font",
 	"font-fontsource",
@@ -66,6 +67,10 @@ compression = [
 cookie = [
 	"dep:topcoat-cookie",
 	"topcoat-session?/cookie",
+]
+datastar = [
+	"dep:topcoat-datastar",
+	"sse",
 ]
 discover = [
 	"dep:inventory",
@@ -167,6 +172,7 @@ topcoat-asset = { workspace = true, optional = true }
 topcoat-cookie = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-core-macro.workspace = true
+topcoat-datastar = { workspace = true, optional = true }
 topcoat-font = { workspace = true, optional = true }
 topcoat-font-macro = { workspace = true, optional = true }
 topcoat-htmx = { workspace = true, optional = true }
@@ -192,6 +198,8 @@ tokio = { workspace = true, optional = true, features = ["macros", "net", "signa
 tokio-tungstenite = { workspace = true, optional = true, features = ["connect"] }
 
 [dev-dependencies]
+futures-core.workspace = true
+futures-util.workspace = true
 serde_json.workspace = true
 uuid = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

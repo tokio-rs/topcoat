@@ -1,0 +1,34 @@
+[package]
+name = "topcoat-datastar"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+topcoat-core.workspace = true
+topcoat-router = { workspace = true, features = ["sse"] }
+
+futures-util.workspace = true
+http.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+
+[dev-dependencies]
+topcoat = { workspace = true, features = ["datastar"] }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.cargo-udeps.ignore]
+development = ["topcoat"]

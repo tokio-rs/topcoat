@@ -6,7 +6,6 @@ const log = (text) => {
 
 // The browser reconnects on its own when the connection drops, sending the id
 // of the last event it saw, so the server resumes the stream without gaps.
-// Restart the server to watch it happen.
 const ticks = new EventSource("/ticks");
 ticks.addEventListener("open", () => log("connected"));
 ticks.addEventListener("tick", (event) => log(`tick: ${event.data}`));
