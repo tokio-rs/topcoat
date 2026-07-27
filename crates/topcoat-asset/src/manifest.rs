@@ -9,7 +9,7 @@ pub const MANIFEST_NAME: &str = "manifest.toml";
 /// Current on-disk manifest format version.
 pub const MANIFEST_VERSION: u32 = 1;
 
-/// On-disk index of a bundle directory, mapping [`Asset`] IDs to files.
+/// On-disk index of a bundle directory, mapping [`AssetId`]s to files.
 #[derive(Serialize, Deserialize)]
 pub struct Manifest {
     pub version: u32,
