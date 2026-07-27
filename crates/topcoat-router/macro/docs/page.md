@@ -37,7 +37,7 @@ async fn about() -> Result {
 Declaring a method (a form submission answered with a rendered view):
 
 ```rust
-# use topcoat::{Result, router::{Form, page}, view::view};
+# use topcoat::{Result, router::{content::Form, page}, view::view};
 # use serde::Deserialize;
 # #[derive(Deserialize)]
 # struct Signup { email: String }
@@ -50,7 +50,7 @@ async fn signup(Form(input): Form<Signup>) -> Result {
 Reading a request body:
 
 ```rust
-# use topcoat::{Result, router::{Form, page}, view::view};
+# use topcoat::{Result, router::{content::Form, page}, view::view};
 # use serde::Deserialize;
 # #[derive(Deserialize)]
 # struct Search { q: String }
@@ -65,7 +65,7 @@ async fn contact(Form(input): Form<Search>) -> Result {
 A page doubles as a [component](../view/attr.component.html): calling it inside [`view!`](../view/macro.view.html) renders it inline. A page that reads a request body takes the already-parsed value as a `body` prop instead of parsing the request.
 
 ```rust
-# use topcoat::{Result, router::{Form, page}, view::view};
+# use topcoat::{Result, router::{content::Form, page}, view::view};
 # use serde::Deserialize;
 # #[derive(Deserialize)]
 # struct Search { q: String }

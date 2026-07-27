@@ -34,7 +34,7 @@ use crate::{
 /// ```rust
 /// use topcoat::{
 ///     Result,
-///     router::{multipart::Multipart, route},
+///     router::{content::multipart::Multipart, route},
 /// };
 ///
 /// #[route(POST "/api/upload")]

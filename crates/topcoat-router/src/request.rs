@@ -13,7 +13,7 @@ pub type Request<T = Body> = http::Request<T>;
 ///
 /// A page or route handler may take a single `FromRequest` value as its request
 /// body parameter, optionally alongside `cx: &Cx`. The built-in extractors
-/// ([`Json`](crate::Json), [`Form`](crate::Form), [`Bytes`],
+/// ([`Json`](crate::content::Json), [`Form`](crate::content::Form), [`Bytes`],
 /// [`String`], [`Body`], and more) all implement this trait; implement it
 /// yourself for request-specific parsing the built-ins don't cover.
 ///

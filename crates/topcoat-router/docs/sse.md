@@ -11,8 +11,8 @@ use futures_core::Stream;
 use topcoat::{
     Result,
     router::{
+        content::sse::{Event, KeepAlive, Sse},
         route,
-        sse::{Event, KeepAlive, Sse},
     },
 };
 
@@ -41,8 +41,8 @@ use topcoat::{
     Result,
     context::Cx,
     router::{
+        content::sse::{Event, Sse, last_event_id},
         route,
-        sse::{Event, Sse, last_event_id},
     },
 };
 

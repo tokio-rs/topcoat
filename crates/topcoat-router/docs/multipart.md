@@ -9,7 +9,7 @@ A route reads an upload by taking a [`Multipart`] parameter and iterating its fi
 ```rust
 use topcoat::{
     Result,
-    router::{multipart::Multipart, route},
+    router::{content::multipart::Multipart, route},
 };
 
 #[route(POST "/api/upload")]

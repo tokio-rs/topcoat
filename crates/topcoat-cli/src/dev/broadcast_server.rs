@@ -11,8 +11,9 @@ use tokio::sync::broadcast;
 use topcoat_core::context::{Cx, app_context};
 use topcoat_router::{
     Body, FromRequest, HeaderValue, Method, Path, Response, RouteFn, RouteFuture, Router,
-    RouterService, header, internal_serve,
-    websocket::{Message, WebSocket, WebSocketUpgrade},
+    RouterService,
+    content::websocket::{Message, WebSocket, WebSocketUpgrade},
+    header, internal_serve,
 };
 
 const PORT_START: u16 = 59039;

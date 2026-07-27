@@ -11,7 +11,7 @@ use topcoat_core::context::Cx;
 use topcoat_core::error::{Error, Result};
 
 use crate::error::{bad_request, method_not_allowed};
-use crate::websocket::WebSocket;
+use crate::content::websocket::WebSocket;
 use crate::{Body, FromRequest, Response, extensions, headers, method};
 
 /// WebSocket handshake extractor: validates the upgrade request and hands the
@@ -33,8 +33,9 @@ use crate::{Body, FromRequest, Response, extensions, headers, method};
 /// use topcoat::{
 ///     Result,
 ///     router::{
-///         Response, route,
-///         websocket::{Message, WebSocketUpgrade},
+///         Response,
+///         content::websocket::{Message, WebSocketUpgrade},
+///         route,
 ///     },
 /// };
 ///
@@ -109,7 +110,7 @@ impl WebSocketUpgrade {
     /// The first declared protocol that the client also requested (via the
     /// `Sec-WebSocket-Protocol` header) is selected, echoed in the handshake
     /// response, and reported by
-    /// [`WebSocket::protocol`](crate::websocket::WebSocket::protocol).
+    /// [`WebSocket::protocol`](crate::content::websocket::WebSocket::protocol).
     pub fn protocols<I>(mut self, protocols: I) -> Self
     where
         I: IntoIterator,
@@ -303,7 +304,7 @@ mod tests {
 
     use super::*;
     use crate::error::{BadRequestError, MethodNotAllowedError};
-    use crate::websocket::Message;
+    use crate::content::websocket::Message;
     use crate::{Path, RouteFn, RouteFuture, Router, RouterService, internal_serve};
 
     /// The `Sec-WebSocket-Key` from RFC 6455's handshake example.

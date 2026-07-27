@@ -99,10 +99,10 @@ impl ToTokens for Procedure {
                     #item
                     Box::pin(async {
                         type Surrogate = <(#(#arg_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
-                        let #topcoat_router::Json(args) = <#topcoat_router::Json<Surrogate> as #topcoat_router::FromRequest>::from_request(cx, body).await?;
+                        let #topcoat_router::content::Json(args) = <#topcoat_router::content::Json<Surrogate> as #topcoat_router::FromRequest>::from_request(cx, body).await?;
                         let (#(#args,)*) = #topcoat_runtime::Surrogate::into_real(args);
                         let response = #topcoat_runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
-                        #topcoat_router::IntoResponse::into_response(#topcoat_router::Json(response), cx)
+                        #topcoat_router::IntoResponse::into_response(#topcoat_router::content::Json(response), cx)
                     })
                 },
             );

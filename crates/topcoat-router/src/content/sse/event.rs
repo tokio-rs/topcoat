@@ -18,7 +18,7 @@ use crate::headers;
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::{Result, router::sse::Event};
+/// use topcoat::{Result, router::content::sse::Event};
 ///
 /// fn tick(count: u32) -> Result<Event> {
 ///     Event::new()
@@ -171,7 +171,7 @@ impl std::error::Error for InvalidEventError {}
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::{context::Cx, router::sse::last_event_id};
+/// use topcoat::{context::Cx, router::content::sse::last_event_id};
 ///
 /// async fn resume_point(cx: &Cx) -> u64 {
 ///     last_event_id(cx)

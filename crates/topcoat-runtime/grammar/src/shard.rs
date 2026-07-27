@@ -139,8 +139,8 @@ impl ToTokens for Shard {
                     |cx, body| ::std::boxed::Box::pin(async move {
                         type __Surrogate =
                             <(#(#value_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
-                        let #topcoat_router::Json(__args) =
-                            <#topcoat_router::Json<__Surrogate> as #topcoat_router::FromRequest>
+                        let #topcoat_router::content::Json(__args) =
+                            <#topcoat_router::content::Json<__Surrogate> as #topcoat_router::FromRequest>
                                 ::from_request(cx, body).await?;
                         let (#(#value_idents,)*) =
                             #topcoat_runtime::Surrogate::into_real(__args);

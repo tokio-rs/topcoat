@@ -10,7 +10,8 @@ use topcoat::{
     context::{Cx, app_context},
     cookie::RouterBuilderCookieExt,
     router::{
-        Form, Router, RouterBuilderDiscoverExt,
+        Router, RouterBuilderDiscoverExt,
+        content::Form,
         error::{SeeOther, see_other},
         layout, page, route,
     },

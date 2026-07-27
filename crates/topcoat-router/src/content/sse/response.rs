@@ -11,7 +11,7 @@ use topcoat_core::{
     error::{Error, Result},
 };
 
-use crate::sse::{Event, KeepAlive, KeepAliveTimer};
+use crate::content::sse::{Event, KeepAlive, KeepAliveTimer};
 use crate::{Body, BoxError, IntoResponse, Response};
 
 /// Server-sent events response: streams [`Event`]s to the client over a
@@ -26,7 +26,7 @@ use crate::{Body, BoxError, IntoResponse, Response};
 ///
 /// A browser `EventSource` reconnects automatically when the connection is
 /// lost. Send [`Event::retry`] to tune its reconnection delay, and
-/// [`Event::id`] together with [`last_event_id`](crate::sse::last_event_id)
+/// [`Event::id`] together with [`last_event_id`](crate::content::sse::last_event_id)
 /// to resume a stream where the client left off.
 ///
 /// # Examples
@@ -36,8 +36,8 @@ use crate::{Body, BoxError, IntoResponse, Response};
 /// use topcoat::{
 ///     Result,
 ///     router::{
+///         content::sse::{Event, KeepAlive, Sse},
 ///         route,
-///         sse::{Event, KeepAlive, Sse},
 ///     },
 /// };
 ///

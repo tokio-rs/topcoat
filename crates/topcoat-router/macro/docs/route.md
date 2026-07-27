@@ -26,7 +26,7 @@ Explicit method and path, reading a JSON body and answering with one:
 use serde::{Deserialize, Serialize};
 use topcoat::{
     Result,
-    router::{Json, route},
+    router::{content::Json, route},
 };
 
 #[derive(Deserialize, Serialize)]

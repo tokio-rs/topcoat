@@ -9,7 +9,8 @@ use topcoat_core::context::Cx;
 use topcoat_core::error::{Error, Result};
 use topcoat_view::View;
 
-use crate::{Body, BoxError, Html};
+use crate::content::Html;
+use crate::{Body, BoxError};
 
 pub type Response<T = Body> = http::Response<T>;
 

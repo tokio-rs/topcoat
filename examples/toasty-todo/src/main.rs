@@ -4,7 +4,8 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{
-        Form, Router, RouterBuilderDiscoverExt,
+        Router, RouterBuilderDiscoverExt,
+        content::Form,
         error::{SeeOther, see_other},
         layout, page, path_param, route,
     },

@@ -114,7 +114,7 @@ A page or route handler can take the request context as `cx: &`[`Cx`](crate::con
 use topcoat::{
     Result,
     context::Cx,
-    router::{Json, route},
+    router::{content::Json, route},
 };
 
 #[route(POST "/api/users")]
@@ -345,7 +345,7 @@ With the `tower` feature enabled, the [`tower`](mod@tower) module bridges the to
 use topcoat::{
     Result,
     context::CxBuilder,
-    router::{Body, Json, Next, Response, Router, layer, layout, page, route},
+    router::{Body, Next, Response, Router, content::Json, layer, layout, page, route},
     view::view,
 };
 

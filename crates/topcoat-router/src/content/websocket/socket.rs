@@ -10,10 +10,10 @@ use hyper_util::rt::TokioIo;
 use tokio_tungstenite::{WebSocketStream, tungstenite};
 use topcoat_core::error::{Error, Result};
 
-use crate::websocket::Message;
+use crate::content::websocket::Message;
 
 /// A WebSocket connection to a client, obtained from
-/// [`WebSocketUpgrade::on_upgrade`](crate::websocket::WebSocketUpgrade::on_upgrade).
+/// [`WebSocketUpgrade::on_upgrade`](crate::content::websocket::WebSocketUpgrade::on_upgrade).
 ///
 /// Exchange [`Message`]s with [`recv`](Self::recv) and [`send`](Self::send),
 /// and end the conversation with [`close`](Self::close). The connection also
@@ -58,7 +58,7 @@ impl WebSocket {
     ///
     /// To close with a status code and reason instead, [`send`](Self::send) a
     /// [`Message::Close`] carrying a
-    /// [`CloseFrame`](crate::websocket::CloseFrame) first.
+    /// [`CloseFrame`](crate::content::websocket::CloseFrame) first.
     ///
     /// # Errors
     ///

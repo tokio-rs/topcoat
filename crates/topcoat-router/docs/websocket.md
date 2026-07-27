@@ -10,8 +10,9 @@ A route becomes a WebSocket endpoint by taking a [`WebSocketUpgrade`] parameter 
 use topcoat::{
     Result,
     router::{
-        Response, route,
-        websocket::{Message, WebSocketUpgrade},
+        Response,
+        content::websocket::{Message, WebSocketUpgrade},
+        route,
     },
 };
 

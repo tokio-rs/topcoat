@@ -31,7 +31,7 @@ use crate::{
 /// use serde::{Deserialize, Serialize};
 /// use topcoat::{
 ///     Result,
-///     router::{Json, route},
+///     router::{content::Json, route},
 /// };
 ///
 /// #[derive(Deserialize)]

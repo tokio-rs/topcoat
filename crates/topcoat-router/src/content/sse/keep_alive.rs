@@ -7,9 +7,9 @@ use bytes::Bytes;
 use tokio::time::{Instant, Sleep};
 use topcoat_core::error::Result;
 
-use crate::sse::Event;
+use crate::content::sse::Event;
 
-/// Configures the keep-alive events [`Sse`](crate::sse::Sse) sends while its
+/// Configures the keep-alive events [`Sse`](crate::content::sse::Sse) sends while its
 /// stream is idle.
 ///
 /// Proxies and load balancers drop connections that look stale; a keep-alive

@@ -3,7 +3,7 @@
 mod body;
 #[cfg(feature = "compression")]
 mod compression;
-mod content;
+pub mod content;
 mod context;
 mod endpoint;
 pub mod error;
@@ -30,7 +30,6 @@ pub mod tower;
 pub use body::*;
 #[cfg(feature = "compression")]
 pub use compression::*;
-pub use content::*;
 pub use context::*;
 pub(crate) use endpoint::Endpoint;
 pub use layer::*;
