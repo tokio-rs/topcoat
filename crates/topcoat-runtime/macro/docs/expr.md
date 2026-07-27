@@ -46,7 +46,7 @@ Expressions operate on a fixed vocabulary of types that exist on both sides, eac
 - `Option<T>`: `is_some`, `is_none`, `unwrap`, and `expect`.
 - `Result<T, E>`: `is_ok`, `is_err`, `ok`, `err`, `unwrap`, `expect`, `unwrap_err`, and `expect_err`.
 - Tuples of vocabulary types.
-- [`Signal`]: `get` and `set`.
+- [`Signal`]: `get` and `set`, plus a shorter spelling for common writes: `toggle` on a `bool` signal, `increment` and `decrement` on an `f64` signal, and `push_str` on a `String` signal.
 
 # Supported syntax
 

@@ -114,6 +114,8 @@ view! {
 
 For the rare event logic the expression vocabulary cannot say, the value can also be a string literal of raw JavaScript: `@click="alert('hi')"`.
 
+`set` is the general write, and a few updates that depend on the current value have a shorter spelling: `toggle` on a `bool` signal, `increment` and `decrement` on an `f64` signal, and `push_str` on a `String` signal. The handler above can therefore be written as `$(|_e| count.increment())`.
+
 # Bind attributes
 
 An attribute starting with `:` is a **bind attribute**: its value is a runtime expression, and the attribute is kept in sync with it. The server renders the initial value like a normal attribute; the browser re-applies it whenever a signal the expression reads changes:
