@@ -43,6 +43,7 @@ full = [
 	"runtime",
 	"serve",
 	"session",
+	"sse",
 	"tailwind",
 	"tower",
 	"ui",
@@ -134,6 +135,10 @@ runtime = [
 ]
 session = [
 	"dep:topcoat-session",
+]
+sse = [
+	"router",
+	"topcoat-router/sse",
 ]
 tailwind = [
 	"dep:topcoat-tailwind",

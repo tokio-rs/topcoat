@@ -32,6 +32,10 @@ serve = [
 	"tokio/sync",
 	"tokio/time",
 ]
+sse = [
+	"dep:tokio",
+	"tokio/time",
+]
 tower = [
 	"dep:tower",
 	"dep:tokio",
@@ -77,9 +81,9 @@ tower-http = { workspace = true, optional = true, features = [
 ] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["compression", "router", "tower", "websocket"] }
+topcoat = { workspace = true, features = ["compression", "router", "sse", "tower", "websocket"] }
 futures-util = { workspace = true, features = ["sink"] }
-tokio = { workspace = true, features = ["io-util", "macros", "rt", "time"] }
+tokio = { workspace = true, features = ["io-util", "macros", "rt", "test-util", "time"] }
 tokio-tungstenite = { workspace = true, features = ["connect"] }
 tower = { workspace = true, features = ["buffer", "limit", "timeout", "util"] }
 tower-http = { workspace = true, features = [

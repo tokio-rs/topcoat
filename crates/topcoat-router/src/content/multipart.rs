@@ -1,3 +1,5 @@
+#![doc = include_str!("../../docs/multipart.md")]
+
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -16,7 +18,7 @@ use crate::{
 
 /// `multipart/form-data` request extractor, commonly used for file uploads.
 ///
-/// Available behind the `multipart` feature. Iterate the request's parts with
+/// Iterate the request's parts with
 /// [`next_field`](Multipart::next_field); each [`Field`] exposes its metadata
 /// ([`name`](Field::name), [`file_name`](Field::file_name),
 /// [`content_type`](Field::content_type), [`headers`](Field::headers)) and its
@@ -32,7 +34,7 @@ use crate::{
 /// ```rust
 /// use topcoat::{
 ///     Result,
-///     router::{Multipart, route},
+///     router::{multipart::Multipart, route},
 /// };
 ///
 /// #[route(POST "/api/upload")]

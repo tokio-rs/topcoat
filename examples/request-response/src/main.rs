@@ -3,8 +3,9 @@ use topcoat::{
     Result,
     context::Cx,
     router::{
-        Body, Bytes, Form, FromRequest, IntoResponse, Json, Multipart, RawForm, Response, Router,
-        RouterBuilderDiscoverExt, error::bad_request, headers, route, to_bytes,
+        Body, Bytes, Form, FromRequest, IntoResponse, Json, RawForm, Response, Router,
+        RouterBuilderDiscoverExt, error::bad_request, headers, multipart::Multipart, route,
+        to_bytes,
     },
 };
 

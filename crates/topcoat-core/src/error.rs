@@ -76,3 +76,9 @@ where
         Self(value.into())
     }
 }
+
+impl From<Error> for Box<dyn std::error::Error + Send + Sync + 'static> {
+    fn from(error: Error) -> Self {
+        error.0.into()
+    }
+}
