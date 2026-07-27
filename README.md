@@ -256,7 +256,6 @@ Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](ht
 - [ ] Streaming SSR / Suspense
 - [ ] Client-side navigation + prefetching
 - [ ] `WebTransport`
-- [ ] Server-sent events
 - [ ] Image optimization / resizing
 - [ ] Markdown support
 - [ ] Easier-to-use middlewares like rate-limiting, compression, etc.
