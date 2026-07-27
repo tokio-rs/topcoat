@@ -50,6 +50,7 @@ members = [
     "examples/runtime",
     "examples/session",
     "examples/shard",
+    "examples/sse",
     "examples/tailwind",
     "examples/toasty-todo",
     "examples/ui",

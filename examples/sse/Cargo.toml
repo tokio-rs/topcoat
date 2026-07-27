@@ -1,0 +1,15 @@
+[package]
+name = "sse"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+futures-core.workspace = true
+futures-util.workspace = true
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+topcoat = { workspace = true, features = ["sse"] }
+
+[lints]
+workspace = true

@@ -2355,6 +2355,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sse"
+version = "0.4.0"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "serde",
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
