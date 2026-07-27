@@ -10,8 +10,8 @@ use tokio_tungstenite::tungstenite::protocol::{Role, WebSocketConfig};
 use topcoat_core::context::Cx;
 use topcoat_core::error::{Error, Result};
 
-use crate::error::{bad_request, method_not_allowed};
 use crate::content::websocket::WebSocket;
+use crate::error::{bad_request, method_not_allowed};
 use crate::{Body, FromRequest, Response, extensions, headers, method};
 
 /// WebSocket handshake extractor: validates the upgrade request and hands the
@@ -303,8 +303,8 @@ mod tests {
     use topcoat_core::context::CxTestBuilder;
 
     use super::*;
-    use crate::error::{BadRequestError, MethodNotAllowedError};
     use crate::content::websocket::Message;
+    use crate::error::{BadRequestError, MethodNotAllowedError};
     use crate::{Path, RouteFn, RouteFuture, Router, RouterService, internal_serve};
 
     /// The `Sec-WebSocket-Key` from RFC 6455's handshake example.

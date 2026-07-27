@@ -5,7 +5,8 @@ use topcoat::{
     router::{
         Body, Bytes, FromRequest, IntoResponse, Response, Router, RouterBuilderDiscoverExt,
         content::{Form, Json, RawForm, multipart::Multipart},
-        error::bad_request, headers, route, to_bytes,
+        error::bad_request,
+        headers, route, to_bytes,
     },
 };
 
