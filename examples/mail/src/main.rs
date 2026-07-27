@@ -7,7 +7,7 @@ use topcoat::{
         Router, RouterBuilderDiscoverExt,
         content::Form,
         error::{SeeOther, see_other},
-        page, route,
+        layout, page, route,
     },
     view::view,
 };
@@ -29,8 +29,8 @@ async fn main() {
         .unwrap();
 }
 
-#[page("/")]
-async fn home() -> Result {
+#[layout("/")]
+async fn root(slot: Result) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -38,22 +38,27 @@ async fn home() -> Result {
                 <title>"Mail"</title>
                 topcoat::dev::script()
             </head>
-            <body>
-                <h1>"Send a welcome mail"</h1>
-                <form method="POST" action="/send">
-                    <input name="name" placeholder="Name" required="true">
-                    <input
-                        type="email"
-                        name="address"
-                        placeholder="Address"
-                        required="true"
-                    >
-                    <button>"send"</button>
-                </form>
-                <p>"Nothing leaves the machine: the mail is written to a file."</p>
-                <a href="/sent">"Outbox"</a>
-            </body>
+            <body>(slot?)</body>
         </html>
+    }
+}
+
+#[page("/")]
+async fn home() -> Result {
+    view! {
+        <h1>"Send a welcome mail"</h1>
+        <form method="POST" action="/send">
+            <input name="name" placeholder="Name" required="true">
+            <input
+                type="email"
+                name="address"
+                placeholder="Address"
+                required="true"
+            >
+            <button>"send"</button>
+        </form>
+        <p>"Nothing leaves the machine: the mail is written to a file."</p>
+        <a href="/sent">"Outbox"</a>
     }
 }
 
@@ -113,28 +118,19 @@ async fn sent() -> Result {
     let files = outbox()?;
 
     view! {
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>"Outbox"</title>
-                topcoat::dev::script()
-            </head>
-            <body>
-                <h1>"Outbox"</h1>
-                <p>
-                    "The mail was written to "
-                    <code>(OUTBOX)</code>
-                    ". Open one of these files in a mail client to read it as \
-                     the recipient would."
-                </p>
-                <ul>
-                    for file in files {
-                        <li>(file)</li>
-                    }
-                </ul>
-                <a href="/">"Send another"</a>
-            </body>
-        </html>
+        <h1>"Outbox"</h1>
+        <p>
+            "The mail was written to "
+            <code>(OUTBOX)</code>
+            ". Open one of these files in a mail client to read it as the \
+             recipient would."
+        </p>
+        <ul>
+            for file in files {
+                <li>(file)</li>
+            }
+        </ul>
+        <a href="/">"Send another"</a>
     }
 }
 

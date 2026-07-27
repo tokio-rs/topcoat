@@ -3,6 +3,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
+#[doc = include_str!("../docs/mail.md")]
 #[proc_macro]
 pub fn mail(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse_macro_input!(tokens as topcoat_mail_grammar::mail::Mail);
