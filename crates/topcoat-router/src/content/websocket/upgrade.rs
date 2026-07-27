@@ -215,6 +215,12 @@ impl FromRequest for WebSocketUpgrade {
             .get(header::SEC_WEBSOCKET_KEY)
             .cloned()
             .ok_or_else(|| bad_request("missing `Sec-WebSocket-Key` request header"))?;
+        if !is_valid_websocket_key(&key) {
+            return Err(bad_request(
+                "`Sec-WebSocket-Key` request header must be base64-encoded 16 bytes",
+            )
+            .into());
+        }
         let requested_protocols = headers.get(header::SEC_WEBSOCKET_PROTOCOL).cloned();
 
         let on_upgrade = extensions(cx).get::<OnUpgrade>().cloned().ok_or_else(|| {
@@ -246,6 +252,17 @@ fn negotiate_protocol(
             .any(|candidate| candidate == supported.as_ref())
     })?;
     HeaderValue::from_str(protocol).ok()
+}
+
+/// Returns whether `key` is 16 bytes encoded as padded standard Base64.
+fn is_valid_websocket_key(key: &HeaderValue) -> bool {
+    let Some(encoded) = key.as_bytes().strip_suffix(b"==") else {
+        return false;
+    };
+    encoded.len() == 22
+        && encoded
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/'))
 }
 
 /// Returns whether the comma-separated header contains `value`, compared
@@ -351,6 +368,50 @@ mod tests {
         );
         let error = extract(&cx).await.expect_err("an old protocol version");
         assert!(error.downcast_ref::<BadRequestError>().is_some());
+    }
+
+    #[tokio::test]
+    async fn invalid_websocket_keys_are_bad_requests() {
+        for (case, key) in [
+            ("empty", ""),
+            ("invalid alphabet", "dGhlIHNhbXBsZSBub25jZQ*="),
+            ("URL-safe alphabet", "----------------------=="),
+            ("one padding character", "dGhlIHNhbXBsZSBub25jZQ="),
+            ("no padding", "dGhlIHNhbXBsZSBub25jZQ"),
+            ("excess padding", "dGhlIHNhbXBsZSBub25jZQ==="),
+            ("too short", "dG9vIHNob3J0"),
+            ("too long", "dGhlIHNhbXBsZSBub25jZSBsb25nZXI="),
+            ("trailing whitespace", "dGhlIHNhbXBsZSBub25jZQ== "),
+        ] {
+            let cx = cx_with(
+                Method::GET,
+                &[
+                    ("connection", "Upgrade"),
+                    ("upgrade", "websocket"),
+                    ("sec-websocket-version", "13"),
+                    ("sec-websocket-key", key),
+                ],
+            );
+            let error = extract(&cx).await.expect_err("an invalid key is rejected");
+            let error = error
+                .downcast_ref::<BadRequestError>()
+                .expect("a bad-request error");
+            assert!(
+                error.description().contains("base64-encoded 16 bytes"),
+                "unexpected error for {case} key {key:?}: {}",
+                error.description()
+            );
+        }
+    }
+
+    #[test]
+    fn valid_websocket_keys_have_the_rfc_6455_shape() {
+        for key in [KEY, "/////////////////////w=="] {
+            assert!(
+                is_valid_websocket_key(&HeaderValue::from_static(key)),
+                "valid key {key:?} was rejected"
+            );
+        }
     }
 
     #[tokio::test]
