@@ -186,7 +186,7 @@ mod tests {
         );
         assert_eq!(
             BundleEvent::Bundled {
-                id: Asset::new("test", "src/lib.rs", "app.css", &crate::AssetOptions::NONE),
+                id: AssetId::new("test", "src/lib.rs", "app.css", &crate::AssetOptions::NONE),
                 file: "app-0123456789abcdef.css".to_owned(),
                 bytes: 12,
             }

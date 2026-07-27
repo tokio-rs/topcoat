@@ -12,7 +12,7 @@ use topcoat_core::context::{Cx, app_context};
 use crate::AssetBundle;
 #[cfg(feature = "serve")]
 use crate::serve::ASSET_ROUTE_PREFIX;
-use crate::{Asset, AssetCatalog, AssetId, BundledAsset};
+use crate::{Asset, AssetCatalog, BundledAsset};
 
 /// Where the bundled assets are hosted.
 #[derive(Debug, Clone)]
@@ -96,13 +96,14 @@ impl AssetConfig {
         }
     }
 
-    /// The catalog mapping [`Asset`] IDs to their bundled files.
+    /// The catalog mapping [`AssetId`](crate::AssetId)s to their bundled
+    /// files.
     #[must_use]
     pub fn catalog(&self) -> &AssetCatalog {
         &self.catalog
     }
 
-    /// Look up the bundled file for an [`Asset`] ID in the catalog.
+    /// Look up the bundled file for an [`Asset`] in the catalog.
     #[must_use]
     pub fn get(&self, asset: Asset) -> Option<&BundledAsset> {
         self.catalog.get(asset.id())
@@ -173,7 +174,7 @@ pub fn asset_config(cx: &Cx) -> &AssetConfig {
     app_context(cx)
 }
 
-/// Resolves an [`Asset`] ID to its [`BundledAsset`] in the context's
+/// Resolves an [`Asset`] to its [`BundledAsset`] in the context's
 /// registered [`AssetConfig`].
 ///
 /// # Panics
@@ -191,7 +192,7 @@ pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Manifest;
+    use crate::{AssetId, AssetOptions, ENCODED_ASSET_SIZE, Manifest, RawAsset};
 
     #[test]
     fn hosted_at_trims_trailing_slashes() {
@@ -203,19 +204,25 @@ mod tests {
 
     #[test]
     fn resolves_urls_against_the_base_url() {
-        let manifest = Manifest::parse(
+        const OPTIONS: AssetOptions = AssetOptions::NONE;
+        const ID: AssetId = AssetId::new("app", "src/lib.rs", "logo.png", &OPTIONS);
+        static ENCODED: [u8; ENCODED_ASSET_SIZE] =
+            RawAsset::encode(ID, "logo.png", "app", "/app", "src/lib.rs", &OPTIONS);
+        let asset = Asset::new(&ENCODED);
+
+        let manifest = Manifest::parse(&format!(
             r#"
 version = 1
 
 [[assets]]
-id = 42
+id = {}
 file = "logo-1a2b3c4d5e6f7a8b.png"
 hash = "0"
 content_type = "image/png"
 "#,
-        )
+            ID.as_u64()
+        ))
         .unwrap();
-        let asset = manifest.assets[0].id;
 
         let config = AssetConfig::hosted_at("https://cdn.example.com/assets", manifest);
 

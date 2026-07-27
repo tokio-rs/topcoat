@@ -1,4 +1,4 @@
-Topcoat assets are declared from Rust code with [`asset!`](asset). The macro returns a small [`Asset`] ID and embeds the declaration into the compiled binary. After building your application, Topcoat can scan the binary, copy or download every declared file into an asset bundle directory, and serve those bundled files from the router.
+Topcoat assets are declared from Rust code with [`asset!`](asset). The macro returns a small [`Asset`] handle and embeds the declaration into the compiled binary. After building your application, Topcoat can scan the binary, copy or download every declared file into an asset bundle directory, and serve those bundled files from the router.
 
 # Declaring assets
 
@@ -44,6 +44,8 @@ When an [`Asset`] appears inside [`view!`](crate::view::view), Topcoat renders i
 ```
 
 The hash in the filename is based on the file contents, so URLs are safe to cache aggressively.
+
+The bundler finds declarations by scanning the compiled binary. The embedded declaration is kept in the binary through the returned [`Asset`] handle, so an asset only ends up in the bundle while some code path uses its handle: a declaration whose handle is never used can be optimized out of the binary, and the bundler then skips it.
 
 # Loading the bundle
 

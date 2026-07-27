@@ -24,7 +24,7 @@ impl BundledAsset {
     }
 }
 
-/// The mapping from [`Asset`] IDs to their bundled filenames and content
+/// The mapping from [`AssetId`]s to their bundled filenames and content
 /// types.
 ///
 /// This is the part of an asset bundle needed to resolve asset URLs, without
@@ -41,7 +41,7 @@ pub struct AssetCatalog {
 }
 
 impl AssetCatalog {
-    /// Look up the bundled asset for an [`Asset`] ID.
+    /// Look up the bundled asset for an [`AssetId`].
     #[must_use]
     pub fn get(&self, id: AssetId) -> Option<&BundledAsset> {
         self.bundled_assets.get(&id)

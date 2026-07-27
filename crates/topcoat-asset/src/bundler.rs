@@ -15,8 +15,7 @@ use std::{
 use sha2::{Digest, Sha256};
 
 use crate::{
-    Asset, AssetError, AssetId, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset,
-    Source,
+    AssetError, AssetId, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset, Source,
 };
 
 use cache::Cache;
@@ -354,11 +353,11 @@ mod tests {
         }
 
         /// Write `contents` to `name` and declare it as an asset.
-        fn declare(&mut self, name: &str, contents: &str) -> Asset {
+        fn declare(&mut self, name: &str, contents: &str) -> AssetId {
             self.declare_with(name, contents, &AssetOptions::NONE)
         }
 
-        fn declare_with(&mut self, name: &str, contents: &str, options: &AssetOptions) -> Asset {
+        fn declare_with(&mut self, name: &str, contents: &str, options: &AssetOptions) -> AssetId {
             let src = self.root.join("src");
             fs::create_dir_all(&src).unwrap();
             let path = src.join(name);
@@ -367,14 +366,14 @@ mod tests {
         }
 
         /// Declare an asset without creating the file it points at.
-        fn declare_missing(&mut self, name: &str) -> Asset {
+        fn declare_missing(&mut self, name: &str) -> AssetId {
             let path = self.root.join("src").join(name);
             let path = path.to_str().unwrap().to_owned();
             self.declare_path(&path, &AssetOptions::NONE)
         }
 
-        fn declare_path(&mut self, path: &str, options: &AssetOptions) -> Asset {
-            let id = Asset::new("test", "src/lib.rs", path, options);
+        fn declare_path(&mut self, path: &str, options: &AssetOptions) -> AssetId {
+            let id = AssetId::new("test", "src/lib.rs", path, options);
             self.binary.extend_from_slice(&RawAsset::encode(
                 id,
                 path,

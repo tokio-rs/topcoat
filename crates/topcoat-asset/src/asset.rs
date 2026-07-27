@@ -7,12 +7,13 @@ use topcoat_core::fnv1a;
 
 use crate::{AssetOptions, ConstReader, ConstWriter, Source};
 
+/// Handle to an asset declared via [`asset!`](crate::asset).
 ///
-///
-/// `Asset` values are cheap to copy and store, and stable across runs as
-/// long as the declaring crate name, source file path, and asset path
-/// don't change. Use [`AssetBundle::get`](crate::AssetBundle::get) to
-/// resolve one back to a file.
+/// `Asset` values are cheap to copy and reference the declaration the
+/// [`asset!`](crate::asset) macro embeds into the compiled binary. Rendered
+/// in a view, a handle resolves to the URL of its bundled file;
+/// [`id`](Self::id) recovers the compact [`AssetId`] the file is cataloged
+/// under.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Asset(&'static [u8]);
 
@@ -23,10 +24,17 @@ impl Asset {
         Self(inner)
     }
 
+    /// The compact [`AssetId`] identifying this asset.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the handle does not reference a valid encoded declaration;
+    /// handles returned by [`asset!`](crate::asset) are always valid.
     #[must_use]
     pub fn id(&self) -> AssetId {
-        // Prevent the optimizer from removing the raw asset bytes from the
-        // executable if they are used.
+        // The bundler discovers assets by scanning the binary for these
+        // bytes; reading them through black_box stops the optimizer from
+        // folding the load and stripping them out.
         let bytes = core::hint::black_box(self.0);
         let mut reader = ConstReader::new(bytes);
         reader.skip(SCRAMBLED_PREFIX.len());
@@ -47,15 +55,23 @@ impl std::fmt::Debug for Asset {
 }
 
 /// Compact identifier for an asset declared via [`asset!`](crate::asset).
+///
+/// `AssetId` values are cheap to copy and store, and stable across runs as
+/// long as the declaring crate name, source file path, and asset path
+/// don't change. They key the catalogs and manifests a bundle is resolved
+/// through: [`Asset::id`] recovers one at runtime, and
+/// [`AssetBundle::get`](crate::AssetBundle::get) resolves it back to a
+/// file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct AssetId(u64);
 
 impl AssetId {
-    /// Build an `Asset` ID from the same inputs the [`asset!`](crate::asset)
+    /// Build an asset ID from the same inputs the [`asset!`](crate::asset)
     /// macro uses.
     ///
-    /// Prefer calling [`asset!`](crate::asset) directly; this is exposed
+    /// Prefer declaring assets with [`asset!`](crate::asset) and reading
+    /// the ID off the returned handle with [`Asset::id`]; this is exposed
     /// for tooling and tests that need to reconstruct an ID from its parts.
     #[must_use]
     pub const fn new(
@@ -86,7 +102,7 @@ impl AssetId {
 /// An asset declaration recovered from a compiled binary.
 ///
 /// This is what the [`Bundler`](crate::Bundler) sees while scanning: the
-/// [`Asset`] ID together with the path, options, and the crate/source
+/// [`AssetId`] together with the path, options, and the crate/source
 /// context needed to resolve relative paths back to real files.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RawAsset {
@@ -98,6 +114,7 @@ pub struct RawAsset {
     options: AssetOptions,
 }
 
+/// Size in bytes of one encoded asset declaration embedded into the binary.
 pub const ENCODED_ASSET_SIZE: usize = 2048;
 
 impl RawAsset {
@@ -242,16 +259,25 @@ fn normalize(path: &Path) -> PathBuf {
     out
 }
 
-/// Declare an asset and get back its [`Asset`] ID.
+/// Declare an asset and get back its [`Asset`] handle.
 ///
 /// The first argument is the asset's source location, either a path or
 /// an `http(s)://` URL. Any remaining arguments configure
 /// [`AssetOptions`] using the same syntax as
 /// [`asset_options!`](crate::asset_options).
 ///
-/// Because the macro expands to a `const` and a `#[used] static`, both
-/// the path and any options must be string literals (or other const
-/// expressions): they cannot be computed at runtime.
+/// Because the macro expands to compile-time items, both the path and any
+/// options must be string literals (or other const expressions): they
+/// cannot be computed at runtime.
+///
+/// # Discovery
+///
+/// The macro embeds the declaration into the compiled binary, where the
+/// [`Bundler`](crate::Bundler) finds it by scanning. The embedded data is
+/// kept in the binary through the returned [`Asset`] handle: an asset is
+/// bundled only while some code path uses its handle. A declaration whose
+/// handle is never used can be optimized out of the binary, and the
+/// bundler then no longer sees it.
 ///
 /// # Path resolution
 ///
@@ -287,9 +313,10 @@ fn normalize(path: &Path) -> PathBuf {
 ///
 /// # Returns
 ///
-/// A `const` [`Asset`] ID. The ID is stable across builds as long as the
-/// declaring crate, source file, and path string don't change: renaming
-/// the file on disk or changing options does *not* change the ID.
+/// A `const`-compatible [`Asset`] handle. Its [`AssetId`], read with
+/// [`Asset::id`], is stable across builds as long as the declaring crate,
+/// source file, and path string don't change: renaming the file on disk
+/// or changing options does *not* change the ID.
 ///
 /// # Examples
 ///
