@@ -15,6 +15,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable e
 - `topcoat-asset`: the `asset!` macro and `AssetBundle` for declaring and serving content-hashed static files.
 - `topcoat-cookie`: the cookie jar, `cookie!` macro, signed/private jars, and `CookieStore<T>`.
 - `topcoat-session`: bring-your-own-storage session authentication: the token/hash model, the session lifecycle, and origin checking.
+- `topcoat-mail`: the `Mail` type and `mail!` macro for declaring mail, and its delivery through pluggable transports (SMTP, file, in-memory).
 - `topcoat-htmx`, `topcoat-alpine-ajax`, and `topcoat-datastar`: request and response helpers for those client libraries.
 - `topcoat-tailwind`: the build-script wrapper around the standalone Tailwind CLI.
 - `topcoat-ui` (+ `registry/`): the component registry behind `topcoat ui`, which copies component source into a project.
@@ -76,6 +77,10 @@ Each crate's `docs/` directory holds the user-facing guides for that crate, embe
 - [`crates/topcoat/docs/tailwind.md`](crates/topcoat/docs/tailwind.md): The Tailwind integration: a build-script wrapper around the standalone Tailwind CLI served as a Topcoat asset.
 - [`crates/topcoat/docs/font.md`](crates/topcoat/docs/font.md): Declaring web fonts with `font!` and `font_face!`, serving them as assets, and pulling families from Fontsource.
 - [`crates/topcoat/docs/icon.md`](crates/topcoat/docs/icon.md): The `icon` component and the Iconify integration for vendoring icon sets at build time.
+
+### Mail
+
+- [`crates/topcoat/docs/mail.md`](crates/topcoat/docs/mail.md): Mail: declaring a `Mail` with the `mail!` macro, the transports (SMTP, file, in-memory), and delivering with `send`.
 
 ### Client library integrations
 
