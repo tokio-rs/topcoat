@@ -83,7 +83,6 @@ async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> Result<SeeOt
         // Mail clients understand far less CSS than browsers do, so mail
         // markup stays plain and carries its styles inline.
         html: {
-            cx =>
             <div style="font-family: sans-serif; max-width: 30rem">
                 // `cid:` addresses the inline attachment below by content id.
                 <img src="cid:ferris" alt="Ferris the crab" width="120">
