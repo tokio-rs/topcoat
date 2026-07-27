@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-grammar-v0.4.0...topcoat-runtime-grammar-v0.5.0) - 2026-07-27
+
+### Added
+
+- *(router)* server-sent events ([#218](https://github.com/tokio-rs/topcoat/pull/218))
+
 ## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-grammar-v0.1.3...topcoat-runtime-grammar-v0.2.0) - 2026-07-19
 
 ### Other

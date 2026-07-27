@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-v0.4.0...topcoat-runtime-v0.5.0) - 2026-07-27
+
+### Added
+
+- *(router)* server-sent events ([#218](https://github.com/tokio-rs/topcoat/pull/218))
+- *(runtime)* add utility methods for signals with primitive types ([#214](https://github.com/tokio-rs/topcoat/pull/214))
+- support wasm builds ([#191](https://github.com/tokio-rs/topcoat/pull/191))
+- add support for routes that handle multiple (or all) methods ([#180](https://github.com/tokio-rs/topcoat/pull/180))
+
+### Fixed
+
+- browser hang when a text expression renders an owned string ([#201](https://github.com/tokio-rs/topcoat/pull/201))
+- remove double type assertion in DOM binding ([#171](https://github.com/tokio-rs/topcoat/pull/171))
+- return Bool surrogates from boolean event fields ([#168](https://github.com/tokio-rs/topcoat/pull/168))
+
+### Other
+
+- fix outdated documentation ([#211](https://github.com/tokio-rs/topcoat/pull/211))
+
 ## [0.3.1](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-v0.3.0...topcoat-runtime-v0.3.1) - 2026-07-20
 
 ### Fixed

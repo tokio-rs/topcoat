@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-macro-v0.4.0...topcoat-runtime-macro-v0.5.0) - 2026-07-27
+
+### Added
+
+- *(runtime)* add utility methods for signals with primitive types ([#214](https://github.com/tokio-rs/topcoat/pull/214))
+
+### Other
+
+- fix outdated documentation ([#211](https://github.com/tokio-rs/topcoat/pull/211))
+
 ## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-macro-v0.1.3...topcoat-runtime-macro-v0.2.0) - 2026-07-19
 
 ### Other

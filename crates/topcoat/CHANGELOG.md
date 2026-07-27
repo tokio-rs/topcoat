@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/v0.4.0...v0.5.0) - 2026-07-27
+
+### Added
+
+- *(datastar)* add datastar support ([#219](https://github.com/tokio-rs/topcoat/pull/219))
+- *(router)* server-sent events ([#218](https://github.com/tokio-rs/topcoat/pull/218))
+- *(mail)* email prototype ([#216](https://github.com/tokio-rs/topcoat/pull/216))
+- *(runtime)* add utility methods for signals with primitive types ([#214](https://github.com/tokio-rs/topcoat/pull/214))
+- websocket support ([#195](https://github.com/tokio-rs/topcoat/pull/195))
+- support wasm builds ([#191](https://github.com/tokio-rs/topcoat/pull/191))
+- support unix listeners ([#190](https://github.com/tokio-rs/topcoat/pull/190))
+- support mounting tower services as routes in the router ([#184](https://github.com/tokio-rs/topcoat/pull/184))
+- make page HTTP methods customizable ([#181](https://github.com/tokio-rs/topcoat/pull/181))
+- add support for routes that handle multiple (or all) methods ([#180](https://github.com/tokio-rs/topcoat/pull/180))
+- topcoat dev reports more build errors ([#208](https://github.com/tokio-rs/topcoat/pull/208))
+- support wasm asset bundling ([#199](https://github.com/tokio-rs/topcoat/pull/199))
+- *(router)* validate websocket handshake keys ([#215](https://github.com/tokio-rs/topcoat/pull/215))
+- [**breaking**] improve boolean attribute behavior and docs ([#179](https://github.com/tokio-rs/topcoat/pull/179))
+- boxed components for cyclic component definition ([#176](https://github.com/tokio-rs/topcoat/pull/176))
+
+### Fixed
+
+- *(asset)* improve asset linking system ([#217](https://github.com/tokio-rs/topcoat/pull/217))
+- formatter exiting with code 0 on failed stdin formatting ([#207](https://github.com/tokio-rs/topcoat/pull/207))
+- keep embedded asset declarations alive on MSVC builds ([#170](https://github.com/tokio-rs/topcoat/pull/170))
+- topcoat dev hot reload never succeeds on Windows (exe file lock) ([#169](https://github.com/tokio-rs/topcoat/pull/169))
+- browser hang when a text expression renders an owned string ([#201](https://github.com/tokio-rs/topcoat/pull/201))
+- remove double type assertion in DOM binding ([#171](https://github.com/tokio-rs/topcoat/pull/171))
+- return Bool surrogates from boolean event fields ([#168](https://github.com/tokio-rs/topcoat/pull/168))
+- topcoat formatter breaking at signal syntax ([#172](https://github.com/tokio-rs/topcoat/pull/172))
+
+### Other
+
+- improve readme
+- *(mail)* mail example and guide ([#221](https://github.com/tokio-rs/topcoat/pull/221))
+- add new roadmap items
+- clarify module router registration
+- fix outdated documentation ([#211](https://github.com/tokio-rs/topcoat/pull/211))
+- [**breaking**] change order of AssetConfig::hosted_at
+- clarify module router paths and parameter handling ([#185](https://github.com/tokio-rs/topcoat/pull/185))
+- [**breaking**] dedicated router error module ([#183](https://github.com/tokio-rs/topcoat/pull/183))
+- improve router macro docs ([#178](https://github.com/tokio-rs/topcoat/pull/178))
+- add sitemaps to roadmap
+- [**breaking**] pass layouts the rendered Result<View> instead of a Slot future ([#166](https://github.com/tokio-rs/topcoat/pull/166))
+- improve router macro docs
+- improve view macro docs
+
 ## [0.4.0](https://github.com/tokio-rs/topcoat/compare/topcoat-v0.3.1...topcoat-v0.4.0) - 2026-07-22
 
 ### Added

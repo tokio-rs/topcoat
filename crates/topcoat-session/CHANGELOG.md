@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-session-v0.4.0...topcoat-session-v0.5.0) - 2026-07-27
+
+### Added
+
+- support wasm builds ([#191](https://github.com/tokio-rs/topcoat/pull/191))
+
+### Other
+
+- [**breaking**] dedicated router error module ([#183](https://github.com/tokio-rs/topcoat/pull/183))
+
 ## [0.3.1](https://github.com/tokio-rs/topcoat/compare/topcoat-session-v0.3.0...topcoat-session-v0.3.1) - 2026-07-20
 
 ### Other

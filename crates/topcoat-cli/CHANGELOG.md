@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.4.0...topcoat-cli-v0.5.0) - 2026-07-27
+
+### Added
+
+- *(router)* server-sent events ([#218](https://github.com/tokio-rs/topcoat/pull/218))
+- *(mail)* email prototype ([#216](https://github.com/tokio-rs/topcoat/pull/216))
+- topcoat dev reports more build errors ([#208](https://github.com/tokio-rs/topcoat/pull/208))
+- support wasm asset bundling ([#199](https://github.com/tokio-rs/topcoat/pull/199))
+- websocket support ([#195](https://github.com/tokio-rs/topcoat/pull/195))
+
+### Fixed
+
+- *(asset)* improve asset linking system ([#217](https://github.com/tokio-rs/topcoat/pull/217))
+- formatter exiting with code 0 on failed stdin formatting ([#207](https://github.com/tokio-rs/topcoat/pull/207))
+- keep embedded asset declarations alive on MSVC builds ([#170](https://github.com/tokio-rs/topcoat/pull/170))
+- topcoat dev hot reload never succeeds on Windows (exe file lock) ([#169](https://github.com/tokio-rs/topcoat/pull/169))
+
+### Other
+
+- fix outdated documentation ([#211](https://github.com/tokio-rs/topcoat/pull/211))
+
 ## [0.4.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.3.1...topcoat-cli-v0.4.0) - 2026-07-22
 
 ### Added
