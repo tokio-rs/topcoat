@@ -48,9 +48,7 @@ async fn home() -> Result {
                     <span data-text="$count"></span>
                 </h1>
 
-                <button data-on:click="@post('/increment')">
-                    "Increment"
-                </button>
+                <button data-on:click="@post('/increment')">"Increment"</button>
 
                 <ol id="log"></ol>
             </body>

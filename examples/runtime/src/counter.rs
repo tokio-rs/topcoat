@@ -7,13 +7,9 @@ async fn counter() -> Result {
         signal count = 0.0;
 
         // Update the signal when a button is clicked.
-        <button @click=$(|_e| count.increment())>
-            "increment"
-        </button>
+        <button @click=$(|_e| count.increment())>"increment"</button>
 
-        <button @click=$(|_e| count.decrement())>
-            "decrement"
-        </button>
+        <button @click=$(|_e| count.decrement())>"decrement"</button>
 
         <br>
         <br>

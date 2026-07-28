@@ -13,8 +13,6 @@ async fn show() -> Result {
         </button>
 
         // Keep the hidden attribute synchronized with the signal.
-        <div :hidden=$(!show.get())>
-            "hello world!"
-        </div>
+        <div :hidden=$(!show.get())>"hello world!"</div>
     }
 }

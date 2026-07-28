@@ -84,10 +84,7 @@ async fn increment(cx: &Cx) -> Result<Response> {
 
     // For an Alpine AJAX request, return only the targeted element.
     if ajax_request(cx) {
-        return view! {
-            <span id="count">(count)</span>
-        }?
-        .into_response(cx);
+        return view! { <span id="count">(count)</span> }?.into_response(cx);
     }
 
     // Without JavaScript, use Post/Redirect/Get and render the complete page.

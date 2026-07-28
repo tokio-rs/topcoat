@@ -61,9 +61,7 @@ async fn page(cx: &Cx) -> Result {
                 (&user.name)
             </div>
 
-            <form method="POST" action="/logout">
-                <button>"log out"</button>
-            </form>
+            <form method="POST" action="/logout"><button>"log out"</button></form>
         } else {
             <div>"currently not logged in"</div>
 

@@ -72,12 +72,7 @@ async fn home(cx: &Cx) -> Result {
 
         // Submit a new todo to POST /todos.
         <form method="post" action="/todos">
-            <input
-                type="text"
-                name="title"
-                placeholder="What needs doing?"
-                required=""
-            >
+            <input type="text" name="title" placeholder="What needs doing?" required="">
             <button type="submit">"Add"</button>
         </form>
 
@@ -119,11 +114,7 @@ async fn toggle_checkbox(todo: &Todo) -> Result {
     // Submit the todo ID when the checkbox changes.
     view! {
         <form method="post" action=(("/todos/", todo.id, "/toggle"))>
-            <input
-                type="checkbox"
-                checked=(todo.done)
-                onchange="this.form.submit()"
-            >
+            <input type="checkbox" checked=(todo.done) onchange="this.form.submit()">
         </form>
     }
 }

@@ -73,9 +73,7 @@ async fn increment(cx: &Cx) -> Result<(HxResponseTrigger, View)> {
     let count = app_context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
 
     // Return the updated HTML fragment.
-    let fragment = view! {
-        <span id="count">(count)</span>
-    }?;
+    let fragment = view! { <span id="count">(count)</span> }?;
 
     // Add `HX-Trigger: counted` so the browser also receives
     // a custom htmx event named `counted`.

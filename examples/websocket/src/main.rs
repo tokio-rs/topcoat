@@ -38,11 +38,7 @@ async fn home() -> Result {
                 // Messages submitted through this form are sent over
                 // the WebSocket connection.
                 <form id="form">
-                    <input
-                        id="input"
-                        autocomplete="off"
-                        placeholder="Say something"
-                    >
+                    <input id="input" autocomplete="off" placeholder="Say something">
                     <button>"Send"</button>
                 </form>
 

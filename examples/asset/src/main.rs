@@ -22,9 +22,7 @@ async fn home() -> Result {
     view! {
         <!DOCTYPE html>
         <html>
-            <head>
-                topcoat::dev::script()
-            </head>
+            <head>topcoat::dev::script()</head>
             <body>
                 // `asset!` declares a file relative to this Rust source file.
                 // Topcoat replaces it with the URL of the bundled image.

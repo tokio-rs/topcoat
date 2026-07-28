@@ -38,21 +38,21 @@ async fn home() -> Result {
                 signal input = String::new();
 
                 <input
-                    // Keep the input value synchronized with the signal.
                     :value=$(input.get())
-
-                    // Update the signal when the input change event fires.
                     @change=$(|e: Event| input.set(e.target.value))
                 >
+                // Keep the input value synchronized with the signal.
+
+                // Update the signal when the input change event fires.
 
                 <button
-                    // Call the Rust procedure on the server and replace the input
-                    // value with the response returned by the server.
                     @click=$(async |_e| {
                         let server_response = print_on_server(input.get()).await;
                         input.set(server_response);
                     })
                 >
+                    // Call the Rust procedure on the server and replace the input
+                    // value with the response returned by the server.
                     "Print on server"
                 </button>
             </body>

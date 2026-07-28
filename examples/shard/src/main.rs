@@ -49,10 +49,7 @@ async fn combobox() -> Result {
 
         <div>
             // Update the signal whenever the user types.
-            <input
-                :value=$(input.get())
-                @input=$(|e: Event| input.set(e.target.value))
-            >
+            <input :value=$(input.get()) @input=$(|e: Event| input.set(e.target.value))>
 
             // Re-render this shard on the server whenever `input` changes.
             combobox_content(input: $(input.get()))

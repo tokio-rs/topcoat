@@ -18,7 +18,6 @@ const LAVISHLY_YOURS: Font = fontsource_font!(LAVISHLY_YOURS, host: Asset);
 // A local file or a Topcoat asset could also be used as the source.
 const ORBITRON: Font = font! {
     "Orbitron",
-
     @font-face {
         src: url(
             "https://cdn.jsdelivr.net/fontsource/fonts/orbitron:vf@latest/latin-wght-normal.woff2"
