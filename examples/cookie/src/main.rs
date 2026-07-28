@@ -9,9 +9,11 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // The Key signs cookies so the client can't forge the counter. Generate it
-    // once at startup and share it across requests as app context. A real app
-    // would load a persisted key instead of generating a fresh one each boot.
+    // The key signs cookies so the client cannot forge the visit counter.
+    // A real application should load a persistent key instead of generating
+    // a new one whenever the server starts.
+    //
+    // By default, the application is available at http://127.0.0.1:3000.
     topcoat::start(
         Router::builder()
             .discover()
@@ -23,9 +25,12 @@ async fn main() {
     .unwrap();
 }
 
-// The application cookie jar: signed with the registered Key, with our defaults
-// baked in. Handlers use this instead of the bare topcoat::cookie::cookies so
-// every cookie gets the same attributes and we can tighten them in one place.
+// Build the signed cookie jar used by this application.
+//
+// Every cookie created through this helper:
+// - is available across the complete application;
+// - cannot be accessed through browser JavaScript;
+// - is sent only in a secure context.
 fn cookies(cx: &Cx) -> impl Cookies {
     signed_cookies(cx)
         .default_path("/")
@@ -43,24 +48,27 @@ impl Visits {
     }
 }
 
-// Builds a typed store over the "visits" cookie, reading the current value from
-// the request and falling back to Visits::default() (zero) when it's missing.
-// Like the cookies jar above, wrapping it in a helper keeps the name and jar
-// consistent across handlers.
+// Read the typed "visits" cookie.
+//
+// If the cookie is missing or its signature is invalid, start from the
+// default Visits value, which contains zero visits.
 fn visits(cx: &Cx) -> CookieStore<Visits, impl Cookies> {
     cookie_store(cookies(cx), "visits").parse_or_default()
 }
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
-    // Increment the visit counter and queue the appropriate `Set-Cookie`
-    // header in the HTTP response.
+    // Increment the typed cookie value and add the updated cookie
+    // to the HTTP response through a Set-Cookie header.
     let visits = visits(cx).update(Visits::increment).commit()?;
 
     view! {
         <!DOCTYPE html>
         <html>
-            <head>topcoat::dev::script()</head>
+            <head>
+                <title>"Cookie"</title>
+                topcoat::dev::script()
+            </head>
             <body>
                 <p>
                     "You have visited this page "

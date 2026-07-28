@@ -14,27 +14,31 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // An in-memory database keeps the example self-contained; point the URL at
-    // a file (e.g. "sqlite:todos.db") to persist todos across restarts.
+    // Use an in-memory SQLite database to keep the example self-contained.
+    // Replace this with `sqlite:todos.db` to persist todos across restarts.
     let db = Db::builder()
         .models(toasty::models!(crate::*))
         .connect("sqlite::memory:")
         .await
         .unwrap();
+
+    // Create the database schema generated from the Toasty models.
     db.push_schema().await.unwrap();
 
+    // Register the database as application context, discover the routes,
+    // and start the server at http://127.0.0.1:3000 by default.
     topcoat::start(Router::builder().discover().app_context(db).build())
         .await
         .unwrap();
 }
 
-// Toasty statements borrow the handle mutably, so each handler clones the
-// shared `Db` (a cheap handle to the underlying connection pool) out of app
-// context.
+// Toasty statements require a mutable database handle.
+// Cloning `Db` is inexpensive because it is a handle to the underlying pool.
 fn db(cx: &Cx) -> Db {
     app_context::<Db>(cx).clone()
 }
 
+// This model defines the structure of a todo stored in SQLite.
 #[derive(Debug, toasty::Model)]
 struct Todo {
     #[key]
@@ -48,6 +52,7 @@ struct Todo {
 
 #[layout("/")]
 async fn root(slot: Result) -> Result {
+    // Wrap every page in a complete HTML document.
     view! {
         <!DOCTYPE html>
         <html>
@@ -65,11 +70,18 @@ async fn home(cx: &Cx) -> Result {
     view! {
         <h1>"Toasty Todos"</h1>
 
+        // Submit a new todo to POST /todos.
         <form method="post" action="/todos">
-            <input type="text" name="title" placeholder="What needs doing?" required="">
+            <input
+                type="text"
+                name="title"
+                placeholder="What needs doing?"
+                required=""
+            >
             <button type="submit">"Add"</button>
         </form>
 
+        // Load all todos and display them in creation order.
         let todos = Todo::all()
             .order_by(Todo::fields().id().asc())
             .exec(&mut db(cx))
@@ -79,7 +91,8 @@ async fn home(cx: &Cx) -> Result {
             <p>"All done!"</p>
         } else {
             <ul
-                style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.375em;"
+                style="list-style: none; padding: 0; display: flex; \
+                    flex-direction: column; gap: 0.375em;"
             >
                 for todo in todos {
                     <li style="display: flex; align-items: center; gap: 0.5em;">
@@ -99,20 +112,25 @@ async fn home(cx: &Cx) -> Result {
     }
 }
 
-// -----------------------
-// Components
+// --- Components -------------------------------------------------------------
 
 #[component]
 async fn toggle_checkbox(todo: &Todo) -> Result {
+    // Submit the todo ID when the checkbox changes.
     view! {
         <form method="post" action=(("/todos/", todo.id, "/toggle"))>
-            <input type="checkbox" checked=(todo.done) onchange="this.form.submit()">
+            <input
+                type="checkbox"
+                checked=(todo.done)
+                onchange="this.form.submit()"
+            >
         </form>
     }
 }
 
 #[component]
 async fn delete_button(todo: &Todo) -> Result {
+    // Submit the todo ID to its delete endpoint.
     view! {
         <form method="post" action=(("/todos/", todo.id, "/delete"))>
             <button type="submit">"delete"</button>
@@ -120,8 +138,7 @@ async fn delete_button(todo: &Todo) -> Result {
     }
 }
 
-// -----------------------
-// API routes
+// --- Routes -----------------------------------------------------------------
 
 #[derive(Deserialize)]
 struct NewTodo {
@@ -130,24 +147,31 @@ struct NewTodo {
 
 #[route(POST "/todos")]
 async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<SeeOther> {
+    // Ignore titles that contain only whitespace.
     let title = new_todo.title.trim();
+
     if !title.is_empty() {
         toasty::create!(Todo { title, done: false })
             .exec(&mut db(cx))
             .await?;
     }
 
+    // Use Post/Redirect/Get to return to the todo list.
     Ok(see_other("/"))
 }
 
+// Parse the dynamic todo ID as an unsigned integer.
 #[path_param(error = bad_request)]
 struct TodoId(u64);
 
 #[route(POST "/todos/{todo_id}/toggle")]
 async fn toggle(cx: &Cx) -> Result<SeeOther> {
     let mut db = db(cx);
+
+    // Load the selected todo and invert its completed state.
     let mut todo = Todo::get_by_id(&mut db, *path_param::<TodoId>(cx)?).await?;
     let done = !todo.done;
+
     toasty::update!(todo { done }).exec(&mut db).await?;
 
     Ok(see_other("/"))
@@ -155,6 +179,8 @@ async fn toggle(cx: &Cx) -> Result<SeeOther> {
 
 #[route(POST "/todos/{todo_id}/delete")]
 async fn delete(cx: &Cx) -> Result<SeeOther> {
+    // Delete the selected todo by its ID.
     Todo::delete_by_id(&mut db(cx), *path_param::<TodoId>(cx)?).await?;
+
     Ok(see_other("/"))
 }

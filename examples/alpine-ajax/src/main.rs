@@ -13,6 +13,8 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
+    // Discover the routes, register the shared counter, and start the server.
+    // By default, the application is available at http://127.0.0.1:3000.
     topcoat::start(
         Router::builder()
             .discover()
@@ -25,8 +27,8 @@ async fn main() {
 
 #[layout("/")]
 async fn root(cx: &Cx, slot: Result) -> Result {
-    // For client-side navigations we don't need to return the full HTML shell again.
-    // Alpine AJAX automatically merges just the targeted content.
+    // Alpine AJAX requests only need the targeted content.
+    // Normal browser requests receive the complete HTML document.
     if ajax_request(cx) {
         return slot;
     }
@@ -35,14 +37,12 @@ async fn root(cx: &Cx, slot: Result) -> Result {
         <!DOCTYPE html>
         <html>
             <head>
-                // `defer` matters here: without it, Alpine can start
-                // initializing before `<body>` exists and silently skip
-                // binding directives on the page's first render.
+                // `defer` ensures that Alpine initializes after the page body
+                // has been parsed.
                 <script
                     defer=""
                     src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"
                 ></script>
-
                 <script
                     defer=""
                     src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"
@@ -57,6 +57,7 @@ async fn root(cx: &Cx, slot: Result) -> Result {
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
+    // Read the current value from the application context.
     let count = app_context::<Counter>(cx).0.load(Ordering::Relaxed);
 
     view! {
@@ -64,31 +65,31 @@ async fn home(cx: &Cx) -> Result {
             "Count: "
             <span id="count">(count)</span>
         </h1>
+
+        // Alpine AJAX intercepts this form and replaces the element whose
+        // id matches `x-target`.
         <form method="post" action="/increment" x-target="count">
             <button type="submit">"Increment"</button>
         </form>
     }
 }
 
-// A shared counter, registered as app context.
+// The counter is shared across every request handled by this process.
 struct Counter(AtomicU64);
 
-// Bumps the counter. For an Alpine AJAX request, returns just the `<span>`
-// wrapping the new value, which Alpine AJAX merges into whichever elements
-// the request targeted (here, `#count`, per the form's `x-target="count"`).
-//
-// The form is a plain HTML `<form method="post">`, so this also has to work
-// with JavaScript disabled: the browser then submits a full-page request,
-// which isn't an Alpine AJAX request, so this falls back to the
-// Post/Redirect/Get pattern, sending the browser back to `/` to see the
-// updated count.
 #[route(POST "/increment")]
 async fn increment(cx: &Cx) -> Result<Response> {
+    // Increment the shared value and obtain the new count.
     let count = app_context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
 
+    // For an Alpine AJAX request, return only the targeted element.
     if ajax_request(cx) {
-        return view! { <span id="count">(count)</span> }?.into_response(cx);
+        return view! {
+            <span id="count">(count)</span>
+        }?
+        .into_response(cx);
     }
 
+    // Without JavaScript, use Post/Redirect/Get and render the complete page.
     see_other("/").into_response(cx)
 }

@@ -6,16 +6,19 @@ use topcoat::{
     view::view,
 };
 
-// The simple way: let the `fontsource_font!` macro pick the faces out of the
-// Fontsource (Google Fonts) catalog. `host: Asset` downloads the files and
-// self-hosts them as Topcoat assets.
+// Select Lavishly Yours from the Fontsource catalog.
+//
+// `host: Asset` downloads the font files while building the asset bundle
+// and serves them locally through Topcoat.
 const LAVISHLY_YOURS: Font = fontsource_font!(LAVISHLY_YOURS, host: Asset);
 
-// The manual way: declare the `@font-face` rules by hand with the `font!` macro,
-// in this case pointing straight at a font on the jsDelivr CDN. You can also use
-// the Topcoat asset system here by wrapping the URL in `asset!(...)`.
+// Declare a font manually with an `@font-face` rule.
+//
+// This example loads the variable Orbitron font directly from jsDelivr.
+// A local file or a Topcoat asset could also be used as the source.
 const ORBITRON: Font = font! {
     "Orbitron",
+
     @font-face {
         src: url(
             "https://cdn.jsdelivr.net/fontsource/fonts/orbitron:vf@latest/latin-wght-normal.woff2"
@@ -27,6 +30,8 @@ const ORBITRON: Font = font! {
 
 #[tokio::main]
 async fn main() {
+    // Load the generated assets, discover the page, and start the server.
+    // By default, the application is available at http://127.0.0.1:3000.
     let router = Router::builder()
         .assets(AssetBundle::load().unwrap())
         .discover()
@@ -41,15 +46,21 @@ async fn home() -> Result {
         <!DOCTYPE html>
         <html>
             <head>
+                <title>"Fonts"</title>
                 topcoat::dev::script()
-                // The `link` component preloads fonts efficiently by default.
+
+                // Generate the required preload and font style elements.
                 topcoat::font::link(font: LAVISHLY_YOURS)
                 topcoat::font::link(font: ORBITRON)
             </head>
+
             <body>
+                // Use the self-hosted Fontsource font.
                 <h1 style=(format!("font-family: {:?}", LAVISHLY_YOURS.family()))>
                     "This font is downloaded from Fontsource and self-hosted via Topcoat assets!"
                 </h1>
+
+                // Use the manually declared font loaded from jsDelivr.
                 <h2 style=(format!("font-family: {:?}", ORBITRON.family()))>
                     "This font is declared by hand and loaded straight from the jsDelivr CDN!"
                 </h2>

@@ -7,6 +7,8 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
+    // Discover the routes declared in this example and start the server.
+    // By default, the application is available at http://127.0.0.1:3000.
     topcoat::start(Router::builder().discover().build())
         .await
         .unwrap();
@@ -34,17 +36,23 @@ async fn home() -> Result {
         <h1>"Path and query params"</h1>
         <ul>
             <li>
-                <a href="/posts?page=2&q=rust">"query params: /posts?page=2&q=rust"</a>
+                <a href="/posts?page=2&q=rust">
+                    "query params: /posts?page=2&q=rust"
+                </a>
             </li>
-            <li><a href="/posts/42">"path param: /posts/42"</a></li>
+            <li>
+                <a href="/posts/42">
+                    "path param: /posts/42"
+                </a>
+            </li>
         </ul>
     }
 }
 
 // --- Query params -----------------------------------------------------------
 
-// #[query_params] parses URL query strings into a typed struct.
-// A query string that fails to parse redirects back here with it cleared.
+// Parse the URL query string into this typed structure.
+// Invalid values redirect to the same page with the query string cleared.
 #[query_params(error = redirect("?"))]
 struct PostsQuery {
     page: Option<u32>,
@@ -53,6 +61,7 @@ struct PostsQuery {
 
 #[page("/posts")]
 async fn posts(cx: &Cx) -> Result {
+    // Read and validate the query parameters from the current request.
     let query = query_params::<PostsQuery>(cx)?;
 
     view! {
@@ -71,12 +80,14 @@ async fn posts(cx: &Cx) -> Result {
 
 // --- Path params ------------------------------------------------------------
 
-// #[path_param] reads a matching {post_id} URL segment and parses it as u32.
+// Read the {post_id} URL segment and parse it as a u32.
+// Return a bad request response if the value is not a number.
 #[path_param(error = bad_request("Post ID must be a number!"))]
 struct PostId(u32);
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
+    // Extract the typed post ID from the current request path.
     let post_id = path_param::<PostId>(cx)?;
 
     view! {
