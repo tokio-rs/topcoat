@@ -66,7 +66,7 @@ Each crate's `docs/` directory holds the user-facing guides for that crate, embe
 
 - [`crates/topcoat/docs/context.md`](crates/topcoat/docs/context.md): The request context `Cx`: router request helpers, path/query helpers, state accessors, and request body parsing.
 - [`crates/topcoat/docs/app_context.md`](crates/topcoat/docs/app_context.md): App context: registering long-lived values with `.app_context(value)` and reading them with `app_context::<T>(cx)`.
-- [`crates/topcoat-core/macro/docs/memoization.md`](crates/topcoat-core/macro/docs/memoization.md): `#[memoize]` for per-request caching of function results keyed by arguments.
+- [`crates/topcoat-core/macro/docs/memoize.md`](crates/topcoat-core/macro/docs/memoize.md): `#[memoize]` for per-request caching of function results keyed by arguments.
 - [`crates/topcoat/docs/functions_not_middlewares.md`](crates/topcoat/docs/functions_not_middlewares.md): The framework's philosophy: prefer composable `cx: &Cx` functions over middleware/extractors for auth and request-scoped data.
 - [`crates/topcoat/docs/cookie.md`](crates/topcoat/docs/cookie.md): Cookies: the request-scoped jar (`cookies(cx)`), the `cookie!` macro, attribute defaults, name prefixes, signed/private cookies, and typed `CookieStore<T>`.
 - [`crates/topcoat/docs/session.md`](crates/topcoat/docs/session.md): Sessions: bring-your-own-storage session authentication -- the token/hash model, the `start`/`stop` lifecycle, sliding expiration and rotation, and custom token stores.
