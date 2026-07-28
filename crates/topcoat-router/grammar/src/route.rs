@@ -1,11 +1,12 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    ItemFn, LitStr,
+    ItemFn, LitStr, Visibility,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
 };
+use topcoat_core_grammar::doc_attrs;
 use topcoat_core_grammar::paths::{topcoat_context, topcoat_inventory, topcoat_router};
 
 use super::handler_args::{HandlerArgs, request_ident};
@@ -61,7 +62,10 @@ impl Route {
 impl ToTokens for Route {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let attr = &self.0;
+        let vis = &self.1.item.vis;
+        let docs = doc_attrs(&self.1.item.attrs);
         let mut item = self.1.item.clone();
+        item.vis = Visibility::Inherited;
         item.sig.generics.params.insert(0, parse_quote! { '__cx });
         item.sig
             .inputs
@@ -89,8 +93,9 @@ impl ToTokens for Route {
         let methods = &attr.methods;
         if let Some(path) = attr.path.as_ref() {
             quote! {
+                #(#docs)*
                 #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_router::RouteFn = #topcoat_router::RouteFn::const_new(
+                #vis const #ident: #topcoat_router::RouteFn = #topcoat_router::RouteFn::const_new(
                     #methods,
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
@@ -98,8 +103,9 @@ impl ToTokens for Route {
             }
         } else {
             quote! {
+                #(#docs)*
                 #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_router::ModuleRouteFn = #topcoat_router::ModuleRouteFn::new(
+                #vis const #ident: #topcoat_router::ModuleRouteFn = #topcoat_router::ModuleRouteFn::new(
                     #methods,
                     module_path!(),
                     #render,

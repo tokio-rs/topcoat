@@ -49,12 +49,7 @@ async fn home() -> Result {
         <h1>"Send a welcome mail"</h1>
         <form method="POST" action="/send">
             <input name="name" placeholder="Name" required="true">
-            <input
-                type="email"
-                name="address"
-                placeholder="Address"
-                required="true"
-            >
+            <input type="email" name="address" placeholder="Address" required="true">
             <button>"send"</button>
         </form>
         <p>"Nothing leaves the machine: the mail is written to a file."</p>

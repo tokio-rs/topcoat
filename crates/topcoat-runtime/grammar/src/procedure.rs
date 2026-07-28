@@ -1,10 +1,11 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    FnArg, ItemFn, Pat, PatIdent, PatType, ReturnType,
+    FnArg, ItemFn, Pat, PatIdent, PatType, ReturnType, Visibility,
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
+use topcoat_core_grammar::doc_attrs;
 use topcoat_core_grammar::paths::{
     topcoat_internal, topcoat_inventory, topcoat_router, topcoat_runtime,
 };
@@ -72,8 +73,12 @@ impl Procedure {
 
 impl ToTokens for Procedure {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let item = &self.1.item;
-        let ident = &item.sig.ident;
+        let ident = &self.1.item.sig.ident;
+
+        let vis = &self.1.item.vis;
+        let docs = doc_attrs(&self.1.item.attrs);
+        let mut item = self.1.item.clone();
+        item.vis = Visibility::Inherited;
 
         let mut args = Vec::new();
         let mut args_with_cx = Vec::new();
@@ -114,8 +119,9 @@ impl ToTokens for Procedure {
         let id = uuid::Uuid::new_v4().to_string();
 
         quote! {
+            #(#docs)*
             #[allow(non_upper_case_globals)]
-            const #ident: &#topcoat_runtime::Procedure::<(#(#arg_tys,)*), #return_ty> = &#topcoat_runtime::Procedure::new(
+            #vis const #ident: &#topcoat_runtime::Procedure::<(#(#arg_tys,)*), #return_ty> = &#topcoat_runtime::Procedure::new(
                 #topcoat_runtime::ProcedureId::new(#id),
                 |cx, body| {
                     #[allow(clippy::unused_async)]

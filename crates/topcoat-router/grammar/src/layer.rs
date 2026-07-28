@@ -1,9 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    ItemFn, LitStr,
+    ItemFn, LitStr, Visibility,
     parse::{Parse, ParseStream},
 };
+use topcoat_core_grammar::doc_attrs;
 use topcoat_core_grammar::paths::{topcoat_inventory, topcoat_router};
 
 pub struct LayerAttr {
@@ -52,8 +53,12 @@ impl Layer {
 impl ToTokens for Layer {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let attr = &self.0;
-        let item = &self.1.item;
-        let ident = &item.sig.ident;
+        let ident = &self.1.item.sig.ident;
+
+        let vis = &self.1.item.vis;
+        let docs = doc_attrs(&self.1.item.attrs);
+        let mut item = self.1.item.clone();
+        item.vis = Visibility::Inherited;
 
         let render = quote! {
             |cx, body, next| {
@@ -67,16 +72,18 @@ impl ToTokens for Layer {
 
         if let Some(path) = attr.path.as_ref() {
             quote! {
+                #(#docs)*
                 #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_router::LayerFn = #topcoat_router::LayerFn::new(
+                #vis const #ident: #topcoat_router::LayerFn = #topcoat_router::LayerFn::new(
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );
             }
         } else {
             quote! {
+                #(#docs)*
                 #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_router::ModuleLayerFn = #topcoat_router::ModuleLayerFn::new(module_path!(), #render);
+                #vis const #ident: #topcoat_router::ModuleLayerFn = #topcoat_router::ModuleLayerFn::new(module_path!(), #render);
             }
         }
         .to_tokens(tokens);
