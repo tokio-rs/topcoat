@@ -6,7 +6,6 @@ use syn::{
     parse_quote,
     spanned::Spanned,
 };
-use topcoat_core_grammar::doc_attrs;
 use topcoat_core_grammar::paths::{topcoat_context, topcoat_inventory, topcoat_router};
 
 use super::handler_args::{HandlerArgs, request_ident};
@@ -63,7 +62,12 @@ impl ToTokens for Route {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let attr = &self.0;
         let vis = &self.1.item.vis;
-        let docs = doc_attrs(&self.1.item.attrs);
+        let docs = self
+            .1
+            .item
+            .attrs
+            .iter()
+            .filter(|attr| attr.path().is_ident("doc"));
         let mut item = self.1.item.clone();
         item.vis = Visibility::Inherited;
         item.sig.generics.params.insert(0, parse_quote! { '__cx });
