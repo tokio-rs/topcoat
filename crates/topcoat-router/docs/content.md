@@ -23,7 +23,22 @@ async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<String> {
 
 The context and the body parameter are both optional and may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once. A body an extractor cannot parse is rejected with `400 Bad Request`; wrap the extractor in [`Option`] to accept a request that carries no body at all. Pages read bodies the same way, but render a view instead of returning a response value.
 
-Implement [`FromRequest`](crate::FromRequest) yourself for request parsing the built-in extractors do not cover, such as a body that is verified against a signature header before it is deserialized.
+# The body limit
+
+Extractors that buffer the body read at most the request's body limit and reject a larger body with `413 Content Too Large`, so a client cannot exhaust the server's memory. The limit defaults to 2 MiB; register the [`BodyLimit`](crate::BodyLimit) layer to change it, for the whole application or for the routes under a path:
+
+```rust
+use topcoat::router::{BodyLimit, Router};
+
+let router = Router::builder()
+    // Allow up to 32 MiB under /upload, keep the 2 MiB default elsewhere.
+    .layer(BodyLimit::max(32 * 1024 * 1024).at("/upload"))
+    .build();
+```
+
+Taking [`Body`](crate::Body) directly is not limited, because the handler streams the body instead of buffering it.
+
+Implement [`FromRequest`](crate::FromRequest) yourself for request parsing the built-in extractors do not cover, such as a body that is verified against a signature header before it is deserialized. Delegate the buffering to [`Bytes`](crate::Bytes) so the body limit stays applied.
 
 # Returning a response
 

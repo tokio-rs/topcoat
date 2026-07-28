@@ -8,9 +8,8 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, FromRequest, IntoResponse, OptionalFromRequest, Response, content_type,
+    Body, Bytes, FromRequest, IntoResponse, OptionalFromRequest, Response, content_type,
     error::{bad_request, bad_request_at},
-    to_bytes,
 };
 
 /// JSON request extractor and response wrapper.
@@ -88,10 +87,7 @@ where
             );
         }
 
-        let bytes = to_bytes(body, usize::MAX)
-            .await
-            .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
-
+        let bytes = Bytes::from_request(cx, body).await?;
         Self::from_bytes(&bytes)
     }
 }
@@ -193,7 +189,12 @@ mod tests {
     use topcoat_core::context::{Cx, CxTestBuilder};
 
     use super::*;
-    use crate::{Body, FromRequest, OptionalFromRequest, error::BadRequestError, to_bytes};
+    use crate::{
+        Body, FromRequest, OptionalFromRequest,
+        body_limit::DEFAULT_BODY_LIMIT,
+        error::{BadRequestError, ContentTooLargeError},
+        to_bytes,
+    };
 
     /// Builds a `Cx` carrying request `Parts` with the given `Content-Type`
     /// header, or no header at all when `content_type` is [`None`].
@@ -246,6 +247,17 @@ mod tests {
             .expect_err("trailing data after the JSON value is rejected");
 
         assert!(error.downcast_ref::<BadRequestError>().is_some());
+    }
+
+    #[tokio::test]
+    async fn from_request_rejects_a_body_over_the_limit() {
+        let cx = cx_with_content_type(Some("application/json"));
+        let body = Body::from(vec![b'1'; DEFAULT_BODY_LIMIT + 1]);
+        let error = <Json<Value> as FromRequest>::from_request(&cx, body)
+            .await
+            .expect_err("a body over the limit is rejected");
+
+        assert!(error.downcast_ref::<ContentTooLargeError>().is_some());
     }
 
     #[tokio::test]

@@ -137,11 +137,14 @@ impl futures_core::Stream for BodyDataStream {
 
 /// Collects an entire [`Body`] into [`Bytes`], failing if it exceeds `limit`.
 ///
-/// Pass [`usize::MAX`] to read the body without enforcing a limit.
+/// Pass [`usize::MAX`] to read the body without enforcing a limit. When
+/// reading a request body, pass the request's
+/// [`body_limit`](crate::body_limit) so the configured limit applies.
 ///
 /// # Errors
 ///
-/// Returns an error if reading the body fails or if it exceeds `limit` bytes.
+/// Returns an error if reading the body fails or if it exceeds `limit` bytes;
+/// the latter is a [`LengthLimitError`](http_body_util::LengthLimitError).
 pub async fn to_bytes(body: Body, limit: usize) -> Result<Bytes, BoxError> {
     if limit == usize::MAX {
         Ok(body.collect().await?.to_bytes())

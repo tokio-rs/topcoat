@@ -21,7 +21,7 @@ async fn post(cx: &Cx) -> Result {
 }
 ```
 
-The router raises some of these itself: a request that matches no route gets a [`NotFoundError`], a matched path with the wrong method a [`MethodNotAllowedError`], and a request body that fails to parse a [`BadRequestError`].
+The router raises some of these itself: a request that matches no route gets a [`NotFoundError`], a matched path with the wrong method a [`MethodNotAllowedError`], a request body that fails to parse a [`BadRequestError`], and a request body over the body limit a [`ContentTooLargeError`].
 
 # From an `Option` or `Result`
 

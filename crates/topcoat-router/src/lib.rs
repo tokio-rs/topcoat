@@ -1,6 +1,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod body;
+mod body_limit;
 #[cfg(feature = "compression")]
 mod compression;
 pub mod content;
@@ -28,6 +29,7 @@ mod service;
 pub mod tower;
 
 pub use body::*;
+pub use body_limit::*;
 #[cfg(feature = "compression")]
 pub use compression::*;
 pub use context::*;

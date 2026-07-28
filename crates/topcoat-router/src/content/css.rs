@@ -3,7 +3,7 @@ use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
     Body, FromRequest, IntoResponse, OptionalFromRequest, Response, content_type,
-    error::bad_request, to_bytes,
+    error::bad_request,
 };
 
 /// CSS request extractor and response wrapper.
@@ -31,14 +31,7 @@ impl FromRequest for Css<String> {
             return Err(bad_request("expected request with `Content-Type: text/css`").into());
         }
 
-        let bytes = to_bytes(body, usize::MAX)
-            .await
-            .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
-
-        let text = String::from_utf8(bytes.into())
-            .map_err(|error| bad_request(format!("request body is not valid UTF-8: {error}")))?;
-
-        Ok(Self(text))
+        Ok(Self(String::from_request(cx, body).await?))
     }
 }
 
@@ -87,7 +80,7 @@ mod tests {
     use topcoat_core::context::{Cx, CxTestBuilder};
 
     use super::*;
-    use crate::error::BadRequestError;
+    use crate::{error::BadRequestError, to_bytes};
 
     /// Builds a `Cx` carrying request `Parts` with the given `Content-Type`
     /// header, or no header at all when `content_type` is [`None`].

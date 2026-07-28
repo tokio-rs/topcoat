@@ -10,7 +10,7 @@ use topcoat_core::{context::Cx, error::Result};
 use crate::{
     Body, Bytes, FromRequest, IntoResponse, OptionalFromRequest, Response, content_type,
     error::{bad_request, bad_request_at},
-    method, to_bytes, uri,
+    method, uri,
 };
 
 /// `application/x-www-form-urlencoded` request extractor and response wrapper.
@@ -170,10 +170,7 @@ impl FromRequest for RawForm {
             .into());
         }
 
-        let bytes = to_bytes(body, usize::MAX)
-            .await
-            .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
-
+        let bytes = Bytes::from_request(cx, body).await?;
         Ok(Self(bytes))
     }
 }

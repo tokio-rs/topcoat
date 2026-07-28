@@ -1,6 +1,11 @@
+use http_body_util::LengthLimitError;
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{Body, error::bad_request, to_bytes};
+use crate::{
+    Body, body_limit,
+    error::{bad_request, content_too_large},
+    to_bytes,
+};
 
 /// Byte-buffer types re-exported for use as request body extractors and as
 /// response bodies.
@@ -21,6 +26,11 @@ pub type Request<T = Body> = http::Request<T>;
 /// at most one `FromRequest` parameter. This is the request-side counterpart of
 /// [`IntoResponse`](crate::IntoResponse).
 ///
+/// An implementation that buffers the body should delegate the buffering to
+/// [`Bytes`], which enforces the request's
+/// [`body_limit`](crate::body_limit); reading the body by hand bypasses that
+/// limit.
+///
 /// # Examples
 ///
 /// Implement it to parse a request in a way the built-ins don't cover. Here,
@@ -35,7 +45,7 @@ pub type Request<T = Body> = http::Request<T>;
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
-///     router::{Body, FromRequest, error::bad_request, headers, route, to_bytes},
+///     router::{Body, Bytes, FromRequest, error::bad_request, headers, route},
 /// };
 ///
 /// struct SignedJson<T>(T);
@@ -50,9 +60,7 @@ pub type Request<T = Body> = http::Request<T>;
 ///             .and_then(|value| value.to_str().ok())
 ///             .ok_or_else(|| bad_request("missing x-signature header"))?;
 ///
-///         let bytes = to_bytes(body, usize::MAX)
-///             .await
-///             .map_err(|error| bad_request(format!("failed to read body: {error}")))?;
+///         let bytes = Bytes::from_request(cx, body).await?;
 ///
 ///         verify_signature(signature, &bytes)?;
 ///
@@ -84,12 +92,17 @@ impl FromRequest for Body {
     }
 }
 
-/// Buffers the entire request body into memory.
+/// Buffers the entire request body into memory, rejecting a body larger than
+/// the request's [`body_limit`] with `413 Content Too Large`.
 impl FromRequest for Bytes {
-    async fn from_request(_cx: &Cx, body: Body) -> Result<Self> {
-        to_bytes(body, usize::MAX)
-            .await
-            .map_err(|error| bad_request(format!("failed to read request body: {error}")).into())
+    async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
+        to_bytes(body, body_limit(cx)).await.map_err(|error| {
+            if error.is::<LengthLimitError>() {
+                content_too_large().into()
+            } else {
+                bad_request(format!("failed to read request body: {error}")).into()
+            }
+        })
     }
 }
 

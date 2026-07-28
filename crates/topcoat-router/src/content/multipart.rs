@@ -6,14 +6,15 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use futures_util::Stream;
 use http::HeaderMap;
+use http_body_util::{LengthLimitError, Limited};
 use topcoat_core::{
     context::Cx,
     error::{Error, Result},
 };
 
 use crate::{
-    Body, FromRequest, OptionalFromRequest, content_type,
-    error::{bad_request, internal_server_error},
+    Body, FromRequest, OptionalFromRequest, body_limit, content_type,
+    error::{bad_request, content_too_large, internal_server_error},
 };
 
 /// `multipart/form-data` request extractor, commonly used for file uploads.
@@ -28,6 +29,10 @@ use crate::{
 ///
 /// Wrap it in [`Option`] to make the body optional: the extractor yields
 /// [`None`] when the request carries no `multipart/form-data` body.
+///
+/// The stream reads at most the request's body limit across all fields;
+/// register a [`BodyLimit`](crate::BodyLimit) layer to raise it for an
+/// upload route.
 ///
 /// # Examples
 ///
@@ -62,7 +67,7 @@ impl FromRequest for Multipart {
             .ok_or_else(invalid_boundary)?;
 
         Ok(Self {
-            inner: multer::Multipart::new(body.into_data_stream(), boundary),
+            inner: multer::Multipart::new(limited(cx, body).into_data_stream(), boundary),
         })
     }
 }
@@ -75,7 +80,7 @@ impl OptionalFromRequest for Multipart {
 
         match multer::parse_boundary(content_type) {
             Ok(boundary) => Ok(Some(Self {
-                inner: multer::Multipart::new(body.into_data_stream(), boundary),
+                inner: multer::Multipart::new(limited(cx, body).into_data_stream(), boundary),
             })),
             Err(multer::Error::NoMultipart) => Ok(None),
             Err(_) => Err(invalid_boundary()),
@@ -89,8 +94,9 @@ impl Multipart {
     /// # Errors
     ///
     /// Returns an error if reading the next field from the multipart stream
-    /// fails; malformed requests are classified as `400 Bad Request` and other
-    /// failures as `500 Internal Server Error`.
+    /// fails; a body over the request's body limit is classified as
+    /// `413 Content Too Large`, malformed requests as `400 Bad Request`, and
+    /// other failures as `500 Internal Server Error`.
     pub async fn next_field(&mut self) -> Result<Option<Field<'_>>> {
         let field = self.inner.next_field().await.map_err(multipart_error)?;
 
@@ -140,9 +146,9 @@ impl Field<'_> {
     ///
     /// # Errors
     ///
-    /// Returns an error if reading the field data fails; malformed requests are
-    /// classified as `400 Bad Request` and other failures as `500 Internal
-    /// Server Error`.
+    /// Returns an error if reading the field data fails; a body over the request's body
+    /// limit is classified as `413 Content Too Large`, malformed requests as
+    /// `400 Bad Request`, and other failures as `500 Internal Server Error`.
     pub async fn bytes(self) -> Result<Bytes> {
         self.inner.bytes().await.map_err(multipart_error)
     }
@@ -151,9 +157,9 @@ impl Field<'_> {
     ///
     /// # Errors
     ///
-    /// Returns an error if reading the field text fails; malformed requests are
-    /// classified as `400 Bad Request` and other failures as `500 Internal
-    /// Server Error`.
+    /// Returns an error if reading the field text fails; a body over the request's body
+    /// limit is classified as `413 Content Too Large`, malformed requests as
+    /// `400 Bad Request`, and other failures as `500 Internal Server Error`.
     pub async fn text(self) -> Result<String> {
         self.inner.text().await.map_err(multipart_error)
     }
@@ -164,9 +170,9 @@ impl Field<'_> {
     ///
     /// # Errors
     ///
-    /// Returns an error if reading the next chunk fails; malformed requests are
-    /// classified as `400 Bad Request` and other failures as `500 Internal
-    /// Server Error`.
+    /// Returns an error if reading the next chunk fails; a body over the request's body
+    /// limit is classified as `413 Content Too Large`, malformed requests as
+    /// `400 Bad Request`, and other failures as `500 Internal Server Error`.
     pub async fn chunk(&mut self) -> Result<Option<Bytes>> {
         self.inner.chunk().await.map_err(multipart_error)
     }
@@ -182,15 +188,32 @@ impl Stream for Field<'_> {
     }
 }
 
+/// Caps `body` at the request's [`body_limit`], so reading past the limit
+/// fails with an error classified as `413 Content Too Large`.
+fn limited(cx: &Cx, body: Body) -> Body {
+    Body::new(Limited::new(body, body_limit(cx)))
+}
+
 fn invalid_boundary() -> Error {
     bad_request("invalid `boundary` for `multipart/form-data` request").into()
 }
 
 fn multipart_error(error: multer::Error) -> Error {
-    if is_client_error(&error) {
+    if is_length_limit_error(&error) {
+        content_too_large().into()
+    } else if is_client_error(&error) {
         bad_request(error.to_string()).into()
     } else {
         internal_server_error(error).into()
+    }
+}
+
+/// Returns whether the multipart stream failed because the request body
+/// exceeded the request's body limit.
+fn is_length_limit_error(error: &multer::Error) -> bool {
+    match error {
+        multer::Error::StreamReadFailed(error) => error.is::<LengthLimitError>(),
+        _ => false,
     }
 }
 
@@ -223,7 +246,11 @@ mod tests {
     use topcoat_core::context::{Cx, CxTestBuilder};
 
     use super::*;
-    use crate::{Body, FromRequest, OptionalFromRequest, error::BadRequestError};
+    use crate::{
+        Body, FromRequest, OptionalFromRequest,
+        body_limit::DEFAULT_BODY_LIMIT,
+        error::{BadRequestError, ContentTooLargeError},
+    };
 
     const BOUNDARY: &str = "X-TOPCOAT-BOUNDARY";
 
@@ -426,6 +453,29 @@ mod tests {
             .expect_err("reading truncated field data fails");
 
         assert!(error.downcast_ref::<BadRequestError>().is_some());
+    }
+
+    #[tokio::test]
+    async fn a_body_over_the_limit_is_content_too_large() {
+        let data = "x".repeat(DEFAULT_BODY_LIMIT + 1);
+        let body = format!(
+            "--{BOUNDARY}\r\n\
+             Content-Disposition: form-data; name=\"upload\"\r\n\
+             \r\n\
+             {data}\r\n\
+             --{BOUNDARY}--\r\n"
+        );
+        let cx = cx_with_content_type(Some(&multipart_content_type()));
+        let mut multipart = <Multipart as FromRequest>::from_request(&cx, Body::from(body))
+            .await
+            .expect("valid multipart request");
+
+        let error = multipart
+            .next_field()
+            .await
+            .expect_err("a body over the limit is rejected");
+
+        assert!(error.downcast_ref::<ContentTooLargeError>().is_some());
     }
 
     #[test]

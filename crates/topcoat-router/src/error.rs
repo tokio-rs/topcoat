@@ -1,6 +1,7 @@
 #![doc = include_str!("../docs/error.md")]
 
 mod bad_request;
+mod content_too_large;
 mod forbidden;
 mod internal_server;
 mod method_not_allowed;
@@ -9,6 +10,7 @@ mod redirect;
 mod unauthorized;
 
 pub use bad_request::*;
+pub use content_too_large::*;
 pub use forbidden::*;
 pub use internal_server::*;
 pub use method_not_allowed::*;
@@ -44,6 +46,7 @@ fn error_into_response(cx: &Cx, error: Error) -> Response {
     }
     let error = try_downcast!(error as ForbiddenError);
     let error = try_downcast!(error as BadRequestError);
+    let error = try_downcast!(error as ContentTooLargeError);
     let error = try_downcast!(error as InternalServerError);
     let error = try_downcast!(error as NotFoundError);
     let error = try_downcast!(error as MethodNotAllowedError);
