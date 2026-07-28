@@ -139,8 +139,6 @@ pub fn body_limit(cx: &Cx) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-
     use http::{Method, Request, StatusCode};
     use topcoat_core::context::CxTestBuilder;
 
@@ -197,7 +195,7 @@ mod tests {
     }
 
     fn echo_route(path: &'static str) -> RouteFn {
-        RouteFn::new(Method::POST, Cow::Borrowed(Path::new(path)), echo)
+        RouteFn::new(Method::POST, path, echo)
     }
 
     /// Dispatches a POST request carrying a body of `size` zero bytes.
@@ -284,11 +282,7 @@ mod tests {
         }
 
         let router = Router::builder()
-            .route(RouteFn::new(
-                Method::POST,
-                Cow::Borrowed(Path::new("/raw")),
-                raw,
-            ))
+            .route(RouteFn::new(Method::POST, "/raw", raw))
             .layer(BodyLimit::max(4))
             .build();
 

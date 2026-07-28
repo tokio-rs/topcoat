@@ -44,7 +44,7 @@ use crate::{
 /// ```rust
 /// use std::convert::Infallible;
 ///
-/// use topcoat::router::{Body, Methods, Path, Request, Response, Router, tower::TowerRoute};
+/// use topcoat::router::{Body, Methods, Request, Response, Router, tower::TowerRoute};
 /// use tower::service_fn;
 ///
 /// // Stands in for a legacy tower application, like an axum router.
@@ -53,11 +53,7 @@ use crate::{
 /// });
 ///
 /// let router = Router::builder()
-///     .route(TowerRoute::new(
-///         Methods::Any,
-///         Path::new("/legacy/{*rest}"),
-///         legacy,
-///     ))
+///     .route(TowerRoute::new(Methods::Any, "/legacy/{*rest}", legacy))
 ///     .build();
 /// ```
 pub struct TowerRoute<S> {
@@ -77,15 +73,15 @@ impl<S> TowerRoute<S> {
     /// [`Methods::Any`] to respond to every method. A route registered for a
     /// specific method takes precedence over an any-method route at the same
     /// path.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `path` is a string that is not a well-formed route path.
     #[must_use]
-    pub fn new(
-        methods: impl Into<OwnedMethods>,
-        path: impl Into<Cow<'static, Path>>,
-        service: S,
-    ) -> Self {
+    pub fn new(methods: impl Into<OwnedMethods>, path: impl IntoPath, service: S) -> Self {
         Self {
             methods: methods.into(),
-            path: path.into(),
+            path: path.into_path(),
             service,
         }
     }

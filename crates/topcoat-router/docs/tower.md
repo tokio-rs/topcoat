@@ -7,17 +7,13 @@ The [tower](https://docs.rs/tower) ecosystem shares one service abstraction acro
 [`TowerRoute`] forwards its requests to a tower service (an axum router, a hyper service, a reverse proxy). Registered at a catch-all path with `Methods::Any`, it hands an entire URL subtree to the service. This is the typical setup when migrating an existing application to topcoat one route at a time. The service receives each request with its original URI; nothing is stripped or rewritten.
 
 ```rust,ignore
-use topcoat::router::{Methods, Path, Router, tower::TowerRoute};
+use topcoat::router::{Methods, Router, tower::TowerRoute};
 
 // The pre-migration application, still serving everything under `/legacy`.
 let legacy: axum::Router = legacy_app();
 
 let router = Router::builder()
-    .route(TowerRoute::new(
-        Methods::Any,
-        Path::new("/legacy/{*rest}"),
-        legacy,
-    ))
+    .route(TowerRoute::new(Methods::Any, "/legacy/{*rest}", legacy))
     .build();
 ```
 

@@ -4,7 +4,7 @@ use std::pin::Pin;
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::View;
 
-use crate::{Body, IntoResponse, Methods, OwnedMethods, Path, Route, RouteFuture};
+use crate::{Body, IntoPath, IntoResponse, Methods, OwnedMethods, Path, Route, RouteFuture};
 
 /// The async render function backing a [`PageFn`].
 pub type PageRenderFn = for<'cx> fn(
@@ -38,12 +38,16 @@ impl PageFn {
     /// The methods are anything convertible into [`OwnedMethods`]: a single
     /// [`Method`](crate::Method), a `&'static [Method]`, a `Vec<Method>`, or
     /// [`Methods::Any`] to respond to every method.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `path` is a string that is not a well-formed route path.
     pub fn new(
         methods: impl Into<OwnedMethods>,
-        path: Cow<'static, Path>,
+        path: impl IntoPath,
         render: PageRenderFn,
     ) -> Self {
-        Self::const_new(methods.into(), path, render)
+        Self::const_new(methods.into(), path.into_path(), render)
     }
 
     /// Const-context constructor used by macro-generated code.
