@@ -456,6 +456,40 @@ impl<'a> FromIterator<PathSegment<'a>> for PathBuf {
     }
 }
 
+/// Conversion into a route path, accepted by APIs that take a path prefix.
+///
+/// A `&'static str` is parsed with [`Path::new`] and panics when it is not a
+/// well-formed path; [`Path`], [`PathBuf`], and `Cow<'static, Path>` values
+/// convert as they are.
+pub trait IntoPath {
+    /// Converts the value into a route path.
+    fn into_path(self) -> Cow<'static, Path>;
+}
+
+impl IntoPath for &'static str {
+    fn into_path(self) -> Cow<'static, Path> {
+        Cow::Borrowed(Path::new(self))
+    }
+}
+
+impl IntoPath for &'static Path {
+    fn into_path(self) -> Cow<'static, Path> {
+        Cow::Borrowed(self)
+    }
+}
+
+impl IntoPath for PathBuf {
+    fn into_path(self) -> Cow<'static, Path> {
+        Cow::Owned(self)
+    }
+}
+
+impl IntoPath for Cow<'static, Path> {
+    fn into_path(self) -> Cow<'static, Path> {
+        self
+    }
+}
+
 impl Display for PathBuf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.inner.fmt(f)

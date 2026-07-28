@@ -1,6 +1,8 @@
+use std::borrow::Cow;
+
 use topcoat_core::context::{Cx, CxBuilder, try_request_context};
 
-use crate::{Body, Layer, LayerFuture, Next, Path};
+use crate::{Body, IntoPath, Layer, LayerFuture, Next, Path};
 
 /// The body limit in bytes applied when no [`BodyLimit`] layer matches the
 /// request.
@@ -36,11 +38,11 @@ pub(crate) const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 ///     .layer(BodyLimit::max(32 * 1024 * 1024).at("/upload"))
 ///     .build();
 /// ```
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 #[must_use]
 pub struct BodyLimit {
     /// The URL path prefix whose routes this layer applies to.
-    path: &'static Path,
+    path: Cow<'static, Path>,
     /// The limit the layer registers on the request context.
     kind: BodyLimitKind,
 }
@@ -49,7 +51,7 @@ impl BodyLimit {
     /// Creates a layer that limits request bodies to `limit` bytes.
     pub const fn max(limit: usize) -> Self {
         Self {
-            path: Path::new("/"),
+            path: Cow::Borrowed(Path::new("/")),
             kind: BodyLimitKind::Limit(limit),
         }
     }
@@ -58,7 +60,7 @@ impl BodyLimit {
     /// buffer a body of any size.
     pub const fn disable() -> Self {
         Self {
-            path: Path::new("/"),
+            path: Cow::Borrowed(Path::new("/")),
             kind: BodyLimitKind::Disable,
         }
     }
@@ -67,18 +69,16 @@ impl BodyLimit {
     ///
     /// # Panics
     ///
-    /// Panics if `path` is not a well-formed route path. Because this is a
-    /// `const fn`, a malformed literal in a `const` context is rejected at
-    /// compile time.
-    pub const fn at(mut self, path: &'static str) -> Self {
-        self.path = Path::new(path);
+    /// Panics if `path` is a string that is not a well-formed route path.
+    pub fn at(mut self, path: impl IntoPath) -> Self {
+        self.path = path.into_path();
         self
     }
 }
 
 impl Layer for BodyLimit {
     fn path(&self) -> &Path {
-        self.path
+        &self.path
     }
 
     fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {

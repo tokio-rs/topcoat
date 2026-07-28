@@ -13,8 +13,8 @@ use topcoat_core::error::{Error, Result};
 use tower::ServiceExt;
 
 use crate::{
-    Body, BoxError, Layer, LayerFuture, Methods, Next, OwnedMethods, Path, Request, Response,
-    Route, RouteFuture, parts,
+    Body, BoxError, IntoPath, Layer, LayerFuture, Methods, Next, OwnedMethods, Path, Request,
+    Response, Route, RouteFuture, parts,
 };
 
 /// A [`Route`] that forwards its requests to a tower service.
@@ -151,14 +151,11 @@ where
 /// ```rust
 /// use std::time::Duration;
 ///
-/// use topcoat::router::{Path, Router, tower::TowerLayer};
+/// use topcoat::router::{Router, tower::TowerLayer};
 /// use tower::timeout::TimeoutLayer;
 ///
 /// let router = Router::builder()
-///     .layer(TowerLayer::new(
-///         Path::new("/api"),
-///         TimeoutLayer::new(Duration::from_secs(5)),
-///     ))
+///     .layer(TowerLayer::new(TimeoutLayer::new(Duration::from_secs(5))).at("/api"))
 ///     .build();
 /// ```
 pub struct TowerLayer<S> {
@@ -169,19 +166,31 @@ pub struct TowerLayer<S> {
 }
 
 impl<S> TowerLayer<S> {
-    /// Wraps the routes under `path` in the middleware `layer` builds.
+    /// Wraps every route in the middleware `layer` builds; scope the layer
+    /// to a path prefix with [`at`](Self::at).
     ///
     /// The middleware is built immediately and shared by every request
     /// passing through this layer.
     #[must_use]
-    pub fn new<L>(path: impl Into<Cow<'static, Path>>, layer: L) -> Self
+    pub fn new<L>(layer: L) -> Self
     where
         L: tower::Layer<TowerNext, Service = S>,
     {
         Self {
-            path: path.into(),
+            path: Cow::Borrowed(Path::new("/")),
             service: layer.layer(TowerNext::new()),
         }
+    }
+
+    /// Scopes the layer to the routes under `path`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `path` is a string that is not a well-formed route path.
+    #[must_use]
+    pub fn at(mut self, path: impl IntoPath) -> Self {
+        self.path = path.into_path();
+        self
     }
 }
 
@@ -794,13 +803,13 @@ mod tests {
 
     #[test]
     fn tower_layer_exposes_its_path() {
-        let layer = TowerLayer::new(Path::new("/admin"), tower::layer::util::Identity::new());
+        let layer = TowerLayer::new(tower::layer::util::Identity::new()).at("/admin");
         assert_eq!(layer.path(), Path::new("/admin"));
     }
 
     #[test]
     fn passes_the_request_through_to_the_route() {
-        let layer = TowerLayer::new(Path::new("/"), tower::layer::util::Identity::new());
+        let layer = TowerLayer::new(tower::layer::util::Identity::new());
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
         let mut cx = cx_for("/x");
 
@@ -812,7 +821,7 @@ mod tests {
 
     #[test]
     fn request_edits_reach_the_route_and_the_context() {
-        let layer = TowerLayer::new(Path::new("/"), MarkRequestLayer);
+        let layer = TowerLayer::new(MarkRequestLayer);
         let route = RouteFn::new(Method::GET, path("/x"), echo_header);
         let mut cx = cx_for("/x");
 
@@ -826,7 +835,7 @@ mod tests {
 
     #[test]
     fn response_edits_reach_the_caller() {
-        let layer = TowerLayer::new(Path::new("/"), MarkResponseLayer);
+        let layer = TowerLayer::new(MarkResponseLayer);
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
         let mut cx = cx_for("/x");
 
@@ -838,7 +847,7 @@ mod tests {
 
     #[test]
     fn middleware_can_short_circuit_without_calling_the_chain() {
-        let layer = TowerLayer::new(Path::new("/"), ShortCircuitLayer);
+        let layer = TowerLayer::new(ShortCircuitLayer);
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
         let mut cx = cx_for("/x");
 
@@ -852,7 +861,7 @@ mod tests {
 
     #[test]
     fn chain_errors_tunnel_through_unchanged() {
-        let layer = TowerLayer::new(Path::new("/"), tower::layer::util::Identity::new());
+        let layer = TowerLayer::new(tower::layer::util::Identity::new());
         let layers = Layers::default();
         let mut cx = cx_for("/missing");
 
@@ -872,10 +881,7 @@ mod tests {
     fn chain_errors_tunnel_through_an_error_boxing_middleware() {
         // `Timeout` boxes its inner service's errors; the original error must
         // still be recovered on the way out.
-        let layer = TowerLayer::new(
-            Path::new("/"),
-            tower::timeout::TimeoutLayer::new(Duration::from_mins(1)),
-        );
+        let layer = TowerLayer::new(tower::timeout::TimeoutLayer::new(Duration::from_mins(1)));
         let layers = Layers::default();
         let mut cx = cx_for("/missing");
 
@@ -894,13 +900,10 @@ mod tests {
     fn middleware_is_built_once_and_shared_across_requests() {
         let builds = Arc::new(AtomicUsize::new(0));
         let requests = Arc::new(AtomicUsize::new(0));
-        let layer = TowerLayer::new(
-            Path::new("/"),
-            CountingLayer {
-                builds: builds.clone(),
-                requests: requests.clone(),
-            },
-        );
+        let layer = TowerLayer::new(CountingLayer {
+            builds: builds.clone(),
+            requests: requests.clone(),
+        });
         assert_eq!(builds.load(Ordering::SeqCst), 1);
 
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
@@ -916,10 +919,7 @@ mod tests {
 
     #[test]
     fn timeout_middleware_cancels_a_hung_route() {
-        let layer = TowerLayer::new(
-            Path::new("/"),
-            tower::timeout::TimeoutLayer::new(Duration::from_millis(10)),
-        );
+        let layer = TowerLayer::new(tower::timeout::TimeoutLayer::new(Duration::from_millis(10)));
         let route = RouteFn::new(Method::GET, path("/x"), hang);
         let mut cx = cx_for("/x");
 
@@ -933,7 +933,7 @@ mod tests {
 
     #[test]
     fn calling_the_chain_twice_errors() {
-        let layer = TowerLayer::new(Path::new("/"), CallTwiceLayer);
+        let layer = TowerLayer::new(CallTwiceLayer);
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
         let mut cx = cx_for("/x");
 
@@ -943,7 +943,7 @@ mod tests {
 
     #[test]
     fn calling_the_chain_without_the_relay_errors() {
-        let layer = TowerLayer::new(Path::new("/"), DetachLayer);
+        let layer = TowerLayer::new(DetachLayer);
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
         let mut cx = cx_for("/x");
 
@@ -957,10 +957,7 @@ mod tests {
     fn works_with_tower_concurrency_limit() {
         let router = Router::builder()
             .route(RouteFn::new(Method::GET, path("/x"), say_route))
-            .layer(TowerLayer::new(
-                Path::new("/"),
-                tower::limit::ConcurrencyLimitLayer::new(1),
-            ))
+            .layer(TowerLayer::new(tower::limit::ConcurrencyLimitLayer::new(1)))
             .build();
 
         // The permit taken for the first request is released for the second.
@@ -980,7 +977,6 @@ mod tests {
             let router = Router::builder()
                 .route(RouteFn::new(Method::GET, path("/x"), say_route))
                 .layer(TowerLayer::new(
-                    Path::new("/"),
                     tower::ServiceBuilder::new()
                         .buffer::<Request>(8)
                         .rate_limit(100, Duration::from_secs(1))
@@ -1004,13 +1000,15 @@ mod tests {
         let router = Router::builder()
             .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
             .route(RouteFn::new(Method::GET, path("/public"), say_route))
-            .layer(TowerLayer::new(
-                Path::new("/admin"),
-                tower_http::set_header::SetResponseHeaderLayer::if_not_present(
-                    http::header::HeaderName::from_static("x-tower"),
-                    HeaderValue::from_static("marked"),
-                ),
-            ))
+            .layer(
+                TowerLayer::new(
+                    tower_http::set_header::SetResponseHeaderLayer::if_not_present(
+                        http::header::HeaderName::from_static("x-tower"),
+                        HeaderValue::from_static("marked"),
+                    ),
+                )
+                .at("/admin"),
+            )
             .build();
 
         let response = send(&router, "/admin/x");
@@ -1025,10 +1023,7 @@ mod tests {
     fn works_with_tower_http_cors() {
         let router = Router::builder()
             .route(RouteFn::new(Method::GET, path("/x"), say_route))
-            .layer(TowerLayer::new(
-                Path::new("/"),
-                tower_http::cors::CorsLayer::permissive(),
-            ))
+            .layer(TowerLayer::new(tower_http::cors::CorsLayer::permissive()))
             .build();
 
         // The middleware answers a preflight request itself; without it the
@@ -1063,7 +1058,6 @@ mod tests {
         let router = Router::builder()
             .route(RouteFn::new(Method::GET, path("/x"), long_route))
             .layer(TowerLayer::new(
-                Path::new("/"),
                 tower_http::compression::CompressionLayer::new(),
             ))
             .build();
@@ -1093,7 +1087,6 @@ mod tests {
         let router = Router::builder()
             .route(RouteFn::new(Method::GET, path("/x"), say_route))
             .layer(TowerLayer::new(
-                Path::new("/"),
                 tower_http::trace::TraceLayer::new_for_http(),
             ))
             .build();
@@ -1112,7 +1105,6 @@ mod tests {
         let router = Router::builder()
             .route(RouteFn::new(Method::GET, path("/x"), hang))
             .layer(TowerLayer::new(
-                Path::new("/"),
                 tower_http::timeout::TimeoutLayer::with_status_code(
                     StatusCode::REQUEST_TIMEOUT,
                     Duration::from_millis(10),
@@ -1200,13 +1192,15 @@ mod tests {
                 Path::new("/legacy/{*rest}"),
                 tower::service_fn(echo_service),
             ))
-            .layer(TowerLayer::new(
-                Path::new("/legacy"),
-                tower_http::set_header::SetResponseHeaderLayer::if_not_present(
-                    http::header::HeaderName::from_static("x-tower"),
-                    HeaderValue::from_static("marked"),
-                ),
-            ))
+            .layer(
+                TowerLayer::new(
+                    tower_http::set_header::SetResponseHeaderLayer::if_not_present(
+                        http::header::HeaderName::from_static("x-tower"),
+                        HeaderValue::from_static("marked"),
+                    ),
+                )
+                .at("/legacy"),
+            )
             .build();
 
         let response = send(&router, "/legacy/x");

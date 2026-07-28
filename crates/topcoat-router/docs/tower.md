@@ -25,19 +25,16 @@ A catch-all segment does not match the bare prefix itself, so register a second 
 
 # Running middleware as a layer
 
-[`TowerLayer`] wraps the routes under its path in the middleware a `tower::Layer` builds (a timeout, a rate limit, CORS, compression) and registers like any other layer:
+[`TowerLayer`] wraps routes in the middleware a `tower::Layer` builds (a timeout, a rate limit, CORS, compression) and registers like any other layer. It wraps every route by default; scope it to the routes under a path prefix with [`at`](TowerLayer::at):
 
 ```rust
 use std::time::Duration;
 
-use topcoat::router::{Path, Router, tower::TowerLayer};
+use topcoat::router::{Router, tower::TowerLayer};
 use tower::timeout::TimeoutLayer;
 
 let router = Router::builder()
-    .layer(TowerLayer::new(
-        Path::new("/api"),
-        TimeoutLayer::new(Duration::from_secs(5)),
-    ))
+    .layer(TowerLayer::new(TimeoutLayer::new(Duration::from_secs(5))).at("/api"))
     .build();
 ```
 
