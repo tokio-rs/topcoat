@@ -11,9 +11,6 @@ target
 .Spotlight-V100
 .Trashes
 
-# Generated mail example output
-examples/mail/outbox/
-
 # Environment files (may contain secrets)
 .env
 .env.*
