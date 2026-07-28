@@ -3,6 +3,7 @@ use quote::{ToTokens, format_ident, quote};
 use syn::{
     FnArg, ItemFn, Pat, PatIdent, PatType, ReturnType,
     parse::{Parse, ParseStream},
+    spanned::Spanned,
 };
 use topcoat_core_grammar::paths::{
     topcoat_internal, topcoat_inventory, topcoat_router, topcoat_runtime,
@@ -16,15 +17,37 @@ impl Parse for ProcedureAttr {
     }
 }
 
+/// The annotated `async fn` that becomes a procedure. Validates the function
+/// signature: procedures must be `async`, must declare a return type, and must
+/// not take a `self` receiver.
 pub struct ProcedureItem {
     item: ItemFn,
 }
 
 impl Parse for ProcedureItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
-            item: input.parse()?,
-        })
+        let item: ItemFn = input.parse()?;
+        if item.sig.asyncness.is_none() {
+            return Err(syn::Error::new(
+                item.sig.fn_token.span(),
+                "procedures must be async",
+            ));
+        }
+        if let ReturnType::Default = &item.sig.output {
+            return Err(syn::Error::new(
+                item.sig.fn_token.span(),
+                "procedures must have a return type",
+            ));
+        }
+        for arg in &item.sig.inputs {
+            if let FnArg::Receiver(r) = arg {
+                return Err(syn::Error::new_spanned(
+                    r,
+                    "procedure functions cannot take a `self` receiver",
+                ));
+            }
+        }
+        Ok(Self { item })
     }
 }
 
@@ -67,7 +90,7 @@ impl ToTokens for Procedure {
                         arg_index += 1;
                     }
                 },
-                FnArg::Receiver(_) => unreachable!("procedures cannot have `self` receiver"),
+                FnArg::Receiver(_) => unreachable!("validated by ProcedureItem"),
             }
         }
 
@@ -84,7 +107,7 @@ impl ToTokens for Procedure {
             })
             .collect::<Vec<_>>();
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
-            unreachable!("procedures must return a value")
+            unreachable!("validated by ProcedureItem")
         };
         let return_ty = quote! { <#return_ty as #topcoat_internal::ResultExt>::T };
 
@@ -112,5 +135,49 @@ impl ToTokens for Procedure {
         if cfg!(feature = "discover") {
             quote! { #topcoat_inventory::submit! { #topcoat_runtime::ErasedProcedure::new(#ident) } }.to_tokens(tokens);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_err(source: &str) -> String {
+        match syn::parse_str::<ProcedureItem>(source) {
+            Ok(_) => panic!("expected parse error for `{source}`"),
+            Err(err) => err.to_string(),
+        }
+    }
+
+    #[test]
+    fn accepts_async_fn_with_return_type() {
+        syn::parse_str::<ProcedureItem>("async fn double(cx: &Cx, value: f64) -> Result<f64> {}")
+            .unwrap();
+    }
+
+    #[test]
+    fn accepts_a_destructured_argument() {
+        // Only argument types reach the generated call, so destructuring
+        // patterns stay valid; the re-emitted function unpacks them.
+        syn::parse_str::<ProcedureItem>(
+            "async fn shift((x, y): (f64, f64)) -> Result<(f64, f64)> {}",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn rejects_non_async_fn() {
+        assert!(parse_err("fn double() -> Result<f64> {}").contains("must be async"));
+    }
+
+    #[test]
+    fn rejects_missing_return_type() {
+        assert!(parse_err("async fn double() {}").contains("must have a return type"));
+    }
+
+    #[test]
+    fn rejects_self_receiver() {
+        let err = parse_err("async fn double(&self) -> Result<f64> {}");
+        assert!(err.contains("cannot take a `self` receiver"));
     }
 }
