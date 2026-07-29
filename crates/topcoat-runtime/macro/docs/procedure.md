@@ -61,6 +61,10 @@ async fn search(cx: &Cx, query: String) -> Result<String> {
 
 Awaiting a call yields the procedure's `Ok` value directly. An `Err` becomes an error response, and the expression awaiting the call fails in the browser without a value; the error itself is not observable from the expression. If the client needs to react to failures, return the outcome as data instead, for example with an `Ok` type of `Result<String, String>`.
 
+# Endpoint URLs
+
+A procedure is served from `/_topcoat/procedures/<id>`, where `<id>` is a hash of the declaring crate, the module path, and the function name. The same source produces the same id on every build, so a page loaded before a deploy keeps calling the procedure after it. Renaming the function, moving it to another module, or renaming the crate changes the id and retires the old URL.
+
 # Registration
 
 Each procedure is served by a route on the [`Router`]. `.discover()` registers every procedure linked into the binary; alternatively, mount procedures individually:

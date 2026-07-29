@@ -74,6 +74,12 @@ Argument types must belong to the shared vocabulary of [`expr!`], since their va
 
 A parameter named `cx` borrowing [`Cx`] is special: just like in a component, it is filled from the request context on the server and does not take an argument at the call site.
 
+# Endpoint URLs
+
+A shard is served from `/_topcoat/shards/<id>`, where `<id>` is a hash of the declaring crate, the module path, and the function name. The same source produces the same id on every build, so a browser tab opened before a deploy keeps reaching the shard after it. Renaming the function, moving it to another module, or renaming the crate changes the id and retires the old URL.
+
+A URL that outlives a deploy is a URL an attacker can keep, which is another reason for the shard to resolve authorization itself, as covered under [Guards](#guards).
+
 # Registration
 
 Each shard is served by a route on the [`Router`]. `.discover()` registers every shard linked into the binary; alternatively, mount shards individually:

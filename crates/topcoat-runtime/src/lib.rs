@@ -3,6 +3,7 @@
 mod bind_attribute;
 mod event_handler;
 mod expr;
+mod id;
 #[cfg(feature = "router")]
 mod procedure;
 #[cfg(feature = "router")]
@@ -15,6 +16,7 @@ mod surrogate;
 pub use bind_attribute::*;
 pub use event_handler::*;
 pub use expr::*;
+pub use id::*;
 #[cfg(feature = "router")]
 pub use procedure::*;
 #[cfg(feature = "router")]

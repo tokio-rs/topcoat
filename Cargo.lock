@@ -3128,7 +3128,6 @@ dependencies = [
  "syn",
  "topcoat-core-grammar",
  "topcoat-runtime",
- "uuid",
 ]
 
 [[package]]
