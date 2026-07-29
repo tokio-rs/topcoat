@@ -94,7 +94,7 @@ async fn build(kind: BuildKind, opts: BuildOpts) -> Option<PathBuf> {
     };
 
     let spinner = Spinner::new("bundling assets");
-    let bundled = crate::asset::run_bundle(&bytes, None).await;
+    let bundled = crate::asset::run_bundle(&exe, &bytes, None).await;
     drop(spinner);
 
     if let Err(error) = bundled {
