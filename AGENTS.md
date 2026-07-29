@@ -17,6 +17,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable e
 - `topcoat-session`: bring-your-own-storage session authentication: the token/hash model, the session lifecycle, and origin checking.
 - `topcoat-mail`: the `Mail` type and `mail!` macro for declaring mail, and its delivery through pluggable transports (SMTP, file, in-memory).
 - `topcoat-htmx`, `topcoat-alpine-ajax`, and `topcoat-datastar`: request and response helpers for those client libraries.
+- `topcoat-inertia`: the Inertia.js v3 page and visit protocol, future-backed props, redirect and asset-version handling, and redirect-scoped flash storage.
 - `topcoat-tailwind`: the build-script wrapper around the standalone Tailwind CLI.
 - `topcoat-ui` (+ `registry/`): the component registry behind `topcoat ui`, which copies component source into a project.
 - `topcoat-cli`: the `topcoat` binary. Each subcommand has its own module under `src/`.
@@ -87,6 +88,10 @@ Each crate's `docs/` directory holds the user-facing guides for that crate, embe
 - [`crates/topcoat/docs/htmx.md`](crates/topcoat/docs/htmx.md): htmx: reading its request headers and setting its response headers from a handler.
 - [`crates/topcoat/docs/alpine-ajax.md`](crates/topcoat/docs/alpine-ajax.md): Alpine AJAX: reading its request headers to render partial responses.
 - [`crates/topcoat/docs/datastar.md`](crates/topcoat/docs/datastar.md): Datastar: reading the signals sent with a request and patching elements and signals over server-sent events.
+- [`crates/topcoat/docs/inertia.md`](crates/topcoat/docs/inertia.md): Inertia.js v3: router and client setup, page rendering, shared props, redirects, asset versions, flash data, and production errors.
+- [`crates/topcoat-inertia/docs/props.md`](crates/topcoat-inertia/docs/props.md): Inertia prop selection and composition: partial, deferred, merge, once, rescued, shared, nested, and infinite-scroll props.
+- [`crates/topcoat-inertia/docs/flash.md`](crates/topcoat-inertia/docs/flash.md): Redirect-scoped flash storage: the default private cookie, persistent keys, size limits, and custom stores.
+- [`crates/topcoat-inertia/docs/validation.md`](crates/topcoat-inertia/docs/validation.md): Immediate and redirected validation errors, error bags, and the reserved `errors` prop.
 
 ### Tooling
 

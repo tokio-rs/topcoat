@@ -3,13 +3,20 @@ use topcoat_core::context::{Cx, try_request_context};
 
 use crate::header;
 
+/// The direction requested by an Inertia.js infinite-scroll visit.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum MergeIntent {
+    /// Add the new page after the existing collection.
     #[default]
     Append,
+    /// Add the new page before the existing collection.
     Prepend,
 }
 
+/// Parsed Inertia.js request metadata.
+///
+/// The router layer creates this from the protocol headers and stores it in
+/// request context. Most handlers only need the free request helpers.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct InertiaRequest {
     inertia: bool,
@@ -25,6 +32,10 @@ pub struct InertiaRequest {
 }
 
 impl InertiaRequest {
+    /// Parses all supported v3 request headers.
+    ///
+    /// Invalid UTF-8 and empty optional values are treated as absent. Unknown
+    /// scroll intents fall back to append.
     #[must_use]
     pub fn from_headers(headers: &HeaderMap) -> Self {
         Self {
@@ -47,51 +58,61 @@ impl InertiaRequest {
         }
     }
 
+    /// Returns whether `X-Inertia` was present.
     #[must_use]
     pub fn is_inertia(&self) -> bool {
         self.inertia
     }
 
+    /// Returns the client asset version.
     #[must_use]
     pub fn version(&self) -> Option<&str> {
         self.version.as_deref()
     }
 
+    /// Returns the component named by a partial reload.
     #[must_use]
     pub fn partial_component(&self) -> Option<&str> {
         self.partial_component.as_deref()
     }
 
+    /// Returns the partial prop paths selected with `only`.
     #[must_use]
     pub fn only(&self) -> Option<&[String]> {
         self.only.as_deref()
     }
 
+    /// Returns the partial prop paths selected with `except`.
     #[must_use]
     pub fn except(&self) -> Option<&[String]> {
         self.except.as_deref()
     }
 
+    /// Returns prop paths whose client merge state must reset.
     #[must_use]
     pub fn reset(&self) -> &[String] {
         &self.reset
     }
 
+    /// Returns once-prop keys already held by the client.
     #[must_use]
     pub fn except_once(&self) -> &[String] {
         &self.except_once
     }
 
+    /// Returns the selected validation error bag.
     #[must_use]
     pub fn error_bag(&self) -> Option<&str> {
         self.error_bag.as_deref()
     }
 
+    /// Returns the infinite-scroll merge direction.
     #[must_use]
     pub fn scroll_intent(&self) -> MergeIntent {
         self.scroll_intent
     }
 
+    /// Returns whether the browser marked this as a speculative prefetch.
     #[must_use]
     pub fn is_prefetch(&self) -> bool {
         self.prefetch
@@ -131,16 +152,19 @@ fn request(cx: &Cx) -> Option<&InertiaRequest> {
 }
 
 #[must_use]
+/// Returns whether the current request is an Inertia visit.
 pub fn inertia_request(cx: &Cx) -> bool {
     request(cx).is_some_and(InertiaRequest::is_inertia)
 }
 
 #[must_use]
+/// Returns the partial component named by the current request.
 pub fn inertia_partial_component(cx: &Cx) -> Option<&str> {
     request(cx).and_then(InertiaRequest::partial_component)
 }
 
 #[must_use]
+/// Returns whether the current request is an Inertia prefetch.
 pub fn inertia_prefetch(cx: &Cx) -> bool {
     request(cx).is_some_and(InertiaRequest::is_prefetch)
 }

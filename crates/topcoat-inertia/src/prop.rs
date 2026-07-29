@@ -10,6 +10,11 @@ use topcoat_core::error::Result;
 
 use crate::ScrollMetadata;
 
+/// A serializable or asynchronous Inertia page prop plus its v3 behavior.
+///
+/// Behavior modifiers compose on one value. For example, a deferred prop can
+/// also be rescued and deep-merged. Invalid combinations return a render error
+/// with the prop path that caused it.
 pub struct Prop<'cx> {
     pub(crate) source: PropSource<'cx>,
     pub(crate) initial: InitialBehavior,
@@ -34,6 +39,9 @@ impl fmt::Debug for Prop<'_> {
 }
 
 impl Prop<'static> {
+    /// Creates an eagerly serialized prop.
+    ///
+    /// Serialization failures are retained and returned from page rendering.
     #[must_use]
     pub fn value(value: impl Serialize) -> Self {
         Self::from_result(serde_json::to_value(value).map_err(Into::into))
@@ -67,6 +75,7 @@ impl<'cx> Prop<'cx> {
         })))
     }
 
+    /// Assigns this deferred prop to a named request group.
     #[must_use]
     pub fn group(mut self, group: impl Into<Cow<'static, str>>) -> Self {
         self.initial = InitialBehavior::Deferred {
@@ -75,30 +84,35 @@ impl<'cx> Prop<'cx> {
         self
     }
 
+    /// Omits a failed deferred value and reports it in `rescuedProps`.
     #[must_use]
     pub fn rescue(mut self) -> Self {
         self.rescue = true;
         self
     }
 
+    /// Includes this prop even when a partial reload did not select it.
     #[must_use]
     pub fn always(mut self) -> Self {
         self.always = true;
         self
     }
 
+    /// Appends this prop at its root on subsequent visits.
     #[must_use]
     pub fn merge(mut self) -> Self {
         self.merge = Some(MergeBehavior::append_root());
         self
     }
 
+    /// Deep-merges this prop on subsequent visits.
     #[must_use]
     pub fn deep_merge(mut self) -> Self {
         self.merge.get_or_insert_with(MergeBehavior::default).deep = true;
         self
     }
 
+    /// Appends this prop at its root on subsequent visits.
     #[must_use]
     pub fn append(mut self) -> Self {
         self.merge
@@ -107,6 +121,7 @@ impl<'cx> Prop<'cx> {
         self
     }
 
+    /// Appends the collection at the nested `path`.
     #[must_use]
     pub fn append_at(mut self, path: impl Into<String>) -> Self {
         self.merge
@@ -116,6 +131,7 @@ impl<'cx> Prop<'cx> {
         self
     }
 
+    /// Prepends this prop at its root on subsequent visits.
     #[must_use]
     pub fn prepend(mut self) -> Self {
         self.merge
@@ -124,6 +140,7 @@ impl<'cx> Prop<'cx> {
         self
     }
 
+    /// Prepends the collection at the nested `path`.
     #[must_use]
     pub fn prepend_at(mut self, path: impl Into<String>) -> Self {
         self.merge
@@ -133,6 +150,7 @@ impl<'cx> Prop<'cx> {
         self
     }
 
+    /// Uses `path` to match items while merging collections.
     #[must_use]
     pub fn match_on(mut self, path: impl Into<String>) -> Self {
         self.merge
@@ -142,30 +160,35 @@ impl<'cx> Prop<'cx> {
         self
     }
 
+    /// Marks this value as a client-cached once prop.
     #[must_use]
     pub fn once(mut self) -> Self {
         self.once.get_or_insert_with(OnceBehavior::default);
         self
     }
 
+    /// Sets the cache key used in once-prop request metadata.
     #[must_use]
     pub fn as_key(mut self, key: impl Into<String>) -> Self {
         self.once.get_or_insert_with(OnceBehavior::default).key = Some(key.into());
         self
     }
 
+    /// Sets how long the client may keep this once prop.
     #[must_use]
     pub fn until(mut self, duration: Duration) -> Self {
         self.once.get_or_insert_with(OnceBehavior::default).expires = Some(duration);
         self
     }
 
+    /// Sends this once prop even when the client reports a cached value.
     #[must_use]
     pub fn fresh(mut self) -> Self {
         self.once.get_or_insert_with(OnceBehavior::default).fresh = true;
         self
     }
 
+    /// Excludes this future from the initial page and uses the default group.
     #[must_use]
     pub fn defer(mut self) -> Self {
         self.initial = InitialBehavior::Deferred {
@@ -174,6 +197,7 @@ impl<'cx> Prop<'cx> {
         self
     }
 
+    /// Adds infinite-scroll metadata and merge behavior.
     #[must_use]
     pub fn scroll(mut self, metadata: ScrollMetadata) -> Self {
         self.scroll = Some(ScrollBehavior {
@@ -183,6 +207,7 @@ impl<'cx> Prop<'cx> {
         self
     }
 
+    /// Points infinite-scroll merging at a nested collection.
     #[must_use]
     pub fn wrapper(mut self, path: impl Into<String>) -> Self {
         if let Some(scroll) = &mut self.scroll {
@@ -305,10 +330,12 @@ impl fmt::Display for InvalidProp {
 impl std::error::Error for InvalidProp {}
 
 #[must_use]
+/// Creates an eagerly serialized plain prop.
 pub fn value(value: impl Serialize) -> Prop<'static> {
     Prop::value(value)
 }
 
+/// Creates a future-backed prop that resolves only when selected.
 pub fn lazy<'cx, T>(future: impl Future<Output = Result<T>> + Send + 'cx) -> Prop<'cx>
 where
     T: Serialize,
@@ -317,10 +344,12 @@ where
 }
 
 #[must_use]
+/// Creates a plain prop that bypasses partial-reload filtering.
 pub fn always(serializable: impl Serialize) -> Prop<'static> {
     value(serializable).always()
 }
 
+/// Creates a future omitted from initial pages unless explicitly requested.
 pub fn optional<'cx, T>(future: impl Future<Output = Result<T>> + Send + 'cx) -> Prop<'cx>
 where
     T: Serialize,
@@ -330,6 +359,7 @@ where
     prop
 }
 
+/// Creates a future loaded by an automatic deferred-prop request.
 pub fn defer<'cx, T>(future: impl Future<Output = Result<T>> + Send + 'cx) -> Prop<'cx>
 where
     T: Serialize,
@@ -338,10 +368,12 @@ where
 }
 
 #[must_use]
+/// Creates a plain prop appended at its root on subsequent visits.
 pub fn merge(serializable: impl Serialize) -> Prop<'static> {
     value(serializable).merge()
 }
 
+/// Creates a future-backed value cached as a once prop by the client.
 pub fn once<'cx, T>(future: impl Future<Output = Result<T>> + Send + 'cx) -> Prop<'cx>
 where
     T: Serialize,
@@ -350,6 +382,7 @@ where
 }
 
 #[must_use]
+/// Creates a plain prop with infinite-scroll metadata.
 pub fn scroll(value: impl Serialize, metadata: ScrollMetadata) -> Prop<'static> {
     Prop::value(value).scroll(metadata)
 }

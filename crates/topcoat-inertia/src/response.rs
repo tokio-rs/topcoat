@@ -16,6 +16,10 @@ use crate::{
     header, lazy, merge, once, optional, scroll,
 };
 
+/// A fluent builder for an Inertia.js page response.
+///
+/// Props resolve only when selected by the current visit. Call [`render`](Self::render)
+/// from a handler, await it, and return the resulting response.
 pub struct Inertia<'cx> {
     component: String,
     props: Vec<(String, Prop<'cx>)>,
@@ -28,6 +32,7 @@ pub struct Inertia<'cx> {
 }
 
 impl Inertia<'_> {
+    /// Starts a page for the named client component.
     #[must_use]
     pub fn new(component: impl Into<String>) -> Self {
         Self {
@@ -44,12 +49,17 @@ impl Inertia<'_> {
 }
 
 impl<'cx> Inertia<'cx> {
+    /// Replaces validation errors for this page.
+    ///
+    /// The value must serialize as a JSON object. The `errors` prop name is
+    /// reserved so validation metadata stays consistent.
     #[must_use]
     pub fn errors(mut self, errors: impl Serialize) -> Self {
         self.errors = Some(serde_json::to_value(errors).map_err(Into::into));
         self
     }
 
+    /// Adds immediate page-level flash data without using redirect storage.
     #[must_use]
     pub fn flash(mut self, key: impl Into<String>, value: impl Serialize) -> Self {
         self.flash
@@ -57,11 +67,13 @@ impl<'cx> Inertia<'cx> {
         self
     }
 
+    /// Adds an eagerly serialized plain prop.
     #[must_use]
     pub fn prop(self, key: impl Into<String>, value: impl Serialize) -> Self {
         self.prop_with(key, Prop::value(value))
     }
 
+    /// Adds a future-backed prop that resolves only when selected.
     #[must_use]
     pub fn lazy<T>(
         self,
@@ -74,11 +86,13 @@ impl<'cx> Inertia<'cx> {
         self.prop_with(key, lazy(future))
     }
 
+    /// Adds a prop that bypasses partial-reload filtering.
     #[must_use]
     pub fn always(self, key: impl Into<String>, value: impl Serialize) -> Self {
         self.prop_with(key, always(value))
     }
 
+    /// Adds a future omitted from initial pages unless explicitly requested.
     #[must_use]
     pub fn optional<T>(
         self,
@@ -91,6 +105,7 @@ impl<'cx> Inertia<'cx> {
         self.prop_with(key, optional(future))
     }
 
+    /// Adds a future loaded by an automatic deferred request.
     #[must_use]
     pub fn defer<T>(
         self,
@@ -103,11 +118,13 @@ impl<'cx> Inertia<'cx> {
         self.prop_with(key, defer(future))
     }
 
+    /// Adds a prop appended at its root on subsequent visits.
     #[must_use]
     pub fn merge(self, key: impl Into<String>, value: impl Serialize) -> Self {
         self.prop_with(key, merge(value))
     }
 
+    /// Adds a future-backed once prop.
     #[must_use]
     pub fn once<T>(
         self,
@@ -120,6 +137,7 @@ impl<'cx> Inertia<'cx> {
         self.prop_with(key, once(future))
     }
 
+    /// Adds a prop with infinite-scroll pagination metadata.
     #[must_use]
     pub fn scroll(
         self,
@@ -130,30 +148,35 @@ impl<'cx> Inertia<'cx> {
         self.prop_with(key, scroll(value, metadata))
     }
 
+    /// Adds a fully configured [`Prop`].
     #[must_use]
     pub fn prop_with(mut self, key: impl Into<String>, prop: Prop<'cx>) -> Self {
         self.props.push((key.into(), prop));
         self
     }
 
+    /// Overrides the URL written to this page object.
     #[must_use]
     pub fn url(mut self, url: impl Into<String>) -> Self {
         self.url = Some(url.into());
         self
     }
 
+    /// Overrides the application's browser-history encryption default.
     #[must_use]
     pub fn encrypt_history(mut self, encrypt: bool) -> Self {
         self.encrypt_history = Some(encrypt);
         self
     }
 
+    /// Asks the client to clear its previous browser history entries.
     #[must_use]
     pub fn clear_history(mut self) -> Self {
         self.clear_history = true;
         self
     }
 
+    /// Asks the client to preserve the current URL fragment.
     #[must_use]
     pub fn preserve_fragment(mut self) -> Self {
         self.preserve_fragment = true;
@@ -261,6 +284,7 @@ impl<'cx> Inertia<'cx> {
     }
 }
 
+/// A resolved Inertia page that implements Topcoat's response conversion.
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct InertiaResponse {
@@ -269,6 +293,7 @@ pub struct InertiaResponse {
 }
 
 impl InertiaResponse {
+    /// Returns the resolved v3 page object.
     #[must_use]
     pub fn page(&self) -> &Page {
         &self.page
@@ -301,6 +326,10 @@ impl IntoResponse for InertiaResponse {
     }
 }
 
+/// A location visit that branches between ordinary and Inertia requests.
+///
+/// Ordinary requests receive a normal 302. Inertia requests receive the v3
+/// 409 plus `X-Inertia-Location` response understood by the client adapter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[must_use]
 pub struct InertiaLocation {
@@ -308,6 +337,7 @@ pub struct InertiaLocation {
 }
 
 impl InertiaLocation {
+    /// Creates a location visit for `url`.
     pub fn new(url: impl Into<String>) -> Self {
         Self { url: url.into() }
     }
@@ -333,6 +363,7 @@ impl IntoResponse for InertiaLocation {
     }
 }
 
+/// Creates a full-page location visit for ordinary and Inertia requests.
 pub fn inertia_location(url: impl Into<String>) -> InertiaLocation {
     InertiaLocation::new(url)
 }

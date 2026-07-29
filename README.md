@@ -238,6 +238,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [htmx](https://docs.rs/topcoat/latest/topcoat/htmx/index.html): drive partial HTML swaps from the server with request/response header helpers.
 - [Alpine AJAX](https://docs.rs/topcoat/latest/topcoat/alpine_ajax/index.html): drive partial HTML swaps from the server with Alpine AJAX's request-header conventions.
 - [Datastar](https://docs.rs/topcoat/latest/topcoat/datastar/index.html): patch elements and signals into the page over server-sent events.
+- [Inertia.js](https://docs.rs/topcoat/latest/topcoat/inertia/index.html): use React, Vue, or Svelte page components with Topcoat routing and server-side data loading through the v3 protocol.
 
 ## Roadmap
 

@@ -1,5 +1,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
+#![doc = include_str!("../docs/props.md")]
+#![doc = include_str!("../docs/flash.md")]
+#![doc = include_str!("../docs/validation.md")]
 
 mod config;
 mod flash;

@@ -6,6 +6,10 @@ use topcoat_view::{NodeViewParts, PartsWriter};
 
 use crate::{InertiaConfig, Page};
 
+/// The inert page-data script and empty client mount element.
+///
+/// This deliberately does not use the legacy `data-page` mount attribute.
+/// Inertia.js v3 reads JSON from a sibling `application/json` script instead.
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct InertiaRoot {
@@ -37,6 +41,11 @@ impl NodeViewParts for InertiaRoot {
     }
 }
 
+/// Builds the v3 bootstrap nodes for `page`.
+///
+/// Place this exactly once in the root HTML callback passed to
+/// [`InertiaConfig::new`]. JSON is escaped so a prop containing `</script>`
+/// cannot terminate the inert script element.
 pub fn inertia_root(page: &Page) -> InertiaRoot {
     InertiaRoot { page: page.clone() }
 }

@@ -17,16 +17,29 @@ const DEFAULT_MAX_AGE: Duration = Duration::from_mins(5);
 const COOKIE_SIZE_LIMIT: usize = 3_800;
 const ENCRYPTION_AND_ATTRIBUTES_ALLOWANCE: usize = 256;
 
+/// The boxed future returned by [`FlashStore`] operations.
 pub type FlashStoreFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T>> + Send + 'a>>;
 
+/// Stores opaque redirect-scoped Inertia flash state.
+///
+/// Implementations may use a session, database, or another request-aware
+/// backend. The payload is owned by this crate and must be returned unchanged.
 pub trait FlashStore: Send + Sync {
+    /// Reads the pending payload, or `None` when the request has no flash data.
     fn read<'a>(&'a self, cx: &'a Cx) -> FlashStoreFuture<'a, Option<Vec<u8>>>;
 
+    /// Replaces the pending payload.
     fn write<'a>(&'a self, cx: &'a Cx, payload: &'a [u8]) -> FlashStoreFuture<'a, ()>;
 
+    /// Deletes the pending payload after it has been included in a page.
     fn delete<'a>(&'a self, cx: &'a Cx) -> FlashStoreFuture<'a, ()>;
 }
 
+/// Encrypted private-cookie storage for redirect-scoped flash data.
+///
+/// This default store requires the cookie layer and a persistent [`Key`] in
+/// app context. It intentionally rejects payloads near the browser cookie
+/// limit. Use a custom [`FlashStore`] for larger validation or flash data.
 #[derive(Debug, Clone)]
 pub struct CookieFlashStore {
     name: String,
@@ -35,6 +48,7 @@ pub struct CookieFlashStore {
 }
 
 impl CookieFlashStore {
+    /// Creates a secure, HTTP-only, same-site flash cookie.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -44,18 +58,24 @@ impl CookieFlashStore {
         }
     }
 
+    /// Sets the private cookie name.
     #[must_use]
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = name.into();
         self
     }
 
+    /// Controls the cookie's `Secure` attribute.
+    ///
+    /// Keep the default in production. Local plain-HTTP development may set
+    /// this to `false`.
     #[must_use]
     pub fn secure(mut self, secure: bool) -> Self {
         self.secure = secure;
         self
     }
 
+    /// Sets how long an unread flash payload remains valid in the browser.
     #[must_use]
     pub fn max_age(mut self, max_age: Duration) -> Self {
         self.max_age = max_age;
