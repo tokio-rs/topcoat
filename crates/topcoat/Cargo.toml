@@ -37,6 +37,7 @@ full = [
 	"htmx",
 	"icon",
 	"icon-iconify",
+	"inertia",
 	"mail",
 	"mail-smtp",
 	"multipart",
@@ -59,6 +60,7 @@ asset = [
 	"dep:topcoat-asset",
 	"topcoat-font?/asset",
 	"topcoat-font-macro?/asset",
+	"topcoat-inertia?/asset",
 ]
 compression = [
 	"router",
@@ -91,6 +93,11 @@ font-fontsource = [
 ]
 htmx = [
 	"dep:topcoat-htmx",
+]
+inertia = [
+	"dep:topcoat-inertia",
+	"router",
+	"cookie",
 ]
 icon = [
 	"dep:topcoat-icon",
@@ -176,6 +183,7 @@ topcoat-datastar = { workspace = true, optional = true }
 topcoat-font = { workspace = true, optional = true }
 topcoat-font-macro = { workspace = true, optional = true }
 topcoat-htmx = { workspace = true, optional = true }
+topcoat-inertia = { workspace = true, optional = true }
 topcoat-icon = { workspace = true, optional = true }
 topcoat-icon-macro = { workspace = true, optional = true }
 topcoat-mail = { workspace = true, optional = true }

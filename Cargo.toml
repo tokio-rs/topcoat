@@ -14,6 +14,7 @@ members = [
     "crates/topcoat-font/grammar",
     "crates/topcoat-font/macro",
     "crates/topcoat-htmx",
+    "crates/topcoat-inertia",
     "crates/topcoat-icon",
     "crates/topcoat-icon/grammar",
     "crates/topcoat-icon/macro",
@@ -121,6 +122,7 @@ topcoat-font = { version = "0.5.0", path = "crates/topcoat-font" }
 topcoat-font-grammar = { version = "0.5.0", path = "crates/topcoat-font/grammar" }
 topcoat-font-macro = { version = "0.5.0", path = "crates/topcoat-font/macro" }
 topcoat-htmx = { version = "0.5.0", path = "crates/topcoat-htmx" }
+topcoat-inertia = { version = "0.5.0", path = "crates/topcoat-inertia" }
 topcoat-icon = { version = "0.5.0", path = "crates/topcoat-icon" }
 topcoat-icon-grammar = { version = "0.5.0", path = "crates/topcoat-icon/grammar" }
 topcoat-icon-macro = { version = "0.5.0", path = "crates/topcoat-icon/macro" }

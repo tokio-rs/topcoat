@@ -39,6 +39,9 @@ pub mod htmx;
 #[cfg(feature = "icon")]
 pub mod icon;
 
+#[cfg(feature = "inertia")]
+pub mod inertia;
+
 #[cfg(feature = "mail")]
 pub mod mail;
 

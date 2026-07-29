@@ -2780,6 +2780,7 @@ dependencies = [
  "topcoat-htmx",
  "topcoat-icon",
  "topcoat-icon-macro",
+ "topcoat-inertia",
  "topcoat-mail",
  "topcoat-mail-macro",
  "topcoat-router",
@@ -3006,6 +3007,26 @@ dependencies = [
  "syn",
  "topcoat",
  "topcoat-icon-grammar",
+]
+
+[[package]]
+name = "topcoat-inertia"
+version = "0.5.0"
+dependencies = [
+ "base64",
+ "http",
+ "http-body",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tokio",
+ "topcoat",
+ "topcoat-asset",
+ "topcoat-cookie",
+ "topcoat-core",
+ "topcoat-router",
+ "topcoat-view",
+ "web-time",
 ]
 
 [[package]]

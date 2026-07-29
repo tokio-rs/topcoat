@@ -43,6 +43,7 @@ changelog_include = [
     "topcoat-font-grammar",
     "topcoat-font-macro",
     "topcoat-htmx",
+    "topcoat-inertia",
     "topcoat-icon",
     "topcoat-icon-grammar",
     "topcoat-icon-macro",
@@ -121,6 +122,11 @@ version_group = "topcoat"
 
 [[package]]
 name = "topcoat-htmx"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-inertia"
 release = true
 version_group = "topcoat"
 
