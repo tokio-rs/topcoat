@@ -15,7 +15,8 @@ use topcoat::{
     },
 };
 
-const PAGE_SIZE: usize = 6;
+const PAGE_SIZE: usize = 8;
+const SEEDED_USER_COUNT: u64 = 40;
 
 #[derive(Clone, Serialize)]
 struct User {
@@ -83,7 +84,7 @@ impl Default for Users {
     fn default() -> Self {
         Self {
             entries: Mutex::new(
-                (1..=9)
+                (1..=SEEDED_USER_COUNT)
                     .map(|id| User {
                         id,
                         name: format!("User {id}"),
@@ -197,7 +198,8 @@ mod tests {
 
         let first_page = users.page(1);
         assert_eq!(first_page.users[0].name, "Ada");
-        assert_eq!(first_page.page_count, 2);
-        assert_eq!(users.stats().total, 10);
+        assert_eq!(first_page.users.len(), PAGE_SIZE);
+        assert_eq!(first_page.page_count, 6);
+        assert_eq!(users.stats().total, 41);
     }
 }

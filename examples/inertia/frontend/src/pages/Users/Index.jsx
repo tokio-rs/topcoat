@@ -58,13 +58,32 @@ export default function Users({ users, stats, activity, navigation }) {
         <p>Stats resolution: #{stats?.resolution}</p>
         <p>Deferred merged activity: {activity?.join(', ')}</p>
       </Deferred>
-      <InfiniteScroll data="users" buffer={100} preserveUrl>
-        <ul>
+      <p className="user-count">
+        Showing {users.length} of {stats?.total ?? '...'} users
+      </p>
+      <p>Scroll inside the list to load the next page.</p>
+      <div className="user-scroll">
+        <InfiniteScroll
+          data="users"
+          as="ul"
+          className="user-list"
+          buffer={80}
+          preserveUrl
+          next={({ hasMore, loading }) => (
+            <p className="scroll-status">
+              {loading
+                ? 'Loading more users...'
+                : hasMore
+                  ? 'Keep scrolling to load more'
+                  : 'All users loaded'}
+            </p>
+          )}
+        >
           {users.map((user) => (
             <li key={user.id}>{user.name}</li>
           ))}
-        </ul>
-      </InfiniteScroll>
+        </InfiniteScroll>
+      </div>
     </>
   )
 }

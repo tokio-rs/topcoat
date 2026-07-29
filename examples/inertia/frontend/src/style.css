@@ -35,6 +35,37 @@ input {
   color: #a11;
 }
 
-li {
-  margin-block: 0.4rem;
+.user-count {
+  font-weight: 600;
+}
+
+.user-scroll {
+  border: 1px solid #c8cfdd;
+  border-radius: 0.4rem;
+  height: 24rem;
+  overflow-y: auto;
+}
+
+.user-list {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0.75rem;
+}
+
+.user-list li {
+  align-items: center;
+  background: #f4f6fa;
+  border-radius: 0.3rem;
+  display: flex;
+  min-height: 2.5rem;
+  padding: 0.75rem;
+}
+
+.scroll-status {
+  color: #596273;
+  margin: 0;
+  padding: 1rem;
+  text-align: center;
 }
