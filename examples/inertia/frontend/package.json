@@ -1,0 +1,16 @@
+{
+  "name": "topcoat-inertia-example",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@inertiajs/react": "3.6.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "vite": "8.1.5"
+  }
+}

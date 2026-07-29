@@ -44,6 +44,7 @@ members = [
     "examples/font",
     "examples/hello-world",
     "examples/htmx",
+    "examples/inertia",
     "examples/icon",
     "examples/mail",
     "examples/manual-router",

@@ -1,0 +1,14 @@
+[package]
+name = "inertia"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+topcoat = { workspace = true, features = ["inertia"] }
+
+[lints]
+workspace = true

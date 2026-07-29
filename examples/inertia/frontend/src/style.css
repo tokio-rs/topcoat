@@ -1,0 +1,40 @@
+:root {
+  color: #1d2433;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 54rem;
+  padding: 2rem;
+}
+
+nav,
+.actions {
+  display: flex;
+  gap: 1rem;
+}
+
+a {
+  color: #3659b3;
+}
+
+button,
+input {
+  font: inherit;
+  padding: 0.45rem 0.7rem;
+}
+
+.flash {
+  background: #e5f7e9;
+  padding: 0.75rem;
+}
+
+.error {
+  color: #a11;
+}
+
+li {
+  margin-block: 0.4rem;
+}
