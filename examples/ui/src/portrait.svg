@@ -1,0 +1,12 @@
+<!-- A stand-in portrait for the avatar demo, served as a Topcoat asset. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c7d2fe" />
+      <stop offset="1" stop-color="#a5b4fc" />
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" fill="url(#sky)" />
+  <circle cx="40" cy="31" r="14" fill="#4c1d95" opacity="0.65" />
+  <path d="M12 80c0-16 12.5-25 28-25s28 9 28 25z" fill="#4c1d95" opacity="0.65" />
+</svg>
