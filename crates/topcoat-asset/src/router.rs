@@ -80,7 +80,7 @@ impl RouterBuilderAssetExt for RouterBuilder {
                 let mut builder = self;
                 let mut registered = HashSet::new();
                 for asset in config.catalog.assets() {
-                    if registered.insert((asset.name(), asset.content_type())) {
+                    if registered.insert(asset.name()) {
                         builder = builder.route(AssetRoute::new(dir, asset));
                     }
                 }
@@ -157,11 +157,16 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "duplicate route registered")]
-    fn one_file_declared_with_two_content_types_conflicts() {
+    fn one_file_declared_with_two_content_types_serves_one_route() {
         let dir = temp_dir("conflicting-content-types");
+        fs::write(dir.join(FILE), "<svg></svg>").unwrap();
         let bundle = bundle(dir, &[(MAIN, "image/svg+xml"), (OTHER, "text/plain")]);
 
-        let _ = Router::builder().assets(bundle).build();
+        let router = Router::builder().assets(bundle).build();
+
+        let parts = get(&router, &format!("{ASSET_ROUTE_PREFIX}/{FILE}"));
+        assert_eq!(parts.status, StatusCode::OK);
+        let content_type = parts.headers.get(CONTENT_TYPE).unwrap();
+        assert!(content_type == "image/svg+xml" || content_type == "text/plain");
     }
 }
