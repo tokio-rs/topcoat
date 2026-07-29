@@ -4,22 +4,6 @@ This example demonstrates how to build a component library with Topcoat UI.
 
 Topcoat UI components are vendored into the application source code instead of being used as an opaque external component library. The installed components can therefore be modified, restyled, and extended directly inside the project.
 
-The showcase includes:
-
-- badges;
-- buttons and button variants;
-- cards;
-- checkboxes;
-- dialogs;
-- dropdown menus and submenus;
-- inputs and labels;
-- progress indicators;
-- selects;
-- spinners;
-- switches;
-- textareas;
-- light and dark theme examples.
-
 ## Prerequisites
 
 This example uses:
@@ -80,62 +64,7 @@ Build your component library
 
 It should contain multiple cards arranged in responsive columns.
 
-Check that you can see examples including:
-
-- button variants and sizes;
-- sign-in and project forms;
-- deployment status badges;
-- a progress bar at 62%;
-- notification controls;
-- a dropdown menu with a submenu;
-- a destructive delete action;
-- a dark deployment card;
-- loading spinners;
-- a project settings card whose "Rename" link opens a dialog over the page;
-- `Tabs` and `Avatar` placeholders marked as coming soon.
-
 The page should use the Geist font and the neutral Topcoat UI theme.
-
-## Test the page
-
-From another terminal, check the root route:
-
-```sh
-curl --include http://127.0.0.1:3000/
-```
-
-The response should have an HTTP `200` status.
-
-Check that the page contains the main heading:
-
-```sh
-curl --silent http://127.0.0.1:3000/ \
-    | grep --fixed-strings "Build your component library"
-```
-
-Check that the generated stylesheet is linked:
-
-```sh
-curl --silent http://127.0.0.1:3000/ \
-    | grep --only-matching --extended-regexp 'href="[^"]+\.css"'
-```
-
-Extract and request the stylesheet:
-
-```sh
-stylesheet_url=$(
-    curl --silent http://127.0.0.1:3000/ \
-        | grep --only-matching --extended-regexp 'href="[^"]+\.css"' \
-        | head --lines 1 \
-        | cut --delimiter='"' --fields=2
-)
-
-echo "$stylesheet_url"
-
-curl --head "http://127.0.0.1:3000$stylesheet_url"
-```
-
-The stylesheet request should return an HTTP `200` response and a CSS content type.
 
 ## Inspect the installed components
 
