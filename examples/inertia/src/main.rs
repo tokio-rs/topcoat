@@ -30,6 +30,7 @@ async fn main() {
     let router = Router::builder()
         .discover()
         .app_context(Key::derive_from(secret.as_bytes()))
+        .app_context(users::Users::default())
         .inertia(config)
         .cookies()
         .sessions(SessionConfig::default())

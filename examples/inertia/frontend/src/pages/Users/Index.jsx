@@ -4,9 +4,23 @@ import {
   InfiniteScroll,
   Link,
   router,
+  usePage,
 } from '@inertiajs/react'
+import { useEffect, useState } from 'react'
 
-export default function Users({ users, stats, activity, navigation, flash }) {
+export default function Users({ users, stats, activity, navigation }) {
+  const { flash } = usePage()
+  const [notice, setNotice] = useState(flash?.notice)
+
+  // InfiniteScroll can start a partial reload immediately when the list fits
+  // in the viewport. Keep the last non-empty flash value across those
+  // background requests so the notice remains readable.
+  useEffect(() => {
+    if (flash?.notice) {
+      setNotice(flash.notice)
+    }
+  }, [flash?.notice])
+
   return (
     <>
       <Head title="Users" />
@@ -15,22 +29,19 @@ export default function Users({ users, stats, activity, navigation, flash }) {
         <Link href="/users/create">Create user</Link>
       </nav>
       <h1>Users</h1>
-      {flash?.notice && <p className="flash">{flash.notice}</p>}
+      {notice && <p className="flash">{notice}</p>}
       <div className="actions">
         <button onClick={() => router.reload({ only: ['stats'] })}>
-          Partial stats reload
+          Reload only stats
         </button>
-        <button
-          onClick={() =>
-            router.visit('/users?refresh_navigation=1', {
-              only: ['navigation'],
-            })
-          }
-        >
-          Force navigation refresh
+        <button onClick={() => router.reload({ reset: ['navigation'] })}>
+          Refresh once navigation
         </button>
       </div>
-      <p>Once navigation: {navigation.join(', ')}</p>
+      <p>
+        Once navigation resolution #{navigation.resolution}:{' '}
+        {navigation.items.join(', ')}
+      </p>
       <Deferred
         data={['stats', 'activity']}
         fallback={<p>Loading deferred data...</p>}
@@ -44,9 +55,10 @@ export default function Users({ users, stats, activity, navigation, flash }) {
         )}
       >
         <p>Total users: {stats?.total}</p>
+        <p>Stats resolution: #{stats?.resolution}</p>
         <p>Deferred merged activity: {activity?.join(', ')}</p>
       </Deferred>
-      <InfiniteScroll data="users" buffer={100}>
+      <InfiniteScroll data="users" buffer={100} preserveUrl>
         <ul>
           {users.map((user) => (
             <li key={user.id}>{user.name}</li>
