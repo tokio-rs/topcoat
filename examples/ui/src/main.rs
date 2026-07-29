@@ -2,6 +2,7 @@ mod components;
 
 use components::accordion::{accordion, accordion_content, accordion_item, accordion_trigger};
 use components::alert::{AlertVariant, alert, alert_description, alert_title};
+use components::alert_dialog::alert_dialog;
 use components::avatar::{AvatarSize, avatar, avatar_fallback, avatar_image};
 use components::badge::{BadgeVariant, badge, badge_variants};
 use components::breadcrumb::{
@@ -21,6 +22,7 @@ use components::dropdown_menu::{
     dropdown_menu_separator, dropdown_menu_sub, dropdown_menu_sub_content,
     dropdown_menu_sub_trigger, dropdown_menu_trigger,
 };
+use components::hover_card::{hover_card, hover_card_content};
 use components::input::input;
 use components::kbd::{kbd, kbd_group};
 use components::label::label;
@@ -32,14 +34,17 @@ use components::progress::progress;
 use components::radio_group::{radio_group, radio_group_item};
 use components::select::select;
 use components::separator::{SeparatorOrientation, separator};
+use components::sheet::{SheetSide, sheet, sheet_content};
 use components::skeleton::skeleton;
 use components::spinner::spinner;
 use components::switch::switch;
 use components::table::{
     table, table_body, table_caption, table_cell, table_footer, table_head, table_header, table_row,
 };
+use components::tabs::{tabs, tabs_content, tabs_list, tabs_trigger};
 use components::textarea::textarea;
 use components::toggle::{ToggleKind, ToggleSize, toggle, toggle_group};
+use components::tooltip::{tooltip, tooltip_content};
 use topcoat::{
     Result,
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset},
@@ -71,15 +76,19 @@ async fn main() {
 #[query_params(error = redirect("?"))]
 struct HomeQuery {
     page: Option<usize>,
+    tab: Option<String>,
     dialog: Option<String>,
 }
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
-    // Both the dialog and the table page are server state like any other: the
+    // Every state the page can be in is in its URL: which page of the table
+    // is showing, which tab is open, and which of the overlays is up. The
     // links in them navigate, and this reads back what they set.
     let query = query_params::<HomeQuery>(cx)?;
     let page = query.page.unwrap_or(1).clamp(1, PAGES);
+    let tab = query.tab.as_deref().unwrap_or(TABS[0].0);
+    let overlay = query.dialog.as_deref();
 
     view! {
         <!DOCTYPE html>
@@ -125,10 +134,8 @@ async fn home(cx: &Cx) -> Result {
                         </div>
                     </header>
 
-                    // A masonry of small, self-contained demos. Each cell is
-                    // a `demo` (built from installed components) or a
-                    // `coming_soon` placeholder for one not yet in the
-                    // registry.
+                    // A masonry of small, self-contained demos, each built
+                    // from the installed components.
                     <div class="mt-14 columns-1 gap-4 sm:columns-2 xl:columns-3">
                         demo(team_card())
                         demo(buttons_card())
@@ -137,7 +144,7 @@ async fn home(cx: &Cx) -> Result {
                         demo(upgrade_card())
                         demo(plan_card())
                         demo(deploy_card())
-                        coming_soon(name: "Tabs")
+                        demo(overview_card(tab: tab))
                         demo(deployments_card(page: page))
                         demo(delete_card())
                         demo(toolbar_card())
@@ -152,13 +159,16 @@ async fn home(cx: &Cx) -> Result {
                         demo(faq_card())
                         demo(notifications_card())
                         demo(rename_card())
+                        demo(hints_card())
                         demo(links_card())
                     </div>
                 </main>
 
-                // The dialog covers the page, so it stands outside the
-                // masonry rather than in the cell that opens it.
-                rename_dialog(open: query.dialog.is_some())
+                // The overlays cover the page, so they stand outside the
+                // masonry rather than in the cells that open them.
+                rename_dialog(open: overlay == Some("rename"))
+                delete_dialog(open: overlay == Some("delete"))
+                filters_sheet(open: overlay == Some("filters"))
             </body>
         </html>
     }
@@ -168,20 +178,6 @@ async fn home(cx: &Cx) -> Result {
 #[component]
 async fn demo(child: View) -> Result {
     view! { <div class="mb-4 break-inside-avoid">(child)</div> }
-}
-
-/// A placeholder cell for a component that is not in the registry yet.
-#[component]
-async fn coming_soon(name: &'static str) -> Result {
-    view! {
-        <div
-            class="mb-4 flex break-inside-avoid flex-col items-center justify-center \
-                gap-1 rounded-xl border border-dashed border-border px-6 py-10"
-        >
-            <p class="text-sm font-medium">(name)</p>
-            <p class="text-xs text-muted-foreground">"Coming soon"</p>
-        </div>
-    }
 }
 
 /// A team roster with per-member role controls.
@@ -473,7 +469,61 @@ async fn delete_card() -> Result {
             card_footer(
                 attrs: attributes! { class="justify-end" },
                 button(variant: ButtonVariant::Ghost, "Cancel")
-                button(variant: ButtonVariant::Destructive, "Delete workspace")
+                // The commit goes through an alert dialog, so it takes a
+                // deliberate answer rather than one stray click.
+                <a
+                    href="?dialog=delete"
+                    class=(button_variants(
+                        ButtonVariant::Destructive,
+                        ButtonSize::Md,
+                    ))
+                >
+                    "Delete workspace"
+                </a>
+            )
+        )
+    }
+}
+
+/// The alert dialog behind the delete action: it asks the question and offers
+/// nothing but the two answers to it.
+#[component]
+async fn delete_dialog(open: bool) -> Result {
+    // Bound out here rather than inline: a hyphenated attribute name inside
+    // an `attributes!` nested in a `view!` currently trips `topcoat fmt`.
+    let labels = attributes! {
+        aria-labelledby="delete-title"
+        aria-describedby="delete-description"
+    };
+
+    view! {
+        alert_dialog(
+            open: open,
+            attrs: labels,
+            dialog_content(
+                dialog_header(
+                    dialog_title(
+                        attrs: attributes! { id="delete-title" },
+                        "Delete this workspace?"
+                    )
+                    dialog_description(
+                        attrs: attributes! { id="delete-description" },
+                        "Its projects, deploys, and audit log go with it. This \
+                         cannot be undone."
+                    )
+                )
+                dialog_footer(
+                    <a
+                        href="/"
+                        class=(button_variants(
+                            ButtonVariant::Ghost,
+                            ButtonSize::Md,
+                        ))
+                    >
+                        "Keep the workspace"
+                    </a>
+                    button(variant: ButtonVariant::Destructive, "Delete")
+                )
             )
         )
     }
@@ -658,7 +708,7 @@ async fn rename_card() -> Result {
                 <div class="flex items-center justify-between gap-4">
                     <p class="truncate font-mono text-sm">"topcoat-ui"</p>
                     <a
-                        href="?dialog"
+                        href="?dialog=rename"
                         class=(button_variants(
                             ButtonVariant::Outline,
                             ButtonSize::Sm,
@@ -718,6 +768,168 @@ async fn rename_dialog(open: bool) -> Result {
                         "Cancel"
                     </a>
                     button("Save")
+                )
+            )
+        )
+    }
+}
+
+/// The panels the overview card tabs between, and the labels of their
+/// triggers.
+const TABS: [(&str, &str); 3] = [
+    ("overview", "Overview"),
+    ("activity", "Activity"),
+    ("settings", "Settings"),
+];
+
+/// A card that tabs between panels.
+///
+/// Which panel shows is in the URL, so each trigger is a link and only the
+/// panel being read is rendered.
+#[component]
+async fn overview_card(tab: &str) -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Project")
+                card_description("Everything about topcoat-ui in one place.")
+            )
+            card_content(
+                tabs(
+                    tabs_list(
+                        for (value, text) in TABS {
+                            tabs_trigger(
+                                active: value == tab,
+                                attrs: attributes! { href=(format!("?tab={value}")) },
+                                (text)
+                            )
+                        }
+                    )
+                    tabs_content(
+                        <p class="text-sm text-muted-foreground">
+                            (match tab {
+                                "activity" => "Grace deployed to production 2 hours ago.",
+                                "settings" => {
+                                    "The project is on the Pro plan, in eu-central-1."
+                                }
+                                _ => "Eight deploys this week, all of them green.",
+                            })
+                        </p>
+                    )
+                )
+            )
+        )
+    }
+}
+
+/// Two things that show on hover: a tooltip carrying a few words, and a hover
+/// card carrying a view.
+#[component]
+async fn hints_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Hover to reveal")
+                card_description("A hint for the button, a profile for the mention.")
+            )
+            card_content(
+                <div class="flex items-center gap-4">
+                    tooltip(
+                        button(
+                            size: ButtonSize::Icon,
+                            variant: ButtonVariant::Outline,
+                            icon(
+                                data: iconify_icon!("feather:copy"),
+                                label: "Copy the deploy URL"
+                            )
+                        )
+                        tooltip_content("Copy the deploy URL")
+                    )
+                    hover_card(
+                        <a href="#ada" class="text-sm font-medium underline">"@ada"</a>
+                        hover_card_content(
+                            <div class="flex items-center gap-3">
+                                avatar(
+                                    size: AvatarSize::Sm,
+                                    avatar_image(attrs: attributes! { src=(PORTRAIT) })
+                                    avatar_fallback("AL")
+                                )
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-medium">"Ada Lovelace"</p>
+                                    <p class="truncate text-xs text-muted-foreground">
+                                        "Owner"
+                                    </p>
+                                </div>
+                            </div>
+                            <p class="text-xs text-muted-foreground">
+                                "Joined in 2024. Deploys on Fridays anyway."
+                            </p>
+                        )
+                    )
+                </div>
+            )
+        )
+    }
+}
+
+/// The sheet behind the deployments table's "Filters" link: a panel along the
+/// right edge, holding what a dialog would be too small for.
+#[component]
+async fn filters_sheet(open: bool) -> Result {
+    view! {
+        sheet(
+            open: open,
+            sheet_content(
+                side: SheetSide::Right,
+                dialog_header(
+                    dialog_title("Filters")
+                    dialog_description("Narrow the deployments in the table.")
+                )
+                <div class="flex flex-col gap-4">
+                    <div class="flex flex-col gap-2">
+                        label(attrs: attributes! { for="filter-env" }, "Environment")
+                        select(
+                            attrs: attributes! { id="filter-env" },
+                            <option>"All environments"</option>
+                            <option>"production"</option>
+                            <option>"staging"</option>
+                        )
+                    </div>
+                    radio_group(
+                        for (value, text) in [
+                            ("any", "Any status"),
+                            ("live", "Live"),
+                            ("failed", "Failed"),
+                        ] {
+                            <div class="flex items-center gap-2">
+                                radio_group_item(
+                                    attrs: attributes! {
+                                        id=(format!("filter-{value}"))
+                                        name="status"
+                                        value=(value)
+                                        checked=(value == "any")
+                                    }
+                                )
+                                label(
+                                    attrs: attributes! { for=(format!("filter-{value}")) },
+                                    (text)
+                                )
+                            </div>
+                        }
+                    )
+                </div>
+                dialog_footer(
+                    attrs: attributes! { class="mt-auto" },
+                    <a
+                        href="/"
+                        class=(button_variants(
+                            ButtonVariant::Ghost,
+                            ButtonSize::Md,
+                        ))
+                    >
+                        "Cancel"
+                    </a>
+                    button("Apply filters")
                 )
             )
         )
@@ -934,6 +1146,23 @@ async fn deployments_card(page: usize) -> Result {
             card_header(
                 card_title("Deployments")
                 card_description("The last builds of this project.")
+            )
+            card_content(
+                <div class="flex items-center justify-between gap-4">
+                    <p class="text-sm text-muted-foreground">"All environments"</p>
+                    // What the sheet holds would not fit a dialog, so it
+                    // comes in from the edge instead.
+                    <a
+                        href="?dialog=filters"
+                        class=(button_variants(
+                            ButtonVariant::Outline,
+                            ButtonSize::Sm,
+                        ))
+                    >
+                        icon(data: iconify_icon!("feather:filter"))
+                        "Filters"
+                    </a>
+                </div>
             )
             // The card pads its sections rather than itself, so the table can
             // span its full width; the table's own padding lines the cells up

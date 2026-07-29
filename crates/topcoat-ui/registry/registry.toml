@@ -15,6 +15,10 @@ source = "src/components/accordion.rs"
 [components.alert]
 source = "src/components/alert.rs"
 
+[components.alert_dialog]
+source = "src/components/alert_dialog.rs"
+dependencies = ["dialog"]
+
 [components.avatar]
 source = "src/components/avatar.rs"
 
@@ -38,6 +42,9 @@ source = "src/components/dialog.rs"
 
 [components.dropdown_menu]
 source = "src/components/dropdown_menu.rs"
+
+[components.hover_card]
+source = "src/components/hover_card.rs"
 
 [components.input]
 source = "src/components/input.rs"
@@ -64,6 +71,10 @@ source = "src/components/select.rs"
 [components.separator]
 source = "src/components/separator.rs"
 
+[components.sheet]
+source = "src/components/sheet.rs"
+dependencies = ["dialog"]
+
 [components.skeleton]
 source = "src/components/skeleton.rs"
 
@@ -76,8 +87,14 @@ source = "src/components/switch.rs"
 [components.table]
 source = "src/components/table.rs"
 
+[components.tabs]
+source = "src/components/tabs.rs"
+
 [components.textarea]
 source = "src/components/textarea.rs"
 
 [components.toggle]
 source = "src/components/toggle.rs"
+
+[components.tooltip]
+source = "src/components/tooltip.rs"
