@@ -7,7 +7,7 @@ use topcoat::cookie::{Key, RouterBuilderCookieExt};
 use topcoat::inertia::{
     CookieFlashStore, Inertia, InertiaConfig, Page, RouterBuilderInertiaExt,
     clear_history_on_redirect, flash, flash_errors, header, inertia_location, inertia_root,
-    preserve_fragment_on_redirect,
+    preserve_fragment_on_redirect, share,
 };
 use topcoat::router::error::see_other;
 use topcoat::router::{Body, IntoResponse, Response, RouteFn, RouteFuture, Router, to_bytes};
@@ -70,7 +70,54 @@ fn external_redirect_handler(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         response
             .headers_mut()
             .insert(CONTENT_LENGTH, HeaderValue::from_static("10"));
+        response
+            .headers_mut()
+            .append(SET_COOKIE, HeaderValue::from_static("session=kept; Path=/"));
         Ok(response)
+    })
+}
+
+fn temporary_external_redirect_handler(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+    Box::pin(async move {
+        let mut response = Response::new(Body::empty());
+        *response.status_mut() = StatusCode::TEMPORARY_REDIRECT;
+        response.headers_mut().insert(
+            LOCATION,
+            HeaderValue::from_static("https://other.test/temporary"),
+        );
+        Ok(response)
+    })
+}
+
+fn found_handler(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+    Box::pin(async move {
+        let mut response = Response::new(Body::empty());
+        *response.status_mut() = StatusCode::FOUND;
+        response
+            .headers_mut()
+            .insert(LOCATION, HeaderValue::from_static("/target"));
+        Ok(response)
+    })
+}
+
+fn precedence_handler(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+    Box::pin(async move {
+        share(cx, "source", "request")?;
+        Inertia::new("Precedence")
+            .prop("source", "page")
+            .render(cx)
+            .await?
+            .into_response(cx)
+    })
+}
+
+fn reserved_errors_handler(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+    Box::pin(async move {
+        Inertia::new("Invalid")
+            .prop("errors", json!({"field": "invalid"}))
+            .render(cx)
+            .await?
+            .into_response(cx)
     })
 }
 
@@ -106,6 +153,7 @@ fn protocol_router(key: Key) -> Router {
             external_redirect_handler,
         ))
         .route(RouteFn::new(Method::POST, "/users", mutation_handler))
+        .route(RouteFn::new(Method::GET, "/precedence", precedence_handler))
         .app_context(key)
         .inertia(config)
         .cookies()
@@ -354,7 +402,171 @@ async fn stale_version_and_redirect_extensions_use_v3_headers() {
     );
     assert!(!external.headers().contains_key(CONTENT_TYPE));
     assert!(!external.headers().contains_key(CONTENT_LENGTH));
+    assert_eq!(
+        external.headers().get(SET_COOKIE).unwrap(),
+        "session=kept; Path=/"
+    );
     assert!(body(external).await.is_empty());
+}
+
+#[tokio::test]
+async fn mutation_redirects_are_normalized_to_see_other() {
+    let router = Router::builder()
+        .route(RouteFn::new(Method::PUT, "/put", found_handler))
+        .route(RouteFn::new(Method::PATCH, "/patch", found_handler))
+        .route(RouteFn::new(Method::DELETE, "/delete", found_handler))
+        .app_context(Key::generate())
+        .inertia(InertiaConfig::new(root).flash_store(CookieFlashStore::new().secure(false)))
+        .cookies()
+        .build();
+
+    for (method, path) in [
+        (Method::PUT, "/put"),
+        (Method::PATCH, "/patch"),
+        (Method::DELETE, "/delete"),
+    ] {
+        let response = router
+            .handle(
+                inertia_request(path)
+                    .method(method)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await;
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/target");
+    }
+}
+
+#[tokio::test]
+async fn prefetch_and_temporary_redirects_keep_normal_http_semantics() {
+    let router = Router::builder()
+        .route(RouteFn::new(Method::GET, "/fragment", redirect_handler))
+        .route(RouteFn::new(
+            Method::GET,
+            "/temporary",
+            temporary_external_redirect_handler,
+        ))
+        .base_url("https://example.test")
+        .app_context(Key::generate())
+        .inertia(
+            InertiaConfig::new(root)
+                .convert_external_redirects(true)
+                .flash_store(CookieFlashStore::new().secure(false)),
+        )
+        .cookies()
+        .build();
+
+    let prefetch = router
+        .handle(
+            inertia_request("/fragment")
+                .header(&header::PURPOSE, "prefetch")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+    assert_eq!(prefetch.status(), StatusCode::SEE_OTHER);
+    assert_eq!(prefetch.headers().get(LOCATION).unwrap(), "/target#details");
+    assert!(!prefetch.headers().contains_key(&header::X_INERTIA_REDIRECT));
+
+    let temporary = router
+        .handle(inertia_request("/temporary").body(Body::empty()).unwrap())
+        .await;
+    assert_eq!(temporary.status(), StatusCode::TEMPORARY_REDIRECT);
+    assert_eq!(
+        temporary.headers().get(LOCATION).unwrap(),
+        "https://other.test/temporary"
+    );
+    assert!(
+        !temporary
+            .headers()
+            .contains_key(&header::X_INERTIA_LOCATION)
+    );
+}
+
+#[tokio::test]
+async fn explicit_location_wins_over_a_stale_asset_version() {
+    let router = Router::builder()
+        .route(RouteFn::new(Method::GET, "/location", location_handler))
+        .app_context(Key::generate())
+        .inertia(
+            InertiaConfig::new(root)
+                .version("server-v2")
+                .flash_store(CookieFlashStore::new().secure(false)),
+        )
+        .cookies()
+        .build();
+    let response = router
+        .handle(
+            inertia_request("/location")
+                .header(&header::X_INERTIA_VERSION, "client-v1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        response.headers().get(&header::X_INERTIA_LOCATION).unwrap(),
+        "/login"
+    );
+    assert!(!response.headers().contains_key(&header::X_INERTIA_VERSION));
+}
+
+#[tokio::test]
+async fn page_props_override_all_shared_prop_sources() {
+    let config = InertiaConfig::new(root)
+        .share_with(|_, props| {
+            props.prop("source", "configured");
+            Ok(())
+        })
+        .flash_store(CookieFlashStore::new().secure(false));
+    let router = Router::builder()
+        .route(RouteFn::new(Method::GET, "/", precedence_handler))
+        .app_context(Key::generate())
+        .inertia(config)
+        .cookies()
+        .build();
+    let response = router
+        .handle(inertia_request("/").body(Body::empty()).unwrap())
+        .await;
+    let page = json_body(response).await;
+
+    assert_eq!(page["props"]["source"], "page");
+    assert_eq!(page["sharedProps"], json!(["errors", "source"]));
+}
+
+#[tokio::test]
+async fn errors_is_reserved_for_the_validation_channel() {
+    let router = Router::builder()
+        .route(RouteFn::new(Method::GET, "/", reserved_errors_handler))
+        .app_context(Key::generate())
+        .inertia(InertiaConfig::new(root).flash_store(CookieFlashStore::new().secure(false)))
+        .cookies()
+        .build();
+    let response = router
+        .handle(inertia_request("/").body(Body::empty()).unwrap())
+        .await;
+
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+    let router = Router::builder()
+        .route(RouteFn::new(Method::GET, "/", page_handler))
+        .app_context(Key::generate())
+        .inertia(
+            InertiaConfig::new(root)
+                .share_with(|_, props| {
+                    props.prop("errors", json!({"field": "invalid"}));
+                    Ok(())
+                })
+                .flash_store(CookieFlashStore::new().secure(false)),
+        )
+        .cookies()
+        .build();
+    let response = router
+        .handle(inertia_request("/").body(Body::empty()).unwrap())
+        .await;
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[tokio::test]

@@ -129,3 +129,57 @@ impl InertiaConfig {
         self
     }
 }
+
+#[cfg(all(test, feature = "asset"))]
+mod tests {
+    use std::fmt::Write as _;
+
+    use topcoat_asset::{AssetCatalog, Manifest};
+    use topcoat_view::View;
+
+    use super::*;
+
+    fn catalog(entries: &[(&str, u64)]) -> AssetCatalog {
+        let mut source = "version = 1\n".to_owned();
+        for (file, id) in entries {
+            write!(
+                &mut source,
+                "\n[[assets]]\nid = {id}\nfile = \"{file}\"\nhash = \"hash\"\ncontent_type = \"text/plain\"\n"
+            )
+            .unwrap();
+        }
+        Manifest::parse(&source).unwrap().into()
+    }
+
+    fn version(catalog: &AssetCatalog) -> String {
+        InertiaConfig::new(|_, _| View::empty())
+            .version_from_assets(catalog)
+            .version
+            .unwrap()
+    }
+
+    #[test]
+    fn asset_version_is_independent_of_catalog_iteration_order() {
+        let forward = catalog(&[("app-a.js", 1), ("app-b.css", 2)]);
+        let reverse = catalog(&[("app-b.css", 2), ("app-a.js", 1)]);
+
+        assert_eq!(version(&forward), version(&reverse));
+    }
+
+    #[test]
+    fn asset_filename_changes_the_version() {
+        let before = catalog(&[("app-a.js", 1)]);
+        let after = catalog(&[("app-b.js", 1)]);
+
+        assert_ne!(version(&before), version(&after));
+    }
+
+    #[test]
+    fn empty_catalog_has_a_stable_version() {
+        let first = AssetCatalog::default();
+        let second = AssetCatalog::default();
+
+        assert_eq!(version(&first), version(&second));
+        assert_eq!(version(&first).len(), 64);
+    }
+}

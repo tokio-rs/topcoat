@@ -201,6 +201,12 @@ impl<'cx> Inertia<'cx> {
             prop,
             shared: false,
         }));
+        if entries.iter().any(|entry| entry.path == "errors") {
+            return Err(ResponseError::new(
+                "`errors` is reserved; use `Inertia::errors(...)` or `flash_errors(...)`",
+            )
+            .into());
+        }
 
         let incoming = try_request_context::<FlashState>(cx)
             .map(FlashState::incoming)
@@ -360,3 +366,27 @@ impl fmt::Display for ResponseError {
 }
 
 impl std::error::Error for ResponseError {}
+
+#[cfg(test)]
+mod tests {
+    use http::header::{ACCEPT_ENCODING, VARY};
+
+    use super::*;
+
+    #[test]
+    fn vary_preserves_existing_values_and_deduplicates_inertia() {
+        let mut headers = HeaderMap::new();
+        headers.append(VARY, HeaderValue::from_static("Accept-Encoding"));
+        headers.append(VARY, HeaderValue::from_static("x-inertia, Origin"));
+
+        add_vary(&mut headers);
+
+        let values = headers
+            .get_all(VARY)
+            .iter()
+            .map(|value| value.to_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(values, ["Accept-Encoding", "x-inertia, Origin"]);
+        assert!(!headers.contains_key(ACCEPT_ENCODING));
+    }
+}

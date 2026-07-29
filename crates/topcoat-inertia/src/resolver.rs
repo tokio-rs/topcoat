@@ -339,11 +339,25 @@ mod tests {
     use std::time::Duration;
 
     use http::{HeaderMap, HeaderValue};
+    use serde::{Serialize, Serializer};
     use serde_json::json;
     use topcoat_core::error::Result;
 
     use super::*;
     use crate::{ScrollMetadata, defer, header, lazy, merge, optional, scroll, value};
+
+    struct SerializationFails;
+
+    impl Serialize for SerializationFails {
+        fn serialize<S>(&self, _serializer: S) -> std::result::Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(serde::ser::Error::custom(
+                "deliberate serialization failure",
+            ))
+        }
+    }
 
     fn request(headers: &[(&http::HeaderName, &str)]) -> InertiaRequest {
         let mut map = HeaderMap::new();
@@ -659,5 +673,34 @@ mod tests {
         .await?;
         assert_eq!(page.prepend_props, ["feed.data"]);
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn plain_and_lazy_serialization_failures_are_returned() {
+        let plain = page(
+            vec![entry("broken", value(SerializationFails))],
+            &InertiaRequest::default(),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            plain
+                .to_string()
+                .contains("deliberate serialization failure")
+        );
+
+        let lazy = page(
+            vec![entry(
+                "broken",
+                lazy(async { Ok::<_, topcoat_core::error::Error>(SerializationFails) }),
+            )],
+            &InertiaRequest::default(),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            lazy.to_string()
+                .contains("deliberate serialization failure")
+        );
     }
 }
