@@ -23,4 +23,14 @@ pub enum BundleError {
         #[source]
         source: Box<ureq::Error>,
     },
+    #[error(
+        "conflicting content types {first:?} and {second:?} for bundled file {file}: \
+         serving one file as two content types needs a different `rename` on one of \
+         the declarations"
+    )]
+    ConflictingContentTypes {
+        file: String,
+        first: String,
+        second: String,
+    },
 }

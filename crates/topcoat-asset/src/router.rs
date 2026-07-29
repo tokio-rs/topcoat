@@ -157,7 +157,7 @@ mod tests {
     }
 
     #[test]
-    fn one_file_declared_with_two_content_types_serves_one_route() {
+    fn a_catalog_that_disagrees_on_content_type_still_serves_one_route() {
         let dir = temp_dir("conflicting-content-types");
         fs::write(dir.join(FILE), "<svg></svg>").unwrap();
         let bundle = bundle(dir, &[(MAIN, "image/svg+xml"), (OTHER, "text/plain")]);
