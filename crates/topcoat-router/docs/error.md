@@ -71,6 +71,19 @@ async fn root_layout(slot: Result) -> Result {
 
 The [`StatusCode`](crate::StatusCode) in the view keeps the response a 404; without it the replacement page would be served as a 200.
 
+A layout sees only the errors raised by the handlers it wraps. A URL that matches no route never enters the layout chain, so the router answers it with its own `text/plain` 404. Register a catch-all page to route unmatched URLs through the layout as well:
+
+```rust
+use topcoat::{Result, router::{error::not_found, page}};
+
+#[page("/{*path}")]
+async fn not_found_page() -> Result {
+    Err(not_found().into())
+}
+```
+
+A more specific route wins over the catch-all. A catch-all needs at least one remaining URL segment, so `/` keeps its own page.
+
 # Unexpected errors
 
 Any other error responds 500 without leaking its message to the client. To record a source error while keeping that behavior, wrap it in [`internal_server_error(error)`](internal_server_error) yourself.
