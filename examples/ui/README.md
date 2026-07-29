@@ -10,6 +10,7 @@ The showcase includes:
 - buttons and button variants;
 - cards;
 - checkboxes;
+- dialogs;
 - dropdown menus and submenus;
 - inputs and labels;
 - progress indicators;
@@ -90,7 +91,8 @@ Check that you can see examples including:
 - a destructive delete action;
 - a dark deployment card;
 - loading spinners;
-- `Tabs`, `Dialog`, and `Avatar` placeholders marked as coming soon.
+- a project settings card whose "Rename" link opens a dialog over the page;
+- `Tabs` and `Avatar` placeholders marked as coming soon.
 
 The page should use the Geist font and the neutral Topcoat UI theme.
 

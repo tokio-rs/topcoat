@@ -6,6 +6,9 @@ use components::card::{
     card, card_content, card_description, card_footer, card_header, card_title,
 };
 use components::checkbox::checkbox;
+use components::dialog::{
+    dialog, dialog_content, dialog_description, dialog_footer, dialog_header, dialog_title,
+};
 use components::dropdown_menu::{
     dropdown_menu, dropdown_menu_content, dropdown_menu_item, dropdown_menu_label,
     dropdown_menu_separator, dropdown_menu_sub, dropdown_menu_sub_content,
@@ -21,11 +24,12 @@ use components::textarea::textarea;
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
+    context::Cx,
     font::fontsource::fontsource_font,
     icon::{icon, iconify::iconify_icon},
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{Router, RouterBuilderDiscoverExt, page, uri},
     tailwind,
-    view::{View, attributes, component, view},
+    view::{View, attributes, class, component, view},
 };
 
 #[tokio::main]
@@ -39,7 +43,11 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
+async fn home(cx: &Cx) -> Result {
+    // The dialog's open state is server state like any other: this page opens
+    // it while the URL carries `?dialog`, which the card's "Rename" link sets.
+    let renaming = uri(cx).query() == Some("dialog");
+
     view! {
         <!DOCTYPE html>
         <html>
@@ -103,10 +111,14 @@ async fn home() -> Result {
                         demo(project_card())
                         demo(feedback_card())
                         demo(notifications_card())
-                        coming_soon(name: "Dialog")
+                        demo(rename_card())
                         coming_soon(name: "Avatar")
                     </div>
                 </main>
+
+                // The dialog covers the page, so it stands outside the
+                // masonry rather than in the cell that opens it.
+                rename_dialog(open: renaming)
             </body>
         </html>
     }
@@ -574,6 +586,87 @@ async fn feedback_card() -> Result {
             card_footer(
                 attrs: attributes! { class="justify-end" },
                 button("Send feedback")
+            )
+        )
+    }
+}
+
+/// A settings card whose action opens [`rename_dialog`]. Nothing about the
+/// trigger is special: opening the dialog is navigating to the URL the page
+/// renders it open for.
+#[component]
+async fn rename_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Project settings")
+                card_description("Rename the project without redeploying it.")
+            )
+            card_content(
+                <div class="flex items-center justify-between gap-4">
+                    <p class="truncate font-mono text-sm">"topcoat-ui"</p>
+                    <a
+                        href="?dialog"
+                        class=(button_variants(
+                            ButtonVariant::Outline,
+                            ButtonSize::Sm,
+                        ))
+                    >
+                        "Rename"
+                    </a>
+                </div>
+            )
+        )
+    }
+}
+
+/// The dialog over the page, shown while `open` is true.
+///
+/// Closing it is navigating back to the page that renders it closed, which
+/// both the corner button and "Cancel" do.
+#[component]
+async fn rename_dialog(open: bool) -> Result {
+    view! {
+        dialog(
+            open: open,
+            dialog_content(
+                // The panel is positioned, so a close control can sit in one
+                // of its corners.
+                <a
+                    href="/"
+                    class=(class!(
+                        button_variants(
+                            ButtonVariant::Ghost,
+                            ButtonSize::Icon,
+                        ),
+                        "absolute top-3 right-3",
+                    ))
+                >
+                    icon(data: iconify_icon!("feather:x"), label: "Close")
+                </a>
+                dialog_header(
+                    dialog_title("Rename project")
+                    dialog_description(
+                        "The project keeps its deploy URLs; only the name \
+                         shown to your team changes."
+                    )
+                )
+                <form class="flex flex-col gap-2">
+                    label(attrs: attributes! { for="rename" }, "Name")
+                    input(attrs: attributes! { id="rename" value="topcoat-ui" })
+                </form>
+                dialog_footer(
+                    <a
+                        href="/"
+                        class=(button_variants(
+                            ButtonVariant::Ghost,
+                            ButtonSize::Md,
+                        ))
+                    >
+                        "Cancel"
+                    </a>
+                    button("Save")
+                )
             )
         )
     }
