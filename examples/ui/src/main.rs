@@ -1,5 +1,6 @@
 mod components;
 
+use components::accordion::{accordion, accordion_content, accordion_item, accordion_trigger};
 use components::alert::{AlertVariant, alert, alert_description, alert_title};
 use components::avatar::{AvatarSize, avatar, avatar_fallback, avatar_image};
 use components::badge::{BadgeVariant, badge, badge_variants};
@@ -28,6 +29,7 @@ use components::pagination::{
     pagination_next, pagination_previous,
 };
 use components::progress::progress;
+use components::radio_group::{radio_group, radio_group_item};
 use components::select::select;
 use components::separator::{SeparatorOrientation, separator};
 use components::skeleton::skeleton;
@@ -37,6 +39,7 @@ use components::table::{
     table, table_body, table_caption, table_cell, table_footer, table_head, table_header, table_row,
 };
 use components::textarea::textarea;
+use components::toggle::{ToggleKind, ToggleSize, toggle, toggle_group};
 use topcoat::{
     Result,
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset},
@@ -132,10 +135,12 @@ async fn home(cx: &Cx) -> Result {
                         demo(sign_in_card())
                         demo(alerts_card())
                         demo(upgrade_card())
+                        demo(plan_card())
                         demo(deploy_card())
                         coming_soon(name: "Tabs")
                         demo(deployments_card(page: page))
                         demo(delete_card())
+                        demo(toolbar_card())
                         demo(status_card())
                         demo(branches_card())
                         demo(docs_card())
@@ -144,6 +149,7 @@ async fn home(cx: &Cx) -> Result {
                         demo(project_card())
                         demo(loading_card())
                         demo(feedback_card())
+                        demo(faq_card())
                         demo(notifications_card())
                         demo(rename_card())
                         demo(links_card())
@@ -712,6 +718,136 @@ async fn rename_dialog(open: bool) -> Result {
                         "Cancel"
                     </a>
                     button("Save")
+                )
+            )
+        )
+    }
+}
+
+/// A plan picker, built on a radio group.
+#[component]
+async fn plan_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Billing plan")
+                card_description("Pick the plan this workspace runs on.")
+            )
+            card_content(
+                radio_group(
+                    // The name the options share is what has the browser
+                    // let go of one when another is picked.
+                    for (value, name, price, picked) in [
+                        ("starter", "Starter", "Free", false),
+                        ("pro", "Pro", "$24 / month", true),
+                        ("scale", "Scale", "$96 / month", false),
+                    ] {
+                        <div class="flex items-center gap-2">
+                            radio_group_item(
+                                attrs: attributes! { id=(value) name="plan" value=(value) checked=(picked) }
+                            )
+                            label(
+                                attrs: attributes! { for=(value) class="flex-1" },
+                                (name)
+                            )
+                            <p class="text-sm text-muted-foreground">(price)</p>
+                        </div>
+                    }
+                )
+            )
+        )
+    }
+}
+
+/// A toolbar of toggles: a segmented control where picking one lets go of the
+/// rest, and formatting toggles that press on their own.
+#[component]
+async fn toolbar_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Report")
+                card_description("The range it covers, and how it reads.")
+            )
+            card_content(
+                <div class="flex flex-col gap-4">
+                    toggle_group(
+                        for (value, text, picked) in [
+                            ("day", "Day", false),
+                            ("week", "Week", true),
+                            ("month", "Month", false),
+                        ] {
+                            toggle(
+                                kind: ToggleKind::Exclusive,
+                                size: ToggleSize::Sm,
+                                attrs: attributes! { name="range" value=(value) checked=(picked) },
+                                (text)
+                            )
+                        }
+                    )
+                    <div class="flex items-center gap-1">
+                        for (name, data, text, pressed) in [
+                            ("bold", iconify_icon!("feather:bold"), "Bold", true),
+                            ("italic", iconify_icon!("feather:italic"), "Italic", false),
+                            (
+                                "underline",
+                                iconify_icon!("feather:underline"),
+                                "Underline",
+                                false,
+                            ),
+                        ] {
+                            toggle(
+                                size: ToggleSize::Sm,
+                                attrs: attributes! { name=(name) checked=(pressed) },
+                                icon(data: data, label: text)
+                            )
+                        }
+                    </div>
+                </div>
+            )
+        )
+    }
+}
+
+/// A FAQ whose answers fold away, one open at a time.
+#[component]
+async fn faq_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Questions")
+                card_description("The rest is in the docs.")
+            )
+            card_content(
+                accordion(
+                    // The name the sections share is what closes the open one
+                    // when another is opened.
+                    for (question, answer, open) in [
+                        (
+                            "Where do the components live?",
+                            "In your own source tree, under the components \
+                             directory you picked.",
+                            true,
+                        ),
+                        (
+                            "Can I edit them?",
+                            "They are yours: restyle, rewrite, and extend them \
+                             like any other file.",
+                            false,
+                        ),
+                        (
+                            "How do updates work?",
+                            "`topcoat ui list` marks what the registry has \
+                             changed since you added it.",
+                            false,
+                        ),
+                    ] {
+                        accordion_item(
+                            attrs: attributes! { name="faq" open=(open) },
+                            accordion_trigger((question))
+                            accordion_content((answer))
+                        )
+                    }
                 )
             )
         )
