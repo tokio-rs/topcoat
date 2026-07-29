@@ -48,6 +48,8 @@ Expressions operate on a fixed vocabulary of types that exist on both sides, eac
 - Tuples of vocabulary types.
 - [`Signal`]: `get` and `set`, plus a shorter spelling for common writes: `toggle` on a `bool` signal, `increment` and `decrement` on an `f64` signal, and `push_str` on a `String` signal.
 
+An expression is evaluated twice, once per side, so a member has to mean the same thing in both. Rust's behavior is the definition and the JavaScript matches it, including where that costs a departure from the JavaScript norm: `len` counts UTF-8 bytes rather than UTF-16 code units, comparisons order by code point rather than by UTF-16 code unit, and `trim` and its siblings strip the Unicode `White_Space` set rather than the ECMAScript one, so U+FEFF is kept and U+0085 is removed.
+
 # Supported syntax
 
 Expressions use a subset of Rust's syntax:
