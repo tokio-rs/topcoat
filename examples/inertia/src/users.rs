@@ -24,8 +24,16 @@ struct User {
     name: String,
 }
 
+#[derive(Clone, Serialize)]
+struct OptimisticUser {
+    id: u64,
+    name: String,
+    age: u8,
+}
+
 pub struct Users {
     entries: Mutex<Vec<User>>,
+    optimistic_entries: Mutex<Vec<OptimisticUser>>,
     stats_resolutions: AtomicU64,
     navigation_resolutions: AtomicU64,
 }
@@ -61,6 +69,29 @@ impl Users {
         );
     }
 
+    fn optimistic_users(&self) -> Vec<OptimisticUser> {
+        self.optimistic_entries
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    fn create_optimistic_user(&self, name: &str, age: u8) {
+        let mut entries = self
+            .optimistic_entries
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let id = entries.iter().map(|user| user.id).max().unwrap_or(0) + 1;
+        entries.insert(
+            0,
+            OptimisticUser {
+                id,
+                name: name.to_owned(),
+                age,
+            },
+        );
+    }
+
     fn stats(&self) -> Stats {
         Stats {
             total: self.lock().len(),
@@ -70,7 +101,7 @@ impl Users {
 
     fn navigation(&self) -> Navigation {
         Navigation {
-            items: ["Home", "Users", "Create user"],
+            items: ["Home", "Users", "Create user", "Optimistic updates"],
             resolution: self.navigation_resolutions.fetch_add(1, Ordering::Relaxed) + 1,
         }
     }
@@ -91,6 +122,18 @@ impl Default for Users {
                     })
                     .collect(),
             ),
+            optimistic_entries: Mutex::new(vec![
+                OptimisticUser {
+                    id: 1,
+                    name: "Ada".to_owned(),
+                    age: 36,
+                },
+                OptimisticUser {
+                    id: 2,
+                    name: "Grace".to_owned(),
+                    age: 42,
+                },
+            ]),
             stats_resolutions: AtomicU64::new(0),
             navigation_resolutions: AtomicU64::new(0),
         }
@@ -111,13 +154,19 @@ struct Stats {
 
 #[derive(Serialize)]
 struct Navigation {
-    items: [&'static str; 3],
+    items: [&'static str; 4],
     resolution: u64,
 }
 
 #[derive(Deserialize)]
 struct NewUser {
     name: String,
+}
+
+#[derive(Deserialize)]
+struct NewOptimisticUser {
+    name: String,
+    age: String,
 }
 
 #[route(GET "/users")]
@@ -165,6 +214,41 @@ async fn store(cx: &Cx, Json(input): Json<NewUser>) -> Result<SeeOther> {
     Ok(see_other("/users"))
 }
 
+#[route(GET "/optimistic")]
+async fn optimistic(cx: &Cx) -> Result<InertiaResponse> {
+    Inertia::new("Optimistic")
+        .prop("optimisticUsers", state(cx).optimistic_users())
+        .render(cx)
+        .await
+}
+
+#[route(POST "/optimistic")]
+async fn optimistic_store(cx: &Cx, Json(input): Json<NewOptimisticUser>) -> Result<SeeOther> {
+    // Keep the temporary row visible long enough to inspect in the local demo.
+    tokio::time::sleep(Duration::from_millis(750)).await;
+
+    let name = input.name.trim();
+    let age = input
+        .age
+        .parse::<u8>()
+        .ok()
+        .filter(|age| (1..=120).contains(age));
+    let mut errors = serde_json::Map::new();
+    if name.len() < 2 {
+        errors.insert("name".to_owned(), json!("Enter at least two characters"));
+    }
+    if age.is_none() {
+        errors.insert("age".to_owned(), json!("Enter an age from 1 to 120"));
+    }
+    if !errors.is_empty() {
+        flash_errors(cx, errors)?;
+        return Ok(see_other("/optimistic"));
+    }
+
+    state(cx).create_optimistic_user(name, age.expect("age was validated"));
+    Ok(see_other("/optimistic"))
+}
+
 fn state(cx: &Cx) -> &Users {
     app_context(cx)
 }
@@ -201,5 +285,17 @@ mod tests {
         assert_eq!(first_page.users.len(), PAGE_SIZE);
         assert_eq!(first_page.page_count, 6);
         assert_eq!(users.stats().total, 41);
+    }
+
+    #[test]
+    fn optimistic_users_are_stored_separately() {
+        let users = Users::default();
+
+        users.create_optimistic_user("Lin", 28);
+
+        let optimistic_users = users.optimistic_users();
+        assert_eq!(optimistic_users[0].name, "Lin");
+        assert_eq!(optimistic_users[0].age, 28);
+        assert_eq!(users.stats().total, 40);
     }
 }

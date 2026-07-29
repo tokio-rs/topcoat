@@ -10,6 +10,7 @@ export default function Home({ greeting }) {
         <Link href="/">Home</Link>
         <Link href="/users">Users</Link>
         <Link href="/users/create">Create user</Link>
+        <Link href="/optimistic">Optimistic updates</Link>
       </nav>
       <h1>{greeting}</h1>
       <p>Shared auth: {auth.name}</p>

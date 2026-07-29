@@ -27,6 +27,7 @@ export default function Users({ users, stats, activity, navigation }) {
       <nav>
         <Link href="/">Home</Link>
         <Link href="/users/create">Create user</Link>
+        <Link href="/optimistic">Optimistic updates</Link>
       </nav>
       <h1>Users</h1>
       {notice && <p className="flash">{notice}</p>}
