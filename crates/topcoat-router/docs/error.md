@@ -4,7 +4,7 @@ Every page, layout, layer, and route handler returns a `Result`. An `Err` become
 
 # Constructors
 
-Every error type in this module has a constructor function named after its response. For example, [`not_found()`](not_found) responds 404 with [`NotFoundError`], [`redirect(uri)`](redirect) responds 307 with [`RedirectError`], and [`bad_request(description)`](bad_request) responds 400 with [`BadRequestError`] and a client-safe description.
+Every error type in this module has a constructor function named after its response. For example, [`not_found()`](not_found) responds 404 with [`NotFoundError`], [`redirect(uri)`](redirect) responds 307 with [`RedirectError`], [`bad_request(description)`](bad_request) responds 400 with [`BadRequestError`] and a client-safe description, and [`service_unavailable(secs)`](service_unavailable) responds 503 with [`ServiceUnavailableError`] and a `Retry-After` header.
 
 A constructor returns a concrete error type that converts into the handler's error, so bubble it up with `?` or return it directly:
 
