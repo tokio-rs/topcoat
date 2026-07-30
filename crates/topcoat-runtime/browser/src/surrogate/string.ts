@@ -1,8 +1,13 @@
 import type { AttributeValueViewParts, NodeViewParts } from "../view";
 import { Bool } from "./bool";
+import { Decimal } from "./decimal";
 import { F64 } from "./f64";
 
 const TEXT_ENCODER = new TextEncoder();
+
+// The plain-decimal grammar `Decimal` accepts, mirroring `is_decimal` on the
+// Rust side: an optional sign, digits, and at most one fractional part.
+const DECIMAL_RE = /^-?\d+(\.\d+)?$/;
 
 // The code points Rust's `str::trim` family treats as whitespace: the Unicode
 // `White_Space` property. `String.prototype.trim` uses the ECMAScript
@@ -95,6 +100,11 @@ export class Str implements AttributeValueViewParts, NodeViewParts {
 
 	contains(other: Str): Bool {
 		return new Bool(this.v.includes(other.v));
+	}
+
+	to_decimal_or_zero(): Decimal {
+		const trimmed = this.v.trim();
+		return new Decimal(DECIMAL_RE.test(trimmed) ? trimmed : "0");
 	}
 
 	isAttributePresent(): boolean {
