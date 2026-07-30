@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: rustup update nightly && rustup default nightly
+      - run: rustup toolchain install nightly --component rustfmt
       - run: cargo +nightly fmt --all -- --check
 
   docs:
