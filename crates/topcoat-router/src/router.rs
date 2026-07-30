@@ -16,9 +16,10 @@ use topcoat_core::{
 };
 
 use crate::{
-    Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, Next, PageFn, PageWithLayouts,
-    PathSegment, RawPathParamSpec, RawPathParams, Route, Terminal,
-    error::{internal_server_response, respond},
+    Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, Next, OriginPolicy, OriginVerdict, PageFn,
+    PageWithLayouts, PathSegment, RawPathParamSpec, RawPathParams, Route, Terminal,
+    UntrustedWebSocketOrigin,
+    error::{forbidden, internal_server_response, respond},
     request::Request,
     response::Response,
 };
@@ -54,6 +55,8 @@ pub struct Router {
     /// The values shared by every request, read back via
     /// [`app_context`](topcoat_core::context::app_context).
     app_context: Arc<ContextMap>,
+    /// The cross-origin request policy applied to every request.
+    origin_policy: OriginPolicy,
     /// The compression applied to responses on their way out.
     #[cfg(feature = "compression")]
     compression: crate::Compression,
@@ -127,8 +130,18 @@ impl Router {
         cx.insert(path_params);
         cx.insert(parts);
 
+        // The cross-origin policy runs before every layer and route: a denied
+        // request is answered without reaching application code, and a flagged
+        // WebSocket handshake carries its verdict for the upgrade to consult.
         let next = Next::new(&self.layers, layers, terminal);
-        let response = next.run(&mut cx, body).await;
+        let response = match self.origin_policy.check(&cx) {
+            OriginVerdict::Allow => next.run(&mut cx, body).await,
+            OriginVerdict::Deny => Err(forbidden().into()),
+            OriginVerdict::UntrustedWebSocket => {
+                cx.insert(UntrustedWebSocketOrigin);
+                next.run(&mut cx, body).await
+            }
+        };
         let response = respond(&cx, response);
 
         // Compression runs outside every layer, so layers see uncompressed
@@ -181,6 +194,7 @@ pub struct RouterBuilder {
     layouts: Vec<LayoutFn>,
     layers: Layers,
     context: ContextMap,
+    origin_policy: OriginPolicy,
     #[cfg(feature = "compression")]
     compression: crate::Compression,
 }
@@ -192,14 +206,13 @@ impl RouterBuilder {
         let mut context = ContextMap::new();
         // Register `()` so APIs generic over an app context type can default to `S = ()`.
         context.insert(());
-        #[cfg(feature = "websocket")]
-        context.insert(crate::content::websocket::WebSocketOrigins::default());
         Self {
             routes: Vec::new(),
             pages: Vec::new(),
             layouts: Vec::new(),
             layers: Layers::default(),
             context,
+            origin_policy: OriginPolicy::default(),
             #[cfg(feature = "compression")]
             compression: crate::Compression::new(),
         }
@@ -359,44 +372,28 @@ impl RouterBuilder {
         self
     }
 
-    /// Sets the browser origins allowed to open WebSockets throughout the
-    /// application.
+    /// Replaces the default [`OriginPolicy`], which rejects state-changing
+    /// cross-origin browser requests and cross-origin WebSocket handshakes.
     ///
-    /// Each value is an origin string containing the scheme, host, and any
-    /// non-default port, such as `"https://app.example.com"`.
-    ///
-    /// If this method is not called, WebSocket routes allow the origin of the
-    /// configured [`BaseUrl`]. Calling this method replaces that default, even
-    /// when `origins` is empty. An individual
-    /// [`WebSocketUpgrade`](crate::content::websocket::WebSocketUpgrade) can add
-    /// an origin or explicitly allow every origin.
+    /// Pass [`OriginPolicy::trust_origins`] to name the cross-origin peers
+    /// the application trusts, such as a federation partner posting back to
+    /// it, or [`OriginPolicy::dangerous_disable`] to turn verification off
+    /// for an application that enforces its own policy.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use topcoat::router::Router;
+    /// use topcoat::router::{OriginPolicy, Router};
     ///
     /// let router = Router::builder()
-    ///     .websocket_origins(["https://app.example.com", "https://admin.example.com"])
+    ///     .origin_policy(OriginPolicy::trust_origins([
+    ///         "https://accounts.example.com",
+    ///     ]))
     ///     .build();
     /// ```
-    #[cfg(feature = "websocket")]
     #[must_use]
-    pub fn websocket_origins<I>(mut self, origins: I) -> Self
-    where
-        I: IntoIterator,
-        I::Item: Into<String>,
-    {
-        if let Some(websocket_origins) = self
-            .context
-            .get_mut::<crate::content::websocket::WebSocketOrigins>()
-        {
-            websocket_origins.replace(origins);
-        } else {
-            let mut websocket_origins = crate::content::websocket::WebSocketOrigins::default();
-            websocket_origins.replace(origins);
-            self.context.insert(websocket_origins);
-        }
+    pub fn origin_policy(mut self, policy: OriginPolicy) -> Self {
+        self.origin_policy = policy;
         self
     }
 
@@ -538,23 +535,10 @@ impl RouterBuilder {
             layouts,
             layers,
             context,
+            origin_policy,
             #[cfg(feature = "compression")]
             compression,
         } = self;
-
-        #[cfg(feature = "websocket")]
-        let mut context = context;
-
-        #[cfg(feature = "websocket")]
-        {
-            let base_url_origin = context
-                .get::<BaseUrl>()
-                .map(crate::content::websocket::WebSocketOrigins::base_url_origin);
-            context
-                .get_mut::<crate::content::websocket::WebSocketOrigins>()
-                .expect("WebSocket origins are registered by RouterBuilder::new")
-                .default_to(base_url_origin);
-        }
 
         // Wire each page to the layouts whose path is a prefix of the page's,
         // ordered from least- to most-specific so the page nests innermost.
@@ -660,6 +644,7 @@ impl RouterBuilder {
             endpoints,
             layers,
             app_context: Arc::new(context),
+            origin_policy,
             #[cfg(feature = "compression")]
             compression,
         }
@@ -1109,6 +1094,49 @@ mod tests {
     #[should_panic(expected = "invalid base URL")]
     fn invalid_base_url_panics_at_registration() {
         let _ = RouterBuilder::new().base_url("not a url");
+    }
+
+    // -- Router::handle: origin policy --
+
+    /// Builds a cross-origin POST to `/x`, as a malicious page would send it.
+    fn cross_origin_post() -> Request {
+        http::Request::builder()
+            .method(Method::POST)
+            .uri("/x")
+            .header("host", "app.example")
+            .header("origin", "https://evil.example")
+            .header("sec-fetch-site", "cross-site")
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    #[test]
+    fn cross_origin_posts_are_forbidden_by_default() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
+            .build();
+        let response = block_on(router.handle(cross_origin_post()));
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn trusted_origins_may_send_cross_origin_posts() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
+            .origin_policy(crate::OriginPolicy::trust_origins(["https://evil.example"]))
+            .build();
+        let response = block_on(router.handle(cross_origin_post()));
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn disabled_origin_policy_lets_cross_origin_posts_through() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
+            .origin_policy(crate::OriginPolicy::dangerous_disable())
+            .build();
+        let response = block_on(router.handle(cross_origin_post()));
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     // -- Router::handle: layers --

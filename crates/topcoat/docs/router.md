@@ -254,6 +254,26 @@ async fn root_layout(slot: Result) -> Result {
 
 See the [`view!`](crate::view::view!) macro docs for the full placement and precedence rules.
 
+# Cross-origin request protection
+
+Browsers attach cookies to cross-origin requests, and any page open in a browser can reach an intranet or localhost server, so a malicious page can send requests that look like they come from your own users. The router therefore checks the origin of every request by default: a state-changing cross-origin browser request (a `POST` from another site, for example) is rejected with `403 Forbidden`, closing off cross-site request forgery (CSRF), and a cross-origin WebSocket handshake is refused, closing off cross-site WebSocket hijacking.
+
+The check is precise about what it rejects. Requests with safe methods (`GET`, `HEAD`, `OPTIONS`) pass. For every other method, the browser-provided `Sec-Fetch-Site` header must be `same-origin` or `none` (a direct navigation); `same-site` is rejected, so sibling subdomains cannot forge requests. For older browsers that do not send it, the `Origin` header's host is compared against the request's own host instead. Requests carrying neither header pass: they come from non-browser clients like `curl`, webhooks, or server-to-server calls, which do not attach cookies ambiently and so cannot be forged through a victim's browser.
+
+Some applications receive legitimate cross-origin requests, and their requests fail with a bare `403 Forbidden` until the origin is trusted. The common cases are federation flows that land a cross-origin browser POST on the application (the SAML POST binding, the OAuth `form_post` response mode) and CORS-enabled frontends served from another domain. Name those origins on the [`OriginPolicy`]:
+
+```rust
+use topcoat::router::{OriginPolicy, Router};
+
+let router = Router::builder()
+    .origin_policy(OriginPolicy::trust_origins(["https://accounts.example.com"]))
+    .build();
+```
+
+A trusted origin may send state-changing requests and open WebSockets. Each value is the full serialized origin: scheme, host, and any non-default port, with no trailing slash. An application that enforces its own policy can turn the check off with [`OriginPolicy::dangerous_disable`].
+
+WebSocket endpoints can additionally accept origins on their own, without trusting them application-wide; see the [WebSocket docs](content::websocket) for the endpoint-level controls.
+
 # Manual registration
 
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):

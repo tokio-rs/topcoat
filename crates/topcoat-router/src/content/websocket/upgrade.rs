@@ -11,13 +11,13 @@ use tokio_tungstenite::{
     },
 };
 use topcoat_core::{
-    context::{Cx, try_app_context},
+    context::{Cx, try_request_context},
     error::{Error, Result},
 };
 
 use crate::{
-    Body,
-    content::websocket::{WebSocket, WebSocketOrigins},
+    Body, UntrustedWebSocketOrigin,
+    content::websocket::WebSocket,
     error::{bad_request, forbidden, method_not_allowed},
     request::{FromRequest, extensions, headers, method},
     response::Response,
@@ -34,12 +34,13 @@ use crate::{
 /// upgrading, the builder methods allow trusted browser origins, negotiate a
 /// subprotocol, and bound message sizes.
 ///
-/// Browsers include an `Origin` header in the handshake. Such requests are
-/// rejected unless the origin is configured on the
-/// [`RouterBuilder`](crate::RouterBuilder), allowed for this endpoint with
-/// [`allow_origin`](Self::allow_origin), or all origins are allowed with
-/// [`allow_any_origin`](Self::allow_any_origin). Requests without an `Origin`
-/// header are accepted for non-browser clients.
+/// The router's [`OriginPolicy`](crate::OriginPolicy) flags a handshake from
+/// an untrusted cross-origin page, and [`on_upgrade`](Self::on_upgrade)
+/// rejects it, so an authenticated socket cannot be opened from an unrelated
+/// page with the user's cookies. Same-origin handshakes, origins trusted
+/// application-wide, and non-browser clients pass. An endpoint accepts an
+/// additional origin with [`allow_origin`](Self::allow_origin), or every
+/// origin with [`allow_any_origin`](Self::allow_any_origin).
 ///
 /// [RFC 6455]: https://datatracker.ietf.org/doc/html/rfc6455
 ///
@@ -72,7 +73,7 @@ use crate::{
 pub struct WebSocketUpgrade {
     config: WebSocketConfig,
     protocols: Vec<Cow<'static, str>>,
-    app_allowed_origins: WebSocketOrigins,
+    untrusted_origin: bool,
     allowed_origins: Vec<String>,
     allow_any_origin: bool,
     origin: Option<HeaderValue>,
@@ -185,8 +186,8 @@ impl WebSocketUpgrade {
         F: Future<Output = ()> + Send + 'static,
     {
         if !origin_allowed(
+            self.untrusted_origin,
             self.origin.as_ref(),
-            &self.app_allowed_origins,
             &self.allowed_origins,
             self.allow_any_origin,
         ) {
@@ -237,7 +238,7 @@ impl fmt::Debug for WebSocketUpgrade {
         f.debug_struct("WebSocketUpgrade")
             .field("config", &self.config)
             .field("protocols", &self.protocols)
-            .field("app_allowed_origins", &self.app_allowed_origins)
+            .field("untrusted_origin", &self.untrusted_origin)
             .field("allowed_origins", &self.allowed_origins)
             .field("allow_any_origin", &self.allow_any_origin)
             .field("origin", &self.origin)
@@ -285,7 +286,7 @@ impl FromRequest for WebSocketUpgrade {
         Ok(Self {
             config: WebSocketConfig::default(),
             protocols: Vec::new(),
-            app_allowed_origins: try_app_context(cx).cloned().unwrap_or_default(),
+            untrusted_origin: try_request_context::<UntrustedWebSocketOrigin>(cx).is_some(),
             allowed_origins: Vec::new(),
             allow_any_origin: false,
             origin: headers.get(header::ORIGIN).cloned(),
@@ -297,26 +298,25 @@ impl FromRequest for WebSocketUpgrade {
     }
 }
 
-/// Returns whether a request's browser origin is permitted.
+/// Returns whether the handshake may proceed: the router's origin policy
+/// found nothing to distrust, or the endpoint allowed the origin itself.
 fn origin_allowed(
+    untrusted_origin: bool,
     origin: Option<&HeaderValue>,
-    app_allowed_origins: &WebSocketOrigins,
     allowed_origins: &[String],
     allow_any_origin: bool,
 ) -> bool {
-    if allow_any_origin {
+    if !untrusted_origin || allow_any_origin {
         return true;
     }
+    // An untrusted handshake without an `Origin` header cannot match an
+    // endpoint allowlist entry, so only `allow_any_origin` accepts it.
     let Some(origin) = origin else {
-        // Browsers always send Origin. Clients without it do not have ambient
-        // browser credentials to abuse.
-        return true;
+        return false;
     };
-    let origin = origin.as_bytes();
-    app_allowed_origins
+    allowed_origins
         .iter()
-        .chain(allowed_origins.iter().map(String::as_str))
-        .any(|allowed| allowed.as_bytes().eq_ignore_ascii_case(origin))
+        .any(|allowed| allowed.as_bytes().eq_ignore_ascii_case(origin.as_bytes()))
 }
 
 /// Selects the first of the endpoint's `supported` subprotocols that the
@@ -379,7 +379,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Path, RouteFn, RouteFuture, RouteHandlerFn, Router, RouterBuilder, RouterService,
+        OriginPolicy, Path, RouteFn, RouteFuture, RouteHandlerFn, Router, RouterBuilder,
+        RouterService,
         content::websocket::Message,
         error::{BadRequestError, MethodNotAllowedError},
         internal_serve,
@@ -515,41 +516,26 @@ mod tests {
     }
 
     #[test]
-    fn app_and_endpoint_origins_form_one_allowlist() {
-        let mut app_allowed = WebSocketOrigins::default();
-        app_allowed.replace(["https://APP.example"]);
-        let endpoint_allowed = ["https://admin.example".to_owned()];
-        let app_origin = HeaderValue::from_static("https://app.example");
-        let endpoint_origin = HeaderValue::from_static("https://admin.example");
-
-        assert!(origin_allowed(
-            Some(&app_origin),
-            &app_allowed,
-            &endpoint_allowed,
-            false
-        ));
-        assert!(origin_allowed(
-            Some(&endpoint_origin),
-            &app_allowed,
-            &endpoint_allowed,
-            false
-        ));
+    fn trusted_handshakes_pass_without_endpoint_configuration() {
+        let origin = HeaderValue::from_static("https://app.example");
+        assert!(origin_allowed(false, Some(&origin), &[], false));
+        assert!(origin_allowed(false, None, &[], false));
     }
 
     #[test]
-    fn browser_origins_require_an_explicit_policy() {
-        let allowed = WebSocketOrigins::default();
+    fn untrusted_handshakes_need_an_endpoint_opt_in() {
         let listed = ["https://app.example".to_owned()];
-        let origin = HeaderValue::from_static("https://app.example");
+        let origin = HeaderValue::from_static("https://APP.example");
         let unlisted = HeaderValue::from_static("https://evil.example");
         let malformed = HeaderValue::from_bytes(b"\xff").unwrap();
 
-        assert!(!origin_allowed(Some(&origin), &allowed, &[], false));
-        assert!(origin_allowed(Some(&origin), &allowed, &listed, false));
-        assert!(origin_allowed(Some(&origin), &allowed, &[], true));
-        assert!(origin_allowed(None, &allowed, &[], false));
-        assert!(!origin_allowed(Some(&unlisted), &allowed, &listed, false));
-        assert!(!origin_allowed(Some(&malformed), &allowed, &listed, false));
+        assert!(!origin_allowed(true, Some(&origin), &[], false));
+        assert!(origin_allowed(true, Some(&origin), &listed, false));
+        assert!(origin_allowed(true, Some(&origin), &[], true));
+        assert!(!origin_allowed(true, None, &listed, false));
+        assert!(origin_allowed(true, None, &[], true));
+        assert!(!origin_allowed(true, Some(&unlisted), &listed, false));
+        assert!(!origin_allowed(true, Some(&malformed), &listed, false));
     }
 
     // -- subprotocol negotiation --
@@ -718,22 +704,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn base_url_origin_allows_route_without_endpoint_configuration() {
+    async fn same_origin_handshake_needs_no_configuration() {
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
-        let router = echo_router_builder(echo_route)
-            .base_url("https://app.example/prefix")
-            .build();
-        let (addr, shutdown_tx, server) = spawn_server(router).await;
+        let (addr, shutdown_tx, server) = spawn_server(echo_router(echo_route)).await;
 
+        // The browser origin serving the page: its host matches the request's.
         let mut request = format!("ws://{addr}/ws").into_client_request().unwrap();
         request.headers_mut().insert(
             header::ORIGIN,
-            HeaderValue::from_static("https://app.example"),
+            HeaderValue::try_from(format!("http://{addr}")).unwrap(),
         );
         let (mut client, response) = tokio_tungstenite::connect_async(request)
             .await
-            .expect("the base URL origin connects");
+            .expect("the page's own origin connects");
         assert_eq!(response.status(), StatusCode::SWITCHING_PROTOCOLS);
 
         client.close(None).await.unwrap();
@@ -741,36 +725,22 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn configured_origins_override_the_base_url_origin() {
+    async fn router_trusted_origin_can_connect() {
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
         let router = echo_router_builder(echo_route)
-            .base_url("https://app.example")
-            .websocket_origins(["https://admin.example"])
+            .origin_policy(OriginPolicy::trust_origins(["https://admin.example"]))
             .build();
         let (addr, shutdown_tx, server) = spawn_server(router).await;
 
-        let mut base_request = format!("ws://{addr}/ws").into_client_request().unwrap();
-        base_request.headers_mut().insert(
-            header::ORIGIN,
-            HeaderValue::from_static("https://app.example"),
-        );
-        let error = tokio_tungstenite::connect_async(base_request)
-            .await
-            .expect_err("the overridden base URL origin is rejected");
-        let tungstenite::Error::Http(response) = error else {
-            panic!("unexpected handshake error: {error}");
-        };
-        assert_eq!(response.status(), StatusCode::FORBIDDEN);
-
-        let mut configured_request = format!("ws://{addr}/ws").into_client_request().unwrap();
-        configured_request.headers_mut().insert(
+        let mut request = format!("ws://{addr}/ws").into_client_request().unwrap();
+        request.headers_mut().insert(
             header::ORIGIN,
             HeaderValue::from_static("https://admin.example"),
         );
-        let (mut client, response) = tokio_tungstenite::connect_async(configured_request)
+        let (mut client, response) = tokio_tungstenite::connect_async(request)
             .await
-            .expect("the configured origin connects");
+            .expect("the trusted origin connects");
         assert_eq!(response.status(), StatusCode::SWITCHING_PROTOCOLS);
 
         client.close(None).await.unwrap();

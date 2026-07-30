@@ -34,41 +34,29 @@ A request that is not a conforming WebSocket handshake is rejected before the ha
 
 # Browser origins
 
-Browsers include an `Origin` header in every WebSocket handshake. `on_upgrade` rejects untrusted origins, so an authenticated socket cannot be opened from an unrelated page with the user's cookies. By default, the router allows the origin of its base URL:
+A WebSocket handshake is exempt from the browser's cross-origin protections: any page can open a socket to any host, and the browser attaches the user's cookies. The router's [`OriginPolicy`](crate::OriginPolicy) therefore treats a cross-origin handshake like a state-changing request, so an authenticated socket cannot be opened from an unrelated page (cross-site WebSocket hijacking). Handshakes from the application's own pages and from non-browser clients pass without configuration; `on_upgrade` rejects the rest with `403 Forbidden`.
+
+A cross-origin peer the whole application trusts is named on the router policy, alongside the origins trusted for state-changing requests:
 
 ```rust
-use topcoat::{
-    Result,
-    router::{
-        Router, content::websocket::WebSocketUpgrade, response::Response, route,
-    },
-};
+use topcoat::router::{OriginPolicy, Router};
 
+let router = Router::builder()
+    .origin_policy(OriginPolicy::trust_origins(["https://admin.example.com"]))
+    .build();
+```
+
+An endpoint that needs an additional origin adds it with [`allow_origin`](WebSocketUpgrade::allow_origin); endpoint origins add to the router policy. Each value includes the scheme, host, and any non-default port:
+
+```rust
+# use topcoat::{Result, router::{content::websocket::WebSocketUpgrade, response::Response, route}};
 #[route(GET "/notifications")]
 async fn notifications(upgrade: WebSocketUpgrade) -> Result<Response> {
-    upgrade.on_upgrade(|_socket| async move {})
+    upgrade
+        .allow_origin("https://admin.example.com")
+        .on_upgrade(|_socket| async move {})
 }
-
-let router = Router::builder()
-    .route(notifications)
-    .base_url("https://app.example.com/prefix")
-    .build();
 ```
-
-Use [`websocket_origins`](crate::RouterBuilder::websocket_origins) when the WebSocket origin policy differs from the base URL:
-
-```rust
-# use topcoat::router::Router;
-let router = Router::builder()
-    .base_url("https://app.example.com")
-    .websocket_origins([
-        "https://admin.example.com",
-        "http://localhost:5173",
-    ])
-    .build();
-```
-
-Calling `websocket_origins` replaces the base URL origin rather than adding to it. Passing an empty collection rejects every browser origin at the router level. An endpoint that needs an additional origin can add it with [`allow_origin`](WebSocketUpgrade::allow_origin); endpoint origins add to the selected router policy. Each value includes the scheme, host, and any non-default port. Non-browser clients can omit `Origin` and do not need an allowlist entry.
 
 [`allow_any_origin`](WebSocketUpgrade::allow_any_origin) is an explicit opt-out for public sockets that do not trust ambient credentials or expose private data.
 

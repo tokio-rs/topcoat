@@ -106,7 +106,6 @@ A normal `curl` request cannot test the complete WebSocket exchange because it d
 ## How it works
 
 - `AssetBundle::load()` loads the generated browser assets.
-- `base_url(...)` sets the public application URL and allows its origin for every WebSocket route.
 - `asset!("./echo.js")` resolves the bundled JavaScript file.
 - `new WebSocket(...)` opens the browser connection.
 - `WebSocketUpgrade` validates and performs the protocol upgrade.

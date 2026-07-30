@@ -1,7 +1,7 @@
 use topcoat_core::context::CxBuilder;
 use topcoat_router::{Body, Layer, LayerFuture, Next, Path, RouterBuilder};
 
-use crate::{OriginLayer, SessionConfig, SessionState};
+use crate::{SessionConfig, SessionState};
 
 /// A router layer that makes the session state available for the current
 /// request.
@@ -29,25 +29,20 @@ impl Layer for SessionLayer {
 
 /// Installs session support on a [`RouterBuilder`].
 pub trait RouterBuilderSessionExt {
-    /// Registers the session `config` on the app context, the root session
-    /// layer, and the [`OriginLayer`] rejecting state-changing cross-origin
-    /// requests (unless disabled with
-    /// [`SessionConfigBuilder::dangerous_disable_origin_verification`](crate::SessionConfigBuilder::dangerous_disable_origin_verification)).
+    /// Registers the session `config` on the app context and the root session
+    /// layer.
     ///
     /// The default cookie token store also needs the cookie layer, registered
-    /// with the cookie crate's `cookies` extension method.
+    /// with the cookie crate's `cookies` extension method. Cross-site request
+    /// forgery is rejected by the router itself, so no session-specific
+    /// protection is registered here.
     #[must_use]
     fn sessions(self, config: SessionConfig) -> Self;
 }
 
 impl RouterBuilderSessionExt for RouterBuilder {
     fn sessions(mut self, config: SessionConfig) -> Self {
-        let verify_origin = config.verify_origin;
         self = self.app_context(config);
-        self = self.layer(SessionLayer::new());
-        if verify_origin {
-            self = self.layer(OriginLayer::new());
-        }
-        self
+        self.layer(SessionLayer::new())
     }
 }
