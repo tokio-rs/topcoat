@@ -52,6 +52,12 @@ pub struct Initialized {
 /// registry cannot be loaded or offers no themes, a named theme is unknown,
 /// a theme selection prompt is declined, or writing the stylesheet or install
 /// state fails.
+///
+/// # Panics
+///
+/// Panics if `choose` returns a name that was not among the ones it was
+/// offered.
+#[track_caller]
 pub fn init(
     package: &Package,
     options: InitOptions,
@@ -114,6 +120,7 @@ struct ThemePlan {
 /// reachable and offer at least one theme, and an explicitly named theme must
 /// exist. When no theme was named, the sole offered theme is taken, or `choose`
 /// picks one when the registry offers several.
+#[track_caller]
 fn plan_theme(
     package: &Package,
     requested: Option<&str>,

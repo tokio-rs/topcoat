@@ -6,6 +6,10 @@ use crate::{IntoResponse, Response};
 
 /// Builds a temporary (HTTP 307) redirect to `uri`.
 ///
+/// # Panics
+///
+/// Panics if `uri` is not a valid `Location` header value.
+///
 /// # Examples
 ///
 /// ```rust
@@ -23,6 +27,7 @@ use crate::{IntoResponse, Response};
 /// }
 /// ```
 #[must_use]
+#[track_caller]
 pub fn redirect(uri: &str) -> RedirectError {
     RedirectError::new(StatusCode::TEMPORARY_REDIRECT, uri)
 }
@@ -31,6 +36,10 @@ pub fn redirect(uri: &str) -> RedirectError {
 ///
 /// Use this for URLs that have moved for good; clients and search engines
 /// are allowed to cache the new location.
+///
+/// # Panics
+///
+/// Panics if `uri` is not a valid `Location` header value.
 ///
 /// # Examples
 ///
@@ -45,6 +54,7 @@ pub fn redirect(uri: &str) -> RedirectError {
 /// }
 /// ```
 #[must_use]
+#[track_caller]
 pub fn redirect_permanent(uri: &str) -> RedirectError {
     RedirectError::new(StatusCode::PERMANENT_REDIRECT, uri)
 }
@@ -67,6 +77,7 @@ impl RedirectError {
     /// # Panics
     ///
     /// Panics if `uri` is not a valid `Location` header value.
+    #[track_caller]
     fn new(status: StatusCode, uri: &str) -> Self {
         Self {
             status,
@@ -97,6 +108,10 @@ impl IntoResponse for RedirectError {
 /// -- the Post/Redirect/Get pattern that keeps a reload from re-submitting the
 /// mutation.
 ///
+/// # Panics
+///
+/// Panics if `uri` is not a valid `Location` header value.
+///
 /// # Examples
 ///
 /// ```rust
@@ -114,6 +129,7 @@ impl IntoResponse for RedirectError {
 /// }
 /// ```
 #[must_use]
+#[track_caller]
 pub fn see_other(uri: &str) -> SeeOther {
     SeeOther::new(uri)
 }
@@ -135,6 +151,7 @@ impl SeeOther {
     /// # Panics
     ///
     /// Panics if `uri` is not a valid `Location` header value.
+    #[track_caller]
     fn new(uri: &str) -> Self {
         Self {
             location: HeaderValue::try_from(uri).expect("redirect uri is not a valid header value"),

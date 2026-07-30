@@ -71,6 +71,7 @@ pub trait RouterBuilderAssetExt {
 }
 
 impl RouterBuilderAssetExt for RouterBuilder {
+    #[track_caller]
     fn assets(self, config: impl Into<AssetConfig>) -> Self {
         let config = config.into();
 

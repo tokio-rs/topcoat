@@ -27,6 +27,7 @@ use crate::config;
 ///
 /// Returns a [`ForbiddenError`] (HTTP 403) when the request is a
 /// state-changing cross-origin request.
+#[track_caller]
 pub fn verify_origin(cx: &Cx) -> Result<(), ForbiddenError> {
     let headers = headers(cx);
     let sec_fetch_site = headers

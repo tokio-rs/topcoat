@@ -23,6 +23,7 @@ impl ObliqueAngle {
     /// Panics if `degrees` is outside `-90.0..=90.0`. Use
     /// `ObliqueAngle::try_from` for a non-panicking conversion.
     #[must_use]
+    #[track_caller]
     pub const fn new(degrees: f32) -> Self {
         assert!(
             degrees >= -90.0 && degrees <= 90.0,
@@ -96,6 +97,7 @@ impl ObliqueAngleRange {
     ///
     /// Panics if `end` is before `start`.
     #[must_use]
+    #[track_caller]
     pub const fn new(start: ObliqueAngle, end: ObliqueAngle) -> Self {
         assert!(end.0 >= start.0, "oblique angle range must not be empty");
         Self { start, end }
@@ -108,6 +110,7 @@ impl ObliqueAngleRange {
     /// Panics if either value is outside `-90.0..=90.0`, or if `end` is before
     /// `start`.
     #[must_use]
+    #[track_caller]
     pub const fn from_degrees(start: f32, end: f32) -> Self {
         Self::new(ObliqueAngle::new(start), ObliqueAngle::new(end))
     }
@@ -173,6 +176,7 @@ impl FontStyle {
     ///
     /// Panics if `degrees` is outside `-90.0..=90.0`.
     #[must_use]
+    #[track_caller]
     pub const fn oblique_angle(degrees: f32) -> Self {
         let angle = ObliqueAngle::new(degrees);
         Self::Oblique(Some(ObliqueAngleRange::new(angle, angle)))
@@ -186,6 +190,7 @@ impl FontStyle {
     /// Panics if either value is outside `-90.0..=90.0`, or if `end` is before
     /// `start`.
     #[must_use]
+    #[track_caller]
     pub const fn oblique_range(start: f32, end: f32) -> Self {
         Self::Oblique(Some(ObliqueAngleRange::from_degrees(start, end)))
     }

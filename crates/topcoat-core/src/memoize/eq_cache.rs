@@ -95,6 +95,7 @@ impl MemoizeEqCache {
     /// downcast back to `OnceLock<V>` (which indicates a marker/type mismatch
     /// between the caller and the function that originally memoized the value).
     #[allow(clippy::needless_pass_by_value)]
+    #[track_caller]
     pub fn get<K, V, F>(&self, marker: F, key: K) -> Option<&V>
     where
         K: Copy,

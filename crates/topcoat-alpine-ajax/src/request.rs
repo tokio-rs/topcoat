@@ -9,6 +9,7 @@ use crate::header;
 /// The header map is borrowed straight from the request, so these reads are
 /// cheap pointer lookups: there is nothing worth caching with `#[memoize]`,
 /// and borrowing avoids the allocation a memoized owned value would require.
+#[track_caller]
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
     request_context::<Parts>(cx)
         .headers
@@ -25,6 +26,7 @@ fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
 /// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn ajax_request(cx: &Cx) -> bool {
     header(cx, &header::X_ALPINE_REQUEST) == Some("true")
 }
@@ -35,6 +37,7 @@ pub fn ajax_request(cx: &Cx) -> bool {
 /// # Panics
 ///
 /// Panics if called outside a router request (no request [`Parts`] in context).
+#[track_caller]
 pub fn ajax_targets(cx: &Cx) -> impl Iterator<Item = &str> {
     header(cx, &header::X_ALPINE_TARGET)
         .unwrap_or_default()
@@ -48,6 +51,7 @@ pub fn ajax_targets(cx: &Cx) -> impl Iterator<Item = &str> {
 ///
 /// Panics if called outside a router request (no request [`Parts`] in context).
 #[must_use]
+#[track_caller]
 pub fn ajax_target(cx: &Cx, id: &str) -> bool {
     ajax_targets(cx).any(|target| target == id)
 }

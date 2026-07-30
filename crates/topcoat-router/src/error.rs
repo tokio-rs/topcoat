@@ -123,6 +123,11 @@ pub trait RouterErrorExt {
     ///
     /// Returns a [`RedirectError`] performing a temporary redirect to `uri`
     /// when the value is absent.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `uri` is not a valid `Location` header value.
+    #[track_caller]
     fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError>;
 
     /// Returns `Ok(value)` if present, otherwise a permanent redirect to `uri`.
@@ -131,6 +136,11 @@ pub trait RouterErrorExt {
     ///
     /// Returns a [`RedirectError`] performing a permanent redirect to `uri`
     /// when the value is absent.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `uri` is not a valid `Location` header value.
+    #[track_caller]
     fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError>;
 
     /// Returns `Ok(value)` if present, otherwise a not-found response.
@@ -166,6 +176,7 @@ pub trait RouterErrorExt {
 impl<T> RouterErrorExt for Option<T> {
     type T = T;
 
+    #[track_caller]
     fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Some(value) => Ok(value),
@@ -173,6 +184,7 @@ impl<T> RouterErrorExt for Option<T> {
         }
     }
 
+    #[track_caller]
     fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Some(value) => Ok(value),
@@ -212,6 +224,7 @@ impl<T> RouterErrorExt for Option<T> {
 impl<T, E> RouterErrorExt for Result<T, E> {
     type T = T;
 
+    #[track_caller]
     fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Ok(value) => Ok(value),
@@ -219,6 +232,7 @@ impl<T, E> RouterErrorExt for Result<T, E> {
         }
     }
 
+    #[track_caller]
     fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Ok(value) => Ok(value),

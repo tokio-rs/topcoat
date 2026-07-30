@@ -19,6 +19,7 @@ use topcoat_core::context::{Cx, request_context};
 /// ```
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn parts(cx: &Cx) -> &Parts {
     request_context(cx)
 }
@@ -38,6 +39,7 @@ pub fn parts(cx: &Cx) -> &Parts {
 /// ```
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn method(cx: &Cx) -> &http::Method {
     &parts(cx).method
 }
@@ -57,6 +59,7 @@ pub fn method(cx: &Cx) -> &http::Method {
 /// ```
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn uri(cx: &Cx) -> &http::Uri {
     &parts(cx).uri
 }
@@ -76,6 +79,7 @@ pub fn uri(cx: &Cx) -> &http::Uri {
 /// ```
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn version(cx: &Cx) -> &http::Version {
     &parts(cx).version
 }
@@ -95,6 +99,7 @@ pub fn version(cx: &Cx) -> &http::Version {
 /// ```
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn headers(cx: &Cx) -> &http::HeaderMap {
     &parts(cx).headers
 }
@@ -113,6 +118,7 @@ pub fn headers(cx: &Cx) -> &http::HeaderMap {
 /// ```
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn content_type(cx: &Cx) -> Option<&str> {
     headers(cx).get(http::header::CONTENT_TYPE)?.to_str().ok()
 }
@@ -137,6 +143,7 @@ pub fn content_type(cx: &Cx) -> Option<&str> {
 /// ```
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn extensions(cx: &Cx) -> &http::Extensions {
     &parts(cx).extensions
 }

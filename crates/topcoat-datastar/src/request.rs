@@ -12,6 +12,7 @@ use crate::header;
 /// [`Parts`](http::request::Parts) in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn datastar_request(cx: &Cx) -> bool {
     headers(cx)
         .get(&header::DATASTAR_REQUEST)

@@ -34,6 +34,7 @@ impl FontFace {
     ///
     /// Panics if the [`TryInto`] conversion of `src` fails.
     #[must_use]
+    #[track_caller]
     pub fn new(family: impl Into<String>, src: impl TryInto<FontSources>) -> Self {
         Self {
             family: family.into(),
@@ -80,6 +81,7 @@ impl FontFace {
     /// # Errors
     ///
     /// Returns any error produced while writing to `f`.
+    #[track_caller]
     pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         f.write_str("@font-face { font-family: \"")?;
         CssString(&mut *f).write_str(&self.family)?;
@@ -173,6 +175,7 @@ impl FontFaces {
     ///
     /// Panics if `faces` is empty.
     #[must_use]
+    #[track_caller]
     pub fn new(faces: impl Into<Vec<FontFace>>) -> Self {
         let faces = faces.into();
         assert!(!faces.is_empty(), "font faces must not be empty");
@@ -192,6 +195,7 @@ impl FontFaces {
     /// # Errors
     ///
     /// Returns any error produced while writing to `f`.
+    #[track_caller]
     pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         for (index, face) in self.0.iter().enumerate() {
             if index > 0 {

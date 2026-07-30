@@ -70,6 +70,7 @@ impl BodyLimit {
     /// # Panics
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
+    #[track_caller]
     pub fn at(mut self, path: impl IntoPath) -> Self {
         self.path = path.into_path();
         self

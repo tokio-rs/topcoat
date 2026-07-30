@@ -39,6 +39,7 @@ impl AssetRoute {
     /// Panics if the asset's `Content-Type` cannot be converted into a
     /// [`HeaderValue`].
     #[must_use]
+    #[track_caller]
     pub fn new(dir: &std::path::Path, asset: &BundledAsset) -> Self {
         let name = asset.name();
         let content_type = HeaderValue::from_str(asset.content_type()).unwrap_or_else(|_| {

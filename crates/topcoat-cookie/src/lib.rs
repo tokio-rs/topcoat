@@ -271,6 +271,7 @@ impl CookieJarCell {
 ///
 /// Panics if the cookie router layer has not been installed for this request.
 #[must_use]
+#[track_caller]
 pub fn cookies(cx: &Cx) -> &CookieJar {
     request_context::<CookieJarCell>(cx).get_or_init(cx)
 }
@@ -282,6 +283,7 @@ pub fn cookies(cx: &Cx) -> &CookieJar {
 ///
 /// Panics if no [`Key`] was registered with `Router::app_context`.
 #[must_use]
+#[track_caller]
 pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
     cookies(cx).signed(app_context::<Key>(cx))
 }
@@ -293,6 +295,7 @@ pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
 ///
 /// Panics if no [`Key`] was registered with `Router::app_context`.
 #[must_use]
+#[track_caller]
 pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
     cookies(cx).private(app_context::<Key>(cx))
 }

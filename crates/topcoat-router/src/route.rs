@@ -63,6 +63,7 @@ impl RouteFn {
     /// # Panics
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
+    #[track_caller]
     pub fn new(
         methods: impl Into<OwnedMethods>,
         path: impl IntoPath,

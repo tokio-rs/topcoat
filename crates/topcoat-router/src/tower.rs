@@ -78,6 +78,7 @@ impl<S> TowerRoute<S> {
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
     #[must_use]
+    #[track_caller]
     pub fn new(methods: impl Into<OwnedMethods>, path: impl IntoPath, service: S) -> Self {
         Self {
             methods: methods.into(),
@@ -184,6 +185,7 @@ impl<S> TowerLayer<S> {
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
     #[must_use]
+    #[track_caller]
     pub fn at(mut self, path: impl IntoPath) -> Self {
         self.path = path.into_path();
         self

@@ -66,6 +66,7 @@ impl MailConfigBuilder {
     ///
     /// Panics when no transport was set.
     #[must_use]
+    #[track_caller]
     pub fn build(self) -> MailConfig {
         MailConfig {
             transport: self.transport.unwrap_or_else(|| {

@@ -35,6 +35,7 @@ pub struct Removed {
 /// longer present in the install state when its component is deleted. This is
 /// an internal invariant: resolution inserts the target pair, so the registry
 /// must still be tracked.
+#[track_caller]
 pub fn remove(
     package: &Package,
     components: &[String],

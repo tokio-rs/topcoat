@@ -109,6 +109,7 @@ impl PathParam {
             impl #impl_generics #topcoat_router::PathParam for #ident #type_generics {
                 type Output<'__cx> = #output;
 
+                #[track_caller]
                 fn path_param(
                     cx: &#topcoat_context::Cx,
                     _: #topcoat_router::PathParamSealed,

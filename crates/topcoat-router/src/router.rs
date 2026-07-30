@@ -273,6 +273,7 @@ impl RouterBuilder {
     /// Panics if two discovered layouts share the same path.
     #[cfg(feature = "discover")]
     #[must_use]
+    #[track_caller]
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::<crate::PathBuf>::new();
         for layout in inventory::iter::<LayoutFn>().cloned() {
@@ -315,6 +316,7 @@ impl RouterBuilder {
     /// Panics if two discovered layers share the same path.
     #[cfg(feature = "discover")]
     #[must_use]
+    #[track_caller]
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::<crate::PathBuf>::new();
         for layer in inventory::iter::<crate::LayerFn>().cloned() {
@@ -379,6 +381,7 @@ impl RouterBuilder {
     /// let router = Router::builder().base_url("https://example.com").build();
     /// ```
     #[must_use]
+    #[track_caller]
     pub fn base_url(self, base_url: impl TryInto<BaseUrl, Error: fmt::Display>) -> Self {
         match base_url.try_into() {
             Ok(base_url) => self.app_context(base_url),
@@ -424,6 +427,7 @@ impl RouterBuilder {
     /// }
     /// ```
     #[must_use]
+    #[track_caller]
     pub fn app_context<T>(mut self, value: T) -> Self
     where
         T: Any + Send + Sync,
@@ -476,6 +480,7 @@ impl RouterBuilder {
     /// stack, so the divergence is rejected rather than resolved by
     /// registration order.
     #[must_use]
+    #[track_caller]
     pub fn build(self) -> Router {
         let RouterBuilder {
             mut routes,
