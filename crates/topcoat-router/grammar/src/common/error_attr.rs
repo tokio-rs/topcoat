@@ -32,12 +32,6 @@ pub struct ErrorAttr {
     pub args: Option<ErrorArgs>,
 }
 
-/// The parenthesized arguments passed to an error constructor.
-pub struct ErrorArgs {
-    pub paren_token: Paren,
-    pub args: Punctuated<Expr, Token![,]>,
-}
-
 impl ErrorAttr {
     /// The span of the constructor name, for attaching validation errors.
     #[must_use]
@@ -88,15 +82,7 @@ impl Parse for ErrorAttr {
             error_token: input.parse()?,
             eq_token: input.parse()?,
             kind: input.parse()?,
-            args: if input.peek(Paren) {
-                let content;
-                Some(ErrorArgs {
-                    paren_token: syn::parenthesized!(content in input),
-                    args: Punctuated::parse_terminated(&content)?,
-                })
-            } else {
-                None
-            },
+            args: input.call(ErrorArgs::parse_option)?,
         })
     }
 }
@@ -148,5 +134,27 @@ impl Parse for ErrorKind {
         } else {
             Err(lookahead.error())
         }
+    }
+}
+
+/// The parenthesized arguments passed to an error constructor.
+pub struct ErrorArgs {
+    pub paren_token: Paren,
+    pub args: Punctuated<Expr, Token![,]>,
+}
+
+impl Parse for ErrorArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let content;
+        Ok(Self {
+            paren_token: syn::parenthesized!(content in input),
+            args: Punctuated::parse_terminated(&content)?,
+        })
+    }
+}
+
+impl ParseOption for ErrorArgs {
+    fn peek(input: ParseStream) -> bool {
+        input.peek(Paren)
     }
 }

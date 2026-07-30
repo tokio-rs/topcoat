@@ -15,7 +15,7 @@ pub enum HandlerArg {
 }
 
 impl HandlerArgs {
-    pub fn parse(item: &ItemFn, kind: &str) -> syn::Result<Self> {
+    pub(crate) fn parse(item: &ItemFn, kind: &str) -> syn::Result<Self> {
         let mut args: Vec<HandlerArg> = Vec::new();
 
         for arg in &item.sig.inputs {
@@ -61,6 +61,7 @@ impl HandlerArgs {
     }
 
     /// The declared type of the request body parameter, if any.
+    #[must_use]
     pub fn request(&self) -> Option<&Type> {
         self.args.iter().find_map(|arg| match arg {
             HandlerArg::Request(ty) => Some(&**ty),
@@ -68,6 +69,7 @@ impl HandlerArgs {
         })
     }
 
+    #[must_use]
     pub fn call_args(&self) -> Vec<TokenStream> {
         self.args
             .iter()
@@ -82,6 +84,7 @@ impl HandlerArgs {
     }
 }
 
+#[must_use]
 pub fn request_ident() -> Ident {
     Ident::new("__topcoat_request", Span::mixed_site())
 }

@@ -11,7 +11,7 @@ use topcoat_core_grammar::{
     paths::{topcoat_context, topcoat_context_macro, topcoat_router, topcoat_router_macro},
 };
 
-use super::error_attr::ErrorAttr;
+use super::common::ErrorAttr;
 
 /// The input to `path_param!`.
 pub struct PathParam {

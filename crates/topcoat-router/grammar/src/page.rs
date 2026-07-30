@@ -11,7 +11,7 @@ use topcoat_core_grammar::paths::{
     topcoat_context, topcoat_inventory, topcoat_router, topcoat_view_macro,
 };
 
-use super::handler_args::{HandlerArg, HandlerArgs, request_ident};
+use super::common::{HandlerArg, HandlerArgs, request_ident};
 use super::method::Methods;
 
 pub struct PageAttr {
