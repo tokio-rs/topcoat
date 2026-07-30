@@ -2,15 +2,20 @@ use std::any::{Any, type_name};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
+use std::future::{Future, poll_fn};
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::pin::pin;
 use std::sync::Arc;
+use std::task::Poll;
 
 use topcoat_core::base_url::BaseUrl;
 use topcoat_core::context::{ContextMap, CxBuilder};
 
+use crate::RawPathParamSpec;
 use crate::{
     Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, Next, PageFn, PageWithLayouts,
-    PathSegment, RawPathParamSpec, RawPathParams, Request, Response, Route, Terminal,
-    error::respond,
+    PathSegment, RawPathParams, Request, Response, Route, Terminal,
+    error::{internal_server_response, respond},
 };
 
 /// A finalized Topcoat routing table.
@@ -62,8 +67,26 @@ impl Router {
     /// A route registered for the request's specific method wins over an
     /// any-method route at the same path. Returns `404 Not Found` when no
     /// route matches the path, or `405 Method Not Allowed` (with an `Allow`
-    /// header) when the path matches but no route accepts the method.
+    /// header) when the path matches but no route accepts the method. A panic
+    /// while processing the request becomes a `500 Internal Server Error`
+    /// response.
     pub async fn handle(&self, request: Request) -> Response {
+        let mut future = pin!(self.handle_inner(request));
+
+        poll_fn(|cx| {
+            // The whole request and its context are discarded after a panic,
+            // so no potentially inconsistent request-local state is reused.
+            match catch_unwind(AssertUnwindSafe(|| future.as_mut().poll(cx))) {
+                Ok(Poll::Ready(response)) => Poll::Ready(response),
+                Ok(Poll::Pending) => Poll::Pending,
+                Err(_) => Poll::Ready(internal_server_response()),
+            }
+        })
+        .await
+    }
+
+    /// Handles one request inside the panic isolation boundary.
+    async fn handle_inner(&self, request: Request) -> Response {
         let (parts, body) = request.into_parts();
 
         // Resolve the layer stack and the chain's terminal. A matched path
@@ -589,7 +612,7 @@ mod tests {
     use http::{HeaderMap, StatusCode};
     use topcoat_core::context::{Cx, app_context, request_context};
     use topcoat_core::error::Result;
-    use topcoat_view::{HtmlContext, PartsWriter, View, ViewParts};
+    use topcoat_view::{DynViewPart, HtmlContext, HtmlWriter, PartsWriter, View, ViewParts};
 
     use super::*;
     use crate::{
@@ -636,6 +659,14 @@ mod tests {
 
     fn say_posted(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { "posted".into_response(cx) })
+    }
+
+    fn panic_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { panic!("request handler panicked") })
+    }
+
+    fn panic_before_future_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        panic!("request handler panicked before returning its future");
     }
 
     /// Echoes the captured path params as `key=value` pairs joined by `&`.
@@ -704,6 +735,27 @@ mod tests {
 
     fn render_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
         Box::pin(async move { Ok(view("page")) })
+    }
+
+    #[derive(Debug, Clone)]
+    struct PanickingViewPart;
+
+    impl DynViewPart for PanickingViewPart {
+        fn render(&self, _cx: &Cx, _w: &mut HtmlWriter<'_, '_>) {
+            panic!("view rendering panicked");
+        }
+
+        fn clone_box(&self) -> Box<dyn DynViewPart> {
+            Box::new(self.clone())
+        }
+    }
+
+    fn render_panicking_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
+        Box::pin(async move {
+            let mut parts = ViewParts::new();
+            PartsWriter::new(&mut parts, HtmlContext::Text).push_dyn(Box::new(PanickingViewPart));
+            Ok(View::new(parts))
+        })
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
@@ -842,6 +894,31 @@ mod tests {
         // The raw catch-all keeps the encoded remainder, slashes included.
         let (_, _, body) = send(&router, Method::GET, "/files/a%2Fb/c%20d");
         assert_eq!(&body[..], b"rest=a%2Fb/c%20d");
+    }
+
+    #[test]
+    fn handler_panics_become_internal_server_errors() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/panic"), panic_route))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/early-panic"),
+                panic_before_future_route,
+            ))
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/panic");
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(&body[..], b"internal server error");
+
+        let (status, _, body) = send(&router, Method::GET, "/early-panic");
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(&body[..], b"internal server error");
+
+        let (status, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"route");
     }
 
     // -- Router::handle: method sets --
@@ -1175,6 +1252,26 @@ mod tests {
             "text/html; charset=utf-8"
         );
         assert_eq!(&body[..], b"page");
+    }
+
+    #[test]
+    fn rendering_panic_becomes_internal_server_error() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(
+                Method::GET,
+                path("/panic"),
+                render_panicking_page,
+            ))
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/panic");
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(&body[..], b"internal server error");
+
+        let (status, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"route");
     }
 
     #[test]

@@ -2911,6 +2911,7 @@ version = "0.5.0"
 dependencies = [
  "futures-util",
  "http",
+ "memchr",
  "serde",
  "serde_json",
  "tokio",

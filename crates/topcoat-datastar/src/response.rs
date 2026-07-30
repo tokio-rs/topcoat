@@ -5,25 +5,34 @@ use serde_json::Value;
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::IntoResponseParts;
 
-use crate::ElementPatchMode;
-use crate::header;
+use crate::{ElementPatchMode, common, header};
 
 /// Targets the elements a `text/html` response patches via the
 /// `datastar-selector` header. The value is a CSS selector.
 ///
 /// Without it, Datastar matches the response's elements to the DOM by their
 /// `id` attribute.
+///
+/// # Panics
+///
+/// Converting from a selector containing a line break panics. Applying a
+/// directly constructed value containing a line break also panics.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatastarSelector(pub String);
 
 impl<T: Into<String>> From<T> for DatastarSelector {
+    #[track_caller]
     fn from(selector: T) -> Self {
-        Self(selector.into())
+        let selector = selector.into();
+        common::assert_valid_selector(&selector);
+        Self(selector)
     }
 }
 
 impl IntoResponseParts for DatastarSelector {
+    #[track_caller]
     fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
+        common::assert_valid_selector(&self.0);
         parts
             .headers
             .insert(header::DATASTAR_SELECTOR, HeaderValue::from_str(&self.0)?);
@@ -154,6 +163,31 @@ mod tests {
             .into_response_parts(&Cx::default(), &mut parts)
             .unwrap();
         assert_eq!(header_value(&parts, &header::DATASTAR_SELECTOR), "#feed");
+    }
+
+    #[test]
+    fn selector_line_breaks_panic() {
+        for selector in [
+            "#feed\nelements <img src=x onerror=alert(1)>",
+            "#feed\relements <img src=x onerror=alert(1)>",
+            "#feed\r\nelements <img src=x onerror=alert(1)>",
+        ] {
+            assert!(
+                std::panic::catch_unwind(|| DatastarSelector::from(selector)).is_err(),
+                "conversion should panic for {selector:?}"
+            );
+
+            let mut parts = parts();
+            assert!(
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    DatastarSelector(selector.to_owned())
+                        .into_response_parts(&Cx::default(), &mut parts)
+                        .unwrap();
+                }))
+                .is_err(),
+                "direct construction should panic for {selector:?}"
+            );
+        }
     }
 
     #[test]

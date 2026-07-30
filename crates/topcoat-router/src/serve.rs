@@ -112,9 +112,13 @@ pub async fn internal_serve(
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
+    use std::convert::Infallible;
     use std::net::SocketAddr;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
     use std::time::Duration;
 
+    use http_body::Frame;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpListener, TcpStream};
     use tokio::sync::oneshot;
@@ -122,7 +126,10 @@ mod tests {
     use topcoat_core::context::Cx;
 
     use super::*;
-    use crate::{Body, IntoResponse, Method, Path, RouteFn, RouteFuture, RouteHandlerFn, Router};
+    use crate::{
+        Body, Bytes, IntoResponse, Method, Path, Response, RouteFn, RouteFuture, RouteHandlerFn,
+        Router,
+    };
 
     /// Builds a router with `handler` registered under `GET /x`.
     fn router_with(handler: RouteHandlerFn) -> Router {
@@ -137,6 +144,28 @@ mod tests {
 
     fn say_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { "served".into_response(cx) })
+    }
+
+    fn panic_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { panic!("request handler panicked") })
+    }
+
+    struct PanickingBody;
+
+    impl http_body::Body for PanickingBody {
+        type Data = Bytes;
+        type Error = Infallible;
+
+        fn poll_frame(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+            panic!("response body panicked");
+        }
+    }
+
+    fn panicking_body_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Ok(Response::new(Body::new(PanickingBody))) })
     }
 
     /// A route slow enough that a shutdown signal lands mid-request.
@@ -176,19 +205,27 @@ mod tests {
             .unwrap();
     }
 
+    async fn get(addr: SocketAddr, path: &str) -> String {
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(
+                format!("GET {path} HTTP/1.1\r\nhost: test\r\nconnection: close\r\n\r\n")
+                    .as_bytes(),
+            )
+            .await
+            .unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).await.unwrap();
+        response
+    }
+
     #[tokio::test]
     async fn returns_once_the_shutdown_signal_fires() {
         let service = RouterService::new(router_with(say_route));
         let (addr, shutdown_tx, server) = spawn_server(service).await;
 
         // A roundtrip proves the server is up before it is shut down.
-        let mut stream = TcpStream::connect(addr).await.unwrap();
-        stream
-            .write_all(b"GET /x HTTP/1.1\r\nhost: test\r\nconnection: close\r\n\r\n")
-            .await
-            .unwrap();
-        let mut response = String::new();
-        stream.read_to_string(&mut response).await.unwrap();
+        let response = get(addr, "/x").await;
         assert!(response.contains("200 OK"));
         assert!(response.ends_with("served"));
 
@@ -197,6 +234,68 @@ mod tests {
 
         // The listener is gone; new connections are refused.
         assert!(TcpStream::connect(addr).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn handler_panic_returns_500_and_server_keeps_running() {
+        let router = Router::builder()
+            .route(RouteFn::new(
+                Method::GET,
+                Cow::Borrowed(Path::new("/panic")),
+                panic_route,
+            ))
+            .route(RouteFn::new(
+                Method::GET,
+                Cow::Borrowed(Path::new("/x")),
+                say_route,
+            ))
+            .build();
+        let (addr, shutdown_tx, server) = spawn_server(RouterService::new(router)).await;
+
+        let response = get(addr, "/panic").await;
+        assert!(response.contains("500 Internal Server Error"));
+        assert!(response.ends_with("internal server error"));
+
+        let response = get(addr, "/x").await;
+        assert!(response.contains("200 OK"));
+        assert!(response.ends_with("served"));
+
+        shutdown_tx.send(()).unwrap();
+        shut_down(server).await;
+    }
+
+    #[tokio::test]
+    async fn response_body_panic_does_not_stop_server() {
+        let router = Router::builder()
+            .route(RouteFn::new(
+                Method::GET,
+                Cow::Borrowed(Path::new("/body-panic")),
+                panicking_body_route,
+            ))
+            .route(RouteFn::new(
+                Method::GET,
+                Cow::Borrowed(Path::new("/x")),
+                say_route,
+            ))
+            .build();
+        let (addr, shutdown_tx, server) = spawn_server(RouterService::new(router)).await;
+
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(b"GET /body-panic HTTP/1.1\r\nhost: test\r\nconnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut response = String::new();
+        // The response has already left the router, so the body panic ends
+        // this connection instead of becoming a replacement 500 response.
+        let _ = stream.read_to_string(&mut response).await;
+
+        let response = get(addr, "/x").await;
+        assert!(response.contains("200 OK"));
+        assert!(response.ends_with("served"));
+
+        shutdown_tx.send(()).unwrap();
+        shut_down(server).await;
     }
 
     #[cfg(unix)]

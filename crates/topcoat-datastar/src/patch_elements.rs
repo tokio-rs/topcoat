@@ -50,10 +50,18 @@ impl PatchElements {
 
     /// Creates a patch that removes the elements matching `selector` from the
     /// DOM.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `selector` contains a line break.
+    #[track_caller]
     pub fn remove(selector: impl Into<String>) -> Self {
+        let selector = selector.into();
+        common::assert_valid_selector(&selector);
+
         Self {
             elements: None,
-            selector: Some(selector.into()),
+            selector: Some(selector),
             mode: ElementPatchMode::Remove,
             use_view_transition: false,
             id: None,
@@ -63,8 +71,15 @@ impl PatchElements {
 
     /// Targets the elements matching this CSS selector instead of matching by
     /// `id`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `selector` contains a line break.
+    #[track_caller]
     pub fn selector(mut self, selector: impl Into<String>) -> Self {
-        self.selector = Some(selector.into());
+        let selector = selector.into();
+        common::assert_valid_selector(&selector);
+        self.selector = Some(selector);
         self
     }
 
@@ -192,6 +207,30 @@ mod tests {
              data: selector #stale\n\
              data: mode remove\n\n"
         );
+    }
+
+    #[test]
+    fn selector_line_breaks_panic() {
+        for selector in [
+            "#feed\nelements <img src=x onerror=alert(1)>",
+            "#feed\relements <img src=x onerror=alert(1)>",
+            "#feed\r\nelements <img src=x onerror=alert(1)>",
+        ] {
+            assert!(
+                std::panic::catch_unwind(|| {
+                    let _ = PatchElements::new("<p>safe</p>").selector(selector);
+                })
+                .is_err(),
+                "selector should panic for {selector:?}"
+            );
+            assert!(
+                std::panic::catch_unwind(|| {
+                    let _ = PatchElements::remove(selector);
+                })
+                .is_err(),
+                "remove should panic for {selector:?}"
+            );
+        }
     }
 
     #[tokio::test]

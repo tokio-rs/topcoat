@@ -40,4 +40,4 @@ yarn test
 
 ## New crates
 
-A new crate must be references in the toplevel `Cargo.toml` as well as `release-plz.toml`.
+A new crate must be referenced in the toplevel `Cargo.toml` as well as `release-plz.toml`.

@@ -18,7 +18,7 @@ When a feature is already best explained in detail by another part of the docume
 ## General
 
 * Use simple, concise language, no fancy words.
-* Avoid exhaustively listig specific implementations or uses that could evolve over time and go stale.
+* Avoid exhaustively listing specific implementations or uses that could evolve over time and go stale.
 * Use only ASCII characters in both code and documentation, e.g. `->` instead of unicode arrow or `...` instead of ellipsis character.
 * Avoid em-dashes entirely. Use colons and semicolons sparingly.
 * Keep individual paragraphs in a markdown file on a single line.

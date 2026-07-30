@@ -81,10 +81,10 @@ topcoat dev
 cargo topcoat dev
 ```
 
-By default, the bundle is written to:
+By default, the bundle is written to an `assets` directory next to the executable it was scanned from:
 
 ```text
-<cargo-target>/assets
+<cargo-target>/<profile>/assets
 ```
 
 The download/cache directory for remote assets is:
@@ -108,6 +108,15 @@ topcoat asset bundle --bin my-app
 topcoat asset bundle --package my-package
 ```
 
+The subcommands build the application to scan it, and they accept the same profile flags as `cargo build`. Bundle with the profile you are going to run, since each profile keeps its own bundle:
+
+```sh
+topcoat asset bundle --release
+topcoat asset bundle --profile my-profile
+```
+
+The profile matters beyond the output path. An asset's ID is derived from the path it was declared with, and a build script writes into `OUT_DIR`, whose path covers the target directory, the profile, and a per-build hash. `tailwind::stylesheet!()` is one such asset. So a `dev` bundle does not describe a `--release` binary even though the file on disk is identical, and a bundle built in one checkout does not describe a binary built in another. Bundle and binary have to come from the same build.
+
 To write the bundle somewhere else, pass `--out` and load the same directory at runtime:
 
 ```sh
@@ -122,7 +131,7 @@ let router = Router::builder()
     .build();
 ```
 
-When `--out` is not in one of the auto-detected locations, use [`AssetBundle::load_dir`] to point at it explicitly.
+[`AssetBundle::load`] only looks next to the executable, so any `--out` outside that location has to be loaded with [`AssetBundle::load_dir`].
 
 # Path resolution
 

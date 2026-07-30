@@ -33,6 +33,13 @@ pub(crate) fn respond(cx: &Cx, value: impl IntoResponse) -> Response {
         .unwrap_or_else(|error| error_into_response(cx, error))
 }
 
+/// Builds a bare 500 response without consulting request or application code.
+pub(crate) fn internal_server_response() -> Response {
+    let mut response = Response::new(Body::from("internal server error"));
+    *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+    response
+}
+
 /// Maps the framework's error types onto their HTTP status codes, falling back
 /// to a 500 for anything else.
 fn error_into_response(cx: &Cx, error: Error) -> Response {
@@ -59,11 +66,9 @@ fn error_into_response(cx: &Cx, error: Error) -> Response {
 /// Renders an error response, falling back to a bare 500 (none of the error
 /// types' responses can actually fail to build).
 fn into_response_or_500(cx: &Cx, value: impl IntoResponse) -> Response {
-    value.into_response(cx).unwrap_or_else(|_| {
-        let mut response = Response::new(Body::from("internal server error"));
-        *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-        response
-    })
+    value
+        .into_response(cx)
+        .unwrap_or_else(|_| internal_server_response())
 }
 
 /// Renders the contained value, or the framework error response on `Err`.
