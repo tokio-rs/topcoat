@@ -18,6 +18,18 @@ const OVERLAY: &str = "fixed inset-0 z-50 size-full max-h-none max-w-none items-
     justify-center overflow-y-auto bg-background/80 p-4 text-foreground backdrop-blur-sm \
     open:flex";
 
+/// The classes fading the veil in and out.
+///
+/// A dialog goes from not being rendered at all to covering the page, which
+/// takes two things beyond the fade itself. `display` is named in the
+/// transition with `allow-discrete`, which holds the layer on the page for as
+/// long as the fade out lasts instead of taking it away at once. And
+/// `@starting-style` gives the layer the value to come from: an element that
+/// was not rendered a moment ago has no previous style to leave behind, so
+/// without it the fade in has nothing to run from.
+const FADE: &str = "opacity-0 open:opacity-100 starting:open:opacity-0 \
+    [transition:opacity_200ms_ease-out,display_200ms_allow-discrete]";
+
 /// A dialog component: a panel over the page for a single task.
 ///
 /// The dialog is a native `<dialog>` whose open state is the `open`
@@ -69,7 +81,11 @@ pub async fn dialog(
     child: View,
 ) -> Result {
     view! {
-        <dialog open=(open) class=(class!(OVERLAY, attrs.remove("class"))) (attrs)>
+        <dialog
+            open=(open)
+            class=(class!(OVERLAY, FADE, attrs.remove("class")))
+            (attrs)
+        >
             (child)
         </dialog>
     }
@@ -87,6 +103,19 @@ pub async fn dialog(
 const CONTENT: &str = "relative my-auto flex w-full max-w-lg flex-col gap-4 rounded-xl \
     border border-border bg-background p-6 text-foreground shadow-sm";
 
+/// The classes bringing the panel in behind the veil.
+///
+/// It comes up a little short of its size and settles into it, which reads as
+/// the panel arriving rather than as the page cutting to it. The panel rests
+/// at that smaller size and is brought to full while the dialog around it is
+/// open, so it plays both ways: in as the dialog opens, and back out as it
+/// closes, for as long as the veil's fade holds the dialog on the page.
+/// `@starting-style` gives it the size to come from the first time, since a
+/// panel that was not rendered a moment ago has no previous size to leave.
+const MOTION: &str = "scale-95 opacity-0 in-[[open]]:scale-100 in-[[open]]:opacity-100 \
+    starting:in-[[open]]:scale-95 starting:in-[[open]]:opacity-0 \
+    [transition:scale_200ms_ease-out,opacity_200ms_ease-out]";
+
 /// The panel of a [`dialog`], holding the dialog's sections.
 ///
 /// A panel stacks a [`dialog_header`], the dialog's body, and a
@@ -95,7 +124,11 @@ const CONTENT: &str = "relative my-auto flex w-full max-w-lg flex-col gap-4 roun
 /// `max-w-*` class among the `attrs`.
 #[component]
 pub async fn dialog_content(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! { <div class=(class!(CONTENT, attrs.remove("class"))) (attrs)>(child)</div> }
+    view! {
+        <div class=(class!(CONTENT, MOTION, attrs.remove("class"))) (attrs)>
+            (child)
+        </div>
+    }
 }
 
 /// The opening section of a [`dialog_content`], stacking a [`dialog_title`]

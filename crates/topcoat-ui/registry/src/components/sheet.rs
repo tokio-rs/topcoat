@@ -13,6 +13,18 @@ use topcoat::{
 const OVERLAY: &str = "fixed inset-0 z-50 size-full max-h-none max-w-none overflow-hidden \
     bg-background/80 text-foreground backdrop-blur-sm open:flex";
 
+/// The classes fading the veil in and out.
+///
+/// A sheet goes from not being rendered at all to covering the page, which
+/// takes two things beyond the fade itself. `display` is named in the
+/// transition with `allow-discrete`, which holds the layer on the page for as
+/// long as the fade out lasts instead of taking it away at once. And
+/// `@starting-style` gives the layer the value to come from: an element that
+/// was not rendered a moment ago has no previous style to leave behind, so
+/// without it the fade in has nothing to run from.
+const FADE: &str = "opacity-0 open:opacity-100 starting:open:opacity-0 \
+    [transition:opacity_200ms_ease-out,display_200ms_allow-discrete]";
+
 /// A sheet component: a panel that comes in from an edge of the page.
 ///
 /// It is a [`dialog`](super::dialog::dialog) laid against a side rather than
@@ -55,7 +67,11 @@ pub async fn sheet(
     child: View,
 ) -> Result {
     view! {
-        <dialog open=(open) class=(class!(OVERLAY, attrs.remove("class"))) (attrs)>
+        <dialog
+            open=(open)
+            class=(class!(OVERLAY, FADE, attrs.remove("class")))
+            (attrs)
+        >
             (child)
         </dialog>
     }
@@ -94,6 +110,35 @@ impl SheetSide {
             Self::Bottom => "mt-auto max-h-full w-full border-t",
         }
     }
+
+    /// The Tailwind classes sliding the panel in from this side.
+    ///
+    /// The panel rests off the edge it comes from and is brought in while the
+    /// sheet around it is open, which is what makes it slide both ways: in as
+    /// the sheet opens, and back out as it closes, for as long as the veil's
+    /// fade holds the sheet on the page. `@starting-style` gives it the place
+    /// to come from the first time, since a panel that was not rendered a
+    /// moment ago has no previous position to leave.
+    fn motion(self) -> &'static str {
+        match self {
+            Self::Left => {
+                "-translate-x-full in-[[open]]:translate-x-0 \
+                 starting:in-[[open]]:-translate-x-full"
+            }
+            Self::Right => {
+                "translate-x-full in-[[open]]:translate-x-0 \
+                 starting:in-[[open]]:translate-x-full"
+            }
+            Self::Top => {
+                "-translate-y-full in-[[open]]:translate-y-0 \
+                 starting:in-[[open]]:-translate-y-full"
+            }
+            Self::Bottom => {
+                "translate-y-full in-[[open]]:translate-y-0 \
+                 starting:in-[[open]]:translate-y-full"
+            }
+        }
+    }
 }
 
 /// The classes shared by every sheet panel, regardless of side.
@@ -103,7 +148,7 @@ impl SheetSide {
 /// scrolls within itself once there is more in it than the edge it lies
 /// against is long.
 const CONTENT: &str = "flex flex-col gap-4 overflow-y-auto border-border bg-background p-6 \
-    text-foreground shadow-sm";
+    text-foreground shadow-sm [transition:translate_200ms_ease-out]";
 
 /// The panel of a [`sheet`], holding its sections.
 ///
@@ -124,7 +169,15 @@ pub async fn sheet_content(
     child: View,
 ) -> Result {
     view! {
-        <div class=(class!(CONTENT, side.classes(), attrs.remove("class"))) (attrs)>
+        <div
+            class=(class!(
+                CONTENT,
+                side.classes(),
+                side.motion(),
+                attrs.remove("class"),
+            ))
+            (attrs)
+        >
             (child)
         </div>
     }
