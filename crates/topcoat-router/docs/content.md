@@ -62,6 +62,8 @@ async fn create_user() -> Result<(StatusCode, Json<User>)> {
 }
 ```
 
+[`Js`] and [`Wasm`] are response-only wrappers for the two media types a browser checks rather than guesses: it refuses to execute a `<script type="module">` that does not arrive as JavaScript, and `WebAssembly.compileStreaming` rejects anything that is not exactly `application/wasm`. Reach for them when a route serves a script or a module by hand rather than through the asset bundle.
+
 Implement [`IntoResponse`](crate::response::IntoResponse) yourself for a type that should control its own status, headers, and body. A page sets its status and headers from inside the `view!` body instead; see the `view!` macro docs.
 
 # Multipart form data
