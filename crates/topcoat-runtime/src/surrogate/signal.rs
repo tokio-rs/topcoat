@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use ref_cast::RefCast;
 use serde::Serialize;
 
@@ -86,11 +88,16 @@ impl SignalSurrogate<f64> {
 impl SignalSurrogate<String> {
     /// Appends a string to the end of the value.
     ///
+    /// The argument is anything that dereferences to a string, so both a
+    /// borrowed `&str` and an owned `String` work. The owned form is what an
+    /// event field yields: `Event::target.value` is a `String`, so
+    /// `message.push_str(e.target.value)` is the common call.
+    ///
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
     #[track_caller]
-    pub fn push_str(&self, _s: &StrSurrogate) {
+    pub fn push_str(&self, _s: impl Deref<Target = StrSurrogate>) {
         write_in_browser_only();
     }
 }
