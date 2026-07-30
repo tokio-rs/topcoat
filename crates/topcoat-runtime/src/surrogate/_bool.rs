@@ -60,6 +60,34 @@ impl BoolSurrogate {
     {
         OptionSurrogate::new(self.0.then_some(t.into_real()))
     }
+
+    /// The `&&` of a runtime expression.
+    ///
+    /// The right side is a closure so that it is only evaluated when the left
+    /// side is true, which is what `&&` means in both languages. Taking a
+    /// value here instead would evaluate both sides and turn
+    /// `opt.is_some() && opt.unwrap() > 0.0` into a panic.
+    #[inline]
+    #[must_use]
+    pub fn and<F>(self, f: F) -> BoolSurrogate
+    where
+        F: FnOnce() -> BoolSurrogate,
+    {
+        if self.0 { f() } else { self }
+    }
+
+    /// The `||` of a runtime expression.
+    ///
+    /// As with [`and`](Self::and), the right side is a closure so it is only
+    /// evaluated when the left side is false.
+    #[inline]
+    #[must_use]
+    pub fn or<F>(self, f: F) -> BoolSurrogate
+    where
+        F: FnOnce() -> BoolSurrogate,
+    {
+        if self.0 { self } else { f() }
+    }
 }
 
 impl std::fmt::Display for BoolSurrogate {

@@ -29,6 +29,18 @@ export class Bool implements AttributeValueViewParts, NodeViewParts {
 		return this.v ? Option.some(t) : Option.none<T>();
 	}
 
+	// `expr!` compiles `a && b` to `a.and(() => b)`. The right side arrives as
+	// a thunk so it is only evaluated when the left side does not already
+	// decide the result, which is what `&&` means on both sides.
+	and(f: () => Bool): Bool {
+		return this.v ? f() : this;
+	}
+
+	// The `||` mirror: the right side runs only when the left side is false.
+	or(f: () => Bool): Bool {
+		return this.v ? this : f();
+	}
+
 	isAttributePresent(): boolean {
 		return this.v;
 	}

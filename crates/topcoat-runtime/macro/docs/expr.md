@@ -41,7 +41,7 @@ The captured value is serialized into the page during the render and becomes a c
 Expressions operate on a fixed vocabulary of types that exist on both sides, each exposing a subset of its Rust API. The members you reach for most:
 
 - `f64`: arithmetic (`+`, `-`, `*`, `/`), comparisons, and negation. All numbers are `f64`, matching JavaScript; integer literals are not accepted, so write `1.0` rather than `1`. Rendered text follows Rust's `Display`, so it is always positional, however large or small: `inf`, `-inf`, and `-0` are spelled the Rust way rather than the JavaScript way.
-- `bool`: `!`, equality comparisons, `then`, and `then_some`.
+- `bool`: `!`, `&&`, `||`, equality comparisons, `then`, and `then_some`. `&&` and `||` short-circuit the way they do in Rust, so the right side of `opt.is_some() && opt.unwrap() > 0.0` is not evaluated when the left side is false.
 - `String` and `&str`: `len`, `is_empty`, `trim`, `trim_start`, `trim_end`, `starts_with`, `ends_with`, `contains`, `to_owned`, and comparisons.
 - `Option<T>`: `is_some`, `is_none`, `unwrap`, and `expect`.
 - `Result<T, E>`: `is_ok`, `is_err`, `ok`, `err`, `unwrap`, `expect`, `unwrap_err`, and `expect_err`.
@@ -55,7 +55,7 @@ An expression is evaluated twice, once per side, so a member has to mean the sam
 Expressions use a subset of Rust's syntax:
 
 - String, `f64`, and `bool` literals.
-- The unary and binary operators listed above.
+- The unary and binary operators listed above, including `&&` and `||`.
 - Method calls, field access, and indexing.
 - Blocks, with `let` bindings of plain identifiers; the trailing expression is the block's value.
 - `if`/`else` as an expression.

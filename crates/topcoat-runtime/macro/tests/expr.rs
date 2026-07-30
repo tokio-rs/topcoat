@@ -53,3 +53,73 @@ async fn push_str_reaches_the_generated_javascript_with_its_argument() {
 
     assert!(html.contains(".push_str("), "{html}");
 }
+
+#[tokio::test]
+async fn logical_and_reaches_the_generated_javascript_lazily() {
+    let cx = &Cx::default();
+    let html = view! {
+        cx =>
+        signal a = true;
+        signal b = false;
+
+        <p>$(a.get() && b.get())</p>
+    }
+    .unwrap()
+    .render(cx);
+
+    // The right side is a thunk, so the browser only evaluates it when the
+    // left side is true. A bare `.and(x)` would evaluate both.
+    assert!(html.contains(".and(() =&gt;"), "{html}");
+    assert!(html.contains(">false<"), "{html}");
+}
+
+#[tokio::test]
+async fn logical_or_reaches_the_generated_javascript_lazily() {
+    let cx = &Cx::default();
+    let html = view! {
+        cx =>
+        signal a = true;
+        signal b = false;
+
+        <p>$(a.get() || b.get())</p>
+    }
+    .unwrap()
+    .render(cx);
+
+    assert!(html.contains(".or(() =&gt;"), "{html}");
+    assert!(html.contains(">true<"), "{html}");
+}
+
+/// `&&` short-circuits, so the right side of a guarded `unwrap` never runs.
+/// Compiling the operator to an eager call would panic here instead, which is
+/// why the right side is a closure rather than a value.
+#[tokio::test]
+async fn logical_and_does_not_evaluate_a_guarded_right_side() {
+    let cx = &Cx::default();
+    let absent: Option<f64> = None;
+
+    let html = view! {
+        cx =>
+        <p>$(absent.is_some() && absent.unwrap() > 0.0)</p>
+    }
+    .unwrap()
+    .render(cx);
+
+    assert!(html.contains(">false<"), "{html}");
+}
+
+/// The `||` mirror: the right side is skipped once the left side is true.
+#[tokio::test]
+async fn logical_or_does_not_evaluate_a_settled_right_side() {
+    let cx = &Cx::default();
+    let absent: Option<f64> = None;
+
+    let html = view! {
+        cx =>
+        <p>$(absent.is_none() || absent.unwrap() > 0.0)</p>
+    }
+    .unwrap()
+    .render(cx);
+
+    assert!(html.contains(">true<"), "{html}");
+}
