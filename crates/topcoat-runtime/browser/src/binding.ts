@@ -18,6 +18,13 @@ const PROPERTY_NAMES = new Set([
 	"indeterminate",
 ]);
 
+/** The subset of those properties the DOM holds as a boolean. */
+const BOOLEAN_PROPERTY_NAMES = new Set([
+	"checked",
+	"selected",
+	"indeterminate",
+]);
+
 type Compute = (ctx: Context) => unknown;
 
 export function setupBinding(el: Element, attr: Attr, scope: Scope): void {
@@ -34,9 +41,29 @@ export function setupBinding(el: Element, attr: Attr, scope: Scope): void {
 	});
 }
 
+/**
+ * Unwraps a computed value into the primitive its DOM property holds.
+ *
+ * A surrogate is an object and every object is truthy, so handing one straight
+ * to a boolean property leaves the element checked (or selected) whatever the
+ * expression evaluated to.
+ */
+export function propertyValue(name: string, value: unknown): unknown {
+	const isBoolean = BOOLEAN_PROPERTY_NAMES.has(name);
+	if (!isAttributeValueViewParts(value)) {
+		return isBoolean ? Boolean(value) : value;
+	}
+	if (isBoolean) return value.isAttributePresent();
+	// An absent value, such as a `None`, has no attribute value to read.
+	return value.isAttributePresent() ? value.toAttributeValue() : "";
+}
+
 function write(el: Element, name: string, value: unknown): void {
 	if (PROPERTY_NAMES.has(name)) {
-		(el as Element & Record<string, unknown>)[name] = value;
+		(el as Element & Record<string, unknown>)[name] = propertyValue(
+			name,
+			value,
+		);
 	}
 	if (isAttributeValueViewParts(value)) {
 		if (!value.isAttributePresent()) {
