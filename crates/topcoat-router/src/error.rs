@@ -8,6 +8,7 @@ mod method_not_allowed;
 mod not_found;
 mod redirect;
 mod service_unavailable;
+mod too_many_requests;
 mod unauthorized;
 
 pub use bad_request::*;
@@ -19,6 +20,7 @@ pub use method_not_allowed::*;
 pub use not_found::*;
 pub use redirect::*;
 pub use service_unavailable::*;
+pub use too_many_requests::*;
 use topcoat_core::{
     context::Cx,
     error::{Error, Result},
@@ -66,6 +68,7 @@ fn error_into_response(cx: &Cx, error: Error) -> Response {
     let error = try_downcast!(error as RedirectError);
     let error = try_downcast!(error as UnauthorizedError);
     let error = try_downcast!(error as ServiceUnavailableError);
+    let error = try_downcast!(error as TooManyRequestsError);
 
     into_response_or_500(cx, internal_server_error(error))
 }
@@ -296,6 +299,24 @@ mod tests {
                 .get(RETRY_AFTER)
                 .map(http::HeaderValue::as_bytes),
             Some(&b"2"[..])
+        );
+    }
+
+    /// The 429 mirror: a rate limit answered as "the server is broken" is the
+    /// failure this guards.
+    #[test]
+    fn a_too_many_requests_error_maps_to_429_not_500() {
+        let error: Error = too_many_requests(60).into();
+
+        let response = error_into_response(&Cx::default(), error);
+
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            response
+                .headers()
+                .get(RETRY_AFTER)
+                .map(http::HeaderValue::as_bytes),
+            Some(&b"60"[..])
         );
     }
 
