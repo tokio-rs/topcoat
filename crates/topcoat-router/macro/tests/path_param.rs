@@ -239,10 +239,12 @@ async fn returns_catch_all_parse_error_to_call_site() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "path parameter \"missing\" was not found in request path")]
 async fn missing_parameter_panics() {
     let router = Router::builder().page(missing_param).build();
-    let _ = send(&router, "/missing-param").await;
+    // The router isolates handler panics, so the panic surfaces as a 500.
+    let (status, body) = send(&router, "/missing-param").await;
+    assert_eq!(status, 500);
+    assert_eq!(body, "internal server error");
 }
 
 #[test]
