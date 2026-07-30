@@ -90,6 +90,43 @@ HOST=0.0.0.0 PORT=8080 topcoat dev
 
 As your app grows, so does the time each rebuild takes. The [build performance chapter](https://doc.rust-lang.org/cargo/guide/build-performance.html) of the Cargo book collects general advice for speeding up compilation, most of which applies directly to a Topcoat project.
 
+## Troubleshooting
+
+A few issues come up often when setting up a project or running the examples.
+
+### `Address already in use`
+
+The server binds `127.0.0.1:3000` by default, so startup fails with `Address already in use` when something else is already listening there, for example another example app that is still running. Stop the other process, or pick a different port:
+
+```sh
+PORT=8080 topcoat dev
+```
+
+### `cargo run --manifest-path` cannot find the manifest
+
+`--manifest-path` is resolved relative to the current directory. The Topcoat example READMEs assume you run their commands from the repository root, so `cargo run --manifest-path examples/hello-world/Cargo.toml` fails with a `manifest path ... does not exist` error when run from inside an example directory. Either move to the repository root, or drop the flag and use a plain `cargo run` from the example's own directory.
+
+### `cargo run` vs `topcoat dev`
+
+`cargo run` builds the binary and serves the app, and that is all. `topcoat dev` additionally bundles assets before starting the server, watches your sources, and rebuilds, rebundles, and restarts on changes, with browser reload for pages that include `topcoat::dev::script()`. Use `cargo run` for a quick one-off launch of an app without assets; use `topcoat dev` for day-to-day development.
+
+### `topcoat: command not found`
+
+The CLI is a separate crate. Install it with `cargo install topcoat-cli`, which places a `topcoat` binary in Cargo's bin directory (usually `~/.cargo/bin`). If the shell still cannot find it, make sure that directory is in your `PATH` environment variable. The CLI is also available as `cargo topcoat ...`, which works as long as `cargo` itself is on your `PATH`.
+
+### An example panics because assets are missing
+
+Apps that call `AssetBundle::load()`, including several examples, expect their asset bundle to have been generated at build time. Running such an app with a plain `cargo run` panics or serves broken asset URLs if the bundle was never written. Run it under `topcoat dev`, which bundles assets automatically, or generate the bundle first with `topcoat asset bundle` and then `cargo run`.
+
+### Repeated rustfmt warnings about unstable options
+
+If a project's `rustfmt.toml` sets unstable options, as the Topcoat repository itself does, the stable toolchain prints a `Warning: can't set ...` line for each of them on every `cargo fmt` run and skips those options. The formatting still completes, but incompletely. To apply the full configuration and silence the warnings, install the nightly toolchain and format with it:
+
+```sh
+rustup toolchain install nightly
+cargo +nightly fmt
+```
+
 ## Where to next
 
 More documentation is available in the [README](https://github.com/tokio-rs/topcoat/tree/main#learn-topcoat), which links a guide for every part of the framework.
