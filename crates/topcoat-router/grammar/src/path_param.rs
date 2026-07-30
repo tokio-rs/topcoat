@@ -232,7 +232,7 @@ impl Parse for PathParam {
         };
 
         if let Some(error) = &param.error
-            && !param.param_type().is_some()
+            && param.param_type().is_none()
         {
             return Err(syn::Error::new(
                 error.error.span(),
