@@ -57,7 +57,7 @@ impl RouterBuilderCookieExt for RouterBuilder {
 mod tests {
     use http::{Method, Request, header};
     use topcoat_core::{context::Cx, error::Result};
-    use topcoat_router::{Body, Methods, Path, Response, Route, RouteFuture, Router};
+    use topcoat_router::{Body, Methods, Path, Route, RouteFuture, Router, response::Response};
 
     use crate::{Cookies, RouterBuilderCookieExt, cookies};
 

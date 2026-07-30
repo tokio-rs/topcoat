@@ -8,7 +8,6 @@ use syn::{
     parse::{Parse, ParseStream},
     visit::{self, Visit},
 };
-
 use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::expr::{

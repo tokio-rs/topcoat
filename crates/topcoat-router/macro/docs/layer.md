@@ -20,7 +20,7 @@ Explicit path:
 use topcoat::{
     Result,
     context::CxBuilder,
-    router::{Body, Next, Response, layer},
+    router::{Body, Next, layer, response::Response},
 };
 
 #[layer("/")]
@@ -35,7 +35,7 @@ async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Respon
 Module-derived path (in `src/app/api.rs` under `module_router!()`, this wraps every request under `/api`):
 
 ```rust
-# use topcoat::{Result, context::CxBuilder, router::{Body, Next, Response, layer}};
+# use topcoat::{Result, context::CxBuilder, router::{Body, Next, layer, response::Response}};
 #[layer]
 async fn api_log(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;

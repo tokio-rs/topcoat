@@ -1,8 +1,10 @@
 use std::time::SystemTime;
 
-use topcoat::Result;
-use topcoat::context::Cx;
-use topcoat::mail::{Attachment, Mail, Mailbox, TextBody, mail};
+use topcoat::{
+    Result,
+    context::Cx,
+    mail::{Attachment, Mail, Mailbox, TextBody, mail},
+};
 
 #[tokio::test]
 async fn empty_body_builds_a_default_mail() -> Result<()> {

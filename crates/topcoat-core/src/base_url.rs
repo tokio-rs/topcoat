@@ -172,6 +172,7 @@ pub enum BaseUrlError {
 /// }
 /// ```
 #[must_use]
+#[track_caller]
 pub fn base_url(cx: &Cx) -> &BaseUrl {
     match try_base_url(cx) {
         Some(base_url) => base_url,

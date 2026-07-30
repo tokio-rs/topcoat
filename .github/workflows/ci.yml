@@ -44,8 +44,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: rustup update stable && rustup default stable
-      - run: cargo fmt --all -- --check
+      - run: rustup update nightly && rustup default nightly
+      - run: cargo +nightly fmt --all -- --check
 
   docs:
     name: docs

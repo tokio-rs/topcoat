@@ -22,6 +22,7 @@ impl UnicodeCodePoint {
     /// Panics if `code_point` is greater than `U+10FFFF`. Use
     /// `UnicodeCodePoint::try_from` for a non-panicking conversion.
     #[must_use]
+    #[track_caller]
     pub const fn new(code_point: u32) -> Self {
         assert!(
             code_point <= 0x10_FFFF,
@@ -90,6 +91,7 @@ impl UnicodeRange {
     ///
     /// Panics if `end` is before `start`.
     #[must_use]
+    #[track_caller]
     pub const fn new(start: UnicodeCodePoint, end: UnicodeCodePoint) -> Self {
         assert!(end.0 >= start.0, "unicode range must not be empty");
         Self { start, end }
@@ -102,6 +104,7 @@ impl UnicodeRange {
     /// Panics if either value is greater than `U+10FFFF`, or if `end` is
     /// before `start`.
     #[must_use]
+    #[track_caller]
     pub const fn from_u32(start: u32, end: u32) -> Self {
         Self::new(UnicodeCodePoint::new(start), UnicodeCodePoint::new(end))
     }

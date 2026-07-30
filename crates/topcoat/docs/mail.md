@@ -98,9 +98,10 @@ The crate ships three transports; each implements the [`Transport`] trait the [`
 [`SmtpTransport`] (behind the `mail-smtp` feature) submits to an SMTP server: a mail provider's submission endpoint or your own mail server. Connections are pooled and reused across sends. Point it at a host with [`relay`](SmtpTransport::relay) (implicit TLS on port 465) or [`starttls`](SmtpTransport::starttls) (STARTTLS on port 587), or configure it from a connection URL, the form that fits a single environment variable:
 
 ```rust,no_run
+# #[cfg(feature = "mail-smtp")]
+# fn example() -> Result<(), topcoat::mail::SmtpError> {
 use topcoat::mail::SmtpTransport;
 
-# fn main() -> Result<(), topcoat::mail::SmtpError> {
 let explicit = SmtpTransport::relay("smtp.example.com")?
     .credentials("username", "password")
     .build();

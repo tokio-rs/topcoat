@@ -95,6 +95,7 @@ impl MemoizeEqCache {
     /// downcast back to `OnceLock<V>` (which indicates a marker/type mismatch
     /// between the caller and the function that originally memoized the value).
     #[allow(clippy::needless_pass_by_value)]
+    #[track_caller]
     pub fn get<K, V, F>(&self, marker: F, key: K) -> Option<&V>
     where
         K: Copy,
@@ -245,8 +246,9 @@ mod impls {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use super::*;
 
     /// Returns a fresh counter with `'static` lifetime so closures that capture it can be
     /// `Copy + 'static` (the bounds `MemoizeCache::memoize` imposes on its function).

@@ -3,13 +3,13 @@ mod mail_field;
 
 pub use field_value::*;
 pub use mail_field::*;
-
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::Token;
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
-
+use syn::{
+    Token,
+    parse::{Parse, ParseStream},
+    punctuated::Punctuated,
+};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_mail};
 
 /// The parsed body of a `mail!` invocation: `name: value` fields in any

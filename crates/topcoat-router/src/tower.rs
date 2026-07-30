@@ -1,20 +1,26 @@
 #![doc = include_str!("../docs/tower.md")]
 
-use std::borrow::Cow;
-use std::fmt::{self, Display};
-use std::future::Future;
-use std::pin::{Pin, pin};
-use std::task::{Context, Poll};
+use std::{
+    borrow::Cow,
+    fmt::{self, Display},
+    future::Future,
+    pin::{Pin, pin},
+    task::{Context, Poll},
+};
 
 use bytes::Bytes;
 use tokio::sync::{mpsc, oneshot};
-use topcoat_core::context::{Cx, CxBuilder};
-use topcoat_core::error::{Error, Result};
+use topcoat_core::{
+    context::{Cx, CxBuilder},
+    error::{Error, Result},
+};
 use tower::ServiceExt;
 
 use crate::{
-    Body, BoxError, IntoPath, Layer, LayerFuture, Methods, Next, OwnedMethods, Path, Request,
-    Response, Route, RouteFuture, parts,
+    Body, BoxError, IntoPath, Layer, LayerFuture, Methods, Next, OwnedMethods, Path, Route,
+    RouteFuture,
+    request::{Request, parts},
+    response::Response,
 };
 
 /// A [`Route`] that forwards its requests to a tower service.
@@ -44,7 +50,9 @@ use crate::{
 /// ```rust
 /// use std::convert::Infallible;
 ///
-/// use topcoat::router::{Body, Methods, Request, Response, Router, tower::TowerRoute};
+/// use topcoat::router::{
+///     Body, Methods, Router, request::Request, response::Response, tower::TowerRoute,
+/// };
 /// use tower::service_fn;
 ///
 /// // Stands in for a legacy tower application, like an axum router.
@@ -78,6 +86,7 @@ impl<S> TowerRoute<S> {
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
     #[must_use]
+    #[track_caller]
     pub fn new(methods: impl Into<OwnedMethods>, path: impl IntoPath, service: S) -> Self {
         Self {
             methods: methods.into(),
@@ -184,6 +193,7 @@ impl<S> TowerLayer<S> {
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
     #[must_use]
+    #[track_caller]
     pub fn at(mut self, path: impl IntoPath) -> Self {
         self.path = path.into_path();
         self
@@ -463,20 +473,23 @@ fn recover(error: BoxError) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-    use std::convert::Infallible;
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::time::Duration;
+    use std::{
+        borrow::Cow,
+        convert::Infallible,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
 
-    use http::request::Parts;
-    use http::{HeaderValue, StatusCode};
+    use http::{HeaderValue, StatusCode, request::Parts};
     use topcoat_core::context::Cx;
 
     use super::*;
     use crate::{
-        Bytes, IntoResponse, Layers, Method, RouteFn, RouteFuture, Router, Terminal,
-        error::NotFoundError, to_bytes,
+        Layers, Method, RouteFn, RouteFuture, Router, Terminal, error::NotFoundError,
+        request::Bytes, response::IntoResponse, to_bytes,
     };
 
     // -- Test helpers --
@@ -526,7 +539,7 @@ mod tests {
     /// edits made by middleware.
     fn echo_header(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
-            let value = crate::headers(cx)
+            let value = crate::request::headers(cx)
                 .get("x-tower")
                 .and_then(|value| value.to_str().ok())
                 .unwrap_or("missing")

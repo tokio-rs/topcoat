@@ -1,9 +1,8 @@
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
-use crate::pretty::pretty_print_str;
-
 use super::{PrettyPrint, Printer, TextMode};
+use crate::pretty::pretty_print_str;
 
 fn format_rust_snippet(
     printer: &mut Printer<'_>,

@@ -4,7 +4,7 @@ A handler declares the request body it accepts and the response it sends through
 
 # Reading a request body
 
-A page or route handler can take the request context as `cx: &Cx` and, alongside it, a single request body parameter. That parameter can be any type that implements [`FromRequest`](crate::FromRequest). [`Json`] and [`Form`] deserialize the body into a type of your own, while [`Bytes`](crate::Bytes) and [`String`] hand it over unparsed and [`Body`](crate::Body) leaves it as a stream to read yourself.
+A page or route handler can take the request context as `cx: &Cx` and, alongside it, a single request body parameter. That parameter can be any type that implements [`FromRequest`](crate::request::FromRequest). [`Json`] and [`Form`] deserialize the body into a type of your own, while [`Bytes`](crate::request::Bytes) and [`String`] hand it over unparsed and [`Body`](crate::Body) leaves it as a stream to read yourself.
 
 ```rust
 # #[derive(serde::Deserialize)] struct CreateUser { name: String }
@@ -38,11 +38,11 @@ let router = Router::builder()
 
 Taking [`Body`](crate::Body) directly is not limited, because the handler streams the body instead of buffering it.
 
-Implement [`FromRequest`](crate::FromRequest) yourself for request parsing the built-in extractors do not cover, such as a body that is verified against a signature header before it is deserialized. Delegate the buffering to [`Bytes`](crate::Bytes) so the body limit stays applied.
+Implement [`FromRequest`](crate::request::FromRequest) yourself for request parsing the built-in extractors do not cover, such as a body that is verified against a signature header before it is deserialized. Delegate the buffering to [`Bytes`](crate::request::Bytes) so the body limit stays applied.
 
 # Returning a response
 
-A route returns `Result<T>` for any `T` that implements [`IntoResponse`](crate::IntoResponse). The same wrappers work in return position, where they serialize the value and set the matching `Content-Type`; a string or byte buffer becomes the body as is.
+A route returns `Result<T>` for any `T` that implements [`IntoResponse`](crate::response::IntoResponse). The same wrappers work in return position, where they serialize the value and set the matching `Content-Type`; a string or byte buffer becomes the body as is.
 
 A tuple builds a response from several parts. The last element is the body, a leading [`StatusCode`](crate::StatusCode) sets the status, and the elements in between attach headers or extensions:
 
@@ -62,7 +62,7 @@ async fn create_user() -> Result<(StatusCode, Json<User>)> {
 }
 ```
 
-Implement [`IntoResponse`](crate::IntoResponse) yourself for a type that should control its own status, headers, and body. A page sets its status and headers from inside the `view!` body instead; see the `view!` macro docs.
+Implement [`IntoResponse`](crate::response::IntoResponse) yourself for a type that should control its own status, headers, and body. A page sets its status and headers from inside the `view!` body instead; see the `view!` macro docs.
 
 # Multipart form data
 

@@ -3,7 +3,6 @@ use syn::{
     Expr, ExprBreak, ExprContinue, Pat, Token,
     parse::{Parse, ParseStream},
 };
-
 use topcoat_core_grammar::ParseOption;
 
 use crate::{
@@ -174,9 +173,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for TemplateBreak {
 
 #[cfg(test)]
 mod tests {
+    use quote::ToTokens;
+
     use super::*;
     use crate::view::Nodes;
-    use quote::ToTokens;
 
     fn parse(source: &str) -> TemplateForLoop<Nodes> {
         syn::parse_str(source).unwrap()

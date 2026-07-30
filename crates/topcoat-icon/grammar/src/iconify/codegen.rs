@@ -3,7 +3,6 @@ use std::fmt::Write as _;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Visibility;
-
 use topcoat_core_grammar::paths::{topcoat_icon, topcoat_view};
 use topcoat_icon::iconify::{IconSet, ResolvedIcon};
 

@@ -2,8 +2,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use super::artifacts::Artifact;
-use super::stderr::StderrTail;
+use super::{artifacts::Artifact, stderr::StderrTail};
 
 /// The messages cargo wrote to stdout during a build, one JSON object per
 /// line: rustc's diagnostics and the artifacts of every compiled crate.
@@ -106,8 +105,9 @@ impl Diagnostic {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     fn messages(values: &[serde_json::Value]) -> Messages {
         let lines: Vec<String> = values.iter().map(ToString::to_string).collect();

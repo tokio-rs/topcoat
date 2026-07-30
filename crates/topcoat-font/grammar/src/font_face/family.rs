@@ -4,7 +4,6 @@ use syn::{
     Expr, Lit, Token,
     parse::{Parse, ParseStream},
 };
-
 use topcoat_core_grammar::ParseOption;
 
 mod kw {

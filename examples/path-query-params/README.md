@@ -117,7 +117,7 @@ curl --include \
 - `query_params::<PostsQuery>(cx)` reads the values from the request.
 - `Option` allows `page` and `q` to be omitted.
 - `PostId` wraps the numeric post identifier.
-- `#[path_param]` enables typed path-segment parsing.
+- `path_param!(post_id: u32, ...)` declares typed path-segment parsing.
 - `path_param::<PostId>(cx)` reads `{post_id}` from the request path.
 - Invalid post IDs return the custom bad request message.
 

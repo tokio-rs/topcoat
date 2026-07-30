@@ -10,8 +10,8 @@ A route becomes a WebSocket endpoint by taking a [`WebSocketUpgrade`] parameter 
 use topcoat::{
     Result,
     router::{
-        Response,
         content::websocket::{Message, WebSocketUpgrade},
+        response::Response,
         route,
     },
 };
@@ -39,7 +39,9 @@ Browsers include an `Origin` header in every WebSocket handshake. `on_upgrade` r
 ```rust
 use topcoat::{
     Result,
-    router::{Response, Router, content::websocket::WebSocketUpgrade, route},
+    router::{
+        Router, content::websocket::WebSocketUpgrade, response::Response, route,
+    },
 };
 
 #[route(GET "/notifications")]

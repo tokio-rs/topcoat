@@ -4,9 +4,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_quote,
 };
-
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_runtime;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime};
 
 use crate::view::{ExprKind, ViewWriter, WriteView};
 

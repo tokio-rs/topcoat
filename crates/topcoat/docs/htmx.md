@@ -142,4 +142,4 @@ let trigger = HxResponseTrigger::after_swap([
 
 The raw `HX-*` header names are available as `HeaderName` constants in [`topcoat::htmx::header`](crate::htmx::header), for when you want to read or write a header directly.
 
-[`IntoResponseParts`]: crate::router::IntoResponseParts
+[`IntoResponseParts`]: crate::router::response::IntoResponseParts

@@ -4,7 +4,7 @@ mod error;
 mod event;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::Write as _,
     fs, io,
     path::Path,
@@ -12,16 +12,15 @@ use std::{
     thread,
 };
 
+use cache::Cache;
+pub use config::*;
+pub use error::*;
+pub use event::*;
 use sha2::{Digest, Sha256};
 
 use crate::{
     AssetError, AssetId, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset, Source,
 };
-
-use cache::Cache;
-pub use config::*;
-pub use error::*;
-pub use event::*;
 
 /// Scans a built binary for [`asset!`](crate::asset) declarations and
 /// writes the referenced files into a bundle directory.
@@ -69,6 +68,11 @@ impl Bundler {
     /// reading/writing a bundled file; and for a checksum mismatch between a
     /// declared asset and its configured `checksum`. When several assets
     /// fail, the one declared earliest is reported.
+    ///
+    /// Assets that resolve to the same output filename share one bundled
+    /// file and one route, so they must agree on how that file is served:
+    /// two of them declaring different content types is rejected with
+    /// [`BundleError::ConflictingContentTypes`].
     pub fn bundle(&self, binary: &[u8], out_dir: impl AsRef<Path>) -> BundleResult {
         let out_dir = out_dir.as_ref();
         fs::create_dir_all(out_dir).map_err(|source| AssetError::ManifestIo {
@@ -99,7 +103,7 @@ impl Bundler {
         });
 
         let mut entries = Vec::with_capacity(assets.len());
-        let mut kept_files = HashSet::with_capacity(assets.len());
+        let mut kept_files = HashMap::with_capacity(assets.len());
         let mut bundled = 0;
         let mut unchanged = 0;
         for prepared in self.prepare_all(&assets, &existing, out_dir) {
@@ -109,13 +113,22 @@ impl Bundler {
             } else {
                 unchanged += 1;
             }
-            kept_files.insert(prepared.entry.file.clone());
+            let content_type = prepared.entry.content_type.clone();
+            if let Some(first) = kept_files.insert(prepared.entry.file.clone(), content_type)
+                && first != prepared.entry.content_type
+            {
+                return Err(BundleError::ConflictingContentTypes {
+                    file: prepared.entry.file,
+                    first,
+                    second: prepared.entry.content_type,
+                });
+            }
             entries.push(prepared.entry);
         }
 
         let mut removed = 0;
         for entry in existing.values() {
-            if !kept_files.contains(&entry.file) {
+            if !kept_files.contains_key(&entry.file) {
                 let path = out_dir.join(&entry.file);
                 match fs::remove_file(&path) {
                     Ok(()) => {
@@ -312,9 +325,8 @@ struct Prepared {
 mod tests {
     use std::{env, path::PathBuf};
 
-    use crate::{AssetOptions, ENCODED_ASSET_SIZE};
-
     use super::*;
+    use crate::{AssetOptions, ENCODED_ASSET_SIZE};
 
     /// A fresh directory under the system temp directory.
     fn temp_dir(name: &str) -> PathBuf {
@@ -697,6 +709,69 @@ mod tests {
         let manifest = Fixture::manifest(&out);
         assert_eq!(manifest.assets[0].content_type, "text/css");
         assert_eq!(manifest.assets[1].content_type, "application/x-custom");
+    }
+
+    #[test]
+    fn one_output_file_declared_with_two_content_types_is_rejected() {
+        let mut fixture = Fixture::new("content-type-conflict");
+        let contents = "<svg></svg>";
+        fixture.declare_with(
+            "mark.svg",
+            contents,
+            &AssetOptions {
+                content_type: Some("image/svg+xml".into()),
+                ..AssetOptions::NONE
+            },
+        );
+        fixture.declare_with(
+            "mark.svg",
+            contents,
+            &AssetOptions {
+                content_type: Some("text/plain".into()),
+                ..AssetOptions::NONE
+            },
+        );
+
+        let out = fixture.out();
+        let error = fixture.bundle(&out, 1).0.unwrap_err();
+        match error {
+            BundleError::ConflictingContentTypes {
+                file,
+                first,
+                second,
+            } => {
+                assert_eq!(file, format!("mark-{}.svg", &sha256(contents)[..16]));
+                assert_eq!(first, "image/svg+xml");
+                assert_eq!(second, "text/plain");
+            }
+            other => panic!("expected conflicting content types, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn one_output_file_declared_with_one_content_type_is_accepted() {
+        let mut fixture = Fixture::new("content-type-agreement");
+        let contents = "<svg></svg>";
+        let options = AssetOptions {
+            content_type: Some("image/svg+xml".into()),
+            ..AssetOptions::NONE
+        };
+        fixture.declare_with("mark.svg", contents, &options);
+        fixture.declare_with(
+            "mark.svg",
+            contents,
+            &AssetOptions {
+                rename: Some("mark".into()),
+                ..options
+            },
+        );
+
+        let out = fixture.out();
+        fixture.bundle(&out, 1).0.unwrap();
+
+        let manifest = Fixture::manifest(&out);
+        assert_eq!(manifest.assets.len(), 2);
+        assert_eq!(manifest.assets[0].file, manifest.assets[1].file);
     }
 
     #[test]

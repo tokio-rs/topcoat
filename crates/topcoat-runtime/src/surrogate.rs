@@ -8,14 +8,13 @@ mod signal;
 mod string;
 mod tuple;
 
-use serde::{Deserialize, Serialize, de};
-
 pub use _bool::*;
 pub use _f64::*;
 pub use _str::*;
 pub use event::*;
 pub use option::*;
 pub use result::*;
+use serde::{Deserialize, Serialize, de};
 pub use signal::*;
 pub use string::*;
 

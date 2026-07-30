@@ -1,5 +1,4 @@
 use std::{
-    ffi::OsStr,
     io,
     path::{Path, PathBuf},
 };
@@ -18,34 +17,24 @@ pub struct AssetBundle {
 }
 
 impl AssetBundle {
-    /// Auto-detect and load the bundle from a conventional location.
+    /// Load the bundle sitting next to the current executable.
     ///
-    /// Walks up from the current executable, checking each ancestor for an
-    /// `assets/manifest.toml`. This covers, without configuration:
+    /// The bundler writes to an `assets` directory beside the executable it
+    /// scanned, so `<exe_dir>/assets` is where a bundle belongs: `cargo run`
+    /// finds `target/<profile>/assets`, and a deployment ships the directory
+    /// alongside the binary.
     ///
-    /// - `<exe_dir>/assets/`: deployment, bundle shipped next to the binary.
-    /// - `target/<profile>/<bin>` -> `target/assets/` (typical `cargo run`).
-    /// - `target/<profile>/examples/<bin>` -> `target/assets/`.
-    /// - `target/<triple>/<profile>/<bin>` -> `target/assets/` (cross-compile).
-    /// - `target/<triple>/<profile>/examples/<bin>` -> `target/assets/`.
-    ///
-    /// The first directory that contains a readable `manifest.toml` is
-    /// loaded. The walk stops once it reaches a directory named `target`
-    /// (since `<target>/assets` is checked at that step) or after a bounded
-    /// number of ancestors. Returns [`io::ErrorKind::NotFound`] if no
-    /// candidate has a manifest.
-    ///
-    /// Use [`AssetBundle::load_dir`] when you already know the exact bundle
-    /// directory, such as a custom path passed to the asset bundler.
+    /// Use [`AssetBundle::load_dir`] when the bundle lives anywhere else, such
+    /// as a custom path passed to the asset bundler with `--out`.
     ///
     /// # Errors
     ///
-    /// Returns [`io::ErrorKind::NotFound`] if no candidate `assets` directory
-    /// contains a readable manifest, or propagates any I/O or parse error from
-    /// reading the located manifest via [`AssetBundle::load_dir`].
+    /// Returns [`io::ErrorKind::NotFound`] if there is no readable manifest
+    /// next to the executable, or propagates any I/O or parse error from
+    /// reading it via [`AssetBundle::load_dir`].
     pub fn load() -> io::Result<Self> {
         let exe = std::env::current_exe()?;
-        let exe_dir = exe
+        let dir = exe
             .parent()
             .ok_or_else(|| {
                 io::Error::new(
@@ -53,35 +42,16 @@ impl AssetBundle {
                     "current executable has no parent directory",
                 )
             })?
-            .to_path_buf();
+            .join("assets");
 
-        let mut tried = Vec::new();
-        let mut current = Some(exe_dir.as_path());
-        for _ in 0..6 {
-            let Some(d) = current else { break };
-            let candidate = d.join("assets");
-            if candidate.join(MANIFEST_NAME).is_file() {
-                return Self::load_dir(candidate);
-            }
-            tried.push(candidate);
-            if d.file_name() == Some(OsStr::new("target")) {
-                break;
-            }
-            current = d.parent();
+        if !dir.join(MANIFEST_NAME).is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("no asset bundle at {}", dir.display()),
+            ));
         }
 
-        Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            format!(
-                "no asset bundle found near {}: tried {}",
-                exe_dir.display(),
-                tried
-                    .iter()
-                    .map(|p| p.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-        ))
+        Self::load_dir(dir)
     }
 
     /// Load a bundle from a specific directory.

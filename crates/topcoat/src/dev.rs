@@ -1,12 +1,15 @@
-use crate::Result;
+#[cfg(feature = "serve")]
+use std::net::SocketAddr;
+
 #[cfg(feature = "serve")]
 use futures_util::SinkExt;
 #[cfg(feature = "serve")]
-use std::net::SocketAddr;
-#[cfg(feature = "serve")]
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::view::{component, view};
+use crate::{
+    Result,
+    view::{component, view},
+};
 
 /// Notify the topcoat dev server that the application is ready.
 ///

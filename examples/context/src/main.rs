@@ -1,7 +1,10 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Router, RouterBuilderDiscoverExt, headers, page, uri},
+    router::{
+        Router, RouterBuilderDiscoverExt, page,
+        request::{headers, uri},
+    },
     view::view,
 };
 

@@ -67,8 +67,9 @@ fn is_final_library(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     fn artifact(crate_types: &[&str], filenames: &[&str]) -> Artifact {
         serde_json::from_value(json!({

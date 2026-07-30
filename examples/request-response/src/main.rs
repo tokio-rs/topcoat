@@ -3,11 +3,12 @@ use topcoat::{
     Result,
     context::Cx,
     router::{
-        Body, Bytes, FromRequest, IntoResponse, Response, Router, RouterBuilderDiscoverExt,
-        body_limit,
+        Body, Router, RouterBuilderDiscoverExt, body_limit,
         content::{Form, Json, RawForm, multipart::Multipart},
         error::bad_request,
-        headers, route, to_bytes,
+        request::{Bytes, FromRequest, headers},
+        response::{IntoResponse, Response},
+        route, to_bytes,
     },
 };
 
@@ -113,9 +114,7 @@ async fn read_bytes(body: Bytes) -> Result<String> {
 // A raw stream bypasses the body limit; pass body_limit(cx) to keep it.
 #[route(POST "/api/upload")]
 async fn upload(cx: &Cx, body: Body) -> Result<String> {
-    let bytes = to_bytes(body, body_limit(cx))
-        .await
-        .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
+    let bytes = to_bytes(body, body_limit(cx)).await?;
 
     Ok(format!("received {} bytes", bytes.len()))
 }

@@ -3,8 +3,11 @@ use std::ops::{Deref, DerefMut};
 use serde::{Deserialize, de::DeserializeOwned};
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
-    Body, FromRequest, Method, OptionalFromRequest, content::Json, error::bad_request, method,
+    Body, Method,
+    content::Json,
+    error::bad_request,
     parse_query_params,
+    request::{FromRequest, OptionalFromRequest, method},
 };
 
 use crate::datastar_request;
@@ -107,8 +110,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use http::Request;
-    use http::header::CONTENT_TYPE;
+    use http::{Request, header::CONTENT_TYPE};
     use serde_json::{Value, json};
     use topcoat_core::context::CxTestBuilder;
     use topcoat_router::error::BadRequestError;

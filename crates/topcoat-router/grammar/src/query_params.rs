@@ -8,7 +8,7 @@ use topcoat_core_grammar::paths::{
     topcoat_context, topcoat_context_macro, topcoat_router, topcoat_serde,
 };
 
-use super::error_attr::ErrorAttr;
+use super::common::ErrorAttr;
 
 pub struct QueryParamsAttr {
     error: Option<ErrorAttr>,

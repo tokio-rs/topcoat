@@ -6,7 +6,6 @@ mod socket;
 mod upgrade;
 
 pub use message::*;
+pub(crate) use origin::*;
 pub use socket::*;
 pub use upgrade::*;
-
-pub(crate) use origin::*;

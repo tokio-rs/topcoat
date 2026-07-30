@@ -203,7 +203,7 @@ use std::time::Duration;
 
 use topcoat::{
     context::Cx,
-    router::headers,
+    router::request::headers,
     session::{Token, TokenStore, TokenStoreFuture},
 };
 

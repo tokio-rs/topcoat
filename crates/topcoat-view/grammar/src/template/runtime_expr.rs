@@ -4,9 +4,7 @@ use syn::{
     Token, parenthesized,
     parse::{Parse, ParseStream},
 };
-
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_runtime_macro;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime_macro};
 
 use crate::view::{ExprKind, ViewWriter, WriteView};
 

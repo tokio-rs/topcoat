@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use topcoat_core::context::Cx;
 
-use crate::context::uri;
+use crate::request::uri;
 
 /// A typed view of the request's query string, as declared by
 /// [`#[query_params]`](attr.query_params.html).

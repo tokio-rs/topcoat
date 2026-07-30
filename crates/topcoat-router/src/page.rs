@@ -1,10 +1,11 @@
-use std::borrow::Cow;
-use std::pin::Pin;
+use std::{borrow::Cow, pin::Pin};
 
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::View;
 
-use crate::{Body, IntoPath, IntoResponse, Methods, OwnedMethods, Path, Route, RouteFuture};
+use crate::{
+    Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, response::IntoResponse,
+};
 
 /// The async render function backing a [`PageFn`].
 pub type PageRenderFn = for<'cx> fn(
@@ -42,6 +43,7 @@ impl PageFn {
     /// # Panics
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
+    #[track_caller]
     pub fn new(
         methods: impl Into<OwnedMethods>,
         path: impl IntoPath,

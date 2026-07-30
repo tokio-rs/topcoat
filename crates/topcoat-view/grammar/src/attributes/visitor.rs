@@ -1,10 +1,9 @@
+use super::{
+    Attribute, AttributeNode, AttributeNodes, AttributeSpread, BindAttribute, EventHandler,
+};
 use crate::template::{
     TemplateBlock, TemplateBreak, TemplateContinue, TemplateElse, TemplateForLoop, TemplateIf,
     TemplateLocal, TemplateMatch,
-};
-
-use super::{
-    Attribute, AttributeNode, AttributeNodes, AttributeSpread, BindAttribute, EventHandler,
 };
 
 pub trait Visit<'ast> {

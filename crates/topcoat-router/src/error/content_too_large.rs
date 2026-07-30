@@ -1,7 +1,7 @@
 use http::StatusCode;
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{IntoResponse, Response};
+use crate::response::{IntoResponse, Response};
 
 /// Builds a content-too-large (HTTP 413) response.
 ///
@@ -12,8 +12,7 @@ use crate::{IntoResponse, Response};
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::Result;
-/// use topcoat::router::error::content_too_large;
+/// use topcoat::{Result, router::error::content_too_large};
 ///
 /// const MAX_COMMENT_CHARS: usize = 4096;
 ///

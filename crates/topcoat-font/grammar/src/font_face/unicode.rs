@@ -5,9 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_font;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_font};
 
 mod kw {
     use syn::custom_keyword;

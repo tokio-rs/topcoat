@@ -8,7 +8,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable e
 
 - `topcoat-core`: foundations shared by the other crates: the `Error`/`Result` types and the request context (`Cx`, `app_context`, `request_context`). Its macro crate provides `#[memoize]`, and its grammar crate holds the pretty-printer backing `topcoat fmt`'s macro-body formatting.
 - `topcoat-view`: the `view!`, `attributes!`, and `class!` macros, the `#[component]` macro, and the runtime `View`/`Attributes`/`Class` types.
-- `topcoat-router`: `Router`, the `#[page]`/`#[layout]`/`#[route]` macros, `module_router!`, and `#[path_param]`/`#[query_params]`.
+- `topcoat-router`: `Router`, the `#[page]`/`#[layout]`/`#[route]` macros, `module_router!`, `path_param!`, and `#[query_params]`.
 - `topcoat-runtime`: the client-side interactive runtime (signals, event handlers, bind attributes, the `expr!` macro) and the injected browser script.
 - `topcoat-font`: the `font!` and `font_face!` macros and the Fontsource integration for bundling and serving web fonts.
 - `topcoat-icon`: the `icon` component and the Iconify integration for vendoring icon sets into a project.

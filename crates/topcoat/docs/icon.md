@@ -68,6 +68,7 @@ topcoat = { version = "0.5.0", default-features = false, features = ["icon-iconi
 Icon sets are staged by a build script. Add a `build.rs` next to `Cargo.toml` naming the sets you use; each set downloads on the first build and is cached, so subsequent builds stay offline:
 
 ```rust,no_run
+# #[cfg(feature = "icon-iconify")]
 # #[allow(clippy::needless_doctest_main)]
 fn main() {
     topcoat::icon::iconify::BuildConfig::new()
@@ -75,6 +76,8 @@ fn main() {
         .stage()
         .unwrap();
 }
+# #[cfg(not(feature = "icon-iconify"))]
+# fn main() {}
 ```
 
 [`include!`] then expands a staged set to `IconData` consts, named after the icons in `SCREAMING_SNAKE_CASE`, and ready to render like any other icon:
@@ -102,6 +105,7 @@ const TRASH: IconData = iconify::iconify_icon!("feather:trash-2");
 By default the downloaded sets are cached in Topcoat's cache inside the Cargo target directory, shared across the workspace. Pass [`cache_dir`] to keep the cache in a directory of your own instead:
 
 ```rust,no_run
+# #[cfg(feature = "icon-iconify")]
 # #[allow(clippy::needless_doctest_main)]
 fn main() {
     topcoat::icon::iconify::BuildConfig::new()
@@ -111,6 +115,8 @@ fn main() {
         .stage()
         .unwrap();
 }
+# #[cfg(not(feature = "icon-iconify"))]
+# fn main() {}
 ```
 
 Each set is cached at `<dir>/<set>.json` and downloaded only when its file is missing or pinned to a different version. Commit the directory for offline, reproducible builds, or gitignore it to keep a cache that survives `cargo clean`. Files you place there yourself are used as-is, so an icon set that is not on Iconify can be vendored the same way.

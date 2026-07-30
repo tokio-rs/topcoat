@@ -31,6 +31,7 @@ impl Asset {
     /// Panics if the handle does not reference a valid encoded declaration;
     /// handles returned by [`asset!`](crate::asset) are always valid.
     #[must_use]
+    #[track_caller]
     pub fn id(&self) -> AssetId {
         // The bundler discovers assets by scanning the binary for these
         // bytes; reading them through black_box stops the optimizer from
@@ -309,7 +310,12 @@ fn normalize(path: &Path) -> PathBuf {
 ///
 /// Output filenames always include a short content hash so bundles stay
 /// cache-friendly: e.g. `logo-1a2b3c4d5e6f7a8b.png`, or
-/// `1a2b3c4d5e6f7a8b.png` if the stem is empty.
+/// `1a2b3c4d5e6f7a8b.png` if the stem is empty. Declarations of one file
+/// share its output filename, and with it the single route the file is
+/// served from, so they cannot disagree about the `Content-Type`: serving
+/// one file as two content types needs a different `rename` on one of the
+/// declarations, and the [`Bundler`](crate::Bundler) rejects the bundle
+/// otherwise.
 ///
 /// # Returns
 ///

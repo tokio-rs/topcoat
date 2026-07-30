@@ -1,14 +1,20 @@
-use std::collections::{BTreeSet, HashSet};
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::{
+    collections::{BTreeSet, HashSet},
+    ffi::OsStr,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use console::style;
-use ignore::WalkBuilder;
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
+use ignore::{
+    WalkBuilder,
+    gitignore::{Gitignore, GitignoreBuilder},
+};
 use notify::{EventKind, RecursiveMode, Watcher, recommended_watcher};
-use tokio::sync::mpsc;
-use tokio::time::{Duration, timeout};
+use tokio::{
+    sync::mpsc,
+    time::{Duration, timeout},
+};
 
 /// How long a burst of filesystem events must stay quiet before it is
 /// reported as a single change. Editors typically emit several events per

@@ -1,6 +1,8 @@
-use std::collections::BTreeMap;
-use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    fmt::Write as _,
+    path::{Path, PathBuf},
+};
 
 use serde::Deserialize;
 use sha2::{Digest, Sha256};

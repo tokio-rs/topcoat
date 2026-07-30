@@ -1,12 +1,10 @@
-use std::convert::Infallible;
-use std::future::ready;
+use std::{convert::Infallible, future::ready};
 
-use http::HeaderMap;
-use http::header::ACCEPT_ENCODING;
+use http::{HeaderMap, header::ACCEPT_ENCODING};
 use tower::{ServiceExt, service_fn};
 use tower_http::compression::predicate::{NotForContentType, Predicate, SizeAbove};
 
-use crate::{Body, Response};
+use crate::{Body, response::Response};
 
 /// Configures the compression a [`Router`](crate::Router) applies to
 /// responses.
@@ -208,17 +206,18 @@ impl CompressionLevel {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-    use std::future::Future;
+    use std::{borrow::Cow, future::Future};
 
-    use http::HeaderValue;
-    use http::header::{CONTENT_ENCODING, VARY};
+    use http::{
+        HeaderValue,
+        header::{CONTENT_ENCODING, VARY},
+    };
     use topcoat_core::context::Cx;
 
     use super::*;
     use crate::{
-        Bytes, HeaderMap, IntoResponse, Method, Path, RouteFn, RouteFuture, RouteHandlerFn, Router,
-        to_bytes,
+        HeaderMap, Method, Path, RouteFn, RouteFuture, RouteHandlerFn, Router, request::Bytes,
+        response::IntoResponse, to_bytes,
     };
 
     // -- Test helpers --

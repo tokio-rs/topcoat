@@ -1,9 +1,6 @@
-use std::io::ErrorKind;
-use std::path::PathBuf;
+use std::{io::ErrorKind, path::PathBuf};
 
-use super::module;
-use super::package::Package;
-use super::state::InstallState;
+use super::{module, package::Package, state::InstallState};
 
 /// A component removed by [`remove`].
 pub struct Removed {
@@ -35,6 +32,7 @@ pub struct Removed {
 /// longer present in the install state when its component is deleted. This is
 /// an internal invariant: resolution inserts the target pair, so the registry
 /// must still be tracked.
+#[track_caller]
 pub fn remove(
     package: &Package,
     components: &[String],

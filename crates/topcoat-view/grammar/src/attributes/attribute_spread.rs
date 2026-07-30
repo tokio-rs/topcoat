@@ -4,7 +4,6 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-
 use topcoat_core_grammar::ParseOption;
 
 use crate::{

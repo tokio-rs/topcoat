@@ -1,17 +1,15 @@
-use std::fmt;
-use std::io;
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
-use std::time::SystemTime;
+use std::{
+    fmt, io,
+    path::{Path, PathBuf},
+    process::Stdio,
+    time::SystemTime,
+};
 
 use clap::Args;
 use console::style;
-use tokio::io::AsyncReadExt;
-use tokio::process::Command;
+use tokio::{io::AsyncReadExt, process::Command};
 
-use super::messages::Messages;
-use super::progress::ProgressScanner;
-use super::stderr::StderrTail;
+use super::{messages::Messages, progress::ProgressScanner, stderr::StderrTail};
 
 /// Which target `cargo build` compiles and with which profile.
 #[derive(Clone, Default)]

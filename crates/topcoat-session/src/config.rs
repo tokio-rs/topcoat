@@ -103,6 +103,7 @@ impl SessionConfigBuilder {
     /// Panics when no token store was set and the default cookie store is
     /// unavailable because the `cookie` feature is disabled.
     #[must_use]
+    #[track_caller]
     pub fn build(self) -> SessionConfig {
         SessionConfig {
             token_store: self.token_store.unwrap_or_else(default_token_store),
@@ -134,12 +135,14 @@ fn default_token_store() -> Box<dyn TokenStore> {
 }
 
 #[cfg(not(feature = "cookie"))]
+#[track_caller]
 fn default_token_store() -> Box<dyn TokenStore> {
     panic!(
         "no token store configured: set one with `SessionConfigBuilder::token_store` or enable the `cookie` feature for the default cookie store"
     )
 }
 
+#[track_caller]
 pub(crate) fn config(cx: &Cx) -> &SessionConfig {
     app_context(cx)
 }

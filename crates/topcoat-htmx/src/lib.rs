@@ -10,7 +10,7 @@
 //!   from a `cx: &Cx`.
 //! - **Responders** ([`HxRedirect`], [`HxRefresh`], [`HxRetarget`],
 //!   [`HxResponseTrigger`], ...) implement
-//!   [`IntoResponseParts`](topcoat_router::IntoResponseParts), so they
+//!   [`IntoResponseParts`](topcoat_router::response::IntoResponseParts), so they
 //!   can be placed before the body in a handler's response tuple to set the
 //!   corresponding [htmx response headers](https://htmx.org/reference/#response_headers).
 //!

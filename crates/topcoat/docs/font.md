@@ -84,7 +84,9 @@ topcoat = { version = "0.5.0", features = ["font-fontsource"] }
 Then specify which font from the [`families`] module you would like to use. By default, this will include every weight and style the font ships, only in its default character subset, loaded by the browser from the [jsDelivr] CDN:
 
 ```rust
+# #[cfg(feature = "font-fontsource")]
 # use topcoat::font::{Font, fontsource::fontsource_font};
+# #[cfg(feature = "font-fontsource")]
 const ROBOTO: Font = fontsource_font!(ROBOTO);
 ```
 
@@ -95,7 +97,9 @@ The resulting [`Font`] can be registered, served, and loaded exactly like a cust
 Every combination of weight, style, and subset is a separate font file, so only include what you use. The `weight`, `style`, and `subset` arguments narrow the font down; each takes a single value or a bracketed list:
 
 ```rust
+# #[cfg(feature = "font-fontsource")]
 # use topcoat::font::{Font, fontsource::fontsource_font};
+# #[cfg(feature = "font-fontsource")]
 const ROBOTO: Font = fontsource_font!(
     ROBOTO,
     weight: [400, 700],
@@ -111,6 +115,8 @@ See [`fontsource_font!`] for the details of each argument.
 By default the font files are loaded from the [jsDelivr] CDN by the user's browser. Pass `host: Asset` to download them at build time instead and serve them from your own origin as content-hashed Topcoat [assets]:
 
 ```rust,no_run
+# #[cfg(feature = "font-fontsource")]
+# fn example() {
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     font::{Font, fontsource::fontsource_font},
@@ -123,6 +129,7 @@ let router = Router::builder()
     .assets(AssetBundle::load().unwrap())
     .discover()
     .build();
+# }
 ```
 
 [Fontsource]: https://fontsource.org/

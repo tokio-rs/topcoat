@@ -5,7 +5,6 @@ use syn::{
     ext::IdentExt,
     parse::{Parse, ParseStream},
 };
-
 use topcoat_core_grammar::paths::topcoat_mail;
 
 use crate::mail::FieldValue;

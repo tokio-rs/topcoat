@@ -7,8 +7,10 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::QuoteOption;
-use topcoat_core_grammar::paths::{topcoat_inventory, topcoat_router};
+use topcoat_core_grammar::{
+    QuoteOption,
+    paths::{topcoat_inventory, topcoat_router},
+};
 
 pub struct Segment {
     attrs: Punctuated<SegmentAttr, Token![,]>,

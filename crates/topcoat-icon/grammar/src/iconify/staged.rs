@@ -8,7 +8,6 @@ use std::{
 };
 
 use proc_macro2::Span;
-
 use topcoat_icon::iconify::{IconSet, STAGE_DIR};
 
 use crate::iconify::suggest::did_you_mean;

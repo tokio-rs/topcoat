@@ -8,7 +8,6 @@ use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-
 use topcoat_core_grammar::ParseOption;
 
 /// An HTML identifier: a sequence of identifier segments joined by `-`, `:`,

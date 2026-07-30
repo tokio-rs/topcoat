@@ -8,9 +8,7 @@ use syn::{
     spanned::Spanned,
     token::Paren,
 };
-
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_view;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
 
 use crate::{
     template::RuntimeExpr,

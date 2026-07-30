@@ -153,6 +153,11 @@ export class ReactiveScope extends Scope {
 				body: JSON.stringify(args),
 				signal: ac.signal,
 			});
+			if (!res.ok) {
+				throw new Error(
+					`Shard request failed: ${res.status} ${res.statusText}`,
+				);
+			}
 			html = await res.text();
 		} catch (e) {
 			if ((e as Error).name === "AbortError") return;

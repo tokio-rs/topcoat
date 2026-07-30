@@ -1,18 +1,27 @@
-use std::borrow::Cow;
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, header};
 use hyper::upgrade::OnUpgrade;
 use hyper_util::rt::TokioIo;
-use tokio_tungstenite::WebSocketStream;
-use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
-use tokio_tungstenite::tungstenite::protocol::{Role, WebSocketConfig};
-use topcoat_core::context::{Cx, try_app_context};
-use topcoat_core::error::{Error, Result};
+use tokio_tungstenite::{
+    WebSocketStream,
+    tungstenite::{
+        handshake::derive_accept_key,
+        protocol::{Role, WebSocketConfig},
+    },
+};
+use topcoat_core::{
+    context::{Cx, try_app_context},
+    error::{Error, Result},
+};
 
-use crate::content::websocket::{WebSocket, WebSocketOrigins};
-use crate::error::{bad_request, forbidden, method_not_allowed};
-use crate::{Body, FromRequest, Response, extensions, headers, method};
+use crate::{
+    Body,
+    content::websocket::{WebSocket, WebSocketOrigins},
+    error::{bad_request, forbidden, method_not_allowed},
+    request::{FromRequest, extensions, headers, method},
+    response::Response,
+};
 
 /// WebSocket handshake extractor: validates the upgrade request and hands the
 /// connection to a callback.
@@ -40,8 +49,8 @@ use crate::{Body, FromRequest, Response, extensions, headers, method};
 /// use topcoat::{
 ///     Result,
 ///     router::{
-///         Response,
 ///         content::websocket::{Message, WebSocketUpgrade},
+///         response::Response,
 ///         route,
 ///     },
 /// };
@@ -360,24 +369,19 @@ fn header_eq(headers: &HeaderMap, name: &HeaderName, value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-    use std::io;
-    use std::net::SocketAddr;
-    use std::time::Duration;
+    use std::{borrow::Cow, io, net::SocketAddr, time::Duration};
 
     use futures_util::{SinkExt, StreamExt};
     use http::Request;
-    use tokio::net::TcpListener;
-    use tokio::sync::oneshot;
-    use tokio::task::JoinHandle;
+    use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle};
     use tokio_tungstenite::tungstenite;
     use topcoat_core::context::CxTestBuilder;
 
     use super::*;
-    use crate::content::websocket::Message;
-    use crate::error::{BadRequestError, MethodNotAllowedError};
     use crate::{
         Path, RouteFn, RouteFuture, RouteHandlerFn, Router, RouterBuilder, RouterService,
+        content::websocket::Message,
+        error::{BadRequestError, MethodNotAllowedError},
         internal_serve,
     };
 

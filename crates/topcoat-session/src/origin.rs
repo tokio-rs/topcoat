@@ -2,7 +2,8 @@ use topcoat_core::context::{Cx, CxBuilder};
 use topcoat_router::{
     Body, Layer, LayerFuture, Method, Next, Path,
     error::{ForbiddenError, forbidden},
-    header, headers, method, uri,
+    header,
+    request::{headers, method, uri},
 };
 
 use crate::config;
@@ -27,6 +28,7 @@ use crate::config;
 ///
 /// Returns a [`ForbiddenError`] (HTTP 403) when the request is a
 /// state-changing cross-origin request.
+#[track_caller]
 pub fn verify_origin(cx: &Cx) -> Result<(), ForbiddenError> {
     let headers = headers(cx);
     let sec_fetch_site = headers

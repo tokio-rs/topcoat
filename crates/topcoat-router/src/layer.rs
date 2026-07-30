@@ -1,12 +1,11 @@
-use std::borrow::Cow;
-use std::ops::Index;
-use std::pin::Pin;
+use std::{borrow::Cow, ops::Index, pin::Pin};
 
 use topcoat_core::{context::CxBuilder, error::Result};
 
 use crate::{
-    Body, Endpoint, Path, Response, Route,
+    Body, Endpoint, Path, Route,
     error::{method_not_allowed, not_found},
+    response::Response,
 };
 
 /// The future returned by [`Layer::handle`] and [`Next::run`]: a boxed, `Send`
@@ -33,8 +32,11 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 ///
 /// ```rust
 /// use std::borrow::Cow;
-/// use topcoat::context::CxBuilder;
-/// use topcoat::router::{Body, Layer, LayerFuture, Next, Path};
+///
+/// use topcoat::{
+///     context::CxBuilder,
+///     router::{Body, Layer, LayerFuture, Next, Path},
+/// };
 ///
 /// struct Timing;
 ///
@@ -234,14 +236,19 @@ impl<'a> Next<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::future::Future;
-    use std::sync::{Arc, Mutex};
+    use std::{
+        future::Future,
+        sync::{Arc, Mutex},
+    };
 
     use http::StatusCode;
     use topcoat_core::context::{ContextMap, Cx, CxBuilder, app_context};
 
     use super::*;
-    use crate::{Bytes, IntoResponse, Method, RouteFn, RouteFuture, error::respond, to_bytes};
+    use crate::{
+        Method, RouteFn, RouteFuture, error::respond, request::Bytes, response::IntoResponse,
+        to_bytes,
+    };
 
     // -- Test helpers --
 
@@ -501,7 +508,7 @@ mod tests {
     #[test]
     fn run_resolves_the_method_not_allowed_terminal() {
         let layers = Layers::default();
-        let no_params: Box<[Arc<str>]> = Box::new([]);
+        let no_params: Box<[crate::RawPathParamSpec]> = Box::new([]);
         let no_layers: Box<[LayerId]> = Box::new([]);
         let mut endpoint = Endpoint::new(no_params, no_layers);
         endpoint.insert(Method::GET, 0);

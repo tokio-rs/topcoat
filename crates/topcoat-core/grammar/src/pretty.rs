@@ -17,14 +17,13 @@ pub use error::*;
 pub use r#macro::*;
 pub use pretty_print::*;
 pub use printer::*;
+use proc_macro2::LineColumn;
 pub use registry::*;
 pub use ring_buffer::*;
 pub use snippet::*;
 pub use span::*;
 pub use token::*;
 pub use trivia::*;
-
-use proc_macro2::LineColumn;
 
 struct Replace {
     start: usize,

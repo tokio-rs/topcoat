@@ -20,6 +20,7 @@ impl FontData {
     ///
     /// Panics if `faces` cannot be converted into a non-empty [`FontFaces`].
     #[must_use]
+    #[track_caller]
     pub fn new(family: impl Into<String>, faces: impl TryInto<FontFaces>) -> Self {
         let family = family.into();
         let faces = faces

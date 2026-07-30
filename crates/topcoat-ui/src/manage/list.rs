@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
 
+use super::{
+    package::Package,
+    state::{InstallState, RegistryState},
+    workspace::Workspace,
+};
 use crate::Registry;
-
-use super::package::Package;
-use super::state::{InstallState, RegistryState};
-use super::workspace::Workspace;
 
 /// One registry's listing: its crate name, and either the status of its
 /// components or the error encountered loading it.

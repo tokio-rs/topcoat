@@ -1,11 +1,11 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
-use syn::{Expr, ExprLit, Lit, LitStr, Token};
-
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_view;
+use syn::{
+    Expr, ExprLit, Lit, LitStr, Token,
+    parse::{Parse, ParseStream},
+    punctuated::Punctuated,
+};
+use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
 
 /// The parsed body of a `class!` invocation. Lowers to a
 /// [`runtime::Class`](topcoat_view::Class).

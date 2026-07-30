@@ -12,14 +12,16 @@
 //! component-based product grid parameterized by size to show how rendering
 //! scales with document length.
 
-use std::future::Future;
-use std::hint::black_box;
-use std::pin::pin;
-use std::task::{Context, Poll, Waker};
+use std::{
+    future::Future,
+    hint::black_box,
+    pin::pin,
+    task::{Context, Poll, Waker},
+};
 
-use criterion::measurement::WallTime;
-use criterion::{BenchmarkGroup, Criterion, Throughput, criterion_group, criterion_main};
-
+use criterion::{
+    BenchmarkGroup, Criterion, Throughput, criterion_group, criterion_main, measurement::WallTime,
+};
 use topcoat::{
     Result,
     context::Cx,

@@ -4,7 +4,7 @@ use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
-    Body, Method, Methods, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder,
+    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouterBuilder, response::Response,
 };
 
 use crate::Surrogated;

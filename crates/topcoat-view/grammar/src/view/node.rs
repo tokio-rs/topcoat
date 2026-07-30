@@ -3,7 +3,6 @@ use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-
 use topcoat_core_grammar::ParseOption;
 
 use crate::{

@@ -14,8 +14,8 @@
 //!   [`Sse`](topcoat_router::content::sse::Sse) response, and returned on its own from a handler it
 //!   becomes a single-event stream.
 //! - **Responders** ([`DatastarSelector`], [`DatastarMode`], ...) implement
-//!   [`IntoResponseParts`](topcoat_router::IntoResponseParts) to set the headers Datastar reads on
-//!   plain `text/html`, `application/json`, and `text/javascript` responses.
+//!   [`IntoResponseParts`](topcoat_router::response::IntoResponseParts) to set the headers Datastar
+//!   reads on plain `text/html`, `application/json`, and `text/javascript` responses.
 //!
 //! The raw header names are available as constants in the [`header`] module.
 

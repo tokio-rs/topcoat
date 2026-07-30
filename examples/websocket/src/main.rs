@@ -2,9 +2,11 @@ use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt, asset},
     router::{
-        Response, Router,
+        Router,
         content::websocket::{Message, WebSocketUpgrade},
-        page, route,
+        page,
+        response::Response,
+        route,
     },
     view::view,
 };

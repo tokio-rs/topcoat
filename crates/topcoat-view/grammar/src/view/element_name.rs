@@ -157,8 +157,7 @@ mod tests {
     fn html_ident_name_stops_at_colon_or_dot() {
         // `:` and `.` are reserved for attribute syntax (`:value`,
         // `class.active`) and must not be consumed as part of an element name.
-        use syn::Token;
-        use syn::parse::Parser;
+        use syn::{Token, parse::Parser};
 
         let parser = |input: syn::parse::ParseStream| -> syn::Result<ElementName> {
             let name = input.parse::<ElementName>()?;

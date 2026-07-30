@@ -1,5 +1,4 @@
-use core::fmt;
-use core::fmt::Write as _;
+use core::{fmt, fmt::Write as _};
 use std::borrow::Cow;
 
 #[cfg(feature = "http")]
@@ -63,6 +62,12 @@ impl View {
         doc = "Status codes and headers declared in the view are discarded;",
         doc = "[`render_response`](Self::render_response) collects them."
     )]
+    ///
+    /// # Panics
+    ///
+    /// Panics if a dynamic attribute key or element name in the view contains
+    /// a character that could break out of the identifier.
+    #[track_caller]
     pub fn render(&self, cx: &Cx) -> String {
         let mut buf = String::with_capacity(self.part.size_hint());
         let mut f = Formatter::new(&mut buf);
@@ -79,8 +84,14 @@ impl View {
     /// the `view!` macro. Competing declarations resolve by render order:
     /// the first status code rendered wins, and the first part that mentions
     /// a header name provides all of that name's values.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a dynamic attribute key or element name in the view contains
+    /// a character that could break out of the identifier.
     #[cfg(feature = "http")]
     #[must_use]
+    #[track_caller]
     pub fn render_response(&self, cx: &Cx) -> RenderedResponse {
         let mut html = String::with_capacity(self.part.size_hint());
         let mut f = Formatter::new(&mut html);
@@ -234,6 +245,7 @@ impl ViewPart {
 
     /// Writes the part into `f`, escaped or validated for the context each
     /// piece of text was written in.
+    #[track_caller]
     pub(crate) fn render(&self, cx: &Cx, f: &mut Formatter<'_>) {
         let mut int_buffer = itoa::Buffer::new();
 
@@ -325,6 +337,7 @@ impl ViewPart {
 /// escaped or validated for that position.
 pub trait DynViewPart: 'static + fmt::Debug + Send {
     /// Writes this part's output into `w`.
+    #[track_caller]
     fn render(&self, cx: &Cx, w: &mut HtmlWriter<'_, '_>);
 
     /// Returns an estimate of the number of bytes this part will write.
@@ -650,8 +663,10 @@ mod tests {
 
     #[cfg(feature = "http")]
     mod response {
-        use http::header::{CACHE_CONTROL, SET_COOKIE};
-        use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
+        use http::{
+            HeaderMap, HeaderName, HeaderValue, StatusCode,
+            header::{CACHE_CONTROL, SET_COOKIE},
+        };
 
         use super::*;
         use crate::NodeViewParts;

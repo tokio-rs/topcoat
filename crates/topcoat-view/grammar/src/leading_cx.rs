@@ -1,10 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::parse::{Parse, ParseStream};
-use syn::{Ident, Token};
-
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_context;
+use syn::{
+    Ident, Token,
+    parse::{Parse, ParseStream},
+};
+use topcoat_core_grammar::{ParseOption, paths::topcoat_context};
 
 /// The leading `cx =>` argument naming the request context a macro body
 /// renders against.

@@ -129,7 +129,7 @@ Components can ask for the current request context by declaring a `cx` parameter
 use topcoat::{
     Result,
     context::Cx,
-    router::uri,
+    router::request::uri,
     view::{component, view},
 };
 

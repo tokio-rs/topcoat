@@ -5,7 +5,6 @@ mod body_limit;
 #[cfg(feature = "compression")]
 mod compression;
 pub mod content;
-mod context;
 mod endpoint;
 pub mod error;
 mod layer;
@@ -17,12 +16,10 @@ mod page;
 mod path;
 mod path_param;
 mod query_param;
-mod request;
-mod response;
+pub mod request;
+pub mod response;
 mod route;
 mod router;
-#[cfg(feature = "serve")]
-mod serve;
 #[cfg(feature = "serve")]
 mod service;
 #[cfg(feature = "tower")]
@@ -32,8 +29,8 @@ pub use body::*;
 pub use body_limit::*;
 #[cfg(feature = "compression")]
 pub use compression::*;
-pub use context::*;
 pub(crate) use endpoint::Endpoint;
+pub use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};
 pub use layer::*;
 #[cfg(feature = "serve")]
 pub use listener::*;
@@ -43,13 +40,7 @@ pub use page::*;
 pub use path::*;
 pub use path_param::*;
 pub use query_param::*;
-pub use request::*;
-pub use response::*;
 pub use route::*;
 pub use router::*;
 #[cfg(feature = "serve")]
-pub use serve::*;
-#[cfg(feature = "serve")]
 pub use service::*;
-
-pub use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};

@@ -2,7 +2,7 @@ use serde::Deserialize;
 use topcoat::{
     Result,
     context::Cx,
-    router::{Body, Router, content::Form, page, to_bytes, uri},
+    router::{Body, Router, content::Form, page, request::uri, to_bytes},
     view::view,
 };
 
