@@ -501,10 +501,13 @@ impl RouterBuilder {
             pages,
             layouts,
             layers,
-            mut context,
+            context,
             #[cfg(feature = "compression")]
             compression,
         } = self;
+
+        #[cfg(feature = "websocket")]
+        let mut context = context;
 
         #[cfg(feature = "websocket")]
         {
