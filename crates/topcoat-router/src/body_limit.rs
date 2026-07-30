@@ -114,16 +114,14 @@ enum BodyLimitKind {
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
-///     router::{Body, FromRequest, body_limit, error::bad_request, to_bytes},
+///     router::{Body, FromRequest, body_limit, to_bytes},
 /// };
 ///
 /// struct Raw(Vec<u8>);
 ///
 /// impl FromRequest for Raw {
 ///     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
-///         let bytes = to_bytes(body, body_limit(cx))
-///             .await
-///             .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
+///         let bytes = to_bytes(body, body_limit(cx)).await?;
 ///
 ///         Ok(Self(bytes.into()))
 ///     }

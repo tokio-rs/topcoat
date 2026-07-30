@@ -1,11 +1,6 @@
-use http_body_util::LengthLimitError;
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{
-    Body, body_limit,
-    error::{bad_request, content_too_large},
-    to_bytes,
-};
+use crate::{Body, body_limit, error::bad_request, to_bytes};
 
 /// Byte-buffer types re-exported for use as request body extractors and as
 /// response bodies.
@@ -96,13 +91,7 @@ impl FromRequest for Body {
 /// the request's [`body_limit`] with `413 Content Too Large`.
 impl FromRequest for Bytes {
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
-        to_bytes(body, body_limit(cx)).await.map_err(|error| {
-            if error.is::<LengthLimitError>() {
-                content_too_large().into()
-            } else {
-                bad_request(format!("failed to read request body: {error}")).into()
-            }
-        })
+        to_bytes(body, body_limit(cx)).await
     }
 }
 

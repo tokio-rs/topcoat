@@ -5,7 +5,10 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use http_body::{Frame, SizeHint};
 use http_body_util::combinators::UnsyncBoxBody;
-use http_body_util::{BodyExt, BodyStream, Empty, Full, Limited};
+use http_body_util::{BodyExt, BodyStream, Empty, Full, LengthLimitError, Limited};
+use topcoat_core::error::Result;
+
+use crate::error::{bad_request, content_too_large};
 
 /// A boxed error type used by the response body machinery.
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -143,12 +146,80 @@ impl futures_core::Stream for BodyDataStream {
 ///
 /// # Errors
 ///
-/// Returns an error if reading the body fails or if it exceeds `limit` bytes;
-/// the latter is a [`LengthLimitError`](http_body_util::LengthLimitError).
-pub async fn to_bytes(body: Body, limit: usize) -> Result<Bytes, BoxError> {
-    if limit == usize::MAX {
-        Ok(body.collect().await?.to_bytes())
+/// Returns a [`ContentTooLargeError`](crate::error::ContentTooLargeError) when
+/// the body exceeds `limit` bytes, and a
+/// [`BadRequestError`](crate::error::BadRequestError) when reading it fails.
+/// Both render themselves as a response, so a
+/// [`FromRequest`](crate::FromRequest) implementation can propagate them with
+/// `?` rather than mapping them by hand.
+pub async fn to_bytes(body: Body, limit: usize) -> Result<Bytes> {
+    let collected = if limit == usize::MAX {
+        body.collect().await
     } else {
-        Ok(Limited::new(body, limit).collect().await?.to_bytes())
+        Limited::new(body, limit).collect().await
+    };
+
+    match collected {
+        Ok(collected) => Ok(collected.to_bytes()),
+        Err(error) => Err(match error.downcast::<LengthLimitError>() {
+            Ok(_) => content_too_large().into(),
+            Err(error) => bad_request(format!("failed to read the body: {error}")).into(),
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::{BadRequestError, ContentTooLargeError};
+
+    /// A body that fails on its first frame, standing in for a connection that
+    /// breaks mid-stream.
+    struct FailingBody;
+
+    impl http_body::Body for FailingBody {
+        type Data = Bytes;
+        type Error = BoxError;
+
+        fn poll_frame(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Option<Result<Frame<Bytes>, BoxError>>> {
+            Poll::Ready(Some(Err("body stream broke".into())))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_body_within_the_limit_reads_in_full() {
+        let bytes = to_bytes(Body::from("hello"), 1024).await.unwrap();
+        assert_eq!(bytes, Bytes::from_static(b"hello"));
+    }
+
+    #[tokio::test]
+    async fn usize_max_reads_without_enforcing_a_limit() {
+        let bytes = to_bytes(Body::from("hello"), usize::MAX).await.unwrap();
+        assert_eq!(bytes, Bytes::from_static(b"hello"));
+    }
+
+    #[tokio::test]
+    async fn a_body_over_the_limit_is_content_too_large() {
+        let error = to_bytes(Body::from("hello"), 4).await.unwrap_err();
+        assert!(error.is::<ContentTooLargeError>());
+    }
+
+    #[tokio::test]
+    async fn a_read_failure_is_a_bad_request_carrying_the_cause() {
+        // Both branches are covered: a limit installs `Limited` around the
+        // body, which boxes the failure a second time.
+        for limit in [usize::MAX, 1024] {
+            let error = to_bytes(Body::new(FailingBody), limit).await.unwrap_err();
+            let error = error
+                .downcast::<BadRequestError>()
+                .expect("a read failure is a bad request");
+            assert_eq!(
+                error.description(),
+                "failed to read the body: body stream broke"
+            );
+        }
     }
 }
