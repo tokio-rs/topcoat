@@ -7,9 +7,9 @@ use syn::{
     spanned::Spanned,
     token::Paren,
 };
-use topcoat_core_grammar::paths::topcoat_router;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_router};
 
-pub mod kw {
+mod kw {
     syn::custom_keyword!(error);
     syn::custom_keyword!(bad_request);
     syn::custom_keyword!(forbidden);
@@ -98,6 +98,12 @@ impl Parse for ErrorAttr {
                 None
             },
         })
+    }
+}
+
+impl ParseOption for ErrorAttr {
+    fn peek(input: ParseStream) -> bool {
+        input.peek(kw::error)
     }
 }
 

@@ -34,10 +34,6 @@ pub fn path_param<T: PathParam + ?Sized>(cx: &Cx) -> T::Output<'_> {
 }
 
 /// Reads the raw path parameters captured by the matched route.
-///
-/// Single-segment values are decoded. Catch-all values remain encoded so `/`
-/// separators stay distinct from encoded slashes. Use [`path_param`] with a
-/// type declared by `path_param!` to read decoded catch-all segments.
 #[inline]
 #[must_use]
 pub fn raw_path_params(cx: &Cx) -> &RawPathParams {

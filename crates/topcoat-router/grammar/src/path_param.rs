@@ -6,32 +6,12 @@ use syn::{
     ext::IdentExt,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::{
-    topcoat_context, topcoat_context_macro, topcoat_router, topcoat_router_macro,
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_context, topcoat_context_macro, topcoat_router, topcoat_router_macro},
 };
 
 use super::error_attr::ErrorAttr;
-
-/// A parsed segment type in a `path_param!` declaration.
-pub struct PathParamType {
-    pub colon_token: Token![:],
-    pub ty: Type,
-}
-
-impl Parse for PathParamType {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
-            colon_token: input.parse()?,
-            ty: input.parse()?,
-        })
-    }
-}
-
-/// An error mapping in a `path_param!` declaration.
-pub struct PathParamError {
-    pub comma_token: Token![,],
-    pub error: ErrorAttr,
-}
 
 /// The input to `path_param!`.
 pub struct PathParam {
@@ -242,37 +222,17 @@ impl PathParam {
 
 impl Parse for PathParam {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut path_param = Self {
+        let param = Self {
             visibility: input.parse()?,
             star_token: input.parse()?,
             name: input.parse()?,
-            param_type: if input.peek(Token![:]) {
-                Some(input.parse()?)
-            } else {
-                None
-            },
-            error: None,
-            trailing_comma: None,
+            param_type: input.call(PathParamType::parse_option)?,
+            error: input.call(PathParamError::parse_option)?,
+            trailing_comma: input.peek(Token![,]).then(|| input.parse()).transpose()?,
         };
 
-        if input.peek(Token![,]) {
-            let comma_token = input.parse()?;
-            if input.is_empty() {
-                path_param.trailing_comma = Some(comma_token);
-            } else {
-                path_param.error = Some(PathParamError {
-                    comma_token,
-                    error: input.parse()?,
-                });
-                path_param.trailing_comma = input.parse()?;
-            }
-        }
-
-        if !input.is_empty() {
-            return Err(input.error("unexpected token in path parameter declaration"));
-        }
-        if let Some(error) = &path_param.error
-            && path_param.param_type.is_none()
+        if let Some(error) = &param.error
+            && !param.param_type().is_some()
         {
             return Err(syn::Error::new(
                 error.error.span(),
@@ -280,7 +240,7 @@ impl Parse for PathParam {
             ));
         }
 
-        Ok(path_param)
+        Ok(param)
     }
 }
 
@@ -296,6 +256,52 @@ impl ToTokens for PathParam {
             #segment
         }
         .to_tokens(tokens);
+    }
+}
+
+/// A parsed segment type in a `path_param!` declaration.
+pub struct PathParamType {
+    pub colon_token: Token![:],
+    pub ty: Type,
+}
+
+impl Parse for PathParamType {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            colon_token: input.parse()?,
+            ty: input.parse()?,
+        })
+    }
+}
+
+impl ParseOption for PathParamType {
+    fn peek(input: ParseStream) -> bool {
+        input.peek(Token![:])
+    }
+}
+
+/// An error mapping in a `path_param!` declaration.
+pub struct PathParamError {
+    pub comma_token: Token![,],
+    pub error: ErrorAttr,
+}
+
+impl Parse for PathParamError {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            comma_token: input.parse()?,
+            error: input.parse()?,
+        })
+    }
+}
+
+impl ParseOption for PathParamError {
+    fn peek(input: ParseStream) -> bool {
+        let input = input.fork();
+        if input.parse::<Token![,]>().is_err() {
+            return false;
+        }
+        ErrorAttr::peek(&input)
     }
 }
 
