@@ -30,7 +30,45 @@ async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
 }
 ```
 
-A request that is not a conforming WebSocket handshake is rejected before the handler's callback is involved: a non-`GET` method with `405 Method Not Allowed`, and missing or malformed handshake headers with `400 Bad Request`. Because the extractor runs inside the handler like any other, request-scoped functions (a session check, `cookies(cx)`) compose with it as usual -- reject the request by returning an error before calling `on_upgrade`.
+A request that is not a conforming WebSocket handshake is rejected before the handler's callback is involved: a non-`GET` method with `405 Method Not Allowed`, and missing or malformed handshake headers with `400 Bad Request`. Because the extractor runs inside the handler like any other, request-scoped functions (a session check, `cookies(cx)`) compose with it as usual: reject the request by returning an error before calling `on_upgrade`.
+
+# Browser origins
+
+Browsers include an `Origin` header in every WebSocket handshake. `on_upgrade` rejects untrusted origins, so an authenticated socket cannot be opened from an unrelated page with the user's cookies. By default, the router allows the origin of its base URL:
+
+```rust
+use topcoat::{
+    Result,
+    router::{Response, Router, content::websocket::WebSocketUpgrade, route},
+};
+
+#[route(GET "/notifications")]
+async fn notifications(upgrade: WebSocketUpgrade) -> Result<Response> {
+    upgrade.on_upgrade(|_socket| async move {})
+}
+
+let router = Router::builder()
+    .route(notifications)
+    .base_url("https://app.example.com/prefix")
+    .build();
+```
+
+Use [`websocket_origins`](crate::RouterBuilder::websocket_origins) when the WebSocket origin policy differs from the base URL:
+
+```rust
+# use topcoat::router::Router;
+let router = Router::builder()
+    .base_url("https://app.example.com")
+    .websocket_origins([
+        "https://admin.example.com",
+        "http://localhost:5173",
+    ])
+    .build();
+```
+
+Calling `websocket_origins` replaces the base URL origin rather than adding to it. Passing an empty collection rejects every browser origin at the router level. An endpoint that needs an additional origin can add it with [`allow_origin`](WebSocketUpgrade::allow_origin); endpoint origins add to the selected router policy. Each value includes the scheme, host, and any non-default port. Non-browser clients can omit `Origin` and do not need an allowlist entry.
+
+[`allow_any_origin`](WebSocketUpgrade::allow_any_origin) is an explicit opt-out for public sockets that do not trust ambient credentials or expose private data.
 
 # Messages
 

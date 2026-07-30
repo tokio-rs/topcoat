@@ -16,6 +16,7 @@ async fn main() {
     let router = Router::builder()
         .page(home)
         .route(echo)
+        .base_url("http://127.0.0.1:3000")
         .assets(AssetBundle::load().unwrap())
         .build();
 
@@ -53,7 +54,8 @@ async fn home() -> Result {
 }
 
 // Upgrade GET /echo from HTTP to WebSocket and echo each text or binary
-// message back to the connected client.
+// message back to the connected client. The router allows the browser origin
+// that serves this page.
 #[route(GET "/echo")]
 async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
     upgrade.on_upgrade(|mut socket| async move {

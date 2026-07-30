@@ -163,6 +163,8 @@ impl RouterBuilder {
         let mut context = ContextMap::new();
         // Register `()` so APIs generic over an app context type can default to `S = ()`.
         context.insert(());
+        #[cfg(feature = "websocket")]
+        context.insert(crate::content::websocket::WebSocketOrigins::default());
         Self {
             routes: Vec::new(),
             pages: Vec::new(),
@@ -326,6 +328,47 @@ impl RouterBuilder {
         self
     }
 
+    /// Sets the browser origins allowed to open WebSockets throughout the
+    /// application.
+    ///
+    /// Each value is an origin string containing the scheme, host, and any
+    /// non-default port, such as `"https://app.example.com"`.
+    ///
+    /// If this method is not called, WebSocket routes allow the origin of the
+    /// configured [`BaseUrl`]. Calling this method replaces that default, even
+    /// when `origins` is empty. An individual
+    /// [`WebSocketUpgrade`](crate::content::websocket::WebSocketUpgrade) can add
+    /// an origin or explicitly allow every origin.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use topcoat::router::Router;
+    ///
+    /// let router = Router::builder()
+    ///     .websocket_origins(["https://app.example.com", "https://admin.example.com"])
+    ///     .build();
+    /// ```
+    #[cfg(feature = "websocket")]
+    #[must_use]
+    pub fn websocket_origins<I>(mut self, origins: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<String>,
+    {
+        if let Some(websocket_origins) = self
+            .context
+            .get_mut::<crate::content::websocket::WebSocketOrigins>()
+        {
+            websocket_origins.replace(origins);
+        } else {
+            let mut websocket_origins = crate::content::websocket::WebSocketOrigins::default();
+            websocket_origins.replace(origins);
+            self.context.insert(websocket_origins);
+        }
+        self
+    }
+
     /// Registers the base URL the application is publicly reachable at, like
     /// `https://example.com`.
     ///
@@ -458,10 +501,21 @@ impl RouterBuilder {
             pages,
             layouts,
             layers,
-            context,
+            mut context,
             #[cfg(feature = "compression")]
             compression,
         } = self;
+
+        #[cfg(feature = "websocket")]
+        {
+            let base_url_origin = context
+                .get::<BaseUrl>()
+                .map(crate::content::websocket::WebSocketOrigins::base_url_origin);
+            context
+                .get_mut::<crate::content::websocket::WebSocketOrigins>()
+                .expect("WebSocket origins are registered by RouterBuilder::new")
+                .default_to(base_url_origin);
+        }
 
         // Wire each page to the layouts whose path is a prefix of the page's,
         // ordered from least- to most-specific so the page nests innermost.
