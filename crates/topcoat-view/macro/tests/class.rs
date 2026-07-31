@@ -1,5 +1,7 @@
-use topcoat::context::Cx;
-use topcoat::view::{Class, class, view};
+use topcoat::{
+    context::Cx,
+    view::{Class, class, view},
+};
 
 fn r(v: topcoat::Result) -> String {
     v.unwrap().render(&Cx::default())

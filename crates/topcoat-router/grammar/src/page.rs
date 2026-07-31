@@ -6,13 +6,15 @@ use syn::{
     parse_quote,
     spanned::Spanned,
 };
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::{
-    topcoat_context, topcoat_inventory, topcoat_router, topcoat_view_macro,
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view_macro},
 };
 
-use super::handler_args::{HandlerArg, HandlerArgs, request_ident};
-use super::method::Methods;
+use super::{
+    common::{HandlerArg, HandlerArgs, request_ident},
+    method::Methods,
+};
 
 pub struct PageAttr {
     /// The declared HTTP methods; the page serves `GET` when omitted.
@@ -137,7 +139,7 @@ impl ToTokens for Page {
         let parse_request = args.request().map(|request_ty| {
             let request_ident = request_ident();
             quote! {
-                let #request_ident = <#request_ty as #topcoat_router::FromRequest>::from_request(cx, body).await?;
+                let #request_ident = <#request_ty as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
             }
         });
         let call_args = args.call_args();

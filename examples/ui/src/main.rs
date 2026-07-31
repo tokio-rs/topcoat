@@ -1,23 +1,23 @@
 mod components;
 
-use components::badge::{BadgeVariant, badge, badge_variants};
-use components::button::{ButtonSize, ButtonVariant, button, button_variants};
-use components::card::{
-    card, card_content, card_description, card_footer, card_header, card_title,
+use components::{
+    badge::{BadgeVariant, badge, badge_variants},
+    button::{ButtonSize, ButtonVariant, button, button_variants},
+    card::{card, card_content, card_description, card_footer, card_header, card_title},
+    checkbox::checkbox,
+    dropdown_menu::{
+        dropdown_menu, dropdown_menu_content, dropdown_menu_item, dropdown_menu_label,
+        dropdown_menu_separator, dropdown_menu_sub, dropdown_menu_sub_content,
+        dropdown_menu_sub_trigger, dropdown_menu_trigger,
+    },
+    input::input,
+    label::label,
+    progress::progress,
+    select::select,
+    spinner::spinner,
+    switch::switch,
+    textarea::textarea,
 };
-use components::checkbox::checkbox;
-use components::dropdown_menu::{
-    dropdown_menu, dropdown_menu_content, dropdown_menu_item, dropdown_menu_label,
-    dropdown_menu_separator, dropdown_menu_sub, dropdown_menu_sub_content,
-    dropdown_menu_sub_trigger, dropdown_menu_trigger,
-};
-use components::input::input;
-use components::label::label;
-use components::progress::progress;
-use components::select::select;
-use components::spinner::spinner;
-use components::switch::switch;
-use components::textarea::textarea;
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},

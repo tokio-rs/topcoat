@@ -12,16 +12,15 @@ use std::{
     thread,
 };
 
+use cache::Cache;
+pub use config::*;
+pub use error::*;
+pub use event::*;
 use sha2::{Digest, Sha256};
 
 use crate::{
     AssetError, AssetId, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset, Source,
 };
-
-use cache::Cache;
-pub use config::*;
-pub use error::*;
-pub use event::*;
 
 /// Scans a built binary for [`asset!`](crate::asset) declarations and
 /// writes the referenced files into a bundle directory.
@@ -326,9 +325,8 @@ struct Prepared {
 mod tests {
     use std::{env, path::PathBuf};
 
-    use crate::{AssetOptions, ENCODED_ASSET_SIZE};
-
     use super::*;
+    use crate::{AssetOptions, ENCODED_ASSET_SIZE};
 
     /// A fresh directory under the system temp directory.
     fn temp_dir(name: &str) -> PathBuf {

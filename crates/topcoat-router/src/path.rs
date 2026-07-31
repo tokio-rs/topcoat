@@ -49,6 +49,7 @@ impl Path {
     /// Panics if `s` is not a well-formed path; see [`PathError`] for the
     /// conditions that are rejected.
     #[must_use]
+    #[track_caller]
     pub const fn new(s: &str) -> &Self {
         match Self::from_str(s) {
             Ok(path) => path,
@@ -496,10 +497,16 @@ impl<'a> FromIterator<PathSegment<'a>> for PathBuf {
 /// convert as they are.
 pub trait IntoPath {
     /// Converts the value into a route path.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is a string that is not a well-formed path.
+    #[track_caller]
     fn into_path(self) -> Cow<'static, Path>;
 }
 
 impl IntoPath for &'static str {
+    #[track_caller]
     fn into_path(self) -> Cow<'static, Path> {
         Cow::Borrowed(Path::new(self))
     }
@@ -565,6 +572,7 @@ impl<'a> PathSegment<'a> {
     /// Panics if `s` is not a well-formed segment; see [`PathError`] for the
     /// conditions that are rejected.
     #[must_use]
+    #[track_caller]
     pub fn new(s: &'a str) -> Self {
         match Self::from_str(s) {
             Ok(segment) => segment,

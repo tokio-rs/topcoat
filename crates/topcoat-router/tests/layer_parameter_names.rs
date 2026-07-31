@@ -1,10 +1,12 @@
-use std::any::Any;
-use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::{
+    any::Any,
+    panic::{AssertUnwindSafe, catch_unwind},
+};
 
 use topcoat::{
     Result,
     context::CxBuilder,
-    router::{Body, Layer, Next, Response, Route, Router, layer, route},
+    router::{Body, Layer, Next, Route, Router, layer, response::Response, route},
 };
 
 const LAYER_DECLARATION_START: u32 = line!() + 1;

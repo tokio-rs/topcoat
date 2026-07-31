@@ -38,6 +38,7 @@ impl FontWeight {
     /// Panics if `weight` is outside `100..=900`. Use
     /// `FontWeight::try_from` for a non-panicking conversion.
     #[must_use]
+    #[track_caller]
     pub const fn new(weight: u16) -> Self {
         assert!(
             weight >= 100 && weight <= 900,
@@ -111,6 +112,7 @@ impl FontWeightRange {
     ///
     /// Panics if `end` is before `start`.
     #[must_use]
+    #[track_caller]
     pub const fn new(start: FontWeight, end: FontWeight) -> Self {
         assert!(end.0 >= start.0, "font weight range must not be empty");
         Self { start, end }
@@ -123,6 +125,7 @@ impl FontWeightRange {
     /// Panics if either value is outside `100..=900`, or if `end` is before
     /// `start`.
     #[must_use]
+    #[track_caller]
     pub const fn from_u16(start: u16, end: u16) -> Self {
         Self::new(FontWeight::new(start), FontWeight::new(end))
     }

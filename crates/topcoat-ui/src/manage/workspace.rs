@@ -1,12 +1,13 @@
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use std::process::Command;
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    process::Command,
+};
 
 use serde::Deserialize;
 
-use crate::{DEFAULT_REGISTRY, DEFAULT_REGISTRY_CRATE};
-
 use super::package::Package;
+use crate::{DEFAULT_REGISTRY, DEFAULT_REGISTRY_CRATE};
 
 /// The cargo dependency graph of a package, used to resolve registries.
 ///

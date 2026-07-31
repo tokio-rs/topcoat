@@ -38,7 +38,7 @@ async fn dashboard(cx: &Cx) -> Result {
 }
 ```
 
-The methods mirror the constructors: [`ok_or_not_found`](RouterErrorExt::ok_or_not_found) for [`not_found`], [`ok_or_redirect`](RouterErrorExt::ok_or_redirect) for [`redirect`], and so on. A failed `#[path_param]` or `#[query_params]` parse feeds the same constructors through the macro's `error = ...` option.
+The methods mirror the constructors: [`ok_or_not_found`](RouterErrorExt::ok_or_not_found) for [`not_found`], [`ok_or_redirect`](RouterErrorExt::ok_or_redirect) for [`redirect`], and so on. A failed `path_param::<T>(cx)` or `query_params::<T>(cx)` parse feeds the same constructors through the declaration's `error = ...` option.
 
 # Catching an error
 

@@ -4,7 +4,6 @@ use syn::{
     Ident,
     parse::{Parse, ParseStream},
 };
-
 use topcoat_core_grammar::paths::topcoat_font_fontsource;
 use topcoat_font::fontsource::Family;
 

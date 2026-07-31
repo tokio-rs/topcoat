@@ -159,6 +159,7 @@ impl HtmlWriter<'_, '_> {
     /// [`ElementName`](HtmlContext::ElementName)) when `s` contains a
     /// character that could break out of the identifier, since HTML has no
     /// escape mechanism there.
+    #[track_caller]
     pub fn write_str(&mut self, s: &str) {
         match self.context {
             HtmlContext::Unescaped => self.f.write_str(s),
@@ -176,6 +177,7 @@ impl HtmlWriter<'_, '_> {
     ///
     /// Panics in the ident contexts when `c` could break out of the
     /// identifier, like [`write_str`](Self::write_str).
+    #[track_caller]
     pub fn write_char(&mut self, c: char) {
         let table = match self.context {
             HtmlContext::Unescaped => return self.f.write_char(c),
@@ -222,6 +224,7 @@ impl HtmlWriter<'_, '_> {
 
     /// Writes `s` verbatim after checking that every byte is allowed in an
     /// ident context, panicking otherwise.
+    #[track_caller]
     fn write_ident(&mut self, s: &str) {
         // A branchless fold with no early exit, so the scan can vectorize.
         // The happy path has to visit every byte anyway; only the failure
@@ -237,6 +240,7 @@ impl HtmlWriter<'_, '_> {
 
     /// Panics with the first forbidden character in `s`.
     #[cold]
+    #[track_caller]
     fn panic_invalid_ident(&self, s: &str) -> ! {
         let position = s
             .bytes()

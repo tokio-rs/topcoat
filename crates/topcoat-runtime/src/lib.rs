@@ -23,7 +23,6 @@ pub use reactive_scope::*;
 pub use shard::*;
 pub use signal::*;
 pub use surrogate::*;
-
 use topcoat_asset::{Asset, asset};
 
 pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");

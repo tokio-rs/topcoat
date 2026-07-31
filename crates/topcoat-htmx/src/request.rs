@@ -9,6 +9,7 @@ use crate::header;
 /// The header map is borrowed straight from the request, so these reads are
 /// cheap pointer lookups: there is nothing worth caching with `#[memoize]`,
 /// and borrowing avoids the allocation a memoized owned value would require.
+#[track_caller]
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
     request_context::<Parts>(cx)
         .headers
@@ -25,6 +26,7 @@ fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
 /// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn hx_request(cx: &Cx) -> bool {
     header(cx, &header::HX_REQUEST) == Some("true")
 }
@@ -37,6 +39,7 @@ pub fn hx_request(cx: &Cx) -> bool {
 /// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn hx_boosted(cx: &Cx) -> bool {
     header(cx, &header::HX_BOOSTED) == Some("true")
 }
@@ -49,6 +52,7 @@ pub fn hx_boosted(cx: &Cx) -> bool {
 /// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn hx_history_restore_request(cx: &Cx) -> bool {
     header(cx, &header::HX_HISTORY_RESTORE_REQUEST) == Some("true")
 }
@@ -61,6 +65,7 @@ pub fn hx_history_restore_request(cx: &Cx) -> bool {
 /// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn hx_current_url(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_CURRENT_URL)
 }
@@ -73,6 +78,7 @@ pub fn hx_current_url(cx: &Cx) -> Option<&str> {
 /// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn hx_prompt(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_PROMPT)
 }
@@ -85,6 +91,7 @@ pub fn hx_prompt(cx: &Cx) -> Option<&str> {
 /// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn hx_target(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_TARGET)
 }
@@ -97,6 +104,7 @@ pub fn hx_target(cx: &Cx) -> Option<&str> {
 /// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn hx_trigger(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_TRIGGER)
 }
@@ -109,6 +117,7 @@ pub fn hx_trigger(cx: &Cx) -> Option<&str> {
 /// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn hx_trigger_name(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_TRIGGER_NAME)
 }

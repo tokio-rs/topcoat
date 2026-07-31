@@ -4,21 +4,21 @@ mod subset;
 mod weight;
 
 pub use list::*;
-pub use style::*;
-pub use subset::*;
-pub use weight::*;
-
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{ToTokens, quote};
+pub use style::*;
+pub use subset::*;
 use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::{
-    topcoat_font, topcoat_font_fontsource, topcoat_font_fontsource_macro, topcoat_font_macro,
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{
+        topcoat_font, topcoat_font_fontsource, topcoat_font_fontsource_macro, topcoat_font_macro,
+    },
 };
+pub use weight::*;
 
 use crate::fontsource::font_face::{Display, FamilyName, Host};
 

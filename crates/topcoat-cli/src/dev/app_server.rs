@@ -1,6 +1,8 @@
-use std::io;
-use std::path::{Path, PathBuf};
-use std::process::{ExitStatus, Stdio};
+use std::{
+    io,
+    path::{Path, PathBuf},
+    process::{ExitStatus, Stdio},
+};
 
 use tokio::process::{Child, Command};
 

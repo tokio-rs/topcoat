@@ -4,6 +4,7 @@ use topcoat_view::{AttributeValueViewParts, DynViewPart, HtmlWriter, PartsWriter
 use crate::{Asset, AssetConfig};
 
 impl DynViewPart for Asset {
+    #[track_caller]
     fn render(&self, cx: &Cx, w: &mut HtmlWriter<'_, '_>) {
         let asset_config = try_app_context::<AssetConfig>(cx).unwrap_or_else(|| {
             panic!("no asset config registered in this router context; load the asset bundle with `.assets(AssetBundle::load().unwrap())`");

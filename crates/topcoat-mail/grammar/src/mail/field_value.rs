@@ -3,7 +3,6 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Brace,
 };
-
 use topcoat_view_grammar::view::View;
 
 /// The value of a [`MailField`](super::MailField), shaped by the field's

@@ -4,9 +4,8 @@ mod value;
 
 pub use attributes::*;
 pub use key::*;
-pub use value::*;
-
 use topcoat_core::context::Cx;
+pub use value::*;
 
 use crate::{HtmlContext, PartsWriter, ViewPart};
 

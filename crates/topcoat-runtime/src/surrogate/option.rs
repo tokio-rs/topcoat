@@ -46,6 +46,7 @@ where
     ///
     /// Panics if the option is `None`.
     #[inline]
+    #[track_caller]
     pub fn unwrap(self) -> T::Surrogate {
         self.0.unwrap().into_surrogate()
     }
@@ -56,6 +57,7 @@ where
     ///
     /// Panics with `msg` if the option is `None`.
     #[inline]
+    #[track_caller]
     pub fn expect(self, msg: &StrSurrogate) -> T::Surrogate {
         self.0.expect(&msg.0).into_surrogate()
     }

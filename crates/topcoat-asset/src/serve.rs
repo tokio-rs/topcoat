@@ -1,9 +1,11 @@
 use std::path::PathBuf as FsPathBuf;
 
-use http::header::{CACHE_CONTROL, CONTENT_TYPE};
-use http::{HeaderValue, Method, StatusCode};
+use http::{
+    HeaderValue, Method, StatusCode,
+    header::{CACHE_CONTROL, CONTENT_TYPE},
+};
 use topcoat_core::context::Cx;
-use topcoat_router::{Body, Methods, Path, PathBuf, Response, Route, RouteFuture};
+use topcoat_router::{Body, Methods, Path, PathBuf, Route, RouteFuture, response::Response};
 
 use crate::BundledAsset;
 
@@ -39,6 +41,7 @@ impl AssetRoute {
     /// Panics if the asset's `Content-Type` cannot be converted into a
     /// [`HeaderValue`].
     #[must_use]
+    #[track_caller]
     pub fn new(dir: &std::path::Path, asset: &BundledAsset) -> Self {
         let name = asset.name();
         let content_type = HeaderValue::from_str(asset.content_type()).unwrap_or_else(|_| {

@@ -20,17 +20,17 @@ pub use attribute_value::*;
 pub(crate) use attribute_writer::*;
 pub use bind_attribute::*;
 pub use event_handler::*;
-pub use visitor::*;
-
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-
 use topcoat_core_grammar::ParseOption;
+pub use visitor::*;
 
-use crate::leading_cx::LeadingCx;
-use crate::template::{TemplateElse, TemplateForLoop, TemplateIf, TemplateMatch};
-use crate::view::{self, ViewWriter, WriteView};
+use crate::{
+    leading_cx::LeadingCx,
+    template::{TemplateElse, TemplateForLoop, TemplateIf, TemplateMatch},
+    view::{self, ViewWriter, WriteView},
+};
 
 /// The full list of attributes attached to a single tag.
 pub struct Attributes {

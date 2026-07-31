@@ -13,6 +13,7 @@ description: Always use this skill before writing procedural macros for Topcoat
 
 * In `Parse` impls, parse directly into the `Self { ... }` fields (`Self { x: input.parse()? }`) rather than through `let` bindings. Use a `let` only when a parsed value must be inspected to decide how to parse a later field.
 * To parse custom keywords that are not re-emitted into the generated code, create a private `mod kw` with `syn::custom_keyword!` invocations instead of parsing `syn::Ident`. Use `input.lookahead1()` if it makes sense.
+* Instead of manually peeking for optional AST nodes in the input stream at the call site, implement `ParseOption` and parse them with `input.call(Node::parse_option)?`.
 
 ## Entry points
 

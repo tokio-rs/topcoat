@@ -175,4 +175,4 @@ The raw `datastar-*` header names are available as `HeaderName` constants in [`t
 
 [`Sse`]: crate::router::content::sse::Sse
 [`Event`]: crate::router::content::sse::Event
-[`IntoResponseParts`]: crate::router::IntoResponseParts
+[`IntoResponseParts`]: crate::router::response::IntoResponseParts

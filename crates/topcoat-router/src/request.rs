@@ -1,15 +1,13 @@
-use http_body_util::LengthLimitError;
-use topcoat_core::{context::Cx, error::Result};
-
-use crate::{
-    Body, body_limit,
-    error::{bad_request, content_too_large},
-    to_bytes,
-};
-
 /// Byte-buffer types re-exported for use as request body extractors and as
 /// response bodies.
 pub use bytes::{Bytes, BytesMut};
+use http::request::Parts;
+use topcoat_core::{
+    context::{Cx, request_context},
+    error::Result,
+};
+
+use crate::{Body, body_limit, error::bad_request, to_bytes};
 
 /// An incoming HTTP request, carrying a [`Body`] by default.
 pub type Request<T = Body> = http::Request<T>;
@@ -24,11 +22,11 @@ pub type Request<T = Body> = http::Request<T>;
 ///
 /// Because the body is a stream that can only be read once, a handler may have
 /// at most one `FromRequest` parameter. This is the request-side counterpart of
-/// [`IntoResponse`](crate::IntoResponse).
+/// [`IntoResponse`](crate::response::IntoResponse).
 ///
 /// An implementation that buffers the body should delegate the buffering to
 /// [`Bytes`], which enforces the request's
-/// [`body_limit`](crate::body_limit); reading the body by hand bypasses that
+/// [`body_limit`]; reading the body by hand bypasses that
 /// limit.
 ///
 /// # Examples
@@ -45,7 +43,12 @@ pub type Request<T = Body> = http::Request<T>;
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
-///     router::{Body, Bytes, FromRequest, error::bad_request, headers, route},
+///     router::{
+///         Body,
+///         error::bad_request,
+///         request::{Bytes, FromRequest, headers},
+///         route,
+///     },
 /// };
 ///
 /// struct SignedJson<T>(T);
@@ -78,7 +81,7 @@ pub type Request<T = Body> = http::Request<T>;
 pub trait FromRequest: Sized {
     /// Builds `Self` from the request context and body.
     ///
-    /// Returns an error (typically [`bad_request`](crate::error::bad_request))
+    /// Returns an error (typically [`bad_request`])
     /// when the request cannot be parsed into `Self`; the error is converted
     /// into the response sent to the client.
     fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> + Send;
@@ -96,13 +99,7 @@ impl FromRequest for Body {
 /// the request's [`body_limit`] with `413 Content Too Large`.
 impl FromRequest for Bytes {
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
-        to_bytes(body, body_limit(cx)).await.map_err(|error| {
-            if error.is::<LengthLimitError>() {
-                content_too_large().into()
-            } else {
-                bad_request(format!("failed to read request body: {error}")).into()
-            }
-        })
+        to_bytes(body, body_limit(cx)).await
     }
 }
 
@@ -149,4 +146,151 @@ where
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
         T::from_request(cx, body).await
     }
+}
+
+/// Returns the [`Parts`] of the current request.
+///
+/// Use this when you need access to multiple components of the request at
+/// once. For individual fields, prefer the dedicated accessors
+/// ([`method`], [`uri`], [`version`], [`headers`], [`extensions`]).
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::parts};
+///
+/// async fn log_request(cx: &Cx) {
+///     let parts = parts(cx);
+///     println!("{} {}", parts.method, parts.uri);
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn parts(cx: &Cx) -> &Parts {
+    request_context(cx)
+}
+
+/// Returns the HTTP [`Method`] of the current request.
+///
+/// [`Method`]: http::Method
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::method};
+///
+/// async fn is_post(cx: &Cx) -> bool {
+///     method(cx) == http::Method::POST
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn method(cx: &Cx) -> &http::Method {
+    &parts(cx).method
+}
+
+/// Returns the [`Uri`] of the current request.
+///
+/// [`Uri`]: http::Uri
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::uri};
+///
+/// async fn current_path(cx: &Cx) -> &str {
+///     uri(cx).path()
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn uri(cx: &Cx) -> &http::Uri {
+    &parts(cx).uri
+}
+
+/// Returns the HTTP [`Version`] of the current request.
+///
+/// [`Version`]: http::Version
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::version};
+///
+/// async fn is_http2(cx: &Cx) -> bool {
+///     *version(cx) == http::Version::HTTP_2
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn version(cx: &Cx) -> &http::Version {
+    &parts(cx).version
+}
+
+/// Returns the [`HeaderMap`] of the current request.
+///
+/// [`HeaderMap`]: http::HeaderMap
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::headers};
+///
+/// async fn user_agent(cx: &Cx) -> Option<&str> {
+///     headers(cx).get("user-agent")?.to_str().ok()
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn headers(cx: &Cx) -> &http::HeaderMap {
+    &parts(cx).headers
+}
+
+/// Returns the `Content-Type` header of the current request as a string slice,
+/// or [`None`] when it is absent or not valid UTF-8.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::content_type};
+///
+/// async fn is_json(cx: &Cx) -> bool {
+///     content_type(cx).is_some_and(|value| value.starts_with("application/json"))
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn content_type(cx: &Cx) -> Option<&str> {
+    headers(cx).get(http::header::CONTENT_TYPE)?.to_str().ok()
+}
+
+/// Returns the [`Extensions`] of the current request.
+///
+/// Extensions carry typed values attached to the request, typically by
+/// middleware running before the handler.
+///
+/// [`Extensions`]: http::Extensions
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::extensions};
+///
+/// struct RequestId(String);
+///
+/// async fn request_id(cx: &Cx) -> Option<&str> {
+///     extensions(cx).get::<RequestId>().map(|id| id.0.as_str())
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn extensions(cx: &Cx) -> &http::Extensions {
+    &parts(cx).extensions
 }

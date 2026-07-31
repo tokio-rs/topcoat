@@ -3,7 +3,6 @@ mod item;
 
 pub use attr::*;
 pub use item::*;
-
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use topcoat_core_grammar::paths::{
@@ -140,7 +139,7 @@ impl ToTokens for Shard {
                         type __Surrogate =
                             <(#(#value_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
                         let #topcoat_router::content::Json(__args) =
-                            <#topcoat_router::content::Json<__Surrogate> as #topcoat_router::FromRequest>
+                            <#topcoat_router::content::Json<__Surrogate> as #topcoat_router::request::FromRequest>
                                 ::from_request(cx, body).await?;
                         let (#(#value_idents,)*) =
                             #topcoat_runtime::Surrogate::into_real(__args);

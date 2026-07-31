@@ -29,6 +29,7 @@ impl FontSourceUrl {
     ///
     /// Returns any error produced while writing to `f`.
     #[cfg_attr(not(feature = "asset"), expect(unused_variables))]
+    #[track_caller]
     pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         let mut f = CssString(f);
         match self {
@@ -185,6 +186,7 @@ impl FontSource {
     /// # Errors
     ///
     /// Returns any error produced while writing to `f`.
+    #[track_caller]
     pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         match self {
             Self::Url { url, format, tech } => {
@@ -260,6 +262,7 @@ impl FontSources {
     /// Panics if `sources` is empty; a CSS `src` descriptor requires at least
     /// one source.
     #[must_use]
+    #[track_caller]
     pub fn new(sources: impl Into<Vec<FontSource>>) -> Self {
         let sources = sources.into();
         assert!(!sources.is_empty(), "font sources must not be empty");
@@ -279,6 +282,7 @@ impl FontSources {
     /// # Errors
     ///
     /// Returns any error produced while writing to `f`.
+    #[track_caller]
     pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         for (index, source) in self.0.iter().enumerate() {
             if index > 0 {

@@ -2,8 +2,10 @@ use http::header::{CONTENT_TYPE, HeaderValue};
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    Body, FromRequest, IntoResponse, OptionalFromRequest, Response, content_type,
+    Body,
     error::bad_request,
+    request::{FromRequest, OptionalFromRequest, content_type},
+    response::{IntoResponse, Response},
 };
 
 /// CSS request extractor and response wrapper.

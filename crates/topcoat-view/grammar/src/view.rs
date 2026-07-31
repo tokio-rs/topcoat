@@ -17,14 +17,12 @@ pub use element_tag::*;
 pub use html_ident::*;
 pub use node::*;
 pub use nodes::*;
-pub use signal_declaration::*;
-pub(crate) use view_writer::*;
-
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
+pub use signal_declaration::*;
 use syn::parse::{Parse, ParseStream};
-
 use topcoat_core_grammar::ParseOption;
+pub(crate) use view_writer::*;
 
 use crate::leading_cx::LeadingCx;
 

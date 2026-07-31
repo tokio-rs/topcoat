@@ -1,5 +1,8 @@
 <div align="center">
-  <h1>Topcoat</h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tokio-rs/topcoat/main/media/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/tokio-rs/topcoat/main/media/logo-light.svg" alt="Topcoat" width="220">
+  </picture>
 </div>
 
 <div align="center">

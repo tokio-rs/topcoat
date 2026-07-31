@@ -4,7 +4,6 @@ use syn::{
     Visibility,
     parse::{Parse, ParseStream},
 };
-
 use topcoat_icon::iconify::IconSet;
 
 use crate::iconify::{

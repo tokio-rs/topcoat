@@ -39,6 +39,11 @@ async fn home() -> Result {
                 <a href="/posts?page=2&q=rust">"query params: /posts?page=2&q=rust"</a>
             </li>
             <li><a href="/posts/42">"path param: /posts/42"</a></li>
+            <li>
+                <a href="/docs/guides/getting-started">
+                    "catch-all param: /docs/guides/getting-started"
+                </a>
+            </li>
         </ul>
     }
 }
@@ -74,10 +79,12 @@ async fn posts(cx: &Cx) -> Result {
 
 // --- Path params ------------------------------------------------------------
 
-// Read the {post_id} URL segment and parse it as a u32.
+// Declare the {post_id} URL segment and parse it as a u32.
 // Return a bad request response if the value is not a number.
-#[path_param(error = bad_request("Post ID must be a number!"))]
-struct PostId(u32);
+path_param!(
+    post_id: u32,
+    error = bad_request("Post ID must be a number!"),
+);
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
@@ -91,5 +98,24 @@ async fn post(cx: &Cx) -> Result {
         </h1>
         <p>"parsed from the {post_id} path segment"</p>
         <p><a href="/posts?page=1">"all posts"</a></p>
+    }
+}
+
+// --- Catch-all params -------------------------------------------------------
+
+// A leading `*` captures every remaining segment. Without a type the parameter
+// reads back as decoded segments.
+path_param!(*doc_path);
+
+#[page("/docs/{*doc_path}")]
+async fn document(cx: &Cx) -> Result {
+    view! {
+        <h1>"Documentation path"</h1>
+        <ul>
+            for segment in path_param::<DocPath>(cx) {
+                <li>(segment)</li>
+            }
+        </ul>
+        <p><a href="/">"back home"</a></p>
     }
 }

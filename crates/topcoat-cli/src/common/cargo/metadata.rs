@@ -1,5 +1,7 @@
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::{
+    path::{Path, PathBuf},
+    process::Stdio,
+};
 
 use tokio::process::Command;
 

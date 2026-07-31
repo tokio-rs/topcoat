@@ -2,7 +2,6 @@ use syn::{
     Expr, Local, Pat, Stmt, Token,
     parse::{Parse, ParseStream},
 };
-
 use topcoat_core_grammar::ParseOption;
 
 use crate::{
@@ -87,8 +86,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for TemplateLocal {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use quote::ToTokens;
+
+    use super::*;
 
     fn parse(source: &str) -> TemplateLocal {
         syn::parse_str(source).unwrap()

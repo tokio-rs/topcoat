@@ -1,12 +1,10 @@
-use http::HeaderValue;
-use http::response::Parts;
+use http::{HeaderValue, response::Parts};
 use serde::Serialize;
 use serde_json::Value;
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_router::IntoResponseParts;
+use topcoat_router::response::IntoResponseParts;
 
-use crate::SwapOption;
-use crate::header;
+use crate::{SwapOption, header};
 
 /// Performs a client-side redirect that does not trigger a full page reload,
 /// via the `HX-Location` header.

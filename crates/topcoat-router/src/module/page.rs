@@ -1,5 +1,4 @@
-use std::borrow::Cow;
-use std::panic::Location;
+use std::{borrow::Cow, panic::Location};
 
 use crate::{LayoutFn, LayoutRenderFn, OwnedMethods, PageFn, PageRenderFn, Path};
 

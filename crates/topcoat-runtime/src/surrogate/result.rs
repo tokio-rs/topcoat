@@ -55,6 +55,7 @@ where
     ///
     /// Panics if the result is `Err`.
     #[inline]
+    #[track_caller]
     pub fn unwrap(self) -> T::Surrogate {
         self.0.unwrap().into_surrogate()
     }
@@ -65,6 +66,7 @@ where
     ///
     /// Panics with `msg` if the result is `Err`.
     #[inline]
+    #[track_caller]
     pub fn expect(self, msg: &StrSurrogate) -> T::Surrogate {
         self.0.expect(&msg.0).into_surrogate()
     }
@@ -83,11 +85,13 @@ where
     E: Surrogated,
 {
     #[inline]
+    #[track_caller]
     pub fn unwrap_err(self) -> E::Surrogate {
         self.0.unwrap_err().into_surrogate()
     }
 
     #[inline]
+    #[track_caller]
     pub fn expect_err(self, msg: &StrSurrogate) -> E::Surrogate {
         self.0.expect_err(&msg.to_string()).into_surrogate()
     }

@@ -10,7 +10,7 @@ Keep this file in sync with CI workflows.
 Run these by default:
 
 ```
-cargo +nightly fmt --all # stable fmt is fine if nightly is missing
+cargo +nightly fmt --all # nightly is required, CI checks formatting with it
 cargo topcoat fmt # formats Topcoat macros inside source files (ignore Leptos errors)
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-features

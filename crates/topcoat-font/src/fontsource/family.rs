@@ -1,6 +1,5 @@
-use crate::UnicodeRanges;
-
 use super::{Style, Subset, families};
+use crate::UnicodeRanges;
 
 /// Static metadata describing a single font family in the Fontsource catalog.
 ///

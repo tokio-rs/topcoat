@@ -8,8 +8,10 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, Bytes, FromRequest, IntoResponse, OptionalFromRequest, Response, content_type,
+    Body,
     error::{bad_request, bad_request_at},
+    request::{Bytes, FromRequest, OptionalFromRequest, content_type},
+    response::{IntoResponse, Response},
 };
 
 /// JSON request extractor and response wrapper.
@@ -190,9 +192,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, FromRequest, OptionalFromRequest,
+        Body,
         body_limit::DEFAULT_BODY_LIMIT,
         error::{BadRequestError, ContentTooLargeError},
+        request::{FromRequest, OptionalFromRequest},
         to_bytes,
     };
 

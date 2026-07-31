@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use serde::Serialize;
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_router::{IntoResponse, Response, content::sse::Event};
+use topcoat_router::{
+    content::sse::Event,
+    response::{IntoResponse, Response},
+};
 
 use crate::common;
 

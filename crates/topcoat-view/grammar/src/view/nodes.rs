@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
 use syn::parse::{Parse, ParseStream};
-
 use topcoat_core_grammar::ParseOption;
 
 use crate::view::{ClosingTag, Node, ViewWriter, WriteView};
@@ -67,8 +66,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Nodes {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use syn::parse::Parser;
+
+    use super::*;
 
     fn parse(source: &str) -> Nodes {
         syn::parse_str(source).unwrap()

@@ -31,6 +31,7 @@ impl Asset {
     /// Panics if the handle does not reference a valid encoded declaration;
     /// handles returned by [`asset!`](crate::asset) are always valid.
     #[must_use]
+    #[track_caller]
     pub fn id(&self) -> AssetId {
         // The bundler discovers assets by scanning the binary for these
         // bytes; reading them through black_box stops the optimizer from

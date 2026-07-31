@@ -12,17 +12,21 @@ mod unauthorized;
 pub use bad_request::*;
 pub use content_too_large::*;
 pub use forbidden::*;
+use http::StatusCode;
 pub use internal_server::*;
 pub use method_not_allowed::*;
 pub use not_found::*;
 pub use redirect::*;
+use topcoat_core::{
+    context::Cx,
+    error::{Error, Result},
+};
 pub use unauthorized::*;
 
-use http::StatusCode;
-
-use crate::{Body, IntoResponse, Response};
-use topcoat_core::context::Cx;
-use topcoat_core::error::{Error, Result};
+use crate::{
+    Body,
+    response::{IntoResponse, Response},
+};
 
 /// Renders any [`IntoResponse`] value into a [`Response`], falling back to the
 /// error's response if conversion fails. This is the terminal conversion the
@@ -31,6 +35,13 @@ pub(crate) fn respond(cx: &Cx, value: impl IntoResponse) -> Response {
     value
         .into_response(cx)
         .unwrap_or_else(|error| error_into_response(cx, error))
+}
+
+/// Builds a bare 500 response without consulting request or application code.
+pub(crate) fn internal_server_response() -> Response {
+    let mut response = Response::new(Body::from("internal server error"));
+    *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+    response
 }
 
 /// Maps the framework's error types onto their HTTP status codes, falling back
@@ -59,11 +70,9 @@ fn error_into_response(cx: &Cx, error: Error) -> Response {
 /// Renders an error response, falling back to a bare 500 (none of the error
 /// types' responses can actually fail to build).
 fn into_response_or_500(cx: &Cx, value: impl IntoResponse) -> Response {
-    value.into_response(cx).unwrap_or_else(|_| {
-        let mut response = Response::new(Body::from("internal server error"));
-        *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-        response
-    })
+    value
+        .into_response(cx)
+        .unwrap_or_else(|_| internal_server_response())
 }
 
 /// Renders the contained value, or the framework error response on `Err`.
@@ -99,9 +108,7 @@ impl IntoResponse for Error {
 /// ```rust
 /// # struct User;
 /// # async fn lookup(_cx: &Cx, _id: u64) -> Option<User> { None }
-/// use topcoat::Result;
-/// use topcoat::context::Cx;
-/// use topcoat::router::error::RouterErrorExt;
+/// use topcoat::{Result, context::Cx, router::error::RouterErrorExt};
 ///
 /// async fn fetch_user(cx: &Cx, id: u64) -> Result<User> {
 ///     let user = lookup(cx, id).await.ok_or_redirect("/users")?;
@@ -118,6 +125,11 @@ pub trait RouterErrorExt {
     ///
     /// Returns a [`RedirectError`] performing a temporary redirect to `uri`
     /// when the value is absent.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `uri` is not a valid `Location` header value.
+    #[track_caller]
     fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError>;
 
     /// Returns `Ok(value)` if present, otherwise a permanent redirect to `uri`.
@@ -126,6 +138,11 @@ pub trait RouterErrorExt {
     ///
     /// Returns a [`RedirectError`] performing a permanent redirect to `uri`
     /// when the value is absent.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `uri` is not a valid `Location` header value.
+    #[track_caller]
     fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError>;
 
     /// Returns `Ok(value)` if present, otherwise a not-found response.
@@ -161,6 +178,7 @@ pub trait RouterErrorExt {
 impl<T> RouterErrorExt for Option<T> {
     type T = T;
 
+    #[track_caller]
     fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Some(value) => Ok(value),
@@ -168,6 +186,7 @@ impl<T> RouterErrorExt for Option<T> {
         }
     }
 
+    #[track_caller]
     fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Some(value) => Ok(value),
@@ -207,6 +226,7 @@ impl<T> RouterErrorExt for Option<T> {
 impl<T, E> RouterErrorExt for Result<T, E> {
     type T = T;
 
+    #[track_caller]
     fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Ok(value) => Ok(value),
@@ -214,6 +234,7 @@ impl<T, E> RouterErrorExt for Result<T, E> {
         }
     }
 
+    #[track_caller]
     fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Ok(value) => Ok(value),

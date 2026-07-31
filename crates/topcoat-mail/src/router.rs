@@ -20,7 +20,8 @@ impl RouterBuilderMailExt for RouterBuilder {
 mod tests {
     use topcoat_core::{context::Cx, error::Result};
     use topcoat_router::{
-        Body, Method, Methods, Path, Request, Response, Route, RouteFuture, Router,
+        Body, Method, Methods, Path, Route, RouteFuture, Router, request::Request,
+        response::Response,
     };
 
     use crate::{Mail, MailConfig, Mailbox, MemoryTransport, RouterBuilderMailExt, send};

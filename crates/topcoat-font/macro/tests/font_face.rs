@@ -1,5 +1,7 @@
-use topcoat::context::Cx;
-use topcoat::font::{FontFace, FontSource, font_face};
+use topcoat::{
+    context::Cx,
+    font::{FontFace, FontSource, font_face},
+};
 
 fn render(face: &FontFace) -> String {
     let mut out = String::new();

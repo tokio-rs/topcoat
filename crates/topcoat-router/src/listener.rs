@@ -1,11 +1,11 @@
-use std::future::Future;
-use std::io;
-use std::net::SocketAddr;
+use std::{future::Future, io, net::SocketAddr};
 
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::TcpListener;
 #[cfg(unix)]
 use tokio::net::UnixListener;
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpListener,
+};
 
 /// A bound listener the serve functions can accept connections from.
 ///

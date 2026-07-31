@@ -5,7 +5,10 @@ use topcoat::{
     alpine_ajax::ajax_request,
     context::{Cx, app_context},
     router::{
-        IntoResponse, Response, Router, RouterBuilderDiscoverExt, error::see_other, layout, page,
+        Router, RouterBuilderDiscoverExt,
+        error::see_other,
+        layout, page,
+        response::{IntoResponse, Response},
         route,
     },
     view::view,

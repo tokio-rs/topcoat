@@ -43,6 +43,7 @@ where
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
+    #[track_caller]
     pub fn set(&self, _v: T::Surrogate) {
         write_in_browser_only();
     }
@@ -54,6 +55,7 @@ impl SignalSurrogate<bool> {
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
+    #[track_caller]
     pub fn toggle(&self) {
         write_in_browser_only();
     }
@@ -65,6 +67,7 @@ impl SignalSurrogate<f64> {
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
+    #[track_caller]
     pub fn increment(&self) {
         write_in_browser_only();
     }
@@ -74,6 +77,7 @@ impl SignalSurrogate<f64> {
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
+    #[track_caller]
     pub fn decrement(&self) {
         write_in_browser_only();
     }
@@ -85,12 +89,14 @@ impl SignalSurrogate<String> {
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
+    #[track_caller]
     pub fn push_str(&self, _s: &StrSurrogate) {
         write_in_browser_only();
     }
 }
 
 /// The panic shared by every signal write evaluated on the server.
+#[track_caller]
 fn write_in_browser_only() -> ! {
     panic!("expressions in which a signal is written to cannot be run server-side");
 }

@@ -83,7 +83,7 @@ Write composable request functions instead. Each function adds one small piece o
 ```rust
 use topcoat::{
     context::{app_context, memoize, Cx},
-    router::{error::{RouterErrorExt, UnauthorizedError}, headers},
+    router::{error::{RouterErrorExt, UnauthorizedError}, request::headers},
     Result,
 };
 

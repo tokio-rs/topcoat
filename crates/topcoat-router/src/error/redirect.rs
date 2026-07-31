@@ -1,19 +1,20 @@
-use http::header::LOCATION;
-use http::{HeaderValue, StatusCode};
+use http::{HeaderValue, StatusCode, header::LOCATION};
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{IntoResponse, Response};
+use crate::response::{IntoResponse, Response};
 
 /// Builds a temporary (HTTP 307) redirect to `uri`.
+///
+/// # Panics
+///
+/// Panics if `uri` is not a valid `Location` header value.
 ///
 /// # Examples
 ///
 /// ```rust
 /// # struct User;
 /// # async fn lookup(_cx: &Cx, _id: u64) -> Option<User> { None }
-/// use topcoat::Result;
-/// use topcoat::context::Cx;
-/// use topcoat::router::error::redirect;
+/// use topcoat::{Result, context::Cx, router::error::redirect};
 ///
 /// async fn fetch_user(cx: &Cx, id: u64) -> Result<User> {
 ///     let Some(user) = lookup(cx, id).await else {
@@ -23,6 +24,7 @@ use crate::{IntoResponse, Response};
 /// }
 /// ```
 #[must_use]
+#[track_caller]
 pub fn redirect(uri: &str) -> RedirectError {
     RedirectError::new(StatusCode::TEMPORARY_REDIRECT, uri)
 }
@@ -32,12 +34,18 @@ pub fn redirect(uri: &str) -> RedirectError {
 /// Use this for URLs that have moved for good; clients and search engines
 /// are allowed to cache the new location.
 ///
+/// # Panics
+///
+/// Panics if `uri` is not a valid `Location` header value.
+///
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::Result;
-/// use topcoat::context::Cx;
-/// use topcoat::router::{error::redirect_permanent, page};
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{error::redirect_permanent, page},
+/// };
 ///
 /// #[page]
 /// async fn legacy_profile(cx: &Cx) -> Result {
@@ -45,6 +53,7 @@ pub fn redirect(uri: &str) -> RedirectError {
 /// }
 /// ```
 #[must_use]
+#[track_caller]
 pub fn redirect_permanent(uri: &str) -> RedirectError {
     RedirectError::new(StatusCode::PERMANENT_REDIRECT, uri)
 }
@@ -67,6 +76,7 @@ impl RedirectError {
     /// # Panics
     ///
     /// Panics if `uri` is not a valid `Location` header value.
+    #[track_caller]
     fn new(status: StatusCode, uri: &str) -> Self {
         Self {
             status,
@@ -97,14 +107,20 @@ impl IntoResponse for RedirectError {
 /// -- the Post/Redirect/Get pattern that keeps a reload from re-submitting the
 /// mutation.
 ///
+/// # Panics
+///
+/// Panics if `uri` is not a valid `Location` header value.
+///
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::Result;
-/// use topcoat::context::Cx;
-/// use topcoat::router::{
-///     error::{SeeOther, see_other},
-///     route,
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{
+///         error::{SeeOther, see_other},
+///         route,
+///     },
 /// };
 ///
 /// #[route(POST "/logout")]
@@ -114,6 +130,7 @@ impl IntoResponse for RedirectError {
 /// }
 /// ```
 #[must_use]
+#[track_caller]
 pub fn see_other(uri: &str) -> SeeOther {
     SeeOther::new(uri)
 }
@@ -135,6 +152,7 @@ impl SeeOther {
     /// # Panics
     ///
     /// Panics if `uri` is not a valid `Location` header value.
+    #[track_caller]
     fn new(uri: &str) -> Self {
         Self {
             location: HeaderValue::try_from(uri).expect("redirect uri is not a valid header value"),

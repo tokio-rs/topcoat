@@ -1,16 +1,18 @@
-use std::borrow::Cow;
-use std::convert::Infallible;
+use std::{borrow::Cow, convert::Infallible};
 
 use bytes::{Bytes, BytesMut};
-use http::header::{CONTENT_TYPE, HeaderName, HeaderValue};
-use http::response::Parts;
-use http::{Extensions, HeaderMap, StatusCode};
-use topcoat_core::context::Cx;
-use topcoat_core::error::{Error, Result};
+use http::{
+    Extensions, HeaderMap, StatusCode,
+    header::{CONTENT_TYPE, HeaderName, HeaderValue},
+    response::Parts,
+};
+use topcoat_core::{
+    context::Cx,
+    error::{Error, Result},
+};
 use topcoat_view::View;
 
-use crate::content::Html;
-use crate::{Body, BoxError};
+use crate::{Body, BoxError, content::Html};
 
 pub type Response<T = Body> = http::Response<T>;
 
@@ -39,7 +41,11 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
-///     router::{Body, IntoResponse, Response, route},
+///     router::{
+///         Body,
+///         response::{IntoResponse, Response},
+///         route,
+///     },
 /// };
 ///
 /// struct Csv(String);

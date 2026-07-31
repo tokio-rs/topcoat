@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use http::Method;
 
-use crate::LayerId;
+use crate::{LayerId, RawPathParamSpec};
 
 /// The index of a registered route, with [`usize::MAX`] reserved to mean
 /// "none".
@@ -88,8 +88,8 @@ pub(crate) struct Endpoint {
     /// The route handling every method without a registration of its own.
     /// Routes registered for a specific method take precedence.
     any: RouteIndex,
-    /// Interned, cheaply clonable path parameter keys for this endpoint.
-    path_params: Box<[Arc<str>]>,
+    /// Interned path parameter names and capture kinds for this endpoint.
+    path_params: Box<[RawPathParamSpec]>,
     /// The layers wrapping every route at this path, as ids into the router's
     /// layer table, precomputed at build time and ordered from least- to
     /// most-specific so the outermost layer runs first. Shared by every method
@@ -98,7 +98,7 @@ pub(crate) struct Endpoint {
 }
 
 impl Endpoint {
-    pub(crate) fn new(path_params: Box<[Arc<str>]>, layers: Box<[LayerId]>) -> Self {
+    pub(crate) fn new(path_params: Box<[RawPathParamSpec]>, layers: Box<[LayerId]>) -> Self {
         Self {
             standard: Default::default(),
             other: HashMap::new(),
@@ -157,8 +157,8 @@ impl Endpoint {
             .chain(self.other.keys())
     }
 
-    /// Returns the interned path parameter keys for this endpoint.
-    pub(crate) fn path_params(&self) -> &[Arc<str>] {
+    /// Returns the path parameter names and capture kinds for this endpoint.
+    pub(crate) fn path_params(&self) -> &[RawPathParamSpec] {
         &self.path_params
     }
 

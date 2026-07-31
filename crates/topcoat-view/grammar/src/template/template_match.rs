@@ -3,7 +3,6 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Brace,
 };
-
 use topcoat_core_grammar::ParseOption;
 
 use crate::{
@@ -192,9 +191,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use quote::ToTokens;
+
     use super::*;
     use crate::view::Node;
-    use quote::ToTokens;
 
     fn parse(source: &str) -> TemplateMatch<Node> {
         syn::parse_str(source).unwrap()
