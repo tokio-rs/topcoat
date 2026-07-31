@@ -348,7 +348,7 @@ impl RouterBuilder {
     }
 
     #[must_use]
-    pub fn origin_policy(mut self, origin_policy: crate::OriginPolicy) -> Self {
+    pub fn origin_policy(mut self, origin_policy: OriginPolicy) -> Self {
         self.origin_policy = origin_policy;
         self
     }
