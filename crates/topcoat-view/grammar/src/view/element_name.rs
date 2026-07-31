@@ -4,6 +4,7 @@ use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{
     Expr, Ident, LitStr,
+    ext::IdentExt,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Paren,
@@ -103,7 +104,7 @@ impl Display for ElementName {
 impl Parse for ElementName {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
-        if lookahead.peek(Ident) {
+        if lookahead.peek(Ident::peek_any) {
             Ok(Self::Ident(HtmlIdent::parse_dash_only(input)?))
         } else if lookahead.peek(LitStr) {
             Ok(Self::LitStr(input.parse()?))
@@ -138,6 +139,13 @@ mod tests {
     fn ident_name_returns_string_name() {
         let name = parse("div");
         assert_eq!(name.string_name().as_deref(), Some("div"));
+        assert!(name.expr().is_none());
+    }
+
+    #[test]
+    fn rust_keyword_name_returns_string_name() {
+        let name = parse("use");
+        assert_eq!(name.string_name().as_deref(), Some("use"));
         assert!(name.expr().is_none());
     }
 

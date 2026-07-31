@@ -38,6 +38,12 @@ async fn nested_elements_render_in_order() {
 }
 
 #[tokio::test]
+async fn rust_keyword_element_names_render() {
+    let html = r(view! { <svg><use href="#icon"></use></svg> });
+    assert_eq!(html, r##"<svg><use href="#icon"></use></svg>"##);
+}
+
+#[tokio::test]
 async fn literal_attributes_render_quoted() {
     let html = r(view! { <a href="/x" class="link">"go"</a> });
     assert_eq!(html, r#"<a href="/x" class="link">go</a>"#);
