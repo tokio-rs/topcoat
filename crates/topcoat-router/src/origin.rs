@@ -111,10 +111,10 @@ impl OriginPolicy {
 
                 // Fallback check for older browsers: Compare the "origin" and "host" header manually.
                 // If they are the same, this is a safe same-origin request.
-                if let Some(origin) =
-                    origin.and_then(|origin| origin.split_once("://").map(|(_, host)| host))
-                {
+                if let Some(origin) = origin {
+                    let origin = origin.split_once("://").map(|(_, host)| host);
                     return if let Some(host) = host
+                        && let Some(origin) = origin
                         && origin.eq_ignore_ascii_case(host)
                     {
                         OriginVerdict::Allow
@@ -159,6 +159,278 @@ impl OriginVerdict {
         match method {
             &Method::GET | &Method::HEAD | &Method::OPTIONS => OriginVerdict::Untrusted,
             _ => OriginVerdict::Deny,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::Request;
+    use topcoat_core::context::CxTestBuilder;
+
+    use super::*;
+
+    /// The request URI used by every test that does not exercise the fallback
+    /// to the URI's authority.
+    const URI: &str = "/checkout";
+
+    /// The `Host` header of the application being protected.
+    const HOST: (&str, &str) = ("host", "app.example");
+
+    /// Builds a `Cx` for a request with the given method, URI, and headers.
+    fn cx_with(method: Method, uri: &str, headers: &[(&str, &str)]) -> Cx {
+        let mut builder = Request::builder().method(method).uri(uri);
+        for (name, value) in headers {
+            builder = builder.header(*name, *value);
+        }
+        let (parts, ()) = builder.body(()).expect("request should build").into_parts();
+        CxTestBuilder::new().request_context(parts).build()
+    }
+
+    /// The verdict `policy` reaches for a request with the given method and
+    /// headers.
+    fn verdict(policy: &OriginPolicy, method: Method, headers: &[(&str, &str)]) -> OriginVerdict {
+        policy.check(&cx_with(method, URI, headers))
+    }
+
+    /// The verdict the default policy reaches for the given method and headers.
+    fn default_verdict(method: Method, headers: &[(&str, &str)]) -> OriginVerdict {
+        verdict(&OriginPolicy::default(), method, headers)
+    }
+
+    // -- sec-fetch-site --
+
+    #[test]
+    fn same_origin_and_direct_navigation_pass() {
+        for site in ["same-origin", "none"] {
+            for method in [Method::GET, Method::POST] {
+                assert_eq!(
+                    default_verdict(method, &[HOST, ("sec-fetch-site", site)]),
+                    OriginVerdict::Allow,
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cross_site_state_changing_requests_are_denied() {
+        for method in [Method::POST, Method::PUT, Method::PATCH, Method::DELETE] {
+            assert_eq!(
+                default_verdict(
+                    method,
+                    &[
+                        HOST,
+                        ("sec-fetch-site", "cross-site"),
+                        ("origin", "https://evil.example"),
+                    ],
+                ),
+                OriginVerdict::Deny,
+            );
+        }
+    }
+
+    #[test]
+    fn cross_site_safe_requests_are_untrusted() {
+        for method in [Method::GET, Method::HEAD, Method::OPTIONS] {
+            assert_eq!(
+                default_verdict(
+                    method,
+                    &[
+                        HOST,
+                        ("sec-fetch-site", "cross-site"),
+                        ("origin", "https://evil.example"),
+                    ],
+                ),
+                OriginVerdict::Untrusted,
+            );
+        }
+    }
+
+    #[test]
+    fn same_site_is_rejected() {
+        // `same-site` is rejected deliberately: a sibling subdomain must not be
+        // able to forge requests.
+        let headers = [
+            HOST,
+            ("sec-fetch-site", "same-site"),
+            ("origin", "https://evil.app.example"),
+        ];
+        assert_eq!(default_verdict(Method::POST, &headers), OriginVerdict::Deny);
+        assert_eq!(
+            default_verdict(Method::GET, &headers),
+            OriginVerdict::Untrusted,
+        );
+    }
+
+    // -- trusted origins --
+
+    #[test]
+    fn trusted_origins_pass_even_cross_site() {
+        let policy = OriginPolicy::trust_origins(["https://accounts.example"]);
+        for method in [Method::GET, Method::POST] {
+            assert_eq!(
+                verdict(
+                    &policy,
+                    method,
+                    &[
+                        HOST,
+                        ("sec-fetch-site", "cross-site"),
+                        ("origin", "https://accounts.example"),
+                    ],
+                ),
+                OriginVerdict::Allow,
+            );
+        }
+    }
+
+    #[test]
+    fn trusted_origins_are_compared_case_insensitively() {
+        let policy = OriginPolicy::trust_origins(["https://Accounts.Example"]);
+        assert_eq!(
+            verdict(
+                &policy,
+                Method::POST,
+                &[
+                    HOST,
+                    ("sec-fetch-site", "cross-site"),
+                    ("origin", "https://accounts.example"),
+                ],
+            ),
+            OriginVerdict::Allow,
+        );
+    }
+
+    #[test]
+    fn trust_is_keyed_on_the_origin_header() {
+        let policy = OriginPolicy::trust_origins(["https://accounts.example"]);
+        // Another origin is still classified by `Sec-Fetch-Site`.
+        assert_eq!(
+            verdict(
+                &policy,
+                Method::POST,
+                &[
+                    HOST,
+                    ("sec-fetch-site", "cross-site"),
+                    ("origin", "https://evil.example"),
+                ],
+            ),
+            OriginVerdict::Deny,
+        );
+        // Without an `Origin` header there is nothing to match against.
+        assert_eq!(
+            verdict(
+                &policy,
+                Method::POST,
+                &[HOST, ("sec-fetch-site", "cross-site")],
+            ),
+            OriginVerdict::Deny,
+        );
+    }
+
+    // -- origin fallback for older browsers --
+
+    #[test]
+    fn origin_fallback_compares_hosts() {
+        assert_eq!(
+            default_verdict(Method::POST, &[HOST, ("origin", "https://app.example")]),
+            OriginVerdict::Allow,
+        );
+        // Hosts are compared case-insensitively, and any explicit port is part
+        // of the comparison.
+        assert_eq!(
+            default_verdict(
+                Method::POST,
+                &[
+                    ("host", "app.example:8443"),
+                    ("origin", "https://App.Example:8443"),
+                ],
+            ),
+            OriginVerdict::Allow,
+        );
+        assert_eq!(
+            default_verdict(
+                Method::POST,
+                &[HOST, ("origin", "https://app.example:8443")],
+            ),
+            OriginVerdict::Deny,
+        );
+        assert_eq!(
+            default_verdict(Method::POST, &[HOST, ("origin", "https://evil.example")]),
+            OriginVerdict::Deny,
+        );
+        assert_eq!(
+            default_verdict(Method::GET, &[HOST, ("origin", "https://evil.example")]),
+            OriginVerdict::Untrusted,
+        );
+    }
+
+    #[test]
+    fn opaque_origins_are_rejected() {
+        // `Origin: null` carries no host, so it can never match the request's
+        // own and must not be mistaken for a non-browser client.
+        assert_eq!(
+            default_verdict(Method::POST, &[HOST, ("origin", "null")]),
+            OriginVerdict::Deny,
+        );
+        assert_eq!(
+            default_verdict(Method::GET, &[HOST, ("origin", "null")]),
+            OriginVerdict::Untrusted,
+        );
+    }
+
+    #[test]
+    fn an_origin_without_a_request_host_is_rejected() {
+        assert_eq!(
+            default_verdict(Method::POST, &[("origin", "https://app.example")]),
+            OriginVerdict::Deny,
+        );
+    }
+
+    #[test]
+    fn the_host_falls_back_to_the_uri_authority() {
+        let policy = OriginPolicy::default();
+        let cx = cx_with(
+            Method::POST,
+            "https://app.example/checkout",
+            &[("origin", "https://app.example")],
+        );
+        assert_eq!(policy.check(&cx), OriginVerdict::Allow);
+
+        // The `Host` header wins over the URI's authority.
+        let cx = cx_with(
+            Method::POST,
+            "https://other.example/checkout",
+            &[HOST, ("origin", "https://app.example")],
+        );
+        assert_eq!(policy.check(&cx), OriginVerdict::Allow);
+    }
+
+    // -- non-browser clients --
+
+    #[test]
+    fn requests_without_either_header_pass() {
+        assert_eq!(default_verdict(Method::POST, &[HOST]), OriginVerdict::Allow);
+        assert_eq!(default_verdict(Method::POST, &[]), OriginVerdict::Allow);
+    }
+
+    // -- disabled verification --
+
+    #[test]
+    fn disabling_verification_allows_everything() {
+        let policy = OriginPolicy::dangerous_disable();
+        for method in [Method::GET, Method::POST] {
+            assert_eq!(
+                verdict(
+                    &policy,
+                    method,
+                    &[
+                        HOST,
+                        ("sec-fetch-site", "cross-site"),
+                        ("origin", "https://evil.example"),
+                    ],
+                ),
+                OriginVerdict::Allow,
+            );
         }
     }
 }

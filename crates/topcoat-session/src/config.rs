@@ -13,10 +13,6 @@ use crate::TokenStore;
 pub struct SessionConfig {
     pub(crate) token_store: Box<dyn TokenStore>,
     pub(crate) lifetime: Duration,
-    #[cfg(feature = "router")]
-    pub(crate) verify_origin: bool,
-    #[cfg(feature = "router")]
-    pub(crate) trusted_origins: Vec<String>,
 }
 
 /// How long a session lives without being refreshed, unless overridden with
@@ -108,10 +104,6 @@ impl SessionConfigBuilder {
         SessionConfig {
             token_store: self.token_store.unwrap_or_else(default_token_store),
             lifetime: self.lifetime,
-            #[cfg(feature = "router")]
-            verify_origin: self.verify_origin,
-            #[cfg(feature = "router")]
-            trusted_origins: self.trusted_origins,
         }
     }
 }

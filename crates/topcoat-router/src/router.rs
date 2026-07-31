@@ -16,11 +16,11 @@ use topcoat_core::{
 };
 
 use crate::{
-    Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, Next, PageFn, PageWithLayouts,
-    PathSegment, RawPathParamSpec, RawPathParams, Route, Terminal,
-    error::{internal_server_response, respond},
+    Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, Next, OriginPolicy, OriginVerdict, PageFn,
+    PageWithLayouts, PathSegment, RawPathParamSpec, RawPathParams, Route, Terminal,
+    error::{forbidden, internal_server_response, respond},
     request::Request,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 
 /// A finalized Topcoat routing table.
@@ -54,6 +54,7 @@ pub struct Router {
     /// The values shared by every request, read back via
     /// [`app_context`](topcoat_core::context::app_context).
     app_context: Arc<ContextMap>,
+    origin_policy: OriginPolicy,
     /// The compression applied to responses on their way out.
     #[cfg(feature = "compression")]
     compression: crate::Compression,
@@ -127,6 +128,15 @@ impl Router {
         cx.insert(path_params);
         cx.insert(parts);
 
+        match self.origin_policy.check(&cx) {
+            OriginVerdict::Deny => {
+                return respond(&cx, forbidden().into_response(&cx));
+            }
+            OriginVerdict::Allow | OriginVerdict::Untrusted => {
+                // Allow
+            }
+        }
+
         let next = Next::new(&self.layers, layers, terminal);
         let response = next.run(&mut cx, body).await;
         let response = respond(&cx, response);
@@ -181,6 +191,7 @@ pub struct RouterBuilder {
     layouts: Vec<LayoutFn>,
     layers: Layers,
     context: ContextMap,
+    origin_policy: OriginPolicy,
     #[cfg(feature = "compression")]
     compression: crate::Compression,
 }
@@ -198,6 +209,7 @@ impl RouterBuilder {
             layouts: Vec::new(),
             layers: Layers::default(),
             context,
+            origin_policy: OriginPolicy::default(),
             #[cfg(feature = "compression")]
             compression: crate::Compression::new(),
         }
@@ -332,6 +344,12 @@ impl RouterBuilder {
             );
             self = self.layer(layer);
         }
+        self
+    }
+
+    #[must_use]
+    pub fn origin_policy(mut self, origin_policy: crate::OriginPolicy) -> Self {
+        self.origin_policy = origin_policy;
         self
     }
 
@@ -495,6 +513,7 @@ impl RouterBuilder {
             layouts,
             layers,
             context,
+            origin_policy,
             #[cfg(feature = "compression")]
             compression,
         } = self;
@@ -603,6 +622,7 @@ impl RouterBuilder {
             endpoints,
             layers,
             app_context: Arc::new(context),
+            origin_policy,
             #[cfg(feature = "compression")]
             compression,
         }

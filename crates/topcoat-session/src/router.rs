@@ -1,7 +1,7 @@
 use topcoat_core::context::CxBuilder;
 use topcoat_router::{Body, Layer, LayerFuture, Next, Path, RouterBuilder};
 
-use crate::{OriginLayer, SessionConfig, SessionState};
+use crate::{SessionConfig, SessionState};
 
 /// A router layer that makes the session state available for the current
 /// request.
@@ -42,12 +42,8 @@ pub trait RouterBuilderSessionExt {
 
 impl RouterBuilderSessionExt for RouterBuilder {
     fn sessions(mut self, config: SessionConfig) -> Self {
-        let verify_origin = config.verify_origin;
         self = self.app_context(config);
         self = self.layer(SessionLayer::new());
-        if verify_origin {
-            self = self.layer(OriginLayer::new());
-        }
         self
     }
 }
