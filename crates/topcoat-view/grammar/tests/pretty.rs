@@ -94,6 +94,7 @@ fixture_test!(attributes_long);
 fixture_test!(attributes_overflow);
 fixture_test!(attributes_macro_short);
 fixture_test!(attributes_macro_long);
+fixture_test!(attributes_macro_html_ident);
 fixture_test!(attribute_expr_value);
 
 // -- Text nodes --------------------------------------------------------------
