@@ -17,7 +17,7 @@ topcoat = { version = "0.5.0", default-features = false, features = ["tailwind"]
 Add a `build.rs` next to `Cargo.toml`:
 
 ```rust,no_run
-# #[allow(clippy::needless_doctest_main)]
+#[allow(clippy::needless_doctest_main)]
 fn main() {
     topcoat::tailwind::BuildConfig::new().render().unwrap();
 }
