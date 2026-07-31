@@ -147,11 +147,7 @@ pub(crate) struct Layers {
     layers: Vec<RegisteredLayer>,
 }
 
-/// A layer paired with the source location used by router diagnostics.
-struct RegisteredLayer {
-    layer: Box<dyn Layer>,
-    source_location: &'static Location<'static>,
-}
+type RegisteredLayer = (Box<dyn Layer>, &'static Location<'static>);
 
 impl Layers {
     /// Registers `layer`, returning the [`LayerId`] that now identifies it.
@@ -159,10 +155,7 @@ impl Layers {
     pub(crate) fn push(&mut self, layer: Box<dyn Layer>) -> LayerId {
         let id = LayerId(self.layers.len());
         let source_location = layer.source_location().unwrap_or(Location::caller());
-        self.layers.push(RegisteredLayer {
-            layer,
-            source_location,
-        });
+        self.layers.push((layer, source_location));
         id
     }
 
@@ -197,19 +190,18 @@ impl Layers {
     pub(crate) fn validate_endpoint(
         &self,
         path: &Path,
-        source_location: &'static Location<'static>,
+        route_location: &'static Location<'static>,
     ) {
-        for layer in &self.layers {
-            let Some((route_segment, layer_segment)) =
-                path.parameter_name_mismatch(layer.layer.path())
+        for (layer, layer_location) in &self.layers {
+            let Some((route_segment, layer_segment)) = path.parameter_name_mismatch(layer.path())
             else {
                 continue;
             };
 
             panic!(
-                "parameter name mismatch between layer and route:\n  layer `{}` at {}\n  route `{path}` at {source_location}\nboth paths describe the same URL prefix, but the layer uses `{layer_segment}` where the route uses `{route_segment}`; use the same parameter name in both declarations",
-                layer.layer.path(),
-                layer.source_location,
+                "parameter name mismatch between layer and route:\n  layer `{}` at {}\n  route `{path}` at {route_location}\nboth paths describe the same URL prefix, but the layer uses `{layer_segment}` where the route uses `{route_segment}`; use the same parameter name in both declarations",
+                layer.path(),
+                layer_location,
             );
         }
     }
@@ -219,7 +211,7 @@ impl Index<LayerId> for Layers {
     type Output = dyn Layer;
 
     fn index(&self, LayerId(index): LayerId) -> &Self::Output {
-        &*self.layers[index].layer
+        &*self.layers[index].0
     }
 }
 

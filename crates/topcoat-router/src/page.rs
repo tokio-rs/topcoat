@@ -91,11 +91,6 @@ impl PageFn {
         &self.path
     }
 
-    /// Returns where this page was declared.
-    pub(crate) fn source_location(&self) -> &'static Location<'static> {
-        self.source_location
-    }
-
     /// Renders the page, returning a [`Result`].
     pub fn render<'cx>(
         &self,
@@ -183,7 +178,7 @@ impl Route for PageWithLayouts {
     }
 
     fn source_location(&self) -> Option<&'static Location<'static>> {
-        Some(self.page.source_location())
+        Some(self.page.source_location)
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {

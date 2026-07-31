@@ -204,12 +204,8 @@ impl Path {
         return self.segments().zip(other.segments()).all(|(a, b)| a == b);
     }
 
-    /// Returns the first differently named dynamic segment when `other` has
-    /// the same segment shape as a prefix of this path.
-    ///
-    /// Static and group segments must match exactly, while parameter and
-    /// catch-all segments must have the same kind. A different path shape or a
-    /// longer `other` path returns `None`.
+    /// Returns the first differently named dynamic segment if `other`
+    /// otherwise has the same segment shape as a prefix.
     pub(crate) fn parameter_name_mismatch<'path, 'prefix>(
         &'path self,
         other: &'prefix Path,
@@ -219,19 +215,17 @@ impl Path {
 
         for other_segment in other.segments() {
             let segment = segments.next()?;
-            match (segment, other_segment) {
-                (PathSegment::Param(path), PathSegment::Param(prefix)) if path != prefix => {
-                    mismatch.get_or_insert((PathSegment::Param(path), PathSegment::Param(prefix)));
-                }
-                (PathSegment::CatchAll(path), PathSegment::CatchAll(prefix)) if path != prefix => {
-                    mismatch.get_or_insert((
-                        PathSegment::CatchAll(path),
-                        PathSegment::CatchAll(prefix),
-                    ));
-                }
-                (segment, other_segment) if segment == other_segment => {}
-                _ => return None,
+            if segment == other_segment {
+                continue;
             }
+            if !matches!(
+                (&segment, &other_segment),
+                (PathSegment::Param(_), PathSegment::Param(_))
+                    | (PathSegment::CatchAll(_), PathSegment::CatchAll(_))
+            ) {
+                return None;
+            }
+            mismatch.get_or_insert((segment, other_segment));
         }
 
         mismatch
@@ -871,44 +865,30 @@ mod tests {
     }
 
     #[test]
-    fn parameter_name_mismatch_finds_equivalent_prefix() {
+    fn parameter_name_mismatch_requires_an_equivalent_prefix_shape() {
         assert_eq!(
             Path::new("/users/{user_id}/posts").parameter_name_mismatch(Path::new("/users/{id}")),
-            Some((PathSegment::Param("user_id"), PathSegment::Param("id"))),
+            Some((PathSegment::Param("user_id"), PathSegment::Param("id")))
         );
         assert_eq!(
             Path::new("/files/{*file_path}").parameter_name_mismatch(Path::new("/files/{*path}")),
             Some((
                 PathSegment::CatchAll("file_path"),
-                PathSegment::CatchAll("path"),
-            )),
+                PathSegment::CatchAll("path")
+            ))
         );
-    }
-
-    #[test]
-    fn parameter_name_mismatch_requires_equivalent_prefix_shape() {
-        assert_eq!(
-            Path::new("/users/{id}").parameter_name_mismatch(Path::new("/posts/{user_id}")),
-            None,
-        );
-        assert_eq!(
-            Path::new("/users/{*rest}").parameter_name_mismatch(Path::new("/users/{id}")),
-            None,
-        );
-        assert_eq!(
-            Path::new("/users/{id}/settings")
-                .parameter_name_mismatch(Path::new("/users/{user_id}/profile")),
-            None,
-        );
-        assert_eq!(
-            Path::new("/(auth)/users/{id}")
-                .parameter_name_mismatch(Path::new("/(tenant)/users/{user_id}")),
-            None,
-        );
-        assert_eq!(
-            Path::new("/users/{id}").parameter_name_mismatch(Path::new("/users/{user_id}/posts")),
-            None,
-        );
+        for (path, prefix) in [
+            ("/users/{id}", "/posts/{user_id}"),
+            ("/users/{*rest}", "/users/{id}"),
+            ("/users/{id}/settings", "/users/{user_id}/profile"),
+            ("/(auth)/users/{id}", "/(tenant)/users/{user_id}"),
+            ("/users/{id}", "/users/{user_id}/posts"),
+        ] {
+            assert_eq!(
+                Path::new(path).parameter_name_mismatch(Path::new(prefix)),
+                None
+            );
+        }
     }
 
     #[test]

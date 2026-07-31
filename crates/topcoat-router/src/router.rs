@@ -4,7 +4,6 @@ use std::{
     collections::HashMap,
     fmt,
     future::{Future, poll_fn},
-    ops::Deref,
     panic::{AssertUnwindSafe, Location, catch_unwind},
     pin::pin,
     sync::Arc,
@@ -186,31 +185,7 @@ pub struct RouterBuilder {
     compression: crate::Compression,
 }
 
-/// A route paired with the source location used by router diagnostics.
-struct RegisteredRoute {
-    route: Box<dyn Route>,
-    source_location: &'static Location<'static>,
-}
-
-impl RegisteredRoute {
-    /// Registers `route`, preferring its declaration site over this call site.
-    #[track_caller]
-    fn new(route: impl Route) -> Self {
-        let source_location = route.source_location().unwrap_or(Location::caller());
-        Self {
-            route: Box::new(route),
-            source_location,
-        }
-    }
-}
-
-impl Deref for RegisteredRoute {
-    type Target = dyn Route;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.route
-    }
-}
+type RegisteredRoute = (Box<dyn Route>, &'static Location<'static>);
 
 impl RouterBuilder {
     /// Creates an empty builder with no routes registered.
@@ -246,7 +221,8 @@ impl RouterBuilder {
     #[must_use]
     #[track_caller]
     pub fn route(mut self, route: impl Route) -> Self {
-        self.routes.push(RegisteredRoute::new(route));
+        let source_location = route.source_location().unwrap_or(Location::caller());
+        self.routes.push((Box::new(route), source_location));
         self
     }
 
@@ -541,7 +517,9 @@ impl RouterBuilder {
                 .cloned()
                 .collect();
             matching.sort_by_key(|layout| layout.path().len());
-            routes.push(RegisteredRoute::new(PageWithLayouts::new(page, matching)));
+            let route = PageWithLayouts::new(page, matching);
+            let source_location = route.source_location().unwrap();
+            routes.push((Box::new(route), source_location));
         }
 
         // Group routes that share a path into a single endpoint first, since
@@ -551,8 +529,8 @@ impl RouterBuilder {
         // divergence panic below.
         let mut grouped: HashMap<Cow<'static, str>, (usize, Endpoint)> = HashMap::new();
         let mut interned_path_params: HashMap<&str, Arc<str>> = HashMap::new();
-        for (index, route) in routes.iter().enumerate() {
-            layers.validate_endpoint(route.path(), route.source_location);
+        for (index, (route, source_location)) in routes.iter().enumerate() {
+            layers.validate_endpoint(route.path(), source_location);
             let layer_stack = layers.for_endpoint(route.path());
             let (first, endpoint) = grouped
                 .entry(route.path().to_matchit_path())
@@ -588,7 +566,7 @@ impl RouterBuilder {
             assert!(
                 layer_stack == endpoint.layers(),
                 "routes `{}` and `{}` serve the same URL path but select different layers",
-                routes[*first].path(),
+                routes[*first].0.path(),
                 route.path(),
             );
 
@@ -632,10 +610,7 @@ impl RouterBuilder {
                 .unwrap_or_else(|error| panic!("failed to register route {path:?}: {error}"));
         }
 
-        let routes = routes
-            .into_iter()
-            .map(|registration| registration.route)
-            .collect();
+        let routes = routes.into_iter().map(|(route, _)| route).collect();
 
         Router {
             routes,
@@ -656,7 +631,7 @@ impl Default for RouterBuilder {
 
 #[cfg(test)]
 mod tests {
-    use std::{any::Any, future::Future, pin::Pin, sync::Mutex};
+    use std::{future::Future, pin::Pin, sync::Mutex};
 
     use http::{HeaderMap, StatusCode};
     use topcoat_core::{
@@ -701,15 +676,10 @@ mod tests {
         (parts.status, parts.headers, bytes)
     }
 
-    fn panic_message(payload: &(dyn Any + Send)) -> String {
-        payload
-            .downcast_ref::<String>()
-            .cloned()
-            .or_else(|| {
-                payload
-                    .downcast_ref::<&str>()
-                    .map(|message| (*message).into())
-            })
+    fn panic_message(f: impl FnOnce()) -> String {
+        *catch_unwind(AssertUnwindSafe(f))
+            .unwrap_err()
+            .downcast()
             .expect("panic payload should be a string")
     }
 
@@ -1169,12 +1139,9 @@ mod tests {
         let route_line = line!() + 1;
         let route = RouteFn::new(Method::GET, path("/users/{user_id}/settings"), say_route);
 
-        let Err(payload) = catch_unwind(AssertUnwindSafe(|| {
-            RouterBuilder::new().route(route).layer(layer).build()
-        })) else {
-            panic!("parameter name mismatch should panic");
-        };
-        let message = panic_message(&*payload);
+        let message = panic_message(|| {
+            let _ = RouterBuilder::new().route(route).layer(layer).build();
+        });
 
         assert!(message.contains("parameter name mismatch between layer and route"));
         assert!(message.contains("layer `/users/{id}`"));
@@ -1187,19 +1154,16 @@ mod tests {
 
     #[test]
     fn catch_all_parameter_name_mismatch_panics_for_pages() {
-        let Err(payload) = catch_unwind(AssertUnwindSafe(|| {
-            RouterBuilder::new()
+        let message = panic_message(|| {
+            let _ = RouterBuilder::new()
                 .page(PageFn::new(
                     Method::GET,
                     path("/files/{*file_path}"),
                     render_page,
                 ))
                 .layer(LayerFn::new(path("/files/{*path}"), trace_admin))
-                .build()
-        })) else {
-            panic!("catch-all parameter name mismatch should panic");
-        };
-        let message = panic_message(&*payload);
+                .build();
+        });
 
         assert!(message.contains("layer `/files/{*path}`"));
         assert!(message.contains("route `/files/{*file_path}`"));
