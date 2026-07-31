@@ -1,5 +1,5 @@
 [package]
-name = "topcoat-shell-view"
+name = "topcoat-shell-view-macro"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -10,23 +10,16 @@ keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
 
-[dependencies]
-topcoat-core.workspace = true
-topcoat-router.workspace = true
-topcoat-shell-view-macro.workspace = true
-topcoat-view = { workspace = true, features = ["http"] }
+[lib]
+proc-macro = true
 
-bytes.workspace = true
-futures-util.workspace = true
-http.workspace = true
-http-body.workspace = true
-http-body-util.workspace = true
-serde_json.workspace = true
+[dependencies]
+topcoat-shell-view-grammar.workspace = true
+
+syn.workspace = true
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["shell-view"] }
-
-tokio = { workspace = true, features = ["macros", "rt", "time"] }
 
 [lints]
 workspace = true

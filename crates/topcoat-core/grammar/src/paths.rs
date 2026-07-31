@@ -217,6 +217,16 @@ pub const topcoat_runtime: Crate = Crate::new("runtime", "topcoat-runtime", "");
 #[allow(non_upper_case_globals)]
 pub const topcoat_runtime_macro: Crate = Crate::new("runtime", "topcoat-runtime-macro", "");
 
+/// `::topcoat::shell_view`, or `topcoat_shell_view` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_shell_view: Crate = Crate::new("shell_view", "topcoat-shell-view", "");
+
+/// The `shell_view!` macro: `::topcoat::shell_view`, or
+/// `topcoat_shell_view_macro` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_shell_view_macro: Crate =
+    Crate::new("shell_view", "topcoat-shell-view-macro", "");
+
 /// `::topcoat::view`, or `topcoat_view` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_view: Crate = Crate::new("view", "topcoat-view", "");

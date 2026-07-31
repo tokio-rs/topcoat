@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{Router, RouterBuilderDiscoverExt, route},
-    shell_view::ShellView,
+    shell_view::{ShellView, shell_view},
     view::{component, view},
 };
 
@@ -33,15 +33,11 @@ async fn home(cx: &Cx) -> Result<ShellView> {
         },
     );
 
-    let shell = view! {
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>"Shell view"</title>
-                topcoat::dev::script()
-            </head>
-            <body>
-                <h1>"Dashboard"</h1>
+    let content = shell_view! {
+        cx =>
+        <main>
+            <h1>"Dashboard"</h1>
+            <div class="portlets">
                 <section>
                     <h2>"Recent activity"</h2>
                     (activity)
@@ -50,6 +46,30 @@ async fn home(cx: &Cx) -> Result<ShellView> {
                     <h2>"Recommendations"</h2>
                     (recommendations_slot)
                 </section>
+                <section>
+                    <h2>"Newsfeed"</h2>
+                    defer newsfeed() {
+                        <p aria-busy="true">"Loading newsfeed..."</p>
+                    }
+                </section>
+            </div>
+        </main>
+    }?;
+    let content = page.include(content);
+
+    let shell = view! {
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <title>"Shell view"</title>
+                topcoat::dev::script()
+            </head>
+            <body>
+                <nav aria-label="Primary">
+                    <a href="/">"Home"</a>
+                    <a href="/account">"Account"</a>
+                </nav>
+                (content)
             </body>
         </html>
     }?;
@@ -60,6 +80,12 @@ async fn home(cx: &Cx) -> Result<ShellView> {
 async fn recent_activity() -> Result {
     tokio::time::sleep(Duration::from_secs(1)).await;
     view! { <p>"You published a new post."</p> }
+}
+
+#[component]
+async fn newsfeed() -> Result {
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    view! { <p>"Here is your news feed."</p> }
 }
 
 #[component]

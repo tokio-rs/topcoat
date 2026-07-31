@@ -16,7 +16,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable e
 - `topcoat-cookie`: the cookie jar, `cookie!` macro, signed/private jars, and `CookieStore<T>`.
 - `topcoat-session`: bring-your-own-storage session authentication: the token/hash model, the session lifecycle, and origin checking.
 - `topcoat-mail`: the `Mail` type and `mail!` macro for declaring mail, and its delivery through pluggable transports (SMTP, file, in-memory).
-- `topcoat-shell-view`: streaming HTML containers that replace placeholders as deferred views finish.
+- `topcoat-shell-view`: streaming HTML containers, the `shell_view!` macro, and placeholders replaced as deferred views finish.
 - `topcoat-htmx`, `topcoat-alpine-ajax`, and `topcoat-datastar`: request and response helpers for those client libraries.
 - `topcoat-tailwind`: the build-script wrapper around the standalone Tailwind CLI.
 - `topcoat-ui` (+ `registry/`): the component registry behind `topcoat ui`, which copies component source into a project.

@@ -1,5 +1,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+extern crate self as topcoat_shell_view;
+
 use std::{
     future::Future,
     pin::Pin,
@@ -22,6 +24,7 @@ use topcoat_router::{
     Body,
     response::{IntoResponse, Response},
 };
+pub use topcoat_shell_view_macro::shell_view;
 use topcoat_view::{HtmlContext, PartsWriter, View, ViewParts};
 
 type DeferredFuture = Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>>;
@@ -154,9 +157,14 @@ mod tests {
     use topcoat::{
         context::{Cx, request_context},
         router::{response::IntoResponse as _, to_bytes},
-        shell_view::ShellView,
-        view::view,
+        shell_view::{ShellView, shell_view},
+        view::{component, view},
     };
+
+    #[component]
+    async fn inline_card() -> topcoat::Result {
+        view! { <p>"Inline result"</p> }
+    }
 
     #[tokio::test]
     async fn streams_shell_then_fragments_in_completion_order() {
@@ -267,6 +275,27 @@ mod tests {
         assert!(html.contains("<aside>"));
         assert!(html.contains("Child loading"));
         assert!(html.contains("Child ready"));
+    }
+
+    #[tokio::test]
+    async fn shell_view_macro_streams_inline_deferred_components() {
+        let cx = Cx::default();
+        let cx_ref = &cx;
+        let shell = shell_view! {
+            cx_ref =>
+            <main>
+                defer inline_card() {
+                    <p>"Inline placeholder"</p>
+                }
+            </main>
+        }
+        .unwrap();
+        let response = shell.into_response(&cx).unwrap();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let html = String::from_utf8(body.to_vec()).unwrap();
+
+        assert!(html.contains("Inline placeholder"));
+        assert!(html.contains("Inline result"));
     }
 
     #[test]

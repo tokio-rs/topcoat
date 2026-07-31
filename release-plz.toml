@@ -50,6 +50,8 @@ changelog_include = [
     "topcoat-mail-grammar",
     "topcoat-mail-macro",
     "topcoat-shell-view",
+    "topcoat-shell-view-grammar",
+    "topcoat-shell-view-macro",
     "topcoat-router",
     "topcoat-router-grammar",
     "topcoat-router-macro",
@@ -157,6 +159,16 @@ version_group = "topcoat"
 
 [[package]]
 name = "topcoat-shell-view"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-shell-view-grammar"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-shell-view-macro"
 release = true
 version_group = "topcoat"
 

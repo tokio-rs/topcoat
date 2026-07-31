@@ -41,6 +41,29 @@ async fn home(cx: &Cx) -> Result<ShellView> {
 
 The shell is the first response chunk. Deferred futures start when the response body is polled, run concurrently, and emit replacement scripts in completion order. A slow fragment does not delay a faster one.
 
+# Inline Deferred Components
+
+Use [`shell_view!`] when the deferred work is a component. Write the component after `defer`; the following block is its placeholder:
+
+```rust
+# use topcoat::{Result, context::Cx, shell_view::{ShellView, shell_view}, view::{component, view}};
+# #[component]
+# async fn newsfeed() -> Result { view! { <p>"News"</p> } }
+# async fn example(cx: &Cx) -> Result<ShellView> {
+shell_view! {
+    cx =>
+    <section>
+        <h2>"Newsfeed"</h2>
+        defer newsfeed() {
+            <p aria-busy="true">"Loading newsfeed..."</p>
+        }
+    </section>
+}
+# }
+```
+
+The macro creates a `ShellView`, registers every inline deferred component, and inserts each returned placeholder into the surrounding markup. Use the builder form when the deferred future needs logic beyond rendering one component.
+
 # Components
 
 A deferred closure can render components through a nested `view!` call:
@@ -66,7 +89,7 @@ Ok(page.finish(shell))
 
 # Composition
 
-Shell views compose at their container boundary. Pass a child to [`include`](ShellViewBuilder::include), insert the returned shell into the parent, then finish the parent. The parent adopts the child's deferred work, so all fragments use one response stream.
+Shell views compose at their container boundary. Pass a child to [`include`](ShellViewBuilder::include), insert the returned shell into the parent, then finish the parent. The parent adopts the child's deferred work, so all fragments use one response stream. A child built with `shell_view!` composes the same way as one built manually.
 
 ```rust
 # use topcoat::{Result, context::Cx, shell_view::ShellView, view::view};
