@@ -1,4 +1,4 @@
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::{
     Expr, ExprBreak, ExprContinue, Pat, Token,
     parse::{Parse, ParseStream},
@@ -11,10 +11,23 @@ use crate::{
     view::{ViewWriter, WriteView},
 };
 
+mod kw {
+    syn::custom_keyword!(concurrent);
+}
+
+pub use kw::concurrent as ConcurrentToken;
+
+impl ParseOption for ConcurrentToken {
+    fn peek(input: ParseStream) -> bool {
+        input.peek(kw::concurrent)
+    }
+}
+
 /// A `for pat in expr { ... }` loop in view-body position. The body is
 /// rendered once per iteration.
 pub struct TemplateForLoop<T> {
     pub for_token: Token![for],
+    pub concurrent_token: Option<ConcurrentToken>,
     pub pat: Box<Pat>,
     pub in_token: Token![in],
     pub expr: Box<Expr>,
@@ -23,14 +36,26 @@ pub struct TemplateForLoop<T> {
 
 impl<T: WriteView> WriteView for TemplateForLoop<T> {
     fn write(&self, writer: &mut ViewWriter) {
-        writer.for_loop(&self.pat, &self.expr, |writer| {
-            self.body.write(writer);
-        });
+        if self.concurrent_token.is_some() {
+            writer.concurrent_for_loop(&self.pat, &self.expr, |writer| {
+                self.body.write(writer);
+            });
+        } else {
+            writer.for_loop(&self.pat, &self.expr, |writer| {
+                self.body.write(writer);
+            });
+        }
     }
 }
 
 impl<T: WriteAttribute> WriteAttribute for TemplateForLoop<T> {
     fn write(&self, writer: &mut AttributeWriter) {
+        if let Some(concurrent_token) = &self.concurrent_token {
+            writer.statement(quote_spanned! {concurrent_token.span=>
+                compile_error!("`for concurrent` is only supported in view-body position");
+            });
+            return;
+        }
         writer.for_loop(&self.pat, &self.expr, |writer| {
             self.body.write(writer);
         });
@@ -41,6 +66,7 @@ impl<T: Parse> Parse for TemplateForLoop<T> {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             for_token: input.parse()?,
+            concurrent_token: input.call(ConcurrentToken::parse_option)?,
             pat: Box::new(input.call(Pat::parse_single)?),
             in_token: input.parse()?,
             expr: Box::new(input.call(Expr::parse_without_eager_brace)?),
@@ -63,6 +89,10 @@ impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty:
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.for_token.pretty_print(printer);
         " ".pretty_print(printer);
+        if self.concurrent_token.is_some() {
+            "concurrent".pretty_print(printer);
+            " ".pretty_print(printer);
+        }
         self.pat.pretty_print(printer);
         " ".pretty_print(printer);
         self.in_token.pretty_print(printer);
@@ -185,9 +215,18 @@ mod tests {
     #[test]
     fn parses_simple_for_loop() {
         let loop_ = parse(r"for x in xs { (x) }");
+        assert!(loop_.concurrent_token.is_none());
         assert_eq!(loop_.pat.to_token_stream().to_string(), "x");
         assert_eq!(loop_.expr.to_token_stream().to_string(), "xs");
         assert_eq!(loop_.body.children.len(), 1);
+    }
+
+    #[test]
+    fn parses_concurrent_for_loop() {
+        let loop_ = parse(r"for concurrent x in xs { (x) }");
+        assert!(loop_.concurrent_token.is_some());
+        assert_eq!(loop_.pat.to_token_stream().to_string(), "x");
+        assert_eq!(loop_.expr.to_token_stream().to_string(), "xs");
     }
 
     #[test]

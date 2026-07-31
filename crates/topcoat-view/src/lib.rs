@@ -28,6 +28,8 @@ pub use view::*;
 /// Macro helpers to shorten the generated source code.
 #[doc(hidden)]
 pub mod internal {
+    use core::future::Future;
+
     pub use futures_util::join as __join;
     use topcoat_core::context::Cx;
 
@@ -44,6 +46,15 @@ pub mod internal {
     #[inline]
     pub fn __view(_cx: &Cx, parts: &mut ViewParts, view: View) {
         parts.push_view(view);
+    }
+
+    #[inline]
+    pub async fn __join_all<I>(futures: I) -> Vec<<I::Item as Future>::Output>
+    where
+        I: IntoIterator,
+        I::Item: Future,
+    {
+        futures_util::future::join_all(futures).await
     }
 
     #[inline]

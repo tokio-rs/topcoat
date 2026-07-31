@@ -100,6 +100,18 @@ impl ViewWriter {
         });
     }
 
+    pub fn concurrent_for_loop(&mut self, pat: &Pat, expr: &Expr, f: impl FnOnce(&mut ViewWriter)) {
+        self.flush();
+        let mut body = ViewWriter::new();
+        f(&mut body);
+        body.flush();
+        self.chunks.push(Chunk::ConcurrentFor {
+            pat: pat.clone(),
+            expr: Box::new(expr.clone()),
+            body: Box::new(body),
+        });
+    }
+
     pub fn if_else(&mut self, expr: &Expr, f: impl FnOnce(&mut ViewWriter, &mut ViewWriter)) {
         self.flush();
         let mut then_branch = ViewWriter::new();
@@ -239,6 +251,27 @@ impl ViewWriter {
                                     }
                                 }
                             }
+                            Chunk::ConcurrentFor { pat, expr, body } => {
+                                let body = build_parts(&body.chunks);
+                                quote! {
+                                    {
+                                        let __render_iteration = async |#pat| {
+                                            let mut __parts = #topcoat_view::ViewParts::new();
+                                            #body
+                                            ::core::result::Result::<
+                                                #topcoat_view::View,
+                                                #topcoat_error::Error,
+                                            >::Ok(#topcoat_view::View::new(__parts))
+                                        };
+                                        let __iterations = (#expr)
+                                            .into_iter()
+                                            .map(__render_iteration);
+                                        for __iteration in __join_all(__iterations).await {
+                                            __view(__cx, &mut __parts, __iteration?);
+                                        }
+                                    }
+                                }
+                            }
                             Chunk::Match { expr, arms } => {
                                 let arm_tokens = arms.iter().map(|arm| {
                                     let pat = &arm.pat;
@@ -332,6 +365,11 @@ enum Chunk {
         tokens: TokenStream,
     },
     For {
+        pat: Pat,
+        expr: Box<Expr>,
+        body: Box<ViewWriter>,
+    },
+    ConcurrentFor {
         pat: Pat,
         expr: Box<Expr>,
         body: Box<ViewWriter>,
@@ -479,6 +517,18 @@ mod tests {
         });
         let out = rendered(writer);
         assert!(out.contains("for x in xs"));
+    }
+
+    #[test]
+    fn concurrent_for_loop_joins_iteration_futures() {
+        let mut writer = ViewWriter::new();
+        writer.concurrent_for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
+            body.write_expr(ExprKind::Node, quote! { x });
+        });
+        let out = rendered(writer);
+
+        assert!(out.contains("let __render_iteration = async | x |"));
+        assert!(out.contains("__join_all (__iterations) . await"));
     }
 
     #[test]

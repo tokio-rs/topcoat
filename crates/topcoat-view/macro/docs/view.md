@@ -187,6 +187,26 @@ view! {
 # }
 ```
 
+Use `for concurrent` when iterations perform independent async component work:
+
+```rust
+# use topcoat::{Result, view::*};
+# struct Post { title: &'static str }
+# #[component]
+# async fn post_card(post: Post) -> Result { view! { <article>(post.title)</article> } }
+# #[component]
+# async fn example() -> Result {
+# let posts = vec![Post { title: "A" }, Post { title: "B" }];
+view! {
+    for concurrent post in posts {
+        post_card(post: post)
+    }
+}
+# }
+```
+
+The iterations render concurrently, but their completed views are inserted in iterator order. Use this form only when iterations are independent. An ordinary `for` remains sequential and can mutate or mutably borrow shared state. `for concurrent` is available in view-body position, not in an element's attribute list.
+
 ## `match`
 
 Use `match` to choose markup from patterns. Match arms can also use guards.

@@ -1,4 +1,17 @@
-use topcoat::{context::Cx, view::view};
+use std::{
+    future::poll_fn,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    task::Poll,
+};
+
+use topcoat::{
+    Result,
+    context::Cx,
+    view::{component, view},
+};
 
 fn r(v: topcoat::Result) -> String {
     v.unwrap().render(&Cx::default())
@@ -101,6 +114,50 @@ async fn for_loop_renders_body_per_item() {
         <ul>
             for title in posts {
                 <li>(title)</li>
+            }
+        </ul>
+    });
+
+    assert_eq!(html, "<ul><li>alpha</li><li>beta</li><li>gamma</li></ul>");
+}
+
+#[component]
+async fn concurrent_loop_item(
+    started: Arc<AtomicUsize>,
+    expected: usize,
+    label: &'static str,
+) -> Result {
+    let mut first_poll = true;
+    poll_fn(|cx| {
+        if first_poll {
+            first_poll = false;
+            started.fetch_add(1, Ordering::SeqCst);
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        } else {
+            assert_eq!(started.load(Ordering::SeqCst), expected);
+            Poll::Ready(())
+        }
+    })
+    .await;
+
+    view! { <li>(label)</li> }
+}
+
+#[tokio::test]
+async fn concurrent_for_loop_polls_iterations_together_and_preserves_order() {
+    let labels = ["alpha", "beta", "gamma"];
+    let started = Arc::new(AtomicUsize::new(0));
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <ul>
+            for concurrent label in labels {
+                concurrent_loop_item(
+                    started: Arc::clone(&started),
+                    expected: labels.len(),
+                    label: label
+                )
             }
         </ul>
     });
