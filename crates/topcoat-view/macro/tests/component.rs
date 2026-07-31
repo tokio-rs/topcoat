@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use topcoat::{
     Result,
     context::Cx,
@@ -93,6 +95,68 @@ async fn component_can_call_other_components_and_forward_child_views() {
 
     assert!(html.contains("<h2>Outer</h2>"));
     assert!(html.contains("<em>inner</em>"));
+}
+
+#[component]
+async fn concurrent_peer(log: Arc<Mutex<Vec<String>>>, label: &'static str) -> Result {
+    log.lock().unwrap().push(format!("enter {label}"));
+    tokio::task::yield_now().await;
+    log.lock().unwrap().push(format!("exit {label}"));
+
+    view! { <span>(label)</span> }
+}
+
+#[tokio::test]
+async fn peer_components_render_concurrently_across_static_markup() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let result: Result = view! {
+        <main>
+            concurrent_peer(log: Arc::clone(&log), label: "a")
+            <aside>concurrent_peer(log: Arc::clone(&log), label: "b")</aside>
+        </main>
+    };
+
+    assert_eq!(
+        *log.lock().unwrap(),
+        ["enter a", "enter b", "exit a", "exit b"],
+    );
+    assert_eq!(
+        result.unwrap().render(__cx),
+        "<main><span>a</span><aside><span>b</span></aside></main>",
+    );
+}
+
+#[tokio::test]
+async fn control_flow_and_loops_split_concurrent_component_groups() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let result: Result = view! {
+        <main>
+            concurrent_peer(log: Arc::clone(&log), label: "a")
+            if true {
+                <section>concurrent_peer(log: Arc::clone(&log), label: "b")</section>
+            }
+            for label in ["c", "d"] {
+                concurrent_peer(log: Arc::clone(&log), label: label)
+            }
+            concurrent_peer(log: Arc::clone(&log), label: "e")
+        </main>
+    };
+
+    assert_eq!(
+        *log.lock().unwrap(),
+        [
+            "enter a", "exit a", "enter b", "exit b", "enter c", "exit c", "enter d", "exit d",
+            "enter e", "exit e",
+        ],
+    );
+    assert_eq!(
+        result.unwrap().render(__cx),
+        "<main><span>a</span><section><span>b</span></section><span>c</span><span>d</span><span>e</span></main>",
+    );
 }
 
 #[component]

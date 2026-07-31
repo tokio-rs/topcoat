@@ -28,6 +28,7 @@ pub use view::*;
 /// Macro helpers to shorten the generated source code.
 #[doc(hidden)]
 pub mod internal {
+    pub use futures_util::join as __join;
     use topcoat_core::context::Cx;
 
     use crate::{

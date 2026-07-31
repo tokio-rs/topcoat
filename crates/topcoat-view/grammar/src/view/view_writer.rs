@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote};
+use quote::{ToTokens, format_ident, quote};
 use syn::{Expr, Ident, Pat};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
@@ -70,6 +70,11 @@ impl ViewWriter {
         self.chunks.push(Chunk::Expr { kind, tokens });
     }
 
+    pub fn write_component(&mut self, tokens: TokenStream) {
+        self.flush();
+        self.chunks.push(Chunk::Component { tokens });
+    }
+
     pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
         self.flush();
         self.chunks.push(Chunk::Local {
@@ -133,8 +138,67 @@ impl ViewWriter {
             } else {
                 fn build_parts(chunks: &[Chunk]) -> TokenStream {
                     let mut output = TokenStream::new();
-                    for chunk in chunks {
-                        match chunk {
+                    let mut index = 0;
+                    while index < chunks.len() {
+                        // Static markup cannot introduce a dependency between component calls.
+                        if matches!(
+                            &chunks[index],
+                            Chunk::Static { .. } | Chunk::Component { .. }
+                        ) {
+                            let start = index;
+                            while index < chunks.len()
+                                && matches!(
+                                    &chunks[index],
+                                    Chunk::Static { .. } | Chunk::Component { .. }
+                                )
+                            {
+                                index += 1;
+                            }
+                            let region = &chunks[start..index];
+                            let components = region
+                                .iter()
+                                .filter_map(|chunk| match chunk {
+                                    Chunk::Component { tokens } => Some(tokens),
+                                    _ => None,
+                                })
+                                .collect::<Vec<_>>();
+                            let results = (0..components.len())
+                                .map(|index| format_ident!("__component_result_{index}"))
+                                .collect::<Vec<_>>();
+                            // Avoid joining when there is only one component to await.
+                            let wait = match components.as_slice() {
+                                [] => TokenStream::new(),
+                                [component] => {
+                                    let result = &results[0];
+                                    quote! { let #result = #component.await; }
+                                }
+                                _ => quote! {
+                                    let (#(#results,)*) = __join!(#(#components),*);
+                                },
+                            };
+                            let mut result_index = 0;
+                            let region_parts = region.iter().map(|chunk| match chunk {
+                                Chunk::Static { string } => {
+                                    let helper = ExprKind::Unescaped.helper();
+                                    quote! { #helper(__cx, &mut __parts, #string); }
+                                }
+                                Chunk::Component { .. } => {
+                                    let result = &results[result_index];
+                                    result_index += 1;
+                                    let helper = ExprKind::View.helper();
+                                    quote! { #helper(__cx, &mut __parts, #result?); }
+                                }
+                                _ => unreachable!(),
+                            });
+                            quote! {{
+                                #wait
+                                #(#region_parts)*
+                            }}
+                            .to_tokens(&mut output);
+                            continue;
+                        }
+
+                        match &chunks[index] {
                             Chunk::Static { string } => {
                                 let helper = ExprKind::Unescaped.helper();
                                 let tokens = quote! { #string };
@@ -144,6 +208,7 @@ impl ViewWriter {
                                 let helper = kind.helper();
                                 quote! { #helper(__cx, &mut __parts, #tokens); }
                             }
+                            Chunk::Component { .. } => unreachable!(),
                             Chunk::Local { pat, expr } => {
                                 quote! { let #pat = #expr; }
                             }
@@ -191,6 +256,7 @@ impl ViewWriter {
                             }
                         }
                         .to_tokens(&mut output);
+                        index += 1;
                     }
                     output
                 }
@@ -253,6 +319,9 @@ enum Chunk {
     },
     Expr {
         kind: ExprKind,
+        tokens: TokenStream,
+    },
+    Component {
         tokens: TokenStream,
     },
     Local {
@@ -362,6 +431,19 @@ mod tests {
         assert!(out.contains("__unescaped (__cx , & mut __parts , \"<p>\")"));
         assert!(out.contains("__node (__cx , & mut __parts , value)"));
         assert!(out.contains("__unescaped (__cx , & mut __parts , \"</p>\")"));
+    }
+
+    #[test]
+    fn static_markup_does_not_split_component_join() {
+        let mut writer = ViewWriter::new();
+        writer.write_str_unescaped("<main>");
+        writer.write_component(quote! { first() });
+        writer.write_str_unescaped("<aside>");
+        writer.write_component(quote! { second() });
+        writer.write_str_unescaped("</aside></main>");
+        let out = rendered(writer);
+
+        assert!(out.contains("__join ! (first () , second ())"));
     }
 
     #[test]

@@ -345,6 +345,10 @@ view! {
 
 See how to define components in the [`component`] macro guide.
 
+Component calls in the same straight-line view body render concurrently. Static HTML between the calls does not split the group, and the completed views are inserted in source order. A Rust expression, local binding, statement, or control-flow construct ends the group because later component props may depend on it.
+
+Each control-flow body forms its own group. An ordinary `for` loop still renders its iterations in order, but peer components within one iteration can render concurrently.
+
 # Boolean And Conditional Attributes
 
 [Boolean HTML attributes](https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML) such as `disabled`, `required`, and `checked` are true when the attribute is present and false when it is absent. HTML expects a present boolean attribute to have an empty value.

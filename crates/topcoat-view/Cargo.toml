@@ -18,6 +18,7 @@ http = [
 [dependencies]
 topcoat-core.workspace = true
 
+futures-util.workspace = true
 http = { workspace = true, optional = true }
 itoa.workspace = true
 memchr.workspace = true
@@ -27,6 +28,7 @@ smallvec.workspace = true
 topcoat = { workspace = true, features = ["view"] }
 
 criterion = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
 
 [[bench]]
 name = "render"
