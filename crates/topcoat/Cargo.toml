@@ -40,6 +40,7 @@ full = [
 	"mail",
 	"mail-smtp",
 	"multipart",
+	"shell-view",
 	"router",
 	"runtime",
 	"serve",
@@ -115,6 +116,10 @@ multipart = [
 	"router",
 	"topcoat-router/multipart",
 ]
+shell-view = [
+	"dep:topcoat-shell-view",
+	"router",
+]
 router = [
 	"dep:topcoat-router",
 	"dep:topcoat-router-macro",
@@ -180,6 +185,7 @@ topcoat-icon = { workspace = true, optional = true }
 topcoat-icon-macro = { workspace = true, optional = true }
 topcoat-mail = { workspace = true, optional = true }
 topcoat-mail-macro = { workspace = true, optional = true }
+topcoat-shell-view = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }

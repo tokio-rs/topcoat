@@ -42,6 +42,9 @@ pub mod icon;
 #[cfg(feature = "mail")]
 pub mod mail;
 
+#[cfg(feature = "shell-view")]
+pub mod shell_view;
+
 #[cfg(feature = "router")]
 pub mod router;
 

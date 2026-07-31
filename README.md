@@ -206,6 +206,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 **Rendering**
 - [The `view!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html): templating syntax, control flow, conditional attributes.
 - [The `#[component]` macro](https://docs.rs/topcoat/latest/topcoat/view/attr.component.html): async functions as components, with child content.
+- [`ShellView`](https://docs.rs/topcoat/latest/topcoat/shell_view/index.html): stream placeholders first and replace them as deferred views finish.
 - [The `attributes!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html): reusable runtime attribute fragments.
 - [The `class!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.class.html): space-separated class lists from static and conditional entries.
 
