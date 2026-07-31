@@ -2307,6 +2307,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "shell-view"
+version = "0.5.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "shell-words"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2787,6 +2795,7 @@ dependencies = [
  "topcoat-runtime",
  "topcoat-runtime-macro",
  "topcoat-session",
+ "topcoat-shell-view",
  "topcoat-tailwind",
  "topcoat-ui-registry",
  "topcoat-view",
@@ -3157,6 +3166,23 @@ dependencies = [
  "topcoat-core",
  "topcoat-router",
  "web-time",
+]
+
+[[package]]
+name = "topcoat-shell-view"
+version = "0.5.0"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "http",
+ "http-body",
+ "http-body-util",
+ "serde_json",
+ "tokio",
+ "topcoat",
+ "topcoat-core",
+ "topcoat-router",
+ "topcoat-view",
 ]
 
 [[package]]

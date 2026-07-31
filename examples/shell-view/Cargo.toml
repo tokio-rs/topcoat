@@ -1,0 +1,13 @@
+[package]
+name = "shell-view"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+topcoat = { workspace = true, features = ["shell-view"] }
+
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true
