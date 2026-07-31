@@ -128,14 +128,14 @@ impl Router {
         cx.insert(path_params);
         cx.insert(parts);
 
-        match self.origin_policy.check(&cx) {
+        // Deny untrusted cross-origin requests.
+        let verdict = match self.origin_policy.check(&cx) {
             OriginVerdict::Deny => {
                 return respond(&cx, forbidden().into_response(&cx));
             }
-            OriginVerdict::Allow | OriginVerdict::Untrusted => {
-                // Allow
-            }
-        }
+            verdict @ (OriginVerdict::Allow | OriginVerdict::Untrusted) => verdict,
+        };
+        cx.insert(verdict);
 
         let next = Next::new(&self.layers, layers, terminal);
         let response = next.run(&mut cx, body).await;
