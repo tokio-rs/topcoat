@@ -52,6 +52,7 @@ impl OriginPolicy {
     /// the full serialized origin: scheme, host, and any non-default port
     /// (`"https://accounts.example.com"`), with no trailing slash. The
     /// comparison is ASCII case-insensitive.
+    #[must_use]
     pub fn trust_origins<I>(origins: I) -> Self
     where
         I: IntoIterator,
@@ -81,9 +82,12 @@ impl OriginPolicy {
         match &self.inner {
             Inner::Disabled => OriginVerdict::Allow,
             Inner::Verify { trusted_origins } => {
+                let method = method(cx);
                 let headers = headers(cx);
                 let header = |name: &str| headers.get(name).and_then(|value| value.to_str().ok());
                 let origin = header(header::ORIGIN.as_str());
+                let host = header(header::HOST.as_str())
+                    .or_else(|| uri(cx).authority().map(http::uri::Authority::as_str));
 
                 // An explicitly trusted origin passes regardless of how the browser
                 // classified the request.
@@ -97,34 +101,31 @@ impl OriginPolicy {
 
                 // The "sec-fetch-site" header is the browser's way to declare that the request comes from
                 // the same origin. If so, it is safe.
-                if let Some(site) = header("sec-fetch-site")
-                    && matches!(site, "same-origin" | "none")
-                {
-                    return OriginVerdict::Allow;
+                if let Some(site) = header("sec-fetch-site") {
+                    return if matches!(site, "same-origin" | "none") {
+                        OriginVerdict::Allow
+                    } else {
+                        OriginVerdict::from_method(method)
+                    };
                 }
 
                 // Fallback check for older browsers: Compare the "origin" and "host" header manually.
                 // If they are the same, this is a safe same-origin request.
+                if let Some(origin) =
+                    origin.and_then(|origin| origin.split_once("://").map(|(_, host)| host))
                 {
-                    let origin =
-                        origin.and_then(|origin| origin.split_once("://").map(|(_, host)| host));
-                    let host = header(header::HOST.as_str())
-                        .or_else(|| uri(cx).authority().map(http::uri::Authority::as_str));
-                    if let Some(origin) = origin
-                        && let Some(host) = host
+                    return if let Some(host) = host
                         && origin.eq_ignore_ascii_case(host)
                     {
-                        return OriginVerdict::Allow;
-                    }
+                        OriginVerdict::Allow
+                    } else {
+                        OriginVerdict::from_method(method)
+                    };
                 }
 
-                // We now know the request is from an untrusted source. We still permit non-state-changing
-                // requests but with `Untrusted` verdict. The `Untrusted` verdict can be used by
-                // WebSockets to reject the request during an upgrade.
-                match *method(cx) {
-                    Method::GET | Method::HEAD | Method::OPTIONS => OriginVerdict::Untrusted,
-                    _ => OriginVerdict::Deny,
-                }
+                // Ther request had neither an "origin" nor a "sec-fetch-site" header.
+                // We assume it comes from a non-browser client and allow the request.
+                OriginVerdict::Allow
             }
         }
     }
@@ -149,5 +150,15 @@ pub(crate) enum OriginVerdict {
     /// A state-changing request from an untrusted origin.
     Deny,
     /// A non-state-changing request from an untrusted origin.
+    /// This can be used, for example, to reject WebSocket upgrades.
     Untrusted,
+}
+
+impl OriginVerdict {
+    fn from_method(method: &Method) -> Self {
+        match method {
+            &Method::GET | &Method::HEAD | &Method::OPTIONS => OriginVerdict::Untrusted,
+            _ => OriginVerdict::Deny,
+        }
+    }
 }
