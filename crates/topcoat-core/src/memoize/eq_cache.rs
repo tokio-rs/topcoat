@@ -1,17 +1,74 @@
 use std::{
     any::Any,
     collections::hash_map::RandomState,
-    future::Future,
+    future::{Future, poll_fn},
     hash::Hash,
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    sync::{Mutex, OnceLock},
+    sync::{
+        Mutex, OnceLock,
+        atomic::{AtomicPtr, Ordering},
+    },
 };
 
 use hashbrown::{Equivalent, HashMap};
 use tokio::sync::OnceCell;
 
 use crate::context::Cx;
+
+// Its address identifies the synchronous call stack or async poll currently running on a thread.
+std::thread_local!(static INITIALIZATION_TOKEN: u8 = const { 0 });
+
+/// A cached value and the token currently running its initializer, if any.
+#[derive(Default)]
+struct MemoizeCell<T> {
+    value: T,
+    // This is recursion metadata, not the initialization lock. `OnceLock::get_or_init` and
+    // `OnceCell::get_or_init` select one initializer at a time, so only the active initializer
+    // writes `owner`.
+    //
+    // Relaxed ordering is enough because this pointer publishes no data. A recursive read happens
+    // on the initializing thread after its own store. A caller on another thread may see null or a
+    // foreign token, but either result safely falls through to the once cell for synchronization.
+    owner: AtomicPtr<u8>,
+}
+
+impl<T> MemoizeCell<T> {
+    #[inline]
+    fn assert_not_recursive<F>(&self) {
+        let owner = self.owner.load(Ordering::Relaxed);
+        if !owner.is_null()
+            && INITIALIZATION_TOKEN.with(|token| owner == std::ptr::from_ref(token).cast_mut())
+        {
+            panic!(
+                "recursive `#[memoize]` initialization of `{}` with the same arguments",
+                std::any::type_name::<F>()
+            );
+        }
+    }
+
+    #[inline]
+    fn scope<R>(&self, f: impl FnOnce() -> R) -> R {
+        INITIALIZATION_TOKEN.with(|token| {
+            debug_assert!(self.owner.load(Ordering::Relaxed).is_null());
+            self.owner
+                .store(std::ptr::from_ref(token).cast_mut(), Ordering::Relaxed);
+            let _guard = InitializationGuard { owner: &self.owner };
+            f()
+        })
+    }
+}
+
+struct InitializationGuard<'a> {
+    owner: &'a AtomicPtr<u8>,
+}
+
+impl Drop for InitializationGuard<'_> {
+    #[inline]
+    fn drop(&mut self) {
+        self.owner.store(std::ptr::null_mut(), Ordering::Relaxed);
+    }
+}
 
 /// The per-request store backing `#[memoize]`.
 ///
@@ -20,8 +77,8 @@ use crate::context::Cx;
 ///
 /// `entries` maps an `(F, K)` shape to an index into `values` via [`anymap3::Map`], where `F` is
 /// the memoized function (used as a marker type to keep different functions' caches disjoint) and
-/// `K` is the owned key type. `values` holds the actual cells (`OnceLock<V>` / `OnceCell<V>`)
-/// behind a stable address so we can hand out `&V` references whose lifetime is tied to the cache.
+/// `K` is the owned key type. `values` holds the actual cells behind a stable address so we can
+/// hand out `&V` references whose lifetime is tied to the cache.
 #[derive(Default)]
 #[doc(hidden)]
 pub struct MemoizeEqCache {
@@ -77,8 +134,12 @@ impl MemoizeEqCache {
         V: Send + Sync + 'static,
         F: (FnOnce(&'a Cx, P) -> V) + 'static,
     {
-        let cell = self.get_or_insert_cell::<F, _, OnceLock<V>>(key);
-        cell.get_or_init(|| f(cx, params))
+        let cell = self.get_or_insert_cell::<F, _, MemoizeCell<OnceLock<V>>>(key);
+        if let Some(value) = cell.value.get() {
+            return value;
+        }
+        cell.assert_not_recursive::<F>();
+        cell.value.get_or_init(|| cell.scope(|| f(cx, params)))
     }
 
     /// Returns the already-computed value for `(F, key)`, or `None` if nothing has been
@@ -91,9 +152,9 @@ impl MemoizeEqCache {
     ///
     /// # Panics
     ///
-    /// Panics if the internal mutex is poisoned, or if a stored cell cannot be
-    /// downcast back to `OnceLock<V>` (which indicates a marker/type mismatch
-    /// between the caller and the function that originally memoized the value).
+    /// Panics if the internal mutex is poisoned, or if a stored cell cannot be downcast back to
+    /// its expected type. A failed downcast indicates a marker/type mismatch between the caller
+    /// and the function that originally memoized the value.
     #[allow(clippy::needless_pass_by_value)]
     #[track_caller]
     pub fn get<K, V, F>(&self, marker: F, key: K) -> Option<&V>
@@ -111,8 +172,9 @@ impl MemoizeEqCache {
                 guard.get::<MarkedHashMap<F, <MemoizeKey<K> as ToOwnedKey>::Owned, usize>>()?;
             *cache.get(&MemoizeKey(key))?
         };
-        let cell: &OnceLock<V> = self.values.get(index).unwrap().downcast_ref().unwrap();
-        cell.get()
+        let cell: &MemoizeCell<OnceLock<V>> =
+            self.values.get(index).unwrap().downcast_ref().unwrap();
+        cell.value.get()
     }
 
     /// Async counterpart to [`memoize`](Self::memoize). Concurrent callers with the same key
@@ -132,8 +194,19 @@ impl MemoizeEqCache {
         F: (FnOnce(&'a Cx, P) -> Fut) + 'static,
         Fut: Future<Output = V>,
     {
-        let cell = self.get_or_insert_cell::<F, _, OnceCell<V>>(key);
-        cell.get_or_init(|| async { f(cx, params).await }).await
+        let cell = self.get_or_insert_cell::<F, _, MemoizeCell<OnceCell<V>>>(key);
+        if let Some(value) = cell.value.get() {
+            return value;
+        }
+        cell.assert_not_recursive::<F>();
+        cell.value
+            .get_or_init(|| async {
+                let mut future = std::pin::pin!(cell.scope(|| f(cx, params)));
+                // Clear ownership after every poll so sibling futures can wait on this cell and
+                // the initializer can move between executor threads.
+                poll_fn(|task| cell.scope(|| future.as_mut().poll(task))).await
+            })
+            .await
     }
 }
 
@@ -354,18 +427,60 @@ mod tests {
         assert_eq!(n.load(Ordering::SeqCst), 1);
     }
 
+    #[test]
+    fn sync_panicked_initializer_can_retry() {
+        let cache = MemoizeEqCache::new();
+        let cx = Cx::default();
+        let n = counter();
+        let f = move |_: &Cx, (): ()| {
+            assert_ne!(n.fetch_add(1, Ordering::SeqCst), 0, "first attempt");
+            42
+        };
+
+        let first = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            cache.memoize(&cx, (), (), f);
+        }));
+
+        assert!(first.is_err());
+        assert_eq!(*cache.memoize(&cx, (), (), f), 42);
+    }
+
+    #[test]
+    fn initialization_on_another_thread_is_not_recursive() {
+        let cell = MemoizeCell::<()>::default();
+        let entered = std::sync::Barrier::new(2);
+        let release = std::sync::Barrier::new(2);
+
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                cell.scope(|| {
+                    entered.wait();
+                    release.wait();
+                });
+            });
+            entered.wait();
+
+            cell.assert_not_recursive::<fn()>();
+
+            release.wait();
+        });
+    }
+
     #[tokio::test]
-    async fn async_same_key_runs_body_once() {
+    async fn async_concurrent_same_key_runs_body_once() {
         let cache = MemoizeEqCache::new();
         let cx = Cx::default();
         let n = counter();
         let f = async move |_: &Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
+            tokio::task::yield_now().await;
             x + y
         };
 
-        let a = cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f).await;
-        let b = cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f).await;
+        let (a, b) = tokio::join!(
+            cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f),
+            cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f),
+        );
 
         assert_eq!(*a, 3);
         assert_eq!(*b, 3);
@@ -387,5 +502,29 @@ mod tests {
         cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f).await;
 
         assert_eq!(n.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn async_cancelled_initializer_can_retry() {
+        let cache = MemoizeEqCache::new();
+        let cx = Cx::default();
+        let n = counter();
+        let f = async move |_: &Cx, (): ()| {
+            if n.fetch_add(1, Ordering::SeqCst) == 0 {
+                std::future::pending::<()>().await;
+            }
+            42
+        };
+
+        {
+            let mut first = std::pin::pin!(cache.memoize_async(&cx, (), (), f));
+            poll_fn(|task| {
+                assert!(first.as_mut().poll(task).is_pending());
+                std::task::Poll::Ready(())
+            })
+            .await;
+        }
+
+        assert_eq!(*cache.memoize_async(&cx, (), (), f).await, 42);
     }
 }
