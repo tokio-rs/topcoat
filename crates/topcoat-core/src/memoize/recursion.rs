@@ -29,13 +29,11 @@ impl Guard {
     /// memoized function `F`.
     #[inline]
     pub(super) fn assert_not_recursive<F>(&self) {
-        let owner = self.owner.load(Ordering::Relaxed);
-        if !owner.is_null() && TOKEN.with(|token| owner == ptr::from_ref(token).cast_mut()) {
-            panic!(
-                "recursive `#[memoize]` initialization of `{}` with the same arguments",
-                std::any::type_name::<F>()
-            );
-        }
+        assert!(
+            !self.is_owned_by_caller(),
+            "recursive `#[memoize]` initialization of `{}` with the same arguments",
+            std::any::type_name::<F>()
+        );
     }
 
     /// Runs `f` with this guard marked as owned by the current thread.
@@ -51,6 +49,13 @@ impl Guard {
             let _scope = Scope { owner: &self.owner };
             f()
         })
+    }
+
+    /// Returns whether the caller is running inside this guard's [`scope`](Self::scope).
+    #[inline]
+    fn is_owned_by_caller(&self) -> bool {
+        let owner = self.owner.load(Ordering::Relaxed);
+        !owner.is_null() && TOKEN.with(|token| owner == ptr::from_ref(token).cast_mut())
     }
 }
 
