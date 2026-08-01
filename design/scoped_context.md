@@ -1,6 +1,6 @@
 # Scoped context
 
-This document designs scoped contexts that temporarily add or shadow context values and a unified `Cx` API for inserting request values. It also defines how [`#[memoize]`](../crates/topcoat-core/macro/docs/memoize.md) responds when an insertion changes a value that a cached result observed.
+This document designs scoped contexts that temporarily add or shadow context values and a unified `Cx` API for mutating request-root values. It also defines how [`#[memoize]`](../crates/topcoat-core/macro/docs/memoize.md) responds when root mutation changes a value that a cached result observed.
 
 # Why context needs scoping
 
@@ -54,7 +54,7 @@ The [URL generation design](https://github.com/tokio-rs/topcoat/pull/225) needs 
 | --- | --- | --- | --- |
 | App | `RouterBuilder::app_context(value)` | `app_context(cx)` | Every request handled by the router |
 | Request root | `cx.insert(value)` on the root `Cx` | `request_context(cx)` | The root scope and its descendants |
-| Scoped | `cx.with(value)`, `cx.with_values((a, b, ...))`, or `scoped_cx.insert(value)` | `request_context(cx)` | That scope and its descendants |
+| Scoped | `cx.with(value)` or `cx.with_values((a, b, ...))` | `request_context(cx)` | That scope and its descendants |
 
 App context is immutable, uses a separate namespace, and cannot be shadowed by request or scoped values. `request_context::<T>` searches scoped bindings from nearest to farthest, then the request root.
 
@@ -131,22 +131,22 @@ A scoped context borrows its parent. It cannot outlive the parent or move into d
 
 `Cx` remains free of lifetime parameters.
 
-# Inserting into the current scope
+# Mutating the request root
 
-`Cx::insert` makes a value current in the scope identified by that `Cx`. Layers use it to install request facilities before calling the inner chain:
+`Cx::insert` and `Cx::get_mut` require `&mut Cx`. Layers receive the mutable root context, so they can install request facilities before calling the inner chain:
 
 ```rust
 #[layer("/")]
-async fn cookie_layer(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
-    let cookies = cx.insert(CookieJarCell::new());
+async fn cookie_layer(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+    cx.insert(CookieJarCell::new());
 
     let mut response = next.run(cx, body).await?;
-    write_cookies(cookies, response.headers_mut());
+    write_cookies(cx, response.headers_mut());
     Ok(response)
 }
 ```
 
-Layers, routes, pages, and components all receive `&Cx`; `CxBuilder` is removed. `Layer::handle` and `Next::run` both take `&Cx`. `Next::run` ties its returned future to that context borrow so a layer can pass either the shared context or a locally created scoped context.
+`CxBuilder` is removed. Layers receive `&mut Cx`; routes, pages, and components receive `&Cx`:
 
 ```rust
 pub trait Layer {
@@ -154,46 +154,51 @@ pub trait Layer {
 
     fn handle<'a>(
         &'a self,
-        cx: &'a Cx,
+        cx: &'a mut Cx,
         body: Body,
         next: Next<'a>,
     ) -> LayerFuture<'a>;
 }
 
 impl<'a> Next<'a> {
-    pub fn run<'cx>(self, cx: &'cx Cx, body: Body) -> LayerFuture<'cx>
-    where
-        'a: 'cx,
-    {
+    pub fn run(self, cx: &'a mut Cx, body: Body) -> LayerFuture<'a> {
         unimplemented!()
     }
 }
 ```
 
-The router inserts built-in request values into the root `Cx` before invoking the layer chain. Use `insert` to keep a value visible through the current scope after `Next::run` returns. Use `with` to limit a value to a new child scope and its descendants:
+The router inserts built-in request values into the root `Cx` before invoking the layer chain. A layer may mutate the root before or after `Next::run`. Once the chain reaches a route, the route receives an immutable borrow and may create scoped contexts while rendering.
 
-| Operation | Changes | Visible through |
-| --- | --- | --- |
-| `cx.insert(value)` | The current scope | That `Cx` and descendants without a nearer binding of the same type |
-| `cx.with(value)` | A new child scope | The returned scoped context and its descendants |
-
-Inserting a type already present in the current scope replaces the value returned by subsequent ordinary lookups. References acquired before the insertion and memoized calls using an earlier revision continue to see the previous value:
+A scoped context exposes only shared access to `Cx`. The root cannot be mutated while that scoped context, or any other borrow derived from `Cx`, may still be used:
 
 ```rust
-cx.insert(HeadingLevel(2));
-let previous = request_context::<HeadingLevel>(cx);
-let section_cx = cx.with(SectionId("security"));
+{
+    let section_cx = cx.with(HeadingLevel(2));
+
+    // cx.insert(...) would fail to compile here because section_cx is used below.
+    render_security_section(&section_cx).await?;
+}
 
 cx.insert(HeadingLevel(3));
-
-assert_eq!(previous, &HeadingLevel(2));
-assert_eq!(request_context::<HeadingLevel>(cx), &HeadingLevel(3));
-assert_eq!(request_context::<HeadingLevel>(&section_cx), &HeadingLevel(3));
 ```
 
-`insert` returns a reference to the binding it installed. A layer can retain the exact value it owns across `Next::run`, even if inner code replaces the same type. Append-only storage cannot return the previous `T` by value.
+`insert` adds or replaces a root value and returns the displaced value. `get_mut` returns mutable access to an existing root value:
 
-`insert` is available to every function with `&Cx`, not only layers. Concurrent insertions into the same scope are serialized; the last committed binding of each type becomes current. Ordinary lookups use the latest committed revision at the time of lookup.
+```rust
+assert_eq!(cx.insert(HeadingLevel(1)), None);
+
+*cx.get_mut::<HeadingLevel>().unwrap() = HeadingLevel(2);
+
+assert_eq!(
+    request_context::<HeadingLevel>(cx),
+    &HeadingLevel(2),
+);
+assert_eq!(cx.insert(HeadingLevel(3)), Some(HeadingLevel(2)));
+```
+
+`insert<T>` and a successful `get_mut<T>` assign a new binding identity before returning. Cached results that observed the previous root `T` no longer match, even if the caller leaves the value returned by `get_mut` unchanged. `get_mut::<T>()` returning `None` changes nothing.
+
+A layer may use a scoped context for work it performs itself, but cannot pass one to `Next::run`, which requires `&mut Cx`.
 
 # Memoization follows observed context values
 
@@ -245,13 +250,6 @@ let next_cx = stable_cx.with(DocsVersion::Next);
 let _ = fetch_api_item(&next_cx, "Router").await; // fetches next version
 ```
 
-The same matching rule covers other lookups:
-
-- After `insert(T)`, a call through that scope, or a descendant that inherits the inserted binding, cannot reuse a variant that recorded a different `T` binding or observed that `T` was absent. It may reuse another variant whose recorded lookups still match; otherwise, it recomputes.
-- Ancestors, sibling scopes, and descendants with a nearer `T` binding remain unaffected.
-- App-context reads add no dependency because scopes cannot shadow them.
-- `try_request_context::<T>` records when `T` is missing. A context that supplies `T` cannot reuse that result.
-
 # Binding identity controls reuse
 
 Memoization compares the identity of a context binding, not the value's `PartialEq` result. Two sibling scoped contexts that each contain `DocsVersion::Stable` contain two bindings, so each computes its own variant:
@@ -266,7 +264,24 @@ let _ = fetch_api_item(&second, "Router").await; // fetches binding B
 
 Create one scoped context above sibling calls when they should share the binding. Binding identity works for every `Any + Send + Sync` value without adding an equality bound to `Cx::with`.
 
-Every insertion creates a new binding identity, even when the inserted value compares equal to the previous value. Interior mutation does not create a new binding. If a context value contains a `Mutex`, atomic, or another interior-mutable value, changing its contents does not invalidate a memoized result. Call `insert` or create a scoped context with a new binding when the change must affect memoized work.
+Root mutation changes only the affected type's binding identity:
+
+```rust
+cx.insert(DocsVersion::Stable); // binding A
+
+let _ = fetch_api_item(cx, "Router").await; // fetches and records A
+let _ = fetch_api_item(cx, "Router").await; // reuses A
+
+*cx.get_mut::<DocsVersion>().unwrap() = DocsVersion::Next; // binding B
+
+let _ = fetch_api_item(cx, "Router").await; // A does not match; fetches B
+
+cx.insert(HeadingLevel(2));
+
+let _ = fetch_api_item(cx, "Router").await; // B still matches; reuses
+```
+
+Replacing a value with an equal value still creates a new binding identity because context values do not require `PartialEq`. `#[memoize]` cannot detect mutation performed through a `Mutex`, atomic, or another interior-mutability API on `&Cx`. When that state affects a memoized result, mutate the root through `get_mut` before entering immutable rendering, or provide a new scoped binding.
 
 # Nested memoized functions carry their dependencies
 
@@ -300,7 +315,7 @@ A binding created inside the outer function is not an input to that function, so
 
 # Scoped context API
 
-`Cx::insert` changes the current scope. `Cx::with` and `Cx::with_values` create a child scope and return `CxScope<'_>`. The document calls this value a scoped context; `CxScope` is its concrete implementation type. It dereferences to `Cx` and cannot outlive its parent.
+`Cx::insert` and `Cx::get_mut` mutate the request root. `Cx::with` and `Cx::with_values` create a child scope and return `CxScope<'_>`. The document calls this value a scoped context; `CxScope` is its concrete implementation type. It dereferences to `Cx` and cannot outlive its parent.
 
 ```rust
 pub struct Cx {
@@ -314,7 +329,15 @@ pub struct CxScope<'cx> {
 pub trait ContextValues: private::Sealed {}
 
 impl Cx {
-    pub fn insert<T>(&self, value: T) -> &T
+    pub fn insert<T>(&mut self, value: T) -> Option<T>
+    where
+        T: Any + Send + Sync,
+    {
+        unimplemented!()
+    }
+
+    #[must_use]
+    pub fn get_mut<T>(&mut self) -> Option<&mut T>
     where
         T: Any + Send + Sync,
     {
@@ -339,44 +362,19 @@ impl Cx {
 }
 ```
 
-`ContextValues` is sealed and implemented for tuples of two through twelve values. `with_values` rejects duplicate types before creating the scope. `with(tuple)` remains available when the tuple itself is one context value. `CxScope<'_>` implements `Deref<Target = Cx>`.
+`ContextValues` is sealed and implemented for tuples of two through twelve values. `with_values` rejects duplicate types before creating the scope. `with(tuple)` remains available when the tuple itself is one context value.
 
-# Scoped binding requirements
+`Cx` does not implement `Clone`. `CxScope<'_>` implements `Deref<Target = Cx>`, but not `DerefMut`, and exposes no methods that forward mutation to its parent.
 
-A request owns an append-only binding store and a tree of scopes. Each scope has a stable identity, a stable parent, and a versioned binding history for each type. `insert` appends a value with a fresh `ContextBindingId`, then atomically advances the request revision and makes that binding current.
+# Context storage requirements
 
-Append-only storage retains replaced bindings, bindings from dropped scopes, and completed memoized results until the request ends. Validation determines whether a caller can reuse a result; it never deletes or deallocates a stored binding or result.
+The request root stores one value and one `ContextBindingId` for each type. A root binding identity identifies a logical version of the value, not its allocation. `insert<T>` replaces the value, returns the previous value if present, and assigns a fresh identity. A successful `get_mut<T>` assigns a fresh identity before returning `&mut T`. Returning `None` changes nothing.
 
-Lookup can resolve each scope as of any in-flight revision, so replacing the current binding does not discard history needed by a running memoized body.
+Each scoped context owns immutable bindings with their own stable identities and links to its parent scope. A scoped binding lives as long as its `CxScope`. Every root version and scoped binding receives a request-unique `ContextBindingId`; IDs are never reused during the request.
 
-An insertion affects only the scope on which `insert` is called and descendants that do not shadow that type:
+Obtaining `&mut Cx` proves that there is no live borrow through a scoped context, context-value reference, memoized-result reference, or memoized future. Root mutation therefore needs no append-only value history or request revision snapshots. The previous root value can be returned immediately; Topcoat does not retain it.
 
-```rust
-let sidebar_cx = cx.with(SectionId("sidebar"));
-let article_cx = cx.with(SectionId("article"));
-
-sidebar_cx.insert(HeadingLevel(2));
-
-assert_eq!(try_request_context::<HeadingLevel>(cx), None);
-assert_eq!(try_request_context::<HeadingLevel>(&article_cx), None);
-
-cx.insert(HeadingLevel(1));
-
-assert_eq!(
-    request_context::<HeadingLevel>(cx),
-    &HeadingLevel(1),
-);
-assert_eq!(
-    request_context::<HeadingLevel>(&sidebar_cx),
-    &HeadingLevel(2),
-); // nearest binding wins
-assert_eq!(
-    request_context::<HeadingLevel>(&article_cx),
-    &HeadingLevel(1),
-); // inherits the root binding
-```
-
-`Cx` does not expose `get_mut`. Calling `insert` on a scope installs a fresh binding there. If that scope already contains the type, subsequent lookups use the new binding while existing references remain valid. Store a type such as `Mutex<T>` when callers must mutate one value in place.
+Cached results that recorded the old root identity stop matching after mutation. They may remain in stable cache storage until the request ends; deleting them while `Cx` is mutably borrowed is a possible memory optimization, not part of cache correctness.
 
 # How cached results match context
 
@@ -416,7 +414,11 @@ let _ = fetch_api_item(&stable_cx, "Router").await; // A still matches; reuses
 
 The failed match through `next_cx` does not delete the result for binding `A`. Matching is per caller, so `stable_cx` can still reuse it.
 
-`try_request_context::<T>` stores a missing read when `T` is absent. App-context reads are not stored because app context cannot change during a request. Like Salsa, Topcoat checks recorded inputs before recomputing.
+`try_request_context::<T>` stores a missing read when `T` is absent. App-context reads are not stored because app context cannot change during a request.
+
+This matching rule provides lazy invalidation. Root mutation changes the affected type's binding identity, so old results stop matching without a Salsa dependency graph, request-wide revision, or descendant traversal.
+
+Root mutation could instead increment a request-wide generation while retaining the binding checks required for scopes, but an unrelated mutation would then invalidate every cached result. Updating only the affected root binding's identity preserves precise reuse without another matching mechanism.
 
 # Concurrent calls for one cache key
 
@@ -454,32 +456,31 @@ let (_context, _view) = tokio::join!(
 
 Calls to different memoized functions also run independently.
 
-In a separate execution, an outermost memoized call captures the request revision before it checks the cache or waits. An insertion can create a later revision while the body runs:
+Root mutation cannot overlap these calls. A memoized future borrows `Cx`, so Rust requires that future and every result reference to end before `insert` or `get_mut`:
 
-| Step | Memoized call | Request context |
-| --- | --- | --- |
-| 1 | Captures revision 7 and starts | `DocsVersion::Stable` at revision 7 |
-| 2 | Continues using revision 7 | `insert(DocsVersion::Next)` creates revision 8 |
-| 3 | Stores and returns the stable result | Revision 8 remains current |
-| 4 | A later call captures revision 8, rejects the stable result, and fetches the next version | Revision 8 remains current |
+```rust
+let fetch = fetch_api_item(cx, "Router");
 
-A waiter keeps the revision it captured before waiting. Nested memoized calls use the outermost call's revision. A child created with `with` or `with_values` sees its own bindings plus ancestor bindings from that revision. Topcoat does not rerun a body when an insertion overlaps it.
+// cx.insert(...) would fail to compile while fetch borrows cx.
+let _ = fetch.await;
 
-Other outcomes follow three rules:
+cx.insert(DocsVersion::Next);
+```
+
+Other outcomes follow two rules:
 
 | Event | Result |
 | --- | --- |
 | The body returns, including `Err` | Store the completed value and wake waiters |
 | The body is cancelled or panics | Store nothing and wake a waiter, which checks the cache and may run the body |
-| The body calls `Cx::insert` | Panic; `with` and `with_values` remain allowed |
 
-Capturing a request revision and committing an insertion briefly serialize, so the captured revision either includes the insertion or precedes it. Other callers for the same key wait while the body runs, but the body holds no request-context lock while running or awaiting.
+Other callers for the same key wait while the body runs. `insert` and `get_mut` cannot run while the memoized body is executing, including across `.await`.
 
 # Non-goals
 
-This proposal preserves `#[memoize]`'s existing non-reentrancy behavior. Recursive memoization and cross-key wait-cycle detection remain outside this design. It does not adopt Salsa's durability, value-equality backdating, tracked outputs, or cycle machinery.
+This proposal preserves `#[memoize]`'s existing non-reentrancy behavior. Recursive memoization and cross-key wait-cycle detection remain outside this design. It does not build an incremental dependency graph; each cached result records only the context lookups needed to validate that result.
 
 # Open questions
 
-- **Tower bridge:** `TowerLayer` currently moves request parts out through the displaced value returned by `CxBuilder::insert`. Append-only `Cx::insert` cannot return ownership of that value, so the bridge needs a separate ownership handoff.
+- **Layer scoping:** Replacing `CxBuilder` with `&mut Cx` lets every layer mutate the request root, but prevents a layer from passing a read-only `CxScope` to `Next::run`. Is scoping intentionally limited to route and rendering code, or does the layer API need a separate way to scope the inner chain?
 - **Lookup names:** Should the chain-aware free functions remain `request_context` and `try_request_context`, or become `scope_context` and `try_scope_context`, or `scoped_context` and `try_scoped_context`? A rename must also decide compatibility aliases and whether `CxTestBuilder::request_context` keeps "request" for request-root registration.
