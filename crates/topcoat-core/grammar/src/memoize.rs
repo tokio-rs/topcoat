@@ -86,9 +86,7 @@ impl ToTokens for Memoize {
         let where_clause = &generics.where_clause;
 
         let mut new_inputs: Vec<TokenStream> = Vec::new();
-        let mut key_idents: Vec<syn::Ident> = Vec::new();
         let mut borrowed_keys: Vec<TokenStream> = Vec::new();
-        let mut closure_pats: Vec<TokenStream> = Vec::new();
         let mut destructures: Vec<TokenStream> = Vec::new();
 
         for arg in &sig.inputs {
@@ -112,13 +110,11 @@ impl ToTokens for Memoize {
                 let mutability = &pi.mutability;
                 let ident = pi.ident.clone();
                 new_inputs.push(quote! { #mutability #ident: #ty });
-                closure_pats.push(quote! { #mutability #ident });
                 ident
             } else {
-                let synth = format_ident!("__key_{}", key_idents.len());
+                let synth = format_ident!("__key_{}", borrowed_keys.len());
                 new_inputs.push(quote! { #synth: #ty });
                 destructures.push(quote! { let #pat = #synth; });
-                closure_pats.push(quote! { #synth });
                 synth
             };
             if is_ref {
@@ -126,7 +122,6 @@ impl ToTokens for Memoize {
             } else {
                 borrowed_keys.push(quote! { &#ident });
             }
-            key_idents.push(ident);
         }
 
         let return_ty = match &sig.output {
@@ -141,31 +136,43 @@ impl ToTokens for Memoize {
             quote! { &'__cx #return_type }
         };
 
-        let call = if asyncness.is_some() {
-            quote! {
-                #topcoat_context::memoize_cache(cx).eq_cache().memoize_async(
-                    cx,
-                    (#(#borrowed_keys,)*),
-                    (#(#key_idents,)*),
-                    async |cx, (#(#closure_pats,)*)| {
-                        #(#destructures)*
-                        #(#body_stmts)*
-                    },
-                ).await
-            }
+        let (lookup, evaluate) = if asyncness.is_some() {
+            (
+                quote! {
+                    #topcoat_context::memoize_cache(cx)
+                        .eq_cache()
+                        .memoize_async::<__TopcoatMemoizeMarker, _, #return_type>(
+                            cx,
+                            (#(#borrowed_keys,)*),
+                        )
+                        .await
+                },
+                quote! { async move { #(#destructures)* #(#body_stmts)* }.await },
+            )
         } else {
-            quote! {
-                #topcoat_context::memoize_cache(cx).eq_cache().memoize(
-                    cx,
-                    (#(#borrowed_keys,)*),
-                    (#(#key_idents,)*),
-                    |cx, (#(#closure_pats,)*)| {
-                        #(#destructures)*
-                        #(#body_stmts)*
-                    },
-                )
-            }
+            (
+                quote! {
+                    #topcoat_context::memoize_cache(cx)
+                        .eq_cache()
+                        .memoize::<__TopcoatMemoizeMarker, _, #return_type>(
+                            cx,
+                            (#(#borrowed_keys,)*),
+                        )
+                },
+                quote! { (|| { #(#destructures)* #(#body_stmts)* })() },
+            )
         };
+        let call = quote! {{
+            struct __TopcoatMemoizeMarker;
+            match #lookup {
+                #topcoat_internal::MemoizeEntry::Occupied(value) => value,
+                #topcoat_internal::MemoizeEntry::Vacant(vacant) => {
+                    let cx = vacant.cx();
+                    let value = #evaluate;
+                    vacant.insert(value)
+                }
+            }
+        }};
 
         let output = if return_type_as_ref {
             quote! { (#call).as_ref() }

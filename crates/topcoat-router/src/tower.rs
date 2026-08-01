@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use tokio::sync::{mpsc, oneshot};
-use topcoat_core::context::{Cx, CxBuilder};
+use topcoat_core::context::Cx;
 use topcoat_core::error::{Error, Result};
 use tower::ServiceExt;
 
@@ -126,6 +126,8 @@ where
 /// as it would in a plain tower stack: its state (a concurrency-limit
 /// semaphore, a rate-limit window) is shared across requests, and changes it
 /// makes to the request are seen by the layers and route it wraps.
+/// Request changes are scoped to that wrapped subtree; outer layers continue
+/// to see their original request parts after the middleware returns.
 ///
 /// The middleware's service must be `Clone`, `Send`, and `Sync`; wrap a
 /// service that is not `Sync` in `tower::buffer`. To run several tower
@@ -202,19 +204,14 @@ where
         &self.path
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         // Clones of a tower service share its cross-request state (semaphores,
         // rate-limit windows) through the service's internal handles.
         let service = self.service.clone();
         Box::pin(async move {
-            // Swap out existing parts with empty ones to avoid cloning headers etc.
-            let parts = cx
-                .insert(http::Request::new(()).into_parts().0)
-                .expect("router context contains parts");
-            // Reassemble the http request the middleware operates on from the
-            // parts stored on the context, and slip it the relay over which
-            // `TowerNext` calls back into this chain.
-            let mut request = Request::from_parts(parts, body);
+            // Tower needs to own a complete request, so clone the request
+            // parts while the outer context retains its copy.
+            let mut request = Request::from_parts(parts(cx).clone(), body);
             let (relay, mut chain_calls) = relay_channel();
             request.extensions_mut().insert(relay);
 
@@ -236,11 +233,14 @@ where
             // racing the chain (like a timeout) stays live and can cancel it.
             let chain = async move {
                 let (mut parts, body) = request.into_parts();
-                // Write the request back so middleware edits are visible to
-                // inner layers and the route.
                 parts.extensions.remove::<Relay>();
-                cx.insert(parts);
-                let result = next.run(cx, body).await.map_err(TowerNextError::tunneled);
+                // Request edits apply only to the layers and route wrapped by
+                // this TowerLayer.
+                let tower_cx = cx.with(parts);
+                let result = next
+                    .run(&tower_cx, body)
+                    .await
+                    .map_err(TowerNextError::tunneled);
                 let _ = respond_to.send(result);
                 // The chain runs at most once; answer any repeated call.
                 while let Some((_, respond_to)) = chain_calls.recv().await {
@@ -494,19 +494,19 @@ mod tests {
     }
 
     /// Builds a request context carrying the parts of a GET request to `uri`.
-    fn cx_for(uri: &str) -> CxBuilder {
+    fn cx_for(uri: &str) -> Cx {
         let (parts, ()) = http::Request::builder()
             .uri(uri)
             .body(())
             .unwrap()
             .into_parts();
-        let mut cx = CxBuilder::default();
+        let cx = Cx::default();
         cx.insert(parts);
         cx
     }
 
     /// Runs a request through `layer` wrapped directly around `route`.
-    fn run(layer: &dyn Layer, cx: &mut CxBuilder, route: &RouteFn) -> Result<Response> {
+    fn run(layer: &dyn Layer, cx: &Cx, route: &RouteFn) -> Result<Response> {
         let layers = Layers::default();
         let next = Next::new(&layers, &[], Terminal::Route(route));
         block_on(layer.handle(cx, Body::empty(), next))
@@ -807,35 +807,34 @@ mod tests {
     fn passes_the_request_through_to_the_route() {
         let layer = TowerLayer::new(tower::layer::util::Identity::new());
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let mut cx = cx_for("/x");
+        let cx = cx_for("/x");
 
-        let response = run(&layer, &mut cx, &route).unwrap();
+        let response = run(&layer, &cx, &route).unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(&body_bytes(response)[..], b"route");
     }
 
     #[test]
-    fn request_edits_reach_the_route_and_the_context() {
+    fn request_edits_reach_only_the_wrapped_route() {
         let layer = TowerLayer::new(MarkRequestLayer);
         let route = RouteFn::new(Method::GET, path("/x"), echo_header);
-        let mut cx = cx_for("/x");
+        let cx = cx_for("/x");
 
-        let response = run(&layer, &mut cx, &route).unwrap();
+        let response = run(&layer, &cx, &route).unwrap();
 
-        // The route saw the header the middleware added, and the modified
-        // request was written back to the context.
+        // The route sees the header while the outer request context does not.
         assert_eq!(&body_bytes(response)[..], b"marked");
-        assert!(cx.get::<Parts>().unwrap().headers.contains_key("x-tower"));
+        assert!(!parts(&cx).headers.contains_key("x-tower"));
     }
 
     #[test]
     fn response_edits_reach_the_caller() {
         let layer = TowerLayer::new(MarkResponseLayer);
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let mut cx = cx_for("/x");
+        let cx = cx_for("/x");
 
-        let response = run(&layer, &mut cx, &route).unwrap();
+        let response = run(&layer, &cx, &route).unwrap();
 
         assert_eq!(response.headers().get("x-tower").unwrap(), "marked");
         assert_eq!(&body_bytes(response)[..], b"route");
@@ -845,24 +844,24 @@ mod tests {
     fn middleware_can_short_circuit_without_calling_the_chain() {
         let layer = TowerLayer::new(ShortCircuitLayer);
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let mut cx = cx_for("/x");
+        let cx = cx_for("/x");
 
-        let response = run(&layer, &mut cx, &route).unwrap();
+        let response = run(&layer, &cx, &route).unwrap();
 
         assert_eq!(&body_bytes(response)[..], b"short");
         // The chain never ran, so the parts stay on the context for outer
         // layers and error rendering.
-        assert!(cx.get::<Parts>().is_some());
+        let _: &Parts = parts(&cx);
     }
 
     #[test]
     fn chain_errors_tunnel_through_unchanged() {
         let layer = TowerLayer::new(tower::layer::util::Identity::new());
         let layers = Layers::default();
-        let mut cx = cx_for("/missing");
+        let cx = cx_for("/missing");
 
         let next = Next::new(&layers, &[], Terminal::NotFound);
-        let result = block_on(layer.handle(&mut cx, Body::empty(), next));
+        let result = block_on(layer.handle(&cx, Body::empty(), next));
 
         // The 404 comes back out as the original typed error, not a response.
         assert!(
@@ -879,10 +878,10 @@ mod tests {
         // still be recovered on the way out.
         let layer = TowerLayer::new(tower::timeout::TimeoutLayer::new(Duration::from_mins(1)));
         let layers = Layers::default();
-        let mut cx = cx_for("/missing");
+        let cx = cx_for("/missing");
 
         let next = Next::new(&layers, &[], Terminal::NotFound);
-        let result = block_on(layer.handle(&mut cx, Body::empty(), next));
+        let result = block_on(layer.handle(&cx, Body::empty(), next));
 
         assert!(
             result
@@ -904,8 +903,8 @@ mod tests {
 
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
         for _ in 0..2 {
-            let mut cx = cx_for("/x");
-            run(&layer, &mut cx, &route).unwrap();
+            let cx = cx_for("/x");
+            run(&layer, &cx, &route).unwrap();
         }
 
         // The tower layer built one service; its per-request clones shared it.
@@ -917,11 +916,11 @@ mod tests {
     fn timeout_middleware_cancels_a_hung_route() {
         let layer = TowerLayer::new(tower::timeout::TimeoutLayer::new(Duration::from_millis(10)));
         let route = RouteFn::new(Method::GET, path("/x"), hang);
-        let mut cx = cx_for("/x");
+        let cx = cx_for("/x");
 
         // The route never resolves; the timeout must fire while the chain is
         // in flight, which requires the middleware to stay polled.
-        let error = run(&layer, &mut cx, &route).unwrap_err();
+        let error = run(&layer, &cx, &route).unwrap_err();
 
         let middleware = error.downcast_ref::<TowerServiceError>().unwrap();
         assert!(middleware.get_ref().is::<tower::timeout::error::Elapsed>());
@@ -931,9 +930,9 @@ mod tests {
     fn calling_the_chain_twice_errors() {
         let layer = TowerLayer::new(CallTwiceLayer);
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let mut cx = cx_for("/x");
+        let cx = cx_for("/x");
 
-        let error = run(&layer, &mut cx, &route).unwrap_err();
+        let error = run(&layer, &cx, &route).unwrap_err();
         assert!(error.downcast_ref::<TowerNextError>().is_some());
     }
 
@@ -941,9 +940,9 @@ mod tests {
     fn calling_the_chain_without_the_relay_errors() {
         let layer = TowerLayer::new(DetachLayer);
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let mut cx = cx_for("/x");
+        let cx = cx_for("/x");
 
-        let error = run(&layer, &mut cx, &route).unwrap_err();
+        let error = run(&layer, &cx, &route).unwrap_err();
         assert!(error.downcast_ref::<TowerNextError>().is_some());
     }
 

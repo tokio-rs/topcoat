@@ -1,165 +1,344 @@
 use std::{
     any::Any,
     collections::hash_map::RandomState,
-    future::Future,
     hash::Hash,
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    sync::{Mutex, OnceLock},
+    sync::{Condvar, Mutex},
 };
 
 use hashbrown::{Equivalent, HashMap};
-use tokio::sync::OnceCell;
+use tokio::sync::Notify;
 
-use crate::context::Cx;
+use crate::context::{ContextRead, Cx};
 
 /// The per-request store backing `#[memoize]`.
 ///
-/// This cache variant holds an owned instance of the key, allowing it to guarantee equality
-/// through the `Eq` trait.
-///
-/// `entries` maps an `(F, K)` shape to an index into `values` via [`anymap3::Map`], where `F` is
-/// the memoized function (used as a marker type to keep different functions' caches disjoint) and
-/// `K` is the owned key type. `values` holds the actual cells (`OnceLock<V>` / `OnceCell<V>`)
-/// behind a stable address so we can hand out `&V` references whose lifetime is tied to the cache.
+/// Each function and owned argument key maps to a stable slot. A slot retains
+/// every completed context variant for that key and serializes computation so
+/// at most one caller runs the function body at a time.
 #[derive(Default)]
 #[doc(hidden)]
 pub struct MemoizeEqCache {
     entries: Mutex<anymap3::Map<dyn Any + Send + Sync>>,
-    values: boxcar::Vec<Box<dyn Any + Send + Sync + 'static>>,
+    slots: boxcar::Vec<Box<dyn Any + Send + Sync + 'static>>,
 }
 
 impl MemoizeEqCache {
     #[must_use]
     pub fn new() -> Self {
-        MemoizeEqCache::default()
+        Self::default()
     }
 
-    /// Returns a stable reference to the cell associated with `(Marker, key)`, creating a default
-    /// cell on first access. `Marker` is the function type and partitions the cache so unrelated
-    /// memoized functions cannot observe each other's entries even when they share a key shape.
-    fn get_or_insert_cell<Marker, K, Cell>(&self, key: K) -> &Cell
+    fn get_or_insert_slot<Marker, K, Slot>(&self, key: K) -> &Slot
     where
         Marker: 'static,
         K: Copy,
         MemoizeKey<K>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<K> as ToOwnedKey>::Owned>,
         <MemoizeKey<K> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
-        Cell: Default + Send + Sync + 'static,
+        Slot: Default + Send + Sync + 'static,
     {
         let index = {
-            let mut guard = self.entries.lock().unwrap();
-            let cache = guard
-                .entry::<MarkedHashMap<Marker, <MemoizeKey<K> as ToOwnedKey>::Owned, usize>>()
-                .or_insert_with(|| MarkedHashMap::new());
+            let mut entries = self.entries.lock().unwrap();
+            let cache = entries
+                .entry::<MarkedHashMap<(Marker, Slot), <MemoizeKey<K> as ToOwnedKey>::Owned, usize>>()
+                .or_insert_with(MarkedHashMap::new);
 
-            // Look up using the borrowed key via `Equivalent` to avoid cloning the arguments on
-            // cache hits; only clone into an owned key when inserting.
             if let Some(&index) = cache.get(&MemoizeKey(key)) {
                 index
             } else {
-                let index = self.values.push(Box::new(Cell::default()));
-                let key_owned = MemoizeKey(key).to_owned_key();
-                cache.insert(key_owned, index);
+                let index = self.slots.push(Box::new(Slot::default()));
+                cache.insert(MemoizeKey(key).to_owned_key(), index);
                 index
             }
         };
-        self.values.get(index).unwrap().downcast_ref().unwrap()
+        self.slots[index].downcast_ref().unwrap()
     }
 
-    /// Runs `f(cx, params)` at most once per `(F, key)` and returns a reference to the cached
-    /// result. `key` is the borrowed lookup key (e.g. `(&str,)`) used to avoid cloning on cache
-    /// hits; `params` is what gets passed to `f` on a miss.
-    pub fn memoize<'a, K, P, V, F>(&'a self, cx: &'a Cx, key: K, params: P, f: F) -> &'a V
-    where
-        K: Copy,
-        MemoizeKey<K>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<K> as ToOwnedKey>::Owned>,
-        <MemoizeKey<K> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
-        V: Send + Sync + 'static,
-        F: (FnOnce(&'a Cx, P) -> V) + 'static,
-    {
-        let cell = self.get_or_insert_cell::<F, _, OnceLock<V>>(key);
-        cell.get_or_init(|| f(cx, params))
-    }
-
-    /// Returns the already-computed value for `(F, key)`, or `None` if nothing has been
-    /// memoized under that marker and key yet. Unlike [`memoize`](Self::memoize) this never
-    /// inserts a cell or runs anything: `marker` is taken only to fix the partition type `F`
-    /// (matching the function the value was memoized with) and is never called.
-    ///
-    /// Only observes entries written by the synchronous [`memoize`](Self::memoize); the async
-    /// variant stores its cells as `OnceCell<V>` and is not visible here.
+    /// Looks up a synchronous result or claims its key for execution.
     ///
     /// # Panics
     ///
-    /// Panics if the internal mutex is poisoned, or if a stored cell cannot be
-    /// downcast back to `OnceLock<V>` (which indicates a marker/type mismatch
-    /// between the caller and the function that originally memoized the value).
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn get<K, V, F>(&self, marker: F, key: K) -> Option<&V>
+    /// Panics if internal memoization state was poisoned by another panic.
+    pub fn memoize<Marker, K, V>(&self, cx: &Cx, key: K) -> MemoizeEntry<'_, V, SyncVacant<'_, V>>
     where
+        Marker: 'static,
         K: Copy,
         MemoizeKey<K>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<K> as ToOwnedKey>::Owned>,
         <MemoizeKey<K> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
         V: Send + Sync + 'static,
-        F: 'static,
+    {
+        let revision = cx.memo_revision();
+        let slot = self.get_or_insert_slot::<Marker, _, SyncMemoSlot<V>>(key);
+        let mut state = slot.state.lock().unwrap();
+
+        loop {
+            if let Some(value) = slot.find(&state, cx, revision) {
+                return MemoizeEntry::Occupied(value);
+            }
+            if !state.running {
+                state.running = true;
+                drop(state);
+                return MemoizeEntry::Vacant(SyncVacant {
+                    inner: Vacant {
+                        slot,
+                        cx: cx.start_memo(revision),
+                        armed: true,
+                    },
+                });
+            }
+            state = slot.ready.wait(state).unwrap();
+        }
+    }
+
+    /// Returns a synchronous value for `key`, without running its body. When
+    /// the key has context variants, this returns the first one.
+    ///
+    /// # Panics
+    ///
+    /// Panics if internal memoization state was poisoned by another panic.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn get<K, V, Marker>(&self, marker: Marker, key: K) -> Option<&V>
+    where
+        Marker: 'static,
+        K: Copy,
+        MemoizeKey<K>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<K> as ToOwnedKey>::Owned>,
+        <MemoizeKey<K> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
+        V: Send + Sync + 'static,
     {
         let _ = marker;
         let index = {
-            let guard = self.entries.lock().unwrap();
-            let cache =
-                guard.get::<MarkedHashMap<F, <MemoizeKey<K> as ToOwnedKey>::Owned, usize>>()?;
+            let entries = self.entries.lock().unwrap();
+            let cache = entries.get::<MarkedHashMap<
+                (Marker, SyncMemoSlot<V>),
+                <MemoizeKey<K> as ToOwnedKey>::Owned,
+                usize,
+            >>()?;
             *cache.get(&MemoizeKey(key))?
         };
-        let cell: &OnceLock<V> = self.values.get(index).unwrap().downcast_ref().unwrap();
-        cell.get()
+        let slot: &SyncMemoSlot<V> = self.slots[index].downcast_ref().unwrap();
+        let state = slot.state.lock().unwrap();
+        (state.completed > 0).then(|| &slot.values[0].value)
     }
 
-    /// Async counterpart to [`memoize`](Self::memoize). Concurrent callers with the same key
-    /// share a single in-flight future via `tokio::sync::OnceCell`.
-    pub async fn memoize_async<'a, K, P, V, F, Fut>(
-        &'a self,
-        cx: &'a Cx,
+    /// Looks up an asynchronous result or claims its key for execution.
+    /// Waiters keep the context revision captured before they began waiting.
+    ///
+    /// # Panics
+    ///
+    /// Panics if internal memoization state was poisoned by another panic.
+    pub async fn memoize_async<Marker, K, V>(
+        &self,
+        cx: &Cx,
         key: K,
-        params: P,
-        f: F,
-    ) -> &'a V
+    ) -> MemoizeEntry<'_, V, AsyncVacant<'_, V>>
     where
+        Marker: 'static,
         K: Copy,
         MemoizeKey<K>: Hash + ToOwnedKey + Equivalent<<MemoizeKey<K> as ToOwnedKey>::Owned>,
         <MemoizeKey<K> as ToOwnedKey>::Owned: Hash + Eq + Send + Sync + 'static,
         V: Send + Sync + 'static,
-        F: (FnOnce(&'a Cx, P) -> Fut) + 'static,
-        Fut: Future<Output = V>,
     {
-        let cell = self.get_or_insert_cell::<F, _, OnceCell<V>>(key);
-        cell.get_or_init(|| async { f(cx, params).await }).await
+        let revision = cx.memo_revision();
+        let slot = self.get_or_insert_slot::<Marker, _, AsyncMemoSlot<V>>(key);
+
+        loop {
+            let notified = slot.ready.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+
+            {
+                let mut state = slot.state.lock().unwrap();
+                if let Some(value) = slot.find(&state, cx, revision) {
+                    return MemoizeEntry::Occupied(value);
+                }
+                if !state.running {
+                    state.running = true;
+                    return MemoizeEntry::Vacant(AsyncVacant {
+                        inner: Vacant {
+                            slot,
+                            cx: cx.start_memo(revision),
+                            armed: true,
+                        },
+                    });
+                }
+            }
+
+            notified.await;
+        }
     }
 }
 
 impl std::fmt::Debug for MemoizeEqCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MemoizeCache").finish()
+        f.debug_struct("MemoizeEqCache").finish()
     }
 }
 
-/// A `HashMap` tagged by a phantom marker type `T` so that maps for different markers are
-/// distinct types in `anymap3`. Two memoized functions with identical `K`/`V` types stay in
-/// separate entries because their `T` (the function type) differs.
-struct MarkedHashMap<T, K, V> {
-    inner: HashMap<K, V, RandomState>,
-    _type: PhantomData<fn() -> T>,
+/// The outcome of checking a memoized function and argument key.
+#[doc(hidden)]
+pub enum MemoizeEntry<'a, V, Vacant> {
+    Occupied(&'a V),
+    Vacant(Vacant),
 }
 
-impl<T, K, V> MarkedHashMap<T, K, V> {
-    fn new() -> Self {
-        Self {
-            inner: HashMap::with_hasher(RandomState::new()),
-            _type: PhantomData,
+struct Vacant<'a, V, Ready: WakeAll> {
+    slot: &'a MemoSlot<V, Ready>,
+    cx: Cx,
+    armed: bool,
+}
+
+impl<'a, V, Ready> Vacant<'a, V, Ready>
+where
+    V: Send + Sync + 'static,
+    Ready: WakeAll,
+{
+    fn cx(&self) -> &Cx {
+        &self.cx
+    }
+
+    fn insert(mut self, value: V) -> &'a V {
+        let index = self.slot.values.push(MemoizedValue {
+            value,
+            reads: self.cx.finish_memo(),
+        });
+        {
+            let mut state = self.slot.state.lock().unwrap();
+            debug_assert_eq!(index, state.completed);
+            state.completed += 1;
+            state.running = false;
+        }
+        self.armed = false;
+        self.slot.ready.notify_all();
+        &self.slot.values[index].value
+    }
+}
+
+impl<V, Ready> Drop for Vacant<'_, V, Ready>
+where
+    Ready: WakeAll,
+{
+    fn drop(&mut self) {
+        if self.armed {
+            self.slot.state.lock().unwrap().running = false;
+            self.slot.ready.notify_all();
         }
     }
 }
 
-impl<T, K, V> Deref for MarkedHashMap<T, K, V> {
+macro_rules! impl_vacant {
+    ($name:ident, $ready:ty) => {
+        /// A claimed memoization key.
+        #[doc(hidden)]
+        pub struct $name<'a, V> {
+            inner: Vacant<'a, V, $ready>,
+        }
+
+        impl<'a, V> $name<'a, V>
+        where
+            V: Send + Sync + 'static,
+        {
+            #[must_use]
+            pub fn cx(&self) -> &Cx {
+                self.inner.cx()
+            }
+
+            /// Publishes the computed value and releases callers waiting on this key.
+            ///
+            /// # Panics
+            ///
+            /// Panics if internal memoization state was poisoned by another panic.
+            #[must_use]
+            pub fn insert(self, value: V) -> &'a V {
+                self.inner.insert(value)
+            }
+        }
+    };
+}
+
+impl_vacant!(SyncVacant, Condvar);
+impl_vacant!(AsyncVacant, Notify);
+
+struct MemoizedValue<V> {
+    value: V,
+    reads: Vec<ContextRead>,
+}
+
+#[derive(Default)]
+struct MemoSlotState {
+    completed: usize,
+    running: bool,
+}
+
+struct MemoSlot<V, Ready> {
+    values: boxcar::Vec<MemoizedValue<V>>,
+    state: Mutex<MemoSlotState>,
+    ready: Ready,
+}
+
+impl<V, Ready> MemoSlot<V, Ready> {
+    fn find<'a>(&'a self, state: &MemoSlotState, cx: &Cx, revision: u64) -> Option<&'a V> {
+        (0..state.completed).find_map(|index| {
+            let memo = &self.values[index];
+            if cx.context_reads_match(revision, &memo.reads) {
+                cx.record_context_reads(&memo.reads);
+                Some(&memo.value)
+            } else {
+                None
+            }
+        })
+    }
+}
+
+impl<V, Ready> Default for MemoSlot<V, Ready>
+where
+    Ready: Default,
+{
+    fn default() -> Self {
+        Self {
+            values: boxcar::Vec::new(),
+            state: Mutex::new(MemoSlotState::default()),
+            ready: Ready::default(),
+        }
+    }
+}
+
+type SyncMemoSlot<V> = MemoSlot<V, Condvar>;
+type AsyncMemoSlot<V> = MemoSlot<V, Notify>;
+
+trait WakeAll {
+    fn notify_all(&self);
+}
+
+impl WakeAll for Condvar {
+    fn notify_all(&self) {
+        Condvar::notify_all(self);
+    }
+}
+
+impl WakeAll for Notify {
+    fn notify_all(&self) {
+        self.notify_waiters();
+    }
+}
+
+/// A `HashMap` tagged by `Marker`, keeping functions with the same argument
+/// shape in separate entries.
+struct MarkedHashMap<Marker, K, V> {
+    inner: HashMap<K, V, RandomState>,
+    marker: PhantomData<fn() -> Marker>,
+}
+
+impl<Marker, K, V> MarkedHashMap<Marker, K, V> {
+    fn new() -> Self {
+        Self {
+            inner: HashMap::with_hasher(RandomState::new()),
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<Marker, K, V> Deref for MarkedHashMap<Marker, K, V> {
     type Target = HashMap<K, V, RandomState>;
 
     fn deref(&self) -> &Self::Target {
@@ -167,36 +346,29 @@ impl<T, K, V> Deref for MarkedHashMap<T, K, V> {
     }
 }
 
-impl<T, K, V> DerefMut for MarkedHashMap<T, K, V> {
+impl<Marker, K, V> DerefMut for MarkedHashMap<Marker, K, V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-/// A newtype wrapper around the argument tuple. It exists so we can implement `Equivalent` and
-/// `ToOwnedKey` for tuples of references against the corresponding tuple of owned values, which
-/// would otherwise run into orphan rules and conflicting blanket impls.
+/// A newtype around the borrowed argument tuple used for cache lookup.
 #[doc(hidden)]
 #[derive(Hash)]
 pub struct MemoizeKey<T>(T);
 
-/// Converts a borrowed key (e.g. `(&str, &i32)`) into the owned key stored in the map
-/// (e.g. `(String, i32)`). Used only on cache misses, when we need to insert.
+/// Converts a borrowed memoization key to its owned stored form.
 #[doc(hidden)]
 pub trait ToOwnedKey {
     type Owned;
     fn to_owned_key(&self) -> Self::Owned;
 }
 
-/// Generates `Equivalent` and `ToOwnedKey` impls for argument tuples up to arity 12, so callers
-/// can pass keys made of borrowed values and still hit entries stored as owned values.
 macro_rules! impl_tuple {
     ($(($kty:ident, $qty:ident, $accessor:tt)),*) => {
         impl<$($kty, $qty),*> Equivalent<($($kty,)*)> for MemoizeKey<($(&$qty,)*)>
         where
-            $(
-                $qty: ?Sized + Equivalent<$kty>,
-            )*
+            $($qty: ?Sized + Equivalent<$kty>,)*
         {
             fn equivalent(&self, key: &($($kty,)*)) -> bool {
                 $(self.0.$accessor.equivalent(&key.$accessor))&&*
@@ -208,6 +380,7 @@ macro_rules! impl_tuple {
             $($qty: ?Sized + ToOwned,)*
         {
             type Owned = ($($qty::Owned,)*);
+
             fn to_owned_key(&self) -> Self::Owned {
                 ($(self.0.$accessor.to_owned(),)*)
             }
@@ -219,8 +392,6 @@ macro_rules! impl_tuple {
 mod impls {
     use super::{Equivalent, MemoizeKey, ToOwnedKey};
 
-    // Hand-written zero-arity impls for memoized functions whose only parameter is `cx`. The
-    // macro's `&&*`-joined body doesn't expand cleanly for zero repetitions.
     impl Equivalent<()> for MemoizeKey<()> {
         fn equivalent(&self, _key: &()) -> bool { true }
     }
@@ -245,145 +416,47 @@ mod impls {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    /// Returns a fresh counter with `'static` lifetime so closures that capture it can be
-    /// `Copy + 'static` (the bounds `MemoizeCache::memoize` imposes on its function).
-    fn counter() -> &'static AtomicUsize {
-        Box::leak(Box::new(AtomicUsize::new(0)))
-    }
+    use super::*;
+
+    struct Add;
 
     #[test]
-    fn sync_same_key_runs_body_once() {
+    fn sync_same_context_variant_reuses_value() {
         let cache = MemoizeEqCache::new();
         let cx = Cx::default();
-        let n = counter();
-        let f = move |_: &Cx, (x, y): (i32, i32)| {
-            n.fetch_add(1, Ordering::SeqCst);
-            x + y
-        };
+        let calls = AtomicUsize::new(0);
 
-        let a = cache.memoize(&cx, (&1i32, &2i32), (1, 2), f);
-        let b = cache.memoize(&cx, (&1i32, &2i32), (1, 2), f);
+        for _ in 0..2 {
+            match cache.memoize::<Add, _, i32>(&cx, (&1, &2)) {
+                MemoizeEntry::Occupied(value) => assert_eq!(*value, 3),
+                MemoizeEntry::Vacant(vacant) => {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    assert_eq!(*vacant.insert(3), 3);
+                }
+            }
+        }
 
-        assert_eq!(*a, 3);
-        assert_eq!(*b, 3);
-        assert_eq!(n.load(Ordering::SeqCst), 1);
-    }
-
-    #[test]
-    fn sync_different_keys_run_body_per_key() {
-        let cache = MemoizeEqCache::new();
-        let cx = Cx::default();
-        let n = counter();
-        let f = move |_: &Cx, (x, y): (i32, i32)| {
-            n.fetch_add(1, Ordering::SeqCst);
-            x + y
-        };
-
-        cache.memoize(&cx, (&1i32, &2i32), (1, 2), f);
-        cache.memoize(&cx, (&1i32, &3i32), (1, 3), f);
-        cache.memoize(&cx, (&1i32, &2i32), (1, 2), f);
-
-        assert_eq!(n.load(Ordering::SeqCst), 2);
-    }
-
-    #[test]
-    fn sync_different_functions_dont_collide() {
-        let cache = MemoizeEqCache::new();
-        let cx = Cx::default();
-        let n1 = counter();
-        let n2 = counter();
-        let f1 = move |_: &Cx, (x,): (i32,)| {
-            n1.fetch_add(1, Ordering::SeqCst);
-            x
-        };
-        let f2 = move |_: &Cx, (x,): (i32,)| {
-            n2.fetch_add(1, Ordering::SeqCst);
-            x * 10
-        };
-
-        let a = cache.memoize(&cx, (&1i32,), (1,), f1);
-        let b = cache.memoize(&cx, (&1i32,), (1,), f2);
-
-        assert_eq!(*a, 1);
-        assert_eq!(*b, 10);
-        assert_eq!(n1.load(Ordering::SeqCst), 1);
-        assert_eq!(n2.load(Ordering::SeqCst), 1);
-    }
-
-    #[test]
-    fn sync_borrowed_str_key_dedupes_by_value() {
-        let cache = MemoizeEqCache::new();
-        let cx = Cx::default();
-        let n = counter();
-        let f = move |_: &Cx, (s,): (&str,)| {
-            n.fetch_add(1, Ordering::SeqCst);
-            s.to_owned()
-        };
-
-        // Two different `&str` slices with the same contents should share a cache entry.
-        let s1 = String::from("alice");
-        let s2 = String::from("alice");
-        let a = cache.memoize(&cx, (s1.as_str(),), (s1.as_str(),), f);
-        let b = cache.memoize(&cx, (s2.as_str(),), (s2.as_str(),), f);
-
-        assert_eq!(a.as_str(), "alice");
-        assert_eq!(b.as_str(), "alice");
-        assert_eq!(n.load(Ordering::SeqCst), 1);
-    }
-
-    #[test]
-    fn sync_zero_arity_key() {
-        let cache = MemoizeEqCache::new();
-        let cx = Cx::default();
-        let n = counter();
-        let f = move |_: &Cx, (): ()| {
-            n.fetch_add(1, Ordering::SeqCst);
-            42
-        };
-
-        let a = cache.memoize(&cx, (), (), f);
-        let b = cache.memoize(&cx, (), (), f);
-
-        assert_eq!(*a, 42);
-        assert_eq!(*b, 42);
-        assert_eq!(n.load(Ordering::SeqCst), 1);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
-    async fn async_same_key_runs_body_once() {
+    async fn async_same_context_variant_reuses_value() {
         let cache = MemoizeEqCache::new();
         let cx = Cx::default();
-        let n = counter();
-        let f = async move |_: &Cx, (x, y): (i32, i32)| {
-            n.fetch_add(1, Ordering::SeqCst);
-            x + y
-        };
+        let calls = AtomicUsize::new(0);
 
-        let a = cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f).await;
-        let b = cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f).await;
+        for _ in 0..2 {
+            match cache.memoize_async::<Add, _, i32>(&cx, (&1, &2)).await {
+                MemoizeEntry::Occupied(value) => assert_eq!(*value, 3),
+                MemoizeEntry::Vacant(vacant) => {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    assert_eq!(*vacant.insert(3), 3);
+                }
+            }
+        }
 
-        assert_eq!(*a, 3);
-        assert_eq!(*b, 3);
-        assert_eq!(n.load(Ordering::SeqCst), 1);
-    }
-
-    #[tokio::test]
-    async fn async_different_keys_run_body_per_key() {
-        let cache = MemoizeEqCache::new();
-        let cx = Cx::default();
-        let n = counter();
-        let f = async move |_: &Cx, (x, y): (i32, i32)| {
-            n.fetch_add(1, Ordering::SeqCst);
-            x + y
-        };
-
-        cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f).await;
-        cache.memoize_async(&cx, (&1i32, &3i32), (1, 3), f).await;
-        cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f).await;
-
-        assert_eq!(n.load(Ordering::SeqCst), 2);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 }

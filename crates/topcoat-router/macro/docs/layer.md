@@ -10,7 +10,7 @@ When several layers wrap a handler, they nest from least specific (outermost) to
 
 # Handler signature
 
-The function is `async` and takes [`cx: &mut CxBuilder`](../context/struct.CxBuilder.html), the request [`body: Body`](struct.Body.html), and a [`next: Next<'_>`](struct.Next.html), returning `Result<T>` where `T` implements [`IntoResponse`](trait.IntoResponse.html). Call [`next.run(cx, body)`](struct.Next.html#method.run) to invoke the inner layers and ultimately the handler. Returning without calling `next.run` short-circuits the request: the layer's return value becomes the response.
+The function is `async` and takes [`cx: &Cx`](../context/struct.Cx.html), the request [`body: Body`](struct.Body.html), and a [`next: Next<'_>`](struct.Next.html), returning `Result<T>` where `T` implements [`IntoResponse`](trait.IntoResponse.html). Call [`next.run(cx, body)`](struct.Next.html#method.run) to invoke the inner layers and ultimately the handler. Pass a child context from [`cx.with(value)`](../context/struct.Cx.html#method.with) to limit a binding to the wrapped subtree. Returning without calling `next.run` short-circuits the request: the layer's return value becomes the response.
 
 # Examples
 
@@ -19,12 +19,12 @@ Explicit path:
 ```rust
 use topcoat::{
     Result,
-    context::CxBuilder,
+    context::Cx,
     router::{Body, Next, Response, layer},
 };
 
 #[layer("/")]
-async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
+async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let start = std::time::Instant::now();
     let response = next.run(cx, body).await?;
     println!("handled in {:?}", start.elapsed());
@@ -35,9 +35,9 @@ async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Respon
 Module-derived path (in `src/app/api.rs` under `module_router!()`, this wraps every request under `/api`):
 
 ```rust
-# use topcoat::{Result, context::CxBuilder, router::{Body, Next, Response, layer}};
+# use topcoat::{Result, context::Cx, router::{Body, Next, Response, layer}};
 #[layer]
-async fn api_log(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
+async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;
     println!("API response: {}", response.status());
     Ok(response)

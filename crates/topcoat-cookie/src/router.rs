@@ -1,7 +1,7 @@
-use topcoat_core::context::CxBuilder;
+use topcoat_core::context::Cx;
 use topcoat_router::{Body, Layer, LayerFuture, Next, Path, RouterBuilder};
 
-use crate::{CookieJarCell, write_cookies};
+use crate::{CookieJarCell, write_cookie_jar};
 
 /// A router layer that makes cookies available for the current request and
 /// writes pending cookie changes onto the response.
@@ -21,12 +21,12 @@ impl Layer for CookieLayer {
         Path::new("/")
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
-            cx.insert(CookieJarCell::new());
+            let cookies = cx.insert(CookieJarCell::new());
 
             let mut response = next.run(cx, body).await?;
-            write_cookies(cx, response.headers_mut());
+            write_cookie_jar(cookies, response.headers_mut());
             Ok(response)
         })
     }

@@ -1,3 +1,5 @@
+pub use crate::memoize::{AsyncVacant, MemoizeEntry, SyncVacant};
+
 /// Converts a borrowed memoized `Option` or `Result` into the ergonomic
 /// borrowed shape exposed by `#[memoize]`.
 ///

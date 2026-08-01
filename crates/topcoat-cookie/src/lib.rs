@@ -305,7 +305,11 @@ pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
 /// incoming `Cookie` header at all.
 #[doc(hidden)]
 pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
-    let Some(jar) = request_context::<CookieJarCell>(cx).get() else {
+    write_cookie_jar(request_context(cx), headers);
+}
+
+pub(crate) fn write_cookie_jar(cookies: &CookieJarCell, headers: &mut http::HeaderMap) {
+    let Some(jar) = cookies.get() else {
         return;
     };
     for value in jar.delta_headers() {

@@ -76,6 +76,7 @@ impl PageFn {
     }
 
     /// Renders the page, returning a [`Result`].
+    #[must_use]
     pub fn render<'cx>(
         &self,
         cx: &'cx Cx,
@@ -122,6 +123,7 @@ impl LayoutFn {
     }
 
     /// Renders the layout, embedding the given child content [`Result`]`<`[`View`]`>` as its slot.
+    #[must_use]
     pub fn render<'cx>(
         &self,
         cx: &'cx Cx,

@@ -2,8 +2,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 /// A unique identifier for a [`Cx`].
 ///
-/// Every [`Cx`] is assigned a distinct `CxId` when it is created, making it
-/// cheap to compare and hash. Retrieve a context's id with [`Cx::id`].
+/// Every request context scope is assigned a distinct `CxId`, making it cheap
+/// to compare and hash. Retrieve a context's id with [`Cx::id`].
 ///
 /// [`Cx`]: crate::context::Cx
 /// [`Cx::id`]: crate::context::Cx::id

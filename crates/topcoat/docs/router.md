@@ -67,17 +67,17 @@ A layout applies to every page whose path starts with the layout's path: a layou
 
 # Layers
 
-A layer wraps request handling under its path prefix. It receives a mutable request context, the request body, and [`Next`], which represents the remaining layers and the handler:
+A layer wraps request handling under its path prefix. It receives the request context, the request body, and [`Next`], which represents the remaining layers and the handler:
 
 ```rust
 use topcoat::{
     Result,
-    context::CxBuilder,
+    context::Cx,
     router::{Body, Next, Response, layer},
 };
 
 #[layer("/")]
-async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
+async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let start = std::time::Instant::now();
     let response = next.run(cx, body).await?;
     println!("handled in {:?}", start.elapsed());
@@ -256,10 +256,10 @@ See the [`view!`](crate::view::view!) macro docs for the full placement and prec
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
 
 ```rust
-# use topcoat::{Result, context::CxBuilder, router::{Body, Next, Response, layer, layout, page, route}, view::view};
+# use topcoat::{Result, context::Cx, router::{Body, Next, Response, layer, layout, page, route}, view::view};
 # #[layout("/")] async fn root_layout(slot: Result) -> Result { view! { (slot?) } }
 # #[layout("/settings")] async fn settings_layout(slot: Result) -> Result { view! { (slot?) } }
-# #[layer("/")] async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
+# #[layer("/")] async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
 # #[page("/")] async fn home() -> Result { view! { <h1>"Home"</h1> } }
 # #[page("/about")] async fn about() -> Result { view! { <h1>"About"</h1> } }
 # #[page("/settings/profile")] async fn profile() -> Result { view! { <h1>"Profile"</h1> } }
@@ -340,7 +340,7 @@ With the `tower` feature enabled, the [`tower`](mod@tower) module bridges the to
 ```rust
 use topcoat::{
     Result,
-    context::CxBuilder,
+    context::Cx,
     router::{Body, Next, Response, Router, content::Json, layer, layout, page, route},
     view::view,
 };
@@ -367,7 +367,7 @@ async fn root_layout(slot: Result) -> Result {
 }
 
 #[layer("/api")]
-async fn api_log(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
+async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;
     println!("API response: {}", response.status());
     Ok(response)

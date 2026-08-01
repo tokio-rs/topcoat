@@ -1,4 +1,4 @@
-[`Cx`] is Topcoat's request context. Pages, layouts, components, and routes can take it as an optional parameter when they need request-scoped information.
+[`Cx`] is Topcoat's request context. Pages, layouts, components, routes, and layers can take it when they need request-scoped information.
 
 Add `cx: &Cx` to the function signature when needed; leave it out when the function does not need request context. Topcoat passes it automatically when the parameter is present.
 
@@ -123,9 +123,63 @@ fn current_customer(cx: &Cx) -> Option<&Customer> {
 }
 ```
 
+# Request context scopes
+
+[`Cx::insert`] adds a value to the current request scope. It returns the exact binding it installed, so a layer can keep using its value after the inner chain runs:
+
+```rust
+use topcoat::context::Cx;
+
+struct RequestLog;
+
+fn install_request_log(cx: &Cx) -> &RequestLog {
+    cx.insert(RequestLog)
+}
+```
+
+Inserting the same type again changes subsequent lookups in that scope and descendants that do not shadow it. Existing references remain valid until the request ends. `Cx` does not provide mutable access to stored values; use a `Mutex`, atomic, or another interior-mutable type when callers must update one binding in place.
+
+[`Cx::with`] creates a child scope without changing its parent. The nearest binding of a type wins:
+
+```rust
+use topcoat::context::{Cx, request_context};
+
+#[derive(Debug, PartialEq, Eq)]
+struct HeadingLevel(u8);
+
+fn render_section(cx: &Cx) {
+    let section_cx = cx.with(HeadingLevel(2));
+
+    assert_eq!(request_context::<HeadingLevel>(&section_cx), &HeadingLevel(2));
+    assert!(topcoat::context::try_request_context::<HeadingLevel>(cx).is_none());
+}
+```
+
+Pass `&section_cx` to a helper, component, or [`Next::run`](crate::router::Next::run) to make the binding visible to that subtree. A scoped context can cross an `.await`, but it borrows its parent and cannot move into detached work that requires `'static`.
+
+[`Cx::with_values`] puts two through twelve values in one child scope:
+
+```rust
+use topcoat::context::{Cx, request_context};
+
+#[derive(Debug, PartialEq, Eq)]
+struct HeadingLevel(u8);
+#[derive(Debug, PartialEq, Eq)]
+struct SectionId(&'static str);
+
+fn render_section(cx: &Cx) {
+    let section_cx = cx.with_values((HeadingLevel(2), SectionId("security")));
+
+    assert_eq!(request_context::<HeadingLevel>(&section_cx), &HeadingLevel(2));
+    assert_eq!(request_context::<SectionId>(&section_cx), &SectionId("security"));
+}
+```
+
+Each tuple element is a separate binding, and duplicate element types panic. `cx.with((a, b))` instead stores the tuple itself as one binding.
+
 # Memoization
 
-[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. See its documentation for the details.
+[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments and the request-context bindings it reads. Wrap the request helpers above with it so repeated calls across a layout, page, and nested components share work when their observed context is unchanged. See its documentation for details.
 
 # Composing helpers
 

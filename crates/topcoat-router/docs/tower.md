@@ -34,6 +34,8 @@ let router = Router::builder()
     .build();
 ```
 
+Request changes made by tower middleware are visible to the Topcoat layers and route wrapped by that `TowerLayer`. They use a child request context and do not change the context seen by outer layers.
+
 # Errors
 
 An error produced by wrapped topcoat routes (a 404, a handler error) passes through a [`TowerLayer`]'s middleware and leaves it as the original error value, so outer layers and layouts can still catch it by type. An error a tower service produces itself (middleware timing out, a mounted service failing) surfaces as a [`TowerServiceError`]; unmapped, the router renders it as a 500.

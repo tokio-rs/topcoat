@@ -1,4 +1,4 @@
-The `#[memoize]` attribute caches the result of a function for the duration of a single request, keyed by its arguments. Call the same function twice with the same arguments inside one request and the body runs only once: the second call returns the cached value.
+The `#[memoize]` attribute caches the result of a function for the duration of one request, keyed by its arguments and the request-context bindings it reads. A second call reuses a result when its arguments match and those observed bindings are unchanged.
 
 This is the per-request equivalent of memoization in libraries like React's `cache`: it's not a global cache and it's not persisted across requests. Each new request starts with an empty cache.
 
@@ -48,7 +48,7 @@ async fn fetch_post(cx: &Cx, slug: &str) -> Post {
 }
 ```
 
-For async functions, concurrent callers with the same arguments share a single in-flight future. If two parts of your page render in parallel and both call `fetch_post(cx, "hello")`, the database is queried once and both callers await the same result.
+For async functions, one body runs at a time for each argument key. Concurrent callers with the same context bindings share its result. A caller whose context resolves an observed type differently waits, checks the completed result, then computes and stores another variant when needed. Calls with different argument keys can run in parallel.
 
 # What gets cached
 
@@ -70,6 +70,41 @@ add(cx, 1, 3); // prints "computing", returns 4 (different args)
 ```
 
 Each `#[memoize]` function has its own independent cache slot, so two functions with the same argument types don't collide.
+
+# Request context dependencies
+
+Calls to `request_context` and `try_request_context` become cache dependencies. An unrelated scoped value does not prevent reuse, while shadowing an observed type selects another result:
+
+```rust
+# use topcoat::context::{Cx, memoize, request_context};
+#[derive(Clone, Copy)]
+struct DocsVersion(&'static str);
+struct HeadingLevel(u8);
+
+#[memoize]
+fn docs_path(cx: &Cx, page: &str) -> String {
+    let version = request_context::<DocsVersion>(cx);
+    format!("/{}/{page}", version.0)
+}
+
+# fn example(cx: &Cx) {
+let stable = cx.with(DocsVersion("stable"));
+let section = stable.with(HeadingLevel(2));
+let next = stable.with(DocsVersion("next"));
+
+docs_path(&stable, "router");  // computes stable
+docs_path(&section, "router"); // reuses stable
+docs_path(&next, "router");    // computes next
+# }
+```
+
+Bindings are matched by identity, not `PartialEq`. Two sibling scopes that each contain `DocsVersion("stable")` hold distinct bindings and compute distinct variants. Create one shared scope above sibling calls when they should reuse a result.
+
+An optional lookup that finds no value records that absence. Adding the type later prevents reuse of the result that observed it missing. App-context reads do not add dependencies because app context is immutable for the request.
+
+Dependencies from nested memoized calls propagate to their caller, including when the nested call is a cache hit. Bindings created in a child scope inside the outer function are not outer inputs, so they are excluded from the outer result's dependencies.
+
+Each outermost call captures a request-context revision before checking the cache or waiting. Its body and any waiter continue to resolve ancestor bindings at that revision if another task inserts a newer binding while work is in flight.
 
 # Borrowed and owned arguments
 
@@ -105,6 +140,7 @@ The macro enforces these at compile time:
 - For an owned argument of type `P`: `P: Clone + Hash + Eq + Send + Sync + 'static`.
 - For a borrowed argument of type `&P`: `P: ToOwned` with `P::Owned: Hash + Eq + Send + Sync + 'static`.
 - The return type `T` must be `Send + Sync + 'static`.
+- Calling `Cx::insert` from the memoized body panics. `Cx::with` and `Cx::with_values` remain available.
 
 Most everyday types (`i32`, `String`, `&str`, `Uuid`, your own `#[derive(Hash, Eq, PartialEq, Clone)]` structs) satisfy these out of the box.
 

@@ -63,6 +63,7 @@ impl View {
         doc = "Status codes and headers declared in the view are discarded;",
         doc = "[`render_response`](Self::render_response) collects them."
     )]
+    #[must_use]
     pub fn render(&self, cx: &Cx) -> String {
         let mut buf = String::with_capacity(self.part.size_hint());
         let mut f = Formatter::new(&mut buf);
