@@ -117,12 +117,12 @@ A layer uses its module path as a prefix:
 // src/app/api.rs: wraps handlers under /api
 use topcoat::{
     Result,
-    context::CxBuilder,
+    context::Cx,
     router::{Body, Next, layer, response::Response},
 };
 
 #[layer]
-async fn api_log(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
+async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;
     println!("API response: {}", response.status());
     Ok(response)

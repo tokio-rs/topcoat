@@ -1,14 +1,15 @@
 //! Type-keyed values made available through the request context.
 //!
 //! [`ContextMap`] is a type-keyed map of values, looked up by their [`TypeId`](std::any::TypeId).
-//! Each [`Cx`] carries two of them:
+//! It stores router-wide app context and stages root values for
+//! [`CxTestBuilder`](super::CxTestBuilder):
 //!
 //! - **App context** is registered once at startup and shared across every request handled by the
 //!   router. Within a request, [`app_context`] retrieves a required value and [`try_app_context`]
 //!   retrieves an optional value by its type.
-//! - **Request context** is scoped to a single request and dropped when the request ends. Within a
-//!   request, [`request_context`] retrieves a required value and [`try_request_context`] retrieves
-//!   an optional value by its type.
+//! - **Request context** is scoped to one request and may be shadowed by child scopes. Within a
+//!   request, [`request_context`] retrieves the nearest required value and [`try_request_context`]
+//!   retrieves the nearest optional value by its type.
 
 use std::any::{Any, type_name};
 
@@ -66,6 +67,7 @@ where
 /// }
 /// ```
 #[track_caller]
+#[must_use]
 pub fn app_context<T>(cx: &Cx) -> &T
 where
     T: Any + Send + Sync,
@@ -82,10 +84,9 @@ where
 /// Returns a reference to the request context value of type `T` registered on
 /// the current request's [`Cx`], or `None` if no such value has been registered.
 ///
-/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may
-/// have at most one registered value per request. Request context lives only
-/// for the duration of the request that owns it; once the request completes,
-/// every value is dropped.
+/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId). The nearest
+/// scoped binding wins, followed by the request root. Every request value is
+/// dropped when its request completes.
 ///
 /// # Examples
 ///
@@ -103,16 +104,15 @@ pub fn try_request_context<T>(cx: &Cx) -> Option<&T>
 where
     T: Any + Send + Sync,
 {
-    cx.request_context.get::<T>()
+    cx.request_value::<T>()
 }
 
 /// Returns a reference to the request context value of type `T` registered on
 /// the current request's [`Cx`].
 ///
-/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may have at most one
-/// registered value per request. Request context lives only for the duration of
-/// the request that owns it; once the request completes, every value is
-/// dropped.
+/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId). The nearest
+/// scoped binding wins, followed by the request root. Every request value is
+/// dropped when its request completes.
 ///
 /// # Panics
 ///
@@ -131,6 +131,7 @@ where
 /// }
 /// ```
 #[track_caller]
+#[must_use]
 pub fn request_context<T>(cx: &Cx) -> &T
 where
     T: Any + Send + Sync,
@@ -147,9 +148,9 @@ where
 /// A type-keyed container of values.
 ///
 /// Each registered value is stored under its [`TypeId`](std::any::TypeId), so a given type can
-/// only be registered once per `ContextMap`. Used by [`Cx`] to hold both the
-/// router-wide app context and the per-request request context; values are
-/// retrieved within a request via [`app_context`], [`try_app_context`],
+/// only be registered once per `ContextMap`. It is used for router-wide app
+/// context and while building test contexts; values are retrieved within a
+/// request via [`app_context`], [`try_app_context`],
 /// [`request_context`], or [`try_request_context`].
 #[derive(Default, Debug)]
 pub struct ContextMap {
@@ -205,6 +206,10 @@ impl ContextMap {
         T: Any + Send + Sync,
     {
         self.entries.get_mut::<T>()
+    }
+
+    pub(crate) fn into_values(self) -> impl Iterator<Item = Box<dyn Any + Send + Sync>> {
+        self.entries.into_raw().into_values()
     }
 }
 

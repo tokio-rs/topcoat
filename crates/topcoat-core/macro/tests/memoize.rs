@@ -1,6 +1,11 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 
-use topcoat::context::{Cx, memoize};
+use topcoat::context::{
+    Cx, CxTestBuilder, app_context, memoize, request_context, try_request_context,
+};
 
 #[tokio::test]
 async fn sync_memoized_function_runs_body_once_per_key_per_request() {
@@ -84,6 +89,21 @@ async fn async_memoized_function_returns_stable_reference() {
     assert!(std::ptr::eq(first.as_ptr(), second.as_ptr()));
 }
 
+#[test]
+fn memoized_futures_are_send() {
+    fn assert_send<T: Send>(_: T) {}
+
+    #[memoize]
+    async fn value(cx: &Cx) -> usize {
+        let _ = cx;
+        tokio::task::yield_now().await;
+        1
+    }
+
+    let cx = Cx::default();
+    assert_send(value(&cx));
+}
+
 #[tokio::test]
 async fn memoized_option_return_is_borrowed_ergonomically() {
     static CALLS: AtomicUsize = AtomicUsize::new(0);
@@ -135,6 +155,511 @@ async fn separate_memoized_functions_have_independent_caches() {
 
     assert_eq!(A_CALLS.load(Ordering::SeqCst), 1);
     assert_eq!(B_CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Version(u8);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct HeadingLevel(u8);
+
+#[memoize]
+fn selected_version(cx: &Cx) -> u8 {
+    request_context::<Version>(cx).0
+}
+
+#[memoize]
+fn outer_version(cx: &Cx) -> u8 {
+    *selected_version(cx)
+}
+
+#[memoize]
+fn inner_heading(cx: &Cx) -> u8 {
+    request_context::<HeadingLevel>(cx).0
+}
+
+#[memoize]
+fn scoped_heading(cx: &Cx) -> u8 {
+    let section = cx.with(HeadingLevel(2));
+    *inner_heading(&section)
+}
+
+#[test]
+fn context_binding_identity_selects_and_retains_variants() {
+    let cx = Cx::default();
+    let first = cx.with(Version(1));
+    let second = cx.with(Version(2));
+
+    let first_value = selected_version(&first);
+    let second_value = selected_version(&second);
+    let first_again = selected_version(&first);
+
+    assert_eq!((*first_value, *second_value), (1, 2));
+    assert!(std::ptr::eq(first_value, first_again));
+}
+
+#[test]
+fn equal_values_in_sibling_scopes_have_distinct_variants() {
+    let cx = Cx::default();
+    let first = cx.with(Version(1));
+    let second = cx.with(Version(1));
+
+    let first_value = selected_version(&first);
+    let second_value = selected_version(&second);
+
+    assert_eq!((*first_value, *second_value), (1, 1));
+    assert!(!std::ptr::eq(first_value, second_value));
+}
+
+#[test]
+fn unrelated_scoped_values_do_not_prevent_reuse() {
+    let cx = Cx::default();
+    let versioned = cx.with(Version(1));
+    let section = versioned.with(HeadingLevel(2));
+
+    let first = selected_version(&versioned);
+    let second = selected_version(&section);
+
+    assert_eq!((*first, *second), (1, 1));
+    assert!(std::ptr::eq(first, second));
+}
+
+#[test]
+fn a_missing_context_read_is_invalidated_by_root_insertion() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn optional_version(cx: &Cx) -> Option<u8> {
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        try_request_context::<Version>(cx).map(|version| version.0)
+    }
+
+    let mut cx = Cx::default();
+    assert_eq!(optional_version(&cx), None);
+
+    cx.insert(Version(2));
+
+    assert_eq!(optional_version(&cx), Some(&2));
+    assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn replacing_a_root_binding_invalidates_its_readers() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn read(cx: &Cx) -> u8 {
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        request_context::<Version>(cx).0
+    }
+
+    let mut cx = CxTestBuilder::new().request_context(Version(1)).build();
+    assert_eq!(*read(&cx), 1);
+    assert_eq!(cx.insert(Version(1)), Some(Version(1)));
+    assert_eq!(*read(&cx), 1);
+
+    assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn successful_get_mut_invalidates_even_without_a_value_change() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn read(cx: &Cx) -> u8 {
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        request_context::<Version>(cx).0
+    }
+
+    let mut cx = CxTestBuilder::new().request_context(Version(1)).build();
+    assert_eq!(*read(&cx), 1);
+    let _ = cx.get_mut::<Version>().unwrap();
+    assert_eq!(*read(&cx), 1);
+
+    assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn failed_get_mut_does_not_invalidate_a_missing_read() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn read(cx: &Cx) -> Option<u8> {
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        try_request_context::<Version>(cx).map(|version| version.0)
+    }
+
+    let mut cx = Cx::default();
+    assert_eq!(read(&cx), None);
+    assert_eq!(cx.get_mut::<Version>(), None);
+    assert_eq!(read(&cx), None);
+
+    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn unrelated_root_mutation_does_not_invalidate_a_result() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn read(cx: &Cx) -> u8 {
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        request_context::<Version>(cx).0
+    }
+
+    let mut cx = CxTestBuilder::new().request_context(Version(1)).build();
+    assert_eq!(*read(&cx), 1);
+    cx.insert(HeadingLevel(2));
+    assert_eq!(*read(&cx), 1);
+
+    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn nested_memoized_calls_propagate_computed_dependencies() {
+    let cx = Cx::default();
+    let stable = cx.with(Version(1));
+    let next = cx.with(Version(2));
+
+    assert_eq!(*outer_version(&stable), 1);
+    assert_eq!(*outer_version(&next), 2);
+}
+
+#[test]
+fn nested_cache_hits_propagate_dependencies() {
+    let cx = Cx::default();
+    let stable = cx.with(Version(1));
+    let next = cx.with(Version(2));
+
+    assert_eq!(*selected_version(&stable), 1);
+    assert_eq!(*outer_version(&stable), 1);
+    assert_eq!(*outer_version(&next), 2);
+}
+
+#[test]
+fn nested_missing_cache_hits_propagate_dependencies() {
+    static OUTER_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn inner(cx: &Cx) -> bool {
+        try_request_context::<Version>(cx).is_some()
+    }
+
+    #[memoize]
+    fn outer(cx: &Cx) -> bool {
+        OUTER_CALLS.fetch_add(1, Ordering::SeqCst);
+        *inner(cx)
+    }
+
+    let mut cx = Cx::default();
+    assert!(!*inner(&cx));
+    assert!(!*outer(&cx));
+
+    cx.insert(Version(1));
+
+    assert!(*outer(&cx));
+    assert_eq!(OUTER_CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn bindings_created_inside_a_memoized_body_are_not_outer_dependencies() {
+    let cx = Cx::default();
+    let first = scoped_heading(&cx);
+    let caller_heading = cx.with(HeadingLevel(9));
+    let second = scoped_heading(&caller_heading);
+
+    assert_eq!(*first, 2);
+    assert!(std::ptr::eq(first, second));
+}
+
+#[test]
+fn internal_bindings_are_excluded_while_inherited_missing_reads_propagate() {
+    static OUTER_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn inner(cx: &Cx) -> (u8, Option<u8>) {
+        (
+            request_context::<HeadingLevel>(cx).0,
+            try_request_context::<Version>(cx).map(|version| version.0),
+        )
+    }
+
+    #[memoize]
+    fn outer(cx: &Cx) -> (u8, Option<u8>) {
+        OUTER_CALLS.fetch_add(1, Ordering::SeqCst);
+        let child = cx.with(HeadingLevel(2));
+        *inner(&child)
+    }
+
+    let mut cx = Cx::default();
+    assert_eq!(*outer(&cx), (2, None));
+
+    cx.insert(Version(9));
+
+    assert_eq!(*outer(&cx), (2, Some(9)));
+    assert_eq!(OUTER_CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn app_context_reads_are_not_dependencies() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn configured(cx: &Cx) -> u8 {
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        app_context::<Version>(cx).0
+    }
+
+    let cx = CxTestBuilder::new().app_context(Version(7)).build();
+    let first = cx.with(HeadingLevel(1));
+    let second = cx.with(HeadingLevel(2));
+
+    assert_eq!(*configured(&first), 7);
+    assert_eq!(*configured(&second), 7);
+    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn nested_reads_from_another_request_do_not_propagate() {
+    static OUTER_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    struct OtherRequest(Arc<Cx>);
+
+    #[memoize]
+    fn inner(cx: &Cx) -> u8 {
+        request_context::<Version>(cx).0
+    }
+
+    #[memoize]
+    fn outer(cx: &Cx) -> u8 {
+        OUTER_CALLS.fetch_add(1, Ordering::SeqCst);
+        *inner(&app_context::<OtherRequest>(cx).0)
+    }
+
+    let other = Arc::new(CxTestBuilder::new().request_context(Version(1)).build());
+    let cx = CxTestBuilder::new()
+        .app_context(OtherRequest(other))
+        .request_context(Version(9))
+        .build();
+
+    assert_eq!(*outer(&cx), 1);
+    let shadowed = cx.with(Version(8));
+    assert_eq!(*outer(&shadowed), 1);
+    assert_eq!(OUTER_CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn nested_hits_from_another_request_do_not_propagate() {
+    static OUTER_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    struct OtherRequest(Arc<Cx>);
+
+    #[memoize]
+    fn inner(cx: &Cx) -> u8 {
+        request_context::<Version>(cx).0
+    }
+
+    #[memoize]
+    fn outer(cx: &Cx) -> u8 {
+        OUTER_CALLS.fetch_add(1, Ordering::SeqCst);
+        *inner(&app_context::<OtherRequest>(cx).0)
+    }
+
+    let other = Arc::new(CxTestBuilder::new().request_context(Version(1)).build());
+    assert_eq!(*inner(&other), 1);
+    let cx = CxTestBuilder::new()
+        .app_context(OtherRequest(other))
+        .request_context(Version(9))
+        .build();
+
+    assert_eq!(*outer(&cx), 1);
+    let shadowed = cx.with(Version(8));
+    assert_eq!(*outer(&shadowed), 1);
+    assert_eq!(OUTER_CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn sync_panicking_computation_can_be_retried() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn flaky(cx: &Cx) -> usize {
+        let _ = cx;
+        let call = CALLS.fetch_add(1, Ordering::SeqCst);
+        assert_ne!(call, 0, "first call panics");
+        call
+    }
+
+    let cx = Cx::default();
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| flaky(&cx)));
+
+    assert!(panic.is_err());
+    assert_eq!(*flaky(&cx), 1);
+}
+
+#[test]
+fn concurrent_sync_calls_with_one_binding_share_computation() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn slow(cx: &Cx) -> usize {
+        let _ = cx;
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        7
+    }
+
+    let cx = Cx::default();
+    std::thread::scope(|scope| {
+        let first = scope.spawn(|| *slow(&cx));
+        let second = scope.spawn(|| *slow(&cx));
+        assert_eq!((first.join().unwrap(), second.join().unwrap()), (7, 7));
+    });
+
+    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn different_sync_context_variants_for_one_key_run_serially() {
+    static ACTIVE: AtomicUsize = AtomicUsize::new(0);
+    static MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn selected(cx: &Cx) -> u8 {
+        let active = ACTIVE.fetch_add(1, Ordering::SeqCst) + 1;
+        MAX_ACTIVE.fetch_max(active, Ordering::SeqCst);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        ACTIVE.fetch_sub(1, Ordering::SeqCst);
+        request_context::<Version>(cx).0
+    }
+
+    let cx = Cx::default();
+    let first_cx = cx.with(Version(1));
+    let second_cx = cx.with(Version(2));
+    std::thread::scope(|scope| {
+        let first = scope.spawn(|| *selected(&first_cx));
+        let second = scope.spawn(|| *selected(&second_cx));
+        assert_eq!((first.join().unwrap(), second.join().unwrap()), (1, 2));
+    });
+
+    assert_eq!(MAX_ACTIVE.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn concurrent_calls_with_one_binding_share_computation() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    async fn selected(cx: &Cx) -> u8 {
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        tokio::task::yield_now().await;
+        request_context::<Version>(cx).0
+    }
+
+    let cx = Cx::default();
+    let versioned = cx.with(Version(1));
+    let (first, second) = tokio::join!(selected(&versioned), selected(&versioned));
+
+    assert_eq!((*first, *second), (1, 1));
+    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn different_context_variants_for_one_key_run_serially() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    static ACTIVE: AtomicUsize = AtomicUsize::new(0);
+    static MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    async fn selected(cx: &Cx) -> u8 {
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        let active = ACTIVE.fetch_add(1, Ordering::SeqCst) + 1;
+        MAX_ACTIVE.fetch_max(active, Ordering::SeqCst);
+        tokio::task::yield_now().await;
+        ACTIVE.fetch_sub(1, Ordering::SeqCst);
+        request_context::<Version>(cx).0
+    }
+
+    let cx = Cx::default();
+    let stable = cx.with(Version(1));
+    let next = cx.with(Version(2));
+    let (first, second) = tokio::join!(selected(&stable), selected(&next));
+
+    assert_eq!((*first, *second), (1, 2));
+    assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+    assert_eq!(MAX_ACTIVE.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn different_argument_keys_run_concurrently() {
+    static ACTIVE: AtomicUsize = AtomicUsize::new(0);
+    static MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    async fn keyed(cx: &Cx, key: u8) -> u8 {
+        let _ = cx;
+        let active = ACTIVE.fetch_add(1, Ordering::SeqCst) + 1;
+        MAX_ACTIVE.fetch_max(active, Ordering::SeqCst);
+        tokio::task::yield_now().await;
+        ACTIVE.fetch_sub(1, Ordering::SeqCst);
+        key
+    }
+
+    let cx = Cx::default();
+    let (first, second) = tokio::join!(keyed(&cx, 1), keyed(&cx, 2));
+
+    assert_eq!((*first, *second), (1, 2));
+    assert_eq!(MAX_ACTIVE.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn cancelled_computation_stores_nothing_and_can_be_retried() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    async fn cancellable(cx: &Cx) -> usize {
+        let _ = cx;
+        let call = CALLS.fetch_add(1, Ordering::SeqCst);
+        if call == 0 {
+            std::future::pending().await
+        } else {
+            call
+        }
+    }
+
+    let cx = Cx::default();
+    {
+        let first = cancellable(&cx);
+        tokio::pin!(first);
+        tokio::select! {
+            biased;
+            _ = &mut first => panic!("the first computation should stay pending"),
+            () = tokio::task::yield_now() => {}
+        }
+    }
+
+    assert_eq!(*cancellable(&cx).await, 1);
+    assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn async_panicking_computation_can_be_retried() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    async fn flaky(cx: &Cx) -> usize {
+        let _ = cx;
+        let call = CALLS.fetch_add(1, Ordering::SeqCst);
+        assert_ne!(call, 0, "first call panics");
+        call
+    }
+
+    let cx = Arc::new(Cx::default());
+    let worker_cx = cx.clone();
+    let worker = tokio::spawn(async move { *flaky(&worker_cx).await });
+
+    assert!(worker.await.is_err());
+    assert_eq!(*flaky(&cx).await, 1);
 }
 
 #[tokio::test]

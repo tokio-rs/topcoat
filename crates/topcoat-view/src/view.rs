@@ -68,6 +68,7 @@ impl View {
     /// Panics if a dynamic attribute key or element name in the view contains
     /// a character that could break out of the identifier.
     #[track_caller]
+    #[must_use]
     pub fn render(&self, cx: &Cx) -> String {
         let mut buf = String::with_capacity(self.part.size_hint());
         let mut f = Formatter::new(&mut buf);

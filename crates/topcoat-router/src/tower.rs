@@ -11,7 +11,7 @@ use std::{
 use bytes::Bytes;
 use tokio::sync::{mpsc, oneshot};
 use topcoat_core::{
-    context::{Cx, CxBuilder},
+    context::Cx,
     error::{Error, Result},
 };
 use tower::ServiceExt;
@@ -212,7 +212,7 @@ where
         &self.path
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         // Clones of a tower service share its cross-request state (semaphores,
         // rate-limit windows) through the service's internal handles.
         let service = self.service.clone();
@@ -484,7 +484,7 @@ mod tests {
     };
 
     use http::{HeaderValue, StatusCode, request::Parts};
-    use topcoat_core::context::Cx;
+    use topcoat_core::context::{Cx, request_context, try_request_context};
 
     use super::*;
     use crate::{
@@ -507,19 +507,19 @@ mod tests {
     }
 
     /// Builds a request context carrying the parts of a GET request to `uri`.
-    fn cx_for(uri: &str) -> CxBuilder {
+    fn cx_for(uri: &str) -> Cx {
         let (parts, ()) = http::Request::builder()
             .uri(uri)
             .body(())
             .unwrap()
             .into_parts();
-        let mut cx = CxBuilder::default();
+        let mut cx = Cx::default();
         cx.insert(parts);
         cx
     }
 
     /// Runs a request through `layer` wrapped directly around `route`.
-    fn run(layer: &dyn Layer, cx: &mut CxBuilder, route: &RouteFn) -> Result<Response> {
+    fn run(layer: &dyn Layer, cx: &mut Cx, route: &RouteFn) -> Result<Response> {
         let layers = Layers::default();
         let next = Next::new(&layers, &[], Terminal::Route(route));
         block_on(layer.handle(cx, Body::empty(), next))
@@ -839,7 +839,11 @@ mod tests {
         // The route saw the header the middleware added, and the modified
         // request was written back to the context.
         assert_eq!(&body_bytes(response)[..], b"marked");
-        assert!(cx.get::<Parts>().unwrap().headers.contains_key("x-tower"));
+        assert!(
+            request_context::<Parts>(&cx)
+                .headers
+                .contains_key("x-tower")
+        );
     }
 
     #[test]
@@ -865,7 +869,7 @@ mod tests {
         assert_eq!(&body_bytes(response)[..], b"short");
         // The chain never ran, so the parts stay on the context for outer
         // layers and error rendering.
-        assert!(cx.get::<Parts>().is_some());
+        assert!(try_request_context::<Parts>(&cx).is_some());
     }
 
     #[test]

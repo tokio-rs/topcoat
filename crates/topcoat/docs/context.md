@@ -89,14 +89,14 @@ async fn post(cx: &Cx) -> Result {
 
 Any function with `&Cx` can read these values.
 
-# App and request context helpers
+# App, request, and scoped context
 
 This module exposes typed context accessors:
 
 - [`app_context::<T>(cx)`](app_context) reads a required value registered on the router with `.app_context(value)`.
 - [`try_app_context::<T>(cx)`](try_app_context) reads an optional value registered on the router.
-- [`request_context::<T>(cx)`](request_context) reads a required typed value attached to the current request.
-- [`try_request_context::<T>(cx)`](try_request_context) reads an optional typed value attached to the current request.
+- [`request_context::<T>(cx)`](request_context) reads the nearest required request or scoped value.
+- [`try_request_context::<T>(cx)`](try_request_context) reads the nearest optional request or scoped value.
 
 ```rust
 use topcoat::context::{Cx, app_context};
@@ -122,9 +122,58 @@ fn current_customer(cx: &Cx) -> Option<&Customer> {
 }
 ```
 
+Use [`Cx::with`] to create a child context that adds or shadows one value. The child borrows its parent and owns the new binding:
+
+```rust
+use topcoat::context::{Cx, request_context};
+
+#[derive(Debug, PartialEq)]
+struct HeadingLevel(u8);
+
+fn section(cx: &Cx) {
+    let section_cx = cx.with(HeadingLevel(2));
+
+    assert_eq!(request_context::<HeadingLevel>(&section_cx), &HeadingLevel(2));
+    assert_eq!(try_request_context::<HeadingLevel>(cx), None);
+}
+# use topcoat::context::try_request_context;
+```
+
+[`Cx::with_values`] adds each element of a tuple as a separate binding. It accepts tuples of two through twelve values and panics if one call contains duplicate types. `cx.with((a, b))` is different: it stores `(a, b)` as one tuple binding.
+
+Request lookup starts at the nearest scope, continues through its parents, and checks the request root last. Other types remain inherited when one type is shadowed. Dropping a [`CxScope`] removes that scope from reach without changing its parent.
+
+# Mutating the request root
+
+Layers receive `&mut Cx` and can register root values with [`Cx::insert`] before calling [`Next::run`](crate::router::Next::run). `insert` returns the displaced value. [`Cx::get_mut`] returns mutable access to an existing root value.
+
+```rust
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{Body, Next, layer, response::Response},
+};
+
+struct RequestFacility;
+
+#[layer("/")]
+async fn facility(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+    cx.insert(RequestFacility);
+    let response = next.run(cx, body).await?;
+
+    // Root mutation is available again after the inner chain completes.
+    let _ = cx.get_mut::<RequestFacility>();
+    Ok(response)
+}
+```
+
+A scoped context provides shared access only. A layer can use a scope for its own local work, but [`Next::run`](crate::router::Next::run) requires the mutable root. Rust also prevents root mutation while a scope, a context value reference, a memoized result, or a memoized future may still be used.
+
 # Memoization
 
-[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. See its documentation for the details.
+[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments and the request-context bindings it reads. A scoped binding has its own identity, even when its value equals another binding. Root insertion and successful mutable access give the affected type a fresh identity, so only results that read that type stop matching.
+
+Nested memoized calls carry their observed dependencies into their caller, including on cache hits. A binding created inside the outer function is not one of the outer function's inputs and does not become an outer dependency. App context is immutable for the request and is not tracked. See the macro documentation for concurrency and caching details.
 
 # Composing helpers
 

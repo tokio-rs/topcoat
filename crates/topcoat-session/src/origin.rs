@@ -1,4 +1,4 @@
-use topcoat_core::context::{Cx, CxBuilder};
+use topcoat_core::context::Cx;
 use topcoat_router::{
     Body, Layer, LayerFuture, Method, Next, Path,
     error::{ForbiddenError, forbidden},
@@ -122,7 +122,7 @@ impl Layer for OriginLayer {
         Path::new("/")
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         match verify_origin(cx) {
             Ok(()) => next.run(cx, body),
             Err(error) => Box::pin(async move { Err(error.into()) }),
