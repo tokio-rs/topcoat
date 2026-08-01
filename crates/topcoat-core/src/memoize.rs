@@ -1,4 +1,5 @@
 mod eq_cache;
+mod recursion;
 
 pub use eq_cache::*;
 

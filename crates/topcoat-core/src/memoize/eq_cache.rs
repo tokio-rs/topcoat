@@ -5,69 +5,20 @@ use std::{
     hash::Hash,
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    sync::{
-        Mutex, OnceLock,
-        atomic::{AtomicPtr, Ordering},
-    },
+    sync::{Mutex, OnceLock},
 };
 
 use hashbrown::{Equivalent, HashMap};
 use tokio::sync::OnceCell;
 
+use super::recursion;
 use crate::context::Cx;
 
-// Its address identifies the synchronous call stack or async poll currently running on a thread.
-std::thread_local!(static INITIALIZATION_TOKEN: u8 = const { 0 });
-
-/// A cached value and the token currently running its initializer, if any.
+/// A cached value and the guard detecting recursive initialization of it.
 #[derive(Default)]
 struct MemoizeCell<T> {
     value: T,
-    // This is recursion metadata, not the initialization lock. `OnceLock::get_or_init` and
-    // `OnceCell::get_or_init` select one initializer at a time, so only the active initializer
-    // writes `owner`.
-    //
-    // Relaxed ordering is enough because this pointer publishes no data. A recursive read happens
-    // on the initializing thread after its own store. A caller on another thread may see null or a
-    // foreign token, but either result safely falls through to the once cell for synchronization.
-    owner: AtomicPtr<u8>,
-}
-
-impl<T> MemoizeCell<T> {
-    #[inline]
-    fn assert_not_recursive<F>(&self) {
-        let owner = self.owner.load(Ordering::Relaxed);
-        if !owner.is_null()
-            && INITIALIZATION_TOKEN.with(|token| owner == std::ptr::from_ref(token).cast_mut())
-        {
-            panic!(
-                "recursive `#[memoize]` initialization of `{}` with the same arguments",
-                std::any::type_name::<F>()
-            );
-        }
-    }
-
-    #[inline]
-    fn scope<R>(&self, f: impl FnOnce() -> R) -> R {
-        INITIALIZATION_TOKEN.with(|token| {
-            debug_assert!(self.owner.load(Ordering::Relaxed).is_null());
-            self.owner
-                .store(std::ptr::from_ref(token).cast_mut(), Ordering::Relaxed);
-            let _guard = InitializationGuard { owner: &self.owner };
-            f()
-        })
-    }
-}
-
-struct InitializationGuard<'a> {
-    owner: &'a AtomicPtr<u8>,
-}
-
-impl Drop for InitializationGuard<'_> {
-    #[inline]
-    fn drop(&mut self) {
-        self.owner.store(std::ptr::null_mut(), Ordering::Relaxed);
-    }
+    recursion: recursion::Guard,
 }
 
 /// The per-request store backing `#[memoize]`.
@@ -138,8 +89,9 @@ impl MemoizeEqCache {
         if let Some(value) = cell.value.get() {
             return value;
         }
-        cell.assert_not_recursive::<F>();
-        cell.value.get_or_init(|| cell.scope(|| f(cx, params)))
+        cell.recursion.assert_not_recursive::<F>();
+        cell.value
+            .get_or_init(|| cell.recursion.scope(|| f(cx, params)))
     }
 
     /// Returns the already-computed value for `(F, key)`, or `None` if nothing has been
@@ -198,13 +150,13 @@ impl MemoizeEqCache {
         if let Some(value) = cell.value.get() {
             return value;
         }
-        cell.assert_not_recursive::<F>();
+        cell.recursion.assert_not_recursive::<F>();
         cell.value
             .get_or_init(|| async {
-                let mut future = std::pin::pin!(cell.scope(|| f(cx, params)));
+                let mut future = std::pin::pin!(cell.recursion.scope(|| f(cx, params)));
                 // Clear ownership after every poll so sibling futures can wait on this cell and
                 // the initializer can move between executor threads.
-                poll_fn(|task| cell.scope(|| future.as_mut().poll(task))).await
+                poll_fn(|task| cell.recursion.scope(|| future.as_mut().poll(task))).await
             })
             .await
     }
@@ -443,27 +395,6 @@ mod tests {
 
         assert!(first.is_err());
         assert_eq!(*cache.memoize(&cx, (), (), f), 42);
-    }
-
-    #[test]
-    fn initialization_on_another_thread_is_not_recursive() {
-        let cell = MemoizeCell::<()>::default();
-        let entered = std::sync::Barrier::new(2);
-        let release = std::sync::Barrier::new(2);
-
-        std::thread::scope(|scope| {
-            scope.spawn(|| {
-                cell.scope(|| {
-                    entered.wait();
-                    release.wait();
-                });
-            });
-            entered.wait();
-
-            cell.assert_not_recursive::<fn()>();
-
-            release.wait();
-        });
     }
 
     #[tokio::test]
