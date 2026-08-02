@@ -1,6 +1,8 @@
 ---
 name: macro
 description: Always use this skill before writing procedural macros for Topcoat
+metadata:
+  internal: true
 ---
 
 ## AST nodes

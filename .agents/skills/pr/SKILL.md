@@ -1,6 +1,8 @@
 ---
 name: pr
 description: Always use this skill before opening a pull request in the Topcoat repository
+metadata:
+  internal: true
 ---
 
 # Opening Pull Requests

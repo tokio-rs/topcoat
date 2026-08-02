@@ -1,6 +1,8 @@
 ---
 name: commit
 description: Always use this skill before authoring a commit message in the Topcoat repository
+metadata:
+  internal: true
 ---
 
 # Authoring Commit Messages

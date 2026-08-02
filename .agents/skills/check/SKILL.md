@@ -1,6 +1,8 @@
 ---
 name: check
 description: Always use this skill to verify a change locally before committing or opening a pull request in the Topcoat repository
+metadata:
+  internal: true
 ---
 
 # Verifying a Change

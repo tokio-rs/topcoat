@@ -1,6 +1,8 @@
 ---
 name: prose
 description: Always use this skill before writing long form markdown documentation for Topcoat.
+metadata:
+  internal: true
 ---
 
 # Prose
