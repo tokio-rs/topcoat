@@ -3,9 +3,9 @@ use std::{any::TypeId, collections::HashMap, sync::Mutex};
 use bit_set::BitSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct ContextBindingId(pub(super) usize);
+pub(super) struct Id(pub(super) usize);
 
-impl ContextBindingId {
+impl Id {
     pub(super) fn frontier(self) -> usize {
         self.0
             .checked_add(1)
@@ -14,24 +14,24 @@ impl ContextBindingId {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BindingKind {
+enum Kind {
     RootNone,
     Value,
 }
 
 #[derive(Debug, Clone, Default)]
-pub(super) struct BindingMask {
+pub(super) struct Mask {
     pub(super) bits: BitSet<usize>,
     pub(super) frontier: usize,
 }
 
-impl BindingMask {
+impl Mask {
     pub(super) fn install(
         &mut self,
-        registry: &BindingRegistry,
+        registry: &Registry,
         type_id: TypeId,
-        previous_id: Option<ContextBindingId>,
-    ) -> ContextBindingId {
+        previous_id: Option<Id>,
+    ) -> Id {
         let (root_none_id, binding_id) = registry.allocate_value(type_id);
         self.advance(registry, binding_id.frontier());
         let previous_id = previous_id.unwrap_or(root_none_id);
@@ -41,63 +41,59 @@ impl BindingMask {
         binding_id
     }
 
-    fn advance(&mut self, registry: &BindingRegistry, frontier: usize) {
+    fn advance(&mut self, registry: &Registry, frontier: usize) {
         assert!(
             frontier >= self.frontier,
             "request context binding mask cannot move backwards"
         );
         for index in self.frontier..frontier {
-            if registry.kind(ContextBindingId(index)) == BindingKind::RootNone {
+            if registry.kind(Id(index)) == Kind::RootNone {
                 self.bits.insert(index);
             }
         }
         self.frontier = frontier;
     }
 
-    pub(super) fn effectively_contains(
-        &self,
-        registry: &BindingRegistry,
-        binding_id: ContextBindingId,
-    ) -> bool {
+    pub(super) fn effectively_contains(&self, registry: &Registry, binding_id: Id) -> bool {
         if binding_id.0 < self.frontier {
             self.bits.contains(binding_id.0)
         } else {
-            registry.kind(binding_id) == BindingKind::RootNone
+            registry.kind(binding_id) == Kind::RootNone
         }
     }
 }
 
 #[derive(Debug, Default)]
-pub(super) struct BindingRegistry {
-    root_none: Mutex<HashMap<TypeId, ContextBindingId>>,
-    kinds: boxcar::Vec<BindingKind>,
+pub(super) struct Registry {
+    root_none: Mutex<HashMap<TypeId, Id>>,
+    kinds: boxcar::Vec<Kind>,
 }
 
-impl BindingRegistry {
-    pub(super) fn root_none(&self, type_id: TypeId) -> ContextBindingId {
+impl Registry {
+    pub(super) fn root_none(&self, type_id: TypeId) -> Id {
         let mut root_none = self.root_none.lock().unwrap();
         *root_none
             .entry(type_id)
-            .or_insert_with(|| self.push(BindingKind::RootNone))
+            .or_insert_with(|| self.push(Kind::RootNone))
     }
 
-    fn allocate_value(&self, type_id: TypeId) -> (ContextBindingId, ContextBindingId) {
+    fn allocate_value(&self, type_id: TypeId) -> (Id, Id) {
         let mut root_none = self.root_none.lock().unwrap();
         let root_none_id = *root_none
             .entry(type_id)
-            .or_insert_with(|| self.push(BindingKind::RootNone));
-        (root_none_id, self.push(BindingKind::Value))
+            .or_insert_with(|| self.push(Kind::RootNone));
+        (root_none_id, self.push(Kind::Value))
     }
 
-    fn push(&self, kind: BindingKind) -> ContextBindingId {
+    fn push(&self, kind: Kind) -> Id {
         self.kinds
             .count()
             .checked_add(1)
             .expect("request context binding ID overflowed");
-        ContextBindingId(self.kinds.push(kind))
+        Id(self.kinds.push(kind))
     }
 
-    fn kind(&self, binding_id: ContextBindingId) -> BindingKind {
+    fn kind(&self, binding_id: Id) -> Kind {
         *self
             .kinds
             .get(binding_id.0)
@@ -145,10 +141,7 @@ mod tests {
 
         assert_eq!(first_id, second_id);
         assert_eq!(cx.request_state.bindings.count(), 1);
-        assert_eq!(
-            cx.request_state.bindings.kind(first_id),
-            BindingKind::RootNone
-        );
+        assert_eq!(cx.request_state.bindings.kind(first_id), Kind::RootNone);
     }
 
     #[test]
@@ -180,8 +173,8 @@ mod tests {
             .root_none(TypeId::of::<Database>());
         let value_id = child.resolve_binding_id(TypeId::of::<Database>());
 
-        assert_eq!(root_none_id, ContextBindingId(0));
-        assert_eq!(value_id, ContextBindingId(1));
+        assert_eq!(root_none_id, Id(0));
+        assert_eq!(value_id, Id(1));
         assert!(
             cx.binding_mask
                 .effectively_contains(&cx.request_state.bindings, root_none_id)

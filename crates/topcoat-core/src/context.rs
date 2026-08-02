@@ -11,7 +11,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use binding::{BindingMask, BindingRegistry, ContextBindingId};
 use bit_set::BitSet;
 pub use context_map::*;
 pub use id::*;
@@ -32,7 +31,7 @@ pub struct Cx {
     app_context: Arc<ContextMap>,
     request_state: Arc<RequestState>,
     bindings: BindingMap,
-    binding_mask: BindingMask,
+    binding_mask: binding::Mask,
 }
 
 impl Cx {
@@ -52,7 +51,7 @@ impl Cx {
             app_context,
             request_state: Arc::new(RequestState::default()),
             bindings: BindingMap::new(),
-            binding_mask: BindingMask::default(),
+            binding_mask: binding::Mask::default(),
         };
         for value in values {
             let _ = cx.install_value(value);
@@ -262,7 +261,7 @@ impl Cx {
     }
 
     #[cfg(test)]
-    fn resolve_binding_id(&self, type_id: TypeId) -> ContextBindingId {
+    fn resolve_binding_id(&self, type_id: TypeId) -> binding::Id {
         self.bindings.get(&type_id).map_or_else(
             || self.request_state.bindings.root_none(type_id),
             |binding| binding.id,
@@ -407,7 +406,7 @@ impl CxTestBuilder {
 }
 
 struct ContextBinding {
-    id: ContextBindingId,
+    id: binding::Id,
     value: ContextValue,
 }
 
@@ -428,7 +427,7 @@ impl ContextBinding {
 
 #[derive(Debug, Default)]
 struct RequestState {
-    bindings: BindingRegistry,
+    bindings: binding::Registry,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
 }
@@ -440,25 +439,25 @@ pub(crate) struct ContextReadMask {
 }
 
 impl ContextReadMask {
-    fn insert(&mut self, binding_id: ContextBindingId) {
+    fn insert(&mut self, binding_id: binding::Id) {
         self.bits.insert(binding_id.0);
         self.frontier = self.frontier.max(binding_id.frontier());
     }
 
-    fn matches(&self, binding_mask: &BindingMask, registry: &BindingRegistry) -> bool {
+    fn matches(&self, binding_mask: &binding::Mask, registry: &binding::Registry) -> bool {
         if self.frontier <= binding_mask.frontier {
             self.bits.is_subset(&binding_mask.bits)
         } else {
             self.bits
                 .iter()
-                .all(|index| binding_mask.effectively_contains(registry, ContextBindingId(index)))
+                .all(|index| binding_mask.effectively_contains(registry, binding::Id(index)))
         }
     }
 }
 
 pub(crate) struct ContextTracker {
     request_state: Arc<RequestState>,
-    input: BindingMask,
+    input: binding::Mask,
     reads: Mutex<ContextReadMask>,
 }
 
@@ -481,7 +480,7 @@ impl ContextTracker {
         self.reads.lock().unwrap().clone()
     }
 
-    fn record(&self, binding_id: ContextBindingId) {
+    fn record(&self, binding_id: binding::Id) {
         if !self
             .input
             .effectively_contains(&self.request_state.bindings, binding_id)
@@ -512,7 +511,7 @@ impl Drop for TrackerScope<'_> {
     }
 }
 
-fn record_context_read(request_state: &Arc<RequestState>, binding_id: ContextBindingId) {
+fn record_context_read(request_state: &Arc<RequestState>, binding_id: binding::Id) {
     ACTIVE_TRACKERS.with(|trackers| {
         for tracker in trackers.borrow().iter() {
             if Arc::ptr_eq(&tracker.request_state, request_state) {
@@ -524,7 +523,7 @@ fn record_context_read(request_state: &Arc<RequestState>, binding_id: ContextBin
 
 pub(crate) fn replay_context_reads(cx: &Cx, reads: &ContextReadMask) {
     for index in &reads.bits {
-        record_context_read(&cx.request_state, ContextBindingId(index));
+        record_context_read(&cx.request_state, binding::Id(index));
     }
 }
 
