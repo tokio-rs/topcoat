@@ -6,7 +6,65 @@ use std::{
 
 use bit_set::BitSet;
 
-use super::ErasedBinding;
+type ErasedBinding = Arc<dyn Any + Send + Sync>;
+
+#[derive(Clone, Default)]
+pub(super) struct BindingSet {
+    entries: im::HashMap<TypeId, ErasedBinding>,
+    mask: Mask,
+}
+
+impl BindingSet {
+    pub(super) fn install_root<T>(&mut self, registry: &Registry, value: T) -> Option<T>
+    where
+        T: Any + Send + Sync,
+    {
+        let type_id = TypeId::of::<T>();
+        let previous_id = self
+            .entries
+            .get(&type_id)
+            .map(|binding| Binding::<T>::downcast(binding).id);
+        let binding_id = self.mask.install_root(registry, type_id, previous_id);
+        self.entries
+            .insert(type_id, Binding::erase(binding_id, value))
+            .map(Binding::<T>::into_value)
+    }
+
+    pub(super) fn install_scoped<T>(&mut self, registry: &Registry, value: T)
+    where
+        T: Any + Send + Sync,
+    {
+        let type_id = TypeId::of::<T>();
+        let previous_id = self
+            .entries
+            .get(&type_id)
+            .map(|binding| Binding::<T>::downcast(binding).id);
+        let binding_id = self.mask.install_scoped(registry, type_id, previous_id);
+        self.entries
+            .insert(type_id, Binding::erase(binding_id, value));
+    }
+
+    pub(super) fn get<T>(&self) -> Option<&Binding<T>>
+    where
+        T: Any + Send + Sync,
+    {
+        self.entries.get(&TypeId::of::<T>()).map(Binding::downcast)
+    }
+
+    pub(super) fn get_mut<T>(&mut self, registry: &Registry) -> Option<&mut T>
+    where
+        T: Any + Send + Sync,
+    {
+        let type_id = TypeId::of::<T>();
+        let binding = Binding::<T>::downcast_unique(self.entries.get_mut(&type_id)?);
+        binding.id = self.mask.install_root(registry, type_id, Some(binding.id));
+        Some(&mut binding.value)
+    }
+
+    pub(super) fn mask(&self) -> &Mask {
+        &self.mask
+    }
+}
 
 pub(super) struct Binding<T> {
     pub(super) id: Id,

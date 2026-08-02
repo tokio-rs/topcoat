@@ -16,9 +16,6 @@ pub use id::*;
 
 use crate::{abort::AbortStore, memoize::MemoizeCache};
 
-type ErasedBinding = Arc<dyn Any + Send + Sync>;
-type BindingMap = im::HashMap<TypeId, ErasedBinding>;
-
 /// The context for one request.
 ///
 /// Pages, layouts, components, and routes receive `&Cx` when they need
@@ -29,8 +26,7 @@ pub struct Cx {
     id: CxId,
     app_context: Arc<ContextMap>,
     request_state: Arc<RequestState>,
-    bindings: BindingMap,
-    binding_mask: binding::Mask,
+    bindings: binding::BindingSet,
 }
 
 impl Cx {
@@ -42,8 +38,7 @@ impl Cx {
             id: CxId::new(),
             app_context,
             request_state: Arc::new(RequestState::default()),
-            bindings: BindingMap::new(),
-            binding_mask: binding::Mask::default(),
+            bindings: binding::BindingSet::default(),
         }
     }
 
@@ -116,8 +111,8 @@ impl Cx {
         T: Any + Send + Sync,
     {
         self.assert_request_state_unique();
-        self.install_root_value(value)
-            .map(binding::Binding::<T>::into_value)
+        self.bindings
+            .install_root(&self.request_state.bindings, value)
     }
 
     /// Returns mutable access to a request-root value.
@@ -136,45 +131,15 @@ impl Cx {
         T: Any + Send + Sync,
     {
         self.assert_request_state_unique();
-        let type_id = TypeId::of::<T>();
-        let binding = binding::Binding::<T>::downcast_unique(self.bindings.get_mut(&type_id)?);
-        let binding_id =
-            self.binding_mask
-                .install_root(&self.request_state.bindings, type_id, Some(binding.id));
-        binding.id = binding_id;
-        Some(&mut binding.value)
+        self.bindings.get_mut::<T>(&self.request_state.bindings)
     }
 
-    fn install_root_value<T>(&mut self, value: T) -> Option<ErasedBinding>
+    fn install_scoped_value<T>(&mut self, value: T)
     where
         T: Any + Send + Sync,
     {
-        let type_id = TypeId::of::<T>();
-        let previous_id = self
-            .bindings
-            .get(&type_id)
-            .map(|binding| binding::Binding::<T>::downcast(binding).id);
-        let binding_id =
-            self.binding_mask
-                .install_root(&self.request_state.bindings, type_id, previous_id);
         self.bindings
-            .insert(type_id, binding::Binding::erase(binding_id, value))
-    }
-
-    fn install_scoped_value<T>(&mut self, value: T) -> Option<ErasedBinding>
-    where
-        T: Any + Send + Sync,
-    {
-        let type_id = TypeId::of::<T>();
-        let previous_id = self
-            .bindings
-            .get(&type_id)
-            .map(|binding| binding::Binding::<T>::downcast(binding).id);
-        let binding_id =
-            self.binding_mask
-                .install_scoped(&self.request_state.bindings, type_id, previous_id);
-        self.bindings
-            .insert(type_id, binding::Binding::erase(binding_id, value))
+            .install_scoped(&self.request_state.bindings, value);
     }
 
     /// Creates a child scope containing `value`.
@@ -187,7 +152,7 @@ impl Cx {
         T: Any + Send + Sync,
     {
         let mut cx = self.child();
-        let _ = cx.install_scoped_value(value);
+        cx.install_scoped_value(value);
         CxScope {
             cx,
             parent: PhantomData,
@@ -221,7 +186,6 @@ impl Cx {
             app_context: self.app_context.clone(),
             request_state: self.request_state.clone(),
             bindings: self.bindings.clone(),
-            binding_mask: self.binding_mask.clone(),
         }
     }
 
@@ -238,20 +202,18 @@ impl Cx {
     where
         T: Any + Send + Sync,
     {
-        let type_id = TypeId::of::<T>();
-        if let Some(binding) = self.bindings.get(&type_id) {
-            let binding = binding::Binding::<T>::downcast(binding);
+        if let Some(binding) = self.bindings.get::<T>() {
             record_context_read(&self.request_state, binding.id);
             return Some(&binding.value);
         }
 
-        let binding_id = self.request_state.bindings.root_none(type_id);
+        let binding_id = self.request_state.bindings.root_none(TypeId::of::<T>());
         record_context_read(&self.request_state, binding_id);
         None
     }
 
     pub(crate) fn context_reads_match(&self, reads: &ContextReadMask) -> bool {
-        reads.matches(&self.binding_mask, &self.request_state.bindings)
+        reads.matches(self.bindings.mask(), &self.request_state.bindings)
     }
 }
 
@@ -326,7 +288,7 @@ macro_rules! impl_context_values {
             }
 
             fn install(self, cx: &mut Cx) {
-                $(let _ = cx.install_scoped_value(self.$index);)+
+                $(cx.install_scoped_value(self.$index);)+
             }
         }
     };
@@ -433,7 +395,7 @@ impl ContextTracker {
     pub(crate) fn new(cx: &Cx) -> Arc<Self> {
         Arc::new(Self {
             request_state: cx.request_state.clone(),
-            input: cx.binding_mask.clone(),
+            input: cx.bindings.mask().clone(),
             reads: Mutex::new(ContextReadMask::default()),
         })
     }
