@@ -54,7 +54,7 @@ impl Cx {
             binding_mask: binding::Mask::default(),
         };
         for value in values {
-            let _ = cx.install_value(value);
+            let _ = cx.install_root_value(value);
         }
         cx
     }
@@ -128,7 +128,7 @@ impl Cx {
         T: Any + Send + Sync,
     {
         self.assert_request_state_unique();
-        self.install_value(Box::new(value))
+        self.install_root_value(Box::new(value))
             .map(binding::Context::into_value)
     }
 
@@ -154,7 +154,7 @@ impl Cx {
         assert!(binding.value.is::<T>(), "context binding type changed");
         let binding_id =
             self.binding_mask
-                .install(&self.request_state.bindings, type_id, Some(binding.id));
+                .install_root(&self.request_state.bindings, type_id, Some(binding.id));
         binding.id = binding_id;
         Some(
             binding
@@ -164,12 +164,27 @@ impl Cx {
         )
     }
 
-    fn install_value(&mut self, value: ContextValue) -> Option<Arc<binding::Context>> {
+    fn install_root_value(&mut self, value: ContextValue) -> Option<Arc<binding::Context>> {
         let type_id = value.as_ref().type_id();
         let previous_id = self.bindings.get(&type_id).map(|binding| binding.id);
         let binding_id =
             self.binding_mask
-                .install(&self.request_state.bindings, type_id, previous_id);
+                .install_root(&self.request_state.bindings, type_id, previous_id);
+        self.bindings.insert(
+            type_id,
+            Arc::new(binding::Context {
+                id: binding_id,
+                value,
+            }),
+        )
+    }
+
+    fn install_scoped_value(&mut self, value: ContextValue) -> Option<Arc<binding::Context>> {
+        let type_id = value.as_ref().type_id();
+        let previous_id = self.bindings.get(&type_id).map(|binding| binding.id);
+        let binding_id =
+            self.binding_mask
+                .install_scoped(&self.request_state.bindings, type_id, previous_id);
         self.bindings.insert(
             type_id,
             Arc::new(binding::Context {
@@ -223,7 +238,7 @@ impl Cx {
             binding_mask: self.binding_mask.clone(),
         };
         for value in values {
-            let _ = cx.install_value(value);
+            let _ = cx.install_scoped_value(value);
         }
         CxScope {
             cx,

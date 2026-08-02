@@ -39,12 +39,6 @@ impl Id {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Kind {
-    RootNone,
-    Value,
-}
-
 #[derive(Debug, Clone, Default)]
 pub(super) struct Mask {
     pub(super) bits: BitSet<usize>,
@@ -52,13 +46,29 @@ pub(super) struct Mask {
 }
 
 impl Mask {
-    pub(super) fn install(
+    pub(super) fn install_root(
         &mut self,
         registry: &Registry,
         type_id: TypeId,
         previous_id: Option<Id>,
     ) -> Id {
-        let (root_none_id, binding_id) = registry.allocate_value(type_id);
+        let (first_id, binding_id) = registry.allocate_root_value(type_id);
+        self.advance(registry, binding_id.frontier());
+        if let Some(previous_id) = previous_id.or(first_id) {
+            let removed = self.bits.remove(previous_id.0);
+            debug_assert!(removed, "previous context binding was not visible");
+        }
+        self.bits.insert(binding_id.0);
+        binding_id
+    }
+
+    pub(super) fn install_scoped(
+        &mut self,
+        registry: &Registry,
+        type_id: TypeId,
+        previous_id: Option<Id>,
+    ) -> Id {
+        let (root_none_id, binding_id) = registry.allocate_scoped_value(type_id);
         self.advance(registry, binding_id.frontier());
         let previous_id = previous_id.unwrap_or(root_none_id);
         let removed = self.bits.remove(previous_id.0);
@@ -72,11 +82,7 @@ impl Mask {
             frontier >= self.frontier,
             "request context binding mask cannot move backwards"
         );
-        for index in self.frontier..frontier {
-            if registry.kind(Id(index)) == Kind::RootNone {
-                self.bits.insert(index);
-            }
-        }
+        registry.materialize_first(&mut self.bits, self.frontier, frontier);
         self.frontier = frontier;
     }
 
@@ -84,51 +90,87 @@ impl Mask {
         if binding_id.0 < self.frontier {
             self.bits.contains(binding_id.0)
         } else {
-            registry.kind(binding_id) == Kind::RootNone
+            registry.is_first(binding_id)
         }
     }
 }
 
 #[derive(Debug, Default)]
+struct RegistryState {
+    // A first ID is either a root value or the implicit None that precedes a
+    // first scoped value. No binding mask can predate a first root value.
+    first: HashMap<TypeId, Id>,
+    next_id: usize,
+}
+
+impl RegistryState {
+    fn allocate(&mut self) -> Id {
+        let id = Id(self.next_id);
+        self.next_id = self
+            .next_id
+            .checked_add(1)
+            .expect("request context binding ID overflowed");
+        id
+    }
+
+    fn first_or_allocate(&mut self, type_id: TypeId) -> (Id, bool) {
+        if let Some(&first_id) = self.first.get(&type_id) {
+            return (first_id, false);
+        }
+
+        let first_id = self.allocate();
+        self.first.insert(type_id, first_id);
+        (first_id, true)
+    }
+}
+
+#[derive(Debug, Default)]
 pub(super) struct Registry {
-    root_none: Mutex<HashMap<TypeId, Id>>,
-    kinds: boxcar::Vec<Kind>,
+    state: Mutex<RegistryState>,
 }
 
 impl Registry {
     pub(super) fn root_none(&self, type_id: TypeId) -> Id {
-        let mut root_none = self.root_none.lock().unwrap();
-        *root_none
-            .entry(type_id)
-            .or_insert_with(|| self.push(Kind::RootNone))
+        self.state.lock().unwrap().first_or_allocate(type_id).0
     }
 
-    fn allocate_value(&self, type_id: TypeId) -> (Id, Id) {
-        let mut root_none = self.root_none.lock().unwrap();
-        let root_none_id = *root_none
-            .entry(type_id)
-            .or_insert_with(|| self.push(Kind::RootNone));
-        (root_none_id, self.push(Kind::Value))
+    fn allocate_root_value(&self, type_id: TypeId) -> (Option<Id>, Id) {
+        let mut state = self.state.lock().unwrap();
+        let (first_id, is_new) = state.first_or_allocate(type_id);
+        if is_new {
+            (None, first_id)
+        } else {
+            (Some(first_id), state.allocate())
+        }
     }
 
-    fn push(&self, kind: Kind) -> Id {
-        self.kinds
-            .count()
-            .checked_add(1)
-            .expect("request context binding ID overflowed");
-        Id(self.kinds.push(kind))
+    fn allocate_scoped_value(&self, type_id: TypeId) -> (Id, Id) {
+        let mut state = self.state.lock().unwrap();
+        let first_id = state.first_or_allocate(type_id).0;
+        (first_id, state.allocate())
     }
 
-    fn kind(&self, binding_id: Id) -> Kind {
-        *self
-            .kinds
-            .get(binding_id.0)
-            .expect("request context binding metadata was not initialized")
+    fn materialize_first(&self, bits: &mut BitSet<usize>, start: usize, end: usize) {
+        let state = self.state.lock().unwrap();
+        for first_id in state.first.values() {
+            if (start..end).contains(&first_id.0) {
+                bits.insert(first_id.0);
+            }
+        }
+    }
+
+    fn is_first(&self, binding_id: Id) -> bool {
+        self.state
+            .lock()
+            .unwrap()
+            .first
+            .values()
+            .any(|&first_id| first_id == binding_id)
     }
 
     #[cfg(test)]
     fn count(&self) -> usize {
-        self.kinds.count()
+        self.state.lock().unwrap().next_id
     }
 }
 
@@ -167,7 +209,7 @@ mod tests {
 
         assert_eq!(first_id, second_id);
         assert_eq!(cx.request_state.bindings.count(), 1);
-        assert_eq!(cx.request_state.bindings.kind(first_id), Kind::RootNone);
+        assert!(cx.request_state.bindings.is_first(first_id));
     }
 
     #[test]
@@ -190,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    fn first_value_allocates_and_shadows_root_none() {
+    fn first_scoped_value_allocates_and_shadows_root_none() {
         let cx = Cx::default();
         let child = cx.with(Database("primary"));
         let root_none_id = cx
@@ -207,6 +249,39 @@ mod tests {
         );
         assert!(!child.binding_mask.bits.contains(root_none_id.0));
         assert!(child.binding_mask.bits.contains(value_id.0));
+    }
+
+    #[test]
+    fn first_root_value_uses_the_first_binding_id() {
+        let mut cx = Cx::default();
+
+        assert_eq!(cx.insert(Database("primary")), None);
+        let binding_id = cx.resolve_binding_id(TypeId::of::<Database>());
+
+        assert_eq!(binding_id, Id(0));
+        assert_eq!(cx.request_state.bindings.count(), 1);
+        assert!(cx.request_state.bindings.is_first(binding_id));
+        assert!(cx.binding_mask.bits.contains(binding_id.0));
+
+        let child = cx.with(Config(1));
+        assert_eq!(request_context::<Database>(&child), &Database("primary"));
+        assert!(child.binding_mask.bits.contains(binding_id.0));
+    }
+
+    #[test]
+    fn root_value_after_a_missing_read_shadows_root_none() {
+        let mut cx = Cx::default();
+
+        assert_eq!(try_request_context::<Database>(&cx), None);
+        let root_none_id = cx.resolve_binding_id(TypeId::of::<Database>());
+        assert_eq!(cx.insert(Database("primary")), None);
+        let binding_id = cx.resolve_binding_id(TypeId::of::<Database>());
+
+        assert_eq!(root_none_id, Id(0));
+        assert_eq!(binding_id, Id(1));
+        assert_eq!(cx.request_state.bindings.count(), 2);
+        assert!(!cx.binding_mask.bits.contains(root_none_id.0));
+        assert!(cx.binding_mask.bits.contains(binding_id.0));
     }
 
     #[test]
@@ -229,12 +304,7 @@ mod tests {
         let mut cx = Cx::default();
 
         assert_eq!(cx.insert(Database("primary")), None);
-        let root_none_id = cx
-            .request_state
-            .bindings
-            .root_none(TypeId::of::<Database>());
         let first_id = cx.resolve_binding_id(TypeId::of::<Database>());
-        assert!(!cx.binding_mask.bits.contains(root_none_id.0));
         assert!(cx.binding_mask.bits.contains(first_id.0));
         assert_eq!(cx.insert(Database("replica")), Some(Database("primary")));
         let second_id = cx.resolve_binding_id(TypeId::of::<Database>());
@@ -242,6 +312,26 @@ mod tests {
         assert_ne!(first_id, second_id);
         assert!(!cx.binding_mask.bits.contains(first_id.0));
         assert!(cx.binding_mask.bits.contains(second_id.0));
+    }
+
+    #[test]
+    fn root_first_value_advances_over_scoped_first_bindings() {
+        let mut cx = Cx::default();
+        let config_none_id;
+        {
+            let child = cx.with(Config(1));
+            config_none_id = cx.request_state.bindings.root_none(TypeId::of::<Config>());
+            assert_eq!(child.resolve_binding_id(TypeId::of::<Config>()), Id(1));
+        }
+
+        assert_eq!(cx.insert(Database("primary")), None);
+        let database_id = cx.resolve_binding_id(TypeId::of::<Database>());
+
+        assert_eq!(config_none_id, Id(0));
+        assert_eq!(database_id, Id(2));
+        assert_eq!(cx.request_state.bindings.count(), 3);
+        assert!(cx.binding_mask.bits.contains(config_none_id.0));
+        assert!(cx.binding_mask.bits.contains(database_id.0));
     }
 
     #[test]
