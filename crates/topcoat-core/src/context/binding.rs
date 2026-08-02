@@ -1,6 +1,32 @@
-use std::{any::TypeId, collections::HashMap, sync::Mutex};
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use bit_set::BitSet;
+
+use super::ContextValue;
+
+pub(super) struct Context {
+    pub(super) id: Id,
+    pub(super) value: ContextValue,
+}
+
+impl Context {
+    pub(super) fn into_value<T>(binding: Arc<Self>) -> T
+    where
+        T: Any + Send + Sync,
+    {
+        let binding = Arc::try_unwrap(binding).unwrap_or_else(|_| {
+            panic!("request root binding is still shared with a scoped context")
+        });
+        *binding
+            .value
+            .downcast::<T>()
+            .expect("context binding type changed")
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Id(pub(super) usize);

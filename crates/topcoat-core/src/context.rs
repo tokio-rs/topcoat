@@ -18,7 +18,7 @@ pub use id::*;
 use crate::{abort::AbortStore, memoize::MemoizeCache};
 
 type ContextValue = Box<dyn Any + Send + Sync>;
-type BindingMap = im::HashMap<TypeId, Arc<ContextBinding>>;
+type BindingMap = im::HashMap<TypeId, Arc<binding::Context>>;
 
 /// The context for one request.
 ///
@@ -129,7 +129,7 @@ impl Cx {
     {
         self.assert_request_state_unique();
         self.install_value(Box::new(value))
-            .map(ContextBinding::into_value)
+            .map(binding::Context::into_value)
     }
 
     /// Returns mutable access to a request-root value.
@@ -168,7 +168,7 @@ impl Cx {
         )
     }
 
-    fn install_value(&mut self, value: ContextValue) -> Option<Arc<ContextBinding>> {
+    fn install_value(&mut self, value: ContextValue) -> Option<Arc<binding::Context>> {
         let type_id = value.as_ref().type_id();
         let previous_id = self.bindings.get(&type_id).map(|binding| binding.id);
         let binding_id =
@@ -176,7 +176,7 @@ impl Cx {
                 .install(&self.request_state.bindings, type_id, previous_id);
         self.bindings.insert(
             type_id,
-            Arc::new(ContextBinding {
+            Arc::new(binding::Context {
                 id: binding_id,
                 value,
             }),
@@ -402,26 +402,6 @@ impl CxTestBuilder {
             Arc::new(self.app_context),
             self.request_context.into_values(),
         )
-    }
-}
-
-struct ContextBinding {
-    id: binding::Id,
-    value: ContextValue,
-}
-
-impl ContextBinding {
-    fn into_value<T>(binding: Arc<Self>) -> T
-    where
-        T: Any + Send + Sync,
-    {
-        let binding = Arc::try_unwrap(binding).unwrap_or_else(|_| {
-            panic!("request root binding is still shared with a scoped context")
-        });
-        *binding
-            .value
-            .downcast::<T>()
-            .expect("context binding type changed")
     }
 }
 
