@@ -1,5 +1,5 @@
 use std::sync::{
-    Arc,
+    Arc, Barrier,
     atomic::{AtomicUsize, Ordering},
 };
 
@@ -184,6 +184,34 @@ fn scoped_heading(cx: &Cx) -> u8 {
     *inner_heading(&section)
 }
 
+fn counted_cx() -> Cx {
+    CxTestBuilder::new()
+        .app_context(AtomicUsize::new(0))
+        .build()
+}
+
+fn calls(cx: &Cx) -> &AtomicUsize {
+    app_context(cx)
+}
+
+#[memoize]
+fn optional_version(cx: &Cx) -> Option<u8> {
+    calls(cx).fetch_add(1, Ordering::SeqCst);
+    try_request_context::<Version>(cx).map(|version| version.0)
+}
+
+#[memoize]
+fn version_is_missing(cx: &Cx) -> bool {
+    calls(cx).fetch_add(1, Ordering::SeqCst);
+    try_request_context::<Version>(cx).is_none()
+}
+
+#[memoize]
+fn counted_version(cx: &Cx) -> u8 {
+    calls(cx).fetch_add(1, Ordering::SeqCst);
+    request_context::<Version>(cx).0
+}
+
 #[test]
 fn context_binding_identity_selects_and_retains_variants() {
     let cx = Cx::default();
@@ -225,94 +253,112 @@ fn unrelated_scoped_values_do_not_prevent_reuse() {
 }
 
 #[test]
+fn missing_reads_reuse_a_variant_across_preexisting_sibling_scopes() {
+    let cx = counted_cx();
+    let first = cx.with(HeadingLevel(1));
+    let second = cx.with(HeadingLevel(2));
+
+    let first_value = version_is_missing(&first);
+    let second_value = version_is_missing(&second);
+
+    assert!(*first_value);
+    assert!(std::ptr::eq(first_value, second_value));
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn preexisting_scope_keeps_implicit_none_after_first_scoped_value() {
+    let cx = counted_cx();
+    let before = cx.with(HeadingLevel(1));
+    let versioned = cx.with(Version(2));
+
+    assert_eq!(optional_version(&versioned), Some(&2));
+    assert_eq!(optional_version(&before), None);
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 2);
+}
+
+#[test]
 fn a_missing_context_read_is_invalidated_by_root_insertion() {
-    static CALLS: AtomicUsize = AtomicUsize::new(0);
-
-    #[memoize]
-    fn optional_version(cx: &Cx) -> Option<u8> {
-        CALLS.fetch_add(1, Ordering::SeqCst);
-        try_request_context::<Version>(cx).map(|version| version.0)
-    }
-
-    let mut cx = Cx::default();
+    let mut cx = counted_cx();
     assert_eq!(optional_version(&cx), None);
 
     cx.insert(Version(2));
 
     assert_eq!(optional_version(&cx), Some(&2));
-    assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn unrelated_root_insertion_preserves_a_cached_missing_read() {
+    let mut cx = counted_cx();
+    assert_eq!(optional_version(&cx), None);
+
+    cx.insert(HeadingLevel(2));
+
+    assert_eq!(optional_version(&cx), None);
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn missing_variant_is_reused_after_a_scoped_value_variant_is_dropped() {
+    let cx = counted_cx();
+    assert_eq!(optional_version(&cx), None);
+    {
+        let versioned = cx.with(Version(2));
+        assert_eq!(optional_version(&versioned), Some(&2));
+    }
+    assert_eq!(optional_version(&cx), None);
+
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 2);
 }
 
 #[test]
 fn replacing_a_root_binding_invalidates_its_readers() {
-    static CALLS: AtomicUsize = AtomicUsize::new(0);
-
-    #[memoize]
-    fn read(cx: &Cx) -> u8 {
-        CALLS.fetch_add(1, Ordering::SeqCst);
-        request_context::<Version>(cx).0
-    }
-
-    let mut cx = CxTestBuilder::new().request_context(Version(1)).build();
-    assert_eq!(*read(&cx), 1);
+    let mut cx = CxTestBuilder::new()
+        .app_context(AtomicUsize::new(0))
+        .request_context(Version(1))
+        .build();
+    assert_eq!(*counted_version(&cx), 1);
     assert_eq!(cx.insert(Version(1)), Some(Version(1)));
-    assert_eq!(*read(&cx), 1);
+    assert_eq!(*counted_version(&cx), 1);
 
-    assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 2);
 }
 
 #[test]
 fn successful_get_mut_invalidates_even_without_a_value_change() {
-    static CALLS: AtomicUsize = AtomicUsize::new(0);
-
-    #[memoize]
-    fn read(cx: &Cx) -> u8 {
-        CALLS.fetch_add(1, Ordering::SeqCst);
-        request_context::<Version>(cx).0
-    }
-
-    let mut cx = CxTestBuilder::new().request_context(Version(1)).build();
-    assert_eq!(*read(&cx), 1);
+    let mut cx = CxTestBuilder::new()
+        .app_context(AtomicUsize::new(0))
+        .request_context(Version(1))
+        .build();
+    assert_eq!(*counted_version(&cx), 1);
     let _ = cx.get_mut::<Version>().unwrap();
-    assert_eq!(*read(&cx), 1);
+    assert_eq!(*counted_version(&cx), 1);
 
-    assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 2);
 }
 
 #[test]
 fn failed_get_mut_does_not_invalidate_a_missing_read() {
-    static CALLS: AtomicUsize = AtomicUsize::new(0);
-
-    #[memoize]
-    fn read(cx: &Cx) -> Option<u8> {
-        CALLS.fetch_add(1, Ordering::SeqCst);
-        try_request_context::<Version>(cx).map(|version| version.0)
-    }
-
-    let mut cx = Cx::default();
-    assert_eq!(read(&cx), None);
+    let mut cx = counted_cx();
+    assert_eq!(optional_version(&cx), None);
     assert_eq!(cx.get_mut::<Version>(), None);
-    assert_eq!(read(&cx), None);
+    assert_eq!(optional_version(&cx), None);
 
-    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 1);
 }
 
 #[test]
 fn unrelated_root_mutation_does_not_invalidate_a_result() {
-    static CALLS: AtomicUsize = AtomicUsize::new(0);
-
-    #[memoize]
-    fn read(cx: &Cx) -> u8 {
-        CALLS.fetch_add(1, Ordering::SeqCst);
-        request_context::<Version>(cx).0
-    }
-
-    let mut cx = CxTestBuilder::new().request_context(Version(1)).build();
-    assert_eq!(*read(&cx), 1);
+    let mut cx = CxTestBuilder::new()
+        .app_context(AtomicUsize::new(0))
+        .request_context(Version(1))
+        .build();
+    assert_eq!(*counted_version(&cx), 1);
     cx.insert(HeadingLevel(2));
-    assert_eq!(*read(&cx), 1);
+    assert_eq!(*counted_version(&cx), 1);
 
-    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -354,6 +400,53 @@ fn nested_missing_cache_hits_propagate_dependencies() {
     let mut cx = Cx::default();
     assert!(!*inner(&cx));
     assert!(!*outer(&cx));
+
+    cx.insert(Version(1));
+
+    assert!(*outer(&cx));
+    assert_eq!(OUTER_CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn nested_missing_hit_propagates_after_the_outer_snapshot() {
+    static OUTER_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    struct Gates {
+        outer_started: Barrier,
+        inner_ready: Barrier,
+    }
+
+    #[memoize]
+    fn inner(cx: &Cx) -> bool {
+        try_request_context::<Version>(cx).is_some()
+    }
+
+    #[memoize]
+    fn outer(cx: &Cx) -> bool {
+        let call = OUTER_CALLS.fetch_add(1, Ordering::SeqCst);
+        if call == 0 {
+            let gates = app_context::<Gates>(cx);
+            gates.outer_started.wait();
+            gates.inner_ready.wait();
+        }
+        *inner(cx)
+    }
+
+    let mut cx = CxTestBuilder::new()
+        .app_context(Gates {
+            outer_started: Barrier::new(2),
+            inner_ready: Barrier::new(2),
+        })
+        .build();
+
+    std::thread::scope(|scope| {
+        let worker = scope.spawn(|| *outer(&cx));
+        let gates = app_context::<Gates>(&cx);
+        gates.outer_started.wait();
+        assert!(!*inner(&cx));
+        gates.inner_ready.wait();
+        assert!(!worker.join().unwrap());
+    });
 
     cx.insert(Version(1));
 

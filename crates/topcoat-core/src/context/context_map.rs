@@ -66,8 +66,8 @@ where
 ///     db.fetch_user(id).await
 /// }
 /// ```
-#[track_caller]
 #[must_use]
+#[track_caller]
 pub fn app_context<T>(cx: &Cx) -> &T
 where
     T: Any + Send + Sync,
@@ -130,8 +130,8 @@ where
 ///     &id.0
 /// }
 /// ```
-#[track_caller]
 #[must_use]
+#[track_caller]
 pub fn request_context<T>(cx: &Cx) -> &T
 where
     T: Any + Send + Sync,

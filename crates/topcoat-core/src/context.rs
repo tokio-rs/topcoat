@@ -7,19 +7,16 @@ use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,
     ops::Deref,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::{Arc, Mutex},
 };
 
+use bit_set::BitSet;
 pub use context_map::*;
 pub use id::*;
 
 use crate::{abort::AbortStore, memoize::MemoizeCache};
 
 type ContextValue = Box<dyn Any + Send + Sync>;
-type ContextSnapshot = HashMap<TypeId, ContextBindingId>;
 type BindingMap = im::HashMap<TypeId, Arc<ContextBinding>>;
 
 /// The context for one request.
@@ -32,7 +29,8 @@ pub struct Cx {
     id: CxId,
     app_context: Arc<ContextMap>,
     request_state: Arc<RequestState>,
-    scoped_bindings: Option<BindingMap>,
+    bindings: BindingMap,
+    binding_mask: BindingMask,
 }
 
 impl Cx {
@@ -40,16 +38,24 @@ impl Cx {
     #[doc(hidden)]
     #[must_use]
     pub fn new(app_context: Arc<ContextMap>) -> Self {
-        Self::from_values(app_context, Vec::new())
+        Self::from_values(app_context, std::iter::empty())
     }
 
-    fn from_values(app_context: Arc<ContextMap>, values: Vec<ContextValue>) -> Self {
-        Self {
+    fn from_values(
+        app_context: Arc<ContextMap>,
+        values: impl IntoIterator<Item = ContextValue>,
+    ) -> Self {
+        let mut cx = Self {
             id: CxId::new(),
             app_context,
-            request_state: Arc::new(RequestState::new(values)),
-            scoped_bindings: None,
+            request_state: Arc::new(RequestState::default()),
+            bindings: BindingMap::new(),
+            binding_mask: BindingMask::default(),
+        };
+        for value in values {
+            let _ = cx.install_value(value);
         }
+        cx
     }
 
     /// Returns this context's unique [`CxId`].
@@ -120,12 +126,8 @@ impl Cx {
     where
         T: Any + Send + Sync,
     {
-        let state = self.request_state_mut();
-        let binding_id = state.next_binding_id();
-        let binding = ContextBinding::new(binding_id, Box::new(value));
-        state
-            .root
-            .insert(TypeId::of::<T>(), Arc::new(binding))
+        self.assert_request_state_unique();
+        self.install_value(Box::new(value))
             .map(ContextBinding::into_value)
     }
 
@@ -144,21 +146,40 @@ impl Cx {
     where
         T: Any + Send + Sync,
     {
-        let state = self.request_state_mut();
+        self.assert_request_state_unique();
         let type_id = TypeId::of::<T>();
-        if !state.root.contains_key(&type_id) {
-            return None;
-        }
-
-        let binding_id = state.next_binding_id();
-        let binding = state
-            .root
-            .get_mut(&type_id)
-            .expect("context binding disappeared");
-        let binding = Arc::get_mut(binding)
+        let Self {
+            request_state,
+            bindings,
+            binding_mask,
+            ..
+        } = self;
+        let binding = Arc::get_mut(bindings.get_mut(&type_id)?)
             .expect("request root binding is still shared with a scoped context");
+        assert!(binding.value.is::<T>(), "context binding type changed");
+        let binding_id = binding_mask.install(&request_state.bindings, type_id, Some(binding.id));
         binding.id = binding_id;
-        binding.value.downcast_mut::<T>()
+        Some(
+            binding
+                .value
+                .downcast_mut::<T>()
+                .expect("context binding type changed"),
+        )
+    }
+
+    fn install_value(&mut self, value: ContextValue) -> Option<Arc<ContextBinding>> {
+        let type_id = value.as_ref().type_id();
+        let previous_id = self.bindings.get(&type_id).map(|binding| binding.id);
+        let binding_id =
+            self.binding_mask
+                .install(&self.request_state.bindings, type_id, previous_id);
+        self.bindings.insert(
+            type_id,
+            Arc::new(ContextBinding {
+                id: binding_id,
+                value,
+            }),
+        )
     }
 
     /// Creates a child scope containing `value`.
@@ -170,7 +191,7 @@ impl Cx {
     where
         T: Any + Send + Sync,
     {
-        self.with_erased_values(vec![Box::new(value)])
+        self.with_erased_values(std::iter::once(Box::new(value) as ContextValue))
     }
 
     /// Creates a child scope containing each tuple element as a separate
@@ -196,33 +217,26 @@ impl Cx {
         self.with_erased_values(values)
     }
 
-    fn with_erased_values(&self, values: Vec<ContextValue>) -> CxScope<'_> {
-        let mut bindings = self.visible_binding_map().clone();
+    fn with_erased_values(&self, values: impl IntoIterator<Item = ContextValue>) -> CxScope<'_> {
+        let mut cx = Cx {
+            id: CxId::new(),
+            app_context: self.app_context.clone(),
+            request_state: self.request_state.clone(),
+            bindings: self.bindings.clone(),
+            binding_mask: self.binding_mask.clone(),
+        };
         for value in values {
-            let type_id = value.as_ref().type_id();
-            let binding_id = self.request_state.next_binding_id();
-            bindings.insert(type_id, Arc::new(ContextBinding::new(binding_id, value)));
+            let _ = cx.install_value(value);
         }
         CxScope {
-            cx: Cx {
-                id: CxId::new(),
-                app_context: self.app_context.clone(),
-                request_state: self.request_state.clone(),
-                scoped_bindings: Some(bindings),
-            },
+            cx,
             parent: PhantomData,
         }
     }
 
-    fn request_state_mut(&mut self) -> &mut RequestState {
+    fn assert_request_state_unique(&mut self) {
         Arc::get_mut(&mut self.request_state)
-            .expect("cannot mutate the request root while a scoped context is still reachable")
-    }
-
-    fn visible_binding_map(&self) -> &BindingMap {
-        self.scoped_bindings
-            .as_ref()
-            .unwrap_or(&self.request_state.root)
+            .expect("cannot mutate the request root while a scoped context is still reachable");
     }
 
     pub(crate) fn request_value<T>(&self) -> Option<&T>
@@ -230,51 +244,31 @@ impl Cx {
         T: Any + Send + Sync,
     {
         let type_id = TypeId::of::<T>();
-        let resolved = self.resolve_value::<T>();
-        record_context_read(
-            &self.request_state,
-            ContextRead {
-                type_id,
-                binding_id: resolved.map(|(_, binding_id)| binding_id),
-            },
-        );
-        resolved.map(|(value, _)| value)
+        if let Some(binding) = self.bindings.get(&type_id) {
+            record_context_read(&self.request_state, binding.id);
+            return Some(
+                binding
+                    .value
+                    .downcast_ref::<T>()
+                    .expect("context binding type changed"),
+            );
+        }
+
+        let binding_id = self.request_state.bindings.root_none(type_id);
+        record_context_read(&self.request_state, binding_id);
+        None
     }
 
-    fn resolve_value<T>(&self) -> Option<(&T, ContextBindingId)>
-    where
-        T: Any + Send + Sync,
-    {
-        self.visible_binding_map()
-            .get(&TypeId::of::<T>())
-            .map(|binding| {
-                (
-                    binding
-                        .value
-                        .downcast_ref::<T>()
-                        .expect("context binding type changed"),
-                    binding.id,
-                )
-            })
+    #[cfg(test)]
+    fn resolve_binding_id(&self, type_id: TypeId) -> ContextBindingId {
+        self.bindings.get(&type_id).map_or_else(
+            || self.request_state.bindings.root_none(type_id),
+            |binding| binding.id,
+        )
     }
 
-    pub(crate) fn resolve_binding_id(&self, type_id: TypeId) -> Option<ContextBindingId> {
-        self.visible_binding_map()
-            .get(&type_id)
-            .map(|binding| binding.id)
-    }
-
-    pub(crate) fn visible_bindings(&self) -> ContextSnapshot {
-        self.visible_binding_map()
-            .iter()
-            .map(|(&type_id, binding)| (type_id, binding.id))
-            .collect()
-    }
-
-    pub(crate) fn context_reads_match(&self, reads: &[ContextRead]) -> bool {
-        reads
-            .iter()
-            .all(|read| self.resolve_binding_id(read.type_id) == read.binding_id)
+    pub(crate) fn context_reads_match(&self, reads: &ContextReadMask) -> bool {
+        reads.matches(&self.binding_mask, &self.request_state.bindings)
     }
 }
 
@@ -405,13 +399,75 @@ impl CxTestBuilder {
     pub fn build(self) -> Cx {
         Cx::from_values(
             Arc::new(self.app_context),
-            self.request_context.into_values().collect(),
+            self.request_context.into_values(),
         )
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct ContextBindingId(u64);
+pub(crate) struct ContextBindingId(usize);
+
+impl ContextBindingId {
+    fn frontier(self) -> usize {
+        self.0
+            .checked_add(1)
+            .expect("request context binding ID overflowed")
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BindingKind {
+    RootNone,
+    Value,
+}
+
+#[derive(Debug, Clone, Default)]
+struct BindingMask {
+    bits: BitSet<usize>,
+    frontier: usize,
+}
+
+impl BindingMask {
+    fn install(
+        &mut self,
+        registry: &BindingRegistry,
+        type_id: TypeId,
+        previous_id: Option<ContextBindingId>,
+    ) -> ContextBindingId {
+        let (root_none_id, binding_id) = registry.allocate_value(type_id);
+        self.advance(registry, binding_id.frontier());
+        let previous_id = previous_id.unwrap_or(root_none_id);
+        let removed = self.bits.remove(previous_id.0);
+        debug_assert!(removed, "previous context binding was not visible");
+        self.bits.insert(binding_id.0);
+        binding_id
+    }
+
+    fn advance(&mut self, registry: &BindingRegistry, frontier: usize) {
+        assert!(
+            frontier >= self.frontier,
+            "request context binding mask cannot move backwards"
+        );
+        for index in self.frontier..frontier {
+            if registry.kind(ContextBindingId(index)) == BindingKind::RootNone {
+                self.bits.insert(index);
+            }
+        }
+        self.frontier = frontier;
+    }
+
+    fn effectively_contains(
+        &self,
+        registry: &BindingRegistry,
+        binding_id: ContextBindingId,
+    ) -> bool {
+        if binding_id.0 < self.frontier {
+            self.bits.contains(binding_id.0)
+        } else {
+            registry.kind(binding_id) == BindingKind::RootNone
+        }
+    }
+}
 
 struct ContextBinding {
     id: ContextBindingId,
@@ -419,16 +475,13 @@ struct ContextBinding {
 }
 
 impl ContextBinding {
-    fn new(id: ContextBindingId, value: ContextValue) -> Self {
-        Self { id, value }
-    }
-
     fn into_value<T>(binding: Arc<Self>) -> T
     where
         T: Any + Send + Sync,
     {
-        let binding = Arc::try_unwrap(binding)
-            .expect("request root binding is still shared with a scoped context");
+        let binding = Arc::try_unwrap(binding).unwrap_or_else(|_| {
+            panic!("request root binding is still shared with a scoped context")
+        });
         *binding
             .value
             .downcast::<T>()
@@ -436,77 +489,91 @@ impl ContextBinding {
     }
 }
 
-impl std::fmt::Debug for ContextBinding {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ContextBinding")
-            .field("id", &self.id)
-            .finish_non_exhaustive()
+#[derive(Debug, Default)]
+struct BindingRegistry {
+    root_none: Mutex<HashMap<TypeId, ContextBindingId>>,
+    kinds: boxcar::Vec<BindingKind>,
+}
+
+impl BindingRegistry {
+    fn root_none(&self, type_id: TypeId) -> ContextBindingId {
+        let mut root_none = self.root_none.lock().unwrap();
+        *root_none
+            .entry(type_id)
+            .or_insert_with(|| self.push(BindingKind::RootNone))
+    }
+
+    fn allocate_value(&self, type_id: TypeId) -> (ContextBindingId, ContextBindingId) {
+        let mut root_none = self.root_none.lock().unwrap();
+        let root_none_id = *root_none
+            .entry(type_id)
+            .or_insert_with(|| self.push(BindingKind::RootNone));
+        (root_none_id, self.push(BindingKind::Value))
+    }
+
+    fn push(&self, kind: BindingKind) -> ContextBindingId {
+        self.kinds
+            .count()
+            .checked_add(1)
+            .expect("request context binding ID overflowed");
+        ContextBindingId(self.kinds.push(kind))
+    }
+
+    fn kind(&self, binding_id: ContextBindingId) -> BindingKind {
+        *self
+            .kinds
+            .get(binding_id.0)
+            .expect("request context binding metadata was not initialized")
+    }
+
+    #[cfg(test)]
+    fn count(&self) -> usize {
+        self.kinds.count()
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct RequestState {
-    root: BindingMap,
+    bindings: BindingRegistry,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
-    next_binding_id: AtomicU64,
 }
 
-impl RequestState {
-    fn new(values: Vec<ContextValue>) -> Self {
-        let mut state = Self {
-            root: BindingMap::new(),
-            memoize_cache: MemoizeCache::new(),
-            abort_store: AbortStore::new(),
-            next_binding_id: AtomicU64::new(0),
-        };
-        for value in values {
-            let type_id = value.as_ref().type_id();
-            let binding_id = state.next_binding_id();
-            state
-                .root
-                .insert(type_id, Arc::new(ContextBinding::new(binding_id, value)));
-        }
-        state
-    }
-
-    fn next_binding_id(&self) -> ContextBindingId {
-        let mut id = self.next_binding_id.load(Ordering::Relaxed);
-        loop {
-            let next = id
-                .checked_add(1)
-                .expect("request context binding ID overflowed");
-            match self.next_binding_id.compare_exchange_weak(
-                id,
-                next,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => return ContextBindingId(id),
-                Err(current) => id = current,
-            }
-        }
-    }
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ContextReadMask {
+    bits: BitSet<usize>,
+    frontier: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct ContextRead {
-    pub(crate) type_id: TypeId,
-    pub(crate) binding_id: Option<ContextBindingId>,
+impl ContextReadMask {
+    fn insert(&mut self, binding_id: ContextBindingId) {
+        self.bits.insert(binding_id.0);
+        self.frontier = self.frontier.max(binding_id.frontier());
+    }
+
+    fn matches(&self, binding_mask: &BindingMask, registry: &BindingRegistry) -> bool {
+        if self.frontier <= binding_mask.frontier {
+            self.bits.is_subset(&binding_mask.bits)
+        } else {
+            self.bits
+                .iter()
+                .all(|index| binding_mask.effectively_contains(registry, ContextBindingId(index)))
+        }
+    }
 }
 
 pub(crate) struct ContextTracker {
     request_state: Arc<RequestState>,
-    input: ContextSnapshot,
-    reads: Mutex<Vec<ContextRead>>,
+    input: BindingMask,
+    reads: Mutex<ContextReadMask>,
 }
 
 impl ContextTracker {
     pub(crate) fn new(cx: &Cx) -> Arc<Self> {
         Arc::new(Self {
             request_state: cx.request_state.clone(),
-            input: cx.visible_bindings(),
-            reads: Mutex::new(Vec::new()),
+            input: cx.binding_mask.clone(),
+            reads: Mutex::new(ContextReadMask::default()),
         })
     }
 
@@ -516,21 +583,18 @@ impl ContextTracker {
         f()
     }
 
-    pub(crate) fn finish(&self) -> Vec<ContextRead> {
+    pub(crate) fn finish(&self) -> ContextReadMask {
         self.reads.lock().unwrap().clone()
     }
 
-    fn record(&self, read: ContextRead) {
-        if self.input.get(&read.type_id).copied() != read.binding_id {
+    fn record(&self, binding_id: ContextBindingId) {
+        if !self
+            .input
+            .effectively_contains(&self.request_state.bindings, binding_id)
+        {
             return;
         }
-
-        let mut reads = self.reads.lock().unwrap();
-        if let Some(previous) = reads.iter().find(|item| item.type_id == read.type_id) {
-            debug_assert_eq!(*previous, read);
-        } else {
-            reads.push(read);
-        }
+        self.reads.lock().unwrap().insert(binding_id);
     }
 }
 
@@ -554,19 +618,19 @@ impl Drop for TrackerScope<'_> {
     }
 }
 
-fn record_context_read(request_state: &Arc<RequestState>, read: ContextRead) {
+fn record_context_read(request_state: &Arc<RequestState>, binding_id: ContextBindingId) {
     ACTIVE_TRACKERS.with(|trackers| {
         for tracker in trackers.borrow().iter() {
             if Arc::ptr_eq(&tracker.request_state, request_state) {
-                tracker.record(read);
+                tracker.record(binding_id);
             }
         }
     });
 }
 
-pub(crate) fn replay_context_reads(cx: &Cx, reads: &[ContextRead]) {
-    for &read in reads {
-        record_context_read(&cx.request_state, read);
+pub(crate) fn replay_context_reads(cx: &Cx, reads: &ContextReadMask) {
+    for index in &reads.bits {
+        record_context_read(&cx.request_state, ContextBindingId(index));
     }
 }
 
@@ -586,7 +650,10 @@ pub fn abort_store(cx: &Cx) -> &AbortStore {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+    use std::sync::{
+        Barrier,
+        atomic::{AtomicUsize, Ordering as AtomicOrdering},
+    };
 
     use super::*;
 
@@ -605,33 +672,125 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_missing_reads_share_one_root_none_identity() {
+        let cx = Cx::default();
+        let ready = Barrier::new(3);
+
+        let (first_id, second_id) = std::thread::scope(|scope| {
+            let first = scope.spawn(|| {
+                ready.wait();
+                assert_eq!(try_request_context::<Database>(&cx), None);
+                cx.resolve_binding_id(TypeId::of::<Database>())
+            });
+            let second = scope.spawn(|| {
+                ready.wait();
+                assert_eq!(try_request_context::<Database>(&cx), None);
+                cx.resolve_binding_id(TypeId::of::<Database>())
+            });
+            ready.wait();
+            (first.join().unwrap(), second.join().unwrap())
+        });
+
+        assert_eq!(first_id, second_id);
+        assert_eq!(cx.request_state.bindings.count(), 1);
+        assert_eq!(
+            cx.request_state.bindings.kind(first_id),
+            BindingKind::RootNone
+        );
+    }
+
+    #[test]
+    fn contexts_created_before_root_none_treat_it_as_visible() {
+        let cx = Cx::default();
+        let before = cx.with(Config(1));
+        let root_none_id = cx
+            .request_state
+            .bindings
+            .root_none(TypeId::of::<Database>());
+
+        assert!(root_none_id.0 >= before.binding_mask.frontier);
+        assert!(!before.binding_mask.bits.contains(root_none_id.0));
+        assert!(
+            before
+                .binding_mask
+                .effectively_contains(&before.request_state.bindings, root_none_id)
+        );
+        assert_eq!(try_request_context::<Database>(&before), None);
+    }
+
+    #[test]
+    fn first_value_allocates_and_shadows_root_none() {
+        let cx = Cx::default();
+        let child = cx.with(Database("primary"));
+        let root_none_id = cx
+            .request_state
+            .bindings
+            .root_none(TypeId::of::<Database>());
+        let value_id = child.resolve_binding_id(TypeId::of::<Database>());
+
+        assert_eq!(root_none_id, ContextBindingId(0));
+        assert_eq!(value_id, ContextBindingId(1));
+        assert!(
+            cx.binding_mask
+                .effectively_contains(&cx.request_state.bindings, root_none_id)
+        );
+        assert!(!child.binding_mask.bits.contains(root_none_id.0));
+        assert!(child.binding_mask.bits.contains(value_id.0));
+    }
+
+    #[test]
+    fn advancing_for_an_unrelated_value_materializes_root_none() {
+        let cx = Cx::default();
+        let root_none_id = cx
+            .request_state
+            .bindings
+            .root_none(TypeId::of::<Database>());
+
+        assert!(!cx.binding_mask.bits.contains(root_none_id.0));
+        let child = cx.with(Config(1));
+
+        assert!(child.binding_mask.bits.contains(root_none_id.0));
+        assert_eq!(try_request_context::<Database>(&child), None);
+    }
+
+    #[test]
     fn root_insert_replaces_and_returns_the_displaced_value() {
         let mut cx = Cx::default();
 
         assert_eq!(cx.insert(Database("primary")), None);
-        let first_id = cx.resolve_binding_id(TypeId::of::<Database>()).unwrap();
+        let root_none_id = cx
+            .request_state
+            .bindings
+            .root_none(TypeId::of::<Database>());
+        let first_id = cx.resolve_binding_id(TypeId::of::<Database>());
+        assert!(!cx.binding_mask.bits.contains(root_none_id.0));
+        assert!(cx.binding_mask.bits.contains(first_id.0));
         assert_eq!(cx.insert(Database("replica")), Some(Database("primary")));
-        let second_id = cx.resolve_binding_id(TypeId::of::<Database>()).unwrap();
+        let second_id = cx.resolve_binding_id(TypeId::of::<Database>());
         assert_eq!(request_context::<Database>(&cx), &Database("replica"));
         assert_ne!(first_id, second_id);
+        assert!(!cx.binding_mask.bits.contains(first_id.0));
+        assert!(cx.binding_mask.bits.contains(second_id.0));
     }
 
     #[test]
     fn get_mut_changes_a_root_value() {
         let mut cx = CxTestBuilder::new().request_context(Config(1)).build();
 
-        let first_id = cx.resolve_binding_id(TypeId::of::<Config>()).unwrap();
+        let first_id = cx.resolve_binding_id(TypeId::of::<Config>());
         cx.get_mut::<Config>().unwrap().0 = 42;
-        let second_id = cx.resolve_binding_id(TypeId::of::<Config>()).unwrap();
+        let second_id = cx.resolve_binding_id(TypeId::of::<Config>());
 
         assert_eq!(request_context::<Config>(&cx), &Config(42));
         assert_ne!(first_id, second_id);
-        let next_id = cx.request_state.next_binding_id.load(Ordering::Relaxed);
+        assert!(!cx.binding_mask.bits.contains(first_id.0));
+        assert!(cx.binding_mask.bits.contains(second_id.0));
+        let binding_count = cx.request_state.bindings.count();
+        let mask = cx.binding_mask.clone();
         assert_eq!(cx.get_mut::<Database>(), None);
-        assert_eq!(
-            cx.request_state.next_binding_id.load(Ordering::Relaxed),
-            next_id
-        );
+        assert_eq!(cx.request_state.bindings.count(), binding_count);
+        assert_eq!(cx.binding_mask.bits, mask.bits);
+        assert_eq!(cx.binding_mask.frontier, mask.frontier);
     }
 
     #[test]

@@ -2914,6 +2914,7 @@ version = "0.5.0"
 dependencies = [
  "anyhow",
  "anymap3",
+ "bit-set",
  "boxcar",
  "hashbrown 0.17.0",
  "http",
