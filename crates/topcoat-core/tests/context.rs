@@ -1,9 +1,11 @@
 use std::sync::{
-    Arc,
+    Arc, Barrier,
     atomic::{AtomicUsize, Ordering},
 };
 
-use topcoat_core::context::{Cx, CxScope, CxTestBuilder, request_context, try_request_context};
+use topcoat_core::context::{
+    Cx, CxScope, CxTestBuilder, app_context, memoize_cache, request_context, try_request_context,
+};
 
 #[derive(Debug, PartialEq)]
 struct Database(&'static str);
@@ -11,12 +13,199 @@ struct Database(&'static str);
 #[derive(Debug, PartialEq)]
 struct Config(u32);
 
+fn counted_cx() -> Cx {
+    CxTestBuilder::new()
+        .app_context(AtomicUsize::new(0))
+        .build()
+}
+
+fn calls(cx: &Cx) -> &AtomicUsize {
+    app_context(cx)
+}
+
+fn optional_database(cx: &Cx) -> Option<&'static str> {
+    memoize_cache(cx)
+        .eq_cache()
+        .memoize(cx, (), (), |cx, ()| {
+            calls(cx).fetch_add(1, Ordering::SeqCst);
+            try_request_context::<Database>(cx).map(|database| database.0)
+        })
+        .as_ref()
+        .copied()
+}
+
+fn optional_config(cx: &Cx) -> Option<u32> {
+    memoize_cache(cx)
+        .eq_cache()
+        .memoize(cx, (), (), |cx, ()| {
+            calls(cx).fetch_add(1, Ordering::SeqCst);
+            try_request_context::<Config>(cx).map(|config| config.0)
+        })
+        .as_ref()
+        .copied()
+}
+
+struct ConcurrentReads {
+    ready: Barrier,
+    calls: AtomicUsize,
+}
+
+fn first_database_is_missing(cx: &Cx) -> &bool {
+    memoize_cache(cx).eq_cache().memoize(cx, (), (), |cx, ()| {
+        let state = app_context::<ConcurrentReads>(cx);
+        let call = state.calls.fetch_add(1, Ordering::SeqCst);
+        if call < 2 {
+            state.ready.wait();
+        }
+        try_request_context::<Database>(cx).is_none()
+    })
+}
+
+fn second_database_is_missing(cx: &Cx) -> &bool {
+    memoize_cache(cx).eq_cache().memoize(cx, (), (), |cx, ()| {
+        let state = app_context::<ConcurrentReads>(cx);
+        let call = state.calls.fetch_add(1, Ordering::SeqCst);
+        if call < 2 {
+            state.ready.wait();
+        }
+        try_request_context::<Database>(cx).is_none()
+    })
+}
+
 struct DropCounter(Arc<AtomicUsize>);
 
 impl Drop for DropCounter {
     fn drop(&mut self) {
         self.0.fetch_add(1, Ordering::SeqCst);
     }
+}
+
+#[test]
+fn concurrent_missing_reads_are_invalidated_by_root_insertion() {
+    let mut cx = CxTestBuilder::new()
+        .app_context(ConcurrentReads {
+            ready: Barrier::new(2),
+            calls: AtomicUsize::new(0),
+        })
+        .build();
+
+    std::thread::scope(|scope| {
+        let first = scope.spawn(|| *first_database_is_missing(&cx));
+        let second = scope.spawn(|| *second_database_is_missing(&cx));
+        assert!(first.join().unwrap());
+        assert!(second.join().unwrap());
+    });
+
+    cx.insert(Database("primary"));
+
+    assert!(!first_database_is_missing(&cx));
+    assert!(!second_database_is_missing(&cx));
+    assert_eq!(
+        app_context::<ConcurrentReads>(&cx)
+            .calls
+            .load(Ordering::SeqCst),
+        4
+    );
+}
+
+#[test]
+fn a_scope_created_before_a_missing_read_reuses_its_cached_variant() {
+    let cx = counted_cx();
+    let before = cx.with(Config(1));
+
+    assert_eq!(optional_database(&cx), None);
+    assert_eq!(optional_database(&before), None);
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn first_scoped_value_shadows_a_cached_missing_value() {
+    let cx = counted_cx();
+    assert_eq!(optional_database(&cx), None);
+
+    let child = cx.with(Database("primary"));
+
+    assert_eq!(optional_database(&child), Some("primary"));
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn first_root_value_is_inherited_by_scopes() {
+    let mut cx = counted_cx();
+    assert_eq!(cx.insert(Database("primary")), None);
+
+    assert_eq!(optional_database(&cx), Some("primary"));
+    let child = cx.with(Config(1));
+
+    assert_eq!(optional_database(&child), Some("primary"));
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn root_value_after_a_missing_read_invalidates_the_cached_variant() {
+    let mut cx = counted_cx();
+    assert_eq!(optional_database(&cx), None);
+
+    assert_eq!(cx.insert(Database("primary")), None);
+
+    assert_eq!(optional_database(&cx), Some("primary"));
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn unrelated_scoped_value_preserves_a_cached_missing_value() {
+    let cx = counted_cx();
+    assert_eq!(optional_database(&cx), None);
+
+    let child = cx.with(Config(1));
+
+    assert_eq!(optional_database(&child), None);
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn replacing_a_root_value_returns_it_and_invalidates_its_cached_variant() {
+    let mut cx = counted_cx();
+    assert_eq!(cx.insert(Database("primary")), None);
+    assert_eq!(optional_database(&cx), Some("primary"));
+
+    assert_eq!(cx.insert(Database("replica")), Some(Database("primary")));
+
+    assert_eq!(optional_database(&cx), Some("replica"));
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn first_root_value_preserves_earlier_cached_missing_values() {
+    let mut cx = counted_cx();
+    {
+        let child = cx.with(Config(1));
+        assert_eq!(optional_config(&cx), None);
+        assert_eq!(request_context::<Config>(&child), &Config(1));
+    }
+
+    assert_eq!(cx.insert(Database("primary")), None);
+
+    assert_eq!(optional_config(&cx), None);
+    assert_eq!(request_context::<Database>(&cx), &Database("primary"));
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn get_mut_invalidates_only_after_a_successful_lookup() {
+    let mut cx = CxTestBuilder::new()
+        .app_context(AtomicUsize::new(0))
+        .request_context(Config(1))
+        .build();
+    assert_eq!(optional_config(&cx), Some(1));
+
+    cx.get_mut::<Config>().unwrap().0 = 42;
+
+    assert_eq!(optional_config(&cx), Some(42));
+    assert_eq!(optional_database(&cx), None);
+    assert_eq!(cx.get_mut::<Database>(), None);
+    assert_eq!(optional_database(&cx), None);
+    assert_eq!(calls(&cx).load(Ordering::SeqCst), 3);
 }
 
 #[test]

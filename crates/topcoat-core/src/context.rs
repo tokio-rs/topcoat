@@ -271,14 +271,6 @@ impl Cx {
         None
     }
 
-    #[cfg(test)]
-    fn resolve_binding_id(&self, type_id: TypeId) -> binding::Id {
-        self.bindings.get(&type_id).map_or_else(
-            || self.request_state.bindings.root_none(type_id),
-            |binding| binding.id,
-        )
-    }
-
     pub(crate) fn context_reads_match(&self, reads: &ContextReadMask) -> bool {
         reads.matches(&self.binding_mask, &self.request_state.bindings)
     }
