@@ -149,16 +149,12 @@ impl Cx {
     {
         self.assert_request_state_unique();
         let type_id = TypeId::of::<T>();
-        let Self {
-            request_state,
-            bindings,
-            binding_mask,
-            ..
-        } = self;
-        let binding = Arc::get_mut(bindings.get_mut(&type_id)?)
+        let binding = Arc::get_mut(self.bindings.get_mut(&type_id)?)
             .expect("request root binding is still shared with a scoped context");
         assert!(binding.value.is::<T>(), "context binding type changed");
-        let binding_id = binding_mask.install(&request_state.bindings, type_id, Some(binding.id));
+        let binding_id =
+            self.binding_mask
+                .install(&self.request_state.bindings, type_id, Some(binding.id));
         binding.id = binding_id;
         Some(
             binding
