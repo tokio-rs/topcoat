@@ -5,7 +5,6 @@ mod id;
 use std::{
     any::{Any, TypeId},
     cell::RefCell,
-    collections::HashSet,
     marker::PhantomData,
     ops::Deref,
     sync::{Arc, Mutex},
@@ -17,8 +16,8 @@ pub use id::*;
 
 use crate::{abort::AbortStore, memoize::MemoizeCache};
 
-type ContextValue = Box<dyn Any + Send + Sync>;
-type BindingMap = im::HashMap<TypeId, Arc<binding::Context>>;
+type ErasedBinding = Arc<dyn Any + Send + Sync>;
+type BindingMap = im::HashMap<TypeId, ErasedBinding>;
 
 /// The context for one request.
 ///
@@ -39,24 +38,13 @@ impl Cx {
     #[doc(hidden)]
     #[must_use]
     pub fn new(app_context: Arc<ContextMap>) -> Self {
-        Self::from_values(app_context, std::iter::empty())
-    }
-
-    fn from_values(
-        app_context: Arc<ContextMap>,
-        values: impl IntoIterator<Item = ContextValue>,
-    ) -> Self {
-        let mut cx = Self {
+        Self {
             id: CxId::new(),
             app_context,
             request_state: Arc::new(RequestState::default()),
             bindings: BindingMap::new(),
             binding_mask: binding::Mask::default(),
-        };
-        for value in values {
-            let _ = cx.install_root_value(value);
         }
-        cx
     }
 
     /// Returns this context's unique [`CxId`].
@@ -128,8 +116,8 @@ impl Cx {
         T: Any + Send + Sync,
     {
         self.assert_request_state_unique();
-        self.install_root_value(Box::new(value))
-            .map(binding::Context::into_value)
+        self.install_root_value(value)
+            .map(binding::Binding::<T>::into_value)
     }
 
     /// Returns mutable access to a request-root value.
@@ -149,49 +137,44 @@ impl Cx {
     {
         self.assert_request_state_unique();
         let type_id = TypeId::of::<T>();
-        let binding = Arc::get_mut(self.bindings.get_mut(&type_id)?)
-            .expect("request root binding is still shared with a scoped context");
-        assert!(binding.value.is::<T>(), "context binding type changed");
+        let binding = binding::Binding::<T>::downcast_unique(self.bindings.get_mut(&type_id)?);
         let binding_id =
             self.binding_mask
                 .install_root(&self.request_state.bindings, type_id, Some(binding.id));
         binding.id = binding_id;
-        Some(
-            binding
-                .value
-                .downcast_mut::<T>()
-                .expect("context binding type changed"),
-        )
+        Some(&mut binding.value)
     }
 
-    fn install_root_value(&mut self, value: ContextValue) -> Option<Arc<binding::Context>> {
-        let type_id = value.as_ref().type_id();
-        let previous_id = self.bindings.get(&type_id).map(|binding| binding.id);
+    fn install_root_value<T>(&mut self, value: T) -> Option<ErasedBinding>
+    where
+        T: Any + Send + Sync,
+    {
+        let type_id = TypeId::of::<T>();
+        let previous_id = self
+            .bindings
+            .get(&type_id)
+            .map(|binding| binding::Binding::<T>::downcast(binding).id);
         let binding_id =
             self.binding_mask
                 .install_root(&self.request_state.bindings, type_id, previous_id);
-        self.bindings.insert(
-            type_id,
-            Arc::new(binding::Context {
-                id: binding_id,
-                value,
-            }),
-        )
+        self.bindings
+            .insert(type_id, binding::Binding::erase(binding_id, value))
     }
 
-    fn install_scoped_value(&mut self, value: ContextValue) -> Option<Arc<binding::Context>> {
-        let type_id = value.as_ref().type_id();
-        let previous_id = self.bindings.get(&type_id).map(|binding| binding.id);
+    fn install_scoped_value<T>(&mut self, value: T) -> Option<ErasedBinding>
+    where
+        T: Any + Send + Sync,
+    {
+        let type_id = TypeId::of::<T>();
+        let previous_id = self
+            .bindings
+            .get(&type_id)
+            .map(|binding| binding::Binding::<T>::downcast(binding).id);
         let binding_id =
             self.binding_mask
                 .install_scoped(&self.request_state.bindings, type_id, previous_id);
-        self.bindings.insert(
-            type_id,
-            Arc::new(binding::Context {
-                id: binding_id,
-                value,
-            }),
-        )
+        self.bindings
+            .insert(type_id, binding::Binding::erase(binding_id, value))
     }
 
     /// Creates a child scope containing `value`.
@@ -203,7 +186,12 @@ impl Cx {
     where
         T: Any + Send + Sync,
     {
-        self.with_erased_values(std::iter::once(Box::new(value) as ContextValue))
+        let mut cx = self.child();
+        let _ = cx.install_scoped_value(value);
+        CxScope {
+            cx,
+            parent: PhantomData,
+        }
     }
 
     /// Creates a child scope containing each tuple element as a separate
@@ -218,31 +206,22 @@ impl Cx {
     where
         V: ContextValues,
     {
-        let values = values.into_context_values();
-        let mut types = HashSet::with_capacity(values.len());
-        assert!(
-            values
-                .iter()
-                .all(|value| types.insert(value.as_ref().type_id())),
-            "a context scope cannot contain duplicate value types"
-        );
-        self.with_erased_values(values)
+        <V as private::ContextValues>::assert_unique_types();
+        let mut cx = self.child();
+        private::ContextValues::install(values, &mut cx);
+        CxScope {
+            cx,
+            parent: PhantomData,
+        }
     }
 
-    fn with_erased_values(&self, values: impl IntoIterator<Item = ContextValue>) -> CxScope<'_> {
-        let mut cx = Cx {
+    fn child(&self) -> Self {
+        Self {
             id: CxId::new(),
             app_context: self.app_context.clone(),
             request_state: self.request_state.clone(),
             bindings: self.bindings.clone(),
             binding_mask: self.binding_mask.clone(),
-        };
-        for value in values {
-            let _ = cx.install_scoped_value(value);
-        }
-        CxScope {
-            cx,
-            parent: PhantomData,
         }
     }
 
@@ -251,19 +230,19 @@ impl Cx {
             .expect("cannot mutate the request root while a scoped context is still reachable");
     }
 
+    fn app_context_mut(&mut self) -> &mut ContextMap {
+        Arc::get_mut(&mut self.app_context).expect("test context app context is still shared")
+    }
+
     pub(crate) fn request_value<T>(&self) -> Option<&T>
     where
         T: Any + Send + Sync,
     {
         let type_id = TypeId::of::<T>();
         if let Some(binding) = self.bindings.get(&type_id) {
+            let binding = binding::Binding::<T>::downcast(binding);
             record_context_read(&self.request_state, binding.id);
-            return Some(
-                binding
-                    .value
-                    .downcast_ref::<T>()
-                    .expect("context binding type changed"),
-            );
+            return Some(&binding.value);
         }
 
         let binding_id = self.request_state.bindings.root_none(type_id);
@@ -325,24 +304,29 @@ impl std::fmt::Debug for CxScope<'_> {
 ///
 /// This trait is implemented for tuples containing two through twelve values.
 /// It is sealed and cannot be implemented outside Topcoat.
-pub trait ContextValues: private::Sealed {
-    #[doc(hidden)]
-    fn into_context_values(self) -> Vec<ContextValue>;
-}
+pub trait ContextValues: private::ContextValues {}
+
+impl<T> ContextValues for T where T: private::ContextValues {}
 
 macro_rules! impl_context_values {
     (@one $(($type:ident, $index:tt)),+) => {
-        impl<$($type),+> private::Sealed for ($($type,)+)
-        where
-            $($type: Any + Send + Sync,)+
-        {}
-
-        impl<$($type),+> ContextValues for ($($type,)+)
+        impl<$($type),+> private::ContextValues for ($($type,)+)
         where
             $($type: Any + Send + Sync,)+
         {
-            fn into_context_values(self) -> Vec<ContextValue> {
-                vec![$(Box::new(self.$index),)+]
+            fn assert_unique_types() {
+                let types = [$(TypeId::of::<$type>()),+];
+                assert!(
+                    types
+                        .iter()
+                        .enumerate()
+                        .all(|(index, type_id)| !types[..index].contains(type_id)),
+                    "a context scope cannot contain duplicate value types"
+                );
+            }
+
+            fn install(self, cx: &mut Cx) {
+                $(let _ = cx.install_scoped_value(self.$index);)+
             }
         }
     };
@@ -361,14 +345,18 @@ impl_context_values!(@each [(T1, 0), (T2, 1)]
 );
 
 mod private {
-    pub trait Sealed {}
+    use super::Cx;
+
+    pub trait ContextValues {
+        fn assert_unique_types();
+        fn install(self, cx: &mut Cx);
+    }
 }
 
 /// Assembles a [`Cx`] from scratch for tests.
 #[derive(Debug, Default)]
 pub struct CxTestBuilder {
-    app_context: ContextMap,
-    request_context: ContextMap,
+    cx: Cx,
 }
 
 impl CxTestBuilder {
@@ -384,7 +372,7 @@ impl CxTestBuilder {
     where
         T: Any + Send + Sync,
     {
-        self.app_context.insert(value);
+        let _ = self.cx.app_context_mut().insert(value);
         self
     }
 
@@ -394,17 +382,14 @@ impl CxTestBuilder {
     where
         T: Any + Send + Sync,
     {
-        self.request_context.insert(value);
+        let _ = self.cx.insert(value);
         self
     }
 
     /// Consumes the builder, returning the assembled [`Cx`].
     #[must_use]
     pub fn build(self) -> Cx {
-        Cx::from_values(
-            Arc::new(self.app_context),
-            self.request_context.into_values(),
-        )
+        self.cx
     }
 }
 

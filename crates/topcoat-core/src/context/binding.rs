@@ -6,25 +6,43 @@ use std::{
 
 use bit_set::BitSet;
 
-use super::ContextValue;
+use super::ErasedBinding;
 
-pub(super) struct Context {
+pub(super) struct Binding<T> {
     pub(super) id: Id,
-    pub(super) value: ContextValue,
+    pub(super) value: T,
 }
 
-impl Context {
-    pub(super) fn into_value<T>(binding: Arc<Self>) -> T
-    where
-        T: Any + Send + Sync,
-    {
-        let binding = Arc::try_unwrap(binding).unwrap_or_else(|_| {
-            panic!("request root binding is still shared with a scoped context")
-        });
-        *binding
-            .value
-            .downcast::<T>()
+impl<T> Binding<T>
+where
+    T: Any + Send + Sync,
+{
+    pub(super) fn erase(id: Id, value: T) -> ErasedBinding {
+        Arc::new(Self { id, value })
+    }
+
+    pub(super) fn downcast(binding: &ErasedBinding) -> &Self {
+        binding
+            .downcast_ref()
             .expect("context binding type changed")
+    }
+
+    pub(super) fn downcast_unique(binding: &mut ErasedBinding) -> &mut Self {
+        Arc::get_mut(binding)
+            .unwrap_or_else(|| panic!("request root binding is still shared with a scoped context"))
+            .downcast_mut()
+            .expect("context binding type changed")
+    }
+
+    pub(super) fn into_value(binding: ErasedBinding) -> T {
+        let binding = binding
+            .downcast::<Self>()
+            .unwrap_or_else(|_| panic!("context binding type changed"));
+        Arc::try_unwrap(binding)
+            .unwrap_or_else(|_| {
+                panic!("request root binding is still shared with a scoped context")
+            })
+            .value
     }
 }
 

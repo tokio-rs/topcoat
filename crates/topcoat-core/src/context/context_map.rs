@@ -1,8 +1,7 @@
 //! Type-keyed values made available through the request context.
 //!
 //! [`ContextMap`] is a type-keyed map of values, looked up by their [`TypeId`](std::any::TypeId).
-//! It stores router-wide app context and stages root values for
-//! [`CxTestBuilder`](super::CxTestBuilder):
+//! It stores router-wide app context:
 //!
 //! - **App context** is registered once at startup and shared across every request handled by the
 //!   router. Within a request, [`app_context`] retrieves a required value and [`try_app_context`]
@@ -149,9 +148,8 @@ where
 ///
 /// Each registered value is stored under its [`TypeId`](std::any::TypeId), so a given type can
 /// only be registered once per `ContextMap`. It is used for router-wide app
-/// context and while building test contexts; values are retrieved within a
-/// request via [`app_context`], [`try_app_context`],
-/// [`request_context`], or [`try_request_context`].
+/// context. Values are retrieved within a request via [`app_context`] or
+/// [`try_app_context`].
 #[derive(Default, Debug)]
 pub struct ContextMap {
     entries: anymap3::Map<dyn Any + Send + Sync>,
@@ -206,10 +204,6 @@ impl ContextMap {
         T: Any + Send + Sync,
     {
         self.entries.get_mut::<T>()
-    }
-
-    pub(crate) fn into_values(self) -> impl Iterator<Item = Box<dyn Any + Send + Sync>> {
-        self.entries.into_raw().into_values()
     }
 }
 
