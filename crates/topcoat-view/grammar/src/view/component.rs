@@ -12,7 +12,10 @@ use topcoat_core_grammar::ParseOption;
 
 use crate::{
     template::RuntimeExpr,
-    view::{Nodes, hir::{LowerView, ViewBuilder}},
+    view::{
+        Nodes,
+        hir::{LowerView, ViewBuilder},
+    },
 };
 
 /// A component invocation, written as `path(name: value, ..., child_node child_node ...)`.
@@ -74,7 +77,12 @@ impl topcoat_core_grammar::pretty::PrettyPrint for NamedArgValue {
 
 impl LowerView for Component {
     fn lower(&self, builder: &mut ViewBuilder) {
-        builder.component(&self.path, &self.named_args, &self.children, self.paren_token.span.span());
+        builder.component(
+            &self.path,
+            &self.named_args,
+            &self.children,
+            self.paren_token.span.span(),
+        );
     }
 }
 

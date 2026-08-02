@@ -12,6 +12,7 @@ mod props;
 pub mod svg;
 mod unescaped;
 mod view;
+mod view_tree;
 
 pub use attribute::*;
 pub use class::*;

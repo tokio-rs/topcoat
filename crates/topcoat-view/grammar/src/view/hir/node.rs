@@ -36,3 +36,23 @@ pub(crate) enum Node {
     /// A `match` whose arm bodies are lowered into nested scopes.
     MatchExpr(MatchExpr),
 }
+
+impl Node {
+    pub(super) fn contains_component(&self) -> bool {
+        match self {
+            Self::Component(_) => true,
+            Self::ForLoop(ForLoop { body, .. }) => body.contains_component(),
+            Self::IfElse(IfElse {
+                then_branch,
+                else_branch,
+                ..
+            }) => then_branch.contains_component() || else_branch.contains_component(),
+            Self::MatchExpr(MatchExpr { arms, .. }) => {
+                arms.iter().any(|arm| arm.body.contains_component())
+            }
+            Self::StaticSegment(_) | Self::ExprNode(_) | Self::Local(_) | Self::Statement(_) => {
+                false
+            }
+        }
+    }
+}
