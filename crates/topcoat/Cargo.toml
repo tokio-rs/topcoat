@@ -49,6 +49,7 @@ full = [
 	"tailwind",
 	"tower",
 	"ui",
+	"vercel",
 	"view",
 	"websocket",
 ]
@@ -160,6 +161,11 @@ tower = [
 ui = [
 	"dep:topcoat-ui-registry",
 ]
+vercel = [
+	"router",
+	"serve",
+	"dep:topcoat-vercel",
+]
 view = [
 	"dep:topcoat-view",
 	"dep:topcoat-view-macro",
@@ -193,6 +199,7 @@ topcoat-runtime-macro = { workspace = true, optional = true }
 topcoat-session = { workspace = true, optional = true }
 topcoat-tailwind = { workspace = true, optional = true }
 topcoat-ui-registry = { workspace = true, optional = true }
+topcoat-vercel = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
 topcoat-view-macro = { workspace = true, optional = true }
 

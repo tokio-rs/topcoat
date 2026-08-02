@@ -20,6 +20,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable e
 - `topcoat-htmx`, `topcoat-alpine-ajax`, and `topcoat-datastar`: request and response helpers for those client libraries.
 - `topcoat-tailwind`: the build-script wrapper around the standalone Tailwind CLI.
 - `topcoat-ui` (+ `registry/`): the component registry behind `topcoat ui`, which copies component source into a project.
+- `topcoat-vercel`: the Vercel runtime adapter and the `topcoat-vercel` CLI, which emits Build Output API deployments.
 - `topcoat-cli`: the `topcoat` binary. Each subcommand has its own module under `src/`.
 
 A crate that backs proc-macros comes as a trio. The base crate holds the runtime types the generated code calls into. Its `grammar/` crate parses the macro body and generates the code, and is only used at compile time. Its `macro/` crate is a thin proc-macro entry point over `grammar/`. Where a macro body is formattable, the `grammar/` crate's `pretty` feature adds the pretty-printer `topcoat fmt` uses.
@@ -89,6 +90,10 @@ Each crate's `docs/` directory holds the user-facing guides for that crate, embe
 - [`crates/topcoat/docs/htmx.md`](crates/topcoat/docs/htmx.md): htmx: reading its request headers and setting its response headers from a handler.
 - [`crates/topcoat/docs/alpine-ajax.md`](crates/topcoat/docs/alpine-ajax.md): Alpine AJAX: reading its request headers to render partial responses.
 - [`crates/topcoat/docs/datastar.md`](crates/topcoat/docs/datastar.md): Datastar: reading the signals sent with a request and patching elements and signals over server-sent events.
+
+### Deployment
+
+- [`crates/topcoat/docs/vercel.md`](crates/topcoat/docs/vercel.md): Running a Topcoat application on Vercel and generating a Build Output API deployment with `topcoat-vercel`.
 
 ### Tooling
 

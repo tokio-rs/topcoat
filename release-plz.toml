@@ -62,6 +62,7 @@ changelog_include = [
     "topcoat-tailwind",
     "topcoat-ui",
     "topcoat-ui-registry",
+    "topcoat-vercel",
     "topcoat-view",
     "topcoat-view-grammar",
     "topcoat-view-macro",
@@ -219,6 +220,11 @@ version_group = "topcoat"
 
 [[package]]
 name = "topcoat-ui-registry"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-vercel"
 release = true
 version_group = "topcoat"
 

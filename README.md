@@ -201,6 +201,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 
 **Start here**
 - [Getting started](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md): create a new project, install the CLI, run the dev server.
+- [Deploy to Vercel](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/vercel.md): build a streaming Rust function with the Vercel Build Output API.
 - [Source code formatting](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-cli/docs/fmt.md): `topcoat fmt` for macro bodies.
 
 **Rendering**
