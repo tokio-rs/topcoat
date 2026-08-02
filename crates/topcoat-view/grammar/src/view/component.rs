@@ -8,11 +8,14 @@ use syn::{
     spanned::Spanned,
     token::Paren,
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_error, topcoat_view},
+};
 
 use crate::{
     template::RuntimeExpr,
-    view::{ExprKind, Nodes, ViewWriter, WriteView},
+    view::{Nodes, ViewWriter, WriteView},
 };
 
 /// A component invocation, written as `path(name: value, ..., child_node child_node ...)`.
@@ -84,29 +87,46 @@ impl WriteView for Component {
             for child in &self.children {
                 child.write(&mut child_writer);
             }
-            let child = child_writer.into_token_stream();
-            quote_spanned! {self.paren_token.span.span()=>
-                .child(#child)
-            }
+            child_writer.into_token_stream()
         });
 
-        writer.write_expr(
-            ExprKind::View,
+        let component = if let Some(child) = child {
             quote_spanned! {self.paren_token.span.span()=>
-                {
+                async {
                     use #topcoat_view::Component;
-                    let props = #name::props_builder()#(#setters)*#child.build();
+                    let __child_slot = __ViewSlot::new();
+                    let props = #name::props_builder()
+                        #(#setters)*
+                        .child(__child_slot.view())
+                        .build();
+                    let __child = async {
+                        __child_slot.fill(#child);
+                        ::core::result::Result::<(), #topcoat_error::Error>::Ok(())
+                    };
                     // The marker is built via `Default` so the same construction
                     // works for both unit-struct and generic (`PhantomData`) markers.
                     #[allow(clippy::default_constructed_unit_structs)]
-                    Component::render(
-                        #name::default(),
-                        __cx,
-                        props,
-                    ).await?
+                    let __component = Component::render(#name::default(), __cx, props);
+                    let (__child_result, __component_result) =
+                        __join(__child, __component).await;
+                    __child_result?;
+                    __component_result
                 }
-            },
-        );
+            }
+        } else {
+            quote_spanned! {self.paren_token.span.span()=>
+                async {
+                    use #topcoat_view::Component;
+                    let props = #name::props_builder()#(#setters)*.build();
+                    // The marker is built via `Default` so the same construction
+                    // works for both unit-struct and generic (`PhantomData`) markers.
+                    #[allow(clippy::default_constructed_unit_structs)]
+                    Component::render(#name::default(), __cx, props).await
+                }
+            }
+        };
+
+        writer.write_component(component);
     }
 }
 

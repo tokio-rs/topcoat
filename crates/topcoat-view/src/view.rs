@@ -1,5 +1,8 @@
 use core::{fmt, fmt::Write as _};
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    sync::{Arc, Mutex},
+};
 
 #[cfg(feature = "http")]
 use http::{HeaderMap, StatusCode};
@@ -208,6 +211,9 @@ pub enum ViewPart {
         inner: Box<[ViewPart]>,
         size_hint: usize,
     },
+    /// A framework-managed slot filled before the completed view is rendered.
+    #[doc(hidden)]
+    Slot(Arc<Mutex<Option<ViewPart>>>),
     /// A response status code recorded at render time; renders no content.
     #[cfg(feature = "http")]
     #[non_exhaustive]
@@ -277,6 +283,12 @@ impl ViewPart {
                     part.render(cx, f);
                 }
             }
+            Self::Slot(inner) => inner
+                .lock()
+                .unwrap()
+                .as_ref()
+                .expect("view slot must be filled before rendering")
+                .render(cx, f),
             #[cfg(feature = "http")]
             Self::StatusCode(status_code) => f.record_status_code(*status_code),
             #[cfg(feature = "http")]
@@ -322,6 +334,11 @@ impl ViewPart {
                 _ => value.len() + value.len() / 8,
             },
             Self::BoxDyn { size_hint, .. } | Self::BoxSlice { size_hint, .. } => *size_hint,
+            Self::Slot(inner) => inner
+                .lock()
+                .unwrap()
+                .as_ref()
+                .map_or(0, ViewPart::size_hint),
             #[cfg(feature = "http")]
             Self::StatusCode(_) | Self::Headers(_) => 0,
         }

@@ -12,6 +12,7 @@ mod props;
 pub mod svg;
 mod unescaped;
 mod view;
+mod view_tree;
 
 pub use attribute::*;
 pub use class::*;
@@ -28,8 +29,10 @@ pub use view::*;
 /// Macro helpers to shorten the generated source code.
 #[doc(hidden)]
 pub mod internal {
+    pub use futures_util::future::{join as __join, join_all as __join_all};
     use topcoat_core::context::Cx;
 
+    pub use crate::view_tree::{ViewSlot as __ViewSlot, ViewTree as __ViewTree};
     use crate::{
         Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
         ElementNameViewParts, HtmlContext, NodeViewParts, PartsWriter, Unescaped, View, ViewParts,

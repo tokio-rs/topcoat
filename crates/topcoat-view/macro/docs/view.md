@@ -345,6 +345,10 @@ view! {
 
 See how to define components in the [`component`] macro guide.
 
+The macro collects component calls into an unresolved view tree, then polls every independent component in that tree concurrently. This includes components selected by `if` and `match`, components separated by static HTML, and every iteration of a `for` loop. Completed views are inserted in source order, regardless of completion order. Components in branches that are not selected do not run.
+
+Child nodes use an internal placeholder while the component renders, allowing components inside the child and the parent to run concurrently. The placeholder is filled before the completed view can be rendered.
+
 # Boolean And Conditional Attributes
 
 [Boolean HTML attributes](https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML) such as `disabled`, `required`, and `checked` are true when the attribute is present and false when it is absent. HTML expects a present boolean attribute to have an empty value.
