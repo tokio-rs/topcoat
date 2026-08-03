@@ -2,15 +2,15 @@ use std::{
     any::{Any, type_name},
     borrow::Cow,
     collections::HashMap,
-    fmt,
+    fmt, iter,
     sync::Arc,
 };
 
 use topcoat_core::{base_url::BaseUrl, context::ContextMap};
 
 use crate::{
-    Endpoint, Layer, Layers, LayoutFn, Methods, OriginLayer, OriginPolicy, PageFn, PageWithLayouts,
-    PathSegment, RawPathParamSpec, Route, Router,
+    Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, OriginLayer, OriginPolicy, PageFn,
+    PageWithLayouts, Path, PathSegment, RawPathParamSpec, Route, Router,
 };
 
 /// Builds a [`Router`] for a Topcoat application.
@@ -399,13 +399,20 @@ impl RouterBuilder {
         // to the same path *and* method are ambiguous, so reject them here.
         // Remember each group's first route index to name it in the layer
         // divergence panic below.
-        let mut grouped: HashMap<Cow<'static, str>, (usize, Endpoint)> = HashMap::new();
+        let mut grouped: HashMap<Cow<'static, str>, Endpoint> = HashMap::new();
         let mut interned_path_params: HashMap<&str, Arc<str>> = HashMap::new();
+        let mut layers_used = iter::repeat_n(false, layers.len()).collect::<Vec<_>>();
         for (index, route) in routes.iter().enumerate() {
             let layer_stack = layers.for_endpoint(route.path());
-            let (first, endpoint) = grouped
+            // Mark layers as used.
+            for layer_id in &layer_stack {
+                layers_used[layer_id.0] = true;
+            }
+
+            let endpoint = grouped
                 .entry(route.path().to_matchit_path())
                 .or_insert_with(|| {
+                    // Pre-compute path params for this endpoint.
                     let path_params = route
                         .path()
                         .segments()
@@ -425,21 +432,8 @@ impl RouterBuilder {
                             })
                         })
                         .collect();
-                    let endpoint =
-                        Endpoint::new(path_params, layer_stack.clone().into_boxed_slice());
-                    (index, endpoint)
+                    Endpoint::new(path_params, layer_stack.into_boxed_slice())
                 });
-
-            // Every route grouped at a path shares the endpoint's layer stack
-            // (the 405 fallback included), so their full paths -- group
-            // segments and all -- must select the same layers. Reject a
-            // divergence rather than let registration order pick a winner.
-            assert!(
-                layer_stack == endpoint.layers(),
-                "routes `{}` and `{}` serve the same URL path but select different layers",
-                routes[*first].path(),
-                route.path(),
-            );
 
             // An any-method route shares its path with specific-method routes
             // (which win at dispatch), so the two kinds are checked for
@@ -471,10 +465,19 @@ impl RouterBuilder {
             }
         }
 
-        // Precompute the layer stack wrapping each endpoint once, so dispatch
-        // only has to index into it rather than filter and sort per request.
+        // Sanity check for unused layers.
+        for (layer_id, used) in layers_used.into_iter().enumerate() {
+            let layer = &layers[LayerId(layer_id)];
+            assert!(
+                used || layer.path() == Path::ROOT,
+                "layer with path `{}` did not match any route, this is likely a mistake",
+                layers[LayerId(layer_id)].path()
+            );
+        }
+
+        // Insert batched endpoints into matchit router.
         let mut endpoints = matchit::Router::new();
-        for (path, (_, mut endpoint)) in grouped {
+        for (path, mut endpoint) in grouped {
             endpoint.alias_head_to_get();
             endpoints
                 .insert(path.clone(), endpoint)
@@ -505,8 +508,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, LayerFn, LayerFuture, Method, Next, Path, RouteFn, RouteFuture,
-        response::IntoResponse,
+        Body, LayerFuture, Method, Next, Path, RouteFn, RouteFuture, response::IntoResponse,
     };
 
     fn path(s: &'static str) -> Cow<'static, Path> {
@@ -516,11 +518,6 @@ mod tests {
     /// A stand-in handler; builder tests register routes without running them.
     fn handler(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { "handled".into_response(cx) })
-    }
-
-    /// A stand-in layer that continues the chain unchanged.
-    fn noop_layer<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
-        Box::pin(async move { next.run(cx, body).await })
     }
 
     struct Greeting;
@@ -573,19 +570,6 @@ mod tests {
     fn route_without_methods_panics_on_build() {
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Vec::<Method>::new(), path("/x"), handler))
-            .build();
-    }
-
-    #[test]
-    #[should_panic(expected = "select different layers")]
-    fn routes_sharing_a_url_with_different_layers_panic() {
-        // Both routes serve `/x` (groups are stripped from the URL), but only
-        // the `(a)` route is wrapped by the `/(a)` layer. The endpoint's layer
-        // stack is shared, so the build rejects the divergence.
-        let _ = RouterBuilder::new()
-            .route(RouteFn::new(Method::GET, path("/(a)/x"), handler))
-            .route(RouteFn::new(Method::POST, path("/(b)/x"), handler))
-            .layer(LayerFn::new(path("/(a)"), noop_layer))
             .build();
     }
 

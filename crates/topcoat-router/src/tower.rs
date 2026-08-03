@@ -182,7 +182,7 @@ impl<S> TowerLayer<S> {
         L: tower::Layer<TowerNext, Service = S>,
     {
         Self {
-            path: Cow::Borrowed(Path::new("/")),
+            path: Cow::Borrowed(Path::ROOT),
             service: layer.layer(TowerNext::new()),
         }
     }

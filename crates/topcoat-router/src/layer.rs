@@ -38,7 +38,7 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 ///
 /// impl Layer for Timing {
 ///     fn path(&self) -> &Path {
-///         Path::new("/")
+///         Path::ROOT
 ///     }
 ///
 ///     fn handle<'a>(
@@ -103,8 +103,8 @@ impl Layer for LayerFn {
 inventory::collect!(LayerFn);
 
 /// The identifier of a [`Layer`] registered on a router.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct LayerId(usize);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct LayerId(pub(crate) usize);
 
 /// The layers registered on a router, in registration order, indexed by
 /// [`LayerId`].
@@ -137,6 +137,11 @@ impl Layers {
             .collect();
         ids.sort_by_key(|id| self[*id].path().len());
         ids
+    }
+
+    /// Returns the number of registered layers.
+    pub(crate) fn len(&self) -> usize {
+        self.layers.len()
     }
 }
 

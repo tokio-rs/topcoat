@@ -34,6 +34,9 @@ pub struct Path {
 }
 
 impl Path {
+    // The root path "/".
+    pub const ROOT: &Path = Path::new("/");
+
     /// Creates a `&Path` from a string slice.
     ///
     /// The root path `"/"` is normalized to an empty inner representation so that

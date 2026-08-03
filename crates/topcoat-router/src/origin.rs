@@ -237,7 +237,7 @@ impl OriginLayer {
 
 impl Layer for OriginLayer {
     fn path(&self) -> &Path {
-        Path::new("/")
+        Path::ROOT
     }
 
     fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {

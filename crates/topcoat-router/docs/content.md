@@ -27,7 +27,7 @@ The context and the body parameter are both optional and may appear in either or
 
 Extractors that buffer the body read at most the request's body limit and reject a larger body with `413 Content Too Large`, so a client cannot exhaust the server's memory. The limit defaults to 2 MiB; register the [`BodyLimit`](crate::BodyLimit) layer to change it, for the whole application or for the routes under a path:
 
-```rust
+```rust,no_run
 use topcoat::router::{BodyLimit, Router};
 
 let router = Router::builder()
