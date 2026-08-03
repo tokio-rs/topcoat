@@ -2,6 +2,7 @@ mod binding;
 mod context_map;
 mod id;
 pub mod test;
+mod value;
 
 use std::{
     any::{Any, TypeId},
@@ -15,6 +16,7 @@ use bit_set::BitSet;
 pub use context_map::*;
 pub use id::*;
 pub use test::*;
+pub use value::ContextValues;
 
 use crate::{abort::AbortStore, memoize::MemoizeCache};
 
@@ -173,9 +175,8 @@ impl Cx {
     where
         V: ContextValues,
     {
-        <V as private::ContextValues>::assert_unique_types();
         let mut cx = self.child();
-        private::ContextValues::install(values, &mut cx);
+        value::install(values, &mut cx);
         CxScope {
             cx,
             parent: PhantomData,
@@ -261,59 +262,6 @@ impl Drop for CxScope<'_> {
 impl std::fmt::Debug for CxScope<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.cx.fmt(f)
-    }
-}
-
-/// A tuple of values that can be installed by [`Cx::with_values`].
-///
-/// This trait is implemented for tuples containing two through twelve values.
-/// It is sealed and cannot be implemented outside Topcoat.
-pub trait ContextValues: private::ContextValues {}
-
-impl<T> ContextValues for T where T: private::ContextValues {}
-
-macro_rules! impl_context_values {
-    (@one $(($type:ident, $index:tt)),+) => {
-        impl<$($type),+> private::ContextValues for ($($type,)+)
-        where
-            $($type: Any + Send + Sync,)+
-        {
-            fn assert_unique_types() {
-                let types = [$(TypeId::of::<$type>()),+];
-                assert!(
-                    types
-                        .iter()
-                        .enumerate()
-                        .all(|(index, type_id)| !types[..index].contains(type_id)),
-                    "a context scope cannot contain duplicate value types"
-                );
-            }
-
-            fn install(self, cx: &mut Cx) {
-                $(cx.install_scoped_value(self.$index);)+
-            }
-        }
-    };
-    (@each [$(($type:ident, $index:tt)),+] ($next:ident, $next_index:tt) $(, $rest:tt)*) => {
-        impl_context_values!(@one $(($type, $index)),+);
-        impl_context_values!(@each [$(($type, $index)),+, ($next, $next_index)] $($rest),*);
-    };
-    (@each [$(($type:ident, $index:tt)),+]) => {
-        impl_context_values!(@one $(($type, $index)),+);
-    };
-}
-
-impl_context_values!(@each [(T1, 0), (T2, 1)]
-    (T3, 2), (T4, 3), (T5, 4), (T6, 5), (T7, 6),
-    (T8, 7), (T9, 8), (T10, 9), (T11, 10), (T12, 11)
-);
-
-mod private {
-    use super::Cx;
-
-    pub trait ContextValues {
-        fn assert_unique_types();
-        fn install(self, cx: &mut Cx);
     }
 }
 
