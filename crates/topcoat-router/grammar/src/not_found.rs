@@ -50,21 +50,20 @@ impl ToTokens for NotFound {
             }
         };
 
-        match self.catch_all_path() {
-            Some(path) => page(quote! { * #path }).to_tokens(tokens),
-            None => {
-                let page = page(quote! { * });
-                quote! {
-                    /// Serves every unmatched URL under this module as a
-                    /// not-found error.
-                    pub mod not_found {
-                        #topcoat_router_macro::segment!(kind = CatchAll, rename = "rest");
+        if let Some(path) = self.catch_all_path() {
+            page(quote! { * #path }).to_tokens(tokens);
+        } else {
+            let page = page(quote! { * });
+            quote! {
+                /// Serves every unmatched URL under this module as a
+                /// not-found error.
+                pub mod not_found {
+                    #topcoat_router_macro::segment!(kind = CatchAll, rename = "rest");
 
-                        #page
-                    }
+                    #page
                 }
-                .to_tokens(tokens);
             }
+            .to_tokens(tokens);
         }
     }
 }
