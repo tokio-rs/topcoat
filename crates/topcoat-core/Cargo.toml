@@ -23,6 +23,7 @@ hashbrown.workspace = true
 http.workspace = true
 im.workspace = true
 pin-project-lite.workspace = true
+scoped-tls-hkt.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 

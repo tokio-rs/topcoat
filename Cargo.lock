@@ -2202,6 +2202,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "scoped-tls-hkt"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9603871ffe5df3ac39cb624790c296dbd47a400d202f56bf3e414045099524d"
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2920,6 +2926,7 @@ dependencies = [
  "http",
  "im",
  "pin-project-lite",
+ "scoped-tls-hkt",
  "thiserror",
  "tokio",
  "topcoat",

@@ -6,7 +6,6 @@ mod value;
 
 use std::{
     any::{Any, TypeId},
-    cell::RefCell,
     marker::PhantomData,
     ops::Deref,
     sync::{Arc, Mutex},
@@ -15,6 +14,7 @@ use std::{
 use bit_set::BitSet;
 pub use context_map::*;
 pub use id::*;
+use scoped_tls_hkt::scoped_thread_local;
 pub use test::*;
 pub use value::ContextValues;
 
@@ -295,28 +295,31 @@ impl ContextReadMask {
     }
 }
 
-pub(crate) struct ContextTracker {
-    request_state: Arc<RequestState>,
-    input: binding::Mask,
+pub(crate) struct ContextTracker<'cx> {
+    cx: &'cx Cx,
     reads: Mutex<ContextReadMask>,
 }
 
-impl ContextTracker {
-    pub(crate) fn new(cx: &Cx) -> Arc<Self> {
-        Arc::new(Self {
-            request_state: cx.request_state.clone(),
-            input: cx.bindings.mask().clone(),
+impl<'cx> ContextTracker<'cx> {
+    pub(crate) fn new(cx: &'cx Cx) -> Self {
+        Self {
+            cx,
             reads: Mutex::new(ContextReadMask::default()),
-        })
+        }
     }
 
-    pub(crate) fn scope<R>(self: &Arc<Self>, f: impl FnOnce() -> R) -> R {
-        let previous = ACTIVE_TRACKER.with(|active| active.borrow_mut().replace(self.clone()));
-        let _scope = TrackerScope {
-            tracker: self,
-            previous,
-        };
-        f()
+    pub(crate) fn scope<R>(&self, f: impl FnOnce() -> R) -> R {
+        if ACTIVE_TRACKER.is_set() {
+            ACTIVE_TRACKER.with(|previous| {
+                let _scope = TrackerScope {
+                    tracker: self,
+                    previous,
+                };
+                ACTIVE_TRACKER.set(self, f)
+            })
+        } else {
+            ACTIVE_TRACKER.set(self, f)
+        }
     }
 
     pub(crate) fn finish(&self) -> ContextReadMask {
@@ -325,16 +328,18 @@ impl ContextTracker {
 
     fn record(&self, binding_id: binding::Id) {
         if !self
-            .input
-            .effectively_contains(&self.request_state.bindings, binding_id)
+            .cx
+            .bindings
+            .mask()
+            .effectively_contains(&self.cx.request_state.bindings, binding_id)
         {
             return;
         }
         self.reads.lock().unwrap().insert(binding_id);
     }
 
-    fn merge_into(&self, tracker: &Self) {
-        if !Arc::ptr_eq(&self.request_state, &tracker.request_state) {
+    fn merge_into(&self, tracker: &ContextTracker<'_>) {
+        if !Arc::ptr_eq(&self.cx.request_state, &tracker.cx.request_state) {
             return;
         }
 
@@ -344,38 +349,27 @@ impl ContextTracker {
     }
 }
 
-thread_local! {
-    static ACTIVE_TRACKER: RefCell<Option<Arc<ContextTracker>>> = const { RefCell::new(None) };
+scoped_thread_local!(static ACTIVE_TRACKER: for<'a> &'a ContextTracker<'a>);
+
+struct TrackerScope<'tracker, 'tracker_cx, 'previous, 'previous_cx> {
+    tracker: &'tracker ContextTracker<'tracker_cx>,
+    previous: &'previous ContextTracker<'previous_cx>,
 }
 
-struct TrackerScope<'a> {
-    tracker: &'a Arc<ContextTracker>,
-    previous: Option<Arc<ContextTracker>>,
-}
-
-impl Drop for TrackerScope<'_> {
+impl Drop for TrackerScope<'_, '_, '_, '_> {
     fn drop(&mut self) {
-        ACTIVE_TRACKER.with(|tracker| {
-            let active = tracker
-                .replace(self.previous.take())
-                .expect("context tracker scope is missing its active tracker");
-            debug_assert!(Arc::ptr_eq(&active, self.tracker));
-
-            if let Some(previous) = tracker.borrow().as_ref() {
-                active.merge_into(previous);
-            }
-        });
+        self.tracker.merge_into(self.previous);
     }
 }
 
 fn record_context_read(request_state: &Arc<RequestState>, binding_id: binding::Id) {
-    ACTIVE_TRACKER.with(|tracker| {
-        if let Some(tracker) = tracker.borrow().as_ref()
-            && Arc::ptr_eq(&tracker.request_state, request_state)
-        {
-            tracker.record(binding_id);
-        }
-    });
+    if ACTIVE_TRACKER.is_set() {
+        ACTIVE_TRACKER.with(|tracker| {
+            if Arc::ptr_eq(&tracker.cx.request_state, request_state) {
+                tracker.record(binding_id);
+            }
+        });
+    }
 }
 
 pub(crate) fn replay_context_reads(cx: &Cx, reads: &ContextReadMask) {
