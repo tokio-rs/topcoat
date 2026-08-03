@@ -1,0 +1,13 @@
+[package]
+name = "deferred-view"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+topcoat.workspace = true
+
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

@@ -73,8 +73,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for NamedArgValue {
     }
 }
 
-impl WriteView for Component {
-    fn write(&self, writer: &mut ViewWriter) {
+impl Component {
+    pub(crate) fn render_future(&self) -> TokenStream {
         let name = &self.path;
 
         let setters = self.named_args.iter().map(|arg| {
@@ -90,7 +90,7 @@ impl WriteView for Component {
             child_writer.into_token_stream()
         });
 
-        let component = if let Some(child) = child {
+        if let Some(child) = child {
             quote_spanned! {self.paren_token.span.span()=>
                 async {
                     use #topcoat_view::Component;
@@ -124,9 +124,13 @@ impl WriteView for Component {
                     Component::render(#name::default(), __cx, props).await
                 }
             }
-        };
+        }
+    }
+}
 
-        writer.write_component(component);
+impl WriteView for Component {
+    fn write(&self, writer: &mut ViewWriter) {
+        writer.write_component(self.render_future());
     }
 }
 

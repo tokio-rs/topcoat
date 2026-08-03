@@ -1,4 +1,5 @@
 mod component;
+mod deferred;
 mod document_type;
 mod element;
 mod element_name;
@@ -10,6 +11,7 @@ mod signal_declaration;
 mod view_writer;
 
 pub use component::*;
+pub use deferred::*;
 pub use document_type::*;
 pub use element::*;
 pub use element_name::*;

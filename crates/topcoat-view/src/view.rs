@@ -9,7 +9,7 @@ use http::{HeaderMap, StatusCode};
 use smallvec::SmallVec;
 use topcoat_core::context::Cx;
 
-use crate::{Formatter, HtmlContext, HtmlWriter};
+use crate::{DeferredPart, Formatter, HtmlContext, HtmlWriter};
 
 /// A self-contained piece of HTML content.
 ///
@@ -58,6 +58,21 @@ impl View {
         }
     }
 
+    /// Uses this view as a placeholder for work streamed after the response
+    /// shell.
+    ///
+    /// The returned view composes normally with other views. When it becomes
+    /// part of an HTTP response, `render` receives an owned request context
+    /// and its completed view replaces this placeholder.
+    #[must_use]
+    pub fn defer<F, Fut>(self, render: F) -> Self
+    where
+        F: FnOnce(topcoat_core::context::CxHandle) -> Fut + Send + 'static,
+        Fut: Future<Output = topcoat_core::error::Result<View>> + Send + 'static,
+    {
+        crate::defer(self, render)
+    }
+
     /// Renders the view into an HTML string.
     #[cfg_attr(
         feature = "http",
@@ -70,6 +85,7 @@ impl View {
     ///
     /// Panics if a dynamic attribute key or element name in the view contains
     /// a character that could break out of the identifier.
+    #[must_use]
     #[track_caller]
     pub fn render(&self, cx: &Cx) -> String {
         let mut buf = String::with_capacity(self.part.size_hint());
@@ -99,11 +115,12 @@ impl View {
         let mut html = String::with_capacity(self.part.size_hint());
         let mut f = Formatter::new(&mut html);
         self.part.render(cx, &mut f);
-        let (status_code, headers) = f.into_recorded();
+        let (status_code, headers, deferred) = f.into_recorded();
         RenderedResponse {
             html,
             status_code,
             headers,
+            deferred,
         }
     }
 
@@ -111,6 +128,11 @@ impl View {
     #[inline]
     pub(crate) fn into_part(self) -> ViewPart {
         self.part
+    }
+
+    #[inline]
+    pub(crate) fn from_part(part: ViewPart) -> Self {
+        Self { part }
     }
 }
 
@@ -131,6 +153,9 @@ pub struct RenderedResponse {
     /// Each name carries the values of the first render part that mentioned
     /// it.
     pub headers: HeaderMap,
+    /// Deferred work discovered while rendering the initial HTML.
+    #[doc(hidden)]
+    pub deferred: Vec<crate::DeferredTask>,
 }
 
 /// A renderable value stored in a [`View`].
@@ -211,6 +236,9 @@ pub enum ViewPart {
         inner: Box<[ViewPart]>,
         size_hint: usize,
     },
+    /// A placeholder backed by work resolved by a streaming response.
+    #[doc(hidden)]
+    Deferred(DeferredPart),
     /// A framework-managed slot filled before the completed view is rendered.
     #[doc(hidden)]
     Slot(Arc<Mutex<Option<ViewPart>>>),
@@ -283,6 +311,17 @@ impl ViewPart {
                     part.render(cx, f);
                 }
             }
+            Self::Deferred(deferred) => {
+                let id = deferred.task().id();
+                write!(
+                    f,
+                    r#"<template data-topcoat-defer-start="{id}"></template>"#
+                )
+                .unwrap();
+                deferred.placeholder().render(cx, f);
+                write!(f, r#"<template data-topcoat-defer-end="{id}"></template>"#).unwrap();
+                f.record_deferred(deferred.task().clone());
+            }
             Self::Slot(inner) => inner
                 .lock()
                 .unwrap()
@@ -334,6 +373,7 @@ impl ViewPart {
                 _ => value.len() + value.len() / 8,
             },
             Self::BoxDyn { size_hint, .. } | Self::BoxSlice { size_hint, .. } => *size_hint,
+            Self::Deferred(deferred) => deferred.placeholder().size_hint() + 128,
             Self::Slot(inner) => inner
                 .lock()
                 .unwrap()
