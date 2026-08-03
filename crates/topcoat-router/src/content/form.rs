@@ -23,6 +23,9 @@ use crate::{
 /// [`IntoResponse`] wrapper, it serializes `T` back to a URL-encoded body and
 /// sets the response `Content-Type`.
 ///
+/// An empty encoded value such as `due=` becomes [`None`] when its target field
+/// is an [`Option`]. A required [`String`] field still receives an empty string.
+///
 /// Wrap it in [`Option`] to make the body optional. For `GET` and `HEAD`
 /// requests the extractor yields [`None`] only when there is no query string;
 /// for other methods it yields [`None`] when there is no `Content-Type` header.
@@ -118,8 +121,7 @@ where
     /// Returns a bad-request error when `bytes` are not valid URL-encoded form
     /// data matching `T`.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let deserializer = serde_urlencoded::Deserializer::new(form_urlencoded::parse(bytes));
-        let value = serde_path_to_error::deserialize(deserializer).map_err(|error| {
+        let value = crate::urlencoded::from_bytes(bytes).map_err(|error| {
             bad_request_at(
                 error.path(),
                 format!("invalid form value: {}", error.inner()),
@@ -194,6 +196,7 @@ fn form_content_type(content_type: Option<&str>) -> bool {
 #[cfg(test)]
 mod tests {
     use http::{Method, Request, header::CONTENT_TYPE};
+    use serde::Deserialize;
     use topcoat_core::context::{Cx, CxTestBuilder};
 
     use super::*;
@@ -325,6 +328,18 @@ mod tests {
         let Form(pairs) =
             Form::<Vec<(String, u32)>>::from_bytes(b"a=1&b=2").expect("valid form data");
         assert_eq!(pairs, vec![("a".to_owned(), 1), ("b".to_owned(), 2)]);
+    }
+
+    #[test]
+    fn from_bytes_treats_empty_optional_value_as_none() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct Input {
+            due: Option<u32>,
+        }
+
+        let Form(input) = Form::<Input>::from_bytes(b"due=").expect("an empty optional value");
+
+        assert_eq!(input, Input { due: None });
     }
 
     #[test]

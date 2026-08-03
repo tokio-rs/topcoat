@@ -48,9 +48,7 @@ pub type QueryParamsError = serde_path_to_error::Error<serde_urlencoded::de::Err
 /// into `T`.
 pub fn parse_query_params<T: DeserializeOwned>(cx: &Cx) -> Result<T, QueryParamsError> {
     let query = uri(cx).query().unwrap_or("");
-    let deserializer =
-        serde_urlencoded::Deserializer::new(form_urlencoded::parse(query.as_bytes()));
-    serde_path_to_error::deserialize(deserializer)
+    crate::urlencoded::from_bytes(query.as_bytes())
 }
 
 /// A guard that limits [`QueryParams::query_params`] to being called through the
@@ -65,5 +63,34 @@ pub struct QueryParamsSealed(());
 impl QueryParamsSealed {
     pub(crate) fn new() -> Self {
         Self(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::Request;
+    use serde::Deserialize;
+    use topcoat_core::context::CxTestBuilder;
+
+    use super::*;
+
+    #[test]
+    fn parse_query_params_treats_empty_optional_value_as_none() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct Query {
+            page: Option<u32>,
+        }
+
+        let (parts, ()) = Request::builder()
+            .uri("/posts?page=")
+            .body(())
+            .expect("request should build")
+            .into_parts();
+        let cx = CxTestBuilder::new().request_context(parts).build();
+
+        assert_eq!(
+            parse_query_params::<Query>(&cx).expect("an empty optional value"),
+            Query { page: None }
+        );
     }
 }
