@@ -117,6 +117,7 @@ fixture_test!(match_expr);
 fixture_test!(component_empty);
 fixture_test!(component_with_child);
 fixture_test!(component_with_children);
+fixture_test!(deferred_component);
 
 // -- Explicit context --------------------------------------------------------
 

@@ -1,6 +1,8 @@
 #[cfg(feature = "http")]
 use http::{HeaderMap, StatusCode};
 
+use crate::DeferredTask;
+
 /// A plain string writer that render output accumulates into.
 ///
 /// `Formatter` is escaping-agnostic: [`write_str`](Self::write_str) and
@@ -10,6 +12,7 @@ use http::{HeaderMap, StatusCode};
 /// [`HtmlContext`](crate::HtmlContext) instead.
 pub struct Formatter<'a> {
     buf: &'a mut String,
+    deferred: Vec<DeferredTask>,
     #[cfg(feature = "http")]
     status_code: Option<StatusCode>,
     #[cfg(feature = "http")]
@@ -22,10 +25,22 @@ impl<'a> Formatter<'a> {
     pub fn new(buf: &'a mut String) -> Self {
         Self {
             buf,
+            deferred: Vec::new(),
             #[cfg(feature = "http")]
             status_code: None,
             #[cfg(feature = "http")]
             headers: HeaderMap::new(),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn record_deferred(&mut self, task: DeferredTask) {
+        if !self
+            .deferred
+            .iter()
+            .any(|existing| existing.id() == task.id())
+        {
+            self.deferred.push(task);
         }
     }
 
@@ -70,8 +85,8 @@ impl<'a> Formatter<'a> {
     /// Consumes the formatter, returning the recorded status code and
     /// headers.
     #[cfg(feature = "http")]
-    pub(crate) fn into_recorded(self) -> (Option<StatusCode>, HeaderMap) {
-        (self.status_code, self.headers)
+    pub(crate) fn into_recorded(self) -> (Option<StatusCode>, HeaderMap, Vec<DeferredTask>) {
+        (self.status_code, self.headers, self.deferred)
     }
 }
 

@@ -11,7 +11,7 @@ use crate::{
         TemplateForLoop, TemplateIf, TemplateLocal, TemplateMatch,
     },
     view::{
-        Component, DocumentType, Element, Nodes, SignalDeclaration,
+        Component, Deferred, DocumentType, Element, Nodes, SignalDeclaration,
         hir::{LowerView, ViewBuilder},
     },
 };
@@ -23,6 +23,7 @@ pub enum Node {
     DocumentType(DocumentType),
     Element(Box<Element>),
     Component(Component),
+    Deferred(Deferred),
     Expr(TemplateExpr),
     RuntimeExpr(RuntimeExpr),
     If(TemplateIf<Nodes>),
@@ -58,6 +59,7 @@ impl LowerView for Node {
             Self::DocumentType(inner) => inner.lower(builder),
             Self::Element(inner) => inner.lower(builder),
             Self::Component(inner) => inner.lower(builder),
+            Self::Deferred(inner) => inner.lower(builder),
             Self::Expr(inner) => inner.lower(builder),
             Self::RuntimeExpr(inner) => inner.lower(builder),
             Self::If(inner) => inner.lower(builder),
@@ -80,6 +82,8 @@ impl Parse for Node {
             Self::DocumentType(input.parse()?)
         } else if Element::peek(input) {
             Self::Element(input.parse()?)
+        } else if Deferred::peek(input) {
+            Self::Deferred(input.parse()?)
         } else if TemplateExpr::peek(input) {
             Self::Expr(input.parse()?)
         } else if RuntimeExpr::peek(input) {
@@ -128,6 +132,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Node {
             Self::DocumentType(inner) => inner.pretty_print(printer),
             Self::Element(inner) => inner.pretty_print(printer),
             Self::Component(inner) => inner.pretty_print(printer),
+            Self::Deferred(inner) => inner.pretty_print(printer),
             Self::Expr(inner) => inner.pretty_print(printer),
             Self::RuntimeExpr(inner) => inner.pretty_print(printer),
             Self::If(inner) => inner.pretty_print(printer),
@@ -163,6 +168,10 @@ mod tests {
         assert!(matches!(parse("<!DOCTYPE html>"), Node::DocumentType(_)));
         assert!(matches!(parse("<br>"), Node::Element(_)));
         assert!(matches!(parse("foo()"), Node::Component(_)));
+        assert!(matches!(
+            parse(r#"defer foo() { "loading" }"#),
+            Node::Deferred(_)
+        ));
         assert!(matches!(parse("(value)"), Node::Expr(_)));
         assert!(matches!(parse(r#"if a { "x" }"#), Node::If(_)));
         assert!(matches!(parse(r"let a = 1;"), Node::Local(_)));

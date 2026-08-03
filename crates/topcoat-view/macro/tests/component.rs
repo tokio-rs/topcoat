@@ -122,6 +122,22 @@ async fn concurrent_group(
     }
 }
 
+#[component]
+async fn deferred_content(label: &'static str) -> Result {
+    view! { <strong>(label)</strong> }
+}
+
+#[component]
+async fn deferred_panel(label: &'static str) -> Result {
+    view! {
+        <section>
+            defer deferred_content(label: label) {
+                <p>"Loading"</p>
+            }
+        </section>
+    }
+}
+
 #[tokio::test]
 async fn components_across_control_flow_render_concurrently_in_source_order() {
     let cx = empty_cx();
@@ -181,6 +197,63 @@ async fn component_loop_iterations_render_concurrently_in_iterator_order() {
     assert_eq!(
         result.unwrap().render(__cx),
         "<main><span>a</span><span>b</span><span>c</span></main>",
+    );
+}
+
+#[tokio::test]
+async fn inline_defer_records_work_on_an_ordinary_view() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let result: Result = view! {
+        <main>
+            defer deferred_content(label: "ready") {
+                <p>"Loading"</p>
+            }
+        </main>
+    };
+
+    let rendered = result.unwrap().render_response(__cx);
+    assert!(rendered.html.contains("<p>Loading</p>"));
+    assert!(rendered.html.contains("data-topcoat-defer-start"));
+    assert_eq!(rendered.deferred.len(), 1);
+
+    let completed = rendered.deferred[0]
+        .clone()
+        .resolve(cx.handle())
+        .await
+        .unwrap();
+    assert_eq!(completed.render(__cx), "<strong>ready</strong>");
+}
+
+#[tokio::test]
+async fn component_views_compose_without_an_include_helper() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let result: Result = view! {
+        <main>
+            deferred_panel(label: "activity")
+            deferred_panel(label: "recommendations")
+        </main>
+    };
+
+    let rendered = result.unwrap().render_response(__cx);
+    assert_eq!(rendered.deferred.len(), 2);
+
+    let activity = rendered.deferred[0]
+        .clone()
+        .resolve(cx.handle())
+        .await
+        .unwrap();
+    let recommendations = rendered.deferred[1]
+        .clone()
+        .resolve(cx.handle())
+        .await
+        .unwrap();
+
+    assert_eq!(activity.render(__cx), "<strong>activity</strong>");
+    assert_eq!(
+        recommendations.render(__cx),
+        "<strong>recommendations</strong>"
     );
 }
 

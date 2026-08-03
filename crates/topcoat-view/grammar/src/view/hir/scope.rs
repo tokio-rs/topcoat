@@ -3,7 +3,7 @@ use quote::{ToTokens, quote};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 use super::{
-    ExprKind, ExprNode, ForLoop, IfElse, Local, MatchExpr, Node, Statement, StaticSegment,
+    Deferred, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchExpr, Node, Statement, StaticSegment,
 };
 
 /// The lowered form of a `view!` invocation: the HIR between the view AST and
@@ -131,6 +131,17 @@ impl Scope {
                         __tree.push_future(#future);
                     }
                 }
+                Node::Deferred(Deferred { .. }) => {
+                    let flush = Self::flush_tree_parts(&mut parts_dirty);
+                    let Node::Deferred(deferred) = node else {
+                        unreachable!()
+                    };
+                    let future = deferred.emit_future();
+                    quote! {
+                        #flush
+                        __tree.push_future(#future);
+                    }
+                }
                 Node::Local(_) | Node::Statement(_) => {
                     let flush = Self::flush_tree_parts(&mut parts_dirty);
                     let remainder = Self::emit_tree_future_for(&nodes[index..]);
@@ -236,7 +247,7 @@ impl Scope {
                     let helper = kind.helper();
                     quote! { #helper(__cx, &mut __parts, #tokens); }
                 }
-                Node::Component(_) => unreachable!(),
+                Node::Component(_) | Node::Deferred(_) => unreachable!(),
                 Node::Local(Local { pat, expr }) => {
                     quote! { let #pat = #expr; }
                 }
