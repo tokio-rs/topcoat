@@ -9,7 +9,7 @@ use std::{
     cell::RefCell,
     marker::PhantomData,
     ops::Deref,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 use bit_set::BitSet;
@@ -116,8 +116,8 @@ impl Cx {
         T: Any + Send + Sync,
     {
         self.assert_request_state_unique();
-        self.bindings
-            .install_root(&self.request_state.bindings, value)
+        let mut registry = self.request_state.registry();
+        self.bindings.install_root(&mut registry, value)
     }
 
     /// Returns mutable access to a request-root value.
@@ -136,15 +136,8 @@ impl Cx {
         T: Any + Send + Sync,
     {
         self.assert_request_state_unique();
-        self.bindings.get_mut::<T>(&self.request_state.bindings)
-    }
-
-    fn install_scoped_value<T>(&mut self, value: T)
-    where
-        T: Any + Send + Sync,
-    {
-        self.bindings
-            .install_scoped(&self.request_state.bindings, value);
+        let mut registry = self.request_state.registry();
+        self.bindings.get_mut::<T>(&mut registry)
     }
 
     /// Creates a child scope containing `value`.
@@ -157,7 +150,10 @@ impl Cx {
         T: Any + Send + Sync,
     {
         let mut scope = self.child();
-        scope.cx.install_scoped_value(value);
+        {
+            let mut registry = scope.cx.request_state.registry();
+            scope.cx.bindings.install_scoped(&mut registry, value);
+        }
         scope
     }
 
@@ -173,8 +169,13 @@ impl Cx {
     where
         V: ContextValues,
     {
+        <V as value::Sealed>::assert_unique();
         let mut scope = self.child();
-        <V as value::Sealed>::install(values, &mut scope.cx);
+        {
+            let mut registry = scope.cx.request_state.registry();
+            let mut installer = value::Installer::new(&mut scope.cx.bindings, &mut registry);
+            <V as value::Sealed>::install(values, &mut installer);
+        }
         scope
     }
 
@@ -208,13 +209,20 @@ impl Cx {
             return Some(&binding.value);
         }
 
-        let binding_id = self.request_state.bindings.root_none(TypeId::of::<T>());
-        record_context_read(self, binding_id);
+        let mut registry = self.request_state.registry();
+        let binding_id = registry.root_none(TypeId::of::<T>());
+        record_context_read_with_registry(self, binding_id, &registry);
         None
     }
 
     pub(crate) fn context_reads_match(&self, reads: &ContextReadMask) -> bool {
-        reads.matches(self.bindings.mask(), &self.request_state.bindings)
+        let binding_mask = &self.bindings.mask;
+        if reads.frontier <= binding_mask.frontier {
+            reads.bits.is_subset(&binding_mask.bits)
+        } else {
+            let registry = self.request_state.registry();
+            binding_mask.contains_reads(&reads.bits, &registry)
+        }
     }
 }
 
@@ -265,9 +273,15 @@ impl std::fmt::Debug for CxScope<'_> {
 
 #[derive(Debug, Default)]
 struct RequestState {
-    bindings: binding::Registry,
+    registry: Mutex<binding::Registry>,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
+}
+
+impl RequestState {
+    fn registry(&self) -> std::sync::MutexGuard<'_, binding::Registry> {
+        self.registry.lock().unwrap()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -295,14 +309,6 @@ impl ContextReadMask {
     ) {
         binding_mask.union_visible_reads(&mut self.bits, &reads.bits, registry);
         self.frontier = self.frontier.max(reads.frontier);
-    }
-
-    fn matches(&self, binding_mask: &binding::Mask, registry: &binding::Registry) -> bool {
-        if self.frontier <= binding_mask.frontier {
-            self.bits.is_subset(&binding_mask.bits)
-        } else {
-            binding_mask.contains_reads(&self.bits, registry)
-        }
     }
 }
 
@@ -338,11 +344,23 @@ impl<'cx> ContextTracker<'cx> {
     }
 
     fn record(&self, binding_id: binding::Id) {
+        if binding_id.0 < self.cx.bindings.mask.frontier {
+            if self.cx.bindings.mask.bits.contains(binding_id.0) {
+                self.reads.borrow_mut().insert(binding_id);
+            }
+            return;
+        }
+
+        let registry = self.cx.request_state.registry();
+        self.record_with_registry(binding_id, &registry);
+    }
+
+    fn record_with_registry(&self, binding_id: binding::Id, registry: &binding::Registry) {
         if !self
             .cx
             .bindings
-            .mask()
-            .effectively_contains(&self.cx.request_state.bindings, binding_id)
+            .mask
+            .effectively_contains(registry, binding_id)
         {
             return;
         }
@@ -358,11 +376,8 @@ impl<'cx> ContextTracker<'cx> {
         if std::ptr::eq(self.cx, cx) {
             tracked.union_with(reads);
         } else {
-            tracked.union_visible(
-                reads,
-                self.cx.bindings.mask(),
-                &self.cx.request_state.bindings,
-            );
+            let registry = self.cx.request_state.registry();
+            tracked.union_visible(reads, &self.cx.bindings.mask, &registry);
         }
     }
 
@@ -390,6 +405,20 @@ fn record_context_read(cx: &Cx, binding_id: binding::Id) {
         ACTIVE_TRACKER.with(|tracker| {
             if Arc::ptr_eq(&tracker.cx.request_state, &cx.request_state) {
                 tracker.record(binding_id);
+            }
+        });
+    }
+}
+
+fn record_context_read_with_registry(
+    cx: &Cx,
+    binding_id: binding::Id,
+    registry: &binding::Registry,
+) {
+    if ACTIVE_TRACKER.is_set() {
+        ACTIVE_TRACKER.with(|tracker| {
+            if Arc::ptr_eq(&tracker.cx.request_state, &cx.request_state) {
+                tracker.record_with_registry(binding_id, registry);
             }
         });
     }

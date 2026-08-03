@@ -1,7 +1,7 @@
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use bit_set::BitSet;
@@ -11,11 +11,11 @@ type ErasedBinding = Arc<dyn Any + Send + Sync>;
 #[derive(Clone, Default)]
 pub(super) struct BindingSet {
     entries: im::HashMap<TypeId, ErasedBinding>,
-    mask: Mask,
+    pub(super) mask: Mask,
 }
 
 impl BindingSet {
-    pub(super) fn install_root<T>(&mut self, registry: &Registry, value: T) -> Option<T>
+    pub(super) fn install_root<T>(&mut self, registry: &mut Registry, value: T) -> Option<T>
     where
         T: Any + Send + Sync,
     {
@@ -27,7 +27,7 @@ impl BindingSet {
             .map(Binding::<T>::into_value)
     }
 
-    pub(super) fn install_scoped<T>(&mut self, registry: &Registry, value: T)
+    pub(super) fn install_scoped<T>(&mut self, registry: &mut Registry, value: T)
     where
         T: Any + Send + Sync,
     {
@@ -45,7 +45,7 @@ impl BindingSet {
         self.entries.get(&TypeId::of::<T>()).map(Binding::downcast)
     }
 
-    pub(super) fn get_mut<T>(&mut self, registry: &Registry) -> Option<&mut T>
+    pub(super) fn get_mut<T>(&mut self, registry: &mut Registry) -> Option<&mut T>
     where
         T: Any + Send + Sync,
     {
@@ -53,10 +53,6 @@ impl BindingSet {
         let binding = Binding::<T>::downcast_unique(self.entries.get_mut(&type_id)?);
         binding.id = self.mask.install_root(registry, type_id, Some(binding.id));
         Some(&mut binding.value)
-    }
-
-    pub(super) fn mask(&self) -> &Mask {
-        &self.mask
     }
 }
 
@@ -118,7 +114,7 @@ pub(super) struct Mask {
 impl Mask {
     pub(super) fn install_root(
         &mut self,
-        registry: &Registry,
+        registry: &mut Registry,
         type_id: TypeId,
         previous_id: Option<Id>,
     ) -> Id {
@@ -134,7 +130,7 @@ impl Mask {
 
     pub(super) fn install_scoped(
         &mut self,
-        registry: &Registry,
+        registry: &mut Registry,
         type_id: TypeId,
         previous_id: Option<Id>,
     ) -> Id {
@@ -180,7 +176,7 @@ impl Mask {
 }
 
 #[derive(Debug, Default)]
-struct RegistryState {
+pub(super) struct Registry {
     // No binding mask can predate a first root value. A mask can predate an
     // implicit root None, so those IDs are tracked separately.
     first: HashMap<TypeId, Id>,
@@ -188,7 +184,7 @@ struct RegistryState {
     next_id: usize,
 }
 
-impl RegistryState {
+impl Registry {
     fn allocate(&mut self) -> Id {
         let id = Id(self.next_id);
         self.next_id = self
@@ -216,40 +212,27 @@ impl RegistryState {
         }
         root_none_id
     }
-}
 
-#[derive(Debug, Default)]
-pub(super) struct Registry {
-    state: Mutex<RegistryState>,
-}
-
-impl Registry {
-    pub(super) fn root_none(&self, type_id: TypeId) -> Id {
-        self.state
-            .lock()
-            .unwrap()
-            .first_or_allocate_root_none(type_id)
+    pub(super) fn root_none(&mut self, type_id: TypeId) -> Id {
+        self.first_or_allocate_root_none(type_id)
     }
 
-    fn allocate_root_value(&self, type_id: TypeId) -> (Option<Id>, Id) {
-        let mut state = self.state.lock().unwrap();
-        let (first_id, is_new) = state.first_or_allocate(type_id);
+    fn allocate_root_value(&mut self, type_id: TypeId) -> (Option<Id>, Id) {
+        let (first_id, is_new) = self.first_or_allocate(type_id);
         if is_new {
             (None, first_id)
         } else {
-            (Some(first_id), state.allocate())
+            (Some(first_id), self.allocate())
         }
     }
 
-    fn allocate_scoped_value(&self, type_id: TypeId) -> (Id, Id) {
-        let mut state = self.state.lock().unwrap();
-        let root_none_id = state.first_or_allocate_root_none(type_id);
-        (root_none_id, state.allocate())
+    fn allocate_scoped_value(&mut self, type_id: TypeId) -> (Id, Id) {
+        let root_none_id = self.first_or_allocate_root_none(type_id);
+        (root_none_id, self.allocate())
     }
 
     fn materialize_root_none(&self, bits: &mut BitSet<usize>, start: usize, end: usize) {
-        let state = self.state.lock().unwrap();
-        for index in state
+        for index in self
             .root_none
             .iter()
             .skip_while(|&index| index < start)
@@ -260,7 +243,7 @@ impl Registry {
     }
 
     fn is_root_none(&self, binding_id: Id) -> bool {
-        self.state.lock().unwrap().root_none.contains(binding_id.0)
+        self.root_none.contains(binding_id.0)
     }
 
     fn union_root_none_reads(
@@ -269,9 +252,8 @@ impl Registry {
         reads: &BitSet<usize>,
         frontier: usize,
     ) {
-        let state = self.state.lock().unwrap();
         for index in reads.iter().skip_while(|&index| index < frontier) {
-            if state.root_none.contains(index) {
+            if self.root_none.contains(index) {
                 tracked.insert(index);
             }
         }
@@ -282,7 +264,6 @@ impl Registry {
         mut reads: impl Iterator<Item = usize>,
         frontier: usize,
     ) -> bool {
-        let state = self.state.lock().unwrap();
-        reads.all(|index| index >= frontier && state.root_none.contains(index))
+        reads.all(|index| index >= frontier && self.root_none.contains(index))
     }
 }

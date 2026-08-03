@@ -1,8 +1,8 @@
 use std::any::{Any, TypeId};
 
-use super::Cx;
+use super::binding::{BindingSet, Registry};
 
-/// A tuple of values that can be installed by [`Cx::with_values`].
+/// A tuple of values that can be installed by [`super::Cx::with_values`].
 ///
 /// This trait is implemented for tuples containing two through twelve values.
 /// It is sealed and cannot be implemented outside Topcoat.
@@ -10,8 +10,28 @@ pub trait ContextValues: Sealed {}
 
 impl<T> ContextValues for T where T: Sealed {}
 
+pub struct Installer<'a> {
+    bindings: &'a mut BindingSet,
+    registry: &'a mut Registry,
+}
+
+impl<'a> Installer<'a> {
+    pub(super) fn new(bindings: &'a mut BindingSet, registry: &'a mut Registry) -> Self {
+        Self { bindings, registry }
+    }
+
+    fn install<T>(&mut self, value: T)
+    where
+        T: Any + Send + Sync,
+    {
+        self.bindings.install_scoped(self.registry, value);
+    }
+}
+
 pub trait Sealed {
-    fn install(self, cx: &mut Cx);
+    fn assert_unique();
+
+    fn install(self, installer: &mut Installer<'_>);
 }
 
 macro_rules! impl_context_values {
@@ -20,7 +40,7 @@ macro_rules! impl_context_values {
         where
             $($type: Any + Send + Sync,)+
         {
-            fn install(self, cx: &mut Cx) {
+            fn assert_unique() {
                 let types = [$(TypeId::of::<$type>()),+];
                 assert!(
                     types
@@ -29,7 +49,10 @@ macro_rules! impl_context_values {
                         .all(|(index, type_id)| !types[..index].contains(type_id)),
                     "a context scope cannot contain duplicate value types"
                 );
-                $(cx.install_scoped_value(self.$index);)+
+            }
+
+            fn install(self, installer: &mut Installer<'_>) {
+                $(installer.install(self.$index);)+
             }
         }
     };
