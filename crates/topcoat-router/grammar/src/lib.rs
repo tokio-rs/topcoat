@@ -4,6 +4,7 @@ pub mod common;
 pub mod layer;
 pub mod layout;
 pub mod method;
+pub mod not_found;
 pub mod page;
 pub mod path_param;
 pub mod query_params;
