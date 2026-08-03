@@ -311,8 +311,11 @@ impl ContextTracker {
     }
 
     pub(crate) fn scope<R>(self: &Arc<Self>, f: impl FnOnce() -> R) -> R {
-        ACTIVE_TRACKERS.with(|trackers| trackers.borrow_mut().push(self.clone()));
-        let _scope = TrackerScope { tracker: self };
+        let previous = ACTIVE_TRACKER.with(|active| active.borrow_mut().replace(self.clone()));
+        let _scope = TrackerScope {
+            tracker: self,
+            previous,
+        };
         f()
     }
 
@@ -329,34 +332,48 @@ impl ContextTracker {
         }
         self.reads.lock().unwrap().insert(binding_id);
     }
+
+    fn merge_into(&self, tracker: &Self) {
+        if !Arc::ptr_eq(&self.request_state, &tracker.request_state) {
+            return;
+        }
+
+        for index in &self.finish().bits {
+            tracker.record(binding::Id(index));
+        }
+    }
 }
 
 thread_local! {
-    static ACTIVE_TRACKERS: RefCell<Vec<Arc<ContextTracker>>> = const { RefCell::new(Vec::new()) };
+    static ACTIVE_TRACKER: RefCell<Option<Arc<ContextTracker>>> = const { RefCell::new(None) };
 }
 
 struct TrackerScope<'a> {
     tracker: &'a Arc<ContextTracker>,
+    previous: Option<Arc<ContextTracker>>,
 }
 
 impl Drop for TrackerScope<'_> {
     fn drop(&mut self) {
-        ACTIVE_TRACKERS.with(|trackers| {
-            let active = trackers
-                .borrow_mut()
-                .pop()
-                .expect("context tracker stack underflow");
+        ACTIVE_TRACKER.with(|tracker| {
+            let active = tracker
+                .replace(self.previous.take())
+                .expect("context tracker scope is missing its active tracker");
             debug_assert!(Arc::ptr_eq(&active, self.tracker));
+
+            if let Some(previous) = tracker.borrow().as_ref() {
+                active.merge_into(previous);
+            }
         });
     }
 }
 
 fn record_context_read(request_state: &Arc<RequestState>, binding_id: binding::Id) {
-    ACTIVE_TRACKERS.with(|trackers| {
-        for tracker in trackers.borrow().iter() {
-            if Arc::ptr_eq(&tracker.request_state, request_state) {
-                tracker.record(binding_id);
-            }
+    ACTIVE_TRACKER.with(|tracker| {
+        if let Some(tracker) = tracker.borrow().as_ref()
+            && Arc::ptr_eq(&tracker.request_state, request_state)
+        {
+            tracker.record(binding_id);
         }
     });
 }

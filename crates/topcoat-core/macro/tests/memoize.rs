@@ -494,6 +494,33 @@ fn internal_bindings_are_excluded_while_inherited_missing_reads_propagate() {
 }
 
 #[test]
+fn reads_from_multiple_internal_scopes_are_not_inputs() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    fn versions(first: &Cx, second: &Cx) -> (u8, u8) {
+        (
+            request_context::<Version>(first).0,
+            request_context::<Version>(second).0,
+        )
+    }
+
+    #[memoize]
+    fn selected(cx: &Cx) -> (u8, u8) {
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        let first = cx.with(Version(1));
+        let second = cx.with(Version(2));
+        versions(&first, &second)
+    }
+
+    let cx = Cx::default();
+    assert_eq!(*selected(&cx), (1, 2));
+
+    let caller_version = cx.with(Version(9));
+    assert_eq!(*selected(&caller_version), (1, 2));
+    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn app_context_reads_are_not_dependencies() {
     static CALLS: AtomicUsize = AtomicUsize::new(0);
 
@@ -681,6 +708,31 @@ async fn different_context_variants_for_one_key_run_serially() {
     assert_eq!((*first, *second), (1, 2));
     assert_eq!(CALLS.load(Ordering::SeqCst), 2);
     assert_eq!(MAX_ACTIVE.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn async_nested_calls_propagate_dependencies_across_polls() {
+    static OUTER_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    async fn inner(cx: &Cx) -> u8 {
+        tokio::task::yield_now().await;
+        request_context::<Version>(cx).0
+    }
+
+    #[memoize]
+    async fn outer(cx: &Cx) -> u8 {
+        OUTER_CALLS.fetch_add(1, Ordering::SeqCst);
+        *inner(cx).await
+    }
+
+    let cx = Cx::default();
+    let stable = cx.with(Version(1));
+    let next = cx.with(Version(2));
+
+    assert_eq!(*outer(&stable).await, 1);
+    assert_eq!(*outer(&next).await, 2);
+    assert_eq!(OUTER_CALLS.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]
