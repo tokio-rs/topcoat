@@ -11,7 +11,7 @@ use std::{
 use hashbrown::{Equivalent, HashMap};
 
 use super::recursion;
-use crate::context::{ContextReadMask, ContextTracker, Cx, replay_context_reads};
+use crate::context::{ContextRead, ContextTracker, Cx, replay_context_reads};
 
 /// The per-request store backing `#[memoize]`.
 ///
@@ -186,7 +186,7 @@ impl std::fmt::Debug for MemoizeEqCache {
 
 struct CachedValue<V> {
     value: V,
-    reads: ContextReadMask,
+    reads: Vec<ContextRead>,
 }
 
 struct MemoSlot<V, Gate> {

@@ -113,6 +113,8 @@ Each `#[memoize]` function has its own independent cache slot, so two functions 
 
 Every `request_context` or `try_request_context` lookup becomes a dependency. A result is reused only while each lookup resolves to the same binding. A missing lookup matches any scope in the request where that type remains missing, including scopes created before the lookup.
 
+Dependency tracking does not propagate into separately spawned threads or tasks. When spawned work affects the result, read request context before spawning and pass the value into that work.
+
 ```rust
 # use topcoat::context::{Cx, memoize, request_context};
 #[derive(Clone, Copy)]

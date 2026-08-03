@@ -260,6 +260,28 @@ fn unrelated_scoped_values_do_not_prevent_reuse() {
 }
 
 #[test]
+fn shadowing_an_older_dependency_invalidates_with_the_youngest_unchanged() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    fn selected(cx: &Cx) -> (u8, u8) {
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        (
+            request_context::<Version>(cx).0,
+            request_context::<HeadingLevel>(cx).0,
+        )
+    }
+
+    let cx = CxTestBuilder::new().request_context(Version(1)).build();
+    let section = cx.with(HeadingLevel(2));
+    assert_eq!(*selected(&section), (1, 2));
+
+    let shadowed = section.with(Version(9));
+    assert_eq!(*selected(&shadowed), (9, 2));
+    assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[test]
 fn missing_reads_reuse_a_variant_across_preexisting_sibling_scopes() {
     let cx = counted_cx();
     let first = cx.with(HeadingLevel(1));
@@ -406,7 +428,7 @@ fn nested_missing_cache_hits_propagate_dependencies() {
 }
 
 #[test]
-fn nested_missing_hit_propagates_after_the_outer_snapshot() {
+fn nested_missing_hit_propagates_into_an_active_outer_call() {
     static OUTER_CALLS: AtomicUsize = AtomicUsize::new(0);
 
     struct Gates {

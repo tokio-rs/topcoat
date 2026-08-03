@@ -1,6 +1,6 @@
 use std::any::{Any, TypeId};
 
-use super::binding::{BindingSet, Registry};
+use super::binding::{BindingSet, IdAllocator};
 
 /// A tuple of values that can be installed by [`super::Cx::with_values`].
 ///
@@ -12,19 +12,19 @@ impl<T> ContextValues for T where T: Sealed {}
 
 pub struct Installer<'a> {
     bindings: &'a mut BindingSet,
-    registry: &'a mut Registry,
+    ids: &'a IdAllocator,
 }
 
 impl<'a> Installer<'a> {
-    pub(super) fn new(bindings: &'a mut BindingSet, registry: &'a mut Registry) -> Self {
-        Self { bindings, registry }
+    pub(super) fn new(bindings: &'a mut BindingSet, ids: &'a IdAllocator) -> Self {
+        Self { bindings, ids }
     }
 
     fn install<T>(&mut self, value: T)
     where
         T: Any + Send + Sync,
     {
-        self.bindings.install_scoped(self.registry, value);
+        let _ = self.bindings.install(self.ids, value);
     }
 }
 

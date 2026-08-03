@@ -9,10 +9,9 @@ use std::{
     cell::RefCell,
     marker::PhantomData,
     ops::Deref,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
-use bit_set::BitSet;
 pub use context_map::*;
 pub use id::*;
 use scoped_tls_hkt::scoped_thread_local;
@@ -116,8 +115,9 @@ impl Cx {
         T: Any + Send + Sync,
     {
         self.assert_request_state_unique();
-        let mut registry = self.request_state.registry();
-        self.bindings.install_root(&mut registry, value)
+        self.bindings
+            .install(&self.request_state.binding_ids, value)
+            .map(binding::Binding::into_value)
     }
 
     /// Returns mutable access to a request-root value.
@@ -136,8 +136,7 @@ impl Cx {
         T: Any + Send + Sync,
     {
         self.assert_request_state_unique();
-        let mut registry = self.request_state.registry();
-        self.bindings.get_mut::<T>(&mut registry)
+        self.bindings.get_mut::<T>(&self.request_state.binding_ids)
     }
 
     /// Creates a child scope containing `value`.
@@ -150,10 +149,10 @@ impl Cx {
         T: Any + Send + Sync,
     {
         let mut scope = self.child();
-        {
-            let mut registry = scope.cx.request_state.registry();
-            scope.cx.bindings.install_scoped(&mut registry, value);
-        }
+        let _ = scope
+            .cx
+            .bindings
+            .install(&scope.cx.request_state.binding_ids, value);
         scope
     }
 
@@ -172,8 +171,8 @@ impl Cx {
         <V as value::Sealed>::assert_unique();
         let mut scope = self.child();
         {
-            let mut registry = scope.cx.request_state.registry();
-            let mut installer = value::Installer::new(&mut scope.cx.bindings, &mut registry);
+            let mut installer =
+                value::Installer::new(&mut scope.cx.bindings, &scope.cx.request_state.binding_ids);
             <V as value::Sealed>::install(values, &mut installer);
         }
         scope
@@ -205,24 +204,28 @@ impl Cx {
         T: Any + Send + Sync,
     {
         if let Some(binding) = self.bindings.get::<T>() {
-            record_context_read(self, binding.id);
-            return Some(&binding.value);
+            record_context_read(
+                self,
+                ContextRead {
+                    type_id: TypeId::of::<T>(),
+                    binding_id: Some(binding.id),
+                },
+            );
+            return Some(binding.value());
         }
 
-        let mut registry = self.request_state.registry();
-        let binding_id = registry.root_none(TypeId::of::<T>());
-        record_context_read_with_registry(self, binding_id, &registry);
+        record_context_read(
+            self,
+            ContextRead {
+                type_id: TypeId::of::<T>(),
+                binding_id: None,
+            },
+        );
         None
     }
 
-    pub(crate) fn context_reads_match(&self, reads: &ContextReadMask) -> bool {
-        let binding_mask = &self.bindings.mask;
-        if reads.frontier <= binding_mask.frontier {
-            reads.bits.is_subset(&binding_mask.bits)
-        } else {
-            let registry = self.request_state.registry();
-            binding_mask.contains_reads(&reads.bits, &registry)
-        }
+    pub(crate) fn context_reads_match(&self, reads: &[ContextRead]) -> bool {
+        reads.iter().all(|read| read.matches(self))
     }
 }
 
@@ -273,55 +276,33 @@ impl std::fmt::Debug for CxScope<'_> {
 
 #[derive(Debug, Default)]
 struct RequestState {
-    registry: Mutex<binding::Registry>,
+    binding_ids: binding::IdAllocator,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
 }
 
-impl RequestState {
-    fn registry(&self) -> std::sync::MutexGuard<'_, binding::Registry> {
-        self.registry.lock().unwrap()
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextRead {
+    type_id: TypeId,
+    binding_id: Option<binding::Id>,
 }
 
-#[derive(Debug, Default)]
-pub(crate) struct ContextReadMask {
-    bits: BitSet<usize>,
-    frontier: usize,
-}
-
-impl ContextReadMask {
-    fn insert(&mut self, binding_id: binding::Id) {
-        self.bits.insert(binding_id.0);
-        self.frontier = self.frontier.max(binding_id.frontier());
-    }
-
-    fn union_with(&mut self, reads: &Self) {
-        self.bits.union_with(&reads.bits);
-        self.frontier = self.frontier.max(reads.frontier);
-    }
-
-    fn union_visible(
-        &mut self,
-        reads: &Self,
-        binding_mask: &binding::Mask,
-        registry: &binding::Registry,
-    ) {
-        binding_mask.union_visible_reads(&mut self.bits, &reads.bits, registry);
-        self.frontier = self.frontier.max(reads.frontier);
+impl ContextRead {
+    fn matches(self, cx: &Cx) -> bool {
+        cx.bindings.resolve(self.type_id) == self.binding_id
     }
 }
 
 pub(crate) struct ContextTracker<'cx> {
     cx: &'cx Cx,
-    reads: RefCell<ContextReadMask>,
+    reads: RefCell<Vec<ContextRead>>,
 }
 
 impl<'cx> ContextTracker<'cx> {
     pub(crate) fn new(cx: &'cx Cx) -> Self {
         Self {
             cx,
-            reads: RefCell::new(ContextReadMask::default()),
+            reads: RefCell::new(Vec::new()),
         }
     }
 
@@ -339,45 +320,33 @@ impl<'cx> ContextTracker<'cx> {
         }
     }
 
-    pub(crate) fn finish(&self) -> ContextReadMask {
+    pub(crate) fn finish(&self) -> Vec<ContextRead> {
         self.reads.take()
     }
 
-    fn record(&self, binding_id: binding::Id) {
-        if binding_id.0 < self.cx.bindings.mask.frontier {
-            if self.cx.bindings.mask.bits.contains(binding_id.0) {
-                self.reads.borrow_mut().insert(binding_id);
-            }
+    fn record(&self, cx: &Cx, read: ContextRead) {
+        if !std::ptr::eq(self.cx, cx) && !read.matches(self.cx) {
             return;
         }
 
-        let registry = self.cx.request_state.registry();
-        self.record_with_registry(binding_id, &registry);
-    }
-
-    fn record_with_registry(&self, binding_id: binding::Id, registry: &binding::Registry) {
-        if !self
-            .cx
-            .bindings
-            .mask
-            .effectively_contains(registry, binding_id)
+        let mut reads = self.reads.borrow_mut();
+        if let Some(previous) = reads
+            .iter()
+            .find(|previous| previous.type_id == read.type_id)
         {
-            return;
+            debug_assert_eq!(*previous, read);
+        } else {
+            reads.push(read);
         }
-        self.reads.borrow_mut().insert(binding_id);
     }
 
-    fn record_reads(&self, cx: &Cx, reads: &ContextReadMask) {
+    fn record_reads(&self, cx: &Cx, reads: &[ContextRead]) {
         if !Arc::ptr_eq(&self.cx.request_state, &cx.request_state) {
             return;
         }
 
-        let mut tracked = self.reads.borrow_mut();
-        if std::ptr::eq(self.cx, cx) {
-            tracked.union_with(reads);
-        } else {
-            let registry = self.cx.request_state.registry();
-            tracked.union_visible(reads, &self.cx.bindings.mask, &registry);
+        for &read in reads {
+            self.record(cx, read);
         }
     }
 
@@ -400,31 +369,17 @@ impl Drop for TrackerScope<'_, '_, '_, '_> {
     }
 }
 
-fn record_context_read(cx: &Cx, binding_id: binding::Id) {
+fn record_context_read(cx: &Cx, read: ContextRead) {
     if ACTIVE_TRACKER.is_set() {
         ACTIVE_TRACKER.with(|tracker| {
             if Arc::ptr_eq(&tracker.cx.request_state, &cx.request_state) {
-                tracker.record(binding_id);
+                tracker.record(cx, read);
             }
         });
     }
 }
 
-fn record_context_read_with_registry(
-    cx: &Cx,
-    binding_id: binding::Id,
-    registry: &binding::Registry,
-) {
-    if ACTIVE_TRACKER.is_set() {
-        ACTIVE_TRACKER.with(|tracker| {
-            if Arc::ptr_eq(&tracker.cx.request_state, &cx.request_state) {
-                tracker.record_with_registry(binding_id, registry);
-            }
-        });
-    }
-}
-
-pub(crate) fn replay_context_reads(cx: &Cx, reads: &ContextReadMask) {
+pub(crate) fn replay_context_reads(cx: &Cx, reads: &[ContextRead]) {
     if ACTIVE_TRACKER.is_set() {
         ACTIVE_TRACKER.with(|tracker| tracker.record_reads(cx, reads));
     }
