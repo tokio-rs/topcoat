@@ -11,8 +11,6 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // Load the browser runtime assets, discover the page and shard endpoint,
-    // and start the server at http://127.0.0.1:3000 by default.
     topcoat::start(
         Router::builder()
             .assets(AssetBundle::load().unwrap())
@@ -29,10 +27,9 @@ async fn home() -> Result {
         <!DOCTYPE html>
         <html>
             <head>
-                // Enable automatic browser reload during development.
                 topcoat::dev::script()
 
-                // Load the Topcoat browser runtime used by signals and shards.
+                // Signals and shards need the browser runtime.
                 topcoat::runtime::script()
             </head>
 
@@ -44,14 +41,12 @@ async fn home() -> Result {
 #[component]
 async fn combobox() -> Result {
     view! {
-        // Store the current search text as reactive browser state.
         signal input = String::new();
 
         <div>
-            // Update the signal whenever the user types.
             <input :value=$(input.get()) @input=$(|e: Event| input.set(e.target.value))>
 
-            // Re-render this shard on the server whenever `input` changes.
+            // The shard renders again on the server whenever `input` changes.
             combobox_content(input: $(input.get()))
         </div>
     }
@@ -59,7 +54,7 @@ async fn combobox() -> Result {
 
 #[shard]
 async fn combobox_content(cx: &Cx, input: String) -> Result {
-    // Run the search on the server and render the matching results.
+    // The input comes from the client, so a real application would validate it.
     let results = search_fruit(cx, &input).await;
 
     view! {
@@ -77,7 +72,6 @@ async fn combobox_content(cx: &Cx, input: String) -> Result {
 async fn search_fruit(_cx: &Cx, input: &str) -> Vec<&'static str> {
     tokio::time::sleep(Duration::from_secs_f32(0.5)).await;
 
-    // Perform a case-insensitive substring search.
     let needle = input.to_lowercase();
 
     FRUIT

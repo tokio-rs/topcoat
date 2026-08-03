@@ -16,8 +16,6 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // Discover the routes, register the shared counter, and start the server.
-    // By default, the application is available at http://127.0.0.1:3000.
     topcoat::start(
         Router::builder()
             .discover()
@@ -30,8 +28,7 @@ async fn main() {
 
 #[layout("/")]
 async fn root(cx: &Cx, slot: Result) -> Result {
-    // Alpine AJAX requests only need the targeted content.
-    // Normal browser requests receive the complete HTML document.
+    // Alpine AJAX requests only need the targeted content, not the document.
     if ajax_request(cx) {
         return slot;
     }
@@ -60,7 +57,6 @@ async fn root(cx: &Cx, slot: Result) -> Result {
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
-    // Read the current value from the application context.
     let count = app_context::<Counter>(cx).0.load(Ordering::Relaxed);
 
     view! {
@@ -77,15 +73,13 @@ async fn home(cx: &Cx) -> Result {
     }
 }
 
-// The counter is shared across every request handled by this process.
 struct Counter(AtomicU64);
 
 #[route(POST "/increment")]
 async fn increment(cx: &Cx) -> Result<Response> {
-    // Increment the shared value and obtain the new count.
     let count = app_context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
 
-    // For an Alpine AJAX request, return only the targeted element.
+    // An Alpine AJAX request only receives the targeted element.
     if ajax_request(cx) {
         return view! { <span id="count">(count)</span> }?.into_response(cx);
     }
