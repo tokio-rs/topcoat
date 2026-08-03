@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use topcoat::{
     Result,
     context::Cx,
@@ -93,6 +95,209 @@ async fn component_can_call_other_components_and_forward_child_views() {
 
     assert!(html.contains("<h2>Outer</h2>"));
     assert!(html.contains("<em>inner</em>"));
+}
+
+#[component]
+async fn concurrent_slot(log: Arc<Mutex<Vec<String>>>, label: &'static str) -> Result {
+    log.lock().unwrap().push(format!("enter {label}"));
+    tokio::task::yield_now().await;
+    log.lock().unwrap().push(format!("exit {label}"));
+
+    view! { <span>(label)</span> }
+}
+
+#[component]
+async fn concurrent_group(
+    log: Arc<Mutex<Vec<String>>>,
+    first: &'static str,
+    second: &'static str,
+    child: View,
+) -> Result {
+    view! {
+        <section>
+            concurrent_slot(log: Arc::clone(&log), label: first)
+            (child)
+            concurrent_slot(log: Arc::clone(&log), label: second)
+        </section>
+    }
+}
+
+#[component]
+async fn deferred_content(label: &'static str) -> Result {
+    view! { <strong>(label)</strong> }
+}
+
+#[component]
+async fn deferred_panel(label: &'static str) -> Result {
+    view! {
+        <section>
+            defer deferred_content(label: label) {
+                <p>"Loading"</p>
+            }
+        </section>
+    }
+}
+
+#[tokio::test]
+async fn components_across_control_flow_render_concurrently_in_source_order() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let result: Result = view! {
+        <main>
+            concurrent_slot(log: Arc::clone(&log), label: "a")
+            if true {
+                <section>concurrent_slot(log: Arc::clone(&log), label: "b")</section>
+            } else {
+                concurrent_slot(log: Arc::clone(&log), label: "skipped-if")
+            }
+            match Some("c") {
+                Some(label) => concurrent_slot(log: Arc::clone(&log), label: label),
+                None => concurrent_slot(log: Arc::clone(&log), label: "skipped-match"),
+            }
+            for label in ["d", "e"] {
+                <aside>concurrent_slot(log: Arc::clone(&log), label: label)</aside>
+            }
+            concurrent_slot(log: Arc::clone(&log), label: "f")
+        </main>
+    };
+
+    assert_eq!(
+        *log.lock().unwrap(),
+        [
+            "enter a", "enter b", "enter c", "enter d", "enter e", "enter f", "exit a", "exit b",
+            "exit c", "exit d", "exit e", "exit f",
+        ],
+    );
+    assert_eq!(
+        result.unwrap().render(__cx),
+        "<main><span>a</span><section><span>b</span></section><span>c</span><aside><span>d</span></aside><aside><span>e</span></aside><span>f</span></main>",
+    );
+}
+
+#[tokio::test]
+async fn component_loop_iterations_render_concurrently_in_iterator_order() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let result: Result = view! {
+        <main>
+            for label in ["a", "b", "c"] {
+                concurrent_slot(log: Arc::clone(&log), label: label)
+            }
+        </main>
+    };
+
+    assert_eq!(
+        *log.lock().unwrap(),
+        [
+            "enter a", "enter b", "enter c", "exit a", "exit b", "exit c"
+        ],
+    );
+    assert_eq!(
+        result.unwrap().render(__cx),
+        "<main><span>a</span><span>b</span><span>c</span></main>",
+    );
+}
+
+#[tokio::test]
+async fn inline_defer_records_work_on_an_ordinary_view() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let result: Result = view! {
+        <main>
+            defer deferred_content(label: "ready") {
+                <p>"Loading"</p>
+            }
+        </main>
+    };
+
+    let rendered = result.unwrap().render_response(__cx);
+    assert!(rendered.html.contains("<p>Loading</p>"));
+    assert!(rendered.html.contains("data-topcoat-defer-start"));
+    assert_eq!(rendered.deferred.len(), 1);
+
+    let completed = rendered.deferred[0]
+        .clone()
+        .resolve(cx.handle())
+        .await
+        .unwrap();
+    assert_eq!(completed.render(__cx), "<strong>ready</strong>");
+}
+
+#[tokio::test]
+async fn component_views_compose_without_an_include_helper() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let result: Result = view! {
+        <main>
+            deferred_panel(label: "activity")
+            deferred_panel(label: "recommendations")
+        </main>
+    };
+
+    let rendered = result.unwrap().render_response(__cx);
+    assert_eq!(rendered.deferred.len(), 2);
+
+    let activity = rendered.deferred[0]
+        .clone()
+        .resolve(cx.handle())
+        .await
+        .unwrap();
+    let recommendations = rendered.deferred[1]
+        .clone()
+        .resolve(cx.handle())
+        .await
+        .unwrap();
+
+    assert_eq!(activity.render(__cx), "<strong>activity</strong>");
+    assert_eq!(
+        recommendations.render(__cx),
+        "<strong>recommendations</strong>"
+    );
+}
+
+#[tokio::test]
+async fn components_in_parent_and_child_views_render_concurrently() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let result: Result = view! {
+        concurrent_group(
+            log: Arc::clone(&log),
+            first: "parent-a",
+            second: "parent-b",
+            concurrent_group(
+                log: Arc::clone(&log),
+                first: "child-a",
+                second: "child-b",
+                concurrent_slot(log: Arc::clone(&log), label: "grandchild-a")
+                concurrent_slot(log: Arc::clone(&log), label: "grandchild-b")
+            )
+        )
+    };
+
+    assert_eq!(
+        *log.lock().unwrap(),
+        [
+            "enter grandchild-a",
+            "enter grandchild-b",
+            "enter child-a",
+            "enter child-b",
+            "enter parent-a",
+            "enter parent-b",
+            "exit grandchild-a",
+            "exit grandchild-b",
+            "exit child-a",
+            "exit child-b",
+            "exit parent-a",
+            "exit parent-b",
+        ],
+    );
+    assert_eq!(
+        result.unwrap().render(__cx),
+        "<section><span>parent-a</span><section><span>child-a</span><span>grandchild-a</span><span>grandchild-b</span><span>child-b</span></section><span>parent-b</span></section>",
+    );
 }
 
 #[component]

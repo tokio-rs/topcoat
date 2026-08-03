@@ -18,6 +18,7 @@ http = [
 [dependencies]
 topcoat-core.workspace = true
 
+futures-util.workspace = true
 http = { workspace = true, optional = true }
 itoa.workspace = true
 memchr.workspace = true

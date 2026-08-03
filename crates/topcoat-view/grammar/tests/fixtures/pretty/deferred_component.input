@@ -1,0 +1,1 @@
+view! { <main>defer recommendations( user_id: 42) {<p class="skeleton">"Loading recommendations"</p>}</main> }

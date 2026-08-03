@@ -19,9 +19,9 @@ use crate::{abort::AbortStore, memoize::MemoizeCache};
 pub struct Cx {
     id: CxId,
     app_context: Arc<ContextMap>,
-    request_context: ContextMap,
-    memoize_cache: MemoizeCache,
-    abort_store: AbortStore,
+    request_context: Arc<ContextMap>,
+    memoize_cache: Arc<MemoizeCache>,
+    abort_store: Arc<AbortStore>,
 }
 
 impl Cx {
@@ -30,16 +30,58 @@ impl Cx {
         Self {
             id: CxId::new(),
             app_context,
-            request_context,
-            memoize_cache: MemoizeCache::new(),
-            abort_store: AbortStore::new(),
+            request_context: Arc::new(request_context),
+            memoize_cache: Arc::new(MemoizeCache::new()),
+            abort_store: Arc::new(AbortStore::new()),
         }
     }
 
     /// Returns this context's unique [`CxId`].
     #[inline]
+    #[must_use]
     pub fn id(&self) -> CxId {
         self.id
+    }
+
+    /// Returns an owned handle to this request context.
+    ///
+    /// The handle keeps request and app context values alive while a response
+    /// stream is still producing deferred views.
+    #[must_use]
+    pub fn handle(&self) -> CxHandle {
+        CxHandle(Self {
+            id: self.id,
+            app_context: Arc::clone(&self.app_context),
+            request_context: Arc::clone(&self.request_context),
+            memoize_cache: Arc::clone(&self.memoize_cache),
+            abort_store: Arc::clone(&self.abort_store),
+        })
+    }
+}
+
+/// An owned handle to a request [`Cx`].
+///
+/// It dereferences to `Cx`, so context helpers accept `&handle`.
+#[derive(Debug)]
+pub struct CxHandle(Cx);
+
+impl Clone for CxHandle {
+    fn clone(&self) -> Self {
+        self.0.handle()
+    }
+}
+
+impl AsRef<Cx> for CxHandle {
+    fn as_ref(&self) -> &Cx {
+        &self.0
+    }
+}
+
+impl Deref for CxHandle {
+    type Target = Cx;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -71,11 +113,17 @@ impl CxBuilder {
     ///
     /// A type can hold only one value at a time, so registering a type that is
     /// already present replaces it and hands back the displaced value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the request context was shared before the builder finished.
     pub fn insert<T>(&mut self, value: T) -> Option<T>
     where
         T: Any + Send + Sync,
     {
-        self.cx.request_context.insert(value)
+        Arc::get_mut(&mut self.cx.request_context)
+            .expect("request context was shared before it was built")
+            .insert(value)
     }
 
     /// Returns `true` if a value of type `T` has been registered on the request
@@ -100,12 +148,18 @@ impl CxBuilder {
 
     /// Returns a mutable reference to the request context value of type `T`, or
     /// `None` if no such value has been registered.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the request context was shared before the builder finished.
     #[must_use]
     pub fn get_mut<T>(&mut self) -> Option<&mut T>
     where
         T: Any + Send + Sync,
     {
-        self.cx.request_context.get_mut::<T>()
+        Arc::get_mut(&mut self.cx.request_context)
+            .expect("request context was shared before it was built")
+            .get_mut::<T>()
     }
 
     /// Consumes the builder, returning the finished [`Cx`].
@@ -169,12 +223,14 @@ impl CxTestBuilder {
 
 #[inline]
 #[doc(hidden)]
+#[must_use]
 pub fn memoize_cache(cx: &Cx) -> &MemoizeCache {
     &cx.memoize_cache
 }
 
 #[inline]
 #[doc(hidden)]
+#[must_use]
 pub fn abort_store(cx: &Cx) -> &AbortStore {
     &cx.abort_store
 }

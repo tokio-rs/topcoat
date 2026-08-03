@@ -40,6 +40,7 @@ members = [
     "examples/context",
     "examples/cookie",
     "examples/datastar",
+    "examples/deferred-view",
     "examples/font",
     "examples/hello-world",
     "examples/htmx",

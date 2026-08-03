@@ -70,6 +70,11 @@ impl ViewWriter {
         self.chunks.push(Chunk::Expr { kind, tokens });
     }
 
+    pub fn write_component(&mut self, tokens: TokenStream) {
+        self.flush();
+        self.chunks.push(Chunk::Component { tokens });
+    }
+
     pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
         self.flush();
         self.chunks.push(Chunk::Local {
@@ -130,72 +135,8 @@ impl ViewWriter {
                 && let Chunk::Static { string } = &self.chunks[0]
             {
                 quote! { #topcoat_view::View::unescaped_unchecked(#string) }
-            } else {
-                fn build_parts(chunks: &[Chunk]) -> TokenStream {
-                    let mut output = TokenStream::new();
-                    for chunk in chunks {
-                        match chunk {
-                            Chunk::Static { string } => {
-                                let helper = ExprKind::Unescaped.helper();
-                                let tokens = quote! { #string };
-                                quote! { #helper(__cx, &mut __parts, #tokens); }
-                            }
-                            Chunk::Expr { kind, tokens } => {
-                                let helper = kind.helper();
-                                quote! { #helper(__cx, &mut __parts, #tokens); }
-                            }
-                            Chunk::Local { pat, expr } => {
-                                quote! { let #pat = #expr; }
-                            }
-                            Chunk::Statement { tokens } => {
-                                quote! { #tokens }
-                            }
-                            Chunk::If {
-                                expr,
-                                then_branch: then,
-                                else_branch: r#else,
-                            } => {
-                                let then_branch = build_parts(&then.chunks);
-                                let else_branch = build_parts(&r#else.chunks);
-                                let else_branch = (!r#else.chunks.is_empty())
-                                    .then(|| quote! { else { #else_branch } });
-                                quote! {
-                                    if #expr {
-                                        #then_branch
-                                    }
-                                    #else_branch
-                                }
-                            }
-                            Chunk::For { pat, expr, body } => {
-                                let body = build_parts(&body.chunks);
-                                quote! {
-                                    for #pat in #expr {
-                                        #body
-                                    }
-                                }
-                            }
-                            Chunk::Match { expr, arms } => {
-                                let arm_tokens = arms.iter().map(|arm| {
-                                    let pat = &arm.pat;
-                                    let guard = arm.guard.as_ref().map(|g| quote! { if #g });
-                                    let body = build_parts(&arm.body.chunks);
-                                    quote! {
-                                        #pat #guard => { #body }
-                                    }
-                                });
-                                quote! {
-                                    match #expr {
-                                        #(#arm_tokens,)*
-                                    }
-                                }
-                            }
-                        }
-                        .to_tokens(&mut output);
-                    }
-                    output
-                }
-
-                let statements = build_parts(&self.chunks);
+            } else if !contains_component(&self.chunks) {
+                let statements = build_ready_parts(&self.chunks);
 
                 quote! {{
                     use #topcoat_view::internal::*;
@@ -203,6 +144,13 @@ impl ViewWriter {
                     #statements
                     #topcoat_view::View::new(__parts)
                 }}
+            } else {
+                let future = build_tree_future(&self.chunks);
+                return if self.nested {
+                    quote! { (#future).await? }
+                } else {
+                    quote! { (#future).await }
+                };
             }
         };
 
@@ -214,6 +162,234 @@ impl ViewWriter {
     }
 }
 
+fn contains_component(chunks: &[Chunk]) -> bool {
+    chunks.iter().any(|chunk| match chunk {
+        Chunk::Component { .. } => true,
+        Chunk::For { body, .. } => contains_component(&body.chunks),
+        Chunk::If {
+            then_branch,
+            else_branch,
+            ..
+        } => contains_component(&then_branch.chunks) || contains_component(&else_branch.chunks),
+        Chunk::Match { arms, .. } => arms.iter().any(|arm| contains_component(&arm.body.chunks)),
+        Chunk::Static { .. }
+        | Chunk::Expr { .. }
+        | Chunk::Local { .. }
+        | Chunk::Statement { .. } => false,
+    })
+}
+
+fn build_tree_future(chunks: &[Chunk]) -> TokenStream {
+    // Declare locals before the tree whose futures may borrow them.
+    let prologue_len = chunks
+        .iter()
+        .take_while(|chunk| matches!(chunk, Chunk::Local { .. } | Chunk::Statement { .. }))
+        .count();
+    let prologue_chunks = &chunks[..prologue_len];
+    let prologue = build_ready_parts(prologue_chunks);
+    let prologue_view = prologue_chunks
+        .iter()
+        .any(|chunk| matches!(chunk, Chunk::Statement { .. }))
+        .then(|| {
+            quote! {
+                __tree.push_view(#topcoat_view::View::new(::core::mem::take(&mut __parts)));
+            }
+        });
+    let (statements, parts_dirty) = build_tree_statements(&chunks[prologue_len..]);
+    let flush = parts_dirty.then(|| {
+        quote! {
+            __tree.push_view(#topcoat_view::View::new(__parts));
+        }
+    });
+
+    quote! {
+        async {
+            use #topcoat_view::internal::*;
+            let mut __parts = #topcoat_view::ViewParts::new();
+            #prologue
+            let mut __tree = __ViewTree::new();
+            #prologue_view
+            #statements
+            #flush
+            __tree.resolve().await
+        }
+    }
+}
+
+fn build_tree_statements(chunks: &[Chunk]) -> (TokenStream, bool) {
+    let mut output = TokenStream::new();
+    let mut parts_dirty = false;
+
+    for (index, chunk) in chunks.iter().enumerate() {
+        match chunk {
+            Chunk::Static { string } => {
+                parts_dirty = true;
+                let helper = ExprKind::Unescaped.helper();
+                quote! { #helper(__cx, &mut __parts, #string); }
+            }
+            Chunk::Expr { kind, tokens } => {
+                parts_dirty = true;
+                let helper = kind.helper();
+                quote! { #helper(__cx, &mut __parts, #tokens); }
+            }
+            Chunk::Component { tokens } => {
+                let flush = flush_tree_parts(&mut parts_dirty);
+                quote! {
+                    #flush
+                    __tree.push_future(#tokens);
+                }
+            }
+            Chunk::Local { .. } | Chunk::Statement { .. } => {
+                let flush = flush_tree_parts(&mut parts_dirty);
+                // Keep later locals inside a subtree so they outlive its pending nodes.
+                let remainder = build_tree_future(&chunks[index..]);
+                quote! {
+                    #flush
+                    __tree.push_future(#remainder);
+                }
+                .to_tokens(&mut output);
+                return (output, false);
+            }
+            Chunk::If {
+                expr,
+                then_branch,
+                else_branch,
+            } if contains_component(&then_branch.chunks)
+                || contains_component(&else_branch.chunks) =>
+            {
+                let then_branch = build_tree_future(&then_branch.chunks);
+                let else_branch = build_tree_future(&else_branch.chunks);
+                let flush = flush_tree_parts(&mut parts_dirty);
+                quote! {
+                    #flush
+                    __tree.push_future(async {
+                        if #expr {
+                            (#then_branch).await
+                        } else {
+                            (#else_branch).await
+                        }
+                    });
+                }
+            }
+            Chunk::For { pat, expr, body } if contains_component(&body.chunks) => {
+                let body = build_tree_future(&body.chunks);
+                let flush = flush_tree_parts(&mut parts_dirty);
+                quote! {
+                    #flush
+                    __tree.push_future(async {
+                        let __iterations = (#expr)
+                            .into_iter()
+                            .map(async |#pat| (#body).await);
+                        let mut __iteration_parts = #topcoat_view::ViewParts::new();
+                        for __iteration in __join_all(__iterations).await {
+                            __view(__cx, &mut __iteration_parts, __iteration?);
+                        }
+                        ::core::result::Result::<
+                            #topcoat_view::View,
+                            #topcoat_error::Error,
+                        >::Ok(#topcoat_view::View::new(__iteration_parts))
+                    });
+                }
+            }
+            Chunk::Match { expr, arms }
+                if arms.iter().any(|arm| contains_component(&arm.body.chunks)) =>
+            {
+                let arm_tokens = arms.iter().map(|arm| {
+                    let pat = &arm.pat;
+                    let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
+                    let body = build_tree_future(&arm.body.chunks);
+                    quote! { #pat #guard => (#body).await }
+                });
+                let flush = flush_tree_parts(&mut parts_dirty);
+                quote! {
+                    #flush
+                    __tree.push_future(async {
+                        match #expr {
+                            #(#arm_tokens,)*
+                        }
+                    });
+                }
+            }
+            Chunk::If { .. } | Chunk::For { .. } | Chunk::Match { .. } => {
+                parts_dirty = true;
+                build_ready_parts(core::slice::from_ref(chunk))
+            }
+        }
+        .to_tokens(&mut output);
+    }
+
+    (output, parts_dirty)
+}
+
+fn flush_tree_parts(parts_dirty: &mut bool) -> TokenStream {
+    if *parts_dirty {
+        *parts_dirty = false;
+        quote! {
+            __tree.push_view(#topcoat_view::View::new(::core::mem::take(&mut __parts)));
+        }
+    } else {
+        TokenStream::new()
+    }
+}
+
+fn build_ready_parts(chunks: &[Chunk]) -> TokenStream {
+    let mut output = TokenStream::new();
+    for chunk in chunks {
+        match chunk {
+            Chunk::Static { string } => {
+                let helper = ExprKind::Unescaped.helper();
+                quote! { #helper(__cx, &mut __parts, #string); }
+            }
+            Chunk::Expr { kind, tokens } => {
+                let helper = kind.helper();
+                quote! { #helper(__cx, &mut __parts, #tokens); }
+            }
+            Chunk::Component { .. } => unreachable!(),
+            Chunk::Local { pat, expr } => quote! { let #pat = #expr; },
+            Chunk::Statement { tokens } => quote! { #tokens },
+            Chunk::If {
+                expr,
+                then_branch,
+                else_branch,
+            } => {
+                let then_branch = build_ready_parts(&then_branch.chunks);
+                let else_branch = build_ready_parts(&else_branch.chunks);
+                let else_branch =
+                    (!else_branch.is_empty()).then(|| quote! { else { #else_branch } });
+                quote! {
+                    if #expr {
+                        #then_branch
+                    }
+                    #else_branch
+                }
+            }
+            Chunk::For { pat, expr, body } => {
+                let body = build_ready_parts(&body.chunks);
+                quote! {
+                    for #pat in #expr {
+                        #body
+                    }
+                }
+            }
+            Chunk::Match { expr, arms } => {
+                let arm_tokens = arms.iter().map(|arm| {
+                    let pat = &arm.pat;
+                    let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
+                    let body = build_ready_parts(&arm.body.chunks);
+                    quote! { #pat #guard => { #body } }
+                });
+                quote! {
+                    match #expr {
+                        #(#arm_tokens,)*
+                    }
+                }
+            }
+        }
+        .to_tokens(&mut output);
+    }
+    output
+}
+
 /// Identifies which `internal` helper a [`Chunk::Expr`] should be wrapped in
 /// when emitted, so the generated code uses the matching `__*` function and
 /// the corresponding `*ViewParts` trait.
@@ -221,7 +397,6 @@ impl ViewWriter {
 pub(crate) enum ExprKind {
     Unescaped,
     Node,
-    View,
     ElementName,
     Attribute,
     AttributeUnescaped,
@@ -235,7 +410,6 @@ impl ExprKind {
         let name = match self {
             Self::Unescaped => "__unescaped",
             Self::Node => "__node",
-            Self::View => "__view",
             Self::ElementName => "__element_name",
             Self::Attribute => "__attribute",
             Self::AttributeUnescaped => "__attribute_unescaped",
@@ -253,6 +427,9 @@ enum Chunk {
     },
     Expr {
         kind: ExprKind,
+        tokens: TokenStream,
+    },
+    Component {
         tokens: TokenStream,
     },
     Local {
@@ -365,6 +542,28 @@ mod tests {
     }
 
     #[test]
+    fn components_across_control_flow_build_a_future_tree() {
+        let mut writer = ViewWriter::new();
+        writer.write_component(quote! { first() });
+        writer.if_else(&syn::parse_quote!(cond), |then_branch, _| {
+            then_branch.write_component(quote! { second() });
+        });
+        writer.for_loop(
+            &syn::parse_quote!(item),
+            &syn::parse_quote!(items),
+            |body| {
+                body.write_component(quote! { row(item) });
+            },
+        );
+        let out = rendered(writer);
+
+        assert!(out.contains("__ViewTree :: new"));
+        assert!(out.contains("push_future (first ())"));
+        assert!(out.contains("if cond"));
+        assert!(out.contains("__join_all"));
+    }
+
+    #[test]
     fn if_else_renders_both_branches() {
         let mut writer = ViewWriter::new();
         writer.if_else(&syn::parse_quote!(cond), |then_branch, else_branch| {
@@ -434,7 +633,6 @@ mod tests {
         for (kind, expected) in [
             (ExprKind::Unescaped, "__unescaped"),
             (ExprKind::Node, "__node"),
-            (ExprKind::View, "__view"),
             (ExprKind::ElementName, "__element_name"),
             (ExprKind::Attribute, "__attribute"),
             (ExprKind::AttributeUnescaped, "__attribute_unescaped"),
