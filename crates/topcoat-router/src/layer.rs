@@ -2,11 +2,7 @@ use std::{borrow::Cow, ops::Index, pin::Pin};
 
 use topcoat_core::{context::CxBuilder, error::Result};
 
-use crate::{
-    Body, Endpoint, Path, Route,
-    error::{method_not_allowed, not_found},
-    response::Response,
-};
+use crate::{Body, Endpoint, Path, Route, error::method_not_allowed, response::Response};
 
 /// The future returned by [`Layer::handle`] and [`Next::run`]: a boxed, `Send`
 /// future borrowing the chain and the request context.
@@ -114,8 +110,9 @@ pub(crate) struct LayerId(usize);
 /// [`LayerId`].
 ///
 /// Layers are [`push`](Self::push)ed as the router is built, then only queried:
-/// [`for_path`](Self::for_path) selects the layers wrapping a request path, and
-/// indexing by [`LayerId`] resolves a selected id back to its layer.
+/// [`for_endpoint`](Self::for_endpoint) selects the layers wrapping an
+/// endpoint's path, and indexing by [`LayerId`] resolves a selected id back to
+/// its layer.
 #[derive(Default)]
 pub(crate) struct Layers {
     layers: Vec<Box<dyn Layer>>,
@@ -127,19 +124,6 @@ impl Layers {
         let id = LayerId(self.layers.len());
         self.layers.push(layer);
         id
-    }
-
-    /// Selects the layers whose path matches the URL `path`, ordered least- to
-    /// most-specific so the outermost layer runs first. Among layers that share a
-    /// path, the most recently registered runs first.
-    pub(crate) fn match_path(&self, path: &str) -> Vec<LayerId> {
-        let mut ids: Vec<LayerId> = (0..self.layers.len())
-            .map(LayerId)
-            .filter(|id| self[*id].path().matches_start(path))
-            .rev()
-            .collect();
-        ids.sort_by_key(|id| self[*id].path().len());
-        ids
     }
 
     /// Selects the layers whose path is a prefix of the endpoint `path`, ordered
@@ -166,16 +150,14 @@ impl Index<LayerId> for Layers {
 
 /// What a [`Next`] chain runs once its layers are exhausted.
 ///
-/// The layers wrapping a path are the same whether or not the request resolves
-/// to a route, so 404 and 405 responses flow through them too: a layer sees a
-/// matched route handler's result, or the not-found / method-not-allowed error,
-/// uniformly as the `Result` returned by [`Next::run`].
+/// The layers wrapping a matched path are the same whichever method the
+/// request uses, so 405 responses flow through them too: a layer sees a
+/// matched route handler's result, or the method-not-allowed error, uniformly
+/// as the `Result` returned by [`Next::run`].
 #[derive(Clone, Copy)]
 pub(crate) enum Terminal<'a> {
     /// A matched route handles the request.
     Route(&'a dyn Route),
-    /// No route matched the path; the chain resolves to a not-found error.
-    NotFound,
     /// The path matched but the method did not; the chain resolves to a
     /// method-not-allowed error listing the endpoint's supported methods.
     MethodNotAllowed(&'a Endpoint),
@@ -224,7 +206,6 @@ impl<'a> Next<'a> {
             ),
             None => match self.terminal {
                 Terminal::Route(route) => route.handle(cx, body),
-                Terminal::NotFound => Box::pin(async move { Err(not_found().into()) }),
                 Terminal::MethodNotAllowed(endpoint) => {
                     let error = method_not_allowed(endpoint.methods().cloned());
                     Box::pin(async move { Err(error.into()) })
@@ -347,77 +328,6 @@ mod tests {
     }
 
     #[test]
-    fn match_path_orders_least_to_most_specific() {
-        let mut layers = Layers::default();
-        // Registered most-specific first, to show the ordering follows path
-        // length rather than registration order.
-        let admin = layers.push(layer_at("/admin"));
-        let root = layers.push(layer_at("/"));
-        assert_eq!(layers.match_path("/admin/x"), vec![root, admin]);
-    }
-
-    #[test]
-    fn match_path_excludes_layers_that_do_not_wrap_the_url() {
-        let mut layers = Layers::default();
-        let _public = layers.push(layer_at("/public"));
-        let admin = layers.push(layer_at("/admin"));
-        assert_eq!(layers.match_path("/admin/x"), vec![admin]);
-    }
-
-    #[test]
-    fn match_path_runs_most_recent_of_a_shared_path_first() {
-        let mut layers = Layers::default();
-        let first = layers.push(layer_at("/"));
-        let second = layers.push(layer_at("/"));
-        // Among layers sharing a path, the most recently registered runs first.
-        assert_eq!(layers.match_path("/x"), vec![second, first]);
-    }
-
-    #[test]
-    fn match_path_selects_nothing_when_no_layers_match() {
-        let mut layers = Layers::default();
-        let _admin = layers.push(layer_at("/admin"));
-        assert!(layers.match_path("/public").is_empty());
-    }
-
-    #[test]
-    fn match_path_tolerates_trailing_slash() {
-        let mut layers = Layers::default();
-        let admin = layers.push(layer_at("/admin"));
-        assert_eq!(layers.match_path("/admin/"), vec![admin]);
-        assert_eq!(layers.match_path("/admin/users/"), vec![admin]);
-    }
-
-    #[test]
-    fn match_path_rejects_partial_segments() {
-        let mut layers = Layers::default();
-        let root = layers.push(layer_at("/"));
-        let _admin = layers.push(layer_at("/admin"));
-        // `/admin` is a string prefix of the URL, but not a whole segment.
-        assert_eq!(layers.match_path("/administrator"), vec![root]);
-    }
-
-    #[test]
-    fn match_path_ignores_group_segments() {
-        let mut layers = Layers::default();
-        let panel = layers.push(layer_at("/(admin)/panel"));
-        let auth = layers.push(layer_at("/(auth)"));
-        // Groups never appear in URLs, so a layer matches the stripped path...
-        assert_eq!(layers.match_path("/panel/settings"), vec![auth, panel]);
-        // ...and a group-only layer matches every URL, like the root.
-        assert_eq!(layers.match_path("/elsewhere"), vec![auth]);
-    }
-
-    #[test]
-    fn match_path_requires_param_segments_to_be_nonempty() {
-        let mut layers = Layers::default();
-        let user = layers.push(layer_at("/users/{id}"));
-        assert_eq!(layers.match_path("/users/42/posts"), vec![user]);
-        // An empty `{id}` segment never routes, so the layer does not match.
-        assert!(layers.match_path("/users//posts").is_empty());
-    }
-
-    #[test]
     fn for_endpoint_orders_prefix_layers_least_to_most_specific() {
         let mut layers = Layers::default();
         let root = layers.push(layer_at("/"));
@@ -490,19 +400,6 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(&body_bytes(response)[..], b"route");
-    }
-
-    #[test]
-    fn run_resolves_the_not_found_terminal() {
-        let layers = Layers::default();
-        let mut cx = CxBuilder::default();
-
-        let indices: &[LayerId] = &[];
-        let next = Next::new(&layers, indices, Terminal::NotFound);
-        let result = block_on(next.run(&mut cx, Body::empty()));
-        let response = respond(&cx, result);
-
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 
     #[test]

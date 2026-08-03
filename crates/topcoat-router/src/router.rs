@@ -6,12 +6,11 @@ use std::{
     task::Poll,
 };
 
-use topcoat_core::context::{ContextMap, CxBuilder};
+use topcoat_core::context::{ContextMap, Cx, CxBuilder};
 
 use crate::{
-    Endpoint, Layer, LayerId, Layers, Next, OriginLayer, RawPathParams, Route, RouterBuilder,
-    Terminal,
-    error::{internal_server_response, respond},
+    Endpoint, Layer, Layers, Next, OriginLayer, RawPathParams, Route, RouterBuilder, Terminal,
+    error::{internal_server_response, not_found, respond},
     request::Request,
     response::Response,
 };
@@ -89,34 +88,24 @@ impl Router {
     async fn handle_inner(&self, request: Request) -> Response {
         let (parts, body) = request.into_parts();
 
-        // Resolve the layer stack and the chain's terminal. A matched path
-        // reuses its endpoint's precomputed layer stack, whether the method
-        // matches (a route) or not (405), so both flow through the same layers.
-        // An unmatched path (404) has no precomputed stack, so its layers are
-        // selected from the request path on this cold path.
-        let not_found_layers: Vec<LayerId>;
-        let (layers, terminal, path_params) =
-            if let Ok(matched) = self.endpoints.at(parts.uri.path()) {
-                let endpoint = matched.value;
-                let path_params = {
-                    debug_assert_eq!(endpoint.path_params().len(), matched.params.len());
-                    let keys = endpoint.path_params().iter().cloned();
-                    let values = matched.params.iter().map(|(_, value)| value);
-                    RawPathParams::from_pairs(keys.zip(values))
-                };
-                let terminal = match endpoint.get(&parts.method).or_else(|| endpoint.any()) {
-                    Some(index) => Terminal::Route(&*self.routes[index]),
-                    None => Terminal::MethodNotAllowed(matched.value),
-                };
-                (matched.value.layers(), terminal, path_params)
-            } else {
-                not_found_layers = self.layers.match_path(parts.uri.path());
-                (
-                    &*not_found_layers,
-                    Terminal::NotFound,
-                    RawPathParams::default(),
-                )
-            };
+        let Ok(matched) = self.endpoints.at(parts.uri.path()) else {
+            return respond(&Cx::default(), not_found());
+        };
+
+        // The chain's terminal, reached through the endpoint's precomputed
+        // layer stack whether the method matches (a route) or not (405), so
+        // both flow through the same layers.
+        let endpoint = matched.value;
+        let path_params = {
+            debug_assert_eq!(endpoint.path_params().len(), matched.params.len());
+            let keys = endpoint.path_params().iter().cloned();
+            let values = matched.params.iter().map(|(_, value)| value);
+            RawPathParams::from_pairs(keys.zip(values))
+        };
+        let terminal = match endpoint.get(&parts.method).or_else(|| endpoint.any()) {
+            Some(index) => Terminal::Route(&*self.routes[index]),
+            None => Terminal::MethodNotAllowed(endpoint),
+        };
 
         let mut cx = CxBuilder::new(self.app_context.clone());
         cx.insert(path_params);
@@ -124,7 +113,7 @@ impl Router {
 
         // The origin layer wraps the whole chain, denying untrusted
         // cross-origin requests before anything else runs.
-        let next = Next::new(&self.layers, layers, terminal);
+        let next = Next::new(&self.layers, endpoint.layers(), terminal);
         let response = self.origin.handle(&mut cx, body, next).await;
         let response = respond(&cx, response);
 
@@ -592,12 +581,22 @@ mod tests {
     }
 
     #[test]
-    fn layers_wrap_not_found_responses() {
-        let (router, trace) =
-            trace_router(RouterBuilder::new().layer(LayerFn::new(path("/"), trace_root)));
+    fn layers_do_not_wrap_not_found_responses() {
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
+                .layer(LayerFn::new(path("/"), trace_root)),
+        );
+
         let (status, _, _) = send(&router, Method::GET, "/missing");
         assert_eq!(status, StatusCode::NOT_FOUND);
-        assert_eq!(*trace.lock().unwrap(), vec!["root"]);
+        assert!(trace.lock().unwrap().is_empty());
+
+        // A trailing slash is a different URL: the route does not match, and
+        // the unmatched path is answered without running any layers.
+        let (status, _, _) = send(&router, Method::GET, "/admin/x/");
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert!(trace.lock().unwrap().is_empty());
     }
 
     #[test]
@@ -613,39 +612,7 @@ mod tests {
     }
 
     #[test]
-    fn layers_run_for_trailing_slash_urls() {
-        let (router, trace) = trace_router(
-            RouterBuilder::new()
-                .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
-                .layer(LayerFn::new(path("/admin"), trace_admin))
-                .layer(LayerFn::new(path("/"), trace_root)),
-        );
-
-        // A trailing slash is a different URL: the route does not match, but
-        // the layers wrapping the path still run around the 404.
-        let (status, _, _) = send(&router, Method::GET, "/admin/x/");
-        assert_eq!(status, StatusCode::NOT_FOUND);
-        assert_eq!(*trace.lock().unwrap(), vec!["root", "admin"]);
-    }
-
-    #[test]
-    fn layers_do_not_run_for_lookalike_prefixes() {
-        let (router, trace) = trace_router(
-            RouterBuilder::new()
-                .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
-                .layer(LayerFn::new(path("/admin"), trace_admin))
-                .layer(LayerFn::new(path("/"), trace_root)),
-        );
-
-        // `/admin` prefixes the string `/administrator` but not its segments,
-        // so only the root layer wraps the 404.
-        let (status, _, _) = send(&router, Method::GET, "/administrator");
-        assert_eq!(status, StatusCode::NOT_FOUND);
-        assert_eq!(*trace.lock().unwrap(), vec!["root"]);
-    }
-
-    #[test]
-    fn layer_selection_ignores_query_strings() {
+    fn dispatch_ignores_query_strings() {
         let (router, trace) = trace_router(
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
@@ -654,12 +621,6 @@ mod tests {
 
         let (status, _, _) = send(&router, Method::GET, "/admin/x?tab=users");
         assert_eq!(status, StatusCode::OK);
-        assert_eq!(*trace.lock().unwrap(), vec!["admin"]);
-
-        // The same holds on the 404 path, which selects layers by URL.
-        trace.lock().unwrap().clear();
-        let (status, _, _) = send(&router, Method::GET, "/admin/missing?tab=users");
-        assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(*trace.lock().unwrap(), vec!["admin"]);
     }
 
@@ -704,18 +665,6 @@ mod tests {
         let (status, _, body) = send(&router, Method::GET, "/dashboard");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"route");
-        assert_eq!(*trace.lock().unwrap(), vec!["auth"]);
-    }
-
-    #[test]
-    fn group_layers_wrap_not_found_urls_anywhere() {
-        let (router, trace) =
-            trace_router(RouterBuilder::new().layer(LayerFn::new(path("/(auth)"), trace_auth)));
-
-        // A 404 URL cannot be attributed to a group, and a group-only path is
-        // URL-equivalent to the root, so the layer wraps every unmatched URL.
-        let (status, _, _) = send(&router, Method::GET, "/missing");
-        assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(*trace.lock().unwrap(), vec!["auth"]);
     }
 
