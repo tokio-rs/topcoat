@@ -203,7 +203,7 @@ impl RouterBuilder {
             layouts: Vec::new(),
             layers: Layers::default(),
             context,
-            origin_policy: OriginPolicy::default(),
+            origin_policy: OriginPolicy::new(),
             #[cfg(feature = "compression")]
             compression: crate::Compression::new(),
         }
@@ -973,7 +973,7 @@ mod tests {
     fn exempt_paths_skip_origin_verification() {
         let router = RouterBuilder::new()
             .route(RouteFn::new(Method::POST, path("/x"), say_posted))
-            .origin_policy(OriginPolicy::default().exempt_paths(["/x"]))
+            .origin_policy(OriginPolicy::new().exempt_paths(["/x"]))
             .build();
         let request = http::Request::builder()
             .method(Method::POST)

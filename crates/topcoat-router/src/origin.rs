@@ -29,9 +29,7 @@ use crate::{
 /// use topcoat::router::{OriginPolicy, Router};
 ///
 /// let router = Router::builder()
-///     .origin_policy(OriginPolicy::trust_origins([
-///         "https://accounts.example.com",
-///     ]))
+///     .origin_policy(OriginPolicy::new().trust_origins(["https://accounts.example.com"]))
 ///     .build();
 /// ```
 #[derive(Debug)]
@@ -52,25 +50,41 @@ enum Inner {
 }
 
 impl OriginPolicy {
-    /// Verifies origins, trusting `origins` to send state-changing
-    /// cross-origin requests and to open cross-origin WebSockets.
+    /// Creates the default policy: every request is verified, with no trusted
+    /// cross-origin peers and no exempt paths.
+    ///
+    /// Loosen it with [`trust_origins`](Self::trust_origins) and
+    /// [`exempt_paths`](Self::exempt_paths).
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            inner: Inner::Verify {
+                trusted_origins: Vec::new(),
+                exempt_paths: Vec::new(),
+            },
+        }
+    }
+
+    /// Trusts `origins` to send state-changing cross-origin requests and to
+    /// open cross-origin WebSockets.
     ///
     /// Each value is compared against the request's `Origin` header, so pass
     /// the full serialized origin: scheme, host, and any non-default port
     /// (`"https://accounts.example.com"`), with no trailing slash. The
     /// comparison is ASCII case-insensitive.
     #[must_use]
-    pub fn trust_origins<I>(origins: I) -> Self
+    pub fn trust_origins<I>(mut self, origins: I) -> Self
     where
         I: IntoIterator,
         I::Item: Into<String>,
     {
-        Self {
-            inner: Inner::Verify {
-                trusted_origins: origins.into_iter().map(Into::into).collect(),
-                exempt_paths: Vec::new(),
-            },
+        if let Inner::Verify {
+            trusted_origins, ..
+        } = &mut self.inner
+        {
+            trusted_origins.extend(origins.into_iter().map(Into::into));
         }
+        self
     }
 
     /// Exempts the routes at `paths` from origin verification.
@@ -86,7 +100,7 @@ impl OriginPolicy {
     /// ```rust
     /// use topcoat::router::OriginPolicy;
     ///
-    /// let policy = OriginPolicy::default().exempt_paths(["/feed/{*rest}"]);
+    /// let policy = OriginPolicy::new().exempt_paths(["/feed/{*rest}"]);
     /// ```
     #[must_use]
     pub fn exempt_paths<I>(mut self, paths: I) -> Self
@@ -188,12 +202,7 @@ impl OriginPolicy {
 /// Verifies with no trusted cross-origin peers and no exempt paths.
 impl Default for OriginPolicy {
     fn default() -> Self {
-        Self {
-            inner: Inner::Verify {
-                trusted_origins: Vec::new(),
-                exempt_paths: Vec::new(),
-            },
-        }
+        Self::new()
     }
 }
 
@@ -265,13 +274,13 @@ mod tests {
     #[test]
     fn non_browser_requests_pass() {
         // Neither an "origin" nor a "sec-fetch-site" header.
-        let policy = OriginPolicy::default();
+        let policy = OriginPolicy::new();
         assert_eq!(check(&policy, Method::POST, &[]), OriginVerdict::Allow);
     }
 
     #[test]
     fn same_origin_requests_pass() {
-        let policy = OriginPolicy::default();
+        let policy = OriginPolicy::new();
         for site in ["same-origin", "none"] {
             assert_eq!(
                 check(&policy, Method::POST, &[("sec-fetch-site", site)]),
@@ -282,7 +291,7 @@ mod tests {
 
     #[test]
     fn cross_origin_safe_methods_pass() {
-        let policy = OriginPolicy::default();
+        let policy = OriginPolicy::new();
         for method in [Method::GET, Method::HEAD, Method::OPTIONS] {
             assert_eq!(
                 check(&policy, method, &[("sec-fetch-site", "cross-site")]),
@@ -293,7 +302,7 @@ mod tests {
 
     #[test]
     fn cross_origin_unsafe_methods_are_denied() {
-        let policy = OriginPolicy::default();
+        let policy = OriginPolicy::new();
         for method in [Method::POST, Method::PUT, Method::DELETE, Method::PATCH] {
             assert_eq!(
                 check(&policy, method, &[("sec-fetch-site", "cross-site")]),
@@ -305,7 +314,7 @@ mod tests {
     #[test]
     fn cross_origin_websocket_upgrades_are_denied() {
         // The handshake is a GET, but upgrading makes it dangerous.
-        let policy = OriginPolicy::default();
+        let policy = OriginPolicy::new();
         assert_eq!(
             check(
                 &policy,
@@ -318,7 +327,7 @@ mod tests {
 
     #[test]
     fn same_origin_websocket_upgrades_pass() {
-        let policy = OriginPolicy::default();
+        let policy = OriginPolicy::new();
         assert_eq!(
             check(
                 &policy,
@@ -333,7 +342,7 @@ mod tests {
 
     #[test]
     fn matching_origin_and_host_pass() {
-        let policy = OriginPolicy::default();
+        let policy = OriginPolicy::new();
         assert_eq!(
             check(
                 &policy,
@@ -346,7 +355,7 @@ mod tests {
 
     #[test]
     fn mismatched_origin_and_host_are_denied_for_unsafe_methods() {
-        let policy = OriginPolicy::default();
+        let policy = OriginPolicy::new();
         let headers = [("origin", "https://evil.example"), ("host", "example.com")];
         assert_eq!(check(&policy, Method::POST, &headers), OriginVerdict::Deny);
         assert_eq!(check(&policy, Method::GET, &headers), OriginVerdict::Allow);
@@ -356,7 +365,7 @@ mod tests {
 
     #[test]
     fn trusted_origins_pass() {
-        let policy = OriginPolicy::trust_origins(["https://accounts.example.com"]);
+        let policy = OriginPolicy::new().trust_origins(["https://accounts.example.com"]);
         assert_eq!(
             check(
                 &policy,
@@ -385,7 +394,7 @@ mod tests {
 
     #[test]
     fn exempt_paths_pass_unchecked() {
-        let policy = OriginPolicy::default().exempt_paths(["/ws/{id}"]);
+        let policy = OriginPolicy::new().exempt_paths(["/ws/{id}"]);
         let headers = [("sec-fetch-site", "cross-site"), ("upgrade", "websocket")];
         assert_eq!(
             policy.check(&cx_with(Method::GET, "/ws/42", &headers)),

@@ -227,5 +227,5 @@ Serialize the raw token with [`Token::encode`] and parse it back with [`Token::d
 # Security notes
 
 - The default cookie is as locked down as a session cookie can be: `__Host-` prefixed, `Secure`, `HttpOnly`, `SameSite=Lax`, and scoped to `/`. It is invisible to scripts and never sent cross-site on subresource or scripted requests.
-- `SameSite=Lax` still sends the cookie on top-level cross-site navigations, so keep every state-changing route on `POST` (or another non-`GET` method), as the examples above do.
+- `SameSite=Lax` still sends the cookie on top-level cross-site navigations, so keep every state-changing route on `POST` (or another non-`GET` method), as the examples above do. The router's [`OriginPolicy`](crate::router::OriginPolicy) then rejects any such request that does arrive cross-origin; safe methods are deliberately not checked, so a state-changing `GET` remains unprotected.
 - Compare sessions by looking the hash up in your storage; never store or log the raw token server-side.

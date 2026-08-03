@@ -254,6 +254,10 @@ async fn root_layout(slot: Result) -> Result {
 
 See the [`view!`](crate::view::view!) macro docs for the full placement and precedence rules.
 
+# Cross-origin requests
+
+The router applies an [`OriginPolicy`] to every request before any layer or handler runs: by default, state-changing cross-origin browser requests and cross-origin WebSocket handshakes are rejected with `403 Forbidden`. Register a policy with [`origin_policy`](RouterBuilder::origin_policy) to trust cross-origin peers, to exempt individual routes, or to opt out; see [`OriginPolicy`] for the exact rules.
+
 # Manual registration
 
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
