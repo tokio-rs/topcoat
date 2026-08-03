@@ -40,10 +40,6 @@ impl Default for SessionConfig {
 pub struct SessionConfigBuilder {
     token_store: Option<Box<dyn TokenStore>>,
     lifetime: Duration,
-    #[cfg(feature = "router")]
-    verify_origin: bool,
-    #[cfg(feature = "router")]
-    trusted_origins: Vec<String>,
 }
 
 impl SessionConfigBuilder {
@@ -63,32 +59,6 @@ impl SessionConfigBuilder {
     #[must_use]
     pub fn lifetime(mut self, lifetime: Duration) -> Self {
         self.lifetime = lifetime;
-        self
-    }
-
-    /// Trusts `origin` to send state-changing cross-origin requests, exempting
-    /// it from [`verify_origin`](crate::verify_origin).
-    ///
-    /// The value is compared against the request's `Origin` header, so pass
-    /// the full serialized origin: scheme, host, and any non-default port
-    /// (`"https://accounts.example.com"`), with no trailing slash.
-    #[cfg(feature = "router")]
-    #[must_use]
-    pub fn trust_origin(mut self, origin: impl Into<String>) -> Self {
-        self.trusted_origins.push(origin.into());
-        self
-    }
-
-    /// Disables the [`OriginLayer`](crate::OriginLayer) that the router's
-    /// `sessions` extension method registers.
-    ///
-    /// Without the layer, nothing rejects state-changing cross-origin
-    /// requests; only disable it if the application enforces its own defense
-    /// against cross-site request forgery.
-    #[cfg(feature = "router")]
-    #[must_use]
-    pub fn dangerous_disable_origin_verification(mut self) -> Self {
-        self.verify_origin = false;
         self
     }
 
@@ -113,10 +83,6 @@ impl Default for SessionConfigBuilder {
         Self {
             token_store: None,
             lifetime: DEFAULT_LIFETIME,
-            #[cfg(feature = "router")]
-            verify_origin: true,
-            #[cfg(feature = "router")]
-            trusted_origins: Vec::new(),
         }
     }
 }
