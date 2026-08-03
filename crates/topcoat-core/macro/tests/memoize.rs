@@ -710,50 +710,63 @@ async fn different_context_variants_for_one_key_run_serially() {
     assert_eq!(MAX_ACTIVE.load(Ordering::SeqCst), 1);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn async_nested_calls_propagate_dependencies_across_polls() {
+    static INNER_CALLS: AtomicUsize = AtomicUsize::new(0);
     static OUTER_CALLS: AtomicUsize = AtomicUsize::new(0);
 
     #[memoize]
-    async fn inner(cx: &Cx) -> u8 {
+    async fn inner(cx: &Cx, key: u8) -> u8 {
+        INNER_CALLS.fetch_add(1, Ordering::SeqCst);
         tokio::task::yield_now().await;
-        request_context::<Version>(cx).0
+        let version = request_context::<Version>(cx).0;
+        tokio::task::yield_now().await;
+        version + key
     }
 
     #[memoize]
-    async fn outer(cx: &Cx) -> u8 {
+    async fn outer(cx: &Cx, key: u8) -> u8 {
         OUTER_CALLS.fetch_add(1, Ordering::SeqCst);
-        *inner(cx).await
+        tokio::task::yield_now().await;
+        *inner(cx, key).await
     }
 
     let cx = Cx::default();
     let stable = cx.with(Version(1));
     let next = cx.with(Version(2));
+    let (first, second) = tokio::join!(outer(&stable, 10), outer(&next, 20));
 
-    assert_eq!(*outer(&stable).await, 1);
-    assert_eq!(*outer(&next).await, 2);
+    assert_eq!((*first, *second), (11, 22));
+    assert!(std::ptr::eq(first, outer(&stable, 10).await));
+    assert!(std::ptr::eq(second, outer(&next, 20).await));
+    assert_eq!(INNER_CALLS.load(Ordering::SeqCst), 2);
     assert_eq!(OUTER_CALLS.load(Ordering::SeqCst), 2);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn different_argument_keys_run_concurrently() {
     static ACTIVE: AtomicUsize = AtomicUsize::new(0);
     static MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
 
     #[memoize]
     async fn keyed(cx: &Cx, key: u8) -> u8 {
-        let _ = cx;
         let active = ACTIVE.fetch_add(1, Ordering::SeqCst) + 1;
         MAX_ACTIVE.fetch_max(active, Ordering::SeqCst);
         tokio::task::yield_now().await;
+        let version = request_context::<Version>(cx).0;
+        tokio::task::yield_now().await;
         ACTIVE.fetch_sub(1, Ordering::SeqCst);
-        key
+        version + key
     }
 
     let cx = Cx::default();
-    let (first, second) = tokio::join!(keyed(&cx, 1), keyed(&cx, 2));
+    let stable = cx.with(Version(1));
+    let next = cx.with(Version(2));
+    let (first, second) = tokio::join!(keyed(&stable, 10), keyed(&next, 20));
 
-    assert_eq!((*first, *second), (1, 2));
+    assert_eq!((*first, *second), (11, 22));
+    assert!(std::ptr::eq(first, keyed(&stable, 10).await));
+    assert!(std::ptr::eq(second, keyed(&next, 20).await));
     assert_eq!(MAX_ACTIVE.load(Ordering::SeqCst), 2);
 }
 
