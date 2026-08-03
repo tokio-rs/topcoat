@@ -2,6 +2,7 @@
 
 mod body;
 mod body_limit;
+mod builder;
 #[cfg(feature = "compression")]
 mod compression;
 pub mod content;
@@ -28,6 +29,7 @@ pub mod tower;
 
 pub use body::*;
 pub use body_limit::*;
+pub use builder::*;
 #[cfg(feature = "compression")]
 pub use compression::*;
 pub(crate) use endpoint::Endpoint;
