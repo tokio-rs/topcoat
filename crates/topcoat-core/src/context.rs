@@ -206,12 +206,12 @@ impl Cx {
         T: Any + Send + Sync,
     {
         if let Some(binding) = self.bindings.get::<T>() {
-            record_context_read(&self.request_state, binding.id);
+            record_context_read(self, binding.id);
             return Some(&binding.value);
         }
 
         let binding_id = self.request_state.bindings.root_none(TypeId::of::<T>());
-        record_context_read(&self.request_state, binding_id);
+        record_context_read(self, binding_id);
         None
     }
 
@@ -362,10 +362,10 @@ impl Drop for TrackerScope<'_, '_, '_, '_> {
     }
 }
 
-fn record_context_read(request_state: &Arc<RequestState>, binding_id: binding::Id) {
+fn record_context_read(cx: &Cx, binding_id: binding::Id) {
     if ACTIVE_TRACKER.is_set() {
         ACTIVE_TRACKER.with(|tracker| {
-            if Arc::ptr_eq(&tracker.cx.request_state, request_state) {
+            if Arc::ptr_eq(&tracker.cx.request_state, &cx.request_state) {
                 tracker.record(binding_id);
             }
         });
@@ -374,7 +374,7 @@ fn record_context_read(request_state: &Arc<RequestState>, binding_id: binding::I
 
 pub(crate) fn replay_context_reads(cx: &Cx, reads: &ContextReadMask) {
     for index in &reads.bits {
-        record_context_read(&cx.request_state, binding::Id(index));
+        record_context_read(cx, binding::Id(index));
     }
 }
 
