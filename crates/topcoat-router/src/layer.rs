@@ -277,6 +277,9 @@ mod tests {
     /// test can observe the order the chain executes in.
     type Trace = Mutex<Vec<&'static str>>;
 
+    #[derive(Debug, PartialEq)]
+    struct LayerState(&'static str);
+
     fn cx_with_trace(trace: Arc<Trace>) -> Cx {
         let mut app = ContextMap::new();
         app.insert(trace);
@@ -284,9 +287,12 @@ mod tests {
     }
 
     fn record_a<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        cx.insert(LayerState("before"));
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("a");
-            next.run(cx, body).await
+            let response = next.run(cx, body).await?;
+            *cx.get_mut::<LayerState>().unwrap() = LayerState("after");
+            Ok(response)
         })
     }
 
@@ -308,26 +314,10 @@ mod tests {
 
     fn record_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
+            assert_eq!(request_context::<LayerState>(cx), &LayerState("before"));
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("route");
             "route".into_response(cx)
         })
-    }
-
-    #[derive(Debug, PartialEq)]
-    struct LayerState(&'static str);
-
-    fn mutate_around<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
-        cx.insert(LayerState("before"));
-        Box::pin(async move {
-            let response = next.run(cx, body).await?;
-            *cx.get_mut::<LayerState>().unwrap() = LayerState("after");
-            Ok(response)
-        })
-    }
-
-    fn sees_layer_state(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        assert_eq!(request_context::<LayerState>(cx), &LayerState("before"));
-        Box::pin(async move { "route".into_response(cx) })
     }
 
     // -- LayerFn --
@@ -559,19 +549,6 @@ mod tests {
 
         // The layers run in `indices` order, then the terminal route.
         assert_eq!(*trace.lock().unwrap(), vec!["a", "b", "route"]);
-    }
-
-    #[test]
-    fn a_layer_can_mutate_the_root_before_and_after_next() {
-        let mut layers = Layers::default();
-        let layer = layers.push(Box::new(LayerFn::new(path("/"), mutate_around)));
-        let indices = [layer];
-        let route = RouteFn::new(Method::GET, path("/x"), sees_layer_state);
-        let mut cx = Cx::default();
-
-        let next = Next::new(&layers, &indices, Terminal::Route(&route));
-        block_on(next.run(&mut cx, Body::empty())).unwrap();
-
         assert_eq!(request_context::<LayerState>(&cx), &LayerState("after"));
     }
 

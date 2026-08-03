@@ -143,37 +143,13 @@ fn section(cx: &Cx) {
 
 Request lookup starts at the nearest scope, continues through its parents, and checks the request root last. Other types remain inherited when one type is shadowed. Dropping a [`CxScope`] removes that scope from reach without changing its parent.
 
-# Mutating the request root
+# Mutating request context
 
-Layers receive `&mut Cx` and can register root values with [`Cx::insert`] before calling [`Next::run`](crate::router::Next::run). `insert` returns the displaced value. [`Cx::get_mut`] returns mutable access to an existing root value.
-
-```rust
-use topcoat::{
-    Result,
-    context::Cx,
-    router::{Body, Next, layer, response::Response},
-};
-
-struct RequestFacility;
-
-#[layer("/")]
-async fn facility(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
-    cx.insert(RequestFacility);
-    let response = next.run(cx, body).await?;
-
-    // Root mutation is available again after the inner chain completes.
-    let _ = cx.get_mut::<RequestFacility>();
-    Ok(response)
-}
-```
-
-A scoped context provides shared access only. A layer can use a scope for its own local work, but [`Next::run`](crate::router::Next::run) requires the mutable root. Rust also prevents root mutation while a scope, a context value reference, a memoized result, or a memoized future may still be used.
+Layers receive `&mut Cx`, so they can register root values with [`Cx::insert`] and mutate existing ones with [`Cx::get_mut`]. A scope provides shared access only, and Rust prevents root mutation while a scope or borrowed result may still be used. Root mutation is available again after [`Next::run`](crate::router::Next::run) completes.
 
 # Memoization
 
-[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments and the request-context bindings it reads. A scoped binding has its own identity, even when its value equals another binding. Root insertion and successful mutable access give the affected type a fresh identity, so only results that read that type stop matching.
-
-Nested memoized calls carry their observed dependencies into their caller, including on cache hits. A binding created inside the outer function is not one of the outer function's inputs and does not become an outer dependency. App context is immutable for the request and is not tracked. See the macro documentation for concurrency and caching details.
+[`#[memoize]`](macro@memoize) keys results by function arguments and the request bindings read during computation. Scoped bindings can select different cached results, while changing one root type invalidates only results that read it. See the macro documentation for dependency and concurrency details.
 
 # Composing helpers
 

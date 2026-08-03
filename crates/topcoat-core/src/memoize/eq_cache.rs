@@ -5,7 +5,7 @@ use std::{
     hash::Hash,
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    sync::{Condvar, Mutex},
+    sync::{Mutex, PoisonError},
 };
 
 use hashbrown::{Equivalent, HashMap};
@@ -86,21 +86,10 @@ impl MemoizeEqCache {
         }
 
         slot.recursion.assert_not_recursive::<F>();
-        let mut running = slot.gate.running.lock().unwrap();
-        loop {
-            if let Some(value) = slot.find(cx) {
-                return value;
-            }
-            if !*running {
-                *running = true;
-                break;
-            }
-            slot.recursion.assert_not_recursive::<F>();
-            running = slot.gate.ready.wait(running).unwrap();
+        let _initialization = slot.gate.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(value) = slot.find(cx) {
+            return value;
         }
-        drop(running);
-
-        let _initialization = SyncInitialization(&slot.gate);
         let tracker = ContextTracker::new(cx);
         let value = tracker.scope(|| slot.recursion.scope(|| f(cx, params)));
         let index = slot.values.push(CachedValue {
@@ -230,22 +219,7 @@ where
     }
 }
 
-#[derive(Default)]
-struct SyncGate {
-    running: Mutex<bool>,
-    ready: Condvar,
-}
-
-struct SyncInitialization<'a>(&'a SyncGate);
-
-impl Drop for SyncInitialization<'_> {
-    fn drop(&mut self) {
-        *self.0.running.lock().unwrap() = false;
-        self.0.ready.notify_all();
-    }
-}
-
-type SyncMemoSlot<V> = MemoSlot<V, SyncGate>;
+type SyncMemoSlot<V> = MemoSlot<V, Mutex<()>>;
 type AsyncMemoSlot<V> = MemoSlot<V, tokio::sync::Mutex<()>>;
 
 /// A `HashMap` tagged by a phantom marker type `T` so that maps for different markers are

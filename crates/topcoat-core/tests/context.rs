@@ -23,53 +23,40 @@ fn calls(cx: &Cx) -> &AtomicUsize {
     app_context(cx)
 }
 
-fn optional_database(cx: &Cx) -> Option<&'static str> {
-    memoize_cache(cx)
-        .eq_cache()
-        .memoize(cx, (), (), |cx, ()| {
-            calls(cx).fetch_add(1, Ordering::SeqCst);
-            try_request_context::<Database>(cx).map(|database| database.0)
-        })
-        .as_ref()
-        .copied()
+macro_rules! optional_context {
+    ($name:ident, $value:ty, $result:ty, $field:tt) => {
+        fn $name(cx: &Cx) -> Option<$result> {
+            memoize_cache(cx)
+                .eq_cache()
+                .memoize(cx, (), (), |cx, ()| {
+                    calls(cx).fetch_add(1, Ordering::SeqCst);
+                    try_request_context::<$value>(cx).map(|value| value.$field)
+                })
+                .as_ref()
+                .copied()
+        }
+    };
 }
 
-fn optional_config(cx: &Cx) -> Option<u32> {
-    memoize_cache(cx)
-        .eq_cache()
-        .memoize(cx, (), (), |cx, ()| {
-            calls(cx).fetch_add(1, Ordering::SeqCst);
-            try_request_context::<Config>(cx).map(|config| config.0)
-        })
-        .as_ref()
-        .copied()
-}
+optional_context!(optional_database, Database, &'static str, 0);
+optional_context!(optional_config, Config, u32, 0);
 
 struct ConcurrentReads {
     ready: Barrier,
     calls: AtomicUsize,
 }
 
-fn first_database_is_missing(cx: &Cx) -> &bool {
-    memoize_cache(cx).eq_cache().memoize(cx, (), (), |cx, ()| {
-        let state = app_context::<ConcurrentReads>(cx);
-        let call = state.calls.fetch_add(1, Ordering::SeqCst);
-        if call < 2 {
-            state.ready.wait();
-        }
-        try_request_context::<Database>(cx).is_none()
-    })
-}
-
-fn second_database_is_missing(cx: &Cx) -> &bool {
-    memoize_cache(cx).eq_cache().memoize(cx, (), (), |cx, ()| {
-        let state = app_context::<ConcurrentReads>(cx);
-        let call = state.calls.fetch_add(1, Ordering::SeqCst);
-        if call < 2 {
-            state.ready.wait();
-        }
-        try_request_context::<Database>(cx).is_none()
-    })
+fn database_is_missing(cx: &Cx, key: u8) -> &bool {
+    memoize_cache(cx)
+        .eq_cache()
+        .memoize(cx, (&key,), (), |cx, ()| {
+            let state = app_context::<ConcurrentReads>(cx);
+            let call = state.calls.fetch_add(1, Ordering::SeqCst);
+            if call < 2 {
+                state.ready.wait();
+            }
+            try_request_context::<Database>(cx).is_none()
+        })
 }
 
 struct DropCounter(Arc<AtomicUsize>);
@@ -90,16 +77,16 @@ fn concurrent_missing_reads_are_invalidated_by_root_insertion() {
         .build();
 
     std::thread::scope(|scope| {
-        let first = scope.spawn(|| *first_database_is_missing(&cx));
-        let second = scope.spawn(|| *second_database_is_missing(&cx));
+        let first = scope.spawn(|| *database_is_missing(&cx, 1));
+        let second = scope.spawn(|| *database_is_missing(&cx, 2));
         assert!(first.join().unwrap());
         assert!(second.join().unwrap());
     });
 
     cx.insert(Database("primary"));
 
-    assert!(!first_database_is_missing(&cx));
-    assert!(!second_database_is_missing(&cx));
+    assert!(!database_is_missing(&cx, 1));
+    assert!(!database_is_missing(&cx, 2));
     assert_eq!(
         app_context::<ConcurrentReads>(&cx)
             .calls
@@ -303,22 +290,16 @@ fn with_values_rejects_duplicate_types() {
 
 #[test]
 fn with_values_supports_arities_two_through_twelve() {
+    macro_rules! scopes {
+        ($cx:ident; [$($value:expr),+] $next:expr $(, $rest:expr)*) => {
+            let _ = $cx.with_values(($($value,)+));
+            scopes!($cx; [$($value),+, $next] $($rest),*);
+        };
+        ($cx:ident; [$($value:expr),+]) => { let _ = $cx.with_values(($($value,)+)); };
+    }
+
     let cx = Cx::default();
-    let _ = cx.with_values((0u8, 1u16));
-    let _ = cx.with_values((0u8, 1u16, 2u32));
-    let _ = cx.with_values((0u8, 1u16, 2u32, 3u64));
-    let _ = cx.with_values((0u8, 1u16, 2u32, 3u64, 4u128));
-    let _ = cx.with_values((0u8, 1u16, 2u32, 3u64, 4u128, 5i8));
-    let _ = cx.with_values((0u8, 1u16, 2u32, 3u64, 4u128, 5i8, 6i16));
-    let _ = cx.with_values((0u8, 1u16, 2u32, 3u64, 4u128, 5i8, 6i16, 7i32));
-    let _ = cx.with_values((0u8, 1u16, 2u32, 3u64, 4u128, 5i8, 6i16, 7i32, 8i64));
-    let _ = cx.with_values((0u8, 1u16, 2u32, 3u64, 4u128, 5i8, 6i16, 7i32, 8i64, 9i128));
-    let _ = cx.with_values((
-        0u8, 1u16, 2u32, 3u64, 4u128, 5i8, 6i16, 7i32, 8i64, 9i128, 10usize,
-    ));
-    let _ = cx.with_values((
-        0u8, 1u16, 2u32, 3u64, 4u128, 5i8, 6i16, 7i32, 8i64, 9i128, 10usize, 11isize,
-    ));
+    scopes!(cx; [0u8, 1u16] 2u32, 3u64, 4u128, 5i8, 6i16, 7i32, 8i64, 9i128, 10usize, 11isize);
 }
 
 #[test]

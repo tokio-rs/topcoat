@@ -20,10 +20,7 @@ impl BindingSet {
         T: Any + Send + Sync,
     {
         let type_id = TypeId::of::<T>();
-        let previous_id = self
-            .entries
-            .get(&type_id)
-            .map(|binding| Binding::<T>::downcast(binding).id);
+        let previous_id = self.get::<T>().map(|binding| binding.id);
         let binding_id = self.mask.install_root(registry, type_id, previous_id);
         self.entries
             .insert(type_id, Binding::erase(binding_id, value))
@@ -35,10 +32,7 @@ impl BindingSet {
         T: Any + Send + Sync,
     {
         let type_id = TypeId::of::<T>();
-        let previous_id = self
-            .entries
-            .get(&type_id)
-            .map(|binding| Binding::<T>::downcast(binding).id);
+        let previous_id = self.get::<T>().map(|binding| binding.id);
         let binding_id = self.mask.install_scoped(registry, type_id, previous_id);
         self.entries
             .insert(type_id, Binding::erase(binding_id, value));

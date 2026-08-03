@@ -11,16 +11,7 @@ pub trait ContextValues: Sealed {}
 impl<T> ContextValues for T where T: Sealed {}
 
 pub trait Sealed {
-    fn assert_unique_types();
     fn install(self, cx: &mut Cx);
-}
-
-pub(super) fn install<V>(values: V, cx: &mut Cx)
-where
-    V: ContextValues,
-{
-    <V as Sealed>::assert_unique_types();
-    <V as Sealed>::install(values, cx);
 }
 
 macro_rules! impl_context_values {
@@ -29,7 +20,7 @@ macro_rules! impl_context_values {
         where
             $($type: Any + Send + Sync,)+
         {
-            fn assert_unique_types() {
+            fn install(self, cx: &mut Cx) {
                 let types = [$(TypeId::of::<$type>()),+];
                 assert!(
                     types
@@ -38,9 +29,6 @@ macro_rules! impl_context_values {
                         .all(|(index, type_id)| !types[..index].contains(type_id)),
                     "a context scope cannot contain duplicate value types"
                 );
-            }
-
-            fn install(self, cx: &mut Cx) {
                 $(cx.install_scoped_value(self.$index);)+
             }
         }

@@ -111,7 +111,7 @@ Each `#[memoize]` function has its own independent cache slot, so two functions 
 
 # Request context dependencies
 
-Every `request_context` or `try_request_context` lookup in the function body becomes a dependency. A completed value is reused only when each lookup still resolves to the same binding. A missing lookup uses a lazily interned request-root binding identity, shared by every context in the request that has no value of that type. This includes scopes created before the first missing lookup.
+Every `request_context` or `try_request_context` lookup becomes a dependency. A result is reused only while each lookup resolves to the same binding. A missing lookup matches any scope in the request where that type remains missing, including scopes created before the lookup.
 
 ```rust
 # use topcoat::context::{Cx, memoize, request_context};
@@ -132,11 +132,11 @@ assert_eq!(version_label(&next), "v2");
 # }
 ```
 
-Bindings are compared by identity, not by value. Two sibling scopes that each contain `DocsVersion(1)` compute separate variants. A child scope that adds an unrelated type can reuse the parent's variant. The cache keeps all completed variants for the request, so an earlier matching scope can reuse its variant after another scope computes one for the same explicit arguments.
+Bindings are compared by identity, not value. Sibling scopes that each contain `DocsVersion(1)` compute separate variants, while a child that adds an unrelated type can reuse its parent's variant. Completed variants remain cached for the request.
 
 Calling `Cx::insert` or successfully calling `Cx::get_mut` gives that root type a fresh binding identity. This lazily invalidates only cached results that read the old identity. A failed `get_mut` changes nothing, and replacing a value with an equal value still creates a new identity.
 
-Nested memoized functions propagate their dependencies into active callers on both misses and hits. A binding introduced by a child scope created inside the outer function does not become an outer dependency, because it was not visible from the outer function's input `Cx`. The shared request-root identity lets a missing lookup propagate when it was also missing from the outer input, even when that identity is first created inside the nested call.
+Nested memoized functions propagate dependencies into active callers on misses and hits. Bindings created inside an outer function are not outer dependencies because they were not visible from its input `Cx`. Missing lookups propagate when the type was also missing from that input.
 
 App-context reads are not dependencies because app context does not change during a request. Mutation through a `Mutex`, atomic, or another interior-mutability API is also not visible to memoization. When such state affects a result, update a root value through `get_mut` before immutable rendering begins, or pass a fresh scoped binding.
 

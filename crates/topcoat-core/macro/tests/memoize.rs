@@ -190,6 +190,13 @@ fn counted_cx() -> Cx {
         .build()
 }
 
+fn versioned_cx() -> Cx {
+    CxTestBuilder::new()
+        .app_context(AtomicUsize::new(0))
+        .request_context(Version(1))
+        .build()
+}
+
 fn calls(cx: &Cx) -> &AtomicUsize {
     app_context(cx)
 }
@@ -314,10 +321,7 @@ fn missing_variant_is_reused_after_a_scoped_value_variant_is_dropped() {
 
 #[test]
 fn replacing_a_root_binding_invalidates_its_readers() {
-    let mut cx = CxTestBuilder::new()
-        .app_context(AtomicUsize::new(0))
-        .request_context(Version(1))
-        .build();
+    let mut cx = versioned_cx();
     assert_eq!(*counted_version(&cx), 1);
     assert_eq!(cx.insert(Version(1)), Some(Version(1)));
     assert_eq!(*counted_version(&cx), 1);
@@ -327,10 +331,7 @@ fn replacing_a_root_binding_invalidates_its_readers() {
 
 #[test]
 fn successful_get_mut_invalidates_even_without_a_value_change() {
-    let mut cx = CxTestBuilder::new()
-        .app_context(AtomicUsize::new(0))
-        .request_context(Version(1))
-        .build();
+    let mut cx = versioned_cx();
     assert_eq!(*counted_version(&cx), 1);
     let _ = cx.get_mut::<Version>().unwrap();
     assert_eq!(*counted_version(&cx), 1);
@@ -350,10 +351,7 @@ fn failed_get_mut_does_not_invalidate_a_missing_read() {
 
 #[test]
 fn unrelated_root_mutation_does_not_invalidate_a_result() {
-    let mut cx = CxTestBuilder::new()
-        .app_context(AtomicUsize::new(0))
-        .request_context(Version(1))
-        .build();
+    let mut cx = versioned_cx();
     assert_eq!(*counted_version(&cx), 1);
     cx.insert(HeadingLevel(2));
     assert_eq!(*counted_version(&cx), 1);
@@ -540,7 +538,7 @@ fn app_context_reads_are_not_dependencies() {
 }
 
 #[test]
-fn nested_reads_from_another_request_do_not_propagate() {
+fn nested_reads_from_another_request_do_not_propagate_on_misses_or_hits() {
     static OUTER_CALLS: AtomicUsize = AtomicUsize::new(0);
 
     struct OtherRequest(Arc<Cx>);
@@ -556,46 +554,22 @@ fn nested_reads_from_another_request_do_not_propagate() {
         *inner(&app_context::<OtherRequest>(cx).0)
     }
 
-    let other = Arc::new(CxTestBuilder::new().request_context(Version(1)).build());
-    let cx = CxTestBuilder::new()
-        .app_context(OtherRequest(other))
-        .request_context(Version(9))
-        .build();
+    for prewarm in [false, true] {
+        OUTER_CALLS.store(0, Ordering::SeqCst);
+        let other = Arc::new(CxTestBuilder::new().request_context(Version(1)).build());
+        if prewarm {
+            assert_eq!(*inner(&other), 1);
+        }
+        let cx = CxTestBuilder::new()
+            .app_context(OtherRequest(other))
+            .request_context(Version(9))
+            .build();
 
-    assert_eq!(*outer(&cx), 1);
-    let shadowed = cx.with(Version(8));
-    assert_eq!(*outer(&shadowed), 1);
-    assert_eq!(OUTER_CALLS.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn nested_hits_from_another_request_do_not_propagate() {
-    static OUTER_CALLS: AtomicUsize = AtomicUsize::new(0);
-
-    struct OtherRequest(Arc<Cx>);
-
-    #[memoize]
-    fn inner(cx: &Cx) -> u8 {
-        request_context::<Version>(cx).0
+        assert_eq!(*outer(&cx), 1);
+        let shadowed = cx.with(Version(8));
+        assert_eq!(*outer(&shadowed), 1);
+        assert_eq!(OUTER_CALLS.load(Ordering::SeqCst), 1);
     }
-
-    #[memoize]
-    fn outer(cx: &Cx) -> u8 {
-        OUTER_CALLS.fetch_add(1, Ordering::SeqCst);
-        *inner(&app_context::<OtherRequest>(cx).0)
-    }
-
-    let other = Arc::new(CxTestBuilder::new().request_context(Version(1)).build());
-    assert_eq!(*inner(&other), 1);
-    let cx = CxTestBuilder::new()
-        .app_context(OtherRequest(other))
-        .request_context(Version(9))
-        .build();
-
-    assert_eq!(*outer(&cx), 1);
-    let shadowed = cx.with(Version(8));
-    assert_eq!(*outer(&shadowed), 1);
-    assert_eq!(OUTER_CALLS.load(Ordering::SeqCst), 1);
 }
 
 #[test]

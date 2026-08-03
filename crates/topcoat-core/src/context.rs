@@ -156,12 +156,9 @@ impl Cx {
     where
         T: Any + Send + Sync,
     {
-        let mut cx = self.child();
-        cx.install_scoped_value(value);
-        CxScope {
-            cx,
-            parent: PhantomData,
-        }
+        let mut scope = self.child();
+        scope.cx.install_scoped_value(value);
+        scope
     }
 
     /// Creates a child scope containing each tuple element as a separate
@@ -176,20 +173,20 @@ impl Cx {
     where
         V: ContextValues,
     {
-        let mut cx = self.child();
-        value::install(values, &mut cx);
-        CxScope {
-            cx,
-            parent: PhantomData,
-        }
+        let mut scope = self.child();
+        <V as value::Sealed>::install(values, &mut scope.cx);
+        scope
     }
 
-    fn child(&self) -> Self {
-        Self {
-            id: CxId::new(),
-            app_context: self.app_context.clone(),
-            request_state: self.request_state.clone(),
-            bindings: self.bindings.clone(),
+    fn child(&self) -> CxScope<'_> {
+        CxScope {
+            cx: Self {
+                id: CxId::new(),
+                app_context: self.app_context.clone(),
+                request_state: self.request_state.clone(),
+                bindings: self.bindings.clone(),
+            },
+            parent: PhantomData,
         }
     }
 
