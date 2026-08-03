@@ -37,6 +37,7 @@ members = [
     "examples/alpine-ajax",
     "examples/app-context",
     "examples/asset",
+    "examples/coffee-shop",
     "examples/context",
     "examples/cookie",
     "examples/datastar",

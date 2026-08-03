@@ -1,0 +1,17 @@
+[package]
+name = "coffee-shop"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+topcoat = { workspace = true, features = ["font-fontsource", "tailwind"] }
+
+[build-dependencies]
+# We cannot use `workspace = true` with `default-features = false`.
+topcoat = { path = "../../crates/topcoat/", default-features = false, features = ["tailwind"] }
+
+[lints]
+workspace = true
