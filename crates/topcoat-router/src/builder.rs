@@ -504,11 +504,18 @@ impl Default for RouterBuilder {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_core::context::{Cx, CxBuilder};
+    use std::{future::Future, pin::Pin};
+
+    use topcoat_core::{
+        context::{Cx, CxBuilder},
+        error::Result,
+    };
+    use topcoat_view::{View, ViewParts};
 
     use super::*;
     use crate::{
-        Body, LayerFuture, Method, Next, Path, RouteFn, RouteFuture, response::IntoResponse,
+        Body, LayerFn, LayerFuture, Method, Next, Path, RouteFn, RouteFuture,
+        response::IntoResponse,
     };
 
     fn path(s: &'static str) -> Cow<'static, Path> {
@@ -518,6 +525,19 @@ mod tests {
     /// A stand-in handler; builder tests register routes without running them.
     fn handler(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { "handled".into_response(cx) })
+    }
+
+    /// A stand-in page; builder tests register pages without rendering them.
+    fn render_page(
+        _cx: &Cx,
+        _body: Body,
+    ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + '_>> {
+        Box::pin(async move { Ok(View::new(ViewParts::new())) })
+    }
+
+    /// A stand-in layer that continues the chain unchanged.
+    fn noop_layer<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        Box::pin(async move { next.run(cx, body).await })
     }
 
     struct Greeting;
@@ -570,6 +590,90 @@ mod tests {
     fn route_without_methods_panics_on_build() {
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Vec::<Method>::new(), path("/x"), handler))
+            .build();
+    }
+
+    #[test]
+    fn layer_wrapping_a_route_builds() {
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/admin/users"), handler))
+            .layer(LayerFn::new(path("/admin"), noop_layer))
+            .build();
+    }
+
+    #[test]
+    fn layer_wrapping_a_page_builds() {
+        // Pages are wired into routes before layers are checked, so a layer
+        // over a page's path counts as used.
+        let _ = RouterBuilder::new()
+            .page(PageFn::new(Method::GET, path("/admin/p"), render_page))
+            .layer(LayerFn::new(path("/admin"), noop_layer))
+            .build();
+    }
+
+    #[test]
+    fn root_layer_without_routes_builds() {
+        // A layer at the root path wraps whatever the router serves, so it is
+        // exempt from the check even with nothing registered.
+        let _ = RouterBuilder::new()
+            .layer(LayerFn::new(path("/"), noop_layer))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "layer with path `/admin` did not match any route")]
+    fn layer_matching_no_route_panics() {
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), handler))
+            .layer(LayerFn::new(path("/admin"), noop_layer))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "layer with path `/admin` did not match any route")]
+    fn layer_matching_part_of_a_segment_panics() {
+        // Prefix matching compares whole segments, so `/admin` does not wrap
+        // `/administrator`.
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/administrator"), handler))
+            .layer(LayerFn::new(path("/admin"), noop_layer))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "layer with path `/(a)` did not match any route")]
+    fn layer_in_an_unused_group_panics() {
+        // Groups are part of the logical path: the `(a)` layer does not wrap
+        // the route in `(b)`, even though both serve `/x`.
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/(b)/x"), handler))
+            .layer(LayerFn::new(path("/(a)"), noop_layer))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "layer with path `/users/{id}` did not match any route")]
+    fn layer_with_another_param_name_panics() {
+        // Parameter names are part of a segment, so `{id}` does not wrap an
+        // endpoint spelled with `{user_id}`.
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/users/{user_id}/posts"),
+                handler,
+            ))
+            .layer(LayerFn::new(path("/users/{id}"), noop_layer))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "layer with path `/posts` did not match any route")]
+    fn one_unused_layer_among_used_ones_panics() {
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/users"), handler))
+            .layer(LayerFn::new(path("/"), noop_layer))
+            .layer(LayerFn::new(path("/users"), noop_layer))
+            .layer(LayerFn::new(path("/posts"), noop_layer))
             .build();
     }
 
