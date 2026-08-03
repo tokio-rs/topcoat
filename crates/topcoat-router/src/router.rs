@@ -16,11 +16,11 @@ use topcoat_core::{
 };
 
 use crate::{
-    Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, Next, OriginPolicy, OriginVerdict, PageFn,
+    Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, Next, OriginLayer, OriginPolicy, PageFn,
     PageWithLayouts, PathSegment, RawPathParamSpec, RawPathParams, Route, Terminal,
-    error::{forbidden, internal_server_response, respond},
+    error::{internal_server_response, respond},
     request::Request,
-    response::{IntoResponse, Response},
+    response::Response,
 };
 
 /// A finalized Topcoat routing table.
@@ -54,7 +54,8 @@ pub struct Router {
     /// The values shared by every request, read back via
     /// [`app_context`](topcoat_core::context::app_context).
     app_context: Arc<ContextMap>,
-    origin_policy: OriginPolicy,
+    /// The origin policy wrapping every request as the outermost layer.
+    origin: OriginLayer,
     /// The compression applied to responses on their way out.
     #[cfg(feature = "compression")]
     compression: crate::Compression,
@@ -128,17 +129,10 @@ impl Router {
         cx.insert(path_params);
         cx.insert(parts);
 
-        // Deny untrusted cross-origin requests.
-        let verdict = match self.origin_policy.check(&cx) {
-            OriginVerdict::Deny => {
-                return respond(&cx, forbidden().into_response(&cx));
-            }
-            verdict @ (OriginVerdict::Allow | OriginVerdict::Untrusted) => verdict,
-        };
-        cx.insert(verdict);
-
+        // The origin layer wraps the whole chain, denying untrusted
+        // cross-origin requests before anything else runs.
         let next = Next::new(&self.layers, layers, terminal);
-        let response = next.run(&mut cx, body).await;
+        let response = self.origin.handle(&mut cx, body, next).await;
         let response = respond(&cx, response);
 
         // Compression runs outside every layer, so layers see uncompressed
@@ -347,6 +341,11 @@ impl RouterBuilder {
         self
     }
 
+    /// Registers the [`OriginPolicy`] the router applies to every request.
+    ///
+    /// The default policy denies state-changing cross-origin browser requests
+    /// and cross-origin WebSocket handshakes; pass a policy to trust
+    /// cross-origin peers, exempt individual routes, or opt out entirely.
     #[must_use]
     pub fn origin_policy(mut self, origin_policy: OriginPolicy) -> Self {
         self.origin_policy = origin_policy;
@@ -622,7 +621,7 @@ impl RouterBuilder {
             endpoints,
             layers,
             app_context: Arc::new(context),
-            origin_policy,
+            origin: OriginLayer::new(origin_policy),
             #[cfg(feature = "compression")]
             compression,
         }
@@ -951,6 +950,39 @@ mod tests {
         let (status, _, body) = send(&router, Method::GET, "/x");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"route");
+    }
+
+    // -- Router::handle: origin policy --
+
+    #[test]
+    fn untrusted_cross_origin_requests_are_forbidden() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
+            .build();
+        let request = http::Request::builder()
+            .method(Method::POST)
+            .uri("/x")
+            .header("sec-fetch-site", "cross-site")
+            .body(Body::empty())
+            .unwrap();
+        let response = block_on(router.handle(request));
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn exempt_paths_skip_origin_verification() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
+            .origin_policy(OriginPolicy::default().exempt_paths(["/x"]))
+            .build();
+        let request = http::Request::builder()
+            .method(Method::POST)
+            .uri("/x")
+            .header("sec-fetch-site", "cross-site")
+            .body(Body::empty())
+            .unwrap();
+        let response = block_on(router.handle(request));
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     // -- Router::handle: method sets --
