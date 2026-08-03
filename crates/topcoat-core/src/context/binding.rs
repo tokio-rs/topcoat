@@ -158,7 +158,7 @@ impl Mask {
             frontier >= self.frontier,
             "request context binding mask cannot move backwards"
         );
-        registry.materialize_first(&mut self.bits, self.frontier, frontier);
+        registry.materialize_root_none(&mut self.bits, self.frontier, frontier);
         self.frontier = frontier;
     }
 
@@ -166,16 +166,31 @@ impl Mask {
         if binding_id.0 < self.frontier {
             self.bits.contains(binding_id.0)
         } else {
-            registry.is_first(binding_id)
+            registry.is_root_none(binding_id)
         }
+    }
+
+    pub(super) fn union_visible_reads(
+        &self,
+        tracked: &mut BitSet<usize>,
+        reads: &BitSet<usize>,
+        registry: &Registry,
+    ) {
+        tracked.extend(reads.intersection(&self.bits));
+        registry.union_root_none_reads(tracked, reads, self.frontier);
+    }
+
+    pub(super) fn contains_reads(&self, reads: &BitSet<usize>, registry: &Registry) -> bool {
+        registry.contains_root_none_reads(reads.difference(&self.bits), self.frontier)
     }
 }
 
 #[derive(Debug, Default)]
 struct RegistryState {
-    // A first ID is either a root value or the implicit None that precedes a
-    // first scoped value. No binding mask can predate a first root value.
+    // No binding mask can predate a first root value. A mask can predate an
+    // implicit root None, so those IDs are tracked separately.
     first: HashMap<TypeId, Id>,
+    root_none: BitSet<usize>,
     next_id: usize,
 }
 
@@ -198,6 +213,15 @@ impl RegistryState {
         self.first.insert(type_id, first_id);
         (first_id, true)
     }
+
+    fn first_or_allocate_root_none(&mut self, type_id: TypeId) -> Id {
+        let (root_none_id, is_new) = self.first_or_allocate(type_id);
+        if is_new {
+            let inserted = self.root_none.insert(root_none_id.0);
+            debug_assert!(inserted, "root None binding ID was already registered");
+        }
+        root_none_id
+    }
 }
 
 #[derive(Debug, Default)]
@@ -207,7 +231,10 @@ pub(super) struct Registry {
 
 impl Registry {
     pub(super) fn root_none(&self, type_id: TypeId) -> Id {
-        self.state.lock().unwrap().first_or_allocate(type_id).0
+        self.state
+            .lock()
+            .unwrap()
+            .first_or_allocate_root_none(type_id)
     }
 
     fn allocate_root_value(&self, type_id: TypeId) -> (Option<Id>, Id) {
@@ -222,25 +249,46 @@ impl Registry {
 
     fn allocate_scoped_value(&self, type_id: TypeId) -> (Id, Id) {
         let mut state = self.state.lock().unwrap();
-        let first_id = state.first_or_allocate(type_id).0;
-        (first_id, state.allocate())
+        let root_none_id = state.first_or_allocate_root_none(type_id);
+        (root_none_id, state.allocate())
     }
 
-    fn materialize_first(&self, bits: &mut BitSet<usize>, start: usize, end: usize) {
+    fn materialize_root_none(&self, bits: &mut BitSet<usize>, start: usize, end: usize) {
         let state = self.state.lock().unwrap();
-        for first_id in state.first.values() {
-            if (start..end).contains(&first_id.0) {
-                bits.insert(first_id.0);
+        for index in state
+            .root_none
+            .iter()
+            .skip_while(|&index| index < start)
+            .take_while(|&index| index < end)
+        {
+            bits.insert(index);
+        }
+    }
+
+    fn is_root_none(&self, binding_id: Id) -> bool {
+        self.state.lock().unwrap().root_none.contains(binding_id.0)
+    }
+
+    fn union_root_none_reads(
+        &self,
+        tracked: &mut BitSet<usize>,
+        reads: &BitSet<usize>,
+        frontier: usize,
+    ) {
+        let state = self.state.lock().unwrap();
+        for index in reads.iter().skip_while(|&index| index < frontier) {
+            if state.root_none.contains(index) {
+                tracked.insert(index);
             }
         }
     }
 
-    fn is_first(&self, binding_id: Id) -> bool {
-        self.state
-            .lock()
-            .unwrap()
-            .first
-            .values()
-            .any(|&first_id| first_id == binding_id)
+    fn contains_root_none_reads(
+        &self,
+        mut reads: impl Iterator<Item = usize>,
+        frontier: usize,
+    ) -> bool {
+        let state = self.state.lock().unwrap();
+        reads.all(|index| index >= frontier && state.root_none.contains(index))
     }
 }

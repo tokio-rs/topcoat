@@ -284,13 +284,26 @@ impl ContextReadMask {
         self.frontier = self.frontier.max(binding_id.frontier());
     }
 
+    fn union_with(&mut self, reads: &Self) {
+        self.bits.union_with(&reads.bits);
+        self.frontier = self.frontier.max(reads.frontier);
+    }
+
+    fn union_visible(
+        &mut self,
+        reads: &Self,
+        binding_mask: &binding::Mask,
+        registry: &binding::Registry,
+    ) {
+        binding_mask.union_visible_reads(&mut self.bits, &reads.bits, registry);
+        self.frontier = self.frontier.max(reads.frontier);
+    }
+
     fn matches(&self, binding_mask: &binding::Mask, registry: &binding::Registry) -> bool {
         if self.frontier <= binding_mask.frontier {
             self.bits.is_subset(&binding_mask.bits)
         } else {
-            self.bits
-                .iter()
-                .all(|index| binding_mask.effectively_contains(registry, binding::Id(index)))
+            binding_mask.contains_reads(&self.bits, registry)
         }
     }
 }
@@ -338,14 +351,26 @@ impl<'cx> ContextTracker<'cx> {
         self.reads.lock().unwrap().insert(binding_id);
     }
 
-    fn merge_into(&self, tracker: &ContextTracker<'_>) {
-        if !Arc::ptr_eq(&self.cx.request_state, &tracker.cx.request_state) {
+    fn record_reads(&self, cx: &Cx, reads: &ContextReadMask) {
+        if !Arc::ptr_eq(&self.cx.request_state, &cx.request_state) {
             return;
         }
 
-        for index in &self.finish().bits {
-            tracker.record(binding::Id(index));
+        let mut tracked = self.reads.lock().unwrap();
+        if std::ptr::eq(self.cx, cx) {
+            tracked.union_with(reads);
+        } else {
+            tracked.union_visible(
+                reads,
+                self.cx.bindings.mask(),
+                &self.cx.request_state.bindings,
+            );
         }
+    }
+
+    fn merge_into(&self, tracker: &ContextTracker<'_>) {
+        let reads = self.reads.lock().unwrap();
+        tracker.record_reads(self.cx, &reads);
     }
 }
 
@@ -373,8 +398,8 @@ fn record_context_read(cx: &Cx, binding_id: binding::Id) {
 }
 
 pub(crate) fn replay_context_reads(cx: &Cx, reads: &ContextReadMask) {
-    for index in &reads.bits {
-        record_context_read(cx, binding::Id(index));
+    if ACTIVE_TRACKER.is_set() {
+        ACTIVE_TRACKER.with(|tracker| tracker.record_reads(cx, reads));
     }
 }
 
