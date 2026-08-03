@@ -62,6 +62,34 @@ Deferred views compose as ordinary views. A component can return a view containi
 
 The response body owns each deferred future. Dropping the body drops pending work. Status codes and headers come from the initial shell because deferred views complete after response headers may be sent. Calling [`View::render`] directly renders the placeholder markers but does not run deferred work; return the view through the router to stream it.
 
+# Streaming JSON
+
+Components can send serialized data to browser modules separately from their HTML. This lets a module begin loading immediately and await its data by key:
+
+```rust
+# use topcoat::{Result, context::Cx, view::{component, view}};
+# #[component]
+# async fn product_search(cx: &Cx) -> Result {
+let products = ["Anvil", "Drill", "Level"];
+let key = cx.send_json(&products)?;
+
+view! {
+    <input data-products=(key.as_str())>
+}
+# }
+```
+
+Browser code reads the attribute and awaits the streamed value:
+
+```js
+const input = document.querySelector("[data-products]");
+const products = await topcoat.json(input.dataset.products);
+```
+
+[`Cx::send_json`](crate::context::Cx::send_json) generates a response-scoped key in a namespace applications cannot use, so generated and named keys cannot collide. Use [`Cx::send_json_named`](crate::context::Cx::send_json_named) when client code needs a stable key. Repeating a named key with the same serialized value is deduplicated; sending a different value under that key is an error.
+
+JSON is serialized on the server and streamed in an inert, HTML-escaped template. The external [`defer_script`] helper parses it and resolves `topcoat.json(key)`, including calls made before the data arrives.
+
 [`view!`]: macro.view.html
 [`component`]: attr.component.html
 [`attributes!`]: macro.attributes.html

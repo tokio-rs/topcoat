@@ -6,8 +6,8 @@ use std::{any::Any, ops::Deref, sync::Arc};
 pub use context_map::*;
 pub use id::*;
 
-pub use crate::memoize::MemoizeAsRef;
-use crate::{abort::AbortStore, memoize::MemoizeCache};
+use crate::{abort::AbortStore, memoize::MemoizeCache, response_event::ResponseEvents};
+pub use crate::{memoize::MemoizeAsRef, response_event::JsonKey};
 
 /// The request context.
 ///
@@ -23,6 +23,7 @@ pub struct Cx {
     request_context: Arc<ContextMap>,
     memoize_cache: Arc<MemoizeCache>,
     abort_store: Arc<AbortStore>,
+    pub(crate) response_events: Arc<ResponseEvents>,
 }
 
 impl Cx {
@@ -34,6 +35,7 @@ impl Cx {
             request_context: Arc::new(request_context),
             memoize_cache: Arc::new(MemoizeCache::new()),
             abort_store: Arc::new(AbortStore::new()),
+            response_events: Arc::new(ResponseEvents::new()),
         }
     }
 
@@ -56,6 +58,7 @@ impl Cx {
             request_context: Arc::clone(&self.request_context),
             memoize_cache: Arc::clone(&self.memoize_cache),
             abort_store: Arc::clone(&self.abort_store),
+            response_events: Arc::clone(&self.response_events),
         })
     }
 }

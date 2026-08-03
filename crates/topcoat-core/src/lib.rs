@@ -10,3 +10,5 @@ pub mod error;
 pub mod fnv1a;
 pub mod internal;
 pub mod memoize;
+#[doc(hidden)]
+pub mod response_event;

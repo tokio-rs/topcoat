@@ -18,9 +18,12 @@ build = []
 anyhow.workspace = true
 anymap3.workspace = true
 boxcar.workspace = true
+getrandom.workspace = true
 hashbrown.workspace = true
 http.workspace = true
 pin-project-lite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 

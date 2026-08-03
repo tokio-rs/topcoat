@@ -9,6 +9,7 @@ mod config;
 mod error;
 mod manifest;
 mod options;
+mod resource;
 #[cfg(feature = "router")]
 mod router;
 #[cfg(feature = "serve")]
@@ -26,6 +27,7 @@ pub use config::*;
 pub use error::*;
 pub use manifest::*;
 pub use options::*;
+pub use resource::*;
 #[cfg(feature = "router")]
 pub use router::*;
 #[cfg(feature = "serve")]
