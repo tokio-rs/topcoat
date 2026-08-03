@@ -50,6 +50,42 @@ async fn fetch_post(cx: &Cx, slug: &str) -> Post {
 
 For async functions, concurrent callers with the same arguments share a single in-flight future. If two parts of your page render in parallel and both call `fetch_post(cx, "hello")`, the database is queried once and both callers await the same result.
 
+# Recursion
+
+Memoized functions can recurse if and only if recursive calls use different arguments. Recursion with identical arguments panics.
+
+Recursion with different arguments uses a different cache entry for each call:
+
+```rust
+# use topcoat::context::{Cx, memoize};
+#[memoize]
+fn factorial(cx: &Cx, n: u64) -> u64 {
+    match n {
+        0 | 1 => 1,
+        _ => n * *factorial(cx, n - 1),
+    }
+}
+
+# fn example(cx: &Cx) {
+assert_eq!(*factorial(cx, 5), 120);
+# }
+```
+
+A nested call with the same arguments panics because it would otherwise deadlock:
+
+```should_panic
+use topcoat::context::{Cx, memoize};
+
+#[memoize]
+fn recurse(cx: &Cx, n: u64) -> u64 {
+    *recurse(cx, n)
+}
+
+fn main() {
+    recurse(&Cx::default(), 1);
+}
+```
+
 # What gets cached
 
 Every argument except `cx` is part of the cache key. Two calls hit the same cache entry if and only if every non-`cx` argument is equal.

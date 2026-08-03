@@ -7,6 +7,8 @@ mod internal_server;
 mod method_not_allowed;
 mod not_found;
 mod redirect;
+mod service_unavailable;
+mod too_many_requests;
 mod unauthorized;
 
 pub use bad_request::*;
@@ -17,6 +19,8 @@ pub use internal_server::*;
 pub use method_not_allowed::*;
 pub use not_found::*;
 pub use redirect::*;
+pub use service_unavailable::*;
+pub use too_many_requests::*;
 use topcoat_core::{
     context::Cx,
     error::{Error, Result},
@@ -63,6 +67,8 @@ fn error_into_response(cx: &Cx, error: Error) -> Response {
     let error = try_downcast!(error as MethodNotAllowedError);
     let error = try_downcast!(error as RedirectError);
     let error = try_downcast!(error as UnauthorizedError);
+    let error = try_downcast!(error as ServiceUnavailableError);
+    let error = try_downcast!(error as TooManyRequestsError);
 
     into_response_or_500(cx, internal_server_error(error))
 }
@@ -268,5 +274,58 @@ impl<T, E> RouterErrorExt for Result<T, E> {
             Ok(value) => Ok(value),
             Err(_) => Err(bad_request(description)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::header::RETRY_AFTER;
+
+    use super::*;
+
+    /// The mapping is a closed list of downcasts, so an error type that is not
+    /// on it degrades to a 500 no matter what its own `IntoResponse` says. A
+    /// shed answered as "broken" rather than "busy" is the failure this guards.
+    #[test]
+    fn a_service_unavailable_error_maps_to_503_not_500() {
+        let error: Error = service_unavailable(2).into();
+
+        let response = error_into_response(&Cx::default(), error);
+
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            response
+                .headers()
+                .get(RETRY_AFTER)
+                .map(http::HeaderValue::as_bytes),
+            Some(&b"2"[..])
+        );
+    }
+
+    /// The 429 mirror: a rate limit answered as "the server is broken" is the
+    /// failure this guards.
+    #[test]
+    fn a_too_many_requests_error_maps_to_429_not_500() {
+        let error: Error = too_many_requests(60).into();
+
+        let response = error_into_response(&Cx::default(), error);
+
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            response
+                .headers()
+                .get(RETRY_AFTER)
+                .map(http::HeaderValue::as_bytes),
+            Some(&b"60"[..])
+        );
+    }
+
+    #[test]
+    fn an_error_that_is_not_on_the_list_still_maps_to_500() {
+        let error: Error = std::io::Error::other("boom").into();
+
+        let response = error_into_response(&Cx::default(), error);
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }
