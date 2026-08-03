@@ -6,9 +6,10 @@ mod value;
 
 use std::{
     any::{Any, TypeId},
+    cell::RefCell,
     marker::PhantomData,
     ops::Deref,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use bit_set::BitSet;
@@ -272,7 +273,7 @@ struct RequestState {
     abort_store: AbortStore,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub(crate) struct ContextReadMask {
     bits: BitSet<usize>,
     frontier: usize,
@@ -310,14 +311,14 @@ impl ContextReadMask {
 
 pub(crate) struct ContextTracker<'cx> {
     cx: &'cx Cx,
-    reads: Mutex<ContextReadMask>,
+    reads: RefCell<ContextReadMask>,
 }
 
 impl<'cx> ContextTracker<'cx> {
     pub(crate) fn new(cx: &'cx Cx) -> Self {
         Self {
             cx,
-            reads: Mutex::new(ContextReadMask::default()),
+            reads: RefCell::new(ContextReadMask::default()),
         }
     }
 
@@ -336,7 +337,7 @@ impl<'cx> ContextTracker<'cx> {
     }
 
     pub(crate) fn finish(&self) -> ContextReadMask {
-        self.reads.lock().unwrap().clone()
+        self.reads.take()
     }
 
     fn record(&self, binding_id: binding::Id) {
@@ -348,7 +349,7 @@ impl<'cx> ContextTracker<'cx> {
         {
             return;
         }
-        self.reads.lock().unwrap().insert(binding_id);
+        self.reads.borrow_mut().insert(binding_id);
     }
 
     fn record_reads(&self, cx: &Cx, reads: &ContextReadMask) {
@@ -356,7 +357,7 @@ impl<'cx> ContextTracker<'cx> {
             return;
         }
 
-        let mut tracked = self.reads.lock().unwrap();
+        let mut tracked = self.reads.borrow_mut();
         if std::ptr::eq(self.cx, cx) {
             tracked.union_with(reads);
         } else {
@@ -369,7 +370,7 @@ impl<'cx> ContextTracker<'cx> {
     }
 
     fn merge_into(&self, tracker: &ContextTracker<'_>) {
-        let reads = self.reads.lock().unwrap();
+        let reads = self.reads.borrow();
         tracker.record_reads(self.cx, &reads);
     }
 }

@@ -178,13 +178,13 @@ impl MemoizeEqCache {
 
         let tracker = ContextTracker::new(cx);
         let mut future = std::pin::pin!(f(cx, params));
-        let value =
-            poll_fn(|task| tracker.scope(|| slot.recursion.scope(|| future.as_mut().poll(task))))
-                .await;
-        let index = slot.values.push(CachedValue {
-            value,
-            reads: tracker.finish(),
-        });
+        let (value, reads) = poll_fn(move |task| {
+            tracker
+                .scope(|| slot.recursion.scope(|| future.as_mut().poll(task)))
+                .map(|value| (value, tracker.finish()))
+        })
+        .await;
+        let index = slot.values.push(CachedValue { value, reads });
         &slot.values[index].value
     }
 }
