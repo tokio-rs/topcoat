@@ -30,6 +30,20 @@ tokio = { workspace = true, features = ["sync"] }
 topcoat.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
 
+criterion.workspace = true
+
+[[bench]]
+name = "request_context"
+harness = false
+
+[[bench]]
+name = "context_scope"
+harness = false
+
+[[bench]]
+name = "memoize"
+harness = false
+
 [lints]
 workspace = true
 

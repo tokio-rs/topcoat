@@ -2921,6 +2921,7 @@ dependencies = [
  "anyhow",
  "anymap3",
  "boxcar",
+ "criterion",
  "hashbrown 0.17.0",
  "http",
  "im",
