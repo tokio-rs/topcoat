@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
 
 use serde::Deserialize;
 
@@ -51,6 +54,17 @@ struct Target {
     crate_types: Vec<String>,
 }
 
+/// Excludes libraries in a build script output directory. Build scripts emit
+/// their own outputs into `<target>/build/<pkg>/<hash>/out/` and shouldn't
+/// be mistaken for the requested package's final output.
+fn is_build_script_output(path: &Path) -> bool {
+    path.ancestors()
+        .any(|a| a.file_name() == Some(OsStr::new("out")))
+        && path
+            .ancestors()
+            .any(|a| a.file_name() == Some(OsStr::new("build")))
+}
+
 /// Whether `path` names a final dynamic-library output: a linked library by
 /// extension (as opposed to an rlib, import library, or dep-info companion in
 /// the same `filenames` list) that cargo uplifted out of the `deps/`
@@ -63,6 +77,7 @@ fn is_final_library(path: &Path) -> bool {
         .parent()
         .and_then(Path::file_name)
         .is_none_or(|dir| dir != "deps")
+        && !is_build_script_output(path)
 }
 
 #[cfg(test)]
@@ -127,5 +142,26 @@ mod tests {
         assert!(!is_final_library(Path::new("/t/debug/libapp.rlib")));
         assert!(!is_final_library(Path::new("/t/debug/app.dll.lib")));
         assert!(!is_final_library(Path::new("/t/debug/app.d")));
+    }
+
+    #[test]
+    fn build_script_library_outputs_are_excluded() {
+        assert!(!is_final_library(Path::new(
+            "/t/debug/build/foo/9251c15296da3db3/out/libfoo.so"
+        )));
+        assert!(!is_final_library(Path::new(
+            "/t/debug/build/bar/a3538d1a8934c29c/out/libbar.dylib"
+        )));
+        assert!(!is_final_library(Path::new(
+            "/t/debug/build/foo/extra/nested/path/out/libfoo.so"
+        )));
+    }
+
+    #[test]
+    fn final_library_paths_are_not_excluded() {
+        assert!(is_final_library(Path::new("/t/debug/libfoo.so")));
+        assert!(is_final_library(Path::new("/t/debug/libfoo.dylib")));
+        assert!(is_final_library(Path::new("/t/debug/foo.dll")));
+        assert!(is_final_library(Path::new("/t/debug/foo.wasm")));
     }
 }
