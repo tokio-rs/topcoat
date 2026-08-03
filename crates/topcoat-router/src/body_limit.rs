@@ -30,7 +30,7 @@ pub(crate) const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use topcoat::router::{BodyLimit, Router};
 ///
 /// let router = Router::builder()

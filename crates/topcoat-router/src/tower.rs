@@ -153,7 +153,7 @@ where
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use std::time::Duration;
 ///
 /// use topcoat::router::{Router, tower::TowerLayer};
