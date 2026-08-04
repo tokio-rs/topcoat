@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    FnArg, ItemFn, LitStr, Pat, ReturnType, Visibility,
+    FnArg, ItemFn, LitStr, Pat, ReturnType, Type, Visibility,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
@@ -62,6 +62,18 @@ impl Parse for LayoutItem {
                     ));
                 }
                 FnArg::Typed(pat_type) => match &*pat_type.pat {
+                    Pat::Ident(pi) if pi.ident == "slot" && !is_path(&pat_type.ty, "Result") => {
+                        return Err(syn::Error::new_spanned(
+                            pat_type,
+                            "the `slot` parameter must have type `Result`",
+                        ));
+                    }
+                    Pat::Ident(pi) if pi.ident == "cx" && !is_cx(&pat_type.ty) => {
+                        return Err(syn::Error::new_spanned(
+                            pat_type,
+                            "the `cx` parameter must have type `&Cx`",
+                        ));
+                    }
                     Pat::Ident(pi)
                         if pi.ident == "slot"
                             && !args.iter().any(|arg| matches!(arg, LayoutArg::Slot)) =>
@@ -92,6 +104,30 @@ impl Parse for LayoutItem {
 
         Ok(Self { item, args })
     }
+}
+
+fn is_path(ty: &Type, ident: &str) -> bool {
+    let Type::Path(path) = ty else {
+        return false;
+    };
+
+    path.qself.is_none()
+        && path
+            .path
+            .segments
+            .last()
+            .is_some_and(|segment| segment.ident == ident)
+}
+
+fn is_cx(ty: &Type) -> bool {
+    let Type::Reference(reference) = ty else {
+        return false;
+    };
+    if reference.mutability.is_some() {
+        return false;
+    }
+
+    is_path(&reference.elem, "Cx")
 }
 
 pub struct Layout(LayoutAttr, LayoutItem);
@@ -247,6 +283,14 @@ mod tests {
     }
 
     #[test]
+    fn accepts_qualified_parameter_types() {
+        syn::parse_str::<LayoutItem>(
+            "async fn shell(slot: topcoat::Result, cx: &topcoat::context::Cx) -> Result { todo!() }",
+        )
+        .unwrap();
+    }
+
+    #[test]
     fn rejects_non_async_fn() {
         assert!(
             parse_err("fn shell(slot: Result) -> Result { todo!() }").contains("must be async")
@@ -266,6 +310,24 @@ mod tests {
             parse_err("async fn shell(cx: &Cx) -> Result { todo!() }")
                 .contains("must take a `slot: Result` parameter")
         );
+    }
+
+    #[test]
+    fn rejects_incorrect_slot_type() {
+        let err = parse_err("async fn shell(slot: String) -> Result { todo!() }");
+        assert!(err.contains("`slot` parameter must have type `Result`"));
+    }
+
+    #[test]
+    fn rejects_incorrect_cx_type() {
+        let err = parse_err("async fn shell(slot: Result, cx: String) -> Result { todo!() }");
+        assert!(err.contains("`cx` parameter must have type `&Cx`"));
+    }
+
+    #[test]
+    fn rejects_mutable_cx_reference() {
+        let err = parse_err("async fn shell(slot: Result, cx: &mut Cx) -> Result { todo!() }");
+        assert!(err.contains("`cx` parameter must have type `&Cx`"));
     }
 
     #[test]
