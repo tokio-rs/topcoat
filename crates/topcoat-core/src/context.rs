@@ -6,7 +6,7 @@ mod value;
 
 use std::{
     any::{Any, TypeId},
-    cell::RefCell,
+    cell::{Cell, RefCell},
     marker::PhantomData,
     ops::Deref,
     sync::Arc,
@@ -15,6 +15,7 @@ use std::{
 pub use context_map::*;
 pub use id::*;
 use scoped_tls_hkt::scoped_thread_local;
+use smallvec::SmallVec;
 pub use test::*;
 pub use value::ContextValues;
 
@@ -28,9 +29,10 @@ use crate::{abort::AbortStore, memoize::MemoizeCache};
 /// [`Cx::with`] to create a child scope that temporarily shadows a value.
 pub struct Cx {
     id: CxId,
+    cache_id: CacheId,
     app_context: Arc<ContextMap>,
     request_state: Arc<RequestState>,
-    bindings: binding::BindingSet,
+    scoped_bindings: Option<binding::ScopedBindings>,
 }
 
 impl Cx {
@@ -40,9 +42,10 @@ impl Cx {
     pub fn new(app_context: Arc<ContextMap>) -> Self {
         Self {
             id: CxId::new(),
+            cache_id: CacheId::ROOT,
             app_context,
             request_state: Arc::new(RequestState::default()),
-            bindings: binding::BindingSet::default(),
+            scoped_bindings: None,
         }
     }
 
@@ -114,10 +117,12 @@ impl Cx {
     where
         T: Any + Send + Sync,
     {
-        self.assert_request_state_unique();
-        self.bindings
-            .install(&self.request_state.binding_ids, value)
-            .map(binding::Binding::into_value)
+        let (previous, id) = {
+            let state = self.request_state_mut();
+            state.root_bindings.install(&state.binding_ids, value)
+        };
+        self.cache_id = CacheId::from(id);
+        previous
     }
 
     /// Returns mutable access to a request-root value.
@@ -135,8 +140,23 @@ impl Cx {
     where
         T: Any + Send + Sync,
     {
-        self.assert_request_state_unique();
-        self.bindings.get_mut::<T>(&self.request_state.binding_ids)
+        let Self {
+            cache_id,
+            request_state,
+            ..
+        } = self;
+        let state = Arc::get_mut(request_state)
+            .expect("cannot mutate the request root while a scoped context is still reachable");
+        let RequestState {
+            root_bindings,
+            binding_ids,
+            ..
+        } = state;
+        let (value, binding_id) = root_bindings.get_mut::<T>()?;
+        let id = binding_ids.allocate();
+        *binding_id = id;
+        *cache_id = CacheId::from(id);
+        Some(value)
     }
 
     /// Creates a child scope containing `value`.
@@ -149,10 +169,12 @@ impl Cx {
         T: Any + Send + Sync,
     {
         let mut scope = self.child();
-        let _ = scope
+        let id = scope
             .cx
-            .bindings
+            .scoped_bindings
+            .get_or_insert_default()
             .install(&scope.cx.request_state.binding_ids, value);
+        scope.cx.cache_id = CacheId::from(id);
         scope
     }
 
@@ -171,8 +193,11 @@ impl Cx {
         <V as value::Sealed>::assert_unique();
         let mut scope = self.child();
         {
-            let mut installer =
-                value::Installer::new(&mut scope.cx.bindings, &scope.cx.request_state.binding_ids);
+            let mut installer = value::Installer::new(
+                scope.cx.scoped_bindings.get_or_insert_default(),
+                &scope.cx.request_state.binding_ids,
+                &mut scope.cx.cache_id,
+            );
             <V as value::Sealed>::install(values, &mut installer);
         }
         scope
@@ -182,50 +207,68 @@ impl Cx {
         CxScope {
             cx: Self {
                 id: CxId::new(),
+                cache_id: self.cache_id,
                 app_context: self.app_context.clone(),
                 request_state: self.request_state.clone(),
-                bindings: self.bindings.clone(),
+                scoped_bindings: self.scoped_bindings.clone(),
             },
             parent: PhantomData,
         }
     }
 
-    fn assert_request_state_unique(&mut self) {
+    fn request_state_mut(&mut self) -> &mut RequestState {
         Arc::get_mut(&mut self.request_state)
-            .expect("cannot mutate the request root while a scoped context is still reachable");
+            .expect("cannot mutate the request root while a scoped context is still reachable")
     }
 
     fn app_context_mut(&mut self) -> &mut ContextMap {
         Arc::get_mut(&mut self.app_context).expect("test context app context is still shared")
     }
 
+    #[inline]
     pub(crate) fn request_value<T>(&self) -> Option<&T>
     where
         T: Any + Send + Sync,
     {
-        if let Some(binding) = self.bindings.get::<T>() {
-            record_context_read(
-                self,
-                ContextRead {
-                    type_id: TypeId::of::<T>(),
-                    binding_id: Some(binding.id),
-                },
-            );
+        if let Some(binding) = self
+            .scoped_bindings
+            .as_ref()
+            .and_then(binding::ScopedBindings::get::<T>)
+        {
+            track_context_read::<T>(self, Some(binding.id));
             return Some(binding.value());
         }
 
-        record_context_read(
-            self,
-            ContextRead {
-                type_id: TypeId::of::<T>(),
-                binding_id: None,
-            },
-        );
-        None
+        let binding = self.request_state.root_bindings.get::<T>();
+        track_context_read::<T>(self, binding.map(|binding| binding.id));
+        binding.map(|binding| &binding.value)
     }
 
     pub(crate) fn context_reads_match(&self, reads: &[ContextRead]) -> bool {
         reads.iter().all(|read| read.matches(self))
+    }
+
+    #[inline]
+    pub(crate) fn cache_id(&self) -> CacheId {
+        self.cache_id
+    }
+
+    fn binding_id<T>(&self) -> Option<binding::Id>
+    where
+        T: Any + Send + Sync,
+    {
+        if let Some(binding) = self
+            .scoped_bindings
+            .as_ref()
+            .and_then(binding::ScopedBindings::get::<T>)
+        {
+            return Some(binding.id);
+        }
+
+        self.request_state
+            .root_bindings
+            .get::<T>()
+            .map(|binding| binding.id)
     }
 }
 
@@ -276,37 +319,77 @@ impl std::fmt::Debug for CxScope<'_> {
 
 #[derive(Debug, Default)]
 struct RequestState {
+    root_bindings: binding::RootBindings,
     binding_ids: binding::IdAllocator,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct ContextRead {
     type_id: TypeId,
     binding_id: Option<binding::Id>,
+    resolve: fn(&Cx) -> Option<binding::Id>,
 }
 
 impl ContextRead {
+    fn new<T>(binding_id: Option<binding::Id>) -> Self
+    where
+        T: Any + Send + Sync,
+    {
+        Self {
+            type_id: TypeId::of::<T>(),
+            binding_id,
+            resolve: Cx::binding_id::<T>,
+        }
+    }
+
     fn matches(self, cx: &Cx) -> bool {
-        cx.bindings.resolve(self.type_id) == self.binding_id
+        (self.resolve)(cx) == self.binding_id
+    }
+}
+
+impl PartialEq for ContextRead {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_id == other.type_id && self.binding_id == other.binding_id
+    }
+}
+
+impl Eq for ContextRead {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct CacheId(usize);
+
+impl CacheId {
+    const ROOT: Self = Self(usize::MAX);
+
+    #[inline]
+    pub(crate) fn get(self) -> usize {
+        self.0
+    }
+}
+
+impl From<binding::Id> for CacheId {
+    fn from(id: binding::Id) -> Self {
+        Self(id.get())
     }
 }
 
 pub(crate) struct ContextTracker<'cx> {
     cx: &'cx Cx,
-    reads: RefCell<Vec<ContextRead>>,
+    reads: RefCell<SmallVec<[ContextRead; 4]>>,
 }
 
 impl<'cx> ContextTracker<'cx> {
     pub(crate) fn new(cx: &'cx Cx) -> Self {
         Self {
             cx,
-            reads: RefCell::new(Vec::new()),
+            reads: RefCell::new(SmallVec::new()),
         }
     }
 
     pub(crate) fn scope<R>(&self, f: impl FnOnce() -> R) -> R {
+        let _tracking = TrackingScope::enter();
         if ACTIVE_TRACKER.is_set() {
             ACTIVE_TRACKER.with(|previous| {
                 let _scope = TrackerScope {
@@ -320,7 +403,7 @@ impl<'cx> ContextTracker<'cx> {
         }
     }
 
-    pub(crate) fn finish(&self) -> Vec<ContextRead> {
+    pub(crate) fn finish(&self) -> SmallVec<[ContextRead; 4]> {
         self.reads.take()
     }
 
@@ -358,6 +441,28 @@ impl<'cx> ContextTracker<'cx> {
 
 scoped_thread_local!(static ACTIVE_TRACKER: for<'a> &'a ContextTracker<'a>);
 
+thread_local! {
+    static TRACKING_CONTEXT: Cell<bool> = const { Cell::new(false) };
+}
+
+struct TrackingScope {
+    previous: bool,
+}
+
+impl TrackingScope {
+    fn enter() -> Self {
+        Self {
+            previous: TRACKING_CONTEXT.replace(true),
+        }
+    }
+}
+
+impl Drop for TrackingScope {
+    fn drop(&mut self) {
+        TRACKING_CONTEXT.set(self.previous);
+    }
+}
+
 struct TrackerScope<'tracker, 'tracker_cx, 'previous, 'previous_cx> {
     tracker: &'tracker ContextTracker<'tracker_cx>,
     previous: &'previous ContextTracker<'previous_cx>,
@@ -369,8 +474,13 @@ impl Drop for TrackerScope<'_, '_, '_, '_> {
     }
 }
 
-fn record_context_read(cx: &Cx, read: ContextRead) {
-    if ACTIVE_TRACKER.is_set() {
+#[inline]
+fn track_context_read<T>(cx: &Cx, binding_id: Option<binding::Id>)
+where
+    T: Any + Send + Sync,
+{
+    if TRACKING_CONTEXT.get() {
+        let read = ContextRead::new::<T>(binding_id);
         ACTIVE_TRACKER.with(|tracker| {
             if Arc::ptr_eq(&tracker.cx.request_state, &cx.request_state) {
                 tracker.record(cx, read);
@@ -380,7 +490,7 @@ fn record_context_read(cx: &Cx, read: ContextRead) {
 }
 
 pub(crate) fn replay_context_reads(cx: &Cx, reads: &[ContextRead]) {
-    if ACTIVE_TRACKER.is_set() {
+    if TRACKING_CONTEXT.get() {
         ACTIVE_TRACKER.with(|tracker| tracker.record_reads(cx, reads));
     }
 }

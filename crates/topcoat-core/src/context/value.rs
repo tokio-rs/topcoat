@@ -1,6 +1,9 @@
 use std::any::{Any, TypeId};
 
-use super::binding::{BindingSet, IdAllocator};
+use super::{
+    CacheId,
+    binding::{IdAllocator, ScopedBindings},
+};
 
 /// A tuple of values that can be installed by [`super::Cx::with_values`].
 ///
@@ -11,20 +14,29 @@ pub trait ContextValues: Sealed {}
 impl<T> ContextValues for T where T: Sealed {}
 
 pub struct Installer<'a> {
-    bindings: &'a mut BindingSet,
+    bindings: &'a mut ScopedBindings,
     ids: &'a IdAllocator,
+    cache_id: &'a mut CacheId,
 }
 
 impl<'a> Installer<'a> {
-    pub(super) fn new(bindings: &'a mut BindingSet, ids: &'a IdAllocator) -> Self {
-        Self { bindings, ids }
+    pub(super) fn new(
+        bindings: &'a mut ScopedBindings,
+        ids: &'a IdAllocator,
+        cache_id: &'a mut CacheId,
+    ) -> Self {
+        Self {
+            bindings,
+            ids,
+            cache_id,
+        }
     }
 
     fn install<T>(&mut self, value: T)
     where
         T: Any + Send + Sync,
     {
-        let _ = self.bindings.install(self.ids, value);
+        *self.cache_id = CacheId::from(self.bindings.install(self.ids, value));
     }
 }
 

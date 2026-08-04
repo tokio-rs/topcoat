@@ -2927,6 +2927,7 @@ dependencies = [
  "im",
  "pin-project-lite",
  "scoped-tls-hkt",
+ "smallvec",
  "thiserror",
  "tokio",
  "topcoat",

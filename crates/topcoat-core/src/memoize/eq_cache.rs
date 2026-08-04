@@ -5,13 +5,17 @@ use std::{
     hash::Hash,
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    sync::{Mutex, PoisonError},
+    sync::{
+        Mutex, OnceLock, PoisonError,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use hashbrown::{Equivalent, HashMap};
+use smallvec::SmallVec;
 
 use super::recursion;
-use crate::context::{ContextRead, ContextTracker, Cx, replay_context_reads};
+use crate::context::{CacheId, ContextRead, ContextTracker, Cx, replay_context_reads};
 
 /// The per-request store backing `#[memoize]`.
 ///
@@ -86,17 +90,29 @@ impl MemoizeEqCache {
         }
 
         slot.recursion.assert_not_recursive::<F>();
-        let _initialization = slot.gate.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut input = Some((params, f));
+        if slot.first.get().is_none() {
+            let cached = slot.first.get_or_init(|| {
+                let (params, f) = input.take().expect("memoize input was already consumed");
+                let tracker = ContextTracker::new(cx);
+                let value = tracker.scope(|| slot.recursion.scope(|| f(cx, params)));
+                CachedValue::new(cx.cache_id(), value, tracker.finish())
+            });
+            if cached.matches(cx) {
+                replay_context_reads(cx, &cached.reads);
+                return &cached.value;
+            }
+        }
+
+        let overflow = slot.overflow();
+        let _initialization = overflow.gate.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(value) = slot.find(cx) {
             return value;
         }
+        let (params, f) = input.take().expect("memoize input was already consumed");
         let tracker = ContextTracker::new(cx);
         let value = tracker.scope(|| slot.recursion.scope(|| f(cx, params)));
-        let index = slot.values.push(CachedValue {
-            value,
-            reads: tracker.finish(),
-        });
-        &slot.values[index].value
+        overflow.insert(CachedValue::new(cx.cache_id(), value, tracker.finish()))
     }
 
     /// Returns the already-computed value for `(F, key)`, or `None` if nothing has been
@@ -134,11 +150,16 @@ impl MemoizeEqCache {
             *cache.get(&MemoizeKey(key))?
         };
         let slot: &SyncMemoSlot<V> = self.values.get(index).unwrap().downcast_ref().unwrap();
-        slot.values.iter().next().map(|(_, cached)| &cached.value)
+        slot.first().map(|cached| &cached.value)
     }
 
     /// Async counterpart to [`memoize`](Self::memoize). Misses for one function and argument key
     /// are serialized with a cancellation-safe lock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `f` panics, recursively initializes the same key, or an internal memoization
+    /// invariant is violated.
     pub async fn memoize_async<'a, K, P, V, F, Fut>(
         &'a self,
         cx: &'a Cx,
@@ -160,11 +181,38 @@ impl MemoizeEqCache {
         }
 
         slot.recursion.assert_not_recursive::<F>();
-        let _initialization = slot.gate.lock().await;
+        let mut input = Some((params, f));
+        if slot.first.get().is_none() {
+            let cached = slot
+                .first
+                .get_or_init(|| {
+                    let (params, f) = input.take().expect("memoize input was already consumed");
+                    async move {
+                        let tracker = ContextTracker::new(cx);
+                        let mut future = std::pin::pin!(f(cx, params));
+                        let (value, reads) = poll_fn(move |task| {
+                            tracker
+                                .scope(|| slot.recursion.scope(|| future.as_mut().poll(task)))
+                                .map(|value| (value, tracker.finish()))
+                        })
+                        .await;
+                        CachedValue::new(cx.cache_id(), value, reads)
+                    }
+                })
+                .await;
+            if cached.matches(cx) {
+                replay_context_reads(cx, &cached.reads);
+                return &cached.value;
+            }
+        }
+
+        let overflow = slot.overflow();
+        let _initialization = overflow.gate.lock().await;
         if let Some(value) = slot.find(cx) {
             return value;
         }
 
+        let (params, f) = input.take().expect("memoize input was already consumed");
         let tracker = ContextTracker::new(cx);
         let mut future = std::pin::pin!(f(cx, params));
         let (value, reads) = poll_fn(move |task| {
@@ -173,8 +221,7 @@ impl MemoizeEqCache {
                 .map(|value| (value, tracker.finish()))
         })
         .await;
-        let index = slot.values.push(CachedValue { value, reads });
-        &slot.values[index].value
+        overflow.insert(CachedValue::new(cx.cache_id(), value, reads))
     }
 }
 
@@ -185,28 +232,108 @@ impl std::fmt::Debug for MemoizeEqCache {
 }
 
 struct CachedValue<V> {
+    last_context: AtomicUsize,
     value: V,
-    reads: Vec<ContextRead>,
+    reads: SmallVec<[ContextRead; 4]>,
 }
 
-struct MemoSlot<V, Gate> {
-    values: boxcar::Vec<CachedValue<V>>,
-    gate: Gate,
-    recursion: recursion::Guard,
-}
+impl<V> CachedValue<V> {
+    fn new(cache_id: CacheId, value: V, reads: SmallVec<[ContextRead; 4]>) -> Self {
+        Self {
+            last_context: AtomicUsize::new(cache_id.get()),
+            value,
+            reads,
+        }
+    }
 
-impl<V, Gate> MemoSlot<V, Gate> {
-    fn find<'a>(&'a self, cx: &Cx) -> Option<&'a V> {
-        let (_, cached) = self
-            .values
-            .iter()
-            .find(|(_, cached)| cx.context_reads_match(&cached.reads))?;
-        replay_context_reads(cx, &cached.reads);
-        Some(&cached.value)
+    fn matches(&self, cx: &Cx) -> bool {
+        let cache_id = cx.cache_id().get();
+        if self.last_context.load(Ordering::Relaxed) == cache_id {
+            return true;
+        }
+        if !cx.context_reads_match(&self.reads) {
+            return false;
+        }
+        self.last_context.store(cache_id, Ordering::Relaxed);
+        true
     }
 }
 
-impl<V, Gate> Default for MemoSlot<V, Gate>
+struct MemoSlot<V, First, Gate> {
+    first: First,
+    overflow: OnceLock<Box<OverflowVariants<V, Gate>>>,
+    recursion: recursion::Guard,
+}
+
+struct OverflowVariants<V, Gate> {
+    values: boxcar::Vec<CachedValue<V>>,
+    gate: Gate,
+}
+
+trait PrimaryVariant<V> {
+    fn get(&self) -> Option<&CachedValue<V>>;
+}
+
+impl<V> PrimaryVariant<V> for OnceLock<CachedValue<V>> {
+    fn get(&self) -> Option<&CachedValue<V>> {
+        OnceLock::get(self)
+    }
+}
+
+impl<V> PrimaryVariant<V> for tokio::sync::OnceCell<CachedValue<V>> {
+    fn get(&self) -> Option<&CachedValue<V>> {
+        tokio::sync::OnceCell::get(self)
+    }
+}
+
+impl<V, First, Gate> MemoSlot<V, First, Gate>
+where
+    First: PrimaryVariant<V>,
+{
+    fn find<'a>(&'a self, cx: &Cx) -> Option<&'a V> {
+        let cached = self
+            .first
+            .get()
+            .filter(|cached| cached.matches(cx))
+            .or_else(|| {
+                self.overflow
+                    .get()?
+                    .values
+                    .iter()
+                    .find_map(|(_, cached)| cached.matches(cx).then_some(cached))
+            })?;
+        replay_context_reads(cx, &cached.reads);
+        Some(&cached.value)
+    }
+
+    fn first(&self) -> Option<&CachedValue<V>> {
+        self.first.get().or_else(|| {
+            self.overflow
+                .get()?
+                .values
+                .iter()
+                .next()
+                .map(|(_, cached)| cached)
+        })
+    }
+
+    fn overflow(&self) -> &OverflowVariants<V, Gate>
+    where
+        Gate: Default,
+    {
+        self.overflow
+            .get_or_init(|| Box::new(OverflowVariants::default()))
+    }
+}
+
+impl<V, Gate> OverflowVariants<V, Gate> {
+    fn insert(&self, cached: CachedValue<V>) -> &V {
+        let index = self.values.push(cached);
+        &self.values[index].value
+    }
+}
+
+impl<V, Gate> Default for OverflowVariants<V, Gate>
 where
     Gate: Default,
 {
@@ -214,13 +341,26 @@ where
         Self {
             values: boxcar::Vec::new(),
             gate: Gate::default(),
+        }
+    }
+}
+
+impl<V, First, Gate> Default for MemoSlot<V, First, Gate>
+where
+    First: Default,
+    Gate: Default,
+{
+    fn default() -> Self {
+        Self {
+            first: First::default(),
+            overflow: OnceLock::new(),
             recursion: recursion::Guard::default(),
         }
     }
 }
 
-type SyncMemoSlot<V> = MemoSlot<V, Mutex<()>>;
-type AsyncMemoSlot<V> = MemoSlot<V, tokio::sync::Mutex<()>>;
+type SyncMemoSlot<V> = MemoSlot<V, OnceLock<CachedValue<V>>, Mutex<()>>;
+type AsyncMemoSlot<V> = MemoSlot<V, tokio::sync::OnceCell<CachedValue<V>>, tokio::sync::Mutex<()>>;
 
 /// A `HashMap` tagged by a phantom marker type `T` so that maps for different markers are
 /// distinct types in `anymap3`. Two memoized functions with identical `K`/`V` types stay in

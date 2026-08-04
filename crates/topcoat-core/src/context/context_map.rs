@@ -99,6 +99,7 @@ where
 /// }
 /// ```
 #[must_use]
+#[inline]
 pub fn try_request_context<T>(cx: &Cx) -> Option<&T>
 where
     T: Any + Send + Sync,
@@ -131,6 +132,7 @@ where
 /// ```
 #[must_use]
 #[track_caller]
+#[inline]
 pub fn request_context<T>(cx: &Cx) -> &T
 where
     T: Any + Send + Sync,
