@@ -19,13 +19,13 @@ impl RootBindings {
         let id = ids.allocate();
         let previous = self
             .entries
-            .insert(RootBinding { id, value })
+            .insert(Binding { id, value })
             .map(|binding| binding.value);
         (previous, id)
     }
 
     #[inline]
-    pub(super) fn get<T>(&self) -> Option<&RootBinding<T>>
+    pub(super) fn get<T>(&self) -> Option<&Binding<T>>
     where
         T: Any + Send + Sync,
     {
@@ -36,17 +36,31 @@ impl RootBindings {
     where
         T: Any + Send + Sync,
     {
-        let binding = self.entries.get_mut::<RootBinding<T>>()?;
+        let binding = self.entries.get_mut::<Binding<T>>()?;
         Some((&mut binding.value, &mut binding.id))
     }
 }
 
-pub(super) struct RootBinding<T> {
+#[derive(Clone)]
+pub(super) struct Binding<T> {
     pub(super) id: Id,
     pub(super) value: T,
 }
 
 type ErasedValue = Arc<dyn Any + Send + Sync>;
+pub(super) type ScopedBinding = Binding<ErasedValue>;
+
+impl Binding<ErasedValue> {
+    #[inline]
+    pub(super) fn value<T>(&self) -> &T
+    where
+        T: Any + Send + Sync,
+    {
+        self.value
+            .downcast_ref()
+            .expect("context binding type changed")
+    }
+}
 
 #[derive(Clone, Default)]
 pub(super) struct ScopedBindings {
@@ -75,32 +89,6 @@ impl ScopedBindings {
         T: Any + Send + Sync,
     {
         self.entries.get(&TypeId::of::<T>())
-    }
-}
-
-pub(super) struct ScopedBinding {
-    pub(super) id: Id,
-    value: ErasedValue,
-}
-
-impl ScopedBinding {
-    #[inline]
-    pub(super) fn value<T>(&self) -> &T
-    where
-        T: Any + Send + Sync,
-    {
-        self.value
-            .downcast_ref()
-            .expect("context binding type changed")
-    }
-}
-
-impl Clone for ScopedBinding {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            value: self.value.clone(),
-        }
     }
 }
 
