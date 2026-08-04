@@ -90,29 +90,11 @@ impl MemoizeEqCache {
         }
 
         slot.recursion.assert_not_recursive::<F>();
-        let mut input = Some((params, f));
-        if slot.first.get().is_none() {
-            let cached = slot.first.get_or_init(|| {
-                let (params, f) = input.take().expect("memoize input was already consumed");
-                let tracker = ContextTracker::new(cx);
-                let value = tracker.scope(|| slot.recursion.scope(|| f(cx, params)));
-                CachedValue::new(cx.cache_id(), value, tracker.finish())
-            });
-            if cached.matches(cx) {
-                replay_context_reads(cx, &cached.reads);
-                return &cached.value;
-            }
-        }
-
-        let overflow = slot.overflow();
-        let _initialization = overflow.gate.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(value) = slot.find(cx) {
+        let mut input = MemoizeInput::new(params, f);
+        if let Some(value) = slot.initialize_first(cx, &mut input) {
             return value;
         }
-        let (params, f) = input.take().expect("memoize input was already consumed");
-        let tracker = ContextTracker::new(cx);
-        let value = tracker.scope(|| slot.recursion.scope(|| f(cx, params)));
-        overflow.insert(CachedValue::new(cx.cache_id(), value, tracker.finish()))
+        slot.initialize_overflow(cx, input)
     }
 
     /// Returns the already-computed value for `(F, key)`, or `None` if nothing has been
@@ -181,53 +163,33 @@ impl MemoizeEqCache {
         }
 
         slot.recursion.assert_not_recursive::<F>();
-        let mut input = Some((params, f));
-        if slot.first.get().is_none() {
-            let cached = slot
-                .first
-                .get_or_init(|| {
-                    let (params, f) = input.take().expect("memoize input was already consumed");
-                    async move {
-                        let tracker = ContextTracker::new(cx);
-                        let mut future = std::pin::pin!(f(cx, params));
-                        let (value, reads) = poll_fn(move |task| {
-                            tracker
-                                .scope(|| slot.recursion.scope(|| future.as_mut().poll(task)))
-                                .map(|value| (value, tracker.finish()))
-                        })
-                        .await;
-                        CachedValue::new(cx.cache_id(), value, reads)
-                    }
-                })
-                .await;
-            if cached.matches(cx) {
-                replay_context_reads(cx, &cached.reads);
-                return &cached.value;
-            }
-        }
-
-        let overflow = slot.overflow();
-        let _initialization = overflow.gate.lock().await;
-        if let Some(value) = slot.find(cx) {
+        let mut input = MemoizeInput::new(params, f);
+        if let Some(value) = slot.initialize_first(cx, &mut input).await {
             return value;
         }
-
-        let (params, f) = input.take().expect("memoize input was already consumed");
-        let tracker = ContextTracker::new(cx);
-        let mut future = std::pin::pin!(f(cx, params));
-        let (value, reads) = poll_fn(move |task| {
-            tracker
-                .scope(|| slot.recursion.scope(|| future.as_mut().poll(task)))
-                .map(|value| (value, tracker.finish()))
-        })
-        .await;
-        overflow.insert(CachedValue::new(cx.cache_id(), value, reads))
+        slot.initialize_overflow(cx, input).await
     }
 }
 
 impl std::fmt::Debug for MemoizeEqCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MemoizeCache").finish()
+    }
+}
+
+// A once-cell initializer may lose a race and never run, so keep the call arguments available
+// until a primary or overflow initializer actually consumes them.
+struct MemoizeInput<P, F>(Option<(P, F)>);
+
+impl<P, F> MemoizeInput<P, F> {
+    #[inline]
+    fn new(params: P, f: F) -> Self {
+        Self(Some((params, f)))
+    }
+
+    #[inline]
+    fn take(&mut self) -> (P, F) {
+        self.0.take().expect("memoize input was already consumed")
     }
 }
 
@@ -246,6 +208,7 @@ impl<V> CachedValue<V> {
         }
     }
 
+    #[inline]
     fn matches(&self, cx: &Cx) -> bool {
         let cache_id = cx.cache_id().get();
         if self.last_context.load(Ordering::Relaxed) == cache_id {
@@ -256,6 +219,15 @@ impl<V> CachedValue<V> {
         }
         self.last_context.store(cache_id, Ordering::Relaxed);
         true
+    }
+
+    #[inline]
+    fn value_for(&self, cx: &Cx) -> Option<&V> {
+        if !self.matches(cx) {
+            return None;
+        }
+        replay_context_reads(cx, &self.reads);
+        Some(&self.value)
     }
 }
 
@@ -290,20 +262,18 @@ impl<V, First, Gate> MemoSlot<V, First, Gate>
 where
     First: PrimaryVariant<V>,
 {
+    #[inline]
     fn find<'a>(&'a self, cx: &Cx) -> Option<&'a V> {
-        let cached = self
-            .first
+        self.first
             .get()
-            .filter(|cached| cached.matches(cx))
+            .and_then(|cached| cached.value_for(cx))
             .or_else(|| {
                 self.overflow
                     .get()?
                     .values
                     .iter()
-                    .find_map(|(_, cached)| cached.matches(cx).then_some(cached))
-            })?;
-        replay_context_reads(cx, &cached.reads);
-        Some(&cached.value)
+                    .find_map(|(_, cached)| cached.value_for(cx))
+            })
     }
 
     fn first(&self) -> Option<&CachedValue<V>> {
@@ -361,6 +331,114 @@ where
 
 type SyncMemoSlot<V> = MemoSlot<V, OnceLock<CachedValue<V>>, Mutex<()>>;
 type AsyncMemoSlot<V> = MemoSlot<V, tokio::sync::OnceCell<CachedValue<V>>, tokio::sync::Mutex<()>>;
+
+impl<V> SyncMemoSlot<V> {
+    #[inline]
+    fn initialize_first<'a, P, F>(
+        &'a self,
+        cx: &'a Cx,
+        input: &mut MemoizeInput<P, F>,
+    ) -> Option<&'a V>
+    where
+        F: FnOnce(&'a Cx, P) -> V,
+    {
+        if self.first.get().is_some() {
+            return None;
+        }
+
+        self.first
+            .get_or_init(|| self.evaluate(cx, input))
+            .value_for(cx)
+    }
+
+    #[inline]
+    fn initialize_overflow<'a, P, F>(&'a self, cx: &'a Cx, mut input: MemoizeInput<P, F>) -> &'a V
+    where
+        F: FnOnce(&'a Cx, P) -> V,
+    {
+        let overflow = self.overflow();
+        let _initialization = overflow.gate.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(value) = self.find(cx) {
+            return value;
+        }
+
+        overflow.insert(self.evaluate(cx, &mut input))
+    }
+
+    #[inline]
+    fn evaluate<'a, P, F>(&self, cx: &'a Cx, input: &mut MemoizeInput<P, F>) -> CachedValue<V>
+    where
+        F: FnOnce(&'a Cx, P) -> V,
+    {
+        let (params, f) = input.take();
+        let tracker = ContextTracker::new(cx);
+        let value = tracker.scope(|| self.recursion.scope(|| f(cx, params)));
+        CachedValue::new(cx.cache_id(), value, tracker.finish())
+    }
+}
+
+impl<V> AsyncMemoSlot<V> {
+    #[inline]
+    async fn initialize_first<'a, P, F, Fut>(
+        &'a self,
+        cx: &'a Cx,
+        input: &mut MemoizeInput<P, F>,
+    ) -> Option<&'a V>
+    where
+        F: FnOnce(&'a Cx, P) -> Fut,
+        Fut: Future<Output = V>,
+    {
+        if self.first.get().is_some() {
+            return None;
+        }
+
+        self.first
+            .get_or_init(|| self.evaluate(cx, input))
+            .await
+            .value_for(cx)
+    }
+
+    #[inline]
+    async fn initialize_overflow<'a, P, F, Fut>(
+        &'a self,
+        cx: &'a Cx,
+        mut input: MemoizeInput<P, F>,
+    ) -> &'a V
+    where
+        F: FnOnce(&'a Cx, P) -> Fut,
+        Fut: Future<Output = V>,
+    {
+        let overflow = self.overflow();
+        let _initialization = overflow.gate.lock().await;
+        if let Some(value) = self.find(cx) {
+            return value;
+        }
+
+        overflow.insert(self.evaluate(cx, &mut input).await)
+    }
+
+    #[inline]
+    async fn evaluate<'a, P, F, Fut>(
+        &self,
+        cx: &'a Cx,
+        input: &mut MemoizeInput<P, F>,
+    ) -> CachedValue<V>
+    where
+        F: FnOnce(&'a Cx, P) -> Fut,
+        Fut: Future<Output = V>,
+    {
+        let (params, f) = input.take();
+        let tracker = ContextTracker::new(cx);
+        let mut future = std::pin::pin!(f(cx, params));
+        let (value, reads) = poll_fn(move |task| {
+            tracker
+                .scope(|| self.recursion.scope(|| future.as_mut().poll(task)))
+                .map(|value| (value, tracker.finish()))
+        })
+        .await;
+        CachedValue::new(cx.cache_id(), value, reads)
+    }
+}
 
 /// A `HashMap` tagged by a phantom marker type `T` so that maps for different markers are
 /// distinct types in `anymap3`. Two memoized functions with identical `K`/`V` types stay in
@@ -468,6 +546,9 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
+    use crate::context::{CxTestBuilder, request_context};
+
+    struct ScopedValue(i32);
 
     /// Returns a fresh counter with `'static` lifetime so closures that capture it can be
     /// `Copy + 'static` (the bounds `MemoizeCache::memoize` imposes on its function).
@@ -626,6 +707,23 @@ mod tests {
         cache.memoize_async(&cx, (&1i32, &3i32), (1, 3), f).await;
         cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f).await;
 
+        assert_eq!(n.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn async_context_variants_are_cached_separately() {
+        let cache = MemoizeEqCache::new();
+        let cx = CxTestBuilder::new().request_context(ScopedValue(1)).build();
+        let child = cx.with(ScopedValue(2));
+        let n = counter();
+        let f = async move |cx: &Cx, (): ()| {
+            n.fetch_add(1, Ordering::SeqCst);
+            request_context::<ScopedValue>(cx).0
+        };
+
+        assert_eq!(*cache.memoize_async(&cx, (), (), f).await, 1);
+        assert_eq!(*cache.memoize_async(&child, (), (), f).await, 2);
+        assert_eq!(*cache.memoize_async(&child, (), (), f).await, 2);
         assert_eq!(n.load(Ordering::SeqCst), 2);
     }
 
