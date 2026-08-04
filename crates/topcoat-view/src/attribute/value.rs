@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use topcoat_core::context::Cx;
 
 use crate::{PartsWriter, Unescaped, ViewPart};
@@ -83,6 +85,7 @@ impl_primitive!(usize, push_usize, ref);
 impl_primitive!(f32, push_f32, ref);
 impl_primitive!(f64, push_f64, ref);
 impl_primitive!(String, push_str);
+impl_primitive!(Cow<'static, str>, push_str);
 
 impl AttributeValueViewParts for &str {
     #[inline]
