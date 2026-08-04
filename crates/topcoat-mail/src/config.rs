@@ -16,7 +16,7 @@ use crate::{Mail, Receipt, Transport};
 /// production) changes nothing at the call sites:
 ///
 /// ```
-/// use topcoat_core::context::test::CxTestBuilder;
+/// use topcoat_core::context::CxTestBuilder;
 /// use topcoat_mail::{Mail, MailConfig, Mailbox, MemoryTransport, send};
 ///
 /// # async fn example() -> topcoat_core::error::Result<()> {

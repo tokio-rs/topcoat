@@ -1,7 +1,7 @@
 mod binding;
 mod context_map;
 mod id;
-pub mod test;
+mod test;
 mod value;
 
 use std::{
