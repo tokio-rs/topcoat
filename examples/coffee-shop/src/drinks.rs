@@ -1,8 +1,5 @@
 use toasty::Db;
-use topcoat::{
-    Result,
-    context::{Cx, app_context, memoize},
-};
+use topcoat::context::{Cx, app_context, memoize};
 
 /// A drink on the menu.
 #[derive(Debug, toasty::Model)]
@@ -36,10 +33,11 @@ pub(crate) fn db(cx: &Cx) -> Db {
 /// share the ordered menu without issuing duplicate Toasty queries.
 #[memoize]
 pub async fn query_drinks(cx: &Cx) -> topcoat::Result<Vec<Drink>> {
-    Drink::all()
+    let result = Drink::all()
         .order_by(Drink::fields().menu_order().asc())
         .exec(&mut db(cx))
-        .await
+        .await?;
+    Ok(result)
 }
 
 pub async fn seed(db: &mut Db) -> toasty::Result<()> {
