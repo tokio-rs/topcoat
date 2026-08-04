@@ -29,6 +29,7 @@ enum Command {
 
 pub async fn run() {
     let cli = TopcoatCli::parse();
+    common::version::warn_on_mismatch();
     match cli.command {
         Command::Ui(cmd) => cmd.run(),
         Command::Fmt(cmd) => cmd.run().await,

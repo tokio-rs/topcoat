@@ -42,6 +42,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 syn.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "process", "signal", "io-util", "time", "sync"] }
+toml.workspace = true
 
 [dev-dependencies]
 topcoat.workspace = true
