@@ -10,7 +10,7 @@ use super::roast_badge;
 use crate::{
     components::button::{ButtonSize, ButtonVariant, button},
     customer::current_customer,
-    drinks::drinks,
+    drinks::{Drink, db},
 };
 
 // The declaration turns this module's segment into a parameter, so the page
@@ -21,10 +21,10 @@ path_param!(slug);
 async fn drink_page(cx: &Cx) -> Result {
     let slug = path_param::<Slug>(cx);
 
-    let drink = drinks(cx)
+    let drink = Drink::filter_by_slug(slug)
+        .first()
+        .exec(&mut db(cx))
         .await?
-        .iter()
-        .find(|drink| drink.slug == slug)
         .ok_or_not_found()?;
 
     // Snapshots captured by the runtime expressions below.

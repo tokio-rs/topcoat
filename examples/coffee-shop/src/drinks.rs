@@ -26,27 +26,20 @@ pub enum Roast {
     Dark,
 }
 
-fn db(cx: &Cx) -> Db {
+pub(crate) fn db(cx: &Cx) -> Db {
     app_context::<Db>(cx).clone()
 }
 
 /// Loads the menu, at most once per request.
 ///
-/// `#[memoize]` caches the result for the duration of a request. The layout,
-/// the menu page, and the drink page all call this function, but the Toasty
-/// query runs only once per request; watch the server log to confirm.
+/// `#[memoize]` caches the result for the duration of a request, so views can
+/// share the ordered menu without issuing duplicate Toasty queries.
 #[memoize]
-async fn query_drinks(cx: &Cx) -> toasty::Result<Vec<Drink>> {
+pub async fn query_drinks(cx: &Cx) -> topcoat::Result<Vec<Drink>> {
     Drink::all()
         .order_by(Drink::fields().menu_order().asc())
         .exec(&mut db(cx))
         .await
-}
-
-pub async fn drinks(cx: &Cx) -> Result<&Vec<Drink>> {
-    query_drinks(cx)
-        .await
-        .map_err(|error| std::io::Error::other(error.to_string()).into())
 }
 
 pub async fn seed(db: &mut Db) -> toasty::Result<()> {

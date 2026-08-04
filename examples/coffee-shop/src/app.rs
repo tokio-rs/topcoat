@@ -26,7 +26,7 @@ use crate::{
         label::label,
     },
     customer::{current_customer, forget_customer, remember_customer},
-    drinks::drinks,
+    drinks::query_drinks,
 };
 
 /// The theme's sans font, pulled from the Fontsource catalog and self-hosted
@@ -90,9 +90,9 @@ async fn shell(cx: &Cx, slot: Result) -> Result {
                     <p
                         class="mx-auto w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground"
                     >
-                        // A `drinks` cache hit: the page inside `slot` already
-                        // rendered, so the menu is loaded by now.
-                        (drinks(cx).await?.len())
+                        // `drinks` is request-memoized, so this shares a menu
+                        // query with pages that already loaded it.
+                        (query_drinks(cx).await?.len())
                         " drinks brewed fresh daily."
                     </p>
                 </footer>
