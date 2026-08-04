@@ -153,7 +153,7 @@ where
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use std::time::Duration;
 ///
 /// use topcoat::router::{Router, tower::TowerLayer};
@@ -182,7 +182,7 @@ impl<S> TowerLayer<S> {
         L: tower::Layer<TowerNext, Service = S>,
     {
         Self {
-            path: Cow::Borrowed(Path::new("/")),
+            path: Cow::Borrowed(Path::ROOT),
             service: layer.layer(TowerNext::new()),
         }
     }
@@ -488,8 +488,11 @@ mod tests {
 
     use super::*;
     use crate::{
-        Layers, Method, RouteFn, RouteFuture, Router, Terminal, error::NotFoundError,
-        request::Bytes, response::IntoResponse, to_bytes,
+        Layers, Method, RouteFn, RouteFuture, Router, Terminal,
+        error::{NotFoundError, not_found},
+        request::Bytes,
+        response::IntoResponse,
+        to_bytes,
     };
 
     // -- Test helpers --
@@ -551,6 +554,12 @@ mod tests {
     /// A route that never resolves, for racing against a timeout middleware.
     fn hang(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(std::future::pending())
+    }
+
+    /// A route resolving to a typed 404 error, to observe how errors cross
+    /// tower middleware.
+    fn not_found_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(not_found().into()) })
     }
 
     /// A route whose body is long enough to clear tower-http's compression
@@ -876,9 +885,10 @@ mod tests {
     fn chain_errors_tunnel_through_unchanged() {
         let layer = TowerLayer::new(tower::layer::util::Identity::new());
         let layers = Layers::default();
+        let route = RouteFn::new(Method::GET, path("/missing"), not_found_route);
         let mut cx = cx_for("/missing");
 
-        let next = Next::new(&layers, &[], Terminal::NotFound);
+        let next = Next::new(&layers, &[], Terminal::Route(&route));
         let result = block_on(layer.handle(&mut cx, Body::empty(), next));
 
         // The 404 comes back out as the original typed error, not a response.
@@ -896,9 +906,10 @@ mod tests {
         // still be recovered on the way out.
         let layer = TowerLayer::new(tower::timeout::TimeoutLayer::new(Duration::from_mins(1)));
         let layers = Layers::default();
+        let route = RouteFn::new(Method::GET, path("/missing"), not_found_route);
         let mut cx = cx_for("/missing");
 
-        let next = Next::new(&layers, &[], Terminal::NotFound);
+        let next = Next::new(&layers, &[], Terminal::Route(&route));
         let result = block_on(layer.handle(&mut cx, Body::empty(), next));
 
         assert!(

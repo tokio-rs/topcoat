@@ -167,6 +167,7 @@ impl RawAsset {
         finder
             .find_iter(binary)
             .filter_map(|index| Self::decode(&binary[index..]))
+            .filter(|asset| !asset.path.is_empty())
             .collect()
     }
 

@@ -30,7 +30,7 @@ pub(crate) const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use topcoat::router::{BodyLimit, Router};
 ///
 /// let router = Router::builder()
@@ -51,7 +51,7 @@ impl BodyLimit {
     /// Creates a layer that limits request bodies to `limit` bytes.
     pub const fn max(limit: usize) -> Self {
         Self {
-            path: Cow::Borrowed(Path::new("/")),
+            path: Cow::Borrowed(Path::ROOT),
             kind: BodyLimitKind::Limit(limit),
         }
     }
@@ -60,7 +60,7 @@ impl BodyLimit {
     /// buffer a body of any size.
     pub const fn disable() -> Self {
         Self {
-            path: Cow::Borrowed(Path::new("/")),
+            path: Cow::Borrowed(Path::ROOT),
             kind: BodyLimitKind::Disable,
         }
     }

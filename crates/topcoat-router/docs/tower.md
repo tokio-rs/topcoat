@@ -23,7 +23,7 @@ A catch-all segment does not match the bare prefix itself, so register a second 
 
 [`TowerLayer`] wraps routes in the middleware a `tower::Layer` builds (a timeout, a rate limit, CORS, compression) and registers like any other layer. It wraps every route by default; scope it to the routes under a path prefix with [`at`](TowerLayer::at):
 
-```rust
+```rust,no_run
 use std::time::Duration;
 
 use topcoat::router::{Router, tower::TowerLayer};

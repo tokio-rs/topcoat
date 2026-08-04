@@ -14,8 +14,6 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // Discover all API routes declared in this file and start the HTTP server.
-    // By default, the endpoints are available at http://127.0.0.1:3000.
     topcoat::start(Router::builder().discover().build())
         .await
         .unwrap();

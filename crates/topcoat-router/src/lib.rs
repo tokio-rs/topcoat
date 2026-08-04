@@ -2,6 +2,7 @@
 
 mod body;
 mod body_limit;
+mod builder;
 #[cfg(feature = "compression")]
 mod compression;
 pub mod content;
@@ -12,6 +13,7 @@ mod layer;
 mod listener;
 mod methods;
 mod module;
+mod origin;
 mod page;
 mod path;
 mod path_param;
@@ -27,6 +29,7 @@ pub mod tower;
 
 pub use body::*;
 pub use body_limit::*;
+pub use builder::*;
 #[cfg(feature = "compression")]
 pub use compression::*;
 pub(crate) use endpoint::Endpoint;
@@ -36,6 +39,7 @@ pub use layer::*;
 pub use listener::*;
 pub use methods::*;
 pub use module::*;
+pub use origin::*;
 pub use page::*;
 pub use path::*;
 pub use path_param::*;

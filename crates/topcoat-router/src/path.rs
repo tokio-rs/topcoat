@@ -34,6 +34,9 @@ pub struct Path {
 }
 
 impl Path {
+    // The root path "/".
+    pub const ROOT: &Path = Path::new("/");
+
     /// Creates a `&Path` from a string slice.
     ///
     /// The root path `"/"` is normalized to an empty inner representation so that
@@ -231,41 +234,6 @@ impl Path {
     /// ```
     #[must_use]
     pub fn matches(&self, url: &str) -> bool {
-        self.match_url(url, false)
-    }
-
-    /// Returns `true` if `url`, a concrete URL path, *starts with* this route
-    /// path.
-    ///
-    /// Matches segments the same way as [`matches`](Path::matches), but allows
-    /// trailing URL segments beyond this path. This is the concrete-URL
-    /// counterpart of [`starts_with`](Path::starts_with), used to select which
-    /// layouts apply to a request URL.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use topcoat_router::Path;
-    ///
-    /// let path = Path::new("/settings");
-    /// // Extra trailing segments are allowed.
-    /// assert!(path.matches_start("/settings/profile"));
-    /// assert!(!path.matches_start("/dashboard"));
-    ///
-    /// assert!(Path::new("/users/{id}").matches_start("/users/42/posts"));
-    /// ```
-    #[must_use]
-    pub fn matches_start(&self, url: &str) -> bool {
-        self.match_url(url, true)
-    }
-
-    /// Walks this path's segments against `url`, treating `Param`/`CatchAll` as
-    /// wildcards and skipping `Group` segments.
-    ///
-    /// When `prefix` is `false` the URL must be fully consumed; when `true` any
-    /// trailing URL segments are allowed. Shared by [`matches`](Path::matches)
-    /// and [`matches_start`](Path::matches_start).
-    fn match_url(&self, url: &str, prefix: bool) -> bool {
         // Splits the `/`-separated URL body into its first segment and the
         // remainder, e.g. "users/42" into ("users", "42") and "users" into
         // ("users", ""). Returns `None` when nothing is left to consume.
@@ -299,9 +267,8 @@ impl Path {
                 PathSegment::CatchAll(_) => return !rest.is_empty(),
             }
         }
-        // Every route segment matched. A full match additionally requires the
-        // URL to be exhausted; a prefix match tolerates trailing segments.
-        prefix || rest.is_empty()
+        // Every route segment matched; the URL must also be exhausted.
+        rest.is_empty()
     }
 
     /// Returns the string backing this path.
@@ -942,80 +909,13 @@ mod tests {
     }
 
     #[test]
-    fn matches_start_allows_trailing_segments() {
-        let path = Path::new("/settings");
-        assert!(path.matches_start("/settings"));
-        assert!(path.matches_start("/settings/profile"));
-        assert!(path.matches_start("/settings/profile/security"));
-    }
-
-    #[test]
-    fn matches_start_mismatch() {
-        assert!(!Path::new("/settings").matches_start("/dashboard"));
-    }
-
-    #[test]
-    fn matches_start_tolerates_trailing_slash() {
-        assert!(Path::new("/admin").matches_start("/admin/"));
-        assert!(Path::new("/users/{id}").matches_start("/users/42/"));
-    }
-
-    #[test]
-    fn matches_start_rejects_partial_segment() {
-        assert!(!Path::new("/admin").matches_start("/administrator"));
-    }
-
-    #[test]
-    fn matches_start_rejects_empty_segments() {
-        assert!(!Path::new("/admin").matches_start("//admin"));
-        assert!(!Path::new("/users/{id}").matches_start("/users//edit"));
-    }
-
-    #[test]
-    fn matches_start_ignores_groups() {
-        // A path inside a group matches the URL with the group stripped, plus
-        // anything nested below it.
-        assert!(Path::new("/(admin)/panel").matches_start("/panel"));
-        assert!(Path::new("/(admin)/panel").matches_start("/panel/settings"));
-        assert!(!Path::new("/(admin)/panel").matches_start("/other"));
-        // A group-only path is URL-equivalent to the root and matches any URL.
-        assert!(Path::new("/(auth)").matches_start("/anything"));
-    }
-
-    #[test]
-    fn matches_start_catch_all() {
-        let path = Path::new("/files/{*rest}");
-        assert!(path.matches_start("/files/a/b"));
-        // The catch-all itself requires at least one segment.
-        assert!(!path.matches_start("/files"));
-        assert!(!path.matches_start("/files/"));
-    }
-
-    #[test]
-    fn matches_start_non_origin_form_urls() {
-        // An asterisk-form request (`OPTIONS *`) or an empty authority-form
-        // path still falls under the root, but under no other path.
-        assert!(Path::new("/").matches_start("*"));
-        assert!(Path::new("/").matches_start(""));
-        assert!(!Path::new("/admin").matches_start("*"));
-        assert!(!Path::new("/admin").matches_start(""));
-    }
-
-    #[test]
-    fn matches_start_with_params() {
-        assert!(Path::new("/users/{id}").matches_start("/users/42/posts"));
-    }
-
-    #[test]
-    fn matches_start_requires_full_prefix() {
-        assert!(!Path::new("/users/{id}/posts").matches_start("/users/42"));
-    }
-
-    #[test]
-    fn matches_start_root_matches_everything() {
-        let root = Path::new("/");
-        assert!(root.matches_start("/"));
-        assert!(root.matches_start("/anything/here"));
+    fn matches_non_origin_form_urls() {
+        // An asterisk-form request (`OPTIONS *`) matches no route path. An
+        // empty authority-form path is equivalent to the root URL.
+        assert!(!Path::new("/").matches("*"));
+        assert!(!Path::new("/admin").matches("*"));
+        assert!(Path::new("/").matches(""));
+        assert!(!Path::new("/admin").matches(""));
     }
 
     // -- Path validation --

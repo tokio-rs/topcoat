@@ -7,8 +7,6 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // Discover the routes declared in this example and start the server.
-    // By default, the application is available at http://127.0.0.1:3000.
     topcoat::start(Router::builder().discover().build())
         .await
         .unwrap();
@@ -16,7 +14,6 @@ async fn main() {
 
 // --- Layout -----------------------------------------------------------------
 
-// The root layout wraps every page because every path starts with "/".
 #[layout("/")]
 async fn root_layout(slot: Result) -> Result {
     view! {
@@ -50,8 +47,7 @@ async fn home() -> Result {
 
 // --- Query params -----------------------------------------------------------
 
-// Parse the URL query string into this typed structure.
-// Invalid values redirect to the same page with the query string cleared.
+// A value that does not parse redirects to the page with the query cleared.
 #[query_params(error = redirect("?"))]
 struct PostsQuery {
     page: Option<u32>,
@@ -60,7 +56,6 @@ struct PostsQuery {
 
 #[page("/posts")]
 async fn posts(cx: &Cx) -> Result {
-    // Read and validate the query parameters from the current request.
     let query = query_params::<PostsQuery>(cx)?;
 
     view! {
@@ -79,8 +74,7 @@ async fn posts(cx: &Cx) -> Result {
 
 // --- Path params ------------------------------------------------------------
 
-// Declare the {post_id} URL segment and parse it as a u32.
-// Return a bad request response if the value is not a number.
+// Declares the `{post_id}` segment and the error for a value that is no u32.
 path_param!(
     post_id: u32,
     error = bad_request("Post ID must be a number!"),
@@ -88,7 +82,6 @@ path_param!(
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
-    // Extract the typed post ID from the current request path.
     let post_id = path_param::<PostId>(cx)?;
 
     view! {

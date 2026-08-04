@@ -8,20 +8,12 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // Build the router manually and start the HTTP server.
-    // By default, the application is available at http://127.0.0.1:3000.
     topcoat::start(router()).await.unwrap();
 }
 
 // --- Router -----------------------------------------------------------------
 
-// Manual routing means every layout, page, and route is explicitly registered.
-//
-// With automatic discovery enabled, this could instead use:
-//
-// fn router() -> Router {
-//     Router::builder().discover().build()
-// }
+// Without `.discover()`, every layout, page, and route is registered by hand.
 fn router() -> Router {
     Router::builder()
         .layout(root_layout)
@@ -36,8 +28,7 @@ fn router() -> Router {
 
 // --- Layouts ----------------------------------------------------------------
 
-// The root layout wraps every page because every registered page path starts
-// with `/`.
+// Wraps every page, because every page path starts with `/`.
 #[layout("/")]
 async fn root_layout(slot: Result) -> Result {
     view! {
@@ -56,14 +47,14 @@ async fn root_layout(slot: Result) -> Result {
 
                 <hr>
 
-                // Render the page or nested layout inside this layout.
+                // The page, or the nested layout wrapping it.
                 (slot?)
             </body>
         </html>
     }
 }
 
-// This nested layout wraps `/docs` and every page below that path.
+// Wraps `/docs` and every page below it.
 #[layout("/docs")]
 async fn docs_layout(slot: Result) -> Result {
     view! {
@@ -76,7 +67,7 @@ async fn docs_layout(slot: Result) -> Result {
 
 // --- Pages ------------------------------------------------------------------
 
-// Each page declares its own URL path, but must also be registered in router().
+// A page declares its own path, but still has to be registered in `router`.
 #[page("/")]
 async fn home() -> Result {
     view! {
@@ -111,7 +102,7 @@ async fn install() -> Result {
 
 // --- Routes -----------------------------------------------------------------
 
-// Routes can return non-page responses. This API endpoint returns plain text.
+// Routes return responses other than pages, and skip the layouts.
 #[route(GET "/api/health")]
 async fn health() -> Result<&'static str> {
     Ok("ok")

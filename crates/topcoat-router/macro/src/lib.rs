@@ -39,6 +39,13 @@ pub fn layer(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
+#[doc = include_str!("../docs/not_found.md")]
+#[proc_macro]
+pub fn not_found(tokens: TokenStream) -> TokenStream {
+    let not_found = syn::parse_macro_input!(tokens as topcoat_router_grammar::not_found::NotFound);
+    quote! { #not_found }.into()
+}
+
 #[doc = include_str!("../docs/segment.md")]
 #[proc_macro]
 pub fn segment(tokens: TokenStream) -> TokenStream {

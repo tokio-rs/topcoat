@@ -34,7 +34,7 @@ mod tests {
         }
 
         fn path(&self) -> &Path {
-            Path::new("/")
+            Path::ROOT
         }
 
         fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {

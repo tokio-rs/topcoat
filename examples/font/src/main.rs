@@ -6,16 +6,12 @@ use topcoat::{
     view::view,
 };
 
-// Select Lavishly Yours from the Fontsource catalog.
-//
-// `host: Asset` downloads the font files while building the asset bundle
-// and serves them locally through Topcoat.
+// `host: Asset` downloads the font files into the asset bundle, so Topcoat
+// serves them itself.
 const LAVISHLY_YOURS: Font = fontsource_font!(LAVISHLY_YOURS, host: Asset);
 
-// Declare a font manually with an `@font-face` rule.
-//
-// This example loads the variable Orbitron font directly from jsDelivr.
-// A local file or a Topcoat asset could also be used as the source.
+// A font declared by hand. The source can be any URL, a local file, or an
+// asset; this one stays on the CDN.
 const ORBITRON: Font = font! {
     "Orbitron",
     @font-face {
@@ -29,8 +25,6 @@ const ORBITRON: Font = font! {
 
 #[tokio::main]
 async fn main() {
-    // Load the generated assets, discover the page, and start the server.
-    // By default, the application is available at http://127.0.0.1:3000.
     let router = Router::builder()
         .assets(AssetBundle::load().unwrap())
         .discover()
@@ -48,18 +42,16 @@ async fn home() -> Result {
                 <title>"Fonts"</title>
                 topcoat::dev::script()
 
-                // Generate the required preload and font style elements.
+                // Renders the preload and style elements the font needs.
                 topcoat::font::link(font: LAVISHLY_YOURS)
                 topcoat::font::link(font: ORBITRON)
             </head>
 
             <body>
-                // Use the self-hosted Fontsource font.
                 <h1 style=(format!("font-family: {:?}", LAVISHLY_YOURS.family()))>
                     "This font is downloaded from Fontsource and self-hosted via Topcoat assets!"
                 </h1>
 
-                // Use the manually declared font loaded from jsDelivr.
                 <h2 style=(format!("font-family: {:?}", ORBITRON.family()))>
                     "This font is declared by hand and loaded straight from the jsDelivr CDN!"
                 </h2>
