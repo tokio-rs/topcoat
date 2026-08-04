@@ -49,7 +49,7 @@ async fn drink_grid(cx: &Cx, query: String) -> Result {
     let needle = query.trim().to_lowercase();
 
     let matches: Vec<&Drink> = drinks(cx)
-        .await
+        .await?
         .iter()
         .filter(|drink| drink.name.to_lowercase().contains(&needle))
         .collect();
@@ -73,17 +73,17 @@ async fn drink_grid(cx: &Cx, query: String) -> Result {
 #[component]
 async fn drink_card(drink: &Drink) -> Result {
     view! {
-        <a href=(("/menu/", drink.slug))>
+        <a href=(("/menu/", &drink.slug))>
             card(
                 // The grid stretches every cell to the row height; the card
                 // fills it and pins the price to the bottom.
                 attrs: attributes! { class="h-full justify-between" },
                 card_header(
                     <div class="flex items-center justify-between gap-4">
-                        card_title((drink.name))
+                        card_title((&drink.name))
                         roast_badge(roast: drink.roast)
                     </div>
-                    card_description((drink.tasting_notes))
+                    card_description((&drink.tasting_notes))
                 )
                 card_content(
                     // Anything can borrow a badge's looks: `badge_variants`

@@ -22,13 +22,13 @@ async fn drink_page(cx: &Cx) -> Result {
     let slug = path_param::<Slug>(cx);
 
     let drink = drinks(cx)
-        .await
+        .await?
         .iter()
         .find(|drink| drink.slug == slug)
         .ok_or_not_found()?;
 
     // Snapshots captured by the runtime expressions below.
-    let name = drink.name;
+    let name = drink.name.clone();
     let price = drink.price;
 
     view! {
@@ -40,11 +40,11 @@ async fn drink_page(cx: &Cx) -> Result {
         </a>
 
         <div class="mt-4 flex items-center gap-4">
-            <h1 class="text-3xl font-bold tracking-tight">(drink.name)</h1>
+            <h1 class="text-3xl font-bold tracking-tight">(&drink.name)</h1>
             roast_badge(roast: drink.roast)
         </div>
 
-        <p class="mt-3 max-w-md text-muted-foreground">(drink.tasting_notes)</p>
+        <p class="mt-3 max-w-md text-muted-foreground">(&drink.tasting_notes)</p>
 
         <div class="mt-8 flex items-center gap-3">
             button(
@@ -84,7 +84,7 @@ async fn drink_page(cx: &Cx) -> Result {
             // its return value into the `confirmation` signal.
             button(
                 attrs: attributes! {
-                    @click=$(async |_e: Event| {
+                    @click=$(async move |_e: Event| {
                         let message = place_order(name.to_owned(), quantity.get()).await;
                         confirmation.set(message);
                     })

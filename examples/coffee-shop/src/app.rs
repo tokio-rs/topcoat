@@ -1,6 +1,7 @@
 mod menu;
 
 use serde::Deserialize;
+use toasty::Db;
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt, asset},
@@ -32,11 +33,12 @@ use crate::{
 /// as a Topcoat asset.
 const GEIST: Font = fontsource_font!(GEIST, host: Asset);
 
-pub fn router() -> Router {
+pub fn router(db: Db) -> Router {
     module_router!()
         // The font, the shard, and the procedure are collected at link time.
         .discover()
         .assets(AssetBundle::load().unwrap())
+        .app_context(db)
         .cookies()
         .build()
 }
@@ -90,7 +92,7 @@ async fn shell(cx: &Cx, slot: Result) -> Result {
                     >
                         // A `drinks` cache hit: the page inside `slot` already
                         // rendered, so the menu is loaded by now.
-                        (drinks(cx).await.len())
+                        (drinks(cx).await?.len())
                         " drinks brewed fresh daily."
                     </p>
                 </footer>
