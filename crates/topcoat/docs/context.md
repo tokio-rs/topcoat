@@ -89,14 +89,14 @@ async fn post(cx: &Cx) -> Result {
 
 Any function with `&Cx` can read these values.
 
-# App and request context helpers
+# App, request, and scoped context
 
 This module exposes typed context accessors:
 
 - [`app_context::<T>(cx)`](app_context) reads a required value registered on the router with `.app_context(value)`.
 - [`try_app_context::<T>(cx)`](try_app_context) reads an optional value registered on the router.
-- [`request_context::<T>(cx)`](request_context) reads a required typed value attached to the current request.
-- [`try_request_context::<T>(cx)`](try_request_context) reads an optional typed value attached to the current request.
+- [`request_context::<T>(cx)`](request_context) reads the nearest required request or scoped value.
+- [`try_request_context::<T>(cx)`](try_request_context) reads the nearest optional request or scoped value.
 
 ```rust
 use topcoat::context::{Cx, app_context};
@@ -122,9 +122,34 @@ fn current_customer(cx: &Cx) -> Option<&Customer> {
 }
 ```
 
+Use [`Cx::with`] to create a child context that adds or shadows one value. The child borrows its parent and owns the new binding:
+
+```rust
+use topcoat::context::{Cx, request_context};
+
+#[derive(Debug, PartialEq)]
+struct HeadingLevel(u8);
+
+fn section(cx: &Cx) {
+    let section_cx = cx.with(HeadingLevel(2));
+
+    assert_eq!(request_context::<HeadingLevel>(&section_cx), &HeadingLevel(2));
+    assert_eq!(try_request_context::<HeadingLevel>(cx), None);
+}
+# use topcoat::context::try_request_context;
+```
+
+[`Cx::with_values`] adds each element of a tuple as a separate binding. It accepts tuples of two through twelve values and panics if one call contains duplicate types. `cx.with((a, b))` is different: it stores `(a, b)` as one tuple binding.
+
+Request lookup starts at the nearest scope, continues through its parents, and checks the request root last. Other types remain inherited when one type is shadowed. Dropping a [`CxScope`] removes that scope from reach without changing its parent.
+
+# Mutating request context
+
+Layers receive `&mut Cx`, so they can register root values with [`Cx::insert`] and mutate existing ones with [`Cx::get_mut`]. A scope provides shared access only, and Rust prevents root mutation while a scope or borrowed result may still be used. Root mutation is available again after [`Next::run`](crate::router::Next::run) completes.
+
 # Memoization
 
-[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. See its documentation for the details.
+[`#[memoize]`](macro@memoize) keys results by function arguments and the request bindings read during computation. Scoped bindings can select different cached results, while changing one root type invalidates only results that read it. See the macro documentation for dependency and concurrency details.
 
 # Composing helpers
 

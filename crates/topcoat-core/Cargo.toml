@@ -20,13 +20,30 @@ anymap3.workspace = true
 boxcar.workspace = true
 hashbrown.workspace = true
 http.workspace = true
+im.workspace = true
 pin-project-lite.workspace = true
+scoped-tls-hkt.workspace = true
+smallvec.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
 topcoat.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
+
+criterion.workspace = true
+
+[[bench]]
+name = "request_context"
+harness = false
+
+[[bench]]
+name = "context_scope"
+harness = false
+
+[[bench]]
+name = "memoize"
+harness = false
 
 [lints]
 workspace = true

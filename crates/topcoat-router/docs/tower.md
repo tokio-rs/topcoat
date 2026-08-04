@@ -34,6 +34,8 @@ let router = Router::builder()
     .build();
 ```
 
+Changes the tower middleware makes to the request parts are written back to the mutable request root before the inner Topcoat layers and route run. Outer layers see the final request parts after `Next::run` returns.
+
 # Errors
 
 An error produced by wrapped topcoat routes (a 404, a handler error) passes through a [`TowerLayer`]'s middleware and leaves it as the original error value, so outer layers and layouts can still catch it by type. An error a tower service produces itself (middleware timing out, a mounted service failing) surfaces as a [`TowerServiceError`]; unmapped, the router renders it as a 500.

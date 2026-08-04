@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use topcoat_core::context::{Cx, CxBuilder, try_request_context};
+use topcoat_core::context::{Cx, try_request_context};
 
 use crate::{Body, IntoPath, Layer, LayerFuture, Next, Path};
 
@@ -82,7 +82,7 @@ impl Layer for BodyLimit {
         &self.path
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         cx.insert(self.kind);
         next.run(cx, body)
     }
