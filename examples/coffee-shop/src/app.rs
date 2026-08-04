@@ -26,7 +26,7 @@ use crate::{
         label::label,
     },
     customer::{current_customer, forget_customer, remember_customer},
-    drinks::query_drinks,
+    drinks::drinks,
 };
 
 /// The theme's sans font, pulled from the Fontsource catalog and self-hosted
@@ -92,7 +92,7 @@ async fn shell(cx: &Cx, slot: Result) -> Result {
                     >
                         // `drinks` is request-memoized, so this shares a menu
                         // query with pages that already loaded it.
-                        (query_drinks(cx).await?.len())
+                        (drinks(cx).await?.len())
                         " drinks brewed fresh daily."
                     </p>
                 </footer>

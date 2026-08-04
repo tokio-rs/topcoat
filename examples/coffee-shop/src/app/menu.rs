@@ -14,7 +14,7 @@ use crate::{
         card::{card, card_content, card_description, card_header, card_title},
         input::input,
     },
-    drinks::{Drink, Roast, query_drinks},
+    drinks::{Drink, Roast, drinks},
 };
 
 // The `menu` module adds a URL segment: this page renders at /menu.
@@ -48,7 +48,7 @@ async fn drink_grid(cx: &Cx, query: String) -> Result {
     // The query comes from the client, so treat it as untrusted input.
     let needle = query.trim().to_lowercase();
 
-    let matches: Vec<&Drink> = query_drinks(cx)
+    let matches: Vec<&Drink> = drinks(cx)
         .await?
         .iter()
         .filter(|drink| drink.name.to_lowercase().contains(&needle))
