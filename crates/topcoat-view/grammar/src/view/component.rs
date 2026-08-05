@@ -1,18 +1,18 @@
 use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
-use quote::ToTokens;
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
     Expr, Ident, Path, Token, parenthesized,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Paren,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
 
 use crate::{
     template::RuntimeExpr,
-    view::{Nodes, hir::{LowerView, ViewBuilder}},
+    view::{ExprKind, Nodes, ViewWriter, WriteView},
 };
 
 /// A component invocation, written as `path(name: value, ..., child_node child_node ...)`.
@@ -28,7 +28,6 @@ pub struct Component {
 }
 
 /// A `name: value` entry in a component's argument list.
-#[derive(Clone)]
 pub struct NamedArg {
     pub ident: Ident,
     pub colon: Token![:],
@@ -37,7 +36,6 @@ pub struct NamedArg {
 
 /// The value of a [`NamedArg`]. Either a plain Rust expression or a `$(...)`
 /// runtime expression.
-#[derive(Clone)]
 pub enum NamedArgValue {
     Expr(Expr),
     Runtime(RuntimeExpr),
@@ -72,9 +70,43 @@ impl topcoat_core_grammar::pretty::PrettyPrint for NamedArgValue {
     }
 }
 
-impl LowerView for Component {
-    fn lower(&self, builder: &mut ViewBuilder) {
-        builder.component(&self.path, &self.named_args, &self.children, self.paren_token.span.span());
+impl WriteView for Component {
+    fn write(&self, writer: &mut ViewWriter) {
+        let name = &self.path;
+
+        let setters = self.named_args.iter().map(|arg| {
+            let ident = &arg.ident;
+            let value = &arg.value;
+            quote! { .#ident(#value) }
+        });
+        let child = (!self.children.is_empty()).then(|| {
+            let mut child_writer = ViewWriter::new_nested();
+            for child in &self.children {
+                child.write(&mut child_writer);
+            }
+            let child = child_writer.into_token_stream();
+            quote_spanned! {self.paren_token.span.span()=>
+                .child(#child)
+            }
+        });
+
+        writer.write_expr(
+            ExprKind::Component,
+            quote_spanned! {self.paren_token.span.span()=>
+                {
+                    use #topcoat_view::Component;
+                    let props = #name::props_builder()#(#setters)*#child.build();
+                    // The marker is built via `Default` so the same construction
+                    // works for both unit-struct and generic (`PhantomData`) markers.
+                    #[allow(clippy::default_constructed_unit_structs)]
+                    Component::render(
+                        #name::default(),
+                        __cx,
+                        props,
+                    ).await?
+                }
+            },
+        );
     }
 }
 
