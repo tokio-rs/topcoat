@@ -105,31 +105,6 @@ add(cx, 1, 3); // prints "computing", returns 4 (different args)
 
 Each `#[memoize]` function has its own independent cache slot, so two functions with the same argument types don't collide.
 
-# Borrowed and owned arguments
-
-Arguments can be passed by value or by reference. Borrowed arguments avoid cloning on cache hits; on a miss the value is cloned once into the cache.
-
-```rust
-# fn main() {}
-# use topcoat::context::{Cx, memoize};
-# struct Record;
-# struct Error;
-# mod db {
-#     pub async fn find(_name: &str) -> Result<super::Record, super::Error> { Ok(super::Record) }
-# }
-#[memoize(as_ref)]
-async fn lookup(cx: &Cx, name: &str) -> Result<Record, Error> {
-    db::find(name).await
-}
-
-# async fn example(cx: &Cx) -> Result<(), &Error> {
-let record = lookup(cx, "alice").await?; // computes; stores "alice".to_owned() as the key
-let record = lookup(cx, "alice").await?; // cache hit, no allocation
-# let _ = record;
-# Ok(())
-# }
-```
-
 # Borrowing Option and Result contents
 
 By default the macro returns a reference to the cached value itself: a function returning `Option<User>` hands out `&Option<User>`. Pass `as_ref` to the attribute to borrow the cached value's contents instead:
@@ -154,6 +129,31 @@ let user: Option<&User> = find_user(cx, 42).await;
 ```
 
 With `as_ref`, the macro rewrites the return type through the `MemoizeAsRef` trait: `Option<T>` comes back as `Option<&T>` and `Result<T, E>` as `Result<&T, &E>`. Implement the trait for your own return types to use them with `as_ref`.
+
+# Borrowed and owned arguments
+
+Arguments can be passed by value or by reference. Borrowed arguments avoid cloning on cache hits; on a miss the value is cloned once into the cache.
+
+```rust
+# fn main() {}
+# use topcoat::context::{Cx, memoize};
+# struct Record;
+# struct Error;
+# mod db {
+#     pub async fn find(_name: &str) -> Result<super::Record, super::Error> { Ok(super::Record) }
+# }
+#[memoize(as_ref)]
+async fn lookup(cx: &Cx, name: &str) -> Result<Record, Error> {
+    db::find(name).await
+}
+
+# async fn example(cx: &Cx) -> Result<(), &Error> {
+let record = lookup(cx, "alice").await?; // computes; stores "alice".to_owned() as the key
+let record = lookup(cx, "alice").await?; // cache hit, no allocation
+# let _ = record;
+# Ok(())
+# }
+```
 
 # Requirements
 

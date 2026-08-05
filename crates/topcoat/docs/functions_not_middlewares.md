@@ -123,7 +123,7 @@ async fn require_auth(cx: &Cx) -> Result<&User, UnauthorizedError> {
 }
 ```
 
-With `as_ref`, `#[memoize]` stores the owned `Option<User>` for the request, but exposes it to callers as `Option<&User>`. That lets downstream helpers borrow the current user without cloning it or threading ownership through the component tree.
+`#[memoize]` stores the owned `Option<User>` for the request, but exposes it to callers as `Option<&User>`. That lets downstream helpers borrow the current user without cloning it or threading ownership through the component tree.
 
 Now the component that needs authentication declares it by calling `require_auth(cx)`:
 
