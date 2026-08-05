@@ -53,9 +53,9 @@ impl<'a> Formatter<'a> {
     /// recorded: the first render part that mentions a header name provides
     /// all of that name's values.
     #[cfg(feature = "http")]
-    pub(crate) fn record_headers(&mut self, headers: &HeaderMap) {
+    pub(crate) fn record_headers(&mut self, headers: HeaderMap) {
         if self.headers.is_empty() {
-            self.headers = headers.clone();
+            self.headers = headers;
             return;
         }
         for name in headers.keys() {
