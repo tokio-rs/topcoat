@@ -71,7 +71,7 @@ impl ViewWriter {
     }
 
     pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
-        self.flush();
+        // Local binding does not need flush because it does not have an effect on static segments.
         self.chunks.push(Chunk::Local {
             pat: pat.clone(),
             expr: Box::new(expr.clone()),
@@ -132,23 +132,26 @@ impl ViewWriter {
                 quote! { #topcoat_view::View::unescaped_unchecked(#string) }
             } else {
                 fn build_parts(chunks: &[Chunk]) -> TokenStream {
-                    let mut output = TokenStream::new();
+                    let mut hoisted = TokenStream::new();
+                    let mut emit = TokenStream::new();
                     for chunk in chunks {
                         match chunk {
                             Chunk::Static { string } => {
                                 let helper = ExprKind::Unescaped.helper();
                                 let tokens = quote! { #string };
                                 quote! { #helper(__cx, &mut __parts, #tokens); }
+                                    .to_tokens(&mut emit);
                             }
                             Chunk::Expr { kind, tokens } => {
                                 let helper = kind.helper();
                                 quote! { #helper(__cx, &mut __parts, #tokens); }
+                                    .to_tokens(&mut emit);
                             }
                             Chunk::Local { pat, expr } => {
-                                quote! { let #pat = #expr; }
+                                quote! { let #pat = #expr; }.to_tokens(&mut hoisted);
                             }
-                            Chunk::Statement { tokens } => {
-                                quote! { #tokens }
+                            Chunk::Statement { .. } => {
+                                todo!("statements currently are not supported");
                             }
                             Chunk::If {
                                 expr,
@@ -159,11 +162,24 @@ impl ViewWriter {
                                 let else_branch = build_parts(&r#else.chunks);
                                 let else_branch = (!r#else.chunks.is_empty())
                                     .then(|| quote! { else { #else_branch } });
-                                quote! {
-                                    if #expr {
-                                        #then_branch
+                                if then.has_component() || r#else.has_component() {
+                                    quote! {
+                                        let #fut = async {
+                                            if #expr {
+                                                #then_branch
+                                            }
+                                            #else_branch
+                                        };
                                     }
-                                    #else_branch
+                                    .to_tokens(&mut emit);
+                                } else {
+                                    quote! {
+                                        if #expr {
+                                            #then_branch
+                                        }
+                                        #else_branch
+                                    }
+                                    .to_tokens(&mut emit);
                                 }
                             }
                             Chunk::For { pat, expr, body } => {
@@ -173,6 +189,7 @@ impl ViewWriter {
                                         #body
                                     }
                                 }
+                                .to_tokens(&mut emit);
                             }
                             Chunk::Match { expr, arms } => {
                                 let arm_tokens = arms.iter().map(|arm| {
@@ -188,11 +205,15 @@ impl ViewWriter {
                                         #(#arm_tokens,)*
                                     }
                                 }
+                                .to_tokens(&mut emit);
                             }
                         }
-                        .to_tokens(&mut output);
                     }
-                    output
+
+                    quote! {
+                        #hoisted
+                        #emit
+                    }
                 }
 
                 let statements = build_parts(&self.chunks);
@@ -212,16 +233,46 @@ impl ViewWriter {
             quote! { async { ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#format_expr) }.await }
         }
     }
+
+    fn has_component(&self) -> bool {
+        for chunk in &self.chunks {
+            match chunk {
+                Chunk::Expr { kind, .. } if *kind == ExprKind::Component => return true,
+                Chunk::If {
+                    then_branch,
+                    else_branch,
+                    ..
+                } if then_branch.has_component() || else_branch.has_component() => return true,
+                Chunk::Match { arms, .. } if arms.iter().any(|arm| arm.body.has_component()) => {
+                    return true;
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+}
+
+struct ScopeWriter<'a> {
+    output: &'a mut TokenStream,
+    chunks: &'a [Chunk],
+    future: usize,
+}
+
+impl<'a> ScopeWriter<'a> {
+    fn new(chunks: &'a [Chunk]) -> Self {
+        Self { chunks, future: 0 }
+    }
 }
 
 /// Identifies which `internal` helper a [`Chunk::Expr`] should be wrapped in
 /// when emitted, so the generated code uses the matching `__*` function and
 /// the corresponding `*ViewParts` trait.
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum ExprKind {
     Unescaped,
     Node,
-    View,
+    Component,
     ElementName,
     Attribute,
     AttributeUnescaped,
@@ -235,7 +286,7 @@ impl ExprKind {
         let name = match self {
             Self::Unescaped => "__unescaped",
             Self::Node => "__node",
-            Self::View => "__view",
+            Self::Component => "__view",
             Self::ElementName => "__element_name",
             Self::Attribute => "__attribute",
             Self::AttributeUnescaped => "__attribute_unescaped",
@@ -434,7 +485,7 @@ mod tests {
         for (kind, expected) in [
             (ExprKind::Unescaped, "__unescaped"),
             (ExprKind::Node, "__node"),
-            (ExprKind::View, "__view"),
+            (ExprKind::Component, "__view"),
             (ExprKind::ElementName, "__element_name"),
             (ExprKind::Attribute, "__attribute"),
             (ExprKind::AttributeUnescaped, "__attribute_unescaped"),

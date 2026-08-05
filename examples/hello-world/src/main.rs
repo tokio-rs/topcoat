@@ -35,6 +35,7 @@ async fn hello(name: &str) -> Result {
             "Hello, "
             (name)
             "!"
+            let kek = 5;
         </h1>
     }
 }

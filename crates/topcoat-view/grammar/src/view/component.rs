@@ -91,7 +91,7 @@ impl WriteView for Component {
         });
 
         writer.write_expr(
-            ExprKind::View,
+            ExprKind::Component,
             quote_spanned! {self.paren_token.span.span()=>
                 {
                     use #topcoat_view::Component;

@@ -3203,6 +3203,8 @@ name = "topcoat-view"
 version = "0.5.0"
 dependencies = [
  "criterion",
+ "futures-core",
+ "futures-util",
  "http",
  "itoa",
  "memchr",
