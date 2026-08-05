@@ -1,0 +1,20 @@
+---
+title: Release Notes
+subtitle: A post that keeps its own directory
+author: Topcoat
+publishDate: "2026-03-18"
+lastModifiedDate: "2026-03-22"
+excerpt: A file named index serves the directory holding it.
+tags:
+  - mdx
+  - routing
+keywords:
+  - index
+  - routes
+---
+
+# Release Notes
+
+This file is `posts/release-notes/index.mdx` and serves `/blog/release-notes`. Without the rule the route would end in a repeated segment.
+
+A directory per post is worth having when a post owns more than its text: images, partials, or a translation sit next to it, and deleting the directory removes the whole post. The flat files alongside this one still work exactly as before.

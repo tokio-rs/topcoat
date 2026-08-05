@@ -34,6 +34,10 @@ members = [
     "crates/topcoat-view/grammar",
     "crates/topcoat-view/macro",
 
+    "crates/topcoat-mdx",
+    "crates/topcoat-mdx/grammar",
+    "crates/topcoat-mdx/macro",
+
     "examples/alpine-ajax",
     "examples/app-context",
     "examples/asset",
@@ -59,6 +63,16 @@ members = [
     "examples/toasty-todo",
     "examples/ui",
     "examples/websocket",
+
+    "examples/mdx/simple",
+    "examples/mdx/components",
+    "examples/mdx/blog",
+    "examples/mdx/docs-site",
+    "examples/mdx/mdx-pages",
+    "examples/mdx/overrides",
+    "examples/mdx/content-index",
+    "examples/mdx/frontmatter",
+    "examples/mdx/gfm",
 
     "benchmarks/topcoat",
 ]
@@ -142,6 +156,10 @@ topcoat-view = { version = "0.5.0", path = "crates/topcoat-view" }
 topcoat-view-grammar = { version = "0.5.0", path = "crates/topcoat-view/grammar" }
 topcoat-view-macro = { version = "0.5.0", path = "crates/topcoat-view/macro" }
 
+topcoat-mdx = { version = "0.5.0", path = "crates/topcoat-mdx" }
+topcoat-mdx-grammar = { version = "0.5.0", path = "crates/topcoat-mdx/grammar" }
+topcoat-mdx-macro = { version = "0.5.0", path = "crates/topcoat-mdx/macro" }
+
 anyhow = "1.0"
 anymap3 = "1.0"
 base64 = "0.22"
@@ -171,6 +189,7 @@ indicatif = "0.18"
 inventory = "0.3.24"
 itoa = "1.0"
 lettre = { version = "0.11", default-features = false }
+markdown = "1.0"
 matchit = "0.9"
 memchr = "2.8"
 mime_guess = "2"
@@ -184,6 +203,8 @@ proc-macro2 = "1.0.106"
 quote = "1.0.45"
 ref-cast = "1.0"
 serde = "1"
+serde-saphyr = "1.0"
+serde-value = "0.7"
 serde_json = "1"
 serde_path_to_error = "0.1"
 serde_urlencoded = "0.7"

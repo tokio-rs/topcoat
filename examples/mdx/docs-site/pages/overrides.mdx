@@ -1,0 +1,9 @@
+# Element Overrides
+
+When the `overrides` option is set on `compile_mdx!`, HTML elements can be rendered through custom components instead of their default tags.
+
+This page routes all `<a>` elements through the `branded_link` component, which adds consistent styling across the documentation site.
+
+Click [this link](https://example.com) to see the override in action. You can also navigate to [the home page](/) using the override component.
+
+Overrides only apply to safe URLs. JavaScript URLs are never routed through override components for security reasons.

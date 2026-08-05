@@ -1,0 +1,11 @@
+# Content Wrappers
+
+The `wrapper` option on `compile_mdx!` wraps all MDX content in a component, so you do not need to repeat layout structure in every page.
+
+This entire page is wrapped by the `page_wrapper` component, which applies a max-width container with horizontal padding.
+
+## Why Use Wrappers?
+
+Wrappers keep your content neatly contained without adding extra markup to each `.mdx` file. The wrapper component receives all the rendered content as its `child` prop.
+
+You can combine wrappers with overrides to get both per-element customization and page-level layout in a single `compile_mdx!` call.

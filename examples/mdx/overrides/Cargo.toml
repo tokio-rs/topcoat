@@ -1,0 +1,12 @@
+[package]
+name = "mdx-overrides"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+topcoat = { workspace = true, features = ["mdx", "serve", "view", "router", "discover"] }
+
+[lints]
+workspace = true

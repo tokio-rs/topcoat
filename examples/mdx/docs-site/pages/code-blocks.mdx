@@ -1,0 +1,28 @@
+# Code Block Meta
+
+Fenced code blocks in MDX support meta strings that provide additional information about the code.
+
+## Line Highlights
+
+You can specify which lines to highlight using a comma-separated list of line numbers in braces:
+
+```rust {1,3}
+fn main() {
+    let x = 42;
+    println!("The answer is {x}");
+}
+```
+
+## Title Attribute
+
+Code blocks can also carry a title attribute to show the file path or description:
+
+```rust title="src/main.rs"
+use topcoat::{Result, router::Router};
+
+fn router() -> Router {
+    Router::builder().build()
+}
+```
+
+Meta strings are preserved during compilation so that syntax highlighters and renderers can use them for styling.

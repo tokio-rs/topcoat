@@ -1,0 +1,9 @@
+---
+title: Home
+---
+
+# Home
+
+This file lives at `pages/home.mdx` and is served at `/home`. No handler was written for it: `mdx_pages!` derived the route from the file path and registered it in the inventory, and `Router::builder().discover()` picked it up.
+
+The <Highlight>Highlight</Highlight> component comes from the shared registry passed to `mdx_pages!` in `main.rs`, so every file in the scan can use it.

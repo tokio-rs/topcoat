@@ -1,0 +1,14 @@
++++
+title = "TOML Frontmatter"
+subtitle = "The same fields in a different syntax"
+author = "Topcoat"
+date = "2026-03-10"
+excerpt = "Frontmatter can be TOML instead of YAML, and the index says which."
+tags = ["mdx", "toml"]
++++
+
+# TOML Frontmatter
+
+This post declares its frontmatter between `+++` delimiters instead of `---`, so it is parsed as TOML. The fields are the same ones the YAML posts use, and they reach the index the same way.
+
+The parser strips the delimiters, so `frontmatter_raw` holds `title = "TOML Frontmatter"` with nothing to say which syntax produced it. That is what `frontmatter_format` is for: the listing reads it to pick a deserializer, rather than guessing from the text.

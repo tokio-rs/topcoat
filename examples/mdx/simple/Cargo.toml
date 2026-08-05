@@ -1,0 +1,12 @@
+[package]
+name = "mdx-simple"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+topcoat = { workspace = true, features = ["mdx", "serve", "view", "router"] }
+
+[lints]
+workspace = true

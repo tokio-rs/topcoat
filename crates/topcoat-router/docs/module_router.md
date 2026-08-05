@@ -40,6 +40,8 @@ pub fn router() -> Router {
 }
 ```
 
+The `mdx_pages!` macro is a common consumer of the discover path: it registers compiled `.mdx` files as page routes via link-time inventory, which `.discover()` picks up.
+
 Anything that is registered as a value is passed in by hand. The asset bundle is the common case: a view that renders an `Asset`, such as a Tailwind stylesheet or a self-hosted font, needs the bundle on the router.
 
 ```rust,no_run

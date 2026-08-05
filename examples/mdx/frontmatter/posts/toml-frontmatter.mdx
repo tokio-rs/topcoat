@@ -1,0 +1,16 @@
++++
+title = "TOML Frontmatter"
+subtitle = "The same fields, a different syntax"
+author = "Topcoat"
+publishDate = "2026-02-02"
+lastModifiedDate = "2026-02-20"
+excerpt = "Frontmatter written as TOML reaches the same struct."
+tags = ["mdx", "toml"]
+keywords = ["metadata", "toml"]
++++
+
+# TOML Frontmatter
+
+This post carries exactly the fields the YAML posts carry, written between `+++` delimiters instead of `---`. It deserializes into the same `BlogPostMeta`, and the layout renders it the same way.
+
+Nothing in the application code chooses a parser. The macro records which syntax each page used and calls the matching deserializer, which matters because the delimiters are stripped during parsing: by the time the frontmatter is a string, `title = "TOML Frontmatter"` and `title: TOML Frontmatter` are the only things left to tell them apart.

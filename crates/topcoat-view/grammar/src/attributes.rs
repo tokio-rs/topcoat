@@ -33,6 +33,7 @@ use crate::{
 };
 
 /// The full list of attributes attached to a single tag.
+#[derive(Default)]
 pub struct Attributes {
     /// The request context binding supplied by a leading `cx =>` argument to
     /// the `attributes!` macro.

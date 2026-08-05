@@ -97,6 +97,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
 
 [[package]]
+name = "annotate-snippets"
+version = "0.12.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f211a51805bc641f3ad5b7664c77d2547af685cc33b4cd8d31964027a46f13f1"
+dependencies = [
+ "anstyle",
+ "memchr",
+ "unicode-width",
+]
+
+[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -165,6 +176,12 @@ dependencies = [
  "tokio",
  "topcoat",
 ]
+
+[[package]]
+name = "arraydeque"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
 
 [[package]]
 name = "asset"
@@ -751,6 +768,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "encoding_rs_io"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cc3c5651fb62ab8aa3103998dade57efdd028544bd300516baa31840c252a83"
+dependencies = [
+ "encoding_rs",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -990,6 +1016,16 @@ dependencies = [
  "log",
  "regex-automata",
  "regex-syntax",
+]
+
+[[package]]
+name = "granit-parser"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c60388b03522b86e24b6b45952255279936b08a871775156fc89c94e792d21d8"
+dependencies = [
+ "arraydeque",
+ "smallvec",
 ]
 
 [[package]]
@@ -1549,10 +1585,96 @@ dependencies = [
 ]
 
 [[package]]
+name = "markdown"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5cab8f2cadc416a82d2e783a1946388b31654d391d1c7d92cc1f03e295b1deb"
+dependencies = [
+ "unicode-id",
+]
+
+[[package]]
 name = "matchit"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8863b587001c1b9a8a4e36008cebc6b3612cb1226fe2de94858e06092687b608"
+
+[[package]]
+name = "mdx-blog"
+version = "0.5.0"
+dependencies = [
+ "serde",
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
+name = "mdx-components"
+version = "0.5.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
+name = "mdx-content-index"
+version = "0.5.0"
+dependencies = [
+ "serde",
+ "serde-saphyr",
+ "tokio",
+ "toml",
+ "topcoat",
+]
+
+[[package]]
+name = "mdx-docs-site"
+version = "0.5.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
+name = "mdx-frontmatter"
+version = "0.5.0"
+dependencies = [
+ "serde",
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
+name = "mdx-gfm"
+version = "0.5.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
+name = "mdx-overrides"
+version = "0.5.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
+name = "mdx-pages"
+version = "0.5.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
+name = "mdx-simple"
+version = "0.5.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
 
 [[package]]
 name = "memchr"
@@ -1622,6 +1744,12 @@ dependencies = [
  "spin",
  "version_check",
 ]
+
+[[package]]
+name = "nohash-hasher"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
 name = "nom"
@@ -1707,6 +1835,15 @@ name = "opaque-debug"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
+
+[[package]]
+name = "ordered-float"
+version = "2.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68f19d67e5a2795c94e73e0bb1cc1a7edeb2e28efd39e2e1c9b7a40c1108b11c"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "page_size"
@@ -2197,6 +2334,33 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde-saphyr"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5bb49c0aa8a5bb88c00b833c11bae50d1611fb89e01336f53b05f7c643b1c883"
+dependencies = [
+ "annotate-snippets",
+ "base64",
+ "encoding_rs_io",
+ "granit-parser",
+ "nohash-hasher",
+ "num-traits",
+ "serde_core",
+ "smallvec",
+ "zmij",
+]
+
+[[package]]
+name = "serde-value"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
+dependencies = [
+ "ordered-float",
+ "serde",
 ]
 
 [[package]]
@@ -2790,6 +2954,8 @@ dependencies = [
  "topcoat-icon-macro",
  "topcoat-mail",
  "topcoat-mail-macro",
+ "topcoat-mdx",
+ "topcoat-mdx-macro",
  "topcoat-router",
  "topcoat-router-macro",
  "topcoat-runtime",
@@ -3052,6 +3218,50 @@ dependencies = [
  "tokio",
  "topcoat",
  "topcoat-mail-grammar",
+]
+
+[[package]]
+name = "topcoat-mdx"
+version = "0.5.0"
+dependencies = [
+ "serde",
+ "serde-saphyr",
+ "toml",
+ "topcoat",
+ "topcoat-mdx-macro",
+]
+
+[[package]]
+name = "topcoat-mdx-grammar"
+version = "0.5.0"
+dependencies = [
+ "heck",
+ "markdown",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "topcoat-view-grammar",
+]
+
+[[package]]
+name = "topcoat-mdx-macro"
+version = "0.5.0"
+dependencies = [
+ "heck",
+ "ignore",
+ "markdown",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde-saphyr",
+ "serde-value",
+ "syn",
+ "tokio",
+ "toml",
+ "topcoat",
+ "topcoat-core-grammar",
+ "topcoat-mdx-grammar",
+ "topcoat-view-grammar",
 ]
 
 [[package]]
@@ -3351,6 +3561,12 @@ name = "unicase"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dbc4bc3a9f746d862c45cb89d705aa10f187bb96c76001afab07a0d35ce60142"
+
+[[package]]
+name = "unicode-id"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70ba288e709927c043cbe476718d37be306be53fb1fafecd0dbe36d072be2580"
 
 [[package]]
 name = "unicode-ident"

@@ -1,0 +1,23 @@
+[package]
+name = "mdx-frontmatter"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+# `mdx-frontmatter` is what lets the macro deserialize frontmatter into a type
+# of this crate's own. Plain `mdx` renders pages but resolves frontmatter only
+# while the macro expands, so nothing of it is readable at runtime.
+topcoat = { workspace = true, features = [
+	"mdx",
+	"mdx-frontmatter",
+	"serve",
+	"view",
+	"router",
+	"discover",
+] }
+serde = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

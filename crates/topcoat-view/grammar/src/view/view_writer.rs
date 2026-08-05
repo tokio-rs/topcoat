@@ -4,7 +4,7 @@ use syn::{Expr, Ident, Pat};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 /// AST nodes that can emit themselves into a [`ViewWriter`].
-pub(crate) trait WriteView {
+pub trait WriteView {
     fn write(&self, writer: &mut ViewWriter);
 }
 
@@ -12,13 +12,20 @@ pub(crate) trait WriteView {
 ///
 /// Adjacent literal markup is concatenated into `static_segment` and flushed as
 /// a single write whenever a dynamic chunk (expression, control flow) appears.
-pub(crate) struct ViewWriter {
+pub struct ViewWriter {
     pub(self) chunks: Vec<Chunk>,
     static_segment: String,
     nested: bool,
 }
 
+impl Default for ViewWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ViewWriter {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             chunks: Vec::new(),
@@ -27,6 +34,7 @@ impl ViewWriter {
         }
     }
 
+    #[must_use]
     pub fn new_nested() -> Self {
         Self {
             chunks: Vec::new(),
@@ -119,6 +127,7 @@ impl ViewWriter {
         });
     }
 
+    #[must_use]
     pub fn into_token_stream(mut self) -> TokenStream {
         self.flush();
 
@@ -214,11 +223,11 @@ impl ViewWriter {
     }
 }
 
-/// Identifies which `internal` helper a [`Chunk::Expr`] should be wrapped in
+/// Identifies which `internal` helper a `Chunk::Expr` should be wrapped in
 /// when emitted, so the generated code uses the matching `__*` function and
 /// the corresponding `*ViewParts` trait.
 #[derive(Copy, Clone)]
-pub(crate) enum ExprKind {
+pub enum ExprKind {
     Unescaped,
     Node,
     View,
@@ -284,7 +293,7 @@ struct MatchArm {
     body: Box<ViewWriter>,
 }
 
-pub(crate) struct MatchArmsBuilder {
+pub struct MatchArmsBuilder {
     arms: Vec<MatchArm>,
 }
 

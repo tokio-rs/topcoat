@@ -1,0 +1,22 @@
+---
+title: Typed Metadata
+subtitle: One struct describes what every post carries
+author: Topcoat
+publishDate: "2026-01-20"
+lastModifiedDate: "2026-02-14"
+excerpt: Passing frontmatter = Type hands deserializing to the macro.
+tags:
+  - mdx
+  - frontmatter
+keywords:
+  - metadata
+  - serde
+---
+
+# Typed Metadata
+
+This post declares seven frontmatter fields. Four of them have named slots on the index entry; the other three would be lost without a type to read them into.
+
+Passing `frontmatter = BlogPostMeta` to `mdx_pages!` gives every entry a `meta()` that answers with the whole struct. The layout around this page reads the subtitle, the author, and both dates from it, none of which appear in the body you are reading.
+
+Deserializing happens once per page, on first read, rather than on every request.

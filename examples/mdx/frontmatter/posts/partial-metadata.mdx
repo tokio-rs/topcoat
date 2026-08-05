@@ -1,0 +1,15 @@
+---
+title: Partial Metadata
+author: Topcoat
+publishDate: "2026-03-05"
+lastModifiedDate: "2026-03-05"
+excerpt: Not every post has to declare every field.
+tags:
+  - mdx
+---
+
+# Partial Metadata
+
+This post leaves out `subtitle` and `keywords`. `BlogPostMeta` declares both as `Option`, so the page deserializes cleanly and the layout skips the parts it has nothing to show.
+
+A type that required those fields would not fail while the macro expands. The macro only knows the name of the type, never its fields, so a page that does not match panics on first read instead, naming the file.

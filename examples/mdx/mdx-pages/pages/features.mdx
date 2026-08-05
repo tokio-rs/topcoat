@@ -1,0 +1,15 @@
+---
+title: Features
+---
+
+# Features
+
+This example demonstrates:
+
+- **Directory scan** - `mdx_pages!("pages")` compiles every `.mdx` and `.md` file it finds
+- **Route derivation** - the route comes from the file path, kebab-cased
+- **Page discovery** - each file submits a `PageFn` that `Router::builder().discover()` collects
+- **Shared components** - one `components = {...}` registry covers the whole directory
+- **Content index** - `mdx_index_pages()` returns the frontmatter of every scanned file
+
+Adding a file to `pages/` is enough to publish a route. Drop in another `.mdx` file and it shows up on the <Highlight>index</Highlight> listing at `/`.

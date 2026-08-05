@@ -1,0 +1,16 @@
+[package]
+name = "mdx-content-index"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+topcoat = { workspace = true, features = ["mdx", "serve", "view", "router", "discover"] }
+# Frontmatter fields beyond the named ones are deserialized by the consumer.
+serde = { workspace = true, features = ["derive"] }
+serde-saphyr.workspace = true
+toml.workspace = true
+
+[lints]
+workspace = true

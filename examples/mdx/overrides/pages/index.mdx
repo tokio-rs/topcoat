@@ -1,0 +1,27 @@
+# Element Overrides
+
+This file is plain markdown. It names no components and knows nothing about the Rust code rendering it. Compare `/` with `/plain` to see the same source through two different sets of overrides.
+
+## Links
+
+Every link here renders through a Rust component: the [Topcoat repository](https://github.com/tokio-rs/topcoat) and a [link with a title](https://example.com "Example Domain"). The component adds the arrow and the styling; the author wrote ordinary markdown.
+
+## Headings
+
+The heading above this paragraph is an override too. The walker generates an `id` for every heading, passes it to the component, and the component turns it into a hover permalink.
+
+## Code blocks
+
+A fenced code block passes its meta string along as `data-*` attributes:
+
+```rust title="main.rs"
+fn main() {
+    println!("hello");
+}
+```
+
+The `title="main.rs"` above becomes the caption. A fence with no language and no meta emits no attributes at all:
+
+```
+plain text, no attributes
+```

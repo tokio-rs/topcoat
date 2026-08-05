@@ -199,6 +199,10 @@ pub const topcoat_icon: Crate = Crate::new("icon", "topcoat-icon", "");
 #[allow(non_upper_case_globals)]
 pub const topcoat_mail: Crate = Crate::new("mail", "topcoat-mail", "");
 
+/// `::topcoat::mdx`, or `topcoat_mdx` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_mdx: Crate = Crate::new("mdx", "topcoat-mdx", "");
+
 /// `::topcoat::router`, or `topcoat_router` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_router: Crate = Crate::new("router", "topcoat-router", "");

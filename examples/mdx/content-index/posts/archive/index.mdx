@@ -1,0 +1,17 @@
+---
+title: Archive
+subtitle: A directory that is itself a page
+author: Topcoat
+date: "2025-11-01"
+excerpt: A file named index stands for the directory holding it.
+tags:
+  - mdx
+---
+
+# Archive
+
+This file is `posts/archive/index.mdx`, and it serves `/posts/archive`. A file named `index` stands for the directory holding it, so the route does not end in a repeated segment the way `posts/archive/archive.mdx` would.
+
+Its sibling `older-post.mdx` is unaffected and still serves `/posts/archive/older-post`. The two conventions live side by side, so a directory can hold both a landing page and the pages below it.
+
+The slug follows the same rule: this entry is indexed as `archive`, not `index`, which is what makes it distinguishable from any other index file in the scan.

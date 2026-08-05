@@ -1,0 +1,54 @@
+# GFM and Code Blocks
+
+The parser enables the GitHub-flavored markdown extensions on top of CommonMark. Everything below is plain markdown; only the code fences route through a Rust component.
+
+## Tables
+
+| Feature | Extension | Renders as |
+| --- | --- | --- |
+| Tables | GFM | `<table>` |
+| Task lists | GFM | `<input type="checkbox">` |
+| Strikethrough | GFM | `<del>` |
+| Footnotes | GFM | `<ol>` at the document end |
+
+## Task lists
+
+- [x] Parse the file at build time
+- [x] Walk the syntax tree into view nodes
+- [ ] Anything at runtime
+
+## Strikethrough and autolinks
+
+Text can be ~~struck through~~, and a bare URL such as https://github.com/tokio-rs/topcoat becomes a link on its own.
+
+## Footnotes
+
+Footnotes are collected as they are referenced[^order] and rendered as a numbered section at the end of the document[^placement].
+
+[^order]: Numbering follows first-reference order, per the GFM spec.
+[^placement]: Each item links back to the point where it was referenced.
+
+## Code block meta
+
+The text after the language on a fence is the meta string. It is parsed into `data-*` attributes and handed to whatever component overrides `pre`.
+
+```rust {2,4} title="server.rs" /Router/
+#[tokio::main]
+async fn main() {
+    let router = Router::builder().discover().build();
+    topcoat::start(router).await.unwrap();
+}
+```
+
+`{2,4}` selects lines to highlight, `title="server.rs"` names the block, and `/Router/` marks a term to emphasize. A fence with only a language gets just `data-lang`:
+
+```toml
+[dependencies]
+topcoat = { version = "0.5.0", features = ["mdx"] }
+```
+
+## Reference links
+
+Definitions can live anywhere in the file and are resolved at compile time, so [the docs][docs] renders as a link with no runtime lookup. A reference with no matching definition stays literal text, exactly as CommonMark specifies.
+
+[docs]: https://docs.rs/topcoat "Topcoat on docs.rs"

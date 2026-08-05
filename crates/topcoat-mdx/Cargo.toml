@@ -1,0 +1,53 @@
+[package]
+name = "topcoat-mdx"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
+
+[features]
+# Deserializing frontmatter into a type of your own, via `frontmatter = Type`
+# on `mdx_pages!` and `mdx_page!`.
+#
+# Separate from rendering MDX, and off by default, because the two need
+# different things at different times. Rendering resolves frontmatter while the
+# macro expands: the parsers run in the proc-macro crate, on the build machine,
+# and nothing of them survives into the binary. Reading it into a type of your
+# own happens at runtime instead, which is what pulls serde and both format
+# parsers into the built program.
+#
+# A site that only renders MDX, or that reads `frontmatter_raw` with a
+# deserializer it already depends on, would otherwise pay for parsers it never
+# calls.
+frontmatter = [
+	"dep:serde",
+	"dep:serde-saphyr",
+	"dep:toml",
+	"topcoat-mdx-macro/frontmatter",
+]
+
+[dependencies]
+topcoat-mdx-macro.workspace = true
+# Versions match topcoat-mdx-macro's: the macro parses frontmatter at compile
+# time and this crate parses the same text at runtime.
+serde = { workspace = true, optional = true }
+serde-saphyr = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+
+[dev-dependencies]
+topcoat = { workspace = true, features = ["mdx"] }
+serde = { workspace = true, features = ["derive"] }
+serde-saphyr.workspace = true
+toml.workspace = true
+
+[lints]
+workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

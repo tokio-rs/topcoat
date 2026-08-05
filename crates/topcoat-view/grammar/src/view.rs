@@ -22,7 +22,7 @@ use quote::{ToTokens, quote};
 pub use signal_declaration::*;
 use syn::parse::{Parse, ParseStream};
 use topcoat_core_grammar::ParseOption;
-pub(crate) use view_writer::*;
+pub use view_writer::*;
 
 use crate::leading_cx::LeadingCx;
 

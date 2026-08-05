@@ -1,0 +1,20 @@
+# Installation Guide
+
+## Add to your project
+
+First, add `topcoat` with the `mdx` feature to your `Cargo.toml`:
+
+```toml
+[dependencies]
+topcoat = { features = ["mdx", "serve", "view", "router", "discover"] }
+```
+
+The `mdx` feature pulls in `router` on its own; `discover` is what lets the page macros register their routes.
+
+## Write your first MDX page
+
+Create a `posts/` directory, as this blog does, and add a `.mdx` file with your content.
+
+## Compile and serve
+
+Point `mdx_pages!` at the directory to get a route per file, or call `compile_mdx!` inside a page handler to render a single file.

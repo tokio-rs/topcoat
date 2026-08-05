@@ -16,14 +16,15 @@ default = [
 	"asset",
 	"compression",
 	"cookie",
+	"discover",
 	"font",
 	"icon",
+	"mdx",
 	"router",
 	"runtime",
 	"serve",
 	"session",
 	"view",
-	"discover",
 ]
 full = [
 	"alpine-ajax",
@@ -39,6 +40,8 @@ full = [
 	"icon-iconify",
 	"mail",
 	"mail-smtp",
+	"mdx",
+	"mdx-frontmatter",
 	"multipart",
 	"router",
 	"runtime",
@@ -75,6 +78,7 @@ datastar = [
 discover = [
 	"dep:inventory",
 	"topcoat-font?/discover",
+	"topcoat-mdx-macro?/discover",
 	"topcoat-router?/discover",
 	"topcoat-router-macro?/discover",
 	"topcoat-runtime?/discover",
@@ -110,6 +114,19 @@ mail = [
 mail-smtp = [
 	"mail",
 	"topcoat-mail/smtp",
+]
+mdx = [
+	"dep:topcoat-mdx",
+	"dep:topcoat-mdx-macro",
+	"router",
+]
+# Reading frontmatter into a type of your own. Separate from `mdx` because
+# rendering resolves frontmatter while the macro expands, on the build machine,
+# while reading it into a type happens at runtime and needs serde and both
+# format parsers in the built program.
+mdx-frontmatter = [
+	"mdx",
+	"topcoat-mdx/frontmatter",
 ]
 multipart = [
 	"router",
@@ -180,6 +197,8 @@ topcoat-icon = { workspace = true, optional = true }
 topcoat-icon-macro = { workspace = true, optional = true }
 topcoat-mail = { workspace = true, optional = true }
 topcoat-mail-macro = { workspace = true, optional = true }
+topcoat-mdx = { workspace = true, optional = true }
+topcoat-mdx-macro = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }
