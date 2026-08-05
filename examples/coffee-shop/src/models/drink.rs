@@ -28,7 +28,7 @@ pub enum Roast {
 ///
 /// `#[memoize]` caches the result for the duration of a request, so views can
 /// share the ordered menu without issuing duplicate Toasty queries.
-#[memoize]
+#[memoize(as_ref)]
 async fn query_drinks(cx: &Cx) -> topcoat::Result<Vec<Drink>> {
     let result = Drink::all()
         .order_by(Drink::fields().menu_order().asc())
