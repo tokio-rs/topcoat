@@ -55,6 +55,7 @@ fn measure(group: &mut BenchmarkGroup<'_, WallTime>, id: impl Into<String>, cx: 
             BatchSize::SmallInput,
         );
     });
+    drop(view);
 }
 
 // ---------------------------------------------------------------------------
