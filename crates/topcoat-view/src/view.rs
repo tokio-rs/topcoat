@@ -68,7 +68,7 @@ impl View {
     /// Panics if a dynamic attribute key or element name in the view contains
     /// a character that could break out of the identifier.
     #[track_caller]
-    pub fn render(&self, cx: &Cx) -> String {
+    pub fn render(self, cx: &Cx) -> String {
         let mut buf = String::with_capacity(self.part.size_hint());
         let mut f = Formatter::new(&mut buf);
         self.part.render(cx, &mut f);
@@ -92,7 +92,7 @@ impl View {
     #[cfg(feature = "http")]
     #[must_use]
     #[track_caller]
-    pub fn render_response(&self, cx: &Cx) -> RenderedResponse {
+    pub fn render_response(self, cx: &Cx) -> RenderedResponse {
         let mut html = String::with_capacity(self.part.size_hint());
         let mut f = Formatter::new(&mut html);
         self.part.render(cx, &mut f);
@@ -246,31 +246,31 @@ impl ViewPart {
     /// Writes the part into `f`, escaped or validated for the context each
     /// piece of text was written in.
     #[track_caller]
-    pub(crate) fn render(&self, cx: &Cx, f: &mut Formatter<'_>) {
+    pub(crate) fn render(self, cx: &Cx, f: &mut Formatter<'_>) {
         let mut int_buffer = itoa::Buffer::new();
 
         match self {
             Self::Empty => {}
-            Self::Bool(inner) => f.write_str(if *inner { "true" } else { "false" }),
+            Self::Bool(inner) => f.write_str(if inner { "true" } else { "false" }),
             // The `Display` output of the numeric types consists of digits,
             // signs, and plain letters, none of which are significant in any
             // HTML context, so they write verbatim.
-            Self::I8(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::I16(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::I32(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::I64(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::I128(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::Isize(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::U8(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::U16(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::U32(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::U64(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::U128(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::Usize(inner) => f.write_str(int_buffer.format(*inner)),
+            Self::I8(inner) => f.write_str(int_buffer.format(inner)),
+            Self::I16(inner) => f.write_str(int_buffer.format(inner)),
+            Self::I32(inner) => f.write_str(int_buffer.format(inner)),
+            Self::I64(inner) => f.write_str(int_buffer.format(inner)),
+            Self::I128(inner) => f.write_str(int_buffer.format(inner)),
+            Self::Isize(inner) => f.write_str(int_buffer.format(inner)),
+            Self::U8(inner) => f.write_str(int_buffer.format(inner)),
+            Self::U16(inner) => f.write_str(int_buffer.format(inner)),
+            Self::U32(inner) => f.write_str(int_buffer.format(inner)),
+            Self::U64(inner) => f.write_str(int_buffer.format(inner)),
+            Self::U128(inner) => f.write_str(int_buffer.format(inner)),
+            Self::Usize(inner) => f.write_str(int_buffer.format(inner)),
             Self::F32(inner) => write!(f, "{inner}").unwrap(),
             Self::F64(inner) => write!(f, "{inner}").unwrap(),
-            Self::Char { value, context } => context.writer(f).write_char(*value),
-            Self::Str { value, context } => context.writer(f).write_str(value),
+            Self::Char { value, context } => context.writer(f).write_char(value),
+            Self::Str { value, context } => context.writer(f).write_str(&value),
             Self::BoxDyn { inner, context, .. } => inner.render(cx, &mut context.writer(f)),
             Self::BoxSlice { inner, .. } => {
                 for part in inner {
@@ -278,9 +278,9 @@ impl ViewPart {
                 }
             }
             #[cfg(feature = "http")]
-            Self::StatusCode(status_code) => f.record_status_code(*status_code),
+            Self::StatusCode(status_code) => f.record_status_code(status_code),
             #[cfg(feature = "http")]
-            Self::Headers(headers) => f.record_headers(headers),
+            Self::Headers(headers) => f.record_headers(*headers),
         }
     }
 

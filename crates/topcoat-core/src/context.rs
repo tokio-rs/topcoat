@@ -6,6 +6,7 @@ use std::{any::Any, ops::Deref, sync::Arc};
 pub use context_map::*;
 pub use id::*;
 
+pub use crate::memoize::MemoizeAsRef;
 use crate::{abort::AbortStore, memoize::MemoizeCache};
 
 /// The request context.

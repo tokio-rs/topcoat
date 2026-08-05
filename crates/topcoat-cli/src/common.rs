@@ -2,3 +2,4 @@
 //! modules themselves.
 
 pub mod cargo;
+pub mod version;

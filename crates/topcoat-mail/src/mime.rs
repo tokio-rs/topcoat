@@ -33,7 +33,7 @@ impl Mail {
     /// Returns [`SendError`] if the mail is incomplete (no `From` address,
     /// no recipients, or no body) or declares an attachment content type or
     /// custom header name that is invalid.
-    pub fn formatted(&self, cx: &Cx) -> Result<Vec<u8>, SendError> {
+    pub fn formatted(self, cx: &Cx) -> Result<Vec<u8>, SendError> {
         Ok(message(cx, self, BccHeader::Dropped)?.formatted())
     }
 }
@@ -59,8 +59,8 @@ pub(crate) enum BccHeader {
 ///
 /// The message carries its envelope (all recipients, including `Bcc`) and
 /// a `Message-ID` and `Date`, generated unless the mail declared them.
-pub(crate) fn message(cx: &Cx, mail: &Mail, bcc: BccHeader) -> Result<Message, SendError> {
-    let builder = headers(mail, bcc)?;
+pub(crate) fn message(cx: &Cx, mail: Mail, bcc: BccHeader) -> Result<Message, SendError> {
+    let builder = headers(&mail, bcc)?;
     let content = body(cx, mail)?;
 
     let message = match content {
@@ -136,7 +136,9 @@ enum Content {
 }
 
 /// Builds the MIME body tree, rendering the HTML body with `cx`.
-fn body(cx: &Cx, mail: &Mail) -> Result<Content, SendError> {
+fn body(cx: &Cx, mut mail: Mail) -> Result<Content, SendError> {
+    let html = mail.html.take().map(|view| view.render(cx));
+
     let inline: Vec<&Attachment> = mail
         .attachments()
         .iter()
@@ -148,7 +150,6 @@ fn body(cx: &Cx, mail: &Mail) -> Result<Content, SendError> {
         .filter(|attachment| attachment.filename().is_some())
         .collect();
 
-    let html = mail.html().map(|view| view.render(cx));
     if html.is_none() && !inline.is_empty() {
         return Err(SendError::InlineWithoutHtml);
     }
@@ -234,14 +235,14 @@ mod tests {
             .to([Mailbox::new("bob@example.com").unwrap()])
     }
 
-    fn formatted(mail: &Mail) -> String {
+    fn formatted(mail: Mail) -> String {
         String::from_utf8(mail.formatted(&Cx::default()).unwrap()).unwrap()
     }
 
     #[test]
     fn text_only_is_a_single_plain_part() {
         let mail = base().subject("Hello").text("Hi Bob").build();
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
 
         assert!(wire.contains("From: Ada <ada@example.com>\r\n"));
         assert!(wire.contains("To: bob@example.com\r\n"));
@@ -256,7 +257,7 @@ mod tests {
         let mail = base()
             .html(View::unescaped_unchecked("<h1>Hi</h1><p>Bye now</p>"))
             .build();
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
         assert!(wire.contains("Content-Type: text/plain; charset=utf-8\r\n"));
@@ -269,7 +270,7 @@ mod tests {
             .html(View::unescaped_unchecked("<h1>Hi</h1>"))
             .text(TextBody::None)
             .build();
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: text/html; charset=utf-8\r\n"));
         assert!(wire.contains("<h1>Hi</h1>"));
@@ -281,7 +282,7 @@ mod tests {
         let mail = base()
             .html(View::unescaped_unchecked("<img src=\"x.png\">"))
             .build();
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
 
         assert!(!wire.contains("text/plain"));
         assert!(!wire.contains("multipart"));
@@ -293,7 +294,7 @@ mod tests {
             .text("Hi Bob")
             .html(View::unescaped_unchecked("<h1>Hi</h1>"))
             .build();
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
         let plain = wire.find("Content-Type: text/plain").unwrap();
@@ -309,7 +310,7 @@ mod tests {
             .html(View::unescaped_unchecked("<img src=\"cid:logo\">"))
             .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
             .build();
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
         assert!(wire.contains("Content-Type: multipart/related;"));
@@ -323,7 +324,7 @@ mod tests {
             .text("Hi Bob")
             .attachments([Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")])
             .build();
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/mixed;"));
         assert!(wire.contains("Content-Disposition: attachment; filename=\"invoice.pdf\"\r\n"));
@@ -336,7 +337,7 @@ mod tests {
             .text("Hi")
             .build();
 
-        let message = message(&Cx::default(), &mail, BccHeader::Dropped).unwrap();
+        let message = message(&Cx::default(), mail.clone(), BccHeader::Dropped).unwrap();
         let recipients: Vec<String> = message
             .envelope()
             .to()
@@ -345,7 +346,7 @@ mod tests {
             .collect();
         assert!(recipients.contains(&"dan@example.com".to_owned()));
 
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
         assert!(!wire.contains("Bcc"));
         assert!(!wire.contains("dan@example.com"));
     }
@@ -357,7 +358,7 @@ mod tests {
             .text("Hi")
             .build();
 
-        let message = message(&Cx::default(), &mail, BccHeader::Kept).unwrap();
+        let message = message(&Cx::default(), mail, BccHeader::Kept).unwrap();
         let wire = String::from_utf8(message.formatted()).unwrap();
         assert!(wire.contains("Bcc: dan@example.com\r\n"));
     }
@@ -369,7 +370,7 @@ mod tests {
             .message_id("<mail@example.com>")
             .date(std::time::SystemTime::UNIX_EPOCH)
             .build();
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
 
         assert!(wire.contains("Message-ID: <mail@example.com>\r\n"));
         assert!(wire.contains("Date: Thu, 01 Jan 1970 00:00:00 +0000\r\n"));
@@ -379,7 +380,7 @@ mod tests {
     fn missing_message_id_and_date_are_generated() {
         let mail = base().text("Hi").build();
 
-        let message = message(&Cx::default(), &mail, BccHeader::Dropped).unwrap();
+        let message = message(&Cx::default(), mail, BccHeader::Dropped).unwrap();
         let id = message_id(&message);
         assert!(id.contains('@'), "generated Message-ID: {id:?}");
         assert!(message.headers().get_raw("Date").is_some());
@@ -394,7 +395,7 @@ mod tests {
                 "<mailto:stop@example.com>".to_owned(),
             )])
             .build();
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
 
         assert!(wire.contains("List-Unsubscribe: <mailto:stop@example.com>\r\n"));
     }
@@ -406,7 +407,7 @@ mod tests {
             .in_reply_to("<earlier@example.com>")
             .references("<earlier@example.com>")
             .build();
-        let wire = formatted(&mail);
+        let wire = formatted(mail);
 
         assert!(wire.contains("In-Reply-To: <earlier@example.com>\r\n"));
         assert!(wire.contains("References: <earlier@example.com>\r\n"));

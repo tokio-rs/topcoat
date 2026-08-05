@@ -53,7 +53,7 @@ impl FileTransport {
 impl Transport for FileTransport {
     fn send<'a>(&'a self, cx: &'a Cx, mail: Mail) -> TransportFuture<'a> {
         Box::pin(async move {
-            let message = mime::message(cx, &mail, BccHeader::Kept)?;
+            let message = mime::message(cx, mail, BccHeader::Kept)?;
             let message_id = mime::message_id(&message);
 
             let path = self.directory.join(format!(

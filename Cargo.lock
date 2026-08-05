@@ -2858,6 +2858,7 @@ dependencies = [
  "serde_json",
  "syn",
  "tokio",
+ "toml",
  "topcoat",
  "topcoat-asset",
  "topcoat-core",

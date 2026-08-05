@@ -20,7 +20,8 @@ use std::{
 };
 
 use criterion::{
-    BenchmarkGroup, Criterion, Throughput, criterion_group, criterion_main, measurement::WallTime,
+    BatchSize, BenchmarkGroup, Criterion, Throughput, criterion_group, criterion_main,
+    measurement::WallTime,
 };
 use topcoat::{
     Result,
@@ -45,11 +46,16 @@ fn block_on<F: Future>(future: F) -> F::Output {
 
 /// Times `view.render(cx)` and reports throughput as the rendered byte length,
 /// so the report shows bytes per second alongside per-render latency.
-fn measure(group: &mut BenchmarkGroup<'_, WallTime>, id: impl Into<String>, cx: &Cx, view: &View) {
-    group.throughput(Throughput::Bytes(view.render(cx).len() as u64));
+fn measure(group: &mut BenchmarkGroup<'_, WallTime>, id: impl Into<String>, cx: &Cx, view: View) {
+    group.throughput(Throughput::Bytes(view.clone().render(cx).len() as u64));
     group.bench_function(id.into(), |b| {
-        b.iter(|| black_box(black_box(view).render(black_box(cx))));
+        b.iter_batched(
+            || view.clone(),
+            |v| black_box(v.render(black_box(cx))),
+            BatchSize::SmallInput,
+        );
     });
+    drop(view);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,26 +438,26 @@ fn bench_render(c: &mut Criterion) {
     let mut group = c.benchmark_group("view_render");
 
     let static_view = block_on(static_page()).expect("render static_page");
-    measure(&mut group, "static_page", &cx, &static_view);
+    measure(&mut group, "static_page", &cx, static_view);
 
     let comments = make_comments(200);
     let comment_view = block_on(comment_feed(&cx, &comments)).expect("render comment_feed");
-    measure(&mut group, "text_escaping", &cx, &comment_view);
+    measure(&mut group, "text_escaping", &cx, comment_view);
 
     let number_rows = make_number_rows(120, 10);
     let number_view = block_on(numeric_table(&cx, &number_rows)).expect("render numeric_table");
-    measure(&mut group, "numeric_table", &cx, &number_view);
+    measure(&mut group, "numeric_table", &cx, number_view);
 
     let tags = make_tags(200);
     let tag_view = block_on(tag_cloud(&cx, &tags)).expect("render tag_cloud");
-    measure(&mut group, "attributes", &cx, &tag_view);
+    measure(&mut group, "attributes", &cx, tag_view);
 
     // The realistic grid grows with the number of cards, showing how render
     // time scales with document length.
     for &count in &[12usize, 96, 768] {
         let products = make_products(count);
         let grid_view = block_on(product_grid(&cx, &products)).expect("render product_grid");
-        measure(&mut group, format!("product_grid/{count}"), &cx, &grid_view);
+        measure(&mut group, format!("product_grid/{count}"), &cx, grid_view);
     }
 
     group.finish();

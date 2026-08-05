@@ -72,7 +72,7 @@ impl MemoryTransport {
 impl Transport for MemoryTransport {
     fn send<'a>(&'a self, cx: &'a Cx, mail: Mail) -> TransportFuture<'a> {
         Box::pin(async move {
-            let message = mime::message(cx, &mail, BccHeader::Dropped)?;
+            let message = mime::message(cx, mail.clone(), BccHeader::Dropped)?;
             let receipt = Receipt::new(mime::message_id(&message));
             self.sent
                 .lock()
