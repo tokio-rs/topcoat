@@ -99,7 +99,7 @@ fn db(cx: &Cx) -> Db {
 }
 
 /// Fetches a user by ID, deduplicated for the duration of the request.
-#[memoize]
+#[memoize(as_ref)]
 async fn fetch_user(cx: &Cx, user_id: &str) -> Option<User> {
     User::fetch_by_id(user_id).exec(db(cx)).await
 }
@@ -123,7 +123,7 @@ async fn require_auth(cx: &Cx) -> Result<&User, UnauthorizedError> {
 }
 ```
 
-`#[memoize]` stores the owned `Option<User>` for the request, but exposes it to callers as `Option<&User>`. That lets downstream helpers borrow the current user without cloning it or threading ownership through the component tree.
+With `as_ref`, `#[memoize]` stores the owned `Option<User>` for the request, but exposes it to callers as `Option<&User>`. That lets downstream helpers borrow the current user without cloning it or threading ownership through the component tree.
 
 Now the component that needs authentication declares it by calling `require_auth(cx)`:
 
