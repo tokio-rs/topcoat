@@ -11,10 +11,11 @@ use topcoat::{
 use crate::{
     components::{
         badge::{BadgeVariant, badge, badge_variants},
+        button::{ButtonVariant, button},
         card::{card, card_content, card_description, card_header, card_title},
         input::input,
     },
-    drinks::{Drink, Roast, drinks},
+    models::{Drink, Roast, drinks},
 };
 
 // The `menu` module adds a URL segment: this page renders at /menu.
@@ -26,7 +27,7 @@ async fn menu_page() -> Result {
 
         <h1 class="text-3xl font-bold tracking-tight">"The menu"</h1>
 
-        <div class="mt-6">
+        <div class="mt-6 flex gap-2">
             input(
                 attrs: attributes! {
                     type="search"
@@ -34,6 +35,15 @@ async fn menu_page() -> Result {
                     :value=$(query.get())
                     @input=$(|e: Event| query.set(e.target.value))
                 }
+            )
+            button(
+                variant: ButtonVariant::Outline,
+                attrs: attributes! {
+                    type="button"
+                    :disabled=$(query.get().is_empty())
+                    @click=$(|_e: Event| query.set("".to_owned()))
+                },
+                "Clear"
             )
         </div>
 

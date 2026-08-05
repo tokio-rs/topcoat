@@ -1,7 +1,7 @@
 mod app;
 mod components;
 mod customer;
-mod drinks;
+mod models;
 
 use toasty::Db;
 
@@ -14,7 +14,7 @@ async fn main() {
         .unwrap();
 
     db.push_schema().await.unwrap();
-    drinks::seed(&mut db).await.unwrap();
+    models::seed(&mut db).await.unwrap();
 
     topcoat::start(app::router(db)).await.unwrap();
 }

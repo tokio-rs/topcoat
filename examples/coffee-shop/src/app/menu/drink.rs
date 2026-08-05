@@ -10,7 +10,7 @@ use super::roast_badge;
 use crate::{
     components::button::{ButtonSize, ButtonVariant, button},
     customer::current_customer,
-    drinks::{Drink, db},
+    models::{Drink, db},
 };
 
 // The declaration turns this module's segment into a parameter, so the page

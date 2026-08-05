@@ -26,7 +26,7 @@ use crate::{
         label::label,
     },
     customer::{current_customer, forget_customer, remember_customer},
-    drinks::drinks,
+    models::drinks,
 };
 
 /// The theme's sans font, pulled from the Fontsource catalog and self-hosted
