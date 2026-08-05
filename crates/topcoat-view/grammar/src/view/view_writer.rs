@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote};
+use quote::{ToTokens, format_ident, quote};
 use syn::{Expr, Ident, Pat};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
@@ -16,6 +16,7 @@ pub(crate) struct ViewWriter {
     pub(self) chunks: Vec<Chunk>,
     static_segment: String,
     nested: bool,
+    has_component: bool,
 }
 
 impl ViewWriter {
@@ -24,6 +25,7 @@ impl ViewWriter {
             chunks: Vec::new(),
             static_segment: String::new(),
             nested: false,
+            has_component: false,
         }
     }
 
@@ -32,6 +34,7 @@ impl ViewWriter {
             chunks: Vec::new(),
             static_segment: String::new(),
             nested: true,
+            has_component: false,
         }
     }
 
@@ -70,6 +73,12 @@ impl ViewWriter {
         self.chunks.push(Chunk::Expr { kind, tokens });
     }
 
+    pub fn component(&mut self, tokens: TokenStream) {
+        self.flush();
+        self.chunks.push(Chunk::Component { tokens });
+        self.has_component = true;
+    }
+
     pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
         // Local binding does not need flush because it does not have an effect on static segments.
         self.chunks.push(Chunk::Local {
@@ -88,6 +97,11 @@ impl ViewWriter {
         let mut body = ViewWriter::new();
         f(&mut body);
         body.flush();
+
+        if body.has_component {
+            self.has_component = true;
+        }
+
         self.chunks.push(Chunk::For {
             pat: pat.clone(),
             expr: Box::new(expr.clone()),
@@ -102,6 +116,11 @@ impl ViewWriter {
         f(&mut then_branch, &mut else_branch);
         then_branch.flush();
         else_branch.flush();
+
+        if then_branch.has_component || else_branch.has_component {
+            self.has_component = true;
+        }
+
         self.chunks.push(Chunk::If {
             expr: expr.clone(),
             then_branch: Box::new(then_branch),
@@ -113,6 +132,13 @@ impl ViewWriter {
         self.flush();
         let mut builder = MatchArmsBuilder { arms: Vec::new() };
         f(&mut builder);
+
+        for arm in &builder.arms {
+            if arm.body.has_component {
+                self.has_component = true;
+            }
+        }
+
         self.chunks.push(Chunk::Match {
             expr: Box::new(expr.clone()),
             arms: builder.arms,
@@ -162,7 +188,7 @@ impl ViewWriter {
                                 let else_branch = build_parts(&r#else.chunks);
                                 let else_branch = (!r#else.chunks.is_empty())
                                     .then(|| quote! { else { #else_branch } });
-                                if then.has_component() || r#else.has_component() {
+                                if then.has_component || r#else.has_component {
                                     quote! {
                                         let #fut = async {
                                             if #expr {
@@ -233,35 +259,127 @@ impl ViewWriter {
             quote! { async { ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#format_expr) }.await }
         }
     }
+}
 
-    fn has_component(&self) -> bool {
-        for chunk in &self.chunks {
+struct ConcurrencyEmitter<'a> {
+    hoist: TokenStream,
+    futures: Vec<Ident>,
+    results: Vec<Ident>,
+}
+
+impl ConcurrencyEmitter {
+    fn new() -> Self {
+        Self {
+            hoist: TokenStream::new(),
+            futures: Vec::new(),
+            results: Vec::new(),
+        }
+    }
+
+    fn next_future(&mut self) -> (Ident, Ident) {
+        let future = format_ident!("__fut{}", self.futures.len());
+        let result = format_ident!("__res{}", self.results.len());
+        self.futures.push(future);
+        self.results.push(result);
+        (future, result)
+    }
+
+    fn has_future(&self) -> bool {
+        !self.futures.is_empty()
+    }
+
+    fn build_inner(&mut self, writer: &ViewWriter) -> TokenStream {
+        let mut output = TokenStream::new();
+        for chunk in chunks {
             match chunk {
-                Chunk::Expr { kind, .. } if *kind == ExprKind::Component => return true,
-                Chunk::If {
-                    then_branch,
-                    else_branch,
-                    ..
-                } if then_branch.has_component() || else_branch.has_component() => return true,
-                Chunk::Match { arms, .. } if arms.iter().any(|arm| arm.body.has_component()) => {
-                    return true;
+                Chunk::Static { string } => {
+                    let helper = ExprKind::Unescaped.helper();
+                    let tokens = quote! { #string };
+                    quote! { #helper(__cx, &mut __parts, #tokens); }.to_tokens(&mut output);
                 }
-                _ => {}
+                Chunk::Expr { kind, tokens } => {
+                    let helper = kind.helper();
+                    quote! { #helper(__cx, &mut __parts, #tokens); }.to_tokens(&mut output);
+                }
+                Chunk::Local { pat, expr } => {
+                    quote! { let #pat = #expr; }.to_tokens(&mut self.hoist);
+                }
+                Chunk::Statement { .. } => {
+                    todo!("statements currently are not supported");
+                }
+                Chunk::If {
+                    expr,
+                    then_branch: then,
+                    else_branch: r#else,
+                } => {
+                    if then.has_component || r#else.has_component {
+                        let then_branch = self.build_inner(&then);
+                        let else_branch = self.build_inner(&r#else);
+                        let else_branch =
+                            (!r#else.chunks.is_empty()).then(|| quote! { else { #else_branch } });
+                        let (future, result) = self.next_future();
+                        quote! {
+                            let #future = async {
+                                if #expr {
+                                    #then_branch
+                                }
+                                #else_branch
+                            };
+                        }
+                        .to_tokens(&mut self.hoist);
+                        quote! {}
+                    } else {
+                        let then_branch = self.build_inner(&then);
+                        let else_branch = self.build_inner(&r#else);
+                        let else_branch =
+                            (!r#else.chunks.is_empty()).then(|| quote! { else { #else_branch } });
+                        quote! {
+                            if #expr {
+                                #then_branch
+                            }
+                            #else_branch
+                        }
+                        .to_tokens(&mut emit);
+                    }
+                }
+                Chunk::For { pat, expr, body } => {
+                    let body = self.build_inner(&body);
+                    quote! {
+                        for #pat in #expr {
+                            #body
+                        }
+                    }
+                    .to_tokens(&mut emit);
+                }
+                Chunk::Match { expr, arms } => {
+                    let arm_tokens = arms.iter().map(|arm| {
+                        let pat = &arm.pat;
+                        let guard = arm.guard.as_ref().map(|g| quote! { if #g });
+                        let body = build_parts(&arm.body.chunks);
+                        quote! {
+                            #pat #guard => { #body }
+                        }
+                    });
+                    quote! {
+                        match #expr {
+                            #(#arm_tokens,)*
+                        }
+                    }
+                    .to_tokens(&mut emit);
+                }
             }
         }
-        false
+        output
     }
-}
 
-struct ScopeWriter<'a> {
-    output: &'a mut TokenStream,
-    chunks: &'a [Chunk],
-    future: usize,
-}
-
-impl<'a> ScopeWriter<'a> {
-    fn new(chunks: &'a [Chunk]) -> Self {
-        Self { chunks, future: 0 }
+    fn build(&mut self, writer: &ViewWriter) -> TokenStream {
+        let inner = self.build_inner(writer);
+        quote! {{
+            use #topcoat_view::internal::*;
+            let mut __parts = #topcoat_view::ViewParts::new();
+            #inner
+            #topcoat_view::View::new(__parts)
+        }}
     }
 }
 
@@ -272,7 +390,6 @@ impl<'a> ScopeWriter<'a> {
 pub(crate) enum ExprKind {
     Unescaped,
     Node,
-    Component,
     ElementName,
     Attribute,
     AttributeUnescaped,
@@ -286,7 +403,6 @@ impl ExprKind {
         let name = match self {
             Self::Unescaped => "__unescaped",
             Self::Node => "__node",
-            Self::Component => "__view",
             Self::ElementName => "__element_name",
             Self::Attribute => "__attribute",
             Self::AttributeUnescaped => "__attribute_unescaped",
@@ -304,6 +420,9 @@ enum Chunk {
     },
     Expr {
         kind: ExprKind,
+        tokens: TokenStream,
+    },
+    Component {
         tokens: TokenStream,
     },
     Local {
