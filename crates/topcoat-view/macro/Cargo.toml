@@ -22,7 +22,7 @@ syn = { workspace = true, features = ["full"] }
 [dev-dependencies]
 topcoat = { workspace = true, features = ["view"] }
 
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
 
 [lints]
 workspace = true

@@ -1,5 +1,8 @@
-pub use futures_util::{future::try_join_all, try_join};
-use topcoat_core::context::Cx;
+pub use futures_util::{
+    future::{Either as __Either, try_join_all as __try_join_all},
+    try_join as __try_join,
+};
+use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
@@ -27,6 +30,14 @@ pub fn __build_view(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
         memory.push_ret();
         View::from_scope(memory.id(), entry, size_hint)
     })
+}
+
+/// Wraps an already-built view in a ready future.
+///
+/// Splices a view without components into a joined position, like the branch
+/// of an `if` whose other branch renders components.
+pub fn __ready_view(view: View) -> futures_util::future::Ready<Result<View>> {
+    futures_util::future::ready(Ok(view))
 }
 
 /// Runs `f` with the writer sealing for a different context, then restores

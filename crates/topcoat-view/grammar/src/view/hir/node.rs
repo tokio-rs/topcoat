@@ -39,6 +39,22 @@ pub(crate) enum Node {
     MatchExpr(MatchExpr),
 }
 
+impl Node {
+    /// Whether this node renders components, in the node itself or anywhere
+    /// under its nested scopes, so emitting it produces a future to await.
+    pub(crate) fn is_async(&self) -> bool {
+        match self {
+            Self::Component(_) => true,
+            Self::ForLoop(node) => node.body.is_async(),
+            Self::IfElse(node) => node.then_branch.is_async() || node.else_branch.is_async(),
+            Self::MatchExpr(node) => node.arms.iter().any(|arm| arm.body.is_async()),
+            Self::StaticSegment(_) | Self::ExprNode(_) | Self::Local(_) | Self::Statement(_) => {
+                false
+            }
+        }
+    }
+}
+
 impl Emit for Node {
     fn emit(&self, emitter: &mut Emitter) {
         match self {
