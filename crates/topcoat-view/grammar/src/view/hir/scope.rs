@@ -31,11 +31,11 @@ impl Scope {
     fn emit_view(&self) -> TokenStream {
         if self.nodes.is_empty() {
             // Optimized path: The view has no content.
-            quote! { #topcoat_view::View::empty() }
+            Self::emit_empty_view()
         } else if self.nodes.len() == 1
             && let Node::Static { string } = &self.nodes[0]
         {
-            quote! { #topcoat_view::View::unescaped_unchecked(#string) }
+            Self::emit_static_view(string)
         } else {
             let statements = Self::emit_nodes(&self.nodes);
             quote! {{
@@ -110,6 +110,14 @@ impl Scope {
             .to_tokens(&mut output);
         }
         output
+    }
+
+    fn emit_empty_view() -> TokenStream {
+        quote! { #topcoat_view::View::empty() }
+    }
+
+    fn emit_static_view(s: &str) -> TokenStream {
+        quote! { #topcoat_view::View::unescaped_unchecked(#s) }
     }
 }
 
