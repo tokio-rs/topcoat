@@ -257,13 +257,25 @@ impl ConcurrencyEmitter {
                     }
                 }
                 Chunk::For { pat, expr, body } => {
-                    let body = self.build_inner(body);
-                    quote! {
-                        for #pat in #expr {
-                            #body
+                    if body.has_component {
+                        let body = body.into_token_stream();
+                        let (future, result) = self.next_future();
+                        quote! {
+                            let #future: impl Future<Output = ::topcoat_core::error::Result<#topcoat_view::View>> = {
+                                #topcoat_view::internal::try_join_all((#expr).map(async |#pat| { #body }))
+                            };
                         }
+                        .to_tokens(&mut self.hoist);
+                        quote! { __view(__cx, &mut __parts, #result); }.to_tokens(&mut output);
+                    } else {
+                        let body = self.build_inner(body);
+                        quote! {
+                            for #pat in #expr {
+                                #body
+                            }
+                        }
+                        .to_tokens(&mut output);
                     }
-                    .to_tokens(&mut output);
                 }
                 Chunk::Match { expr, arms } => {
                     // let arm_tokens = arms.iter().map(|arm| {
