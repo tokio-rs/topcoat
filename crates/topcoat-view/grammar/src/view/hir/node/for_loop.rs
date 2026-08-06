@@ -32,7 +32,7 @@ impl Emit for ForLoop {
         });
         emitter.emit(quote! {
             for __loop_view in #ident {
-                __view(__cx, __mem, __loop_view);
+                __view(__cx, __parts, __loop_view);
             }
         });
     }

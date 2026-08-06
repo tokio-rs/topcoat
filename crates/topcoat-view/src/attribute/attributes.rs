@@ -86,11 +86,10 @@ impl Attributes {
             // A present value is always captured as an instruction block,
             // even when it writes nothing (a `true` boolean), so it never
             // collides with the empty view that marks an absent attribute.
-            __build_view(|memory| {
-                v.into_view_parts(
-                    cx,
-                    &mut PartsWriter::new(memory, HtmlContext::AttributeValue),
-                );
+            __build_view(|parts| {
+                parts.in_context(HtmlContext::AttributeValue, |parts| {
+                    v.into_view_parts(cx, parts);
+                });
             })
         } else {
             View::empty()
@@ -169,11 +168,10 @@ mod tests {
     }
 
     fn render(cx: &Cx, attrs: Attributes) -> String {
-        __build_view(|memory| {
-            attrs.into_view_parts(
-                cx,
-                &mut PartsWriter::new(memory, HtmlContext::AttributeValue),
-            );
+        __build_view(|parts| {
+            parts.in_context(HtmlContext::AttributeValue, |parts| {
+                attrs.into_view_parts(cx, parts);
+            });
         })
         .render(cx)
     }

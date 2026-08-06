@@ -469,15 +469,15 @@ mod tests {
     fn attribute_value_entries_are_spliced_verbatim() {
         block_on(scope(async {
             let cx = Cx::default();
-            let value = __build_view(|memory| {
-                PartsWriter::new(memory, HtmlContext::AttributeValue).push_str("[&>*]:mt-2");
+            let value = __build_view(|parts| {
+                parts.in_context(HtmlContext::AttributeValue, |parts| {
+                    parts.push_str("[&>*]:mt-2");
+                });
             });
-            let html = __build_view(|memory| {
-                AttributeValueViewParts::into_view_parts(
-                    Class(("btn", &value)),
-                    &cx,
-                    &mut PartsWriter::new(memory, HtmlContext::AttributeValue),
-                );
+            let html = __build_view(|parts| {
+                parts.in_context(HtmlContext::AttributeValue, |parts| {
+                    AttributeValueViewParts::into_view_parts(Class(("btn", &value)), &cx, parts);
+                });
             })
             .render(&cx);
             assert_eq!(html, "btn [&amp;>*]:mt-2");

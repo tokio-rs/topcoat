@@ -28,7 +28,7 @@ impl Emit for MatchExpr {
                 #(#arms,)*
             };
         });
-        emitter.emit(quote! { __view(__cx, __mem, #ident); });
+        emitter.emit(quote! { __view(__cx, __parts, #ident); });
     }
 }
 

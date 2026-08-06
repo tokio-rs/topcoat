@@ -44,6 +44,9 @@ pub(crate) enum ViewRepr {
     Scoped {
         memory: MemoryId,
         entry: InstructionPtr,
+        /// An estimate of the number of bytes the block writes when
+        /// rendered, accumulated while the view was built.
+        size_hint: usize,
     },
 }
 
@@ -56,11 +59,15 @@ impl Default for ViewRepr {
 
 impl View {
     /// Creates the handle for an instruction block built in the memory
-    /// identified by `memory`.
+    /// identified by `memory`, estimated to write `size_hint` bytes.
     #[inline]
-    pub(crate) fn from_scope(memory: MemoryId, entry: InstructionPtr) -> Self {
+    pub(crate) fn from_scope(memory: MemoryId, entry: InstructionPtr, size_hint: usize) -> Self {
         Self {
-            repr: ViewRepr::Scoped { memory, entry },
+            repr: ViewRepr::Scoped {
+                memory,
+                entry,
+                size_hint,
+            },
         }
     }
 
@@ -114,8 +121,12 @@ impl View {
     pub fn render(self, cx: &Cx) -> String {
         match self.repr {
             ViewRepr::Static(body) => body.to_owned(),
-            ViewRepr::Scoped { memory, entry } => {
-                let mut html = String::new();
+            ViewRepr::Scoped {
+                memory,
+                entry,
+                size_hint,
+            } => {
+                let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
                 Self::execute(memory, entry, cx, &mut f);
                 html
@@ -148,8 +159,12 @@ impl View {
                 status_code: None,
                 headers: HeaderMap::new(),
             },
-            ViewRepr::Scoped { memory, entry } => {
-                let mut html = String::new();
+            ViewRepr::Scoped {
+                memory,
+                entry,
+                size_hint,
+            } => {
+                let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
                 Self::execute(memory, entry, cx, &mut f);
                 let (status_code, headers) = f.into_recorded();
@@ -171,7 +186,6 @@ impl View {
                 active.id() == memory,
                 "tried to render a view outside the scope it was built in",
             );
-            f.reserve(active.size_hint());
             Machine::new(active, entry).execute(cx, f);
         });
     }
@@ -219,13 +233,14 @@ pub trait DynViewPart: 'static + fmt::Debug + Send {
 }
 
 macro_rules! impl_push_primitive {
-    ($method:ident, $ty:ty) => {
+    ($method:ident, $ty:ty, $size_hint:expr) => {
         #[doc = concat!("Appends a `", stringify!($ty), "` rendered as text.")]
         ///
         /// Its rendered form contains no character that is significant in any
         /// HTML context, so no escaping applies.
         #[inline]
         pub fn $method(&mut self, value: $ty) -> &mut Self {
+            self.size_hint += $size_hint;
             self.memory.$method(value);
             self
         }
@@ -249,36 +264,68 @@ macro_rules! impl_push_primitive {
 /// correctly, or by delegating to another implementation of the same
 /// position trait. [`push_str_unescaped`](Self::push_str_unescaped) is the
 /// only way to opt out of that protection.
+///
+/// The writer also accumulates a size hint: an estimate of the number of
+/// bytes everything pushed so far will write when rendered. The estimate
+/// becomes the built view's size hint, which pre-allocates the output buffer
+/// at render time.
 pub struct PartsWriter<'a> {
     memory: &'a mut Memory,
     context: HtmlContext,
+    size_hint: usize,
 }
 
 impl<'a> PartsWriter<'a> {
     /// Creates a writer that seals everything pushed into it with `context`.
     #[inline]
     pub fn new(memory: &'a mut Memory, context: HtmlContext) -> Self {
-        Self { memory, context }
+        Self {
+            memory,
+            context,
+            size_hint: 0,
+        }
     }
 
-    /// Returns a writer over the same memory for a different context.
+    /// Returns the accumulated size hint of everything pushed so far.
+    #[inline]
+    pub(crate) fn size_hint(&self) -> usize {
+        self.size_hint
+    }
+
+    /// Runs `f` with this writer sealing for a different context, then
+    /// restores the current context.
     ///
     /// In-crate compositions that span more than one position use this to
     /// transition between the positions they cover, such as
     /// [`Attribute`](crate::Attribute) moving from a key to a value or
     /// [`push_comment`](Self::push_comment) sealing a comment body.
     #[inline]
-    pub(crate) fn with_context(&mut self, context: HtmlContext) -> PartsWriter<'_> {
-        PartsWriter {
-            memory: self.memory,
-            context,
+    pub(crate) fn in_context<R>(
+        &mut self,
+        context: HtmlContext,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let previous = std::mem::replace(&mut self.context, context);
+        let result = f(self);
+        self.context = previous;
+        result
+    }
+
+    /// Estimates the bytes `value` writes when rendered in `context`.
+    fn str_size_hint(value: &str, context: HtmlContext) -> usize {
+        match context {
+            HtmlContext::Unescaped => value.len(),
+            // Assume some characters escape into multi-byte sequences.
+            _ => value.len() + value.len() / 8,
         }
     }
 
     /// Appends a string, sealed with this writer's context.
     #[inline]
     pub fn push_str(&mut self, value: impl Into<Cow<'static, str>>) -> &mut Self {
-        match value.into() {
+        let value = value.into();
+        self.size_hint += Self::str_size_hint(&value, self.context);
+        match value {
             Cow::Borrowed(value) => self.memory.push_static_str(value, self.context),
             Cow::Owned(value) => self.memory.push_string(value, self.context),
         }
@@ -292,7 +339,9 @@ impl<'a> PartsWriter<'a> {
     /// runtime's escaping and can lead to XSS vulnerabilities.
     #[inline]
     pub fn push_str_unescaped(&mut self, value: impl Into<Cow<'static, str>>) -> &mut Self {
-        match value.into() {
+        let value = value.into();
+        self.size_hint += value.len();
+        match value {
             Cow::Borrowed(value) => self.memory.push_static_str(value, HtmlContext::Unescaped),
             Cow::Owned(value) => self.memory.push_string(value, HtmlContext::Unescaped),
         }
@@ -319,7 +368,7 @@ impl<'a> PartsWriter<'a> {
             self.context,
         );
         self.push_str_unescaped("<!-- ");
-        build(&mut self.with_context(HtmlContext::Comment));
+        self.in_context(HtmlContext::Comment, build);
         self.push_str_unescaped(" -->");
         self
     }
@@ -327,30 +376,39 @@ impl<'a> PartsWriter<'a> {
     /// Appends a character, sealed with this writer's context.
     #[inline]
     pub fn push_char(&mut self, value: char) -> &mut Self {
+        // One to four UTF-8 bytes, or an escape sequence.
+        self.size_hint += 3;
         self.memory.push_char(value, self.context);
         self
     }
 
-    impl_push_primitive!(push_bool, bool);
-    impl_push_primitive!(push_i8, i8);
-    impl_push_primitive!(push_i16, i16);
-    impl_push_primitive!(push_i32, i32);
-    impl_push_primitive!(push_i64, i64);
-    impl_push_primitive!(push_i128, i128);
-    impl_push_primitive!(push_isize, isize);
-    impl_push_primitive!(push_u8, u8);
-    impl_push_primitive!(push_u16, u16);
-    impl_push_primitive!(push_u32, u32);
-    impl_push_primitive!(push_u64, u64);
-    impl_push_primitive!(push_u128, u128);
-    impl_push_primitive!(push_usize, usize);
-    impl_push_primitive!(push_f32, f32);
-    impl_push_primitive!(push_f64, f64);
+    // Each numeric size hint is the midpoint, rounded up, between the
+    // shortest and widest output the type can render, including the leading
+    // `-` for signed types (`isize`/`usize` assume a 64-bit target). A
+    // float's rendered width is unbounded for extreme magnitudes, so the
+    // upper end is the shortest round-trip form of a typical value.
+
+    impl_push_primitive!(push_bool, bool, 5);
+    impl_push_primitive!(push_i8, i8, 3);
+    impl_push_primitive!(push_i16, i16, 4);
+    impl_push_primitive!(push_i32, i32, 6);
+    impl_push_primitive!(push_i64, i64, 11);
+    impl_push_primitive!(push_i128, i128, 21);
+    impl_push_primitive!(push_isize, isize, 11);
+    impl_push_primitive!(push_u8, u8, 2);
+    impl_push_primitive!(push_u16, u16, 3);
+    impl_push_primitive!(push_u32, u32, 6);
+    impl_push_primitive!(push_u64, u64, 11);
+    impl_push_primitive!(push_u128, u128, 20);
+    impl_push_primitive!(push_usize, usize, 11);
+    impl_push_primitive!(push_f32, f32, 9);
+    impl_push_primitive!(push_f64, f64, 13);
 
     /// Appends a part that writes its output at render time, sealed with
     /// this writer's context.
     #[inline]
     pub fn push_dyn(&mut self, part: Box<dyn DynViewPart>) -> &mut Self {
+        self.size_hint += part.size_hint();
         self.memory.push_dyn(part, self.context);
         self
     }
@@ -358,13 +416,18 @@ impl<'a> PartsWriter<'a> {
     /// Appends a nested view.
     ///
     /// The view's content was already sealed with the contexts it was built
-    /// for; this writer's context does not apply.
+    /// for; this writer's context does not apply. The view's size hint joins
+    /// this writer's, so a view spliced twice counts its output twice.
     ///
     /// # Panics
     ///
     /// Panics if the view was built in a different scope.
     #[inline]
     pub fn push_view(&mut self, view: View) -> &mut Self {
+        self.size_hint += match view.repr() {
+            ViewRepr::Static(body) => body.len(),
+            ViewRepr::Scoped { size_hint, .. } => size_hint,
+        };
         self.memory.push_view(view);
         self
     }
@@ -462,15 +525,14 @@ mod tests {
     #[test]
     fn push_view_splices_nested_views() {
         in_scope(async |cx| {
-            let inner = __build_view(|memory| {
-                PartsWriter::new(memory, HtmlContext::Text).push_str("a < b");
+            let inner = __build_view(|parts| {
+                parts.push_str("a < b");
             });
 
-            let outer = __build_view(|memory| {
-                let mut w = PartsWriter::new(memory, HtmlContext::Unescaped);
-                w.push_str("<p>");
-                w.push_view(inner);
-                w.push_str("</p>");
+            let outer = __build_view(|parts| {
+                parts.push_str_unescaped("<p>");
+                parts.push_view(inner);
+                parts.push_str_unescaped("</p>");
             });
             assert_eq!(outer.render(cx), "<p>a &lt; b</p>");
         });
@@ -480,16 +542,16 @@ mod tests {
     fn document_order_follows_splice_order_not_memory_order() {
         in_scope(async |cx| {
             // Built in reverse: `second` occupies earlier memory addresses.
-            let second = __build_view(|memory| {
-                PartsWriter::new(memory, HtmlContext::Text).push_str("B");
+            let second = __build_view(|parts| {
+                parts.push_str("B");
             });
-            let first = __build_view(|memory| {
-                PartsWriter::new(memory, HtmlContext::Text).push_str("A");
+            let first = __build_view(|parts| {
+                parts.push_str("A");
             });
 
-            let outer = __build_view(|memory| {
-                memory.push_view(first);
-                memory.push_view(second);
+            let outer = __build_view(|parts| {
+                parts.push_view(first);
+                parts.push_view(second);
             });
             assert_eq!(outer.render(cx), "AB");
         });
@@ -498,41 +560,60 @@ mod tests {
     #[test]
     fn static_views_are_spliced_verbatim() {
         in_scope(async |cx| {
-            let outer = __build_view(|memory| {
-                memory.push_view(View::unescaped_unchecked("<hr>"));
-                memory.push_view(View::empty());
+            let outer = __build_view(|parts| {
+                parts.push_view(View::unescaped_unchecked("<hr>"));
+                parts.push_view(View::empty());
             });
             assert_eq!(outer.render(cx), "<hr>");
         });
     }
 
     #[test]
+    fn size_hint_accumulates_across_splices() {
+        in_scope(async |_cx| {
+            let inner = __build_view(|parts| {
+                parts.push_str_unescaped("12345678");
+            });
+
+            let outer = __build_view(|parts| {
+                parts.push_view(inner);
+                parts.push_view(inner);
+                parts.push_view(View::unescaped_unchecked("<hr>"));
+            });
+            let ViewRepr::Scoped { size_hint, .. } = outer.repr() else {
+                panic!("expected a scoped view");
+            };
+            assert_eq!(size_hint, 8 + 8 + 4);
+        });
+    }
+
+    #[test]
     #[should_panic(expected = "no view scope is active")]
     fn building_a_view_outside_a_scope_panics() {
-        __build_view(|_memory| {});
+        __build_view(|_parts| {});
     }
 
     #[test]
     #[should_panic(expected = "no view scope is active")]
     fn rendering_a_scoped_view_outside_a_scope_panics() {
-        let view = in_scope(async |_cx| __build_view(|_memory| {}));
+        let view = in_scope(async |_cx| __build_view(|_parts| {}));
         view.render(&Cx::default());
     }
 
     #[test]
     #[should_panic(expected = "outside the scope it was built in")]
     fn rendering_a_view_in_a_different_scope_panics() {
-        let view = in_scope(async |_cx| __build_view(|_memory| {}));
+        let view = in_scope(async |_cx| __build_view(|_parts| {}));
         in_scope(async |cx| view.render(cx));
     }
 
     #[test]
     #[should_panic(expected = "outside the scope it was built in")]
     fn splicing_a_view_from_a_different_scope_panics() {
-        let view = in_scope(async |_cx| __build_view(|_memory| {}));
+        let view = in_scope(async |_cx| __build_view(|_parts| {}));
         in_scope(async |_cx| {
-            __build_view(|memory| {
-                memory.push_view(view);
+            __build_view(|parts| {
+                parts.push_view(view);
             })
         });
     }
@@ -547,17 +628,17 @@ mod tests {
         use super::*;
         use crate::NodeViewParts;
 
-        fn push_node(cx: &Cx, memory: &mut crate::render::Memory, value: impl NodeViewParts) {
-            value.into_view_parts(cx, &mut PartsWriter::new(memory, HtmlContext::Text));
+        fn push_node(cx: &Cx, parts: &mut PartsWriter<'_>, value: impl NodeViewParts) {
+            value.into_view_parts(cx, parts);
         }
 
         #[test]
         fn status_code_is_recorded_and_renders_nothing() {
             in_scope(async |cx| {
-                let view = __build_view(|memory| {
-                    push_node(cx, memory, "a");
-                    push_node(cx, memory, StatusCode::NOT_FOUND);
-                    push_node(cx, memory, "b");
+                let view = __build_view(|parts| {
+                    push_node(cx, parts, "a");
+                    push_node(cx, parts, StatusCode::NOT_FOUND);
+                    push_node(cx, parts, "b");
                 });
 
                 let rendered = view.render_response(cx);
@@ -570,8 +651,8 @@ mod tests {
         #[test]
         fn render_response_without_declarations_is_empty() {
             in_scope(async |cx| {
-                let view = __build_view(|memory| {
-                    push_node(cx, memory, "a");
+                let view = __build_view(|parts| {
+                    push_node(cx, parts, "a");
                 });
 
                 let rendered = view.render_response(cx);
@@ -584,14 +665,14 @@ mod tests {
         #[test]
         fn render_discards_declarations() {
             in_scope(async |cx| {
-                let view = __build_view(|memory| {
-                    push_node(cx, memory, StatusCode::NOT_FOUND);
+                let view = __build_view(|parts| {
+                    push_node(cx, parts, StatusCode::NOT_FOUND);
                     push_node(
                         cx,
-                        memory,
+                        parts,
                         (CACHE_CONTROL, HeaderValue::from_static("no-store")),
                     );
-                    push_node(cx, memory, "a");
+                    push_node(cx, parts, "a");
                 });
 
                 assert_eq!(view.render(cx), "a");
@@ -601,9 +682,9 @@ mod tests {
         #[test]
         fn first_status_code_wins() {
             in_scope(async |cx| {
-                let view = __build_view(|memory| {
-                    push_node(cx, memory, StatusCode::NOT_FOUND);
-                    push_node(cx, memory, StatusCode::OK);
+                let view = __build_view(|parts| {
+                    push_node(cx, parts, StatusCode::NOT_FOUND);
+                    push_node(cx, parts, StatusCode::OK);
                 });
 
                 let rendered = view.render_response(cx);
@@ -614,10 +695,10 @@ mod tests {
         #[test]
         fn first_mention_of_a_header_name_wins() {
             in_scope(async |cx| {
-                let view = __build_view(|memory| {
+                let view = __build_view(|parts| {
                     push_node(
                         cx,
-                        memory,
+                        parts,
                         (CACHE_CONTROL, HeaderValue::from_static("no-store")),
                     );
                     let mut later = HeaderMap::new();
@@ -626,7 +707,7 @@ mod tests {
                         HeaderName::from_static("x-extra"),
                         HeaderValue::from_static("1"),
                     );
-                    push_node(cx, memory, later);
+                    push_node(cx, parts, later);
                 });
 
                 let rendered = view.render_response(cx);
@@ -644,9 +725,9 @@ mod tests {
                 let mut later = HeaderMap::new();
                 later.insert(SET_COOKIE, HeaderValue::from_static("c=3"));
 
-                let view = __build_view(|memory| {
-                    push_node(cx, memory, first);
-                    push_node(cx, memory, later);
+                let view = __build_view(|parts| {
+                    push_node(cx, parts, first);
+                    push_node(cx, parts, later);
                 });
 
                 let rendered = view.render_response(cx);
@@ -658,23 +739,23 @@ mod tests {
         #[test]
         fn placement_decides_precedence_across_nested_views() {
             in_scope(async |cx| {
-                let inner = __build_view(|memory| {
-                    push_node(cx, memory, StatusCode::NOT_FOUND);
-                    push_node(cx, memory, "inner");
+                let inner = __build_view(|parts| {
+                    push_node(cx, parts, StatusCode::NOT_FOUND);
+                    push_node(cx, parts, "inner");
                 });
 
                 // A status code before the nested view overrides it.
-                let outer = __build_view(|memory| {
-                    push_node(cx, memory, StatusCode::FORBIDDEN);
-                    memory.push_view(inner);
+                let outer = __build_view(|parts| {
+                    push_node(cx, parts, StatusCode::FORBIDDEN);
+                    parts.push_view(inner);
                 });
                 let rendered = outer.render_response(cx);
                 assert_eq!(rendered.status_code, Some(StatusCode::FORBIDDEN));
 
                 // A status code after the nested view is only a fallback.
-                let outer = __build_view(|memory| {
-                    memory.push_view(inner);
-                    push_node(cx, memory, StatusCode::FORBIDDEN);
+                let outer = __build_view(|parts| {
+                    parts.push_view(inner);
+                    push_node(cx, parts, StatusCode::FORBIDDEN);
                 });
                 let rendered = outer.render_response(cx);
                 assert_eq!(rendered.status_code, Some(StatusCode::NOT_FOUND));

@@ -29,6 +29,6 @@ impl Emit for IfElse {
         emitter.hoist(quote! {
             let #ident = if #expr { #then_branch } else { #else_branch };
         });
-        emitter.emit(quote! { __view(__cx, __mem, #ident); });
+        emitter.emit(quote! { __view(__cx, __parts, #ident); });
     }
 }

@@ -16,7 +16,7 @@ pub(crate) fn render_with(
 ) -> String {
     block_on(scope(async {
         let cx = Cx::default();
-        __build_view(|memory| f(&cx, &mut PartsWriter::new(memory, context))).render(&cx)
+        __build_view(|parts| parts.in_context(context, |parts| f(&cx, parts))).render(&cx)
     }))
 }
 

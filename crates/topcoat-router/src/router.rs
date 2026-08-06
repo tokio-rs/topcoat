@@ -150,9 +150,7 @@ mod tests {
         context::{Cx, CxBuilder, app_context, request_context},
         error::Result,
     };
-    use topcoat_view::{
-        DynViewPart, HtmlContext, HtmlWriter, PartsWriter, View, internal::__build_view,
-    };
+    use topcoat_view::{DynViewPart, HtmlWriter, View, internal::__build_view};
 
     use super::*;
     use crate::{
@@ -268,8 +266,8 @@ mod tests {
     type ViewFuture<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
 
     fn view(text: &'static str) -> View {
-        __build_view(|memory| {
-            PartsWriter::new(memory, HtmlContext::Text).push_str(text);
+        __build_view(|parts| {
+            parts.push_str(text);
         })
     }
 
@@ -288,8 +286,8 @@ mod tests {
 
     fn render_panicking_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
         Box::pin(async move {
-            Ok(__build_view(|memory| {
-                PartsWriter::new(memory, HtmlContext::Text).push_dyn(Box::new(PanickingViewPart));
+            Ok(__build_view(|parts| {
+                parts.push_dyn(Box::new(PanickingViewPart));
             }))
         })
     }
@@ -298,11 +296,10 @@ mod tests {
     fn layout_root(_cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
-            Ok(__build_view(|memory| {
-                let mut writer = PartsWriter::new(memory, HtmlContext::Text);
-                writer.push_str("R[");
-                writer.push_view(inner);
-                writer.push_str("]");
+            Ok(__build_view(|parts| {
+                parts.push_str("R[");
+                parts.push_view(inner);
+                parts.push_str("]");
             }))
         })
     }
@@ -311,11 +308,10 @@ mod tests {
     fn layout_admin(_cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
-            Ok(__build_view(|memory| {
-                let mut writer = PartsWriter::new(memory, HtmlContext::Text);
-                writer.push_str("A[");
-                writer.push_view(inner);
-                writer.push_str("]");
+            Ok(__build_view(|parts| {
+                parts.push_str("A[");
+                parts.push_view(inner);
+                parts.push_str("]");
             }))
         })
     }

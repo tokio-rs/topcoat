@@ -4,94 +4,121 @@ use topcoat_core::context::Cx;
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
     ElementNameViewParts, HtmlContext, NodeViewParts, PartsWriter, Unescaped, View,
-    render::{Memory, with_memory},
+    render::with_memory,
 };
 
 /// Builds a view's instruction block in one synchronous burst.
 ///
 /// Records the entry address in the active scope's memory, runs `f` to push
-/// the block's instructions, terminates the block with a return instruction,
-/// and returns the view handle. `f` must not build other views; nested views
-/// are built first and spliced into the block with [`__view`].
+/// the block's instructions through a text-context writer, and terminates the
+/// block with a return instruction. The returned view handle carries the
+/// writer's accumulated size hint. `f` must not build other views; nested
+/// views are built first and spliced into the block with [`__view`].
 ///
 /// # Panics
 ///
 /// Panics if no view scope is active on the current task.
-pub fn __build_view(f: impl FnOnce(&mut Memory)) -> View {
+pub fn __build_view(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
     with_memory(|memory| {
         let entry = memory.next_ptr();
-        f(memory);
+        let mut parts = PartsWriter::new(memory, HtmlContext::Text);
+        f(&mut parts);
+        let size_hint = parts.size_hint();
         memory.push_ret();
-        View::from_scope(memory.id(), entry)
+        View::from_scope(memory.id(), entry, size_hint)
     })
 }
 
+/// Runs `f` with the writer sealing for a different context, then restores
+/// the current context.
+///
+/// Out-of-crate macro expansions use this for compositions that span more
+/// than one position, like the runtime's JavaScript views.
 #[inline]
-pub fn __unescaped(_cx: &Cx, memory: &mut Memory, s: &'static str) {
-    memory.push_static_str(s, HtmlContext::Unescaped);
+pub fn __in_context<R>(
+    parts: &mut PartsWriter<'_>,
+    context: HtmlContext,
+    f: impl FnOnce(&mut PartsWriter<'_>) -> R,
+) -> R {
+    parts.in_context(context, f)
 }
 
 #[inline]
-pub fn __view(_cx: &Cx, memory: &mut Memory, view: View) {
-    memory.push_view(view);
+pub fn __unescaped(_cx: &Cx, parts: &mut PartsWriter<'_>, s: &'static str) {
+    parts.push_str_unescaped(s);
 }
 
 #[inline]
-pub fn __node(cx: &Cx, memory: &mut Memory, node: impl NodeViewParts) {
-    node.into_view_parts(cx, &mut PartsWriter::new(memory, HtmlContext::Text));
+pub fn __view(_cx: &Cx, parts: &mut PartsWriter<'_>, view: View) {
+    parts.push_view(view);
 }
 
 #[inline]
-pub fn __element_name(cx: &Cx, memory: &mut Memory, element_name: impl ElementNameViewParts) {
-    element_name.into_view_parts(cx, &mut PartsWriter::new(memory, HtmlContext::ElementName));
+pub fn __node(cx: &Cx, parts: &mut PartsWriter<'_>, node: impl NodeViewParts) {
+    parts.in_context(HtmlContext::Text, |parts| node.into_view_parts(cx, parts));
 }
 
 #[inline]
-pub fn __attribute_key(cx: &Cx, memory: &mut Memory, attribute_key: impl AttributeKeyViewParts) {
-    attribute_key.into_view_parts(cx, &mut PartsWriter::new(memory, HtmlContext::AttributeKey));
+pub fn __element_name(
+    cx: &Cx,
+    parts: &mut PartsWriter<'_>,
+    element_name: impl ElementNameViewParts,
+) {
+    parts.in_context(HtmlContext::ElementName, |parts| {
+        element_name.into_view_parts(cx, parts);
+    });
+}
+
+#[inline]
+pub fn __attribute_key(
+    cx: &Cx,
+    parts: &mut PartsWriter<'_>,
+    attribute_key: impl AttributeKeyViewParts,
+) {
+    parts.in_context(HtmlContext::AttributeKey, |parts| {
+        attribute_key.into_view_parts(cx, parts);
+    });
 }
 
 #[inline]
 pub fn __attribute_value(
     cx: &Cx,
-    memory: &mut Memory,
+    parts: &mut PartsWriter<'_>,
     attribute_value: impl AttributeValueViewParts,
 ) {
-    attribute_value.into_view_parts(
-        cx,
-        &mut PartsWriter::new(memory, HtmlContext::AttributeValue),
-    );
+    parts.in_context(HtmlContext::AttributeValue, |parts| {
+        attribute_value.into_view_parts(cx, parts);
+    });
 }
 
 #[inline]
 pub fn __attribute(
     cx: &Cx,
-    memory: &mut Memory,
+    parts: &mut PartsWriter<'_>,
     (key, value): (impl AttributeKeyViewParts, impl AttributeValueViewParts),
 ) {
-    __attributes(cx, memory, Attribute::new(key, value));
+    __attributes(cx, parts, Attribute::new(key, value));
 }
 
 #[inline]
 pub fn __attribute_unescaped(
     cx: &Cx,
-    memory: &mut Memory,
+    parts: &mut PartsWriter<'_>,
     (key, value): (&'static str, impl AttributeValueViewParts),
 ) {
     __attributes(
         cx,
-        memory,
+        parts,
         Attribute::new(Unescaped::new_unchecked(key), value),
     );
 }
 
 #[inline]
-pub fn __attributes(cx: &Cx, memory: &mut Memory, attributes: impl AttributeViewParts) {
+pub fn __attributes(cx: &Cx, parts: &mut PartsWriter<'_>, attributes: impl AttributeViewParts) {
     // Whole-attribute values do their own context transitions between
     // keys and values; the attribute-value context here is the safe
     // default for any text pushed directly.
-    attributes.into_view_parts(
-        cx,
-        &mut PartsWriter::new(memory, HtmlContext::AttributeValue),
-    );
+    parts.in_context(HtmlContext::AttributeValue, |parts| {
+        attributes.into_view_parts(cx, parts);
+    });
 }

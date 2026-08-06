@@ -17,7 +17,7 @@ impl Emit for ExprNode {
         let helper = self.kind.helper();
 
         emitter.hoist(quote! { let #ident = #tokens; });
-        emitter.emit(quote! { #helper(__cx, __mem, #ident); });
+        emitter.emit(quote! { #helper(__cx, __parts, #ident); });
     }
 }
 

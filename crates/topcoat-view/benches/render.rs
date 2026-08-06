@@ -444,7 +444,9 @@ fn bench_render(c: &mut Criterion) {
         measure(&mut group, "static_page", &cx, static_view);
 
         let comments = make_comments(200);
-        let comment_view = comment_feed(&cx, &comments).await.expect("render comment_feed");
+        let comment_view = comment_feed(&cx, &comments)
+            .await
+            .expect("render comment_feed");
         measure(&mut group, "text_escaping", &cx, comment_view);
 
         let number_rows = make_number_rows(120, 10);

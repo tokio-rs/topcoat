@@ -53,6 +53,6 @@ impl Emit for Component {
                 ).await?
             };
         });
-        emitter.emit(quote_spanned! {*span=> __view(__cx, __mem, #ident); });
+        emitter.emit(quote_spanned! {*span=> __view(__cx, __parts, #ident); });
     }
 }

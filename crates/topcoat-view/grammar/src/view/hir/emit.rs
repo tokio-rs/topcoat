@@ -54,7 +54,7 @@ impl Emitter {
         let Self { hoist, emit, .. } = self;
         quote! {{
             #hoist
-            __build_view(|__mem| {
+            __build_view(|__parts| {
                 #emit
             })
         }}

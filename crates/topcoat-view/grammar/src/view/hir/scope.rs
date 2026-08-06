@@ -118,9 +118,9 @@ mod tests {
         let out = rendered(builder);
         assert!(out.contains("let __expr0 = value"));
         assert!(out.contains("__build_view"));
-        assert!(out.contains("__unescaped (__cx , __mem , \"<p>\")"));
-        assert!(out.contains("__node (__cx , __mem , __expr0)"));
-        assert!(out.contains("__unescaped (__cx , __mem , \"</p>\")"));
+        assert!(out.contains("__unescaped (__cx , __parts , \"<p>\")"));
+        assert!(out.contains("__node (__cx , __parts , __expr0)"));
+        assert!(out.contains("__unescaped (__cx , __parts , \"</p>\")"));
     }
 
     #[test]
@@ -135,7 +135,7 @@ mod tests {
         assert!(out.contains("else"));
         assert!(out.contains("\"yes\""));
         assert!(out.contains("\"no\""));
-        assert!(out.contains("__view (__cx , __mem , __expr0)"));
+        assert!(out.contains("__view (__cx , __parts , __expr0)"));
     }
 
     #[test]
@@ -180,7 +180,7 @@ mod tests {
         assert!(out.contains("let __expr0 = match v"));
         assert!(out.contains("A =>"));
         assert!(out.contains("B if flag =>"));
-        assert!(out.contains("__view (__cx , __mem , __expr0)"));
+        assert!(out.contains("__view (__cx , __parts , __expr0)"));
     }
 
     #[test]

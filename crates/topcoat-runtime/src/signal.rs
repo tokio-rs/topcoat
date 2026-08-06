@@ -224,7 +224,7 @@ mod tests {
         task::{Context, Poll, Waker},
     };
 
-    use topcoat_view::{HtmlContext, PartsWriter, internal::__build_view, scope};
+    use topcoat_view::{internal::__build_view, scope};
 
     use super::*;
 
@@ -247,9 +247,8 @@ mod tests {
 
         let cx = Cx::default();
         let html = block_on(scope(async {
-            __build_view(|memory| {
-                SignalDeclaration::new(&signal)
-                    .into_view_parts(&cx, &mut PartsWriter::new(memory, HtmlContext::Text));
+            __build_view(|parts| {
+                SignalDeclaration::new(&signal).into_view_parts(&cx, parts);
             })
             .render(&cx)
         }));

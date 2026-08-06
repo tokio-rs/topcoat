@@ -70,8 +70,8 @@ impl Expr {
             Ok(quote! {{
                 use #topcoat_runtime::internal::*;
 
-                let __js_view = #topcoat_view::internal::__build_view(|__mem| {
-                    __js(__mem, #js);
+                let __js_view = #topcoat_view::internal::__build_view(|__parts| {
+                    __js(__parts, #js);
                 });
                 #topcoat_runtime::Expr::new(#rust, __js_view)
             }})
@@ -94,9 +94,9 @@ impl Expr {
             let mut js_externals = TokenStream::new();
             for (index, binding) in externals.iter().enumerate() {
                 let rust_ident = &binding.rust_ident;
-                quote! { __surrogate(__mem, &#rust_ident); }.to_tokens(&mut js_externals);
+                quote! { __surrogate(__parts, &#rust_ident); }.to_tokens(&mut js_externals);
                 if index < externals.len() - 1 {
-                    quote! { __js_unescaped(__mem, ", "); }.to_tokens(&mut js_externals);
+                    quote! { __js_unescaped(__parts, ", "); }.to_tokens(&mut js_externals);
                 }
             }
 
@@ -108,10 +108,10 @@ impl Expr {
                 let (#(#rust_external_idents,)*) = (#(#rust_external_values,)*);
                 // The JS view serializes the surrogates by reference, so it
                 // is built before the Rust expression consumes them.
-                let __js_view = #topcoat_view::internal::__build_view(|__mem| {
-                    __js_unescaped(__mem, #js_head);
+                let __js_view = #topcoat_view::internal::__build_view(|__parts| {
+                    __js_unescaped(__parts, #js_head);
                     #js_externals
-                    __js(__mem, #js_tail);
+                    __js(__parts, #js_tail);
                 });
                 #topcoat_runtime::Expr::new(#rust, __js_view)
             }})
