@@ -157,99 +157,8 @@ impl ViewWriter {
             {
                 quote! { #topcoat_view::View::unescaped_unchecked(#string) }
             } else {
-                fn build_parts(chunks: &[Chunk]) -> TokenStream {
-                    let mut hoisted = TokenStream::new();
-                    let mut emit = TokenStream::new();
-                    for chunk in chunks {
-                        match chunk {
-                            Chunk::Static { string } => {
-                                let helper = ExprKind::Unescaped.helper();
-                                let tokens = quote! { #string };
-                                quote! { #helper(__cx, &mut __parts, #tokens); }
-                                    .to_tokens(&mut emit);
-                            }
-                            Chunk::Expr { kind, tokens } => {
-                                let helper = kind.helper();
-                                quote! { #helper(__cx, &mut __parts, #tokens); }
-                                    .to_tokens(&mut emit);
-                            }
-                            Chunk::Local { pat, expr } => {
-                                quote! { let #pat = #expr; }.to_tokens(&mut hoisted);
-                            }
-                            Chunk::Statement { .. } => {
-                                todo!("statements currently are not supported");
-                            }
-                            Chunk::If {
-                                expr,
-                                then_branch: then,
-                                else_branch: r#else,
-                            } => {
-                                let then_branch = build_parts(&then.chunks);
-                                let else_branch = build_parts(&r#else.chunks);
-                                let else_branch = (!r#else.chunks.is_empty())
-                                    .then(|| quote! { else { #else_branch } });
-                                if then.has_component || r#else.has_component {
-                                    quote! {
-                                        let #fut = async {
-                                            if #expr {
-                                                #then_branch
-                                            }
-                                            #else_branch
-                                        };
-                                    }
-                                    .to_tokens(&mut emit);
-                                } else {
-                                    quote! {
-                                        if #expr {
-                                            #then_branch
-                                        }
-                                        #else_branch
-                                    }
-                                    .to_tokens(&mut emit);
-                                }
-                            }
-                            Chunk::For { pat, expr, body } => {
-                                let body = build_parts(&body.chunks);
-                                quote! {
-                                    for #pat in #expr {
-                                        #body
-                                    }
-                                }
-                                .to_tokens(&mut emit);
-                            }
-                            Chunk::Match { expr, arms } => {
-                                let arm_tokens = arms.iter().map(|arm| {
-                                    let pat = &arm.pat;
-                                    let guard = arm.guard.as_ref().map(|g| quote! { if #g });
-                                    let body = build_parts(&arm.body.chunks);
-                                    quote! {
-                                        #pat #guard => { #body }
-                                    }
-                                });
-                                quote! {
-                                    match #expr {
-                                        #(#arm_tokens,)*
-                                    }
-                                }
-                                .to_tokens(&mut emit);
-                            }
-                        }
-                    }
-
-                    quote! {
-                        #hoisted
-                        #emit
-                    }
-                }
-
-                let statements = build_parts(&self.chunks);
-
-                quote! {{
-                    use #topcoat_view::internal::*;
-                    let mut __parts = #topcoat_view::ViewParts::new();
-                    #statements
-                    #topcoat_view::View::new(__parts)
-                }}
+                let mut emitter = ConcurrencyEmitter::new();
+                emitter.build(&self)
             }
         };
 
@@ -261,7 +170,7 @@ impl ViewWriter {
     }
 }
 
-struct ConcurrencyEmitter<'a> {
+struct ConcurrencyEmitter {
     hoist: TokenStream,
     futures: Vec<Ident>,
     results: Vec<Ident>,
@@ -279,8 +188,8 @@ impl ConcurrencyEmitter {
     fn next_future(&mut self) -> (Ident, Ident) {
         let future = format_ident!("__fut{}", self.futures.len());
         let result = format_ident!("__res{}", self.results.len());
-        self.futures.push(future);
-        self.results.push(result);
+        self.futures.push(future.clone());
+        self.results.push(result.clone());
         (future, result)
     }
 
@@ -290,7 +199,7 @@ impl ConcurrencyEmitter {
 
     fn build_inner(&mut self, writer: &ViewWriter) -> TokenStream {
         let mut output = TokenStream::new();
-        for chunk in chunks {
+        for chunk in &writer.chunks {
             match chunk {
                 Chunk::Static { string } => {
                     let helper = ExprKind::Unescaped.helper();
@@ -300,6 +209,11 @@ impl ConcurrencyEmitter {
                 Chunk::Expr { kind, tokens } => {
                     let helper = kind.helper();
                     quote! { #helper(__cx, &mut __parts, #tokens); }.to_tokens(&mut output);
+                }
+                Chunk::Component { tokens } => {
+                    let (future, result) = self.next_future();
+                    quote! { let #future = async { #tokens }; }.to_tokens(&mut self.hoist);
+                    quote! { __view(__cx, &mut __parts, #result); }.to_tokens(&mut output);
                 }
                 Chunk::Local { pat, expr } => {
                     quote! { let #pat = #expr; }.to_tokens(&mut self.hoist);
@@ -313,13 +227,13 @@ impl ConcurrencyEmitter {
                     else_branch: r#else,
                 } => {
                     if then.has_component || r#else.has_component {
-                        let then_branch = self.build_inner(&then);
-                        let else_branch = self.build_inner(&r#else);
+                        let then_branch = ConcurrencyEmitter::new().build(then);
+                        let else_branch = ConcurrencyEmitter::new().build(r#else);
                         let else_branch =
                             (!r#else.chunks.is_empty()).then(|| quote! { else { #else_branch } });
                         let (future, result) = self.next_future();
                         quote! {
-                            let #future = async {
+                            let #future: impl Future<Output = ::topcoat_core::error::Result<#topcoat_view::View>> = async {
                                 if #expr {
                                     #then_branch
                                 }
@@ -327,10 +241,10 @@ impl ConcurrencyEmitter {
                             };
                         }
                         .to_tokens(&mut self.hoist);
-                        quote! {}
+                        quote! { __view(__cx, &mut __parts, #result); }.to_tokens(&mut output);
                     } else {
-                        let then_branch = self.build_inner(&then);
-                        let else_branch = self.build_inner(&r#else);
+                        let then_branch = self.build_inner(then);
+                        let else_branch = self.build_inner(r#else);
                         let else_branch =
                             (!r#else.chunks.is_empty()).then(|| quote! { else { #else_branch } });
                         quote! {
@@ -339,33 +253,33 @@ impl ConcurrencyEmitter {
                             }
                             #else_branch
                         }
-                        .to_tokens(&mut emit);
+                        .to_tokens(&mut output);
                     }
                 }
                 Chunk::For { pat, expr, body } => {
-                    let body = self.build_inner(&body);
+                    let body = self.build_inner(body);
                     quote! {
                         for #pat in #expr {
                             #body
                         }
                     }
-                    .to_tokens(&mut emit);
+                    .to_tokens(&mut output);
                 }
                 Chunk::Match { expr, arms } => {
-                    let arm_tokens = arms.iter().map(|arm| {
-                        let pat = &arm.pat;
-                        let guard = arm.guard.as_ref().map(|g| quote! { if #g });
-                        let body = build_parts(&arm.body.chunks);
-                        quote! {
-                            #pat #guard => { #body }
-                        }
-                    });
-                    quote! {
-                        match #expr {
-                            #(#arm_tokens,)*
-                        }
-                    }
-                    .to_tokens(&mut emit);
+                    // let arm_tokens = arms.iter().map(|arm| {
+                    //     let pat = &arm.pat;
+                    //     let guard = arm.guard.as_ref().map(|g| quote! { if #g });
+                    //     let body = build_parts(&arm.body.chunks);
+                    //     quote! {
+                    //         #pat #guard => { #body }
+                    //     }
+                    // });
+                    // quote! {
+                    //     match #expr {
+                    //         #(#arm_tokens,)*
+                    //     }
+                    // }
+                    // .to_tokens(&mut emit);
                 }
             }
         }
@@ -374,9 +288,19 @@ impl ConcurrencyEmitter {
 
     fn build(&mut self, writer: &ViewWriter) -> TokenStream {
         let inner = self.build_inner(writer);
+
+        let hoist = &self.hoist;
+
+        let futures = &self.futures;
+        let results = &self.results;
+        let join =
+            quote! { let (#(#results),*) = #topcoat_view::internal::try_join!(#(#futures),*)?; };
+
         quote! {{
             use #topcoat_view::internal::*;
             let mut __parts = #topcoat_view::ViewParts::new();
+            #hoist
+            #join
             #inner
             #topcoat_view::View::new(__parts)
         }}
