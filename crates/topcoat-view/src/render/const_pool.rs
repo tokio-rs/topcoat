@@ -79,4 +79,15 @@ impl ConstPool {
     pub fn fetch_headers(&self, ptr: HeadersPtr) -> &http::HeaderMap {
         &self.headers[ptr.0]
     }
+
+    /// Prints how many operands of each kind the pool holds.
+    pub fn print_stats(&self) {
+        println!("ConstPool {{");
+        println!("  static_strs: {}", self.static_strs.len());
+        println!("  strings: {}", self.strings.len());
+        println!("  dyns: {}", self.dyns.len());
+        #[cfg(feature = "http")]
+        println!("  headers: {}", self.headers.len());
+        println!("}}");
+    }
 }

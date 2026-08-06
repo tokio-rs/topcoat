@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    collections::BTreeMap,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use crate::{
     DynViewPart, HtmlContext, View,
@@ -217,5 +220,51 @@ impl Memory {
     pub fn push_headers(&mut self, value: http::HeaderMap) {
         let ptr = self.pool.push_headers(value);
         self.push_instruction(Instruction::Headers { ptr });
+    }
+
+    /// Prints the memory's fields and how many instructions of each kind it
+    /// holds.
+    pub fn print_stats(&self) {
+        println!("Memory {{");
+        println!("  id: {}", self.id.0);
+        println!(
+            "  instructions: {} ({} bytes)",
+            self.instructions.len(),
+            self.instructions.len() * std::mem::size_of::<Instruction>(),
+        );
+        let mut counts = BTreeMap::new();
+        for instruction in &self.instructions {
+            let name = match instruction {
+                Instruction::Call { .. } => "Call",
+                Instruction::Ret => "Ret",
+                Instruction::Bool(_) => "Bool",
+                Instruction::I8(_) => "I8",
+                Instruction::I16(_) => "I16",
+                Instruction::I32(_) => "I32",
+                Instruction::I64(_) => "I64",
+                Instruction::Isize(_) => "Isize",
+                Instruction::U8(_) => "U8",
+                Instruction::U16(_) => "U16",
+                Instruction::U32(_) => "U32",
+                Instruction::U64(_) => "U64",
+                Instruction::Usize(_) => "Usize",
+                Instruction::F32(_) => "F32",
+                Instruction::F64(_) => "F64",
+                Instruction::Char { .. } => "Char",
+                Instruction::StaticStr { .. } => "StaticStr",
+                Instruction::String { .. } => "String",
+                Instruction::Dyn { .. } => "Dyn",
+                #[cfg(feature = "http")]
+                Instruction::StatusCode(_) => "StatusCode",
+                #[cfg(feature = "http")]
+                Instruction::Headers { .. } => "Headers",
+            };
+            *counts.entry(name).or_insert(0usize) += 1;
+        }
+        for (name, count) in counts {
+            println!("    {name}: {count}");
+        }
+        self.pool.print_stats();
+        println!("}}");
     }
 }
