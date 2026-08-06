@@ -1,10 +1,14 @@
+#[derive(Debug, Clone, Copy)]
 pub struct StaticStrPtr(usize);
 
+#[derive(Debug, Clone, Copy)]
 pub struct StringPtr(usize);
 
 #[cfg(feature = "http")]
+#[derive(Debug, Clone, Copy)]
 pub struct HeadersPtr(usize);
 
+#[derive(Debug, Clone)]
 pub struct ReadOnlyMemory {
     static_strs: Vec<&'static str>,
     strings: Vec<String>,

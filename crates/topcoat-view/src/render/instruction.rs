@@ -1,9 +1,7 @@
-use crate::{Formatter, HtmlContext, render::ReadOnlyMemory};
-
-pub struct InstructionMemory {
-    instructions: Vec<Instruction>,
-    rom: ReadOnlyMemory,
-}
+use crate::{
+    Formatter, HtmlContext,
+    render::{HeadersPtr, ReadOnlyMemory, StaticStrPtr, StringPtr},
+};
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
@@ -55,9 +53,15 @@ pub enum Instruction {
     Char { value: char, context: HtmlContext },
 
     /// A static string and its context.
-    StaticStr { ptr: usize, context: HtmlContext },
+    StaticStr {
+        ptr: StaticStrPtr,
+        context: HtmlContext,
+    },
     /// A dynamic string and its context.
-    String { ptr: usize, context: HtmlContext },
+    String {
+        ptr: StringPtr,
+        context: HtmlContext,
+    },
 
     /// A response status code recorded at render time; renders no content.
     #[cfg(feature = "http")]
@@ -66,48 +70,7 @@ pub enum Instruction {
     /// Response headers recorded at render time; renders no content.
     #[cfg(feature = "http")]
     #[non_exhaustive]
-    Headers { ptr: usize },
-}
-
-impl Instruction {
-    pub fn execute(&self, rom: &ReadOnlyMemory, f: &mut Formatter<'_>) {
-        use std::fmt::Write;
-        let mut int_buffer = itoa::Buffer::new();
-
-        match self {
-            Self::Bool(inner) => f.write_str(if *inner { "true" } else { "false" }),
-            // The `Display` output of the numeric types consists of digits,
-            // signs, and plain letters, none of which are significant in any
-            // HTML context, so they write verbatim.
-            Self::I8(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::I16(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::I32(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::I64(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::Isize(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::U8(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::U16(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::U32(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::U64(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::Usize(inner) => f.write_str(int_buffer.format(*inner)),
-            Self::F32(inner) => write!(f, "{inner}").unwrap(),
-            Self::F64(inner) => write!(f, "{inner}").unwrap(),
-            Self::Char { value, context } => context.writer(f).write_char(*value),
-            Self::StaticStr { ptr, context } => {
-                context.writer(f).write_str(rom.fetch_static_str(*ptr))
-            }
-            Self::Str { value, context } => context.writer(f).write_str(&value),
-            Self::BoxDyn { inner, context, .. } => inner.render(cx, &mut context.writer(f)),
-            Self::BoxSlice { inner, .. } => {
-                for part in inner {
-                    part.render(cx, f);
-                }
-            }
-            #[cfg(feature = "http")]
-            Self::StatusCode(status_code) => f.record_status_code(status_code),
-            #[cfg(feature = "http")]
-            Self::Headers(headers) => f.record_headers(*headers),
-        }
-    }
+    Headers { ptr: HeadersPtr },
 }
 
 const _: () = {
