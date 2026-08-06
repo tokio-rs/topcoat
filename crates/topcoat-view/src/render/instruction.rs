@@ -1,12 +1,12 @@
 use crate::{
-    Formatter, HtmlContext,
-    render::{HeadersPtr, ReadOnlyMemory, StaticStrPtr, StringPtr},
+    HtmlContext,
+    render::{HeadersPtr, InstructionPtr, StaticStrPtr, StringPtr},
 };
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
     /// Jump to a different point in the instruction memory.
-    Call { ip: usize },
+    Call { ip: InstructionPtr },
     /// Return back to the previous call instruction, if any.
     Ret,
 

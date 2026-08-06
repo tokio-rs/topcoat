@@ -17,6 +17,15 @@ pub struct ReadOnlyMemory {
 }
 
 impl ReadOnlyMemory {
+    pub fn new() -> Self {
+        Self {
+            static_strs: Vec::new(),
+            strings: Vec::new(),
+            #[cfg(feature = "http")]
+            headers: Vec::new(),
+        }
+    }
+
     pub fn push_static_str(&mut self, value: &'static str) -> StaticStrPtr {
         self.static_strs.push(value);
         StaticStrPtr(self.static_strs.len() - 1)

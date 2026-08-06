@@ -1,16 +1,16 @@
 use crate::{
     Formatter,
-    render::{Instruction, Memory, ReadOnlyMemory},
+    render::{Instruction, InstructionPtr, Memory, ReadOnlyMemory},
 };
 
 pub struct Machine<'a> {
     memory: &'a Memory,
-    ip: usize,
-    stack: Vec<usize>,
+    ip: InstructionPtr,
+    stack: Vec<InstructionPtr>,
 }
 
 impl<'a> Machine<'a> {
-    pub fn new(memory: &'a Memory, ip: usize) -> Self {
+    pub fn new(memory: &'a Memory, ip: InstructionPtr) -> Self {
         Self {
             memory,
             ip,
@@ -29,7 +29,7 @@ impl<'a> Machine<'a> {
     pub fn execute(&mut self, rom: &ReadOnlyMemory, f: &mut Formatter<'_>) {
         loop {
             let instruction = self.memory.instruction(self.ip);
-            self.ip += 1;
+            self.ip.increment();
 
             use std::fmt::Write;
             let mut int_buffer = itoa::Buffer::new();
