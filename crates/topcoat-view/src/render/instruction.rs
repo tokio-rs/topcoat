@@ -1,4 +1,4 @@
-use crate::{Formatter, HtmlContext};
+use crate::{Formatter, HtmlContext, render::ReadOnlyMemory};
 
 pub struct InstructionMemory {
     instructions: Vec<Instruction>,
@@ -92,7 +92,9 @@ impl Instruction {
             Self::F32(inner) => write!(f, "{inner}").unwrap(),
             Self::F64(inner) => write!(f, "{inner}").unwrap(),
             Self::Char { value, context } => context.writer(f).write_char(*value),
-            Self::StaticStr { ptr, context } => {}
+            Self::StaticStr { ptr, context } => {
+                context.writer(f).write_str(rom.fetch_static_str(*ptr))
+            }
             Self::Str { value, context } => context.writer(f).write_str(&value),
             Self::BoxDyn { inner, context, .. } => inner.render(cx, &mut context.writer(f)),
             Self::BoxSlice { inner, .. } => {
