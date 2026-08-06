@@ -171,6 +171,7 @@ impl View {
                 active.id() == memory,
                 "tried to render a view outside the scope it was built in",
             );
+            f.reserve(active.size_hint());
             Machine::new(active, entry).execute(cx, f);
         });
     }
@@ -206,6 +207,15 @@ pub trait DynViewPart: 'static + fmt::Debug + Send {
     /// Writes this part's output into `w`.
     #[track_caller]
     fn render(&self, cx: &Cx, w: &mut HtmlWriter<'_, '_>);
+
+    /// Returns an estimate of the number of bytes this part will write.
+    ///
+    /// Used to pre-allocate the output buffer, so aim for a close estimate. A
+    /// slight over-estimate is usually preferable to an under-estimate.
+    #[inline]
+    fn size_hint(&self) -> usize {
+        0
+    }
 }
 
 macro_rules! impl_push_primitive {
