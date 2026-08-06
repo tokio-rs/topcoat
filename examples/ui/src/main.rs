@@ -1,3 +1,7 @@
+// Nested components render concurrently, so a deeply composed demo holds the
+// render futures of its whole subtree at once.
+#![allow(clippy::large_futures)]
+
 mod components;
 
 use components::{

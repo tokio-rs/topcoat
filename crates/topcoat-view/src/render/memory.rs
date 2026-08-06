@@ -34,6 +34,17 @@ impl MemoryId {
     }
 }
 
+/// A reserved slot in a [`Memory`] that a view resolves into later.
+///
+/// Returned by [`reserve_view`](Memory::reserve_view) alongside the
+/// placeholder view pointing at the slot, and consumed by
+/// [`fill_view`](Memory::fill_view).
+#[derive(Debug, Clone, Copy)]
+pub struct ViewSlot {
+    memory: MemoryId,
+    ptr: InstructionPtr,
+}
+
 /// The instruction memory of a view scope.
 ///
 /// Every `view!` invocation inside a [`scope`](crate::scope) appends its
@@ -112,6 +123,60 @@ impl Memory {
     /// block.
     pub fn push_ret(&mut self) {
         self.push_instruction(Instruction::Ret);
+    }
+
+    /// Reserves a slot for a view that resolves later, such as the child of
+    /// a concurrently rendering component.
+    ///
+    /// Returns a placeholder view pointing at the slot and the slot itself.
+    /// Once [`fill_view`](Self::fill_view) redirects the slot, the
+    /// placeholder renders the filled view's content; rendering it before
+    /// that panics. The placeholder carries no size hint, since the filled
+    /// view's is not known yet.
+    pub fn reserve_view(&mut self) -> (View, ViewSlot) {
+        let ptr = self.next_ptr();
+        self.push_instruction(Instruction::Placeholder);
+        let slot = ViewSlot {
+            memory: self.id,
+            ptr,
+        };
+        (View::from_scope(self.id, ptr, 0), slot)
+    }
+
+    /// Redirects a reserved slot to `view`, resolving its placeholder.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the slot was reserved in a different scope, if the view was
+    /// built in a different scope, or if the slot was already filled.
+    pub fn fill_view(&mut self, slot: ViewSlot, view: View) {
+        assert!(
+            slot.memory == self.id,
+            "tried to fill a view slot outside the scope it was reserved in",
+        );
+        let entry = match view.repr() {
+            // A static view has no block to jump to, so it is materialized
+            // as one.
+            ViewRepr::Static(body) => {
+                let entry = self.next_ptr();
+                self.push_static_str(body, HtmlContext::Unescaped);
+                self.push_ret();
+                entry
+            }
+            ViewRepr::Scoped { memory, entry, .. } => {
+                assert!(
+                    memory == self.id,
+                    "tried to use a view outside the scope it was built in",
+                );
+                entry
+            }
+        };
+        let instruction = &mut self.instructions[slot.ptr.0];
+        assert!(
+            matches!(instruction, Instruction::Placeholder),
+            "tried to fill a view slot twice",
+        );
+        *instruction = Instruction::Jmp { entry };
     }
 
     pub fn push_bool(&mut self, value: bool) {
@@ -237,6 +302,8 @@ impl Memory {
             let name = match instruction {
                 Instruction::Call { .. } => "Call",
                 Instruction::Ret => "Ret",
+                Instruction::Jmp { .. } => "Jmp",
+                Instruction::Placeholder => "Placeholder",
                 Instruction::Bool(_) => "Bool",
                 Instruction::I8(_) => "I8",
                 Instruction::I16(_) => "I16",

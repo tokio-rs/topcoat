@@ -7,7 +7,7 @@ use topcoat_core::{context::Cx, error::Result};
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
     ElementNameViewParts, HtmlContext, NodeViewParts, PartsWriter, Unescaped, View,
-    render::with_memory,
+    render::{Memory, ViewSlot, with_memory},
 };
 
 /// Builds a view's instruction block in one synchronous burst.
@@ -30,6 +30,31 @@ pub fn __build_view(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
         memory.push_ret();
         View::from_scope(memory.id(), entry, size_hint)
     })
+}
+
+/// Reserves a slot in the active scope's memory for a view that resolves
+/// later.
+///
+/// A component whose children render components of their own passes the
+/// placeholder view to its props so it can render concurrently with the
+/// children; [`__fill_view`] redirects the slot once they resolve.
+///
+/// # Panics
+///
+/// Panics if no view scope is active on the current task.
+#[must_use]
+pub fn __reserve_view() -> (View, ViewSlot) {
+    with_memory(Memory::reserve_view)
+}
+
+/// Redirects a reserved slot to `view`, resolving its placeholder.
+///
+/// # Panics
+///
+/// Panics if no view scope is active on the current task, if the slot or the
+/// view belongs to a different scope, or if the slot was already filled.
+pub fn __fill_view(slot: ViewSlot, view: View) {
+    with_memory(|memory| memory.fill_view(slot, view));
 }
 
 /// Wraps an already-built view in a ready future.

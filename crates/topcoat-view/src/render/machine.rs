@@ -8,8 +8,9 @@ use crate::{
 /// Executes a view's instruction block into a [`Formatter`].
 ///
 /// Execution starts at the view's entry, descends into nested views through
-/// [`Call`](Instruction::Call) instructions, and finishes when the entry
-/// block's [`Ret`](Instruction::Ret) is reached with an empty call stack.
+/// [`Call`](Instruction::Call) instructions, follows the
+/// [`Jmp`](Instruction::Jmp) redirects of filled view slots, and finishes
+/// when a [`Ret`](Instruction::Ret) is reached with an empty call stack.
 pub struct Machine<'a> {
     memory: &'a Memory,
     ptr: InstructionPtr,
@@ -26,6 +27,12 @@ impl<'a> Machine<'a> {
         }
     }
 
+    /// Executes instructions from the entry until the block returns.
+    ///
+    /// # Panics
+    ///
+    /// Panics if execution reaches a reserved view slot that was never
+    /// filled.
     pub fn execute(&mut self, cx: &Cx, f: &mut Formatter<'_>) {
         use std::fmt::Write;
 
@@ -44,6 +51,10 @@ impl<'a> Machine<'a> {
                     Some(ptr) => self.ptr = ptr,
                     None => break,
                 },
+                Instruction::Jmp { entry } => self.ptr = *entry,
+                Instruction::Placeholder => {
+                    panic!("tried to render a placeholder view before it was filled")
+                }
 
                 Instruction::Bool(inner) => f.write_str(if *inner { "true" } else { "false" }),
                 Instruction::I8(inner) => f.write_str(int_buffer.format(*inner)),

@@ -453,7 +453,7 @@ impl<'a> PartsWriter<'a> {
 mod tests {
     use super::*;
     use crate::{
-        internal::__build_view,
+        internal::{__build_view, __fill_view, __reserve_view},
         render::scope,
         test_util::{block_on, render_with},
     };
@@ -566,6 +566,66 @@ mod tests {
             });
             assert_eq!(outer.render(cx), "<hr>");
         });
+    }
+
+    #[test]
+    fn filled_view_slot_renders_the_resolved_view() {
+        in_scope(async |cx| {
+            let (placeholder, slot) = __reserve_view();
+            // The outer view splices the placeholder before the child exists.
+            let outer = __build_view(|parts| {
+                parts.push_str_unescaped("<p>");
+                parts.push_view(placeholder);
+                parts.push_str_unescaped("</p>");
+            });
+
+            let child = __build_view(|parts| {
+                parts.push_str("a < b");
+            });
+            __fill_view(slot, child);
+
+            assert_eq!(outer.render(cx), "<p>a &lt; b</p>");
+            assert_eq!(placeholder.render(cx), "a &lt; b");
+        });
+    }
+
+    #[test]
+    fn static_views_fill_a_slot_like_scoped_ones() {
+        in_scope(async |cx| {
+            let (placeholder, slot) = __reserve_view();
+            __fill_view(slot, View::unescaped_unchecked("<hr>"));
+            assert_eq!(placeholder.render(cx), "<hr>");
+
+            let (placeholder, slot) = __reserve_view();
+            __fill_view(slot, View::empty());
+            assert_eq!(placeholder.render(cx), "");
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "before it was filled")]
+    fn rendering_an_unfilled_placeholder_panics() {
+        in_scope(async |cx| {
+            let (placeholder, _slot) = __reserve_view();
+            placeholder.render(cx)
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "tried to fill a view slot twice")]
+    fn filling_a_slot_twice_panics() {
+        in_scope(async |_cx| {
+            let (_placeholder, slot) = __reserve_view();
+            __fill_view(slot, View::empty());
+            __fill_view(slot, View::empty());
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "outside the scope it was reserved in")]
+    fn filling_a_slot_in_a_different_scope_panics() {
+        let slot = in_scope(async |_cx| __reserve_view().1);
+        in_scope(async |_cx| __fill_view(slot, View::empty()));
     }
 
     #[test]

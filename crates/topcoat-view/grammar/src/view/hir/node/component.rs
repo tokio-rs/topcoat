@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote, quote_spanned};
+use quote::{quote, quote_spanned};
 use syn::Path;
-use topcoat_core_grammar::paths::topcoat_view;
+use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 use crate::view::{
     NamedArg,
@@ -57,11 +57,12 @@ impl Component {
     /// Returns the expression yielding this component's render future when
     /// the children render components of their own.
     ///
-    /// The named args and the children's future still evaluate eagerly in
-    /// source order; the returned future joins in the children, builds the
-    /// props, and renders. It captures only the evaluated args and the
-    /// children's future, so it composes with the joins of the enclosing
-    /// scope like a plain render future.
+    /// The children cannot resolve before the props build, so the props take
+    /// a placeholder view holding a reserved slot in the scope's instruction
+    /// memory instead. The returned future joins the component's render with
+    /// a future that awaits the children and redirects the slot to their
+    /// view, so a component renders concurrently with its own children at
+    /// any nesting depth.
     fn render_future_with_async_children(&self, children: &Scope) -> TokenStream {
         let Self {
             path,
@@ -70,34 +71,32 @@ impl Component {
             ..
         } = self;
 
-        let bindings = named_args.iter().enumerate().map(|(index, arg)| {
-            let ident = format_ident!("__arg{index}");
-            let value = &arg.value;
-            quote! { let #ident = #value; }
-        });
-        let setters = named_args.iter().enumerate().map(|(index, arg)| {
+        let setters = named_args.iter().map(|arg| {
             let ident = &arg.ident;
-            let value = format_ident!("__arg{index}");
+            let value = &arg.value;
             quote! { .#ident(#value) }
         });
         let child = children.emit_future();
 
         quote_spanned! {*span=> {
             use #topcoat_view::Component;
-            #(#bindings)*
+            let (__placeholder, __slot) = __reserve_view();
             let __child = #child;
+            let props = #path::props_builder()#(#setters)*.child(__placeholder).build();
+            // The marker is built via `Default` so the same construction
+            // works for both unit-struct and generic (`PhantomData`) markers.
+            #[allow(clippy::default_constructed_unit_structs)]
+            let __render = Component::render(
+                #path::default(),
+                __cx,
+                props,
+            );
             async move {
-                let __child = __child.await?;
-                let props = #path::props_builder()#(#setters)*.child(__child).build();
-                // The marker is built via `Default` so the same construction
-                // works for both unit-struct and generic (`PhantomData`)
-                // markers.
-                #[allow(clippy::default_constructed_unit_structs)]
-                Component::render(
-                    #path::default(),
-                    __cx,
-                    props,
-                ).await
+                let (__rendered, ()) = __try_join!(__render, async move {
+                    __fill_view(__slot, __child.await?);
+                    ::core::result::Result::<(), #topcoat_error::Error>::Ok(())
+                })?;
+                ::core::result::Result::<_, #topcoat_error::Error>::Ok(__rendered)
             }
         }}
     }
@@ -108,11 +107,11 @@ impl Emit for Component {
         let ident = emitter.fresh_ident();
         let span = self.span;
 
-        // Children that render components of their own await while the props
-        // build. With inline awaits that is fine; in a joined position the
-        // awaits have to move into the render future instead.
+        // Children that render components of their own resolve through a
+        // reserved slot, so the component overlaps with them instead of
+        // awaiting them while the props build.
         let future = match &self.children {
-            Some(children) if !emitter.inline_await() && children.is_async() => {
+            Some(children) if children.is_async() => {
                 self.render_future_with_async_children(children)
             }
             _ => self.render_future(),

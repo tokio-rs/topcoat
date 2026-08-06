@@ -118,9 +118,12 @@ mod tests {
     }
 
     fn add_component(builder: &mut ViewBuilder, name: &str) {
+        add_component_with_children(builder, name, &syn::parse_quote!());
+    }
+
+    fn add_component_with_children(builder: &mut ViewBuilder, name: &str, children: &Nodes) {
         let path = syn::parse_str(name).unwrap();
-        let children: Nodes = syn::parse_quote!();
-        builder.component(&path, &[], &children, Span::call_site());
+        builder.component(&path, &[], children, Span::call_site());
     }
 
     #[test]
@@ -256,6 +259,26 @@ mod tests {
         builder.str_unescaped("<hr>");
         let out = rendered(builder);
         assert!(out.contains(". await ?"));
+        assert!(!out.contains("__try_join"));
+    }
+
+    #[test]
+    fn async_children_resolve_through_a_reserved_slot() {
+        let mut builder = ViewBuilder::new();
+        add_component_with_children(&mut builder, "wrapper", &syn::parse_quote!(inner()));
+        let out = rendered(builder);
+        assert!(out.contains("__reserve_view"));
+        assert!(out.contains(". child (__placeholder)"));
+        assert!(out.contains("__fill_view (__slot , __child . await ?)"));
+        assert!(out.contains("__try_join"));
+    }
+
+    #[test]
+    fn sync_children_build_before_the_props() {
+        let mut builder = ViewBuilder::new();
+        add_component_with_children(&mut builder, "wrapper", &syn::parse_quote!("static"));
+        let out = rendered(builder);
+        assert!(!out.contains("__reserve_view"));
         assert!(!out.contains("__try_join"));
     }
 
