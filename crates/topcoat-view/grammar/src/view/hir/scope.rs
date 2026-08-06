@@ -25,12 +25,6 @@ impl Scope {
         quote! { async { ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#view) }.await }
     }
 
-    /// Emits a nested view (e.g. a component's children), which is spliced
-    /// into the parent's `async` block and must not introduce its own.
-    pub fn emit_nested(&self) -> TokenStream {
-        self.emit_view()
-    }
-
     fn emit_view(&self) -> TokenStream {
         if self.nodes.is_empty() {
             // Optimized path: The view has no content.
@@ -75,8 +69,8 @@ impl Scope {
                         quote! { .#ident(#value) }
                     });
                     let child = children.as_ref().map(|scope| {
-                        let child = scope.emit_nested();
-                        quote_spanned! {*span=> .child(#child) }
+                        let child = scope.emit();
+                        quote_spanned! {*span=> .child(#child?) }
                     });
                     quote_spanned! {*span=>
                         __view(__cx, &mut __parts, {
@@ -169,15 +163,6 @@ mod tests {
     fn empty_top_level_view_emits_view_empty() {
         let out = rendered(ViewBuilder::new());
         assert!(out.contains("async"));
-        assert!(out.contains(&quote! { #topcoat_view::View::empty }.to_string()));
-    }
-
-    #[test]
-    fn empty_nested_view_omits_async_wrapper() {
-        // Nested views (e.g. component children) are spliced into a parent and
-        // must not introduce their own async block.
-        let out = ViewBuilder::new().finish().emit_nested().to_string();
-        assert!(!out.contains("async"));
         assert!(out.contains(&quote! { #topcoat_view::View::empty }.to_string()));
     }
 
