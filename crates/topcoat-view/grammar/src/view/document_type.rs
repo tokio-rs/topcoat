@@ -24,7 +24,7 @@ pub struct DocumentType {
 
 impl LowerView for DocumentType {
     fn lower(&self, builder: &mut ViewBuilder) {
-        builder.str_unescaped("<!DOCTYPE html>");
+        builder.write_str_unescaped("<!DOCTYPE html>");
     }
 }
 

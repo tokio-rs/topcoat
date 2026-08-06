@@ -1,11 +1,8 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote, quote_spanned};
+use quote::{ToTokens, quote};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
-use super::{
-    Component, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchExpr, Node, Statement,
-    StaticSegment,
-};
+use super::{ExprKind, Node};
 
 /// The lowered form of a `view!` invocation: the HIR between the view AST and
 /// the emitted `TokenStream`. Built by [`ViewBuilder`](super::ViewBuilder).
@@ -25,14 +22,20 @@ impl Scope {
         quote! { async { ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#view) }.await }
     }
 
+    /// Emits a nested view (e.g. a component's children), which is spliced
+    /// into the parent's `async` block and must not introduce its own.
+    pub fn emit_nested(&self) -> TokenStream {
+        self.emit_view()
+    }
+
     fn emit_view(&self) -> TokenStream {
         if self.nodes.is_empty() {
             // Optimized path: The view has no content.
-            Self::emit_empty_view()
+            quote! { #topcoat_view::View::empty() }
         } else if self.nodes.len() == 1
-            && let Node::StaticSegment(StaticSegment { string }) = &self.nodes[0]
+            && let Node::Static { string } = &self.nodes[0]
         {
-            Self::emit_static_view(string)
+            quote! { #topcoat_view::View::unescaped_unchecked(#string) }
         } else {
             let statements = Self::emit_nodes(&self.nodes);
             quote! {{
@@ -48,56 +51,26 @@ impl Scope {
         let mut output = TokenStream::new();
         for node in nodes {
             match node {
-                Node::StaticSegment(StaticSegment { string }) => {
+                Node::Static { string } => {
                     let helper = ExprKind::Unescaped.helper();
                     let tokens = quote! { #string };
                     quote! { #helper(__cx, &mut __parts, #tokens); }
                 }
-                Node::ExprNode(ExprNode { kind, tokens }) => {
+                Node::Expr { kind, tokens } => {
                     let helper = kind.helper();
                     quote! { #helper(__cx, &mut __parts, #tokens); }
                 }
-                Node::Component(Component {
-                    path,
-                    named_args,
-                    children,
-                    span,
-                }) => {
-                    let setters = named_args.iter().map(|arg| {
-                        let ident = &arg.ident;
-                        let value = &arg.value;
-                        quote! { .#ident(#value) }
-                    });
-                    let child = children.as_ref().map(|scope| {
-                        let child = scope.emit();
-                        quote_spanned! {*span=> .child(#child?) }
-                    });
-                    quote_spanned! {*span=>
-                        __view(__cx, &mut __parts, {
-                            use #topcoat_view::Component;
-                            let props = #path::props_builder()#(#setters)*#child.build();
-                            // The marker is built via `Default` so the same construction
-                            // works for both unit-struct and generic (`PhantomData`) markers.
-                            #[allow(clippy::default_constructed_unit_structs)]
-                            Component::render(
-                                #path::default(),
-                                __cx,
-                                props,
-                            ).await?
-                        });
-                    }
-                }
-                Node::Local(Local { pat, expr }) => {
+                Node::Local { pat, expr } => {
                     quote! { let #pat = #expr; }
                 }
-                Node::Statement(Statement { tokens }) => {
+                Node::Statement { tokens } => {
                     quote! { #tokens }
                 }
-                Node::IfElse(IfElse {
+                Node::If {
                     expr,
                     then_branch,
                     else_branch,
-                }) => {
+                } => {
                     let then_tokens = Self::emit_nodes(&then_branch.nodes);
                     let else_tokens = (!else_branch.nodes.is_empty()).then(|| {
                         let tokens = Self::emit_nodes(&else_branch.nodes);
@@ -110,7 +83,7 @@ impl Scope {
                         #else_tokens
                     }
                 }
-                Node::ForLoop(ForLoop { pat, expr, body }) => {
+                Node::For { pat, expr, body } => {
                     let body = Self::emit_nodes(&body.nodes);
                     quote! {
                         for #pat in #expr {
@@ -118,7 +91,7 @@ impl Scope {
                         }
                     }
                 }
-                Node::MatchExpr(MatchExpr { expr, arms }) => {
+                Node::Match { expr, arms } => {
                     let arm_tokens = arms.iter().map(|arm| {
                         let pat = &arm.pat;
                         let guard = arm.guard.as_ref().map(|g| quote! { if #g });
@@ -137,14 +110,6 @@ impl Scope {
             .to_tokens(&mut output);
         }
         output
-    }
-
-    fn emit_empty_view() -> TokenStream {
-        quote! { #topcoat_view::View::empty() }
-    }
-
-    fn emit_static_view(s: &str) -> TokenStream {
-        quote! { #topcoat_view::View::unescaped_unchecked(#s) }
     }
 }
 
@@ -167,11 +132,20 @@ mod tests {
     }
 
     #[test]
+    fn empty_nested_view_omits_async_wrapper() {
+        // Nested views (e.g. component children) are spliced into a parent and
+        // must not introduce their own async block.
+        let out = ViewBuilder::new().finish().emit_nested().to_string();
+        assert!(!out.contains("async"));
+        assert!(out.contains(&quote! { #topcoat_view::View::empty }.to_string()));
+    }
+
+    #[test]
     fn adjacent_literal_text_is_concatenated() {
         let mut builder = ViewBuilder::new();
-        builder.str_unescaped("<div>");
-        builder.text("hello");
-        builder.str_unescaped("</div>");
+        builder.write_str_unescaped("<div>");
+        builder.write_text("hello");
+        builder.write_str_unescaped("</div>");
         let out = rendered(builder);
         assert!(out.contains("\"<div>hello</div>\""));
     }
@@ -179,16 +153,16 @@ mod tests {
     #[test]
     fn literal_text_is_escaped_for_its_position() {
         let mut builder = ViewBuilder::new();
-        builder.str_unescaped("<p>");
-        builder.text("a < b & \"c\"");
-        builder.str_unescaped("</p>");
+        builder.write_str_unescaped("<p>");
+        builder.write_text("a < b & \"c\"");
+        builder.write_str_unescaped("</p>");
         let out = rendered(builder);
         assert!(out.contains("a &lt; b &amp; \\\"c\\\""));
 
         let mut builder = ViewBuilder::new();
-        builder.str_unescaped("<p x=\"");
-        builder.attribute_value("a < b & \"c\"");
-        builder.str_unescaped("\">");
+        builder.write_str_unescaped("<p x=\"");
+        builder.write_attribute_value("a < b & \"c\"");
+        builder.write_str_unescaped("\">");
         let out = rendered(builder);
         assert!(out.contains("a < b &amp; &quot;c&quot;"));
     }
@@ -196,9 +170,9 @@ mod tests {
     #[test]
     fn expression_breaks_static_segment_with_kind_helper() {
         let mut builder = ViewBuilder::new();
-        builder.str_unescaped("<p>");
-        builder.expr(ExprKind::Node, quote! { value });
-        builder.str_unescaped("</p>");
+        builder.write_str_unescaped("<p>");
+        builder.write_expr(ExprKind::Node, quote! { value });
+        builder.write_str_unescaped("</p>");
         let out = rendered(builder);
         assert!(out.contains("__unescaped (__cx , & mut __parts , \"<p>\")"));
         assert!(out.contains("__node (__cx , & mut __parts , value)"));
@@ -209,8 +183,8 @@ mod tests {
     fn if_else_renders_both_branches() {
         let mut builder = ViewBuilder::new();
         builder.if_else(&syn::parse_quote!(cond), |then_branch, else_branch| {
-            then_branch.str_unescaped("yes");
-            else_branch.str_unescaped("no");
+            then_branch.write_str_unescaped("yes");
+            else_branch.write_str_unescaped("no");
         });
         let out = rendered(builder);
         assert!(out.contains("if cond"));
@@ -223,7 +197,7 @@ mod tests {
     fn if_without_else_omits_else_branch() {
         let mut builder = ViewBuilder::new();
         builder.if_else(&syn::parse_quote!(cond), |then_branch, _| {
-            then_branch.str_unescaped("yes");
+            then_branch.write_str_unescaped("yes");
         });
         let out = rendered(builder);
         assert!(out.contains("if cond"));
@@ -234,7 +208,7 @@ mod tests {
     fn for_loop_wraps_body_in_for_in_expr() {
         let mut builder = ViewBuilder::new();
         builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.str_unescaped("x");
+            body.write_str_unescaped("x");
         });
         let out = rendered(builder);
         assert!(out.contains("for x in xs"));
@@ -245,13 +219,13 @@ mod tests {
         let mut builder = ViewBuilder::new();
         builder.match_expr(&syn::parse_quote!(v), |arms| {
             arms.arm(&syn::parse_quote!(A), None, |body| {
-                body.str_unescaped("a");
+                body.write_str_unescaped("a");
             });
             arms.arm(
                 &syn::parse_quote!(B),
                 Some(&syn::parse_quote!(flag)),
                 |body| {
-                    body.str_unescaped("b");
+                    body.write_str_unescaped("b");
                 },
             );
         });
@@ -265,7 +239,7 @@ mod tests {
     fn local_binding_emits_let_statement() {
         let mut builder = ViewBuilder::new();
         builder.local_binding(&syn::parse_quote!(x), &syn::parse_quote!(value));
-        builder.str_unescaped("ok");
+        builder.write_str_unescaped("ok");
         let out = rendered(builder);
         assert!(out.contains("let x = value"));
     }
@@ -275,6 +249,7 @@ mod tests {
         for (kind, expected) in [
             (ExprKind::Unescaped, "__unescaped"),
             (ExprKind::Node, "__node"),
+            (ExprKind::View, "__view"),
             (ExprKind::ElementName, "__element_name"),
             (ExprKind::Attribute, "__attribute"),
             (ExprKind::AttributeUnescaped, "__attribute_unescaped"),
@@ -283,7 +258,7 @@ mod tests {
             (ExprKind::Attributes, "__attributes"),
         ] {
             let mut builder = ViewBuilder::new();
-            builder.expr(kind, quote! { v });
+            builder.write_expr(kind, quote! { v });
             assert!(
                 rendered(builder).contains(expected),
                 "expected helper `{expected}`",

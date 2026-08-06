@@ -12,7 +12,10 @@ use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
 
 use crate::{
     template::RuntimeExpr,
-    view::{Nodes, ViewWriter, WriteView},
+    view::{
+        Nodes,
+        hir::{ExprKind, LowerView, ViewBuilder},
+    },
 };
 
 /// A component invocation, written as `path(name: value, ..., child_node child_node ...)`.
@@ -70,8 +73,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for NamedArgValue {
     }
 }
 
-impl WriteView for Component {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for Component {
+    fn lower(&self, builder: &mut ViewBuilder) {
         let name = &self.path;
 
         let setters = self.named_args.iter().map(|arg| {
@@ -80,28 +83,31 @@ impl WriteView for Component {
             quote! { .#ident(#value) }
         });
         let child = (!self.children.is_empty()).then(|| {
-            let mut child_writer = ViewWriter::new_nested();
-            for child in &self.children {
-                child.write(&mut child_writer);
-            }
-            let child = child_writer.into_token_stream();
+            let mut child_builder = ViewBuilder::new();
+            self.children.lower(&mut child_builder);
+            let child = child_builder.finish().emit_nested();
             quote_spanned! {self.paren_token.span.span()=>
                 .child(#child)
             }
         });
 
-        writer.component(quote_spanned! {self.paren_token.span.span()=>
-            use #topcoat_view::Component;
-            let props = #name::props_builder()#(#setters)*#child.build();
-            // The marker is built via `Default` so the same construction
-            // works for both unit-struct and generic (`PhantomData`) markers.
-            #[allow(clippy::default_constructed_unit_structs)]
-            Component::render(
-                #name::default(),
-                __cx,
-                props,
-            ).await?
-        });
+        builder.write_expr(
+            ExprKind::View,
+            quote_spanned! {self.paren_token.span.span()=>
+                {
+                    use #topcoat_view::Component;
+                    let props = #name::props_builder()#(#setters)*#child.build();
+                    // The marker is built via `Default` so the same construction
+                    // works for both unit-struct and generic (`PhantomData`) markers.
+                    #[allow(clippy::default_constructed_unit_structs)]
+                    Component::render(
+                        #name::default(),
+                        __cx,
+                        props,
+                    ).await?
+                }
+            },
+        );
     }
 }
 

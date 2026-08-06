@@ -27,7 +27,7 @@ impl LowerView for BindAttribute {
     fn lower(&self, builder: &mut ViewBuilder) {
         let key = &self.key;
         let value = &self.value;
-        builder.expr(
+        builder.write_expr(
             ExprKind::Attributes,
             quote! {
                 #topcoat_runtime::BindAttribute::new(#key, #value)

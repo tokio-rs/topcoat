@@ -1,38 +1,74 @@
-mod component;
-mod expr_node;
-mod for_loop;
-mod if_else;
-mod local;
-mod match_expr;
-mod statement;
-mod static_segment;
+use proc_macro2::{Span, TokenStream};
+use syn::{Expr, Ident, Pat};
 
-pub(crate) use component::*;
-pub(crate) use expr_node::*;
-pub(crate) use for_loop::*;
-pub(crate) use if_else::*;
-pub(crate) use local::*;
-pub(crate) use match_expr::*;
-pub(crate) use statement::*;
-pub(crate) use static_segment::*;
+use super::Scope;
 
 /// A single node of a lowered [`View`](crate::view::View). Produced by
 /// [`ViewBuilder`](super::ViewBuilder), emitted by [`Scope`].
 pub(crate) enum Node {
     /// Literal markup, emitted verbatim.
-    StaticSegment(StaticSegment),
-    /// A component invocation, emitted through the props builder.
-    Component(Component),
+    Static { string: String },
     /// A dynamic expression, emitted through its [`ExprKind`]'s helper.
-    ExprNode(ExprNode),
+    Expr { kind: ExprKind, tokens: TokenStream },
     /// A `let pat = expr;` binding, in scope for the nodes that follow it.
-    Local(Local),
+    Local { pat: Pat, expr: Box<Expr> },
     /// A verbatim Rust statement.
-    Statement(Statement),
+    Statement { tokens: TokenStream },
     /// A `for` loop whose body is lowered into a nested scope.
-    ForLoop(ForLoop),
+    For {
+        pat: Pat,
+        expr: Box<Expr>,
+        body: Scope,
+    },
     /// An `if`/`else` whose branches are lowered into nested scopes.
-    IfElse(IfElse),
+    If {
+        expr: Expr,
+        then_branch: Scope,
+        else_branch: Scope,
+    },
     /// A `match` whose arm bodies are lowered into nested scopes.
-    MatchExpr(MatchExpr),
+    Match {
+        expr: Box<Expr>,
+        arms: Vec<MatchArm>,
+    },
+}
+
+/// A single `pat (if guard)? => body` arm of a [`Node::Match`].
+pub(crate) struct MatchArm {
+    pub pat: Pat,
+    pub guard: Option<Expr>,
+    pub body: Scope,
+}
+
+/// Identifies which `internal` helper a [`Node::Expr`] should be wrapped in
+/// when emitted, so the generated code uses the matching `__*` function and
+/// the corresponding `*ViewParts` trait.
+#[derive(Copy, Clone)]
+pub(crate) enum ExprKind {
+    Unescaped,
+    Node,
+    View,
+    ElementName,
+    Attribute,
+    AttributeUnescaped,
+    AttributeKey,
+    AttributeValue,
+    Attributes,
+}
+
+impl ExprKind {
+    pub(super) fn helper(self) -> Ident {
+        let name = match self {
+            Self::Unescaped => "__unescaped",
+            Self::Node => "__node",
+            Self::View => "__view",
+            Self::ElementName => "__element_name",
+            Self::Attribute => "__attribute",
+            Self::AttributeUnescaped => "__attribute_unescaped",
+            Self::AttributeKey => "__attribute_key",
+            Self::AttributeValue => "__attribute_value",
+            Self::Attributes => "__attributes",
+        };
+        Ident::new(name, Span::call_site())
+    }
 }

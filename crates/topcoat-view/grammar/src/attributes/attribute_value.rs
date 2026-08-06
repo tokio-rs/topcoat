@@ -23,9 +23,9 @@ impl LowerView for AttributeValue {
     fn lower(&self, builder: &mut ViewBuilder) {
         match self {
             Self::Expr(inner) => {
-                builder.expr(ExprKind::AttributeValue, inner.expr.to_token_stream());
+                builder.write_expr(ExprKind::AttributeValue, inner.expr.to_token_stream());
             }
-            Self::LitStr(inner) => builder.attribute_value(&inner.value()),
+            Self::LitStr(inner) => builder.write_attribute_value(&inner.value()),
         }
     }
 }

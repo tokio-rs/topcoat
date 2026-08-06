@@ -27,7 +27,7 @@ pub struct AttributeSpread {
 
 impl LowerView for AttributeSpread {
     fn lower(&self, builder: &mut ViewBuilder) {
-        builder.expr(ExprKind::Attributes, self.expr.expr.to_token_stream());
+        builder.write_expr(ExprKind::Attributes, self.expr.expr.to_token_stream());
     }
 }
 

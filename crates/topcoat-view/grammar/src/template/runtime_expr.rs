@@ -9,7 +9,7 @@ use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime_macro};
 use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 
 /// A `$(`...`)` runtime expression, lowered through `runtime::expr!`.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub struct RuntimeExpr {
     pub dollar: Token![$],
     pub paren: syn::token::Paren,
@@ -18,7 +18,7 @@ pub struct RuntimeExpr {
 
 impl LowerView for RuntimeExpr {
     fn lower(&self, builder: &mut ViewBuilder) {
-        builder.expr(ExprKind::Node, self.to_token_stream());
+        builder.write_expr(ExprKind::Node, self.to_token_stream());
     }
 }
 

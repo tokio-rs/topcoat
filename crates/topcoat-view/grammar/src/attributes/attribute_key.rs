@@ -66,9 +66,9 @@ impl AttributeKey {
 impl LowerView for AttributeKey {
     fn lower(&self, builder: &mut ViewBuilder) {
         match self {
-            Self::Ident(inner) => builder.str_unescaped(&inner.to_string()),
+            Self::Ident(inner) => builder.write_str_unescaped(&inner.to_string()),
             Self::Expr(inner) => {
-                builder.expr(ExprKind::AttributeKey, inner.expr.to_token_stream());
+                builder.write_expr(ExprKind::AttributeKey, inner.expr.to_token_stream());
             }
         }
     }

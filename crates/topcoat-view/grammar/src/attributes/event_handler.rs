@@ -69,14 +69,14 @@ impl LowerView for EventHandler {
         let value = &self.value;
         match value {
             EventHandlerValue::LitStr(value) => {
-                builder.str_unescaped("data-topcoat-on:");
+                builder.write_str_unescaped("data-topcoat-on:");
                 key.lower(builder);
-                builder.str_unescaped("=\"");
-                builder.attribute_value(&value.value());
-                builder.str_unescaped("\"");
+                builder.write_str_unescaped("=\"");
+                builder.write_attribute_value(&value.value());
+                builder.write_str_unescaped("\"");
             }
             EventHandlerValue::Expr(value) => {
-                builder.expr(
+                builder.write_expr(
                     ExprKind::Attributes,
                     quote! {
                         #topcoat_runtime::EventHandler::new(
