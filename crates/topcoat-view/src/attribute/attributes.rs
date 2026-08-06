@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use topcoat_core::context::Cx;
 
 use crate::{
-    Attribute, AttributeValueViewParts, AttributeViewParts, HtmlContext, PartsWriter, ViewPart,
-    ViewParts,
+    Attribute, AttributeValueViewParts, AttributeViewParts, HtmlContext, PartsWriter, View,
+    internal::__build_view,
 };
 
 /// A runtime collection of HTML attributes with unique keys.
@@ -13,9 +13,13 @@ use crate::{
 /// same key again replaces the previous value. Do not rely on render order.
 /// Prefer constructing `Attributes` with the [`attributes!`](macro.attributes.html)
 /// macro.
+///
+/// Each value is captured as a [`View`] in the active scope's instruction
+/// memory, so a collection can only be built and rendered inside a view
+/// scope.
 #[derive(Debug, Default, Clone)]
 pub struct Attributes {
-    map: HashMap<String, ViewPart>,
+    map: HashMap<String, View>,
 }
 
 impl Attributes {
@@ -53,50 +57,51 @@ impl Attributes {
         self.map.contains_key(k.as_ref())
     }
 
-    /// Returns the view parts stored for attribute key `k`, if present.
+    /// Returns the view stored for attribute key `k`, if present.
     #[inline]
-    pub fn get(&self, k: impl AsRef<str>) -> Option<&ViewPart> {
+    pub fn get(&self, k: impl AsRef<str>) -> Option<&View> {
         self.map.get(k.as_ref())
     }
 
     /// Inserts or replaces an attribute.
     ///
-    /// The value is converted with [`AttributeValueViewParts`].
-    /// If the key was already present, the previous rendered value is returned.
-    /// If the implementation of [`AttributeValueViewParts`] for `v` signals that
-    /// the attribute should not be present, [`ViewPart::empty`] will be used as
-    /// the value instead, which call cause the previous value to be removed
-    /// and the attribute will not be rendered in a `view!`.
+    /// The value is captured as a [`View`] with [`AttributeValueViewParts`].
+    /// If the key was already present, the previous captured value is
+    /// returned. If the implementation of [`AttributeValueViewParts`] for `v`
+    /// signals that the attribute should not be present, [`View::empty`] is
+    /// stored as the value instead, which causes the previous value to be
+    /// removed and the attribute not to be rendered in a `view!`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no view scope is active on the current task.
     #[inline]
     pub fn insert(
         &mut self,
         cx: &Cx,
         k: impl Into<String>,
         v: impl AttributeValueViewParts,
-    ) -> Option<ViewPart> {
-        if v.attribute_present() {
-            let mut view_parts = ViewParts::new();
-            v.into_view_parts(
-                cx,
-                &mut PartsWriter::new(&mut view_parts, HtmlContext::AttributeValue),
-            );
-            // `ViewPart::Empty` is the absent marker, so a present value that
-            // produced no parts (a `true` boolean) is stored as an empty
-            // string part to keep the attribute rendered.
-            let part = match ViewPart::from(view_parts) {
-                ViewPart::Empty => ViewPart::unescaped(""),
-                part => part,
-            };
-            self.map.insert(k.into(), part)
+    ) -> Option<View> {
+        let value = if v.attribute_present() {
+            // A present value is always captured as an instruction block,
+            // even when it writes nothing (a `true` boolean), so it never
+            // collides with the empty view that marks an absent attribute.
+            __build_view(|memory| {
+                v.into_view_parts(
+                    cx,
+                    &mut PartsWriter::new(memory, HtmlContext::AttributeValue),
+                );
+            })
         } else {
-            self.map.insert(k.into(), ViewPart::empty())
-        }
+            View::empty()
+        };
+        self.map.insert(k.into(), value)
     }
 
-    /// Removes an attribute, returning its rendered value if the key was
+    /// Removes an attribute, returning its captured value if the key was
     /// present.
     #[inline]
-    pub fn remove(&mut self, k: impl AsRef<str>) -> Option<ViewPart> {
+    pub fn remove(&mut self, k: impl AsRef<str>) -> Option<View> {
         self.map.remove(k.as_ref())
     }
 
@@ -109,11 +114,11 @@ impl Attributes {
     /// Inserts every `(key, value)` entry from `iter`, replacing any keys
     /// already present.
     #[inline]
-    pub fn extend(&mut self, iter: impl IntoIterator<Item = (String, ViewPart)>) {
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = (String, View)>) {
         self.map.extend(iter);
     }
 
-    /// Returns an iterator over attribute keys and rendered values.
+    /// Returns an iterator over attribute keys and captured values.
     #[inline]
     #[must_use]
     pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
@@ -130,8 +135,8 @@ impl AttributeViewParts for Attributes {
 }
 
 impl IntoIterator for Attributes {
-    type Item = (String, ViewPart);
-    type IntoIter = std::collections::hash_map::IntoIter<String, ViewPart>;
+    type Item = (String, View);
+    type IntoIter = std::collections::hash_map::IntoIter<String, View>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -140,8 +145,8 @@ impl IntoIterator for Attributes {
 }
 
 impl<'a> IntoIterator for &'a Attributes {
-    type Item = (&'a String, &'a ViewPart);
-    type IntoIter = std::collections::hash_map::Iter<'a, String, ViewPart>;
+    type Item = (&'a String, &'a View);
+    type IntoIter = std::collections::hash_map::Iter<'a, String, View>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -156,15 +161,21 @@ mod tests {
     use topcoat_core::context::Cx;
 
     use super::*;
-    use crate::View;
+    use crate::{render::scope, test_util::block_on};
 
-    fn render(attrs: Attributes) -> String {
-        let mut parts = ViewParts::new();
-        attrs.into_view_parts(
-            &Cx::default(),
-            &mut PartsWriter::new(&mut parts, HtmlContext::AttributeValue),
-        );
-        View::new(parts).render(&Cx::default())
+    /// Runs `f` with a request context inside a fresh view scope.
+    fn in_scope<R>(f: impl FnOnce(&Cx) -> R) -> R {
+        block_on(scope(async { f(&Cx::default()) }))
+    }
+
+    fn render(cx: &Cx, attrs: Attributes) -> String {
+        __build_view(|memory| {
+            attrs.into_view_parts(
+                cx,
+                &mut PartsWriter::new(memory, HtmlContext::AttributeValue),
+            );
+        })
+        .render(cx)
     }
 
     #[test]
@@ -182,128 +193,159 @@ mod tests {
 
     #[test]
     fn insert_then_contains_key() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "class", "button");
-        assert!(attrs.contains_key("class"));
-        assert!(!attrs.contains_key("id"));
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "class", "button");
+            assert!(attrs.contains_key("class"));
+            assert!(!attrs.contains_key("id"));
+        });
     }
 
     #[test]
     fn insert_returns_none_for_new_key() {
-        let mut attrs = Attributes::new();
-        assert!(attrs.insert(&Cx::default(), "class", "button").is_none());
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            assert!(attrs.insert(cx, "class", "button").is_none());
+        });
     }
 
     #[test]
     fn insert_replaces_existing_value() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "class", "button");
-        let previous = attrs.insert(&Cx::default(), "class", "link");
-        assert!(previous.is_some());
-        assert_eq!(render(attrs), " class=\"link\"");
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "class", "button");
+            let previous = attrs.insert(cx, "class", "link");
+            assert!(previous.is_some());
+            assert_eq!(render(cx, attrs), " class=\"link\"");
+        });
     }
 
     #[test]
     fn get_returns_inserted_value() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "class", "button");
-        assert!(attrs.get("class").is_some());
-        assert!(attrs.get("missing").is_none());
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "class", "button");
+            assert!(attrs.get("class").is_some());
+            assert!(attrs.get("missing").is_none());
+        });
     }
 
     #[test]
     fn remove_returns_value_and_deletes_entry() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "class", "button");
-        assert!(attrs.remove("class").is_some());
-        assert!(!attrs.contains_key("class"));
-        assert!(attrs.remove("class").is_none());
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "class", "button");
+            assert!(attrs.remove("class").is_some());
+            assert!(!attrs.contains_key("class"));
+            assert!(attrs.remove("class").is_none());
+        });
     }
 
     #[test]
     fn clear_removes_all_entries() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "class", "button");
-        attrs.insert(&Cx::default(), "id", "submit");
-        attrs.clear();
-        assert_eq!(attrs.iter().count(), 0);
-        assert!(!attrs.contains_key("class"));
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "class", "button");
+            attrs.insert(cx, "id", "submit");
+            attrs.clear();
+            assert_eq!(attrs.iter().count(), 0);
+            assert!(!attrs.contains_key("class"));
+        });
     }
 
     #[test]
     fn renders_single_attribute() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "class", "button");
-        assert_eq!(render(attrs), " class=\"button\"");
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "class", "button");
+            assert_eq!(render(cx, attrs), " class=\"button\"");
+        });
     }
 
     #[test]
     fn renders_multiple_attributes() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "class", "button");
-        attrs.insert(&Cx::default(), "id", "submit");
-        let rendered = render(attrs);
-        let parts: HashSet<&str> = rendered
-            .split_terminator(' ')
-            .filter(|s| !s.is_empty())
-            .collect();
-        let expected: HashSet<&str> = ["class=\"button\"", "id=\"submit\""].into_iter().collect();
-        assert_eq!(parts, expected);
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "class", "button");
+            attrs.insert(cx, "id", "submit");
+            let rendered = render(cx, attrs);
+            let parts: HashSet<&str> = rendered
+                .split_terminator(' ')
+                .filter(|s| !s.is_empty())
+                .collect();
+            let expected: HashSet<&str> =
+                ["class=\"button\"", "id=\"submit\""].into_iter().collect();
+            assert_eq!(parts, expected);
+        });
     }
 
     #[test]
     fn escapes_attribute_value() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "data-x", "a\"b<c");
-        assert_eq!(render(attrs), " data-x=\"a&quot;b<c\"");
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "data-x", "a\"b<c");
+            assert_eq!(render(cx, attrs), " data-x=\"a&quot;b<c\"");
+        });
     }
 
     #[test]
     fn omits_false_boolean_attribute() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "disabled", false);
-        assert_eq!(render(attrs), "");
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "disabled", false);
+            assert_eq!(render(cx, attrs), "");
+        });
     }
 
     #[test]
     fn renders_true_boolean_attribute() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "disabled", true);
-        assert_eq!(render(attrs), " disabled=\"\"");
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "disabled", true);
+            assert_eq!(render(cx, attrs), " disabled=\"\"");
+        });
     }
 
     #[test]
     fn omits_none_option_attribute() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "title", Option::<&str>::None);
-        assert!(attrs.get("title").unwrap().is_empty());
-        assert_eq!(render(attrs), "");
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "title", Option::<&str>::None);
+            assert!(attrs.get("title").unwrap().is_empty());
+            assert_eq!(render(cx, attrs), "");
+        });
     }
 
     #[test]
     fn renders_some_option_attribute() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "title", Some("hello"));
-        assert_eq!(render(attrs), " title=\"hello\"");
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "title", Some("hello"));
+            assert_eq!(render(cx, attrs), " title=\"hello\"");
+        });
     }
 
     #[test]
     fn iter_yields_inserted_entries() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "class", "button");
-        attrs.insert(&Cx::default(), "id", "submit");
-        let keys: HashSet<&str> = attrs.iter().map(|(k, _)| k.as_str()).collect();
-        let expected: HashSet<&str> = ["class", "id"].into_iter().collect();
-        assert_eq!(keys, expected);
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "class", "button");
+            attrs.insert(cx, "id", "submit");
+            let keys: HashSet<&str> = attrs.iter().map(|(k, _)| k.as_str()).collect();
+            let expected: HashSet<&str> = ["class", "id"].into_iter().collect();
+            assert_eq!(keys, expected);
+        });
     }
 
     #[test]
     fn into_iter_yields_inserted_entries() {
-        let mut attrs = Attributes::new();
-        attrs.insert(&Cx::default(), "class", "button");
-        attrs.insert(&Cx::default(), "id", "submit");
-        let keys: HashSet<String> = attrs.into_iter().map(|(k, _)| k).collect();
-        let expected: HashSet<String> = ["class", "id"].into_iter().map(String::from).collect();
-        assert_eq!(keys, expected);
+        in_scope(|cx| {
+            let mut attrs = Attributes::new();
+            attrs.insert(cx, "class", "button");
+            attrs.insert(cx, "id", "submit");
+            let keys: HashSet<String> = attrs.into_iter().map(|(k, _)| k).collect();
+            let expected: HashSet<String> = ["class", "id"].into_iter().map(String::from).collect();
+            assert_eq!(keys, expected);
+        });
     }
 }

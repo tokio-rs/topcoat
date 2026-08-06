@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use topcoat_core::context::Cx;
 
-use crate::{AttributeValueViewParts, PartsWriter, ViewPart};
+use crate::{AttributeValueViewParts, PartsWriter, View};
 
 /// Converts a value used as a class list entry into view parts.
 ///
@@ -77,7 +77,7 @@ impl ClassViewParts for Cow<'static, str> {
 /// An attribute value, such as one taken from an
 /// [`Attributes`](crate::Attributes) collection with
 /// [`get`](crate::Attributes::get), spliced in as a single entry.
-impl ClassViewParts for ViewPart {
+impl ClassViewParts for View {
     #[inline]
     fn is_present(&self) -> bool {
         self.attribute_present()
@@ -85,21 +85,22 @@ impl ClassViewParts for ViewPart {
 
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        // The part was already sealed with the context it was written in, so
-        // it is spliced in verbatim rather than escaped a second time.
-        parts.push_part(self);
+        // The view's content was already sealed with the context it was
+        // written in, so it is spliced in verbatim rather than escaped a
+        // second time.
+        parts.push_view(self);
     }
 }
 
-impl ClassViewParts for &ViewPart {
+impl ClassViewParts for &View {
     #[inline]
     fn is_present(&self) -> bool {
-        self.attribute_present()
+        View::attribute_present(self)
     }
 
     #[inline]
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
-        ClassViewParts::into_view_parts(ViewPart::clone(self), cx, parts);
+        ClassViewParts::into_view_parts(*self, cx, parts);
     }
 }
 
@@ -357,17 +358,17 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HtmlContext, View, ViewParts};
+    use crate::{
+        HtmlContext,
+        internal::__build_view,
+        render::scope,
+        test_util::{block_on, render_with},
+    };
 
     fn render(class: Class<impl ClassEntries>) -> String {
-        let cx = Cx::default();
-        let mut parts = ViewParts::new();
-        AttributeValueViewParts::into_view_parts(
-            class,
-            &cx,
-            &mut PartsWriter::new(&mut parts, HtmlContext::AttributeValue),
-        );
-        View::new(parts).render(&cx)
+        render_with(HtmlContext::AttributeValue, |cx, parts| {
+            AttributeValueViewParts::into_view_parts(class, cx, parts);
+        })
     }
 
     #[test]
@@ -466,16 +467,27 @@ mod tests {
 
     #[test]
     fn attribute_value_entries_are_spliced_verbatim() {
-        let mut parts = ViewParts::new();
-        PartsWriter::new(&mut parts, HtmlContext::AttributeValue).push_str("[&>*]:mt-2");
-        let part = ViewPart::from(parts);
-        assert_eq!(render(Class(("btn", &part))), "btn [&amp;>*]:mt-2");
+        block_on(scope(async {
+            let cx = Cx::default();
+            let value = __build_view(|memory| {
+                PartsWriter::new(memory, HtmlContext::AttributeValue).push_str("[&>*]:mt-2");
+            });
+            let html = __build_view(|memory| {
+                AttributeValueViewParts::into_view_parts(
+                    Class(("btn", &value)),
+                    &cx,
+                    &mut PartsWriter::new(memory, HtmlContext::AttributeValue),
+                );
+            })
+            .render(&cx);
+            assert_eq!(html, "btn [&amp;>*]:mt-2");
+        }));
     }
 
     #[test]
     fn empty_attribute_value_entry_is_skipped_without_a_separator() {
-        let part = ViewPart::empty();
-        assert_eq!(render(Class(("a", &part, "b"))), "a b");
+        let value = View::empty();
+        assert_eq!(render(Class(("a", &value, "b"))), "a b");
     }
 
     #[test]

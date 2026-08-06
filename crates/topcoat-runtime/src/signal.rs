@@ -219,9 +219,25 @@ impl EncodedSignals {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_view::{HtmlContext, PartsWriter, View, ViewParts};
+    use std::{
+        pin::pin,
+        task::{Context, Poll, Waker},
+    };
+
+    use topcoat_view::{HtmlContext, PartsWriter, internal::__build_view, scope};
 
     use super::*;
+
+    /// Drives `fut` to completion on the current thread.
+    fn block_on<F: Future>(fut: F) -> F::Output {
+        let mut fut = pin!(fut);
+        let mut cx = Context::from_waker(Waker::noop());
+        loop {
+            if let Poll::Ready(output) = fut.as_mut().poll(&mut cx) {
+                return output;
+            }
+        }
+    }
 
     #[test]
     fn payload_cannot_terminate_the_comment() {
@@ -230,10 +246,13 @@ mod tests {
         let signal = Signal::new(String::from("a-->b\"c&d"));
 
         let cx = Cx::default();
-        let mut parts = ViewParts::new();
-        SignalDeclaration::new(&signal)
-            .into_view_parts(&cx, &mut PartsWriter::new(&mut parts, HtmlContext::Text));
-        let html = View::new(parts).render(&cx);
+        let html = block_on(scope(async {
+            __build_view(|memory| {
+                SignalDeclaration::new(&signal)
+                    .into_view_parts(&cx, &mut PartsWriter::new(memory, HtmlContext::Text));
+            })
+            .render(&cx)
+        }));
 
         // The comment context escaped `>`, so the only `-->` left is the
         // marker's own terminator; the payload cannot end the comment early.

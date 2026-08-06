@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use topcoat_core::context::Cx;
 
-use crate::{PartsWriter, Unescaped, ViewPart};
+use crate::{PartsWriter, Unescaped, View};
 
 /// Converts a value used as an attribute value into view parts.
 ///
@@ -193,18 +193,18 @@ where
     }
 }
 
-impl AttributeValueViewParts for ViewPart {
+/// An attribute value captured as a nested view, such as one taken from an
+/// [`Attributes`](crate::Attributes) collection. An empty view marks the
+/// attribute as absent.
+impl AttributeValueViewParts for View {
+    #[inline]
     fn attribute_present(&self) -> bool {
-        match self {
-            Self::Empty | Self::Bool(false) => false,
-            Self::BoxSlice { inner, .. } if inner.is_empty() => false,
-            _ => true,
-        }
+        !self.is_empty()
     }
 
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_part(self);
+        parts.push_view(self);
     }
 }
 

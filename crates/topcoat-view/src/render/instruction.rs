@@ -1,12 +1,14 @@
+#[cfg(feature = "http")]
+use crate::render::HeadersPtr;
 use crate::{
     HtmlContext,
-    render::{HeadersPtr, InstructionPtr, StaticStrPtr, StringPtr},
+    render::{DynPtr, InstructionPtr, StaticStrPtr, StringPtr},
 };
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
     /// Jump to a different point in the instruction memory.
-    Call { ip: InstructionPtr },
+    Call { entry: InstructionPtr },
     /// Return back to the previous call instruction, if any.
     Ret,
 
@@ -62,6 +64,8 @@ pub enum Instruction {
         ptr: StringPtr,
         context: HtmlContext,
     },
+    /// A part that writes its output at render time, and its context.
+    Dyn { ptr: DynPtr, context: HtmlContext },
 
     /// A response status code recorded at render time; renders no content.
     #[cfg(feature = "http")]

@@ -510,7 +510,7 @@ mod tests {
         context::{Cx, CxBuilder},
         error::Result,
     };
-    use topcoat_view::{View, ViewParts};
+    use topcoat_view::View;
 
     use super::*;
     use crate::{
@@ -532,7 +532,7 @@ mod tests {
         _cx: &Cx,
         _body: Body,
     ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + '_>> {
-        Box::pin(async move { Ok(View::new(ViewParts::new())) })
+        Box::pin(async move { Ok(View::empty()) })
     }
 
     /// A stand-in layer that continues the chain unchanged.

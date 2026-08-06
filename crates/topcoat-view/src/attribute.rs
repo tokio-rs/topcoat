@@ -7,7 +7,7 @@ pub use key::*;
 use topcoat_core::context::Cx;
 pub use value::*;
 
-use crate::{HtmlContext, PartsWriter, ViewPart};
+use crate::{HtmlContext, PartsWriter, View};
 
 /// A single HTML attribute.
 ///
@@ -57,21 +57,23 @@ where
 {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         if self.value.attribute_present() {
-            parts.push_part(ViewPart::unescaped(" "));
+            parts.push_str_unescaped(" ");
             self.key
                 .into_view_parts(cx, &mut parts.with_context(HtmlContext::AttributeKey));
-            parts.push_part(ViewPart::unescaped("=\""));
+            parts.push_str_unescaped("=\"");
             self.value
                 .into_view_parts(cx, &mut parts.with_context(HtmlContext::AttributeValue));
-            parts.push_part(ViewPart::unescaped("\""));
+            parts.push_str_unescaped("\"");
         }
     }
 }
 
-impl AttributeViewParts for ViewPart {
+/// One or more attributes captured as a nested view, such as a rendered
+/// attribute block forwarded by a component.
+impl AttributeViewParts for View {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_part(self);
+        parts.push_view(self);
     }
 }
 
@@ -141,15 +143,12 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{View, ViewParts};
+    use crate::test_util::render_with;
 
     fn render(attribute: impl AttributeViewParts) -> String {
-        let mut parts = ViewParts::new();
-        attribute.into_view_parts(
-            &Cx::default(),
-            &mut PartsWriter::new(&mut parts, HtmlContext::AttributeValue),
-        );
-        View::new(parts).render(&Cx::default())
+        render_with(HtmlContext::AttributeValue, |cx, parts| {
+            attribute.into_view_parts(cx, parts);
+        })
     }
 
     #[test]

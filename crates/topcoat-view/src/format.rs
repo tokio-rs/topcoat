@@ -29,6 +29,12 @@ impl<'a> Formatter<'a> {
         }
     }
 
+    /// Reserves capacity for at least `additional` more bytes of output.
+    #[inline]
+    pub(crate) fn reserve(&mut self, additional: usize) {
+        self.buf.reserve(additional);
+    }
+
     /// Writes a string verbatim.
     #[inline]
     pub fn write_str(&mut self, s: &str) {

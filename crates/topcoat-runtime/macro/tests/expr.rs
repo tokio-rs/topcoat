@@ -10,14 +10,17 @@ use topcoat::{context::Cx, view::view};
 #[tokio::test]
 async fn toggle_reaches_the_generated_javascript() {
     let cx = &Cx::default();
-    let html = view! {
-        cx =>
-        signal open = false;
+    let html = topcoat::view::scope(async {
+        view! {
+            cx =>
+            signal open = false;
 
-        <button @click=$(|_e| open.toggle())>"x"</button>
-    }
-    .unwrap()
-    .render(cx);
+            <button @click=$(|_e| open.toggle())>"x"</button>
+        }
+        .unwrap()
+        .render(cx)
+    })
+    .await;
 
     assert!(html.contains(".toggle()"), "{html}");
 }
@@ -25,15 +28,18 @@ async fn toggle_reaches_the_generated_javascript() {
 #[tokio::test]
 async fn increment_and_decrement_reach_the_generated_javascript() {
     let cx = &Cx::default();
-    let html = view! {
-        cx =>
-        signal count = 0.0;
+    let html = topcoat::view::scope(async {
+        view! {
+            cx =>
+            signal count = 0.0;
 
-        <button @click=$(|_e| count.increment())>"+"</button>
-        <button @click=$(|_e| count.decrement())>"-"</button>
-    }
-    .unwrap()
-    .render(cx);
+            <button @click=$(|_e| count.increment())>"+"</button>
+            <button @click=$(|_e| count.decrement())>"-"</button>
+        }
+        .unwrap()
+        .render(cx)
+    })
+    .await;
 
     assert!(html.contains(".increment()"), "{html}");
     assert!(html.contains(".decrement()"), "{html}");
@@ -42,14 +48,17 @@ async fn increment_and_decrement_reach_the_generated_javascript() {
 #[tokio::test]
 async fn push_str_reaches_the_generated_javascript_with_its_argument() {
     let cx = &Cx::default();
-    let html = view! {
-        cx =>
-        signal name = String::new();
+    let html = topcoat::view::scope(async {
+        view! {
+            cx =>
+            signal name = String::new();
 
-        <button @click=$(|_e| name.push_str("!"))>"x"</button>
-    }
-    .unwrap()
-    .render(cx);
+            <button @click=$(|_e| name.push_str("!"))>"x"</button>
+        }
+        .unwrap()
+        .render(cx)
+    })
+    .await;
 
     assert!(html.contains(".push_str("), "{html}");
 }
@@ -61,14 +70,21 @@ async fn push_str_reaches_the_generated_javascript_with_its_argument() {
 #[tokio::test]
 async fn push_str_accepts_the_owned_string_from_an_event() {
     let cx = &Cx::default();
-    let html = view! {
-        cx =>
-        signal message = String::new();
+    let html = topcoat::view::scope(async {
+        view! {
+            cx =>
+            signal message = String::new();
 
-        <input @input=$(|e: topcoat::runtime::Event| message.push_str(e.target.value))>
-    }
-    .unwrap()
-    .render(cx);
+            <input
+                @input=$(|e: topcoat::runtime::Event| {
+                    message.push_str(e.target.value)
+                })
+            >
+        }
+        .unwrap()
+        .render(cx)
+    })
+    .await;
 
     assert!(html.contains(".push_str("), "{html}");
 }

@@ -1,7 +1,5 @@
-use std::sync::atomic::{AtomicU32, Ordering};
-
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::Ident;
 
 use crate::view::hir::emit::{Emit, Emitter};
@@ -14,15 +12,12 @@ pub(crate) struct ExprNode {
 
 impl Emit for ExprNode {
     fn emit(&self, emitter: &mut Emitter) {
-        static ID: AtomicU32 = AtomicU32::new(0);
-        let id = ID.fetch_add(1, Ordering::Relaxed);
-        let identifier = format_ident!("__expr{id}");
-
+        let ident = emitter.fresh_ident();
         let tokens = &self.tokens;
         let helper = self.kind.helper();
 
-        emitter.hoist(quote! { let #identifier = #tokens; });
-        emitter.emit(quote! { #helper(__cx, &mut __parts, #identifier); });
+        emitter.hoist(quote! { let #ident = #tokens; });
+        emitter.emit(quote! { #helper(__cx, __mem, #ident); });
     }
 }
 
@@ -31,7 +26,6 @@ impl Emit for ExprNode {
 /// the corresponding `*ViewParts` trait.
 #[derive(Copy, Clone)]
 pub(crate) enum ExprKind {
-    Unescaped,
     Node,
     ElementName,
     Attribute,
@@ -44,7 +38,6 @@ pub(crate) enum ExprKind {
 impl ExprKind {
     pub(crate) fn helper(self) -> Ident {
         let name = match self {
-            Self::Unescaped => "__unescaped",
             Self::Node => "__node",
             Self::ElementName => "__element_name",
             Self::Attribute => "__attribute",

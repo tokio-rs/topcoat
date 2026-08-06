@@ -24,14 +24,17 @@ async fn greeting(name: &str) -> Result {
 
 #[tokio::test]
 async fn component_with_named_arg_renders_inline() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let result: Result = view! { <main>greeting(name: "Ada")</main> };
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let result: Result = view! { <main>greeting(name: "Ada")</main> };
 
-    assert_eq!(
-        result.unwrap().render(__cx),
-        "<main><h1>Hello, Ada!</h1></main>"
-    );
+        assert_eq!(
+            result.unwrap().render(__cx),
+            "<main><h1>Hello, Ada!</h1></main>"
+        );
+    })
+    .await;
 }
 
 #[component]
@@ -41,14 +44,17 @@ async fn badge(label: &str, tone: &str) -> Result {
 
 #[tokio::test]
 async fn component_with_multiple_named_args_renders_attributes() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let result: Result = view! { badge(label: "New", tone: "success") };
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let result: Result = view! { badge(label: "New", tone: "success") };
 
-    assert_eq!(
-        result.unwrap().render(__cx),
-        r#"<span class="badge badge-success">New</span>"#,
-    );
+        assert_eq!(
+            result.unwrap().render(__cx),
+            r#"<span class="badge badge-success">New</span>"#,
+        );
+    })
+    .await;
 }
 
 #[component]
@@ -63,20 +69,23 @@ async fn panel(title: &str, child: View) -> Result {
 
 #[tokio::test]
 async fn component_with_trailing_child_nodes_collects_them_as_child_view() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let result: Result = view! {
-        panel(
-            title: "Profile",
-            <p>"hello"</p>
-            <p>"world"</p>
-        )
-    };
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let result: Result = view! {
+            panel(
+                title: "Profile",
+                <p>"hello"</p>
+                <p>"world"</p>
+            )
+        };
 
-    assert_eq!(
-        result.unwrap().render(__cx),
-        "<section class=\"panel\"><h2>Profile</h2><div class=\"body\"><p>hello</p><p>world</p></div></section>",
-    );
+        assert_eq!(
+            result.unwrap().render(__cx),
+            "<section class=\"panel\"><h2>Profile</h2><div class=\"body\"><p>hello</p><p>world</p></div></section>",
+        );
+    })
+    .await;
 }
 
 #[component]
@@ -86,13 +95,16 @@ async fn nested_caller(child: View) -> Result {
 
 #[tokio::test]
 async fn component_can_call_other_components_and_forward_child_views() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let result: Result = view! { nested_caller(<em>"inner"</em>) };
-    let html = result.unwrap().render(__cx);
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let result: Result = view! { nested_caller(<em>"inner"</em>) };
+        let html = result.unwrap().render(__cx);
 
-    assert!(html.contains("<h2>Outer</h2>"));
-    assert!(html.contains("<em>inner</em>"));
+        assert!(html.contains("<h2>Outer</h2>"));
+        assert!(html.contains("<em>inner</em>"));
+    })
+    .await;
 }
 
 #[component]
@@ -102,11 +114,14 @@ async fn no_args_component() -> Result {
 
 #[tokio::test]
 async fn component_without_args_renders() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let result: Result = view! { no_args_component() };
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let result: Result = view! { no_args_component() };
 
-    assert_eq!(result.unwrap().render(__cx), "<p>static</p>");
+        assert_eq!(result.unwrap().render(__cx), "<p>static</p>");
+    })
+    .await;
 }
 
 #[component]
@@ -117,11 +132,14 @@ async fn uses_cx(cx: &Cx) -> Result {
 
 #[tokio::test]
 async fn component_can_take_cx_param() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let result: Result = view! { uses_cx() };
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let result: Result = view! { uses_cx() };
 
-    assert_eq!(result.unwrap().render(__cx), "<p>cx component</p>");
+        assert_eq!(result.unwrap().render(__cx), "<p>cx component</p>");
+    })
+    .await;
 }
 
 #[component]
@@ -132,15 +150,18 @@ async fn shout(label: impl Into<String> + Send) -> Result {
 
 #[tokio::test]
 async fn component_with_impl_trait_param_accepts_any_impl() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let result: Result = view! { shout(label: "hi") };
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let result: Result = view! { shout(label: "hi") };
 
-    assert_eq!(result.unwrap().render(__cx), "<b>HI</b>");
+        assert_eq!(result.unwrap().render(__cx), "<b>HI</b>");
 
-    let result: Result = view! { shout(label: String::from("owned")) };
+        let result: Result = view! { shout(label: String::from("owned")) };
 
-    assert_eq!(result.unwrap().render(__cx), "<b>OWNED</b>");
+        assert_eq!(result.unwrap().render(__cx), "<b>OWNED</b>");
+    })
+    .await;
 }
 
 #[component]
@@ -156,14 +177,17 @@ async fn item_list(items: impl IntoIterator<Item = u8> + Send) -> Result {
 
 #[tokio::test]
 async fn component_with_bounded_impl_trait_param_renders() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let result: Result = view! { item_list(items: vec![1, 2, 3]) };
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let result: Result = view! { item_list(items: vec![1, 2, 3]) };
 
-    assert_eq!(
-        result.unwrap().render(__cx),
-        "<ul><li>1</li><li>2</li><li>3</li></ul>",
-    );
+        assert_eq!(
+            result.unwrap().render(__cx),
+            "<ul><li>1</li><li>2</li><li>3</li></ul>",
+        );
+    })
+    .await;
 }
 
 #[component]
@@ -173,11 +197,14 @@ async fn count<T: Send + Sync>(items: Vec<T>) -> Result {
 
 #[tokio::test]
 async fn generic_component_renders() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let result: Result = view! { count(items: vec!["a", "b", "c"]) };
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let result: Result = view! { count(items: vec!["a", "b", "c"]) };
 
-    assert_eq!(result.unwrap().render(__cx), "<span>3</span>");
+        assert_eq!(result.unwrap().render(__cx), "<span>3</span>");
+    })
+    .await;
 }
 
 struct TreeNode {
@@ -203,30 +230,33 @@ async fn tree(node: &TreeNode) -> Result {
 
 #[tokio::test]
 async fn boxed_component_renders_itself_recursively() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let root = TreeNode {
-        label: "root",
-        children: vec![
-            TreeNode {
-                label: "a",
-                children: vec![TreeNode {
-                    label: "a1",
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let root = TreeNode {
+            label: "root",
+            children: vec![
+                TreeNode {
+                    label: "a",
+                    children: vec![TreeNode {
+                        label: "a1",
+                        children: vec![],
+                    }],
+                },
+                TreeNode {
+                    label: "b",
                     children: vec![],
-                }],
-            },
-            TreeNode {
-                label: "b",
-                children: vec![],
-            },
-        ],
-    };
-    let result: Result = view! { <ul>tree(node: &root)</ul> };
+                },
+            ],
+        };
+        let result: Result = view! { <ul>tree(node: &root)</ul> };
 
-    assert_eq!(
-        result.unwrap().render(__cx),
-        "<ul><li>root<ul><li>a<ul><li>a1</li></ul></li><li>b</li></ul></li></ul>",
-    );
+        assert_eq!(
+            result.unwrap().render(__cx),
+            "<ul><li>root<ul><li>a<ul><li>a1</li></ul></li><li>b</li></ul></li></ul>",
+        );
+    })
+    .await;
 }
 
 // A cycle only needs one boxed component: `odd_steps` stays a plain
@@ -253,12 +283,15 @@ async fn odd_steps(n: u32) -> Result {
 
 #[tokio::test]
 async fn mutually_recursive_components_need_only_one_boxed() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let result: Result = view! { even_steps(n: 3) };
+    topcoat::view::scope(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let result: Result = view! { even_steps(n: 3) };
 
-    assert_eq!(
-        result.unwrap().render(__cx),
-        "<i>3</i><b>2</b><i>1</i><b>0</b>",
-    );
+        assert_eq!(
+            result.unwrap().render(__cx),
+            "<i>3</i><b>2</b><i>1</i><b>0</b>",
+        );
+    })
+    .await;
 }

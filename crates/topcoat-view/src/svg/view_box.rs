@@ -56,18 +56,13 @@ impl AttributeValueViewParts for ViewBox {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_core::context::Cx;
-
     use super::*;
-    use crate::{HtmlContext, View, ViewParts};
+    use crate::{HtmlContext, test_util::render_with};
 
     fn render(value: impl AttributeValueViewParts) -> String {
-        let mut parts = ViewParts::new();
-        value.into_view_parts(
-            &Cx::default(),
-            &mut PartsWriter::new(&mut parts, HtmlContext::AttributeValue),
-        );
-        View::new(parts).render(&Cx::default())
+        render_with(HtmlContext::AttributeValue, |cx, parts| {
+            value.into_view_parts(cx, parts);
+        })
     }
 
     #[test]

@@ -51,7 +51,7 @@ async fn collects_every_field() -> Result<()> {
     assert_eq!(mail.reply_to(), [Mailbox::new("replies@example.com")?]);
     assert_eq!(mail.subject(), "Analytical engines");
     assert_eq!(
-        mail.html().map(|html| html.clone().render(&Cx::default())),
+        mail.html().map(|html| html.render(&Cx::default())),
         Some("<p>The engine weaves algebraic patterns.</p>".to_owned())
     );
     assert_eq!(
@@ -96,26 +96,31 @@ async fn additive_fields_append_in_written_order() -> Result<()> {
 
 #[tokio::test]
 async fn html_renders_dynamic_parts_against_the_named_context() -> Result<()> {
-    let cx = &Cx::default();
-    let name = "Ada";
+    // A dynamic mail body is a scoped view, so it is built and rendered
+    // inside one view scope.
+    topcoat::view::scope(async {
+        let cx = &Cx::default();
+        let name = "Ada";
 
-    let mail = mail! {
-        html: {
-            cx =>
-            <p>
-                "Hello, "
-                (name)
-                "!"
-            </p>
-        },
-    }?;
+        let mail = mail! {
+            html: {
+                cx =>
+                <p>
+                    "Hello, "
+                    (name)
+                    "!"
+                </p>
+            },
+        }?;
 
-    assert_eq!(
-        mail.html().map(|html| html.clone().render(cx)),
-        Some("<p>Hello, Ada!</p>".to_owned())
-    );
+        assert_eq!(
+            mail.html().map(|html| html.render(cx)),
+            Some("<p>Hello, Ada!</p>".to_owned())
+        );
 
-    Ok(())
+        Ok(())
+    })
+    .await
 }
 
 #[tokio::test]

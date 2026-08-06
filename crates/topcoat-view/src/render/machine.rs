@@ -1,50 +1,49 @@
+use topcoat_core::context::Cx;
+
 use crate::{
     Formatter,
-    render::{Instruction, InstructionPtr, Memory, ReadOnlyMemory},
+    render::{Instruction, InstructionPtr, Memory},
 };
 
+/// Executes a view's instruction block into a [`Formatter`].
+///
+/// Execution starts at the view's entry, descends into nested views through
+/// [`Call`](Instruction::Call) instructions, and finishes when the entry
+/// block's [`Ret`](Instruction::Ret) is reached with an empty call stack.
 pub struct Machine<'a> {
     memory: &'a Memory,
-    ip: InstructionPtr,
+    ptr: InstructionPtr,
     stack: Vec<InstructionPtr>,
 }
 
 impl<'a> Machine<'a> {
-    pub fn new(memory: &'a Memory, ip: InstructionPtr) -> Self {
+    #[must_use]
+    pub fn new(memory: &'a Memory, entry: InstructionPtr) -> Self {
         Self {
             memory,
-            ip,
+            ptr: entry,
             stack: Vec::new(),
         }
     }
 
-    fn push(&mut self) {
-        self.stack.push(self.ip);
-    }
+    pub fn execute(&mut self, cx: &Cx, f: &mut Formatter<'_>) {
+        use std::fmt::Write;
 
-    fn pop(&mut self) {
-        self.ip = self.stack.pop().expect("popped empty stack");
-    }
-
-    pub fn execute(&mut self, rom: &ReadOnlyMemory, f: &mut Formatter<'_>) {
+        let pool = self.memory.pool();
+        let mut int_buffer = itoa::Buffer::new();
         loop {
-            let instruction = self.memory.instruction(self.ip);
-            self.ip.increment();
-
-            use std::fmt::Write;
-            let mut int_buffer = itoa::Buffer::new();
+            let instruction = self.memory.instruction(self.ptr);
+            self.ptr.increment();
 
             match instruction {
-                Instruction::Call { ip: to } => {
-                    self.push();
-                    self.ip = to;
+                Instruction::Call { entry } => {
+                    self.stack.push(self.ptr);
+                    self.ptr = *entry;
                 }
-                Instruction::Ret => {
-                    if self.stack.is_empty() {
-                        break;
-                    }
-                    self.pop();
-                }
+                Instruction::Ret => match self.stack.pop() {
+                    Some(ptr) => self.ptr = ptr,
+                    None => break,
+                },
 
                 Instruction::Bool(inner) => f.write_str(if *inner { "true" } else { "false" }),
                 Instruction::I8(inner) => f.write_str(int_buffer.format(*inner)),
@@ -62,16 +61,19 @@ impl<'a> Machine<'a> {
                 Instruction::Char { value, context } => context.writer(f).write_char(*value),
 
                 Instruction::StaticStr { ptr, context } => {
-                    context.writer(f).write_str(rom.fetch_static_str(*ptr))
+                    context.writer(f).write_str(pool.fetch_static_str(*ptr));
                 }
                 Instruction::String { ptr, context } => {
-                    context.writer(f).write_str(rom.fetch_string(*ptr))
+                    context.writer(f).write_str(pool.fetch_string(*ptr));
+                }
+                Instruction::Dyn { ptr, context } => {
+                    pool.fetch_dyn(*ptr).render(cx, &mut context.writer(f));
                 }
 
                 #[cfg(feature = "http")]
                 Instruction::StatusCode(status_code) => f.record_status_code(*status_code),
                 #[cfg(feature = "http")]
-                Instruction::Headers { ptr } => f.record_headers(rom.fetch_headers(*ptr).clone()),
+                Instruction::Headers { ptr } => f.record_headers(pool.fetch_headers(*ptr).clone()),
             }
         }
     }
