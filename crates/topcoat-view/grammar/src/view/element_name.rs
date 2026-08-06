@@ -85,10 +85,10 @@ impl ElementName {
 impl LowerView for ElementName {
     fn lower(&self, builder: &mut ViewBuilder) {
         match self {
-            Self::Ident(inner) => builder.write_str_unescaped(&inner.to_string()),
-            Self::LitStr(inner) => builder.write_str_unescaped(&inner.value()),
+            Self::Ident(inner) => builder.str_unescaped(&inner.to_string()),
+            Self::LitStr(inner) => builder.str_unescaped(&inner.value()),
             Self::Expr(inner) => {
-                builder.write_expr(ExprKind::ElementName, inner.expr.to_token_stream());
+                builder.expr(ExprKind::ElementName, inner.expr.to_token_stream());
             }
         }
     }

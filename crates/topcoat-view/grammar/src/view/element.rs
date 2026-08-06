@@ -85,40 +85,40 @@ impl LowerView for Element {
                 let name_ident = name_expr
                     .map(|_| Ident::new(&format!("__element_name_{increment}"), Span::call_site()));
 
-                builder.write_str_unescaped("<");
+                builder.str_unescaped("<");
                 match (name_ident.as_ref(), name_expr) {
                     (Some(ident), Some(expr)) => {
                         builder
                             .local_binding(&syn::parse_quote!(#ident), &syn::parse_quote!(&#expr));
-                        builder.write_expr(ExprKind::ElementName, quote! { #ident });
+                        builder.expr(ExprKind::ElementName, quote! { #ident });
                     }
                     _ => opening_tag.name.lower(builder),
                 }
                 opening_tag.attributes.lower(builder);
-                builder.write_str_unescaped(">");
+                builder.str_unescaped(">");
 
                 for child in children {
                     child.lower(builder);
                 }
 
-                builder.write_str_unescaped("</");
+                builder.str_unescaped("</");
                 match name_ident {
-                    Some(ident) => builder.write_expr(ExprKind::ElementName, quote! { #ident }),
+                    Some(ident) => builder.expr(ExprKind::ElementName, quote! { #ident }),
                     _ => opening_tag.name.lower(builder),
                 }
-                builder.write_str_unescaped(">");
+                builder.str_unescaped(">");
             }
             Self::SelfClosing { tag } => {
-                builder.write_str_unescaped("<");
+                builder.str_unescaped("<");
                 tag.name.lower(builder);
                 tag.attributes.lower(builder);
-                builder.write_str_unescaped("/>");
+                builder.str_unescaped("/>");
             }
             Self::Void { tag } => {
-                builder.write_str_unescaped("<");
+                builder.str_unescaped("<");
                 tag.name.lower(builder);
                 tag.attributes.lower(builder);
-                builder.write_str_unescaped(">");
+                builder.str_unescaped(">");
             }
         }
     }

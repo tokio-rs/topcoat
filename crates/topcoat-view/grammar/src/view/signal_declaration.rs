@@ -31,7 +31,7 @@ impl LowerView for SignalDeclaration {
             &parse_quote! { #ident },
             &parse_quote! { &#topcoat_runtime::Signal::new(#ident) },
         );
-        builder.write_expr(
+        builder.expr(
             ExprKind::Node,
             quote! { #topcoat_runtime::SignalDeclaration::new(#ident) },
         );

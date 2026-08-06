@@ -1,6 +1,5 @@
 use proc_macro2::TokenStream;
 use syn::{Expr, Pat};
-use topcoat_core_grammar::paths::topcoat_view;
 
 use super::{ExprKind, MatchArm, Node, Scope};
 
@@ -37,34 +36,33 @@ impl ViewBuilder {
             });
         }
     }
-
-    pub fn write_str_unescaped(&mut self, s: &str) {
-        self.static_segment.push_str(s);
-    }
-
-    /// Appends literal text escaped for a text node position.
-    pub fn write_text(&mut self, s: &str) {
-        self.write_in_context(topcoat_view::HtmlContext::Text, s);
-    }
-
-    /// Appends literal text escaped for a double-quoted attribute value
-    /// position.
-    pub fn write_attribute_value(&mut self, s: &str) {
-        self.write_in_context(topcoat_view::HtmlContext::AttributeValue, s);
-    }
-
     fn write_in_context(&mut self, context: topcoat_view::HtmlContext, s: &str) {
         let mut f = topcoat_view::Formatter::new(&mut self.static_segment);
         context.writer(&mut f).write_str(s);
     }
 
-    pub fn write_expr(&mut self, kind: ExprKind, tokens: TokenStream) {
+    pub fn str_unescaped(&mut self, s: &str) {
+        self.static_segment.push_str(s);
+    }
+
+    /// Appends literal text escaped for a text node position.
+    pub fn text(&mut self, s: &str) {
+        self.write_in_context(topcoat_view::HtmlContext::Text, s);
+    }
+
+    /// Appends literal text escaped for a double-quoted attribute value
+    /// position.
+    pub fn attribute_value(&mut self, s: &str) {
+        self.write_in_context(topcoat_view::HtmlContext::AttributeValue, s);
+    }
+
+    pub fn expr(&mut self, kind: ExprKind, tokens: TokenStream) {
         self.flush();
         self.nodes.push(Node::Expr { kind, tokens });
     }
 
     pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
-        self.flush();
+        // Locals do not need flush because they don't affect static segments.
         self.nodes.push(Node::Local {
             pat: pat.clone(),
             expr: Box::new(expr.clone()),

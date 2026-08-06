@@ -143,9 +143,9 @@ mod tests {
     #[test]
     fn adjacent_literal_text_is_concatenated() {
         let mut builder = ViewBuilder::new();
-        builder.write_str_unescaped("<div>");
-        builder.write_text("hello");
-        builder.write_str_unescaped("</div>");
+        builder.str_unescaped("<div>");
+        builder.text("hello");
+        builder.str_unescaped("</div>");
         let out = rendered(builder);
         assert!(out.contains("\"<div>hello</div>\""));
     }
@@ -153,16 +153,16 @@ mod tests {
     #[test]
     fn literal_text_is_escaped_for_its_position() {
         let mut builder = ViewBuilder::new();
-        builder.write_str_unescaped("<p>");
-        builder.write_text("a < b & \"c\"");
-        builder.write_str_unescaped("</p>");
+        builder.str_unescaped("<p>");
+        builder.text("a < b & \"c\"");
+        builder.str_unescaped("</p>");
         let out = rendered(builder);
         assert!(out.contains("a &lt; b &amp; \\\"c\\\""));
 
         let mut builder = ViewBuilder::new();
-        builder.write_str_unescaped("<p x=\"");
-        builder.write_attribute_value("a < b & \"c\"");
-        builder.write_str_unescaped("\">");
+        builder.str_unescaped("<p x=\"");
+        builder.attribute_value("a < b & \"c\"");
+        builder.str_unescaped("\">");
         let out = rendered(builder);
         assert!(out.contains("a < b &amp; &quot;c&quot;"));
     }
@@ -170,9 +170,9 @@ mod tests {
     #[test]
     fn expression_breaks_static_segment_with_kind_helper() {
         let mut builder = ViewBuilder::new();
-        builder.write_str_unescaped("<p>");
-        builder.write_expr(ExprKind::Node, quote! { value });
-        builder.write_str_unescaped("</p>");
+        builder.str_unescaped("<p>");
+        builder.expr(ExprKind::Node, quote! { value });
+        builder.str_unescaped("</p>");
         let out = rendered(builder);
         assert!(out.contains("__unescaped (__cx , & mut __parts , \"<p>\")"));
         assert!(out.contains("__node (__cx , & mut __parts , value)"));
@@ -183,8 +183,8 @@ mod tests {
     fn if_else_renders_both_branches() {
         let mut builder = ViewBuilder::new();
         builder.if_else(&syn::parse_quote!(cond), |then_branch, else_branch| {
-            then_branch.write_str_unescaped("yes");
-            else_branch.write_str_unescaped("no");
+            then_branch.str_unescaped("yes");
+            else_branch.str_unescaped("no");
         });
         let out = rendered(builder);
         assert!(out.contains("if cond"));
@@ -197,7 +197,7 @@ mod tests {
     fn if_without_else_omits_else_branch() {
         let mut builder = ViewBuilder::new();
         builder.if_else(&syn::parse_quote!(cond), |then_branch, _| {
-            then_branch.write_str_unescaped("yes");
+            then_branch.str_unescaped("yes");
         });
         let out = rendered(builder);
         assert!(out.contains("if cond"));
@@ -208,7 +208,7 @@ mod tests {
     fn for_loop_wraps_body_in_for_in_expr() {
         let mut builder = ViewBuilder::new();
         builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.write_str_unescaped("x");
+            body.str_unescaped("x");
         });
         let out = rendered(builder);
         assert!(out.contains("for x in xs"));
@@ -219,13 +219,13 @@ mod tests {
         let mut builder = ViewBuilder::new();
         builder.match_expr(&syn::parse_quote!(v), |arms| {
             arms.arm(&syn::parse_quote!(A), None, |body| {
-                body.write_str_unescaped("a");
+                body.str_unescaped("a");
             });
             arms.arm(
                 &syn::parse_quote!(B),
                 Some(&syn::parse_quote!(flag)),
                 |body| {
-                    body.write_str_unescaped("b");
+                    body.str_unescaped("b");
                 },
             );
         });
@@ -239,7 +239,7 @@ mod tests {
     fn local_binding_emits_let_statement() {
         let mut builder = ViewBuilder::new();
         builder.local_binding(&syn::parse_quote!(x), &syn::parse_quote!(value));
-        builder.write_str_unescaped("ok");
+        builder.str_unescaped("ok");
         let out = rendered(builder);
         assert!(out.contains("let x = value"));
     }
@@ -258,7 +258,7 @@ mod tests {
             (ExprKind::Attributes, "__attributes"),
         ] {
             let mut builder = ViewBuilder::new();
-            builder.write_expr(kind, quote! { v });
+            builder.expr(kind, quote! { v });
             assert!(
                 rendered(builder).contains(expected),
                 "expected helper `{expected}`",

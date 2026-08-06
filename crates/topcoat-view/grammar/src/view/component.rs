@@ -91,7 +91,7 @@ impl LowerView for Component {
             }
         });
 
-        builder.write_expr(
+        builder.expr(
             ExprKind::View,
             quote_spanned! {self.paren_token.span.span()=>
                 {

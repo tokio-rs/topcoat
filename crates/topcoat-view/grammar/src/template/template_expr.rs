@@ -18,7 +18,7 @@ pub struct TemplateExpr {
 impl LowerView for TemplateExpr {
     fn lower(&self, builder: &mut ViewBuilder) {
         let expr = &self.expr;
-        builder.write_expr(ExprKind::Node, expr.to_token_stream());
+        builder.expr(ExprKind::Node, expr.to_token_stream());
     }
 }
 

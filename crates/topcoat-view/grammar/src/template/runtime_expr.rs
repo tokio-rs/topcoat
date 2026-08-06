@@ -18,7 +18,7 @@ pub struct RuntimeExpr {
 
 impl LowerView for RuntimeExpr {
     fn lower(&self, builder: &mut ViewBuilder) {
-        builder.write_expr(ExprKind::Node, self.to_token_stream());
+        builder.expr(ExprKind::Node, self.to_token_stream());
     }
 }
 

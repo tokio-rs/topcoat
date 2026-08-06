@@ -31,19 +31,19 @@ impl LowerView for Attribute {
     fn lower(&self, builder: &mut ViewBuilder) {
         match self.value {
             AttributeValue::LitStr(_) => {
-                builder.write_str_unescaped(" ");
+                builder.str_unescaped(" ");
                 self.key.lower(builder);
-                builder.write_str_unescaped("=\"");
+                builder.str_unescaped("=\"");
                 self.value.lower(builder);
-                builder.write_str_unescaped("\"");
+                builder.str_unescaped("\"");
             }
             AttributeValue::Expr(_) => {
                 let key = &self.key;
                 let value = &self.value;
                 if matches!(key, AttributeKey::Expr(..)) {
-                    builder.write_expr(ExprKind::Attribute, quote! { (#key, #value) });
+                    builder.expr(ExprKind::Attribute, quote! { (#key, #value) });
                 } else {
-                    builder.write_expr(ExprKind::AttributeUnescaped, quote! { (#key, #value) });
+                    builder.expr(ExprKind::AttributeUnescaped, quote! { (#key, #value) });
                 }
             }
         }
