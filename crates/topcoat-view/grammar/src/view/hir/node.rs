@@ -1,3 +1,4 @@
+mod component;
 mod expr_node;
 mod for_loop;
 mod if_else;
@@ -6,6 +7,7 @@ mod match_expr;
 mod statement;
 mod static_segment;
 
+pub(crate) use component::*;
 pub(crate) use expr_node::*;
 pub(crate) use for_loop::*;
 pub(crate) use if_else::*;
@@ -19,6 +21,8 @@ pub(crate) use static_segment::*;
 pub(crate) enum Node {
     /// Literal markup, emitted verbatim.
     StaticSegment(StaticSegment),
+    /// A component invocation, emitted through the props builder.
+    Component(Component),
     /// A dynamic expression, emitted through its [`ExprKind`]'s helper.
     ExprNode(ExprNode),
     /// A `let pat = expr;` binding, in scope for the nodes that follow it.
