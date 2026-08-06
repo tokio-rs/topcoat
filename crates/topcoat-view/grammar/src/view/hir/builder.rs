@@ -1,7 +1,10 @@
 use proc_macro2::TokenStream;
 use syn::{Expr, Pat};
 
-use super::{ExprKind, MatchArm, Node, Scope};
+use super::{
+    ExprKind, ExprNode, ForLoop, IfElse, Local, MatchArm, MatchExpr, Node, Scope, Statement,
+    StaticSegment,
+};
 
 /// AST nodes that can lower themselves into a [`ViewBuilder`].
 pub(crate) trait LowerView {
@@ -12,8 +15,8 @@ pub(crate) trait LowerView {
 /// expansion is emitted from.
 ///
 /// Adjacent literal markup is concatenated into `static_segment` and flushed
-/// as a single [`Node::Static`] whenever a dynamic node (expression, control
-/// flow) is lowered.
+/// as a single [`Node::StaticSegment`] whenever a dynamic node (expression,
+/// control flow) is lowered.
 pub(crate) struct ViewBuilder {
     nodes: Vec<Node>,
     static_segment: String,
@@ -31,9 +34,9 @@ impl ViewBuilder {
         if !self.static_segment.is_empty() {
             let mut static_segment = String::new();
             std::mem::swap(&mut self.static_segment, &mut static_segment);
-            self.nodes.push(Node::Static {
+            self.nodes.push(Node::StaticSegment(StaticSegment {
                 string: static_segment,
-            });
+            }));
         }
     }
     fn write_in_context(&mut self, context: topcoat_view::HtmlContext, s: &str) {
@@ -58,31 +61,31 @@ impl ViewBuilder {
 
     pub fn expr(&mut self, kind: ExprKind, tokens: TokenStream) {
         self.flush();
-        self.nodes.push(Node::Expr { kind, tokens });
+        self.nodes.push(Node::ExprNode(ExprNode { kind, tokens }));
     }
 
     pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
         // Locals do not need flush because they don't affect static segments.
-        self.nodes.push(Node::Local {
+        self.nodes.push(Node::Local(Local {
             pat: pat.clone(),
             expr: Box::new(expr.clone()),
-        });
+        }));
     }
 
     pub fn statement(&mut self, tokens: TokenStream) {
         self.flush();
-        self.nodes.push(Node::Statement { tokens });
+        self.nodes.push(Node::Statement(Statement { tokens }));
     }
 
     pub fn for_loop(&mut self, pat: &Pat, expr: &Expr, f: impl FnOnce(&mut ViewBuilder)) {
         self.flush();
         let mut body = ViewBuilder::new();
         f(&mut body);
-        self.nodes.push(Node::For {
+        self.nodes.push(Node::ForLoop(ForLoop {
             pat: pat.clone(),
             expr: Box::new(expr.clone()),
             body: body.finish(),
-        });
+        }));
     }
 
     pub fn if_else(&mut self, expr: &Expr, f: impl FnOnce(&mut ViewBuilder, &mut ViewBuilder)) {
@@ -90,21 +93,21 @@ impl ViewBuilder {
         let mut then_branch = ViewBuilder::new();
         let mut else_branch = ViewBuilder::new();
         f(&mut then_branch, &mut else_branch);
-        self.nodes.push(Node::If {
+        self.nodes.push(Node::IfElse(IfElse {
             expr: expr.clone(),
             then_branch: then_branch.finish(),
             else_branch: else_branch.finish(),
-        });
+        }));
     }
 
     pub fn match_expr(&mut self, expr: &Expr, f: impl FnOnce(&mut MatchArmsBuilder)) {
         self.flush();
         let mut builder = MatchArmsBuilder { arms: Vec::new() };
         f(&mut builder);
-        self.nodes.push(Node::Match {
+        self.nodes.push(Node::MatchExpr(MatchExpr {
             expr: Box::new(expr.clone()),
             arms: builder.arms,
-        });
+        }));
     }
 
     /// Flushes any pending literal markup and returns the lowered [`Scope`].
@@ -114,7 +117,7 @@ impl ViewBuilder {
     }
 }
 
-/// Collects the arms of a [`Node::Match`], each lowered into its own
+/// Collects the arms of a [`Node::MatchExpr`], each lowered into its own
 /// [`Scope`].
 pub(crate) struct MatchArmsBuilder {
     arms: Vec<MatchArm>,

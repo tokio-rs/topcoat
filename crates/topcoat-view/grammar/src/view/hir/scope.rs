@@ -2,7 +2,9 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
-use super::{ExprKind, Node};
+use super::{
+    ExprKind, ExprNode, ForLoop, IfElse, Local, MatchExpr, Node, Statement, StaticSegment,
+};
 
 /// The lowered form of a `view!` invocation: the HIR between the view AST and
 /// the emitted `TokenStream`. Built by [`ViewBuilder`](super::ViewBuilder).
@@ -33,7 +35,7 @@ impl Scope {
             // Optimized path: The view has no content.
             Self::emit_empty_view()
         } else if self.nodes.len() == 1
-            && let Node::Static { string } = &self.nodes[0]
+            && let Node::StaticSegment(StaticSegment { string }) = &self.nodes[0]
         {
             Self::emit_static_view(string)
         } else {
@@ -51,26 +53,26 @@ impl Scope {
         let mut output = TokenStream::new();
         for node in nodes {
             match node {
-                Node::Static { string } => {
+                Node::StaticSegment(StaticSegment { string }) => {
                     let helper = ExprKind::Unescaped.helper();
                     let tokens = quote! { #string };
                     quote! { #helper(__cx, &mut __parts, #tokens); }
                 }
-                Node::Expr { kind, tokens } => {
+                Node::ExprNode(ExprNode { kind, tokens }) => {
                     let helper = kind.helper();
                     quote! { #helper(__cx, &mut __parts, #tokens); }
                 }
-                Node::Local { pat, expr } => {
+                Node::Local(Local { pat, expr }) => {
                     quote! { let #pat = #expr; }
                 }
-                Node::Statement { tokens } => {
+                Node::Statement(Statement { tokens }) => {
                     quote! { #tokens }
                 }
-                Node::If {
+                Node::IfElse(IfElse {
                     expr,
                     then_branch,
                     else_branch,
-                } => {
+                }) => {
                     let then_tokens = Self::emit_nodes(&then_branch.nodes);
                     let else_tokens = (!else_branch.nodes.is_empty()).then(|| {
                         let tokens = Self::emit_nodes(&else_branch.nodes);
@@ -83,7 +85,7 @@ impl Scope {
                         #else_tokens
                     }
                 }
-                Node::For { pat, expr, body } => {
+                Node::ForLoop(ForLoop { pat, expr, body }) => {
                     let body = Self::emit_nodes(&body.nodes);
                     quote! {
                         for #pat in #expr {
@@ -91,7 +93,7 @@ impl Scope {
                         }
                     }
                 }
-                Node::Match { expr, arms } => {
+                Node::MatchExpr(MatchExpr { expr, arms }) => {
                     let arm_tokens = arms.iter().map(|arm| {
                         let pat = &arm.pat;
                         let guard = arm.guard.as_ref().map(|g| quote! { if #g });
