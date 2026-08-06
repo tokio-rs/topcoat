@@ -1,0 +1,135 @@
+use proc_macro2::TokenStream;
+use syn::{Expr, Pat};
+use topcoat_core_grammar::paths::topcoat_view;
+
+use super::{ExprKind, MatchArm, Node, Scope};
+
+/// AST nodes that can lower themselves into a [`ViewBuilder`].
+pub(crate) trait LowerView {
+    fn lower(&self, builder: &mut ViewBuilder);
+}
+
+/// Lowers the AST of a `view!` invocation into a [`Scope`], the HIR the
+/// expansion is emitted from.
+///
+/// Adjacent literal markup is concatenated into `static_segment` and flushed
+/// as a single [`Node::Static`] whenever a dynamic node (expression, control
+/// flow) is lowered.
+pub(crate) struct ViewBuilder {
+    nodes: Vec<Node>,
+    static_segment: String,
+}
+
+impl ViewBuilder {
+    pub fn new() -> Self {
+        Self {
+            nodes: Vec::new(),
+            static_segment: String::new(),
+        }
+    }
+
+    fn flush(&mut self) {
+        if !self.static_segment.is_empty() {
+            let mut static_segment = String::new();
+            std::mem::swap(&mut self.static_segment, &mut static_segment);
+            self.nodes.push(Node::Static {
+                string: static_segment,
+            });
+        }
+    }
+
+    pub fn write_str_unescaped(&mut self, s: &str) {
+        self.static_segment.push_str(s);
+    }
+
+    /// Appends literal text escaped for a text node position.
+    pub fn write_text(&mut self, s: &str) {
+        self.write_in_context(topcoat_view::HtmlContext::Text, s);
+    }
+
+    /// Appends literal text escaped for a double-quoted attribute value
+    /// position.
+    pub fn write_attribute_value(&mut self, s: &str) {
+        self.write_in_context(topcoat_view::HtmlContext::AttributeValue, s);
+    }
+
+    fn write_in_context(&mut self, context: topcoat_view::HtmlContext, s: &str) {
+        let mut f = topcoat_view::Formatter::new(&mut self.static_segment);
+        context.writer(&mut f).write_str(s);
+    }
+
+    pub fn write_expr(&mut self, kind: ExprKind, tokens: TokenStream) {
+        self.flush();
+        self.nodes.push(Node::Expr { kind, tokens });
+    }
+
+    pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
+        self.flush();
+        self.nodes.push(Node::Local {
+            pat: pat.clone(),
+            expr: Box::new(expr.clone()),
+        });
+    }
+
+    pub fn statement(&mut self, tokens: TokenStream) {
+        self.flush();
+        self.nodes.push(Node::Statement { tokens });
+    }
+
+    pub fn for_loop(&mut self, pat: &Pat, expr: &Expr, f: impl FnOnce(&mut ViewBuilder)) {
+        self.flush();
+        let mut body = ViewBuilder::new();
+        f(&mut body);
+        self.nodes.push(Node::For {
+            pat: pat.clone(),
+            expr: Box::new(expr.clone()),
+            body: body.finish(),
+        });
+    }
+
+    pub fn if_else(&mut self, expr: &Expr, f: impl FnOnce(&mut ViewBuilder, &mut ViewBuilder)) {
+        self.flush();
+        let mut then_branch = ViewBuilder::new();
+        let mut else_branch = ViewBuilder::new();
+        f(&mut then_branch, &mut else_branch);
+        self.nodes.push(Node::If {
+            expr: expr.clone(),
+            then_branch: then_branch.finish(),
+            else_branch: else_branch.finish(),
+        });
+    }
+
+    pub fn match_expr(&mut self, expr: &Expr, f: impl FnOnce(&mut MatchArmsBuilder)) {
+        self.flush();
+        let mut builder = MatchArmsBuilder { arms: Vec::new() };
+        f(&mut builder);
+        self.nodes.push(Node::Match {
+            expr: Box::new(expr.clone()),
+            arms: builder.arms,
+        });
+    }
+
+    /// Flushes any pending literal markup and returns the lowered [`Scope`].
+    pub fn finish(mut self) -> Scope {
+        self.flush();
+        Scope::new(self.nodes)
+    }
+}
+
+/// Collects the arms of a [`Node::Match`], each lowered into its own
+/// [`Scope`].
+pub(crate) struct MatchArmsBuilder {
+    arms: Vec<MatchArm>,
+}
+
+impl MatchArmsBuilder {
+    pub fn arm(&mut self, pat: &Pat, guard: Option<&Expr>, f: impl FnOnce(&mut ViewBuilder)) {
+        let mut body = ViewBuilder::new();
+        f(&mut body);
+        self.arms.push(MatchArm {
+            pat: pat.clone(),
+            guard: guard.cloned(),
+            body: body.finish(),
+        });
+    }
+}

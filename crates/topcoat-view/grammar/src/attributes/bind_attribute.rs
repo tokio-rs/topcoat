@@ -6,9 +6,12 @@ use syn::{
 use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime};
 
 use crate::{
-    attributes::{AttributeKey, AttributeWriter, WriteAttribute},
+    attributes::{
+        AttributeKey,
+        hir::{AttributeBuilder, LowerAttribute},
+    },
     template::TemplateOrRuntimeExpr,
-    view::{ExprKind, ViewWriter, WriteView},
+    view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
 /// A `:name=(expr)` or `:name=$(expr)` attribute: a one-way binding to a DOM
@@ -20,11 +23,11 @@ pub struct BindAttribute {
     pub value: TemplateOrRuntimeExpr,
 }
 
-impl WriteView for BindAttribute {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for BindAttribute {
+    fn lower(&self, builder: &mut ViewBuilder) {
         let key = &self.key;
         let value = &self.value;
-        writer.write_expr(
+        builder.write_expr(
             ExprKind::Attributes,
             quote! {
                 #topcoat_runtime::BindAttribute::new(#key, #value)
@@ -33,11 +36,11 @@ impl WriteView for BindAttribute {
     }
 }
 
-impl WriteAttribute for BindAttribute {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for BindAttribute {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         let key = &self.key;
         let value = &self.value;
-        writer.insert_block(
+        builder.insert_block(
             2,
             quote! {
                 {

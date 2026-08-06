@@ -6,7 +6,7 @@ use syn::{
 };
 use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime_macro};
 
-use crate::view::{ExprKind, ViewWriter, WriteView};
+use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 
 /// A `$(`...`)` runtime expression, lowered through `runtime::expr!`.
 #[derive(Debug, PartialEq)]
@@ -16,9 +16,9 @@ pub struct RuntimeExpr {
     pub expr: syn::Expr,
 }
 
-impl WriteView for RuntimeExpr {
-    fn write(&self, writer: &mut ViewWriter) {
-        writer.write_expr(ExprKind::Node, self.to_token_stream());
+impl LowerView for RuntimeExpr {
+    fn lower(&self, builder: &mut ViewBuilder) {
+        builder.write_expr(ExprKind::Node, self.to_token_stream());
     }
 }
 

@@ -3,7 +3,10 @@ use std::ops::Deref;
 use syn::parse::{Parse, ParseStream};
 use topcoat_core_grammar::ParseOption;
 
-use crate::view::{ClosingTag, Node, ViewWriter, WriteView};
+use crate::view::{
+    ClosingTag, Node,
+    hir::{LowerView, ViewBuilder},
+};
 
 /// A sequence of sibling [`Node`]s: the shared building block used by both a
 /// top-level [`View`](super::View), a [`Component`](super::Component)'s
@@ -38,10 +41,10 @@ impl Parse for Nodes {
     }
 }
 
-impl WriteView for Nodes {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for Nodes {
+    fn lower(&self, builder: &mut ViewBuilder) {
         for node in self {
-            node.write(writer);
+            node.lower(builder);
         }
     }
 }

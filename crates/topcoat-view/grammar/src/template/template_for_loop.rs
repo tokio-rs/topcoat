@@ -6,9 +6,9 @@ use syn::{
 use topcoat_core_grammar::ParseOption;
 
 use crate::{
-    attributes::{AttributeWriter, WriteAttribute},
+    attributes::hir::{AttributeBuilder, LowerAttribute},
     template::TemplateBlock,
-    view::{ViewWriter, WriteView},
+    view::hir::{LowerView, ViewBuilder},
 };
 
 /// A `for pat in expr { ... }` loop in view-body position. The body is
@@ -21,18 +21,18 @@ pub struct TemplateForLoop<T> {
     pub body: TemplateBlock<T>,
 }
 
-impl<T: WriteView> WriteView for TemplateForLoop<T> {
-    fn write(&self, writer: &mut ViewWriter) {
-        writer.for_loop(&self.pat, &self.expr, |writer| {
-            self.body.write(writer);
+impl<T: LowerView> LowerView for TemplateForLoop<T> {
+    fn lower(&self, builder: &mut ViewBuilder) {
+        builder.for_loop(&self.pat, &self.expr, |body| {
+            self.body.lower(body);
         });
     }
 }
 
-impl<T: WriteAttribute> WriteAttribute for TemplateForLoop<T> {
-    fn write(&self, writer: &mut AttributeWriter) {
-        writer.for_loop(&self.pat, &self.expr, |writer| {
-            self.body.write(writer);
+impl<T: LowerAttribute> LowerAttribute for TemplateForLoop<T> {
+    fn lower(&self, builder: &mut AttributeBuilder) {
+        builder.for_loop(&self.pat, &self.expr, |body| {
+            self.body.lower(body);
         });
     }
 }
@@ -79,17 +79,17 @@ pub struct TemplateContinue {
     pub semi_token: Token![;],
 }
 
-impl WriteView for TemplateContinue {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for TemplateContinue {
+    fn lower(&self, builder: &mut ViewBuilder) {
         let expr_continue = &self.expr_continue;
-        writer.statement(quote! { #expr_continue; });
+        builder.statement(quote! { #expr_continue; });
     }
 }
 
-impl WriteAttribute for TemplateContinue {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for TemplateContinue {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         let expr_continue = &self.expr_continue;
-        writer.statement(quote! { #expr_continue; });
+        builder.statement(quote! { #expr_continue; });
     }
 }
 
@@ -128,17 +128,17 @@ pub struct TemplateBreak {
     pub semi_token: Token![;],
 }
 
-impl WriteView for TemplateBreak {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for TemplateBreak {
+    fn lower(&self, builder: &mut ViewBuilder) {
         let expr_break = &self.expr_break;
-        writer.statement(quote! { #expr_break; });
+        builder.statement(quote! { #expr_break; });
     }
 }
 
-impl WriteAttribute for TemplateBreak {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for TemplateBreak {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         let expr_break = &self.expr_break;
-        writer.statement(quote! { #expr_break; });
+        builder.statement(quote! { #expr_break; });
     }
 }
 

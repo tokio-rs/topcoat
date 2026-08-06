@@ -6,7 +6,7 @@ use syn::{
 };
 use topcoat_core_grammar::ParseOption;
 
-use crate::view::{ExprKind, ViewWriter, WriteView};
+use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 
 /// A parenthesized Rust expression embedded as a child node, e.g. `(5 + 6)`.
 #[derive(Debug, PartialEq)]
@@ -15,10 +15,10 @@ pub struct TemplateExpr {
     pub expr: syn::Expr,
 }
 
-impl WriteView for TemplateExpr {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for TemplateExpr {
+    fn lower(&self, builder: &mut ViewBuilder) {
         let expr = &self.expr;
-        writer.write_expr(ExprKind::Node, expr.to_token_stream());
+        builder.write_expr(ExprKind::Node, expr.to_token_stream());
     }
 }
 

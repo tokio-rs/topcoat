@@ -7,9 +7,12 @@ use syn::{
 use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime};
 
 use crate::{
-    attributes::{AttributeKey, AttributeWriter, WriteAttribute},
+    attributes::{
+        AttributeKey,
+        hir::{AttributeBuilder, LowerAttribute},
+    },
     template::TemplateOrRuntimeExpr,
-    view::{ExprKind, ViewWriter, WriteView},
+    view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
 /// The value attached to an [`EventHandler`]. Either a Rust expression
@@ -60,20 +63,20 @@ pub struct EventHandler {
     pub value: EventHandlerValue,
 }
 
-impl WriteView for EventHandler {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for EventHandler {
+    fn lower(&self, builder: &mut ViewBuilder) {
         let key = &self.key;
         let value = &self.value;
         match value {
             EventHandlerValue::LitStr(value) => {
-                writer.write_str_unescaped("data-topcoat-on:");
-                key.write(writer);
-                writer.write_str_unescaped("=\"");
-                writer.write_attribute_value(&value.value());
-                writer.write_str_unescaped("\"");
+                builder.write_str_unescaped("data-topcoat-on:");
+                key.lower(builder);
+                builder.write_str_unescaped("=\"");
+                builder.write_attribute_value(&value.value());
+                builder.write_str_unescaped("\"");
             }
             EventHandlerValue::Expr(value) => {
-                writer.write_expr(
+                builder.write_expr(
                     ExprKind::Attributes,
                     quote! {
                         #topcoat_runtime::EventHandler::new(
@@ -87,12 +90,12 @@ impl WriteView for EventHandler {
     }
 }
 
-impl WriteAttribute for EventHandler {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for EventHandler {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         let key = &self.key;
         match &self.value {
             EventHandlerValue::LitStr(value) => {
-                writer.insert_block(
+                builder.insert_block(
                     1,
                     quote! {
                         {
@@ -103,7 +106,7 @@ impl WriteAttribute for EventHandler {
                 );
             }
             EventHandlerValue::Expr(value) => {
-                writer.insert_block(
+                builder.insert_block(
                     1,
                     quote! {
                         {

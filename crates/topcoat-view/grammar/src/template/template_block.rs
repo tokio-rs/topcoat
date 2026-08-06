@@ -6,8 +6,8 @@ use syn::{
 use topcoat_core_grammar::ParseOption;
 
 use crate::{
-    attributes::{AttributeWriter, WriteAttribute},
-    view::{ViewWriter, WriteView},
+    attributes::hir::{AttributeBuilder, LowerAttribute},
+    view::hir::{LowerView, ViewBuilder},
 };
 
 /// A brace-delimited group of template nodes: `{ ...nodes... }`. Used as the
@@ -18,15 +18,15 @@ pub struct TemplateBlock<T> {
     pub children: T,
 }
 
-impl<T: WriteView> WriteView for TemplateBlock<T> {
-    fn write(&self, writer: &mut ViewWriter) {
-        self.children.write(writer);
+impl<T: LowerView> LowerView for TemplateBlock<T> {
+    fn lower(&self, builder: &mut ViewBuilder) {
+        self.children.lower(builder);
     }
 }
 
-impl<T: WriteAttribute> WriteAttribute for TemplateBlock<T> {
-    fn write(&self, writer: &mut AttributeWriter) {
-        self.children.write(writer);
+impl<T: LowerAttribute> LowerAttribute for TemplateBlock<T> {
+    fn lower(&self, builder: &mut AttributeBuilder) {
+        self.children.lower(builder);
     }
 }
 

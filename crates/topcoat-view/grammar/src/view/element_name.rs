@@ -12,7 +12,10 @@ use syn::{
 
 use crate::{
     template::TemplateExpr,
-    view::{ExprKind, HtmlIdent, ViewWriter, WriteView},
+    view::{
+        HtmlIdent,
+        hir::{ExprKind, LowerView, ViewBuilder},
+    },
 };
 
 /// The name appearing in an [`Element`](super::Element)'s tag. May be an HTML
@@ -79,13 +82,13 @@ impl ElementName {
     }
 }
 
-impl WriteView for ElementName {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for ElementName {
+    fn lower(&self, builder: &mut ViewBuilder) {
         match self {
-            Self::Ident(inner) => writer.write_str_unescaped(&inner.to_string()),
-            Self::LitStr(inner) => writer.write_str_unescaped(&inner.value()),
+            Self::Ident(inner) => builder.write_str_unescaped(&inner.to_string()),
+            Self::LitStr(inner) => builder.write_str_unescaped(&inner.value()),
             Self::Expr(inner) => {
-                writer.write_expr(ExprKind::ElementName, inner.expr.to_token_stream());
+                builder.write_expr(ExprKind::ElementName, inner.expr.to_token_stream());
             }
         }
     }

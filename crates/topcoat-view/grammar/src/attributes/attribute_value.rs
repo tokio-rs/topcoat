@@ -8,7 +8,7 @@ use syn::{
 
 use crate::{
     template::TemplateExpr,
-    view::{ExprKind, ViewWriter, WriteView},
+    view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
 /// The value part of an [`Attribute`](super::Attribute). Either a string
@@ -19,13 +19,13 @@ pub enum AttributeValue {
     LitStr(LitStr),
 }
 
-impl WriteView for AttributeValue {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for AttributeValue {
+    fn lower(&self, builder: &mut ViewBuilder) {
         match self {
             Self::Expr(inner) => {
-                writer.write_expr(ExprKind::AttributeValue, inner.expr.to_token_stream());
+                builder.write_expr(ExprKind::AttributeValue, inner.expr.to_token_stream());
             }
-            Self::LitStr(inner) => writer.write_attribute_value(&inner.value()),
+            Self::LitStr(inner) => builder.write_attribute_value(&inner.value()),
         }
     }
 }

@@ -4,7 +4,7 @@ use syn::{
 };
 use topcoat_core_grammar::ParseOption;
 
-use crate::view::{ViewWriter, WriteView};
+use crate::view::hir::{LowerView, ViewBuilder};
 
 mod kw {
     use syn::custom_keyword;
@@ -22,9 +22,9 @@ pub struct DocumentType {
     pub gt_token: Token![>],
 }
 
-impl WriteView for DocumentType {
-    fn write(&self, writer: &mut ViewWriter) {
-        writer.write_str_unescaped("<!DOCTYPE html>");
+impl LowerView for DocumentType {
+    fn lower(&self, builder: &mut ViewBuilder) {
+        builder.write_str_unescaped("<!DOCTYPE html>");
     }
 }
 
