@@ -1,10 +1,11 @@
-use proc_macro2::TokenStream;
-use syn::{Expr, Pat};
+use proc_macro2::{Span, TokenStream};
+use syn::{Expr, Pat, Path};
 
 use super::{
-    ExprKind, ExprNode, ForLoop, IfElse, Local, MatchArm, MatchExpr, Node, Scope, Statement,
-    StaticSegment,
+    Component, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchArm, MatchExpr, Node, Scope,
+    Statement, StaticSegment,
 };
+use crate::view::{NamedArg, Nodes};
 
 /// AST nodes that can lower themselves into a [`ViewBuilder`].
 pub(crate) trait LowerView {
@@ -75,6 +76,29 @@ impl ViewBuilder {
     pub fn statement(&mut self, tokens: TokenStream) {
         self.flush();
         self.nodes.push(Node::Statement(Statement { tokens }));
+    }
+
+    /// Lowers a component invocation, keeping the path, named arguments, and
+    /// lowered children for emission by [`Scope`].
+    pub fn component(
+        &mut self,
+        path: &Path,
+        named_args: &[NamedArg],
+        children: &Nodes,
+        span: Span,
+    ) {
+        self.flush();
+        let children = (!children.is_empty()).then(|| {
+            let mut child_builder = ViewBuilder::new();
+            children.lower(&mut child_builder);
+            child_builder.finish()
+        });
+        self.nodes.push(Node::Component(Component {
+            path: path.clone(),
+            named_args: named_args.to_vec(),
+            children,
+            span,
+        }));
     }
 
     pub fn for_loop(&mut self, pat: &Pat, expr: &Expr, f: impl FnOnce(&mut ViewBuilder)) {

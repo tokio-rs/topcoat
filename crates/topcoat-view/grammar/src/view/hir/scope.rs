@@ -1,9 +1,10 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{ToTokens, quote, quote_spanned};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 use super::{
-    ExprKind, ExprNode, ForLoop, IfElse, Local, MatchExpr, Node, Statement, StaticSegment,
+    Component, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchExpr, Node, Statement,
+    StaticSegment,
 };
 
 /// The lowered form of a `view!` invocation: the HIR between the view AST and
@@ -61,6 +62,36 @@ impl Scope {
                 Node::ExprNode(ExprNode { kind, tokens }) => {
                     let helper = kind.helper();
                     quote! { #helper(__cx, &mut __parts, #tokens); }
+                }
+                Node::Component(Component {
+                    path,
+                    named_args,
+                    children,
+                    span,
+                }) => {
+                    let setters = named_args.iter().map(|arg| {
+                        let ident = &arg.ident;
+                        let value = &arg.value;
+                        quote! { .#ident(#value) }
+                    });
+                    let child = children.as_ref().map(|scope| {
+                        let child = scope.emit_nested();
+                        quote_spanned! {*span=> .child(#child) }
+                    });
+                    quote_spanned! {*span=>
+                        {
+                            use #topcoat_view::Component;
+                            let props = #path::props_builder()#(#setters)*#child.build();
+                            // The marker is built via `Default` so the same construction
+                            // works for both unit-struct and generic (`PhantomData`) markers.
+                            #[allow(clippy::default_constructed_unit_structs)]
+                            Component::render(
+                                #path::default(),
+                                __cx,
+                                props,
+                            ).await?
+                        }
+                    }
                 }
                 Node::Local(Local { pat, expr }) => {
                     quote! { let #pat = #expr; }
@@ -259,7 +290,6 @@ mod tests {
         for (kind, expected) in [
             (ExprKind::Unescaped, "__unescaped"),
             (ExprKind::Node, "__node"),
-            (ExprKind::View, "__view"),
             (ExprKind::ElementName, "__element_name"),
             (ExprKind::Attribute, "__attribute"),
             (ExprKind::AttributeUnescaped, "__attribute_unescaped"),

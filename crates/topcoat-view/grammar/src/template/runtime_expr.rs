@@ -9,7 +9,7 @@ use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime_macro};
 use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 
 /// A `$(`...`)` runtime expression, lowered through `runtime::expr!`.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RuntimeExpr {
     pub dollar: Token![$],
     pub paren: syn::token::Paren,
