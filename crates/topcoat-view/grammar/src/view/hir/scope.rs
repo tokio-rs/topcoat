@@ -79,7 +79,7 @@ impl Scope {
                         quote_spanned! {*span=> .child(#child) }
                     });
                     quote_spanned! {*span=>
-                        {
+                        __view(__cx, &mut __parts, {
                             use #topcoat_view::Component;
                             let props = #path::props_builder()#(#setters)*#child.build();
                             // The marker is built via `Default` so the same construction
@@ -90,7 +90,7 @@ impl Scope {
                                 __cx,
                                 props,
                             ).await?
-                        }
+                        });
                     }
                 }
                 Node::Local(Local { pat, expr }) => {
