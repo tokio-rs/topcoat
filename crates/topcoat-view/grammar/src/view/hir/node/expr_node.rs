@@ -14,6 +14,7 @@ pub(crate) struct ExprNode {
 pub(crate) enum ExprKind {
     Unescaped,
     Node,
+    View,
     ElementName,
     Attribute,
     AttributeUnescaped,
@@ -27,6 +28,7 @@ impl ExprKind {
         let name = match self {
             Self::Unescaped => "__unescaped",
             Self::Node => "__node",
+            Self::View => "__view",
             Self::ElementName => "__element_name",
             Self::Attribute => "__attribute",
             Self::AttributeUnescaped => "__attribute_unescaped",
