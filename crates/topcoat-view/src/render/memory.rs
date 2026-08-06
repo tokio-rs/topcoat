@@ -259,8 +259,8 @@ impl Memory {
         if value.is_empty() {
             return;
         }
-        let ptr = self.pool.push_static_str(value);
-        self.push_instruction(Instruction::StaticStr { ptr, context });
+        // let ptr = self.pool.push_static_str(value);
+        self.push_instruction(Instruction::StaticStr { s: value, context });
     }
 
     pub fn push_string(&mut self, value: String, context: HtmlContext) {

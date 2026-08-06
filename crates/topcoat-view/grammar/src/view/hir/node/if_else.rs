@@ -40,7 +40,7 @@ impl Emit for IfElse {
             let then_branch = then_branch.emit_future();
             let else_branch = else_branch.emit_future();
 
-            emitter.hoist_result_future(
+            emitter.hoist_future(
                 Span::call_site(),
                 &ident,
                 &quote! {

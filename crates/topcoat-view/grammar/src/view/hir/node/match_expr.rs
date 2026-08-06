@@ -44,7 +44,7 @@ impl Emit for MatchExpr {
                 quote! { #pat #guard => #body }
             });
 
-            emitter.hoist_result_future(
+            emitter.hoist_future(
                 Span::call_site(),
                 &ident,
                 &quote! {

@@ -25,7 +25,7 @@ impl Emit for ForLoop {
             // The future owns its iteration's bindings, so it outlives the
             // iteration that produced it.
             let body = body.emit_owned_future();
-            emitter.hoist_result_future(
+            emitter.hoist_future(
                 Span::call_site(),
                 &ident,
                 &quote! {{

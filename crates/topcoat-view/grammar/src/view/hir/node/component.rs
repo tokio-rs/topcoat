@@ -1,6 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
-use syn::Path;
+use syn::{Path, spanned::Spanned};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 use crate::view::{
@@ -27,7 +27,7 @@ impl Component {
             path,
             named_args,
             children,
-            span,
+            ..
         } = self;
 
         let setters = named_args.iter().map(|arg| {
@@ -37,10 +37,10 @@ impl Component {
         });
         let child = children.as_ref().map(|scope| {
             let child = scope.emit_expr();
-            quote_spanned! {*span=> .child(#child) }
+            quote! { .child(#child) }
         });
 
-        quote_spanned! {*span=> {
+        quote_spanned! {path.span()=> {
             use #topcoat_view::Component;
             let props = #path::props_builder()#(#setters)*#child.build();
             // The marker is built via `Default` so the same construction
@@ -65,10 +65,7 @@ impl Component {
     /// any nesting depth.
     fn render_future_with_async_children(&self, children: &Scope) -> TokenStream {
         let Self {
-            path,
-            named_args,
-            span,
-            ..
+            path, named_args, ..
         } = self;
 
         let setters = named_args.iter().map(|arg| {
@@ -78,7 +75,7 @@ impl Component {
         });
         let child = children.emit_future();
 
-        quote_spanned! {*span=> {
+        quote_spanned! {path.span()=> {
             use #topcoat_view::Component;
             let (__placeholder, __slot) = __reserve_view();
             let __child = #child;
@@ -117,7 +114,6 @@ impl Emit for Component {
             _ => self.render_future(),
         };
 
-        emitter.hoist_result_future(span, &ident, &future);
-        emitter.emit(quote_spanned! {span=> __view(__cx, __parts, #ident); });
+        emitter.hoist_future(span, &ident, &future);
     }
 }

@@ -63,7 +63,7 @@ impl Emitter {
     /// With inline awaits the binding awaits the future in place. Otherwise
     /// the binding holds the future itself and is rebound to its output by
     /// the join that follows the hoist phase.
-    pub(super) fn hoist_result_future(&mut self, span: Span, ident: &Ident, future: &TokenStream) {
+    pub(super) fn hoist_future(&mut self, span: Span, ident: &Ident, future: &TokenStream) {
         if self.inline_await {
             self.hoist(quote_spanned! {span=> let #ident = #future.await?; });
         } else {
