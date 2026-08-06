@@ -282,7 +282,9 @@ async fn project_card() -> Result {
 }
 
 /// A branch switcher, rendered open so the menu shows on the page.
-#[component]
+// Boxed because the deeply nested menu renders concurrently, which holds
+// every nested component's future at once and makes this one large.
+#[component(boxed)]
 async fn branches_card() -> Result {
     view! {
         card(

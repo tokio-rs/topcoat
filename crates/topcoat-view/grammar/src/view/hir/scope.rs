@@ -74,7 +74,7 @@ impl Scope {
     /// enclosing block; for one that does, use
     /// [`emit_owned_future`](Self::emit_owned_future).
     pub(crate) fn emit_future(&self) -> TokenStream {
-        self.future(quote! { async })
+        self.future(&quote! { async })
     }
 
     /// Emits this scope as an expression yielding a future of the view that
@@ -82,10 +82,10 @@ impl Scope {
     /// expression is evaluated in, like one iteration's future outliving the
     /// iteration in a joined `for` loop.
     pub(crate) fn emit_owned_future(&self) -> TokenStream {
-        self.future(quote! { async move })
+        self.future(&quote! { async move })
     }
 
-    fn future(&self, header: TokenStream) -> TokenStream {
+    fn future(&self, header: &TokenStream) -> TokenStream {
         let view = self.emit_expr();
         if self.is_async() {
             quote! {

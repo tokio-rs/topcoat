@@ -43,7 +43,7 @@ impl Emit for IfElse {
             emitter.hoist_result_future(
                 Span::call_site(),
                 &ident,
-                quote! {
+                &quote! {
                     if #expr {
                         __Either::Left(#then_branch)
                     } else {

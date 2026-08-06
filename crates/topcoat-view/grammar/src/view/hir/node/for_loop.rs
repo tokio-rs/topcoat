@@ -28,7 +28,7 @@ impl Emit for ForLoop {
             emitter.hoist_result_future(
                 Span::call_site(),
                 &ident,
-                quote! {{
+                &quote! {{
                     let mut __futures = ::std::vec::Vec::new();
                     for #pat in #expr {
                         __futures.push(#body);

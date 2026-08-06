@@ -47,7 +47,7 @@ impl Emit for MatchExpr {
             emitter.hoist_result_future(
                 Span::call_site(),
                 &ident,
-                quote! {
+                &quote! {
                     match #expr {
                         #(#arms,)*
                     }

@@ -118,7 +118,7 @@ impl Emit for Component {
             _ => self.render_future(),
         };
 
-        emitter.hoist_result_future(span, &ident, future);
+        emitter.hoist_result_future(span, &ident, &future);
         emitter.emit(quote_spanned! {span=> __view(__cx, __parts, #ident); });
     }
 }
