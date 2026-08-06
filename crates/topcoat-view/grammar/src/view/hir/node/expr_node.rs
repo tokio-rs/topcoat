@@ -1,10 +1,29 @@
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use proc_macro2::{Span, TokenStream};
+use quote::{format_ident, quote};
 use syn::Ident;
+
+use crate::view::hir::emit::{Emit, Emitter};
 
 /// A dynamic expression, emitted through its [`ExprKind`]'s helper.
 pub(crate) struct ExprNode {
     pub kind: ExprKind,
     pub tokens: TokenStream,
+}
+
+impl Emit for ExprNode {
+    fn emit(&self, emitter: &mut Emitter) {
+        static ID: AtomicU32 = AtomicU32::new(0);
+        let id = ID.fetch_add(1, Ordering::Relaxed);
+        let identifier = format_ident!("__expr{id}");
+
+        let tokens = &self.tokens;
+        let helper = self.kind.helper();
+
+        emitter.hoist(quote! { let #identifier = #tokens; });
+        emitter.emit(quote! { #helper(__cx, &mut __parts, #identifier); });
+    }
 }
 
 /// Identifies which `internal` helper an [`ExprNode`] should be wrapped in
