@@ -54,7 +54,7 @@ impl MatchArmBody for Node {
 impl LowerView for Node {
     fn lower(&self, builder: &mut ViewBuilder) {
         match self {
-            Self::Text(inner) => builder.write_text(&inner.value()),
+            Self::Text(inner) => builder.text(&inner.value()),
             Self::DocumentType(inner) => inner.lower(builder),
             Self::Element(inner) => inner.lower(builder),
             Self::Component(inner) => inner.lower(builder),

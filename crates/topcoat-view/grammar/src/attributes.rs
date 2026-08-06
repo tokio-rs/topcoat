@@ -62,7 +62,7 @@ impl LowerView for Attributes {
         // If we cannot statically assert that all attribute keys are unique we must fall back to a
         // slower runtime map of attributes.
         if visitor.dynamic {
-            builder.write_expr(ExprKind::Attributes, self.to_token_stream());
+            builder.expr(ExprKind::Attributes, self.to_token_stream());
         } else {
             for item in &self.items {
                 LowerView::lower(item, builder);
