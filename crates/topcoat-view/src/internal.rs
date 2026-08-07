@@ -18,6 +18,7 @@
 //! placeholder must form a block of its own, so [`reserve`] is called
 //! between blocks, never while one is building.
 
+use futures_util::FutureExt;
 pub use futures_util::{
     future::{Either, try_join_all},
     try_join,
@@ -39,11 +40,7 @@ use crate::{
 /// arena is installed while `fut` polls, and the returned view takes
 /// ownership of it.
 pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Result<View>> {
-    let scoped = ArenaScope::scope(fut);
-    async move {
-        let (view, arena) = scoped.await;
-        Ok(view?.seal(arena))
-    }
+    ArenaScope::scope(fut).map(|(view, arena)| Ok(view?.seal(arena)))
 }
 
 /// Builds a view in one synchronous burst, in the enclosing invocation's
