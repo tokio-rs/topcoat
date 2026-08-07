@@ -569,7 +569,12 @@ mod tests {
                 HeaderName::from_static("x-test"),
                 HeaderValue::from_static("1"),
             );
-            view! { cx => (StatusCode::IM_A_TEAPOT) (header) "hi" }
+            view! {
+                cx =>
+                (StatusCode::IM_A_TEAPOT)
+                (header)
+                "hi"
+            }
         });
         assert_eq!(parts.status, StatusCode::IM_A_TEAPOT);
         assert_eq!(header(&parts, "content-type"), "text/html; charset=utf-8");
@@ -584,7 +589,11 @@ mod tests {
                 CONTENT_TYPE,
                 HeaderValue::from_static("application/xhtml+xml"),
             );
-            view! { cx => (header) "hi" }
+            view! {
+                cx =>
+                (header)
+                "hi"
+            }
         });
         assert_eq!(header(&parts, "content-type"), "application/xhtml+xml");
     }

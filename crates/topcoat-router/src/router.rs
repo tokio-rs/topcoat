@@ -299,7 +299,12 @@ mod tests {
     fn layout_root(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
-            view! { cx => "R[" (inner) "]" }
+            view! {
+                cx =>
+                "R["
+                (inner)
+                "]"
+            }
         })
     }
 
@@ -307,7 +312,12 @@ mod tests {
     fn layout_admin(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
-            view! { cx => "A[" (inner) "]" }
+            view! {
+                cx =>
+                "A["
+                (inner)
+                "]"
+            }
         })
     }
 
