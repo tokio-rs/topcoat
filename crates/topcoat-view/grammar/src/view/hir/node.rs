@@ -1,4 +1,5 @@
 mod component;
+mod deferred;
 mod expr_node;
 mod for_loop;
 mod if_else;
@@ -8,6 +9,7 @@ mod statement;
 mod static_segment;
 
 pub(crate) use component::*;
+pub(crate) use deferred::*;
 pub(crate) use expr_node::*;
 pub(crate) use for_loop::*;
 pub(crate) use if_else::*;
@@ -23,6 +25,8 @@ pub(crate) enum Node {
     StaticSegment(StaticSegment),
     /// A component invocation, emitted through the props builder.
     Component(Component),
+    /// A deferred component invocation paired with its placeholder.
+    Deferred(Deferred),
     /// A dynamic expression, emitted through its [`ExprKind`]'s helper.
     ExprNode(ExprNode),
     /// A `let pat = expr;` binding, in scope for the nodes that follow it.
@@ -35,4 +39,24 @@ pub(crate) enum Node {
     IfElse(IfElse),
     /// A `match` whose arm bodies are lowered into nested scopes.
     MatchExpr(MatchExpr),
+}
+
+impl Node {
+    pub(super) fn contains_component(&self) -> bool {
+        match self {
+            Self::Component(_) | Self::Deferred(_) => true,
+            Self::ForLoop(ForLoop { body, .. }) => body.contains_component(),
+            Self::IfElse(IfElse {
+                then_branch,
+                else_branch,
+                ..
+            }) => then_branch.contains_component() || else_branch.contains_component(),
+            Self::MatchExpr(MatchExpr { arms, .. }) => {
+                arms.iter().any(|arm| arm.body.contains_component())
+            }
+            Self::StaticSegment(_) | Self::ExprNode(_) | Self::Local(_) | Self::Statement(_) => {
+                false
+            }
+        }
+    }
 }

@@ -1,16 +1,26 @@
-use std::{borrow::Cow, convert::Infallible};
+use std::{
+    borrow::Cow,
+    convert::Infallible,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use bytes::{Bytes, BytesMut};
+use futures_util::stream::FuturesUnordered;
 use http::{
     Extensions, HeaderMap, StatusCode,
     header::{CONTENT_TYPE, HeaderName, HeaderValue},
     response::Parts,
 };
+use http_body::Frame;
+use http_body_util::StreamBody;
 use topcoat_core::{
-    context::Cx,
+    context::{Cx, CxHandle},
     error::{Error, Result},
+    response_event::{ClientResourceKind, ResponseEvent, ResponseEventReceiver},
 };
-use topcoat_view::View;
+use topcoat_view::{DeferredTask, Formatter, HtmlContext, View};
 
 use crate::{Body, BoxError, content::Html};
 
@@ -18,6 +28,155 @@ pub type Response<T = Body> = http::Response<T>;
 
 const TEXT_PLAIN: HeaderValue = HeaderValue::from_static("text/plain; charset=utf-8");
 const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("application/octet-stream");
+
+type PendingDeferred = Pin<Box<dyn Future<Output = Result<(u64, View)>> + Send + 'static>>;
+
+struct DeferredResponseStream {
+    initial: Option<Bytes>,
+    cx: CxHandle,
+    pending: FuturesUnordered<PendingDeferred>,
+    response_events: ResponseEventReceiver,
+    ready_patch: Option<Bytes>,
+}
+
+impl DeferredResponseStream {
+    fn new(
+        html: String,
+        cx: CxHandle,
+        deferred: Vec<DeferredTask>,
+        response_events: ResponseEventReceiver,
+    ) -> Self {
+        let mut stream = Self {
+            initial: Some(Bytes::from(html)),
+            cx,
+            pending: FuturesUnordered::new(),
+            response_events,
+            ready_patch: None,
+        };
+        stream.extend(deferred);
+        stream
+    }
+
+    fn extend(&mut self, deferred: Vec<DeferredTask>) {
+        for task in deferred {
+            let cx = self.cx.clone();
+            let id = task.id();
+            self.pending
+                .push(Box::pin(async move { Ok((id, task.resolve(cx).await?)) }));
+        }
+    }
+
+    fn take_response_event(&mut self) -> Option<Bytes> {
+        let event = self.response_events.try_next()?;
+        Some(Bytes::from(response_event(event)))
+    }
+}
+
+impl futures_core::Stream for DeferredResponseStream {
+    type Item = Result<Frame<Bytes>>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if let Some(initial) = self.initial.take() {
+            return Poll::Ready(Some(Ok(Frame::data(initial))));
+        }
+
+        if let Some(event) = self.take_response_event() {
+            return Poll::Ready(Some(Ok(Frame::data(event))));
+        }
+        if let Some(patch) = self.ready_patch.take() {
+            return Poll::Ready(Some(Ok(Frame::data(patch))));
+        }
+
+        match futures_core::Stream::poll_next(Pin::new(&mut self.pending), cx) {
+            Poll::Ready(Some(Ok((id, view)))) => {
+                let rendered = view.render_response(&self.cx);
+                self.extend(rendered.deferred);
+                self.ready_patch = Some(Bytes::from(deferred_patch(id, &rendered.html)));
+                if let Some(event) = self.take_response_event() {
+                    Poll::Ready(Some(Ok(Frame::data(event))))
+                } else {
+                    Poll::Ready(Some(Ok(Frame::data(
+                        self.ready_patch
+                            .take()
+                            .expect("deferred patch was just stored"),
+                    ))))
+                }
+            }
+            Poll::Ready(Some(Err(error))) => Poll::Ready(Some(Err(error))),
+            Poll::Ready(None) => {
+                if let Some(event) = self.take_response_event() {
+                    Poll::Ready(Some(Ok(Frame::data(event))))
+                } else {
+                    Poll::Ready(None)
+                }
+            }
+            Poll::Pending => match self.response_events.poll_next(cx) {
+                Poll::Ready(Some(event)) => {
+                    Poll::Ready(Some(Ok(Frame::data(Bytes::from(response_event(event))))))
+                }
+                Poll::Ready(None) | Poll::Pending => Poll::Pending,
+            },
+        }
+    }
+}
+
+fn deferred_patch(id: u64, html: &str) -> String {
+    format!(r#"<template data-topcoat-defer-patch="{id}">{html}</template>"#)
+}
+
+fn response_event(event: ResponseEvent) -> String {
+    let mut html = String::new();
+    let mut formatter = Formatter::new(&mut html);
+    HtmlContext::Unescaped
+        .writer(&mut formatter)
+        .write_str("<template ");
+
+    match event {
+        ResponseEvent::Resource(resource) => {
+            let kind = match resource.kind {
+                ClientResourceKind::Stylesheet => "stylesheet",
+                ClientResourceKind::Module => "module",
+            };
+            HtmlContext::Unescaped
+                .writer(&mut formatter)
+                .write_str("data-topcoat-resource=\"");
+            HtmlContext::AttributeValue
+                .writer(&mut formatter)
+                .write_str(kind);
+            HtmlContext::Unescaped
+                .writer(&mut formatter)
+                .write_str("\" data-topcoat-resource-key=\"");
+            HtmlContext::AttributeValue
+                .writer(&mut formatter)
+                .write_str(&resource.key);
+            HtmlContext::Unescaped
+                .writer(&mut formatter)
+                .write_str("\" data-topcoat-resource-src=\"");
+            HtmlContext::AttributeValue
+                .writer(&mut formatter)
+                .write_str(&resource.url);
+            HtmlContext::Unescaped
+                .writer(&mut formatter)
+                .write_str("\"></template>");
+        }
+        ResponseEvent::Json { key, json } => {
+            HtmlContext::Unescaped
+                .writer(&mut formatter)
+                .write_str("data-topcoat-json=\"");
+            HtmlContext::AttributeValue
+                .writer(&mut formatter)
+                .write_str(&key);
+            HtmlContext::Unescaped
+                .writer(&mut formatter)
+                .write_str("\">");
+            HtmlContext::Text.writer(&mut formatter).write_str(&json);
+            HtmlContext::Unescaped
+                .writer(&mut formatter)
+                .write_str("</template>");
+        }
+    }
+    html
+}
 
 /// Converts a value into an HTTP [`Response`].
 ///
@@ -236,7 +395,21 @@ impl IntoResponse for Parts {
 impl IntoResponse for View {
     fn into_response(self, cx: &Cx) -> Result<Response> {
         let rendered = self.render_response(cx);
-        let mut response = Html(rendered.html).into_response(cx)?;
+        let streams = !rendered.deferred.is_empty() || cx.has_response_events();
+        let mut response = if streams {
+            let response_events = cx.take_response_event_receiver();
+            let stream = DeferredResponseStream::new(
+                rendered.html,
+                cx.handle(),
+                rendered.deferred,
+                response_events,
+            );
+            let mut response = Html(String::new()).into_response(cx)?;
+            *response.body_mut() = Body::new(StreamBody::new(stream));
+            response
+        } else {
+            Html(rendered.html).into_response(cx)?
+        };
         if let Some(status_code) = rendered.status_code {
             *response.status_mut() = status_code;
         }
@@ -420,8 +593,20 @@ impl_into_response_tuples!(
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        future::{pending, poll_fn},
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, Ordering},
+        },
+        task::Poll,
+        time::Duration,
+    };
+
+    use futures_util::StreamExt as _;
     use http_body_util::Full;
-    use topcoat_view::{HtmlContext, NodeViewParts, PartsWriter, ViewParts};
+    use topcoat_core::context::request_context;
+    use topcoat_view::{HtmlContext, NodeViewParts, PartsWriter, ViewParts, defer};
 
     use super::*;
     use crate::to_bytes;
@@ -553,6 +738,14 @@ mod tests {
         View::new(parts)
     }
 
+    fn compose(views: impl IntoIterator<Item = View>) -> View {
+        let mut parts = ViewParts::new();
+        for view in views {
+            parts.push_view(view);
+        }
+        View::new(parts)
+    }
+
     #[test]
     fn view_is_an_html_response() {
         let (parts, body) = run(view(|_cx, writer| {
@@ -591,6 +784,198 @@ mod tests {
             writer.push_str("hi");
         }));
         assert_eq!(header(&parts, "content-type"), "application/xhtml+xml");
+    }
+
+    #[tokio::test]
+    async fn deferred_views_stream_template_patches_in_completion_order() {
+        let cx = Cx::default();
+        let completed = Arc::new(Mutex::new(Vec::new()));
+        let slow_completed = Arc::clone(&completed);
+        let slow = defer(
+            view(|_cx, writer| {
+                writer.push_str("slow loading");
+            }),
+            move |_cx| async move {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                slow_completed.lock().unwrap().push("slow");
+                Ok(view(|_cx, writer| {
+                    writer.push_str("slow ready");
+                }))
+            },
+        );
+        let fast_completed = Arc::clone(&completed);
+        let fast = defer(
+            view(|_cx, writer| {
+                writer.push_str("fast loading");
+            }),
+            move |_cx| async move {
+                fast_completed.lock().unwrap().push("fast");
+                Ok(view(|_cx, writer| {
+                    writer.push_str("fast ready");
+                }))
+            },
+        );
+        let response = compose([slow, fast]).into_response(&cx).unwrap();
+        let mut body = response.into_body().into_data_stream();
+
+        let shell = body.next().await.unwrap().unwrap();
+        let shell = String::from_utf8(shell.to_vec()).unwrap();
+        assert!(shell.contains("slow loading"));
+        assert!(shell.contains("fast loading"));
+
+        let first = body.next().await.unwrap().unwrap();
+        let first = String::from_utf8(first.to_vec()).unwrap();
+        let second = body.next().await.unwrap().unwrap();
+        let second = String::from_utf8(second.to_vec()).unwrap();
+        assert!(first.contains("fast ready"));
+        assert!(second.contains("slow ready"));
+        assert!(first.starts_with("<template data-topcoat-defer-patch="));
+        assert!(!first.contains("<script"));
+        assert_eq!(*completed.lock().unwrap(), ["fast", "slow"]);
+    }
+
+    #[tokio::test]
+    async fn response_events_are_streamed_before_the_fragment_that_requested_them() {
+        let cx = Cx::default();
+        let deferred = defer(View::empty(), |cx| async move {
+            cx.require_client_resource(topcoat_core::response_event::ClientResource {
+                key: "catalog-module".to_owned(),
+                kind: ClientResourceKind::Module,
+                url: "/catalog.js?x=1&y=2".to_owned(),
+            })?;
+            cx.send_json_named("catalog", &serde_json::json!({ "html": "</template>&" }))?;
+            Ok(view(|_cx, writer| {
+                writer.push_str("catalog ready");
+            }))
+        });
+        let response = deferred.into_response(&cx).unwrap();
+        let mut body = response.into_body().into_data_stream();
+
+        let shell = String::from_utf8(body.next().await.unwrap().unwrap().to_vec()).unwrap();
+        let resource = String::from_utf8(body.next().await.unwrap().unwrap().to_vec()).unwrap();
+        let json = String::from_utf8(body.next().await.unwrap().unwrap().to_vec()).unwrap();
+        let patch = String::from_utf8(body.next().await.unwrap().unwrap().to_vec()).unwrap();
+
+        assert!(shell.contains("data-topcoat-defer-start"));
+        assert_eq!(
+            resource,
+            "<template data-topcoat-resource=\"module\" data-topcoat-resource-key=\"catalog-module\" data-topcoat-resource-src=\"/catalog.js?x=1&amp;y=2\"></template>"
+        );
+        assert_eq!(
+            json,
+            "<template data-topcoat-json=\"catalog\">{\"html\":\"&lt;/template&gt;&amp;\"}</template>"
+        );
+        assert!(patch.contains("catalog ready"));
+        assert!(body.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn response_events_stream_without_deferred_views_and_deduplicate_resources() {
+        let cx = Cx::default();
+        let resource = topcoat_core::response_event::ClientResource {
+            key: "styles".to_owned(),
+            kind: ClientResourceKind::Stylesheet,
+            url: "/styles.css".to_owned(),
+        };
+        cx.require_client_resource(resource.clone()).unwrap();
+        cx.require_client_resource(resource).unwrap();
+        let response = view(|_cx, writer| {
+            writer.push_str("shell");
+        })
+        .into_response(&cx)
+        .unwrap();
+        let mut body = response.into_body().into_data_stream();
+
+        assert_eq!(body.next().await.unwrap().unwrap(), "shell");
+        let resource = String::from_utf8(body.next().await.unwrap().unwrap().to_vec()).unwrap();
+        assert!(resource.contains("data-topcoat-resource=\"stylesheet\""));
+        assert!(body.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn nested_views_adopt_deferred_work_without_an_include_helper() {
+        let cx = Cx::default();
+        let child = defer(
+            view(|_cx, writer| {
+                writer.push_str("outer loading");
+            }),
+            |_cx| async move {
+                Ok(defer(
+                    view(|_cx, writer| {
+                        writer.push_str("inner loading");
+                    }),
+                    |_cx| async move {
+                        Ok(view(|_cx, writer| {
+                            writer.push_str("inner ready");
+                        }))
+                    },
+                ))
+            },
+        );
+        let response = compose([child]).into_response(&cx).unwrap();
+        let mut body = response.into_body().into_data_stream();
+
+        let shell = String::from_utf8(body.next().await.unwrap().unwrap().to_vec()).unwrap();
+        let outer = String::from_utf8(body.next().await.unwrap().unwrap().to_vec()).unwrap();
+        let inner = String::from_utf8(body.next().await.unwrap().unwrap().to_vec()).unwrap();
+        assert!(shell.contains("outer loading"));
+        assert!(outer.contains("inner loading"));
+        assert!(outer.contains("data-topcoat-defer-start"));
+        assert!(inner.contains("inner ready"));
+        assert!(body.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn deferred_views_keep_request_context_alive() {
+        struct Name(&'static str);
+
+        let cx = topcoat_core::context::CxTestBuilder::new()
+            .request_context(Name("Ada"))
+            .build();
+        let greeting = defer(View::empty(), |cx| async move {
+            let name = request_context::<Name>(&cx).0;
+            Ok(view(|_cx, writer| {
+                writer.push_str(name);
+            }))
+        });
+        let response = greeting.into_response(&cx).unwrap();
+        drop(cx);
+
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert!(String::from_utf8(body.to_vec()).unwrap().contains("Ada"));
+    }
+
+    struct DropFlag(Arc<AtomicBool>);
+
+    impl Drop for DropFlag {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    #[tokio::test]
+    async fn dropping_the_response_cancels_deferred_views() {
+        let cx = Cx::default();
+        let dropped = Arc::new(AtomicBool::new(false));
+        let future_dropped = Arc::clone(&dropped);
+        let deferred = defer(View::empty(), move |_cx| async move {
+            let _drop_flag = DropFlag(future_dropped);
+            pending::<()>().await;
+            unreachable!()
+        });
+        let response = deferred.into_response(&cx).unwrap();
+        let mut body = response.into_body().into_data_stream();
+
+        body.next().await.unwrap().unwrap();
+        poll_fn(|cx| {
+            assert!(body.poll_next_unpin(cx).is_pending());
+            Poll::Ready(())
+        })
+        .await;
+        assert!(!dropped.load(Ordering::SeqCst));
+
+        drop(body);
+        assert!(dropped.load(Ordering::SeqCst));
     }
 
     // -- header arrays --

@@ -45,6 +45,35 @@ When an [`Asset`] appears inside [`view!`](crate::view::view), Topcoat renders i
 
 The hash in the filename is based on the file contents, so URLs are safe to cache aggressively.
 
+# Streaming component assets
+
+A component can require a stylesheet or JavaScript module through its request context. The requirement is flushed independently of the component's HTML, so the browser can load the asset while a deferred component is still rendering:
+
+```rust
+use topcoat::{
+    Result,
+    asset::{Asset, CxAssetExt, asset},
+    context::Cx,
+    view::{component, view},
+};
+
+const CHART_CSS: Asset = asset!("./chart.css");
+const CHART_JS: Asset = asset!("./chart.js");
+
+#[component]
+async fn chart(cx: &Cx) -> Result {
+    cx.require_asset(CHART_CSS.stylesheet())?;
+    cx.require_asset(CHART_JS.module())?;
+
+    let data_key = cx.send_json_named("sales-chart", &[12, 18, 15])?;
+    view! { <div data-chart=(data_key.as_str())></div> }
+}
+```
+
+Call `require_asset` before slow work to flush the requirement as early as possible. Stylesheets are inserted as external `<link>` elements and modules as external `<script type="module">` elements. Requirements for the same asset and kind are deduplicated on both the server and browser.
+
+Streaming assets use the same external helper as deferred views, so the document must include [`defer_script`](crate::view::defer_script). Streamed response chunks are inert annotated templates; no inline executable script is generated, which keeps the mechanism compatible with Content Security Policies that disallow inline scripts.
+
 The bundler finds declarations by scanning the compiled binary. The embedded declaration is kept in the binary through the returned [`Asset`] handle, so an asset only ends up in the bundle while some code path uses its handle: a declaration whose handle is never used can be optimized out of the binary, and the bundler then skips it.
 
 # Loading the bundle

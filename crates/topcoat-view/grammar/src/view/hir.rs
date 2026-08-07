@@ -1,5 +1,4 @@
 mod builder;
-mod emit;
 mod node;
 mod scope;
 

@@ -1,10 +1,9 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote, quote_spanned};
+use quote::{ToTokens, quote};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 use super::{
-    Component, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchExpr, Node, Statement,
-    StaticSegment,
+    Deferred, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchExpr, Node, Statement, StaticSegment,
 };
 
 /// The lowered form of a `view!` invocation: the HIR between the view AST and
@@ -21,11 +20,27 @@ impl Scope {
     /// Emits the expansion of a top-level `view!` invocation: the view
     /// expression wrapped in an `async` block.
     pub fn emit(&self) -> TokenStream {
-        let view = self.emit_view();
-        quote! { async { ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#view) }.await }
+        let future = self.emit_future();
+        quote! { (#future).await }
     }
 
-    fn emit_view(&self) -> TokenStream {
+    pub(super) fn emit_future(&self) -> TokenStream {
+        if self.contains_component() {
+            self.emit_tree_future()
+        } else {
+            let view = self.emit_ready_view();
+            quote! {
+                async {
+                    ::core::result::Result::<
+                        #topcoat_view::View,
+                        #topcoat_error::Error,
+                    >::Ok(#view)
+                }
+            }
+        }
+    }
+
+    fn emit_ready_view(&self) -> TokenStream {
         if self.nodes.is_empty() {
             // Optimized path: The view has no content.
             Self::emit_empty_view()
@@ -34,7 +49,7 @@ impl Scope {
         {
             Self::emit_static_view(string)
         } else {
-            let statements = Self::emit_nodes(&self.nodes);
+            let statements = Self::emit_ready_nodes(&self.nodes);
             quote! {{
                 use #topcoat_view::internal::*;
                 let mut __parts = #topcoat_view::ViewParts::new();
@@ -44,7 +59,182 @@ impl Scope {
         }
     }
 
-    fn emit_nodes(nodes: &[Node]) -> TokenStream {
+    pub(super) fn contains_component(&self) -> bool {
+        self.nodes.iter().any(Node::contains_component)
+    }
+
+    fn emit_tree_future(&self) -> TokenStream {
+        Self::emit_tree_future_for(&self.nodes)
+    }
+
+    fn emit_tree_future_for(nodes: &[Node]) -> TokenStream {
+        // Leading locals live outside the tree so every pending node can
+        // borrow them. Later locals begin a nested future for the remainder.
+        let prologue_len = nodes
+            .iter()
+            .take_while(|node| matches!(node, Node::Local(_) | Node::Statement(_)))
+            .count();
+        let prologue_nodes = &nodes[..prologue_len];
+        let prologue = Self::emit_ready_nodes(prologue_nodes);
+        let prologue_view = prologue_nodes
+            .iter()
+            .any(|node| matches!(node, Node::Statement(_)))
+            .then(|| {
+                quote! {
+                    __tree.push_view(#topcoat_view::View::new(
+                        ::core::mem::take(&mut __parts),
+                    ));
+                }
+            });
+        let (statements, parts_dirty) = Self::emit_tree_nodes(&nodes[prologue_len..]);
+        let flush = parts_dirty.then(|| {
+            quote! {
+                __tree.push_view(#topcoat_view::View::new(__parts));
+            }
+        });
+
+        quote! {
+            async {
+                use #topcoat_view::internal::*;
+                let mut __parts = #topcoat_view::ViewParts::new();
+                #prologue
+                let mut __tree = __ViewTree::new();
+                #prologue_view
+                #statements
+                #flush
+                __tree.resolve().await
+            }
+        }
+    }
+
+    fn emit_tree_nodes(nodes: &[Node]) -> (TokenStream, bool) {
+        let mut output = TokenStream::new();
+        let mut parts_dirty = false;
+
+        for (index, node) in nodes.iter().enumerate() {
+            match node {
+                Node::StaticSegment(StaticSegment { string }) => {
+                    parts_dirty = true;
+                    let helper = ExprKind::Unescaped.helper();
+                    quote! { #helper(__cx, &mut __parts, #string); }
+                }
+                Node::ExprNode(ExprNode { kind, tokens }) => {
+                    parts_dirty = true;
+                    let helper = kind.helper();
+                    quote! { #helper(__cx, &mut __parts, #tokens); }
+                }
+                Node::Component(component) => {
+                    let flush = Self::flush_tree_parts(&mut parts_dirty);
+                    let future = component.emit_future();
+                    quote! {
+                        #flush
+                        __tree.push_future(#future);
+                    }
+                }
+                Node::Deferred(Deferred { .. }) => {
+                    let flush = Self::flush_tree_parts(&mut parts_dirty);
+                    let Node::Deferred(deferred) = node else {
+                        unreachable!()
+                    };
+                    let future = deferred.emit_future();
+                    quote! {
+                        #flush
+                        __tree.push_future(#future);
+                    }
+                }
+                Node::Local(_) | Node::Statement(_) => {
+                    let flush = Self::flush_tree_parts(&mut parts_dirty);
+                    let remainder = Self::emit_tree_future_for(&nodes[index..]);
+                    quote! {
+                        #flush
+                        __tree.push_future(#remainder);
+                    }
+                    .to_tokens(&mut output);
+                    return (output, false);
+                }
+                Node::IfElse(IfElse {
+                    expr,
+                    then_branch,
+                    else_branch,
+                }) if then_branch.contains_component() || else_branch.contains_component() => {
+                    let then_branch = then_branch.emit_future();
+                    let else_branch = else_branch.emit_future();
+                    let flush = Self::flush_tree_parts(&mut parts_dirty);
+                    quote! {
+                        #flush
+                        __tree.push_future(async {
+                            if #expr {
+                                (#then_branch).await
+                            } else {
+                                (#else_branch).await
+                            }
+                        });
+                    }
+                }
+                Node::ForLoop(ForLoop { pat, expr, body }) if body.contains_component() => {
+                    let body = body.emit_future();
+                    let flush = Self::flush_tree_parts(&mut parts_dirty);
+                    quote! {
+                        #flush
+                        __tree.push_future(async {
+                            let __iterations = (#expr)
+                                .into_iter()
+                                .map(async |#pat| (#body).await);
+                            let mut __iteration_parts = #topcoat_view::ViewParts::new();
+                            for __iteration in __join_all(__iterations).await {
+                                __view(__cx, &mut __iteration_parts, __iteration?);
+                            }
+                            ::core::result::Result::<
+                                #topcoat_view::View,
+                                #topcoat_error::Error,
+                            >::Ok(#topcoat_view::View::new(__iteration_parts))
+                        });
+                    }
+                }
+                Node::MatchExpr(MatchExpr { expr, arms })
+                    if arms.iter().any(|arm| arm.body.contains_component()) =>
+                {
+                    let arm_tokens = arms.iter().map(|arm| {
+                        let pat = &arm.pat;
+                        let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
+                        let body = arm.body.emit_future();
+                        quote! { #pat #guard => (#body).await }
+                    });
+                    let flush = Self::flush_tree_parts(&mut parts_dirty);
+                    quote! {
+                        #flush
+                        __tree.push_future(async {
+                            match #expr {
+                                #(#arm_tokens,)*
+                            }
+                        });
+                    }
+                }
+                Node::IfElse(_) | Node::ForLoop(_) | Node::MatchExpr(_) => {
+                    parts_dirty = true;
+                    Self::emit_ready_nodes(core::slice::from_ref(node))
+                }
+            }
+            .to_tokens(&mut output);
+        }
+
+        (output, parts_dirty)
+    }
+
+    fn flush_tree_parts(parts_dirty: &mut bool) -> TokenStream {
+        if *parts_dirty {
+            *parts_dirty = false;
+            quote! {
+                __tree.push_view(#topcoat_view::View::new(
+                    ::core::mem::take(&mut __parts),
+                ));
+            }
+        } else {
+            TokenStream::new()
+        }
+    }
+
+    fn emit_ready_nodes(nodes: &[Node]) -> TokenStream {
         let mut output = TokenStream::new();
         for node in nodes {
             match node {
@@ -57,36 +247,7 @@ impl Scope {
                     let helper = kind.helper();
                     quote! { #helper(__cx, &mut __parts, #tokens); }
                 }
-                Node::Component(Component {
-                    path,
-                    named_args,
-                    children,
-                    span,
-                }) => {
-                    let setters = named_args.iter().map(|arg| {
-                        let ident = &arg.ident;
-                        let value = &arg.value;
-                        quote! { .#ident(#value) }
-                    });
-                    let child = children.as_ref().map(|scope| {
-                        let child = scope.emit();
-                        quote_spanned! {*span=> .child(#child?) }
-                    });
-                    quote_spanned! {*span=>
-                        __view(__cx, &mut __parts, {
-                            use #topcoat_view::Component;
-                            let props = #path::props_builder()#(#setters)*#child.build();
-                            // The marker is built via `Default` so the same construction
-                            // works for both unit-struct and generic (`PhantomData`) markers.
-                            #[allow(clippy::default_constructed_unit_structs)]
-                            Component::render(
-                                #path::default(),
-                                __cx,
-                                props,
-                            ).await?
-                        });
-                    }
-                }
+                Node::Component(_) | Node::Deferred(_) => unreachable!(),
                 Node::Local(Local { pat, expr }) => {
                     quote! { let #pat = #expr; }
                 }
@@ -98,9 +259,9 @@ impl Scope {
                     then_branch,
                     else_branch,
                 }) => {
-                    let then_tokens = Self::emit_nodes(&then_branch.nodes);
+                    let then_tokens = Self::emit_ready_nodes(&then_branch.nodes);
                     let else_tokens = (!else_branch.nodes.is_empty()).then(|| {
-                        let tokens = Self::emit_nodes(&else_branch.nodes);
+                        let tokens = Self::emit_ready_nodes(&else_branch.nodes);
                         quote! { else { #tokens } }
                     });
                     quote! {
@@ -111,7 +272,7 @@ impl Scope {
                     }
                 }
                 Node::ForLoop(ForLoop { pat, expr, body }) => {
-                    let body = Self::emit_nodes(&body.nodes);
+                    let body = Self::emit_ready_nodes(&body.nodes);
                     quote! {
                         for #pat in #expr {
                             #body
@@ -122,7 +283,7 @@ impl Scope {
                     let arm_tokens = arms.iter().map(|arm| {
                         let pat = &arm.pat;
                         let guard = arm.guard.as_ref().map(|g| quote! { if #g });
-                        let body = Self::emit_nodes(&arm.body.nodes);
+                        let body = Self::emit_ready_nodes(&arm.body.nodes);
                         quote! {
                             #pat #guard => { #body }
                         }

@@ -675,6 +675,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "deferred-view"
+version = "0.5.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "deranged"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2892,9 +2900,12 @@ dependencies = [
  "anyhow",
  "anymap3",
  "boxcar",
+ "getrandom 0.4.2",
  "hashbrown 0.17.0",
  "http",
  "pin-project-lite",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "topcoat",

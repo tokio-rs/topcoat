@@ -141,7 +141,7 @@ async fn home(cx: &Cx) -> Result {
                                     size: ButtonSize::Sm,
                                     attrs: attributes! { name="name" value="" },
                                     "Not "
-                                    (name)
+                                    (&name)
                                     "?"
                                 )
                             </form>

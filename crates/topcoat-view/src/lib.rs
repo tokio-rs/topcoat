@@ -3,6 +3,7 @@
 mod attribute;
 mod class;
 mod component;
+mod deferred;
 mod element;
 mod escape;
 mod format;
@@ -12,10 +13,12 @@ mod props;
 pub mod svg;
 mod unescaped;
 mod view;
+mod view_tree;
 
 pub use attribute::*;
 pub use class::*;
 pub use component::*;
+pub use deferred::*;
 pub use element::*;
 pub use escape::*;
 pub use format::*;

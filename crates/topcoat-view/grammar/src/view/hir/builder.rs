@@ -2,8 +2,8 @@ use proc_macro2::{Span, TokenStream};
 use syn::{Expr, Pat, Path};
 
 use super::{
-    Component, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchArm, MatchExpr, Node, Scope,
-    Statement, StaticSegment,
+    Component, Deferred, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchArm, MatchExpr, Node,
+    Scope, Statement, StaticSegment,
 };
 use crate::view::{NamedArg, Nodes};
 
@@ -97,6 +97,36 @@ impl ViewBuilder {
             path: path.clone(),
             named_args: named_args.to_vec(),
             children,
+            span,
+        }));
+    }
+
+    /// Lowers a deferred component and the placeholder rendered before it resolves.
+    pub fn deferred(
+        &mut self,
+        path: &Path,
+        named_args: &[NamedArg],
+        children: &Nodes,
+        placeholder: &Nodes,
+        span: Span,
+        component_span: Span,
+    ) {
+        self.flush();
+        let children = (!children.is_empty()).then(|| {
+            let mut child_builder = ViewBuilder::new();
+            children.lower(&mut child_builder);
+            child_builder.finish()
+        });
+        let mut placeholder_builder = ViewBuilder::new();
+        placeholder.lower(&mut placeholder_builder);
+        self.nodes.push(Node::Deferred(Deferred {
+            component: Component {
+                path: path.clone(),
+                named_args: named_args.to_vec(),
+                children,
+                span: component_span,
+            },
+            placeholder: placeholder_builder.finish(),
             span,
         }));
     }

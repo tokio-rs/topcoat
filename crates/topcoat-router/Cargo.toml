@@ -19,7 +19,6 @@ discover = [
 	"dep:inventory",
 ]
 multipart = [
-	"dep:futures-util",
 	"dep:multer",
 ]
 serve = [
@@ -56,7 +55,7 @@ bytes.workspace = true
 form_urlencoded.workspace = true
 futures-core.workspace = true
 futures-sink = { workspace = true, optional = true }
-futures-util = { workspace = true, optional = true }
+futures-util.workspace = true
 heck.workspace = true
 http.workspace = true
 http-body.workspace = true
