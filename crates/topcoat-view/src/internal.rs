@@ -5,17 +5,17 @@
 //! reach it through fully qualified paths, so nothing is imported into the
 //! user's scope.
 //!
-//! The module has two concerns. The build entry points ([`build`],
-//! [`build_sync`], [`block`], [`reserve`]) manage who owns the instruction
+//! The module has two concerns. The build entry points (`build`,
+//! `build_sync`, `block`, `reserve`) manage who owns the instruction
 //! arena and where a view's instruction block starts and ends. The
-//! [`Builder`] is the emission handle a [`block`] hands out: its methods
+//! `Builder` is the emission handle a `block` hands out: its methods
 //! push the block's parts, sealed with the HTML context of the position
 //! they fill.
 //!
 //! Two rules keep the arena's blocks executable. A block's instructions
-//! must land contiguously, so everything pushed through a [`Builder`]
+//! must land contiguously, so everything pushed through a `Builder`
 //! happens in one synchronous burst with no `await` in between. A
-//! placeholder must form a block of its own, so [`reserve`] is called
+//! placeholder must form a block of its own, so `reserve` is called
 //! between blocks, never while one is building.
 
 use futures_util::FutureExt;
