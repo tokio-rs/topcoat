@@ -23,6 +23,7 @@ futures-util.workspace = true
 http = { workspace = true, optional = true }
 itoa.workspace = true
 memchr.workspace = true
+pin-project-lite.workspace = true
 smallvec.workspace = true
 
 [dev-dependencies]

@@ -3218,6 +3218,7 @@ dependencies = [
  "http",
  "itoa",
  "memchr",
+ "pin-project-lite",
  "smallvec",
  "topcoat",
  "topcoat-core",

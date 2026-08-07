@@ -1,9 +1,16 @@
-use std::{cell::Cell, future::poll_fn, pin::pin};
+use std::{
+    cell::Cell,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-use crate::render::Memory;
+use pin_project_lite::pin_project;
+use topcoat_core::error::Result;
+
+use crate::{View, render::Memory};
 
 thread_local! {
-    static MEMORY: Cell<Option<Memory>> = const { Cell::new(None) };
+    static MEMORY: Cell<Option<Box<Memory>>> = const { Cell::new(None) };
 }
 
 /// Returns whether an instruction memory is installed on the current task,
@@ -15,42 +22,90 @@ pub(crate) fn memory_installed() -> bool {
     installed
 }
 
-/// Runs `fut` with a fresh instruction [`Memory`] installed unless one
-/// already is, returning the fresh memory alongside the output.
-///
-/// Every `view!` invocation inside `fut` appends to the installed memory.
-/// The memory is only installed while `fut` polls on the task that entered
-/// it; a future spawned onto another task builds its own memory instead.
-/// Within `fut`, futures that build views may run concurrently, for example
-/// under `try_join`.
-pub(crate) async fn maybe_install<F: Future>(fut: F) -> (F::Output, Option<Memory>) {
-    // Checked when the wrapping future first polls: with a memory already
-    // installed, an enclosing invocation owns the build and `fut` polls
-    // through unwrapped.
-    let installing = !memory_installed();
-    let mut fut = pin!(fut);
-    let mut memory = installing.then(Memory::new);
-    let output = poll_fn(|task_cx| {
-        let _enter = installing.then(|| Enter::new(&mut memory));
-        fut.as_mut().poll(task_cx)
-    })
-    .await;
-    (output, memory)
+pin_project! {
+    /// The future of a root `view!` invocation, deciding at its first poll
+    /// who owns the instruction memory.
+    ///
+    /// With a memory already installed on the task, an enclosing invocation
+    /// owns the build and the inner future polls through unwrapped.
+    /// Otherwise this invocation is the root: a fresh memory is installed
+    /// while the inner future polls, and the resulting view takes ownership
+    /// of it. The memory is only installed on the task polling this future;
+    /// a future spawned onto another task builds its own memory instead.
+    /// Within the inner future, futures that build views may run
+    /// concurrently, for example under `try_join`.
+    pub struct RootView<F> {
+        #[pin]
+        fut: F,
+        // The fresh memory between polls; `None` while a poll has it
+        // installed, and `None` forever when an enclosing invocation owns
+        // the build.
+        memory: Option<Box<Memory>>,
+        state: RootViewState,
+    }
+}
+
+/// Tracks whether a [`RootView`] has decided who owns the memory, and the
+/// decision it made.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootViewState {
+    Undecided,
+    Installing,
+    PollingThrough,
+}
+
+impl<F> RootView<F> {
+    pub(crate) fn new(fut: F) -> Self {
+        Self {
+            fut,
+            memory: None,
+            state: RootViewState::Undecided,
+        }
+    }
+}
+
+impl<F: Future<Output = Result<View>>> Future for RootView<F> {
+    type Output = Result<View>;
+
+    fn poll(self: Pin<&mut Self>, task_cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        if *this.state == RootViewState::Undecided {
+            *this.state = if memory_installed() {
+                RootViewState::PollingThrough
+            } else {
+                *this.memory = Some(Box::new(Memory::new()));
+                RootViewState::Installing
+            };
+        }
+        let output = if *this.state == RootViewState::Installing {
+            let _enter = Enter::new(this.memory);
+            this.fut.poll(task_cx)
+        } else {
+            this.fut.poll(task_cx)
+        };
+        match output {
+            Poll::Ready(view) => Poll::Ready(match this.memory.take() {
+                Some(memory) => Ok(view?.into_owned(*memory)),
+                None => view,
+            }),
+            Poll::Pending => Poll::Pending,
+        }
+    }
 }
 
 /// Runs `f` with a fresh instruction [`Memory`] installed and returns the
 /// memory alongside the output.
 ///
-/// The synchronous counterpart of [`install`], for captures that build in a
+/// The synchronous counterpart of [`RootView`], for captures that build in a
 /// single burst outside any enclosing invocation.
 pub(crate) fn install_sync<R>(f: impl FnOnce() -> R) -> (R, Memory) {
-    let mut memory = Some(Memory::new());
+    let mut memory = Some(Box::new(Memory::new()));
     let output = {
         let _enter = Enter::new(&mut memory);
         f()
     };
     let memory = memory.take().expect("the memory was reinstated on exit");
-    (output, memory)
+    (output, *memory)
 }
 
 /// Grants access to the installed memory for the duration of `f`.
@@ -75,7 +130,7 @@ pub(crate) fn with_memory<R>(f: impl FnOnce(&mut Memory) -> R) -> R {
 }
 
 /// Puts the taken memory back into its slot, also when `f` panics.
-struct Restore(Option<Memory>);
+struct Restore(Option<Box<Memory>>);
 
 impl Drop for Restore {
     fn drop(&mut self) {
@@ -90,12 +145,12 @@ impl Drop for Restore {
 /// On drop the memory moves back and the enclosing invocation's memory is
 /// reinstated, also when the poll panics.
 struct Enter<'a> {
-    slot: &'a mut Option<Memory>,
-    previous: Option<Memory>,
+    slot: &'a mut Option<Box<Memory>>,
+    previous: Option<Box<Memory>>,
 }
 
 impl<'a> Enter<'a> {
-    fn new(slot: &'a mut Option<Memory>) -> Self {
+    fn new(slot: &'a mut Option<Box<Memory>>) -> Self {
         let previous = MEMORY.replace(slot.take());
         Self { slot, previous }
     }
@@ -114,5 +169,11 @@ impl Drop for Enter<'_> {
 /// without a `view!` invocation establishing the memory.
 #[cfg(test)]
 pub(crate) async fn scope<F: Future>(fut: F) -> F::Output {
-    maybe_install(fut).await.0
+    let mut fut = std::pin::pin!(fut);
+    let mut memory = Some(Box::new(Memory::new()));
+    std::future::poll_fn(|task_cx| {
+        let _enter = Enter::new(&mut memory);
+        fut.as_mut().poll(task_cx)
+    })
+    .await
 }
