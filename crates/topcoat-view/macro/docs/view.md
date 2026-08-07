@@ -477,7 +477,7 @@ The macro accepts dynamic Rust values by routing them through small runtime trai
 - [`AttributeViewParts`] for values that emit one or more full attributes in APIs that accept complete attribute fragments.
 - [`ElementNameViewParts`] for values used as dynamic element names: `<(name)>...</(name)>`.
 
-Each trait method receives a [`PartsWriter`] for the position being filled. Everything pushed through its `push_*` methods is escaped or validated for that position when the view renders; [`push_str_unescaped`][PartsWriter::push_str_unescaped] is the only opt-out and must only be given trusted markup.
+Each trait method receives a [`PartsWriter`] for the position being filled. Everything pushed through its `push_*` methods is escaped or validated for that position when the view renders; the `push_*_unescaped` methods are the only opt-out and must only be given trusted markup.
 
 For example, a type can opt into child-node rendering by implementing [`NodeViewParts`]:
 
@@ -491,7 +491,7 @@ struct Badge(String);
 
 impl NodeViewParts for Badge {
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str(self.0);
+        parts.push_string(self.0);
     }
 }
 
@@ -518,7 +518,7 @@ impl AttributeValueViewParts for DataId {
 
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         if let Some(value) = self.0 {
-            parts.push_str(value);
+            parts.push_string(value);
         }
     }
 }
@@ -536,7 +536,6 @@ view! {
 [`ElementNameViewParts`]: trait.ElementNameViewParts.html
 [`NodeViewParts`]: trait.NodeViewParts.html
 [`PartsWriter`]: struct.PartsWriter.html
-[PartsWriter::push_str_unescaped]: struct.PartsWriter.html#method.push_str_unescaped
 [`component`]: attr.component.html
 [`attributes!`]: macro.attributes.html
 [`class!`]: macro.class.html
