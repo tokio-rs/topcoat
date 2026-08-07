@@ -544,7 +544,10 @@ impl AttributeValueViewParts for Length {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HtmlContext, arena::ArenaScope, internal::{block, build_sync}};
+    use crate::{
+        arena::ArenaScope,
+        internal::{block, build_sync},
+    };
 
     /// Every unit constructor paired with its rendered form. The numeric value
     /// is the same across cases so each assertion focuses on the unit suffix.

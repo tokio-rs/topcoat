@@ -588,16 +588,19 @@ mod tests {
     };
 
     use super::*;
-    use crate::internal::{build, build_sync, reserve};
+    use crate::internal::{build, build_sync, reserve, write_block};
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl AsyncFnOnce(&Cx) -> R) -> R {
         block_on(ArenaScope::scope(async { f(&Cx::default()).await })).0
     }
 
-    /// Builds a view outside any scope, so it owns its arena.
-    fn owned(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-        build_sync(f)
+    /// Builds a view in one synchronous burst from the parts `f` pushes.
+    ///
+    /// Appends to the enclosing arena inside a root build and owns an arena
+    /// of its own outside one.
+    fn sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+        build_sync(|| write_block(f))
     }
 
     /// Drives `fut` to completion on the current thread.
@@ -617,7 +620,7 @@ mod tests {
     /// Builds a view inside a fresh scope through a writer sealed with
     /// `context` and renders it.
     fn render_with(context: HtmlContext, f: impl FnOnce(&mut PartsWriter<'_>)) -> String {
-        in_scope(async |cx| build_sync(|parts| parts.in_context(context, f)).render(cx))
+        in_scope(async |cx| sync(|parts| parts.in_context(context, f)).render(cx))
     }
 
     #[test]
@@ -682,11 +685,11 @@ mod tests {
     #[test]
     fn push_view_splices_nested_views() {
         in_scope(async |cx| {
-            let inner = build_sync(|parts| {
+            let inner = sync(|parts| {
                 parts.push_str("a < b");
             });
 
-            let outer = build_sync(|parts| {
+            let outer = sync(|parts| {
                 parts.push_str_unescaped("<p>");
                 parts.push_view(inner);
                 parts.push_str_unescaped("</p>");
@@ -699,14 +702,14 @@ mod tests {
     fn document_order_follows_splice_order_not_arena_order() {
         in_scope(async |cx| {
             // Built in reverse: `second` occupies earlier arena addresses.
-            let second = build_sync(|parts| {
+            let second = sync(|parts| {
                 parts.push_str("B");
             });
-            let first = build_sync(|parts| {
+            let first = sync(|parts| {
                 parts.push_str("A");
             });
 
-            let outer = build_sync(|parts| {
+            let outer = sync(|parts| {
                 parts.push_view(first);
                 parts.push_view(second);
             });
@@ -716,7 +719,7 @@ mod tests {
 
     #[test]
     fn owned_views_render_without_an_active_build() {
-        let view = owned(|parts| {
+        let view = sync(|parts| {
             parts.push_str("a < b");
         });
         assert_eq!(view.render(&Cx::default()), "a &lt; b");
@@ -724,11 +727,11 @@ mod tests {
 
     #[test]
     fn owned_views_splice_across_memories() {
-        let inner = owned(|parts| {
+        let inner = sync(|parts| {
             parts.push_str("a < b");
         });
 
-        let outer = owned(|parts| {
+        let outer = sync(|parts| {
             parts.push_str_unescaped("<p>");
             parts.push_view(inner);
             parts.push_str_unescaped("</p>");
@@ -738,12 +741,12 @@ mod tests {
 
     #[test]
     fn owned_views_splice_into_an_active_build() {
-        let inner = owned(|parts| {
+        let inner = sync(|parts| {
             parts.push_str("a < b");
         });
 
         in_scope(async |cx| {
-            let outer = build_sync(|parts| {
+            let outer = sync(|parts| {
                 parts.push_str_unescaped("<p>");
                 parts.push_view(inner);
                 parts.push_str_unescaped("</p>");
@@ -754,7 +757,7 @@ mod tests {
 
     #[test]
     fn owned_views_fill_a_slot_like_nested_ones() {
-        let inner = owned(|parts| {
+        let inner = sync(|parts| {
             parts.push_str("a < b");
         });
 
@@ -769,7 +772,7 @@ mod tests {
     fn nested_root_invocations_append_to_the_enclosing_arena() {
         in_scope(async |cx| {
             let inner = build(async {
-                Ok(build_sync(|parts| {
+                Ok(sync(|parts| {
                     parts.push_str("x");
                 }))
             })
@@ -777,7 +780,7 @@ mod tests {
             .expect("the build is infallible");
             assert!(matches!(inner.repr, ViewRepr::Scoped { .. }));
 
-            let outer = build_sync(|parts| {
+            let outer = sync(|parts| {
                 parts.push_view(inner);
             });
             assert_eq!(outer.render(cx), "x");
@@ -788,7 +791,7 @@ mod tests {
     fn owned_views_are_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>(_value: &T) {}
 
-        let view = owned(|parts| {
+        let view = sync(|parts| {
             parts.push_str("x");
         });
         assert_send_sync(&view);
@@ -797,7 +800,7 @@ mod tests {
     #[test]
     fn static_views_are_spliced_verbatim() {
         in_scope(async |cx| {
-            let outer = build_sync(|parts| {
+            let outer = sync(|parts| {
                 parts.push_view(View::unescaped_unchecked("<hr>"));
                 parts.push_view(View::empty());
             });
@@ -810,13 +813,13 @@ mod tests {
         in_scope(async |cx| {
             let (placeholder, slot) = reserve();
             // The outer view splices the placeholder before the child exists.
-            let outer = build_sync(|parts| {
+            let outer = sync(|parts| {
                 parts.push_str_unescaped("<p>");
                 parts.push_view(placeholder.clone());
                 parts.push_str_unescaped("</p>");
             });
 
-            let child = build_sync(|parts| {
+            let child = sync(|parts| {
                 parts.push_str("a < b");
             });
             slot.fill(child);
@@ -868,11 +871,11 @@ mod tests {
     #[test]
     fn size_hint_accumulates_across_splices() {
         in_scope(async |_cx| {
-            let inner = build_sync(|parts| {
+            let inner = sync(|parts| {
                 parts.push_str_unescaped("12345678");
             });
 
-            let outer = build_sync(|parts| {
+            let outer = sync(|parts| {
                 parts.push_view(inner.clone());
                 parts.push_view(inner);
                 parts.push_view(View::unescaped_unchecked("<hr>"));
@@ -886,7 +889,7 @@ mod tests {
 
     #[test]
     fn build_sync_outside_a_root_build_owns_its_arena() {
-        let view = build_sync(|parts| {
+        let view = sync(|parts| {
             parts.push_str("a < b");
         });
         assert!(matches!(view.repr, ViewRepr::Owned { .. }));
@@ -902,23 +905,23 @@ mod tests {
     #[test]
     #[should_panic(expected = "no view is building")]
     fn rendering_an_escaped_nested_view_panics() {
-        let view = in_scope(async |_cx| build_sync(|_parts| {}));
+        let view = in_scope(async |_cx| sync(|_parts| {}));
         view.render(&Cx::default());
     }
 
     #[test]
     #[should_panic(expected = "outside the `view!` invocation it was built in")]
     fn rendering_a_nested_view_in_a_different_root_build_panics() {
-        let view = in_scope(async |_cx| build_sync(|_parts| {}));
+        let view = in_scope(async |_cx| sync(|_parts| {}));
         in_scope(async |cx| view.render(cx));
     }
 
     #[test]
     #[should_panic(expected = "outside the `view!` invocation it was built in")]
     fn splicing_a_nested_view_from_a_different_root_build_panics() {
-        let view = in_scope(async |_cx| build_sync(|_parts| {}));
+        let view = in_scope(async |_cx| sync(|_parts| {}));
         in_scope(async |_cx| {
-            build_sync(|parts| {
+            sync(|parts| {
                 parts.push_view(view);
             })
         });
@@ -941,7 +944,7 @@ mod tests {
         #[test]
         fn status_code_is_recorded_and_renders_nothing() {
             in_scope(async |cx| {
-                let view = build_sync(|parts| {
+                let view = sync(|parts| {
                     push_node(cx, parts, "a");
                     push_node(cx, parts, StatusCode::NOT_FOUND);
                     push_node(cx, parts, "b");
@@ -957,7 +960,7 @@ mod tests {
         #[test]
         fn render_response_without_declarations_is_empty() {
             in_scope(async |cx| {
-                let view = build_sync(|parts| {
+                let view = sync(|parts| {
                     push_node(cx, parts, "a");
                 });
 
@@ -971,7 +974,7 @@ mod tests {
         #[test]
         fn render_discards_declarations() {
             in_scope(async |cx| {
-                let view = build_sync(|parts| {
+                let view = sync(|parts| {
                     push_node(cx, parts, StatusCode::NOT_FOUND);
                     push_node(
                         cx,
@@ -988,7 +991,7 @@ mod tests {
         #[test]
         fn first_status_code_wins() {
             in_scope(async |cx| {
-                let view = build_sync(|parts| {
+                let view = sync(|parts| {
                     push_node(cx, parts, StatusCode::NOT_FOUND);
                     push_node(cx, parts, StatusCode::OK);
                 });
@@ -1001,7 +1004,7 @@ mod tests {
         #[test]
         fn first_mention_of_a_header_name_wins() {
             in_scope(async |cx| {
-                let view = build_sync(|parts| {
+                let view = sync(|parts| {
                     push_node(
                         cx,
                         parts,
@@ -1031,7 +1034,7 @@ mod tests {
                 let mut later = HeaderMap::new();
                 later.insert(SET_COOKIE, HeaderValue::from_static("c=3"));
 
-                let view = build_sync(|parts| {
+                let view = sync(|parts| {
                     push_node(cx, parts, first);
                     push_node(cx, parts, later);
                 });
@@ -1045,13 +1048,13 @@ mod tests {
         #[test]
         fn placement_decides_precedence_across_nested_views() {
             in_scope(async |cx| {
-                let inner = build_sync(|parts| {
+                let inner = sync(|parts| {
                     push_node(cx, parts, StatusCode::NOT_FOUND);
                     push_node(cx, parts, "inner");
                 });
 
                 // A status code before the nested view overrides it.
-                let outer = build_sync(|parts| {
+                let outer = sync(|parts| {
                     push_node(cx, parts, StatusCode::FORBIDDEN);
                     parts.push_view(inner.clone());
                 });
@@ -1059,7 +1062,7 @@ mod tests {
                 assert_eq!(rendered.status_code, Some(StatusCode::FORBIDDEN));
 
                 // A status code after the nested view is only a fallback.
-                let outer = build_sync(|parts| {
+                let outer = sync(|parts| {
                     parts.push_view(inner);
                     push_node(cx, parts, StatusCode::FORBIDDEN);
                 });
