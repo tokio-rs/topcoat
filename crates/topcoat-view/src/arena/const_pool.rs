@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     DynViewPart,
-    render::{Arena, InstructionPtr},
+    arena::{Arena, InstructionPtr},
 };
 
 /// The index of a static string in a [`ConstPool`].
@@ -33,7 +33,7 @@ pub struct ViewPtr(usize);
 #[derive(Debug, Clone, Copy)]
 pub struct HeadersPtr(usize);
 
-/// The constant pool of a [`Arena`](crate::render::Arena): the out-of-line
+/// The constant pool of an [`Arena`](crate::arena::Arena): the out-of-line
 /// operands the instruction sequence refers to by index.
 ///
 /// Instructions are fixed-size, so any operand that does not fit inline, such

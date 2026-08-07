@@ -7,7 +7,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Formatter, HtmlContext, HtmlWriter,
-    render::{Arena, ArenaId, InstructionPtr, Machine, with_arena},
+    arena::{Arena, ArenaId, ArenaScope, InstructionPtr, Renderer},
 };
 
 /// A self-contained piece of HTML content.
@@ -194,7 +194,7 @@ impl View {
             } => {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
-                Machine::new(&arena, entry).execute(cx, &mut f);
+                Renderer::new(&arena, entry).execute(cx, &mut f);
                 html
             }
         }
@@ -248,7 +248,7 @@ impl View {
             } => {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
-                Machine::new(&arena, entry).execute(cx, &mut f);
+                Renderer::new(&arena, entry).execute(cx, &mut f);
                 let (status_code, headers) = f.into_recorded();
                 RenderedResponse {
                     html,
@@ -263,12 +263,12 @@ impl View {
     /// of the enclosing `view!` invocation still building it.
     #[track_caller]
     fn execute(arena: ArenaId, entry: InstructionPtr, cx: &Cx, f: &mut Formatter<'_>) {
-        with_arena(|active| {
+        ArenaScope::with(|active| {
             assert!(
                 active.id() == arena,
                 "tried to render a view outside the `view!` invocation it was built in",
             );
-            Machine::new(active, entry).execute(cx, f);
+            Renderer::new(active, entry).execute(cx, f);
         });
     }
 }
@@ -569,14 +569,11 @@ mod tests {
     };
 
     use super::*;
-    use crate::{
-        internal::{build, build_sync, reserve},
-        render::scope,
-    };
+    use crate::internal::{build, build_sync, reserve};
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl AsyncFnOnce(&Cx) -> R) -> R {
-        block_on(scope(async { f(&Cx::default()).await }))
+        block_on(ArenaScope::test(async { f(&Cx::default()).await }))
     }
 
     /// Builds a view outside any scope, so it owns its arena.

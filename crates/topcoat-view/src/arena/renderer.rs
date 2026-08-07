@@ -2,7 +2,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Formatter,
-    render::{Arena, Instruction, InstructionPtr, StrPtr},
+    arena::{Arena, Instruction, InstructionPtr, StrPtr},
 };
 
 /// Executes a view's instruction block into a [`Formatter`].
@@ -11,13 +11,13 @@ use crate::{
 /// [`Call`](Instruction::Call) instructions, follows the
 /// [`Jmp`](Instruction::Jmp) redirects of filled view slots, and finishes
 /// when a [`Ret`](Instruction::Ret) is reached with an empty call stack.
-pub struct Machine<'a> {
+pub struct Renderer<'a> {
     arena: &'a Arena,
     ptr: InstructionPtr,
     stack: Vec<InstructionPtr>,
 }
 
-impl<'a> Machine<'a> {
+impl<'a> Renderer<'a> {
     #[must_use]
     pub fn new(arena: &'a Arena, entry: InstructionPtr) -> Self {
         Self {
@@ -57,7 +57,7 @@ impl<'a> Machine<'a> {
                 }
                 Instruction::View { ptr } => {
                     let (arena, entry) = pool.fetch_view(*ptr);
-                    Machine::new(arena, entry).execute(cx, f);
+                    Renderer::new(arena, entry).execute(cx, f);
                 }
 
                 Instruction::Bool(inner) => f.write_str(if *inner { "true" } else { "false" }),

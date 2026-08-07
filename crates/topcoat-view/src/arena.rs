@@ -1,61 +1,20 @@
-use std::{
-    collections::BTreeMap,
-    sync::atomic::{AtomicU64, Ordering},
-};
+mod const_pool;
+mod id;
+mod instruction;
+mod instruction_pool;
+mod renderer;
+mod scope;
+mod view_slot;
 
-use crate::{
-    DynViewPart, HtmlContext, View,
-    render::{ConstPool, Instruction, StrPtr},
-    view::ViewRepr,
-};
+pub use const_pool::*;
+pub use id::*;
+pub use instruction::*;
+pub use instruction_pool::*;
+pub use renderer::*;
+pub use scope::*;
+pub use view_slot::*;
 
-/// The address of an instruction in a [`Arena`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct InstructionPtr(usize);
-
-impl InstructionPtr {
-    pub(crate) fn increment(&mut self) {
-        self.0 += 1;
-    }
-}
-
-/// The identity of a [`Arena`], unique for the lifetime of the process.
-///
-/// A view still under construction records the id of the arena its
-/// instructions live in, so using it against a different arena fails instead
-/// of executing that arena's instructions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ArenaId(u64);
-
-impl ArenaId {
-    fn next() -> Self {
-        static COUNTER: AtomicU64 = AtomicU64::new(0);
-        Self(COUNTER.fetch_add(1, Ordering::Relaxed))
-    }
-}
-
-/// A reserved slot in an [`Arena`] that a view resolves into later.
-///
-/// Returned by [`reserve_view`](Arena::reserve_view) alongside the
-/// placeholder view pointing at the slot, and consumed by
-/// [`fill_view`](Arena::fill_view).
-#[derive(Debug, Clone, Copy)]
-pub struct ViewSlot {
-    arena: ArenaId,
-    ptr: InstructionPtr,
-}
-
-impl ViewSlot {
-    /// Redirects this slot to `view`, resolving its placeholder.
-    ///
-    /// # Panics
-    ///
-    /// Panics if no view is building on the current task, if the slot or the
-    /// view belongs to a different arena, or if the slot was already filled.
-    pub fn fill(self, view: View) {
-        crate::render::with_arena(|arena| arena.fill_view(self, view));
-    }
-}
+use crate::{DynViewPart, HtmlContext, View, view::ViewRepr};
 
 /// The instruction arena of a build.
 ///
@@ -75,7 +34,7 @@ impl ViewSlot {
 #[derive(Debug)]
 pub struct Arena {
     id: ArenaId,
-    instructions: Vec<Instruction>,
+    instructions: InstructionPool,
     pool: ConstPool,
 }
 
@@ -83,7 +42,7 @@ impl Arena {
     pub(crate) fn new() -> Self {
         Self {
             id: ArenaId::next(),
-            instructions: Vec::new(),
+            instructions: InstructionPool::new(),
             pool: ConstPool::new(),
         }
     }
@@ -97,11 +56,11 @@ impl Arena {
     /// Returns the address the next pushed instruction will live at.
     #[must_use]
     pub fn next_ptr(&self) -> InstructionPtr {
-        InstructionPtr(self.instructions.len())
+        self.instructions.next_ptr()
     }
 
     pub(crate) fn instruction(&self, ptr: InstructionPtr) -> &Instruction {
-        &self.instructions[ptr.0]
+        self.instructions.fetch(ptr)
     }
 
     pub(crate) fn pool(&self) -> &ConstPool {
@@ -153,10 +112,7 @@ impl Arena {
     pub fn reserve_view(&mut self) -> (View, ViewSlot) {
         let ptr = self.next_ptr();
         self.push_instruction(Instruction::Placeholder);
-        let slot = ViewSlot {
-            arena: self.id,
-            ptr,
-        };
+        let slot = ViewSlot::new(self.id, ptr);
         (View::from_scope(self.id, ptr, 0), slot)
     }
 
@@ -169,7 +125,7 @@ impl Arena {
     /// already filled.
     pub fn fill_view(&mut self, slot: ViewSlot, view: View) {
         assert!(
-            slot.arena == self.id,
+            slot.arena() == self.id,
             "tried to fill a view slot outside the `view!` invocation it was reserved in",
         );
         let entry = match view.repr() {
@@ -198,7 +154,7 @@ impl Arena {
                 block_entry
             }
         };
-        let instruction = &mut self.instructions[slot.ptr.0];
+        let instruction = self.instructions.fetch_mut(slot.ptr());
         assert!(
             matches!(instruction, Instruction::Placeholder),
             "tried to fill a view slot twice",
@@ -326,53 +282,13 @@ impl Arena {
         self.push_instruction(Instruction::Headers { ptr });
     }
 
-    /// Prints the arena's fields and how many instructions of each kind it
-    /// holds.
+    /// Prints the arena's fields and how many instructions and constants of
+    /// each kind it holds.
     #[allow(unused)]
     pub(crate) fn print_stats(&self) {
         println!("Arena {{");
-        println!("  id: {}", self.id.0);
-        println!(
-            "  instructions: {} ({} bytes)",
-            self.instructions.len(),
-            self.instructions.len() * std::mem::size_of::<Instruction>(),
-        );
-        let mut counts = BTreeMap::new();
-        for instruction in &self.instructions {
-            let name = match instruction {
-                Instruction::Call { .. } => "Call",
-                Instruction::Ret => "Ret",
-                Instruction::Jmp { .. } => "Jmp",
-                Instruction::Placeholder => "Placeholder",
-                Instruction::View { .. } => "View",
-                Instruction::Bool(_) => "Bool",
-                Instruction::I8(_) => "I8",
-                Instruction::I16(_) => "I16",
-                Instruction::I32(_) => "I32",
-                Instruction::I64(_) => "I64",
-                Instruction::Isize(_) => "Isize",
-                Instruction::U8(_) => "U8",
-                Instruction::U16(_) => "U16",
-                Instruction::U32(_) => "U32",
-                Instruction::U64(_) => "U64",
-                Instruction::Usize(_) => "Usize",
-                Instruction::F32(_) => "F32",
-                Instruction::F64(_) => "F64",
-                Instruction::Char { .. } => "Char",
-                Instruction::StaticStr { .. } => "StaticStr",
-                Instruction::Str { .. } => "Str",
-                Instruction::String { .. } => "String",
-                Instruction::Dyn { .. } => "Dyn",
-                #[cfg(feature = "http")]
-                Instruction::StatusCode(_) => "StatusCode",
-                #[cfg(feature = "http")]
-                Instruction::Headers { .. } => "Headers",
-            };
-            *counts.entry(name).or_insert(0usize) += 1;
-        }
-        for (name, count) in counts {
-            println!("    {name}: {count}");
-        }
+        println!("  id: {:?}", self.id);
+        self.instructions.print_stats();
         self.pool.print_stats();
         println!("}}");
     }

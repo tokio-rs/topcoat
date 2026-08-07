@@ -543,14 +543,8 @@ impl AttributeValueViewParts for Length {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        future::Future,
-        pin::pin,
-        task::{Context, Poll, Waker},
-    };
-
     use super::*;
-    use crate::{HtmlContext, internal::build_sync, render::scope};
+    use crate::{HtmlContext, arena::ArenaScope, internal::build_sync};
 
     /// Every unit constructor paired with its rendered form. The numeric value
     /// is the same across cases so each assertion focuses on the unit suffix.
@@ -606,22 +600,8 @@ mod tests {
         (Length::cqmax(2.0), "2cqmax"),
     ];
 
-    /// Drives `fut` to completion on the current thread.
-    ///
-    /// The futures under test never wait on external events, so polling in a
-    /// tight loop is sufficient.
-    fn block_on<F: Future>(fut: F) -> F::Output {
-        let mut fut = pin!(fut);
-        let mut task = Context::from_waker(Waker::noop());
-        loop {
-            if let Poll::Ready(output) = fut.as_mut().poll(&mut task) {
-                return output;
-            }
-        }
-    }
-
     fn render(value: impl AttributeValueViewParts) -> String {
-        block_on(scope(async {
+        let (html, _) = ArenaScope::enter(|| {
             let cx = Cx::default();
             build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
@@ -629,7 +609,8 @@ mod tests {
                 });
             })
             .render(&cx)
-        }))
+        });
+        html
     }
 
     #[test]

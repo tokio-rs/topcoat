@@ -153,35 +153,16 @@ impl<'a> IntoIterator for &'a Attributes {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::HashSet,
-        future::Future,
-        pin::pin,
-        task::{Context, Poll, Waker},
-    };
+    use std::collections::HashSet;
 
     use topcoat_core::context::Cx;
 
     use super::*;
-    use crate::{internal::build_sync, render::scope};
+    use crate::{arena::ArenaScope, internal::build_sync};
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl FnOnce(&Cx) -> R) -> R {
-        block_on(scope(async { f(&Cx::default()) }))
-    }
-
-    /// Drives `fut` to completion on the current thread.
-    ///
-    /// The futures under test never wait on external events, so polling in a
-    /// tight loop is sufficient.
-    fn block_on<F: Future>(fut: F) -> F::Output {
-        let mut fut = pin!(fut);
-        let mut task = Context::from_waker(Waker::noop());
-        loop {
-            if let Poll::Ready(output) = fut.as_mut().poll(&mut task) {
-                return output;
-            }
-        }
+        ArenaScope::enter(|| f(&Cx::default())).0
     }
 
     fn render(cx: &Cx, attrs: Attributes) -> String {

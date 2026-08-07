@@ -330,31 +330,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        future::Future,
-        pin::pin,
-        task::{Context, Poll, Waker},
-    };
-
     use super::*;
-    use crate::{AttributeValue, HtmlContext, internal::build_sync, render::scope};
-
-    /// Drives `fut` to completion on the current thread.
-    ///
-    /// The futures under test never wait on external events, so polling in a
-    /// tight loop is sufficient.
-    fn block_on<F: Future>(fut: F) -> F::Output {
-        let mut fut = pin!(fut);
-        let mut task = Context::from_waker(Waker::noop());
-        loop {
-            if let Poll::Ready(output) = fut.as_mut().poll(&mut task) {
-                return output;
-            }
-        }
-    }
+    use crate::{AttributeValue, HtmlContext, arena::ArenaScope, internal::build_sync};
 
     fn render(class: Class<impl ClassEntries>) -> String {
-        block_on(scope(async {
+        let (html, _) = ArenaScope::enter(|| {
             let cx = Cx::default();
             build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
@@ -362,7 +342,8 @@ mod tests {
                 });
             })
             .render(&cx)
-        }))
+        });
+        html
     }
 
     #[test]
@@ -461,7 +442,7 @@ mod tests {
 
     #[test]
     fn attribute_value_entries_are_spliced_verbatim() {
-        block_on(scope(async {
+        ArenaScope::enter(|| {
             let cx = Cx::default();
             let value = AttributeValue::captured(build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
@@ -475,7 +456,7 @@ mod tests {
             })
             .render(&cx);
             assert_eq!(html, "btn [&amp;>*]:mt-2");
-        }));
+        });
     }
 
     #[test]

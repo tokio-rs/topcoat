@@ -24,11 +24,11 @@ pub use futures_util::{
 };
 use topcoat_core::{context::Cx, error::Result};
 
-pub use crate::render::ViewSlot;
+pub use crate::arena::ViewSlot;
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
     ElementNameViewParts, HtmlContext, NodeViewParts, PartsWriter, Unescaped, View,
-    render::{Arena, ArenaFuture, enter_sync, is_building, with_arena},
+    arena::{Arena, ArenaScope},
 };
 
 /// Builds a top-level `view!` invocation, deciding who owns the arena.
@@ -39,7 +39,7 @@ use crate::{
 /// arena is installed while `fut` polls, and the returned view takes
 /// ownership of it.
 pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Result<View>> {
-    ArenaFuture::new(fut)
+    ArenaScope::scope(fut)
 }
 
 /// Builds a view in one synchronous burst, in the enclosing invocation's
@@ -50,11 +50,9 @@ pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Re
 /// [`Attributes`](crate::Attributes) capture values through this, so they
 /// work standalone as well as inside a `view!`.
 pub fn build_sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-    if is_building() {
-        framed(f)
-    } else {
-        let (view, arena) = enter_sync(|| framed(f));
-        view.seal(arena)
+    match ArenaScope::enter(|| framed(f)) {
+        (view, Some(arena)) => view.seal(arena),
+        (view, None) => view,
     }
 }
 
@@ -76,7 +74,7 @@ pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> View {
 
 /// Appends an instruction block filled by `f` through a text-context writer.
 fn framed(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-    with_arena(|arena| {
+    ArenaScope::with(|arena| {
         let entry = arena.next_ptr();
         let mut parts = PartsWriter::new(arena, HtmlContext::Text);
         f(&mut parts);
@@ -97,7 +95,7 @@ fn framed(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
 /// Panics if no view is building on the current task.
 #[must_use]
 pub fn reserve() -> (View, ViewSlot) {
-    with_arena(Arena::reserve_view)
+    ArenaScope::with(Arena::reserve_view)
 }
 
 /// Wraps an already-built view in a ready future.
