@@ -18,19 +18,14 @@ impl Scope {
         Self { nodes }
     }
 
-    /// Emits the expansion of a top-level `view!` invocation: the view
-    /// expression wrapped in an `async` block, routed through `__root_view`
-    /// so the invocation owns its instruction memory unless an enclosing
-    /// invocation is already building.
-    ///
-    /// A static-only view carries no instructions, so it skips the
-    /// `__root_view` wrapper and needs no memory at all.
     pub fn emit(&self) -> TokenStream {
         let view = self.emit_expr();
-        let body = quote! { async {
-            use #topcoat_view::internal::*;
-            ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#view)
-        } };
+        let body = quote! {
+            async {
+                use #topcoat_view::internal::*;
+                ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#view)
+            }
+        };
         if self.is_static() {
             quote! { #body.await }
         } else {

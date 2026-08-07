@@ -13,8 +13,8 @@ thread_local! {
     static MEMORY: Cell<Option<Box<Memory>>> = const { Cell::new(None) };
 }
 
-/// Returns whether an instruction memory is installed on the current task,
-/// meaning an enclosing root `view!` invocation is building.
+/// Returns whether a`Memory` is installed on the current task,
+/// meaning an enclosing `view!` invocation is building.
 pub(crate) fn memory_installed() -> bool {
     let memory = MEMORY.take();
     let installed = memory.is_some();
