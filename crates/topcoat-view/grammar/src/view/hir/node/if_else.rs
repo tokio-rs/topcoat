@@ -1,6 +1,7 @@
 use proc_macro2::Span;
 use quote::quote;
 use syn::Expr;
+use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
     Scope,
@@ -25,10 +26,10 @@ impl Emit for IfElse {
 
         let renders_components = then_branch.is_async() || else_branch.is_async();
         if emitter.inline_await() || !renders_components {
-            let then_branch = then_branch.emit_expr();
+            let then_branch = then_branch.emit_view();
             // An empty else branch still yields the empty view, so both
             // branches produce a view to splice.
-            let else_branch = else_branch.emit_expr();
+            let else_branch = else_branch.emit_view();
 
             emitter.hoist(quote! {
                 let #ident = if #expr { #then_branch } else { #else_branch };
@@ -45,13 +46,13 @@ impl Emit for IfElse {
                 &ident,
                 &quote! {
                     if #expr {
-                        __Either::Left(#then_branch)
+                        #topcoat_view::internal::Either::Left(#then_branch)
                     } else {
-                        __Either::Right(#else_branch)
+                        #topcoat_view::internal::Either::Right(#else_branch)
                     }
                 },
             );
         }
-        emitter.emit(quote! { __view(__cx, __parts, #ident); });
+        emitter.burst(quote! { __b.view(#ident); });
     }
 }

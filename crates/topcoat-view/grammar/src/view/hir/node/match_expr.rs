@@ -1,6 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{Expr, Pat};
+use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
     Scope,
@@ -23,7 +24,7 @@ impl Emit for MatchExpr {
             let arms = self.arms.iter().map(|arm| {
                 let pat = &arm.pat;
                 let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
-                let body = arm.body.emit_expr();
+                let body = arm.body.emit_view();
                 quote! { #pat #guard => #body }
             });
 
@@ -54,7 +55,7 @@ impl Emit for MatchExpr {
                 },
             );
         }
-        emitter.emit(quote! { __view(__cx, __parts, #ident); });
+        emitter.burst(quote! { __b.view(#ident); });
     }
 }
 
@@ -66,10 +67,10 @@ fn nest_either(future: TokenStream, index: usize, arm_count: usize) -> TokenStre
     let mut tokens = if last {
         future
     } else {
-        quote! { __Either::Left(#future) }
+        quote! { #topcoat_view::internal::Either::Left(#future) }
     };
     for _ in 0..if last { arm_count - 1 } else { index } {
-        tokens = quote! { __Either::Right(#tokens) };
+        tokens = quote! { #topcoat_view::internal::Either::Right(#tokens) };
     }
     tokens
 }

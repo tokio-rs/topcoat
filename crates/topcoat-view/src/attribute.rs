@@ -142,7 +142,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{internal::__build_view, render::scope};
+    use crate::{internal::build_sync, render::scope};
 
     /// Drives `fut` to completion on the current thread.
     ///
@@ -161,7 +161,7 @@ mod tests {
     fn render(attribute: impl AttributeViewParts) -> String {
         block_on(scope(async {
             let cx = Cx::default();
-            __build_view(|parts| {
+            build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
                     attribute.into_view_parts(&cx, parts);
                 });

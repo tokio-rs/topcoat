@@ -64,7 +64,7 @@ impl NodeViewParts for ReactiveScope {
         let last = self.exprs.len().saturating_sub(1);
         for (index, expr) in self.exprs.into_iter().enumerate() {
             parts.push_static_str_unescaped("\"");
-            topcoat_view::internal::__view(cx, parts, expr);
+            topcoat_view::internal::view(parts, expr);
             parts.push_static_str_unescaped("\"");
             if index != last {
                 parts.push_static_str_unescaped(", ");

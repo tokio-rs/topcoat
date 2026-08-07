@@ -1,6 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{TokenStreamExt, format_ident, quote, quote_spanned};
 use syn::Ident;
+use topcoat_core_grammar::paths::topcoat_view;
 
 /// HIR nodes that emit themselves into the two phases of an [`Emitter`].
 pub(crate) trait Emit {
@@ -11,19 +12,20 @@ pub(crate) trait Emit {
 ///
 /// The hoist phase evaluates every expression of the view in source order,
 /// including building the views of nested control flow, and binds the results
-/// to fresh identifiers. The emit phase then pushes the view's instruction
+/// to fresh identifiers. The burst phase then pushes the view's instruction
 /// block in one synchronous burst that only reads those bindings. Keeping
-/// every `await` out of the emit phase is what guarantees the block lands
-/// contiguously in the scope's shared instruction memory.
+/// every `await`, and every user expression that may build a view of its
+/// own, out of the burst phase is what lets the block land contiguously in
+/// the scope's shared instruction arena.
 ///
 /// Component renders are futures. With inline awaits, the hoist phase awaits
 /// each one where it is bound. Without them, the hoist phase only binds the
 /// futures and registers them to be joined, so sibling components render
-/// concurrently; the join runs after the hoist phase, right before the emit
-/// phase's burst.
+/// concurrently; the join runs after the hoist phase, right before the
+/// burst.
 pub(crate) struct Emitter {
     hoist: TokenStream,
-    emit: TokenStream,
+    burst: TokenStream,
     counter: u32,
     inline_await: bool,
     join: Vec<Ident>,
@@ -33,7 +35,7 @@ impl Emitter {
     pub(super) fn new(inline_await: bool) -> Self {
         Self {
             hoist: TokenStream::new(),
-            emit: TokenStream::new(),
+            burst: TokenStream::new(),
             counter: 0,
             inline_await,
             join: Vec::new(),
@@ -72,9 +74,9 @@ impl Emitter {
         }
     }
 
-    /// Appends instruction pushes to the emit phase.
-    pub(super) fn emit(&mut self, tokens: TokenStream) {
-        self.emit.append_all(tokens);
+    /// Appends pushes on the `__b` builder to the burst phase.
+    pub(super) fn burst(&mut self, tokens: TokenStream) {
+        self.burst.append_all(tokens);
     }
 
     /// Returns the statement that awaits the registered futures and rebinds
@@ -83,7 +85,9 @@ impl Emitter {
         match self.join.as_slice() {
             [] => TokenStream::new(),
             [ident] => quote! { let #ident = #ident.await?; },
-            idents => quote! { let (#(#idents),*) = __try_join!(#(#idents),*)?; },
+            idents => quote! {
+                let (#(#idents),*) = #topcoat_view::internal::try_join!(#(#idents),*)?;
+            },
         }
     }
 
@@ -92,12 +96,12 @@ impl Emitter {
     /// and yields the view handle.
     pub(super) fn finish(self) -> TokenStream {
         let join = self.join_bindings();
-        let Self { hoist, emit, .. } = self;
+        let Self { hoist, burst, .. } = self;
         quote! {{
             #hoist
             #join
-            __build_view(|__parts| {
-                #emit
+            #topcoat_view::internal::block(__cx, |__b| {
+                #burst
             })
         }}
     }

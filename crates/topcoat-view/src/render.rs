@@ -1,11 +1,11 @@
+mod arena;
 mod const_pool;
+mod current;
 mod instruction;
 mod machine;
-mod memory;
-mod scope;
 
+pub use arena::*;
 pub use const_pool::*;
+pub(crate) use current::*;
 pub use instruction::*;
 pub use machine::*;
-pub use memory::*;
-pub(crate) use scope::*;

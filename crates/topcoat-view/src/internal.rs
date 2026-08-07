@@ -1,92 +1,110 @@
+//! The contract between the view macros and this crate's runtime.
+//!
+//! Everything here exists for the code the `view!` and `attributes!` macros
+//! (and out-of-crate macros composing with them) expand to. The expansions
+//! reach it through fully qualified paths, so nothing is imported into the
+//! user's scope.
+//!
+//! The module has two concerns. The build entry points ([`build`],
+//! [`build_sync`], [`block`], [`reserve`]) manage who owns the instruction
+//! arena and where a view's instruction block starts and ends. The
+//! [`Builder`] is the emission handle a [`block`] hands out: its methods
+//! push the block's parts, sealed with the HTML context of the position
+//! they fill.
+//!
+//! Two rules keep the arena's blocks executable. A block's instructions
+//! must land contiguously, so everything pushed through a [`Builder`]
+//! happens in one synchronous burst with no `await` in between. A
+//! placeholder must form a block of its own, so [`reserve`] is called
+//! between blocks, never while one is building.
+
 pub use futures_util::{
-    future::{Either as __Either, try_join_all as __try_join_all},
-    try_join as __try_join,
+    future::{Either, try_join_all},
+    try_join,
 };
 use topcoat_core::{context::Cx, error::Result};
 
+pub use crate::render::ViewSlot;
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
     ElementNameViewParts, HtmlContext, NodeViewParts, PartsWriter, Unescaped, View,
-    render::{Memory, RootView, ViewSlot, install_sync, memory_installed, with_memory},
+    render::{Arena, ArenaFuture, enter_sync, is_building, with_arena},
 };
 
-/// Builds a top-level `view!` invocation, deciding who owns the memory.
+/// Builds a top-level `view!` invocation, deciding who owns the arena.
 ///
 /// When an enclosing invocation is already building on this task, this is a
-/// nested build: `fut` appends to the enclosing memory and the returned view
+/// nested build: `fut` appends to the enclosing arena and the returned view
 /// stays a handle into it. Otherwise this invocation is the root: a fresh
-/// memory is installed while `fut` polls, and the returned view takes
+/// arena is installed while `fut` polls, and the returned view takes
 /// ownership of it.
-pub fn __root_view(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Result<View>> {
-    RootView::new(fut)
+pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Result<View>> {
+    ArenaFuture::new(fut)
 }
 
 /// Builds a view in one synchronous burst, in the enclosing invocation's
-/// memory when one is building on this task and in a memory of its own
+/// arena when one is building on this task and in an arena of its own
 /// otherwise.
 ///
-/// Runtime collections like [`Attributes`](crate::Attributes) capture values
-/// through this, so they work standalone as well as inside a `view!`.
-pub fn __capture_view(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-    if memory_installed() {
-        __build_view(f)
+/// The synchronous counterpart of [`build`]. Runtime collections like
+/// [`Attributes`](crate::Attributes) capture values through this, so they
+/// work standalone as well as inside a `view!`.
+pub fn build_sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+    if is_building() {
+        framed(f)
     } else {
-        let (view, memory) = install_sync(|| __build_view(f));
-        view.into_owned(memory)
+        let (view, arena) = enter_sync(|| framed(f));
+        view.seal(arena)
     }
 }
 
-/// Builds a view's instruction block in one synchronous burst.
+/// Appends a view's instruction block in one synchronous burst, pushing its
+/// parts through the [`Builder`] handed to `f`.
 ///
-/// Records the entry address in the installed memory, runs `f` to push the
-/// block's instructions through a text-context writer, and terminates the
-/// block with a return instruction. The returned view handle carries the
-/// writer's accumulated size hint. `f` must not build other views; nested
-/// views are built first and spliced into the block with [`__view`].
+/// Records the entry address in the installed arena, runs `f`, and
+/// terminates the block with a return instruction. The returned view handle
+/// carries the builder's accumulated size hint. `f` must not build other
+/// views; nested views are built first and spliced into the block with
+/// [`Builder::view`].
 ///
 /// # Panics
 ///
 /// Panics if no view is building on the current task.
-pub fn __build_view(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-    with_memory(|memory| {
-        let entry = memory.next_ptr();
-        let mut parts = PartsWriter::new(memory, HtmlContext::Text);
+pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> View {
+    framed(|parts| f(&mut Builder { cx, parts }))
+}
+
+/// Appends an instruction block filled by `f` through a text-context writer.
+fn framed(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+    with_arena(|arena| {
+        let entry = arena.next_ptr();
+        let mut parts = PartsWriter::new(arena, HtmlContext::Text);
         f(&mut parts);
         let size_hint = parts.size_hint();
-        memory.push_ret();
-        View::from_scope(memory.id(), entry, size_hint)
+        arena.push_ret();
+        View::from_scope(arena.id(), entry, size_hint)
     })
 }
 
-/// Reserves a slot in the installed memory for a view that resolves later.
+/// Reserves a slot in the installed arena for a view that resolves later.
 ///
 /// A component whose children render components of their own passes the
 /// placeholder view to its props so it can render concurrently with the
-/// children; [`__fill_view`] redirects the slot once they resolve.
+/// children; [`ViewSlot::fill`] redirects the slot once they resolve.
 ///
 /// # Panics
 ///
 /// Panics if no view is building on the current task.
 #[must_use]
-pub fn __reserve_view() -> (View, ViewSlot) {
-    with_memory(Memory::reserve_view)
-}
-
-/// Redirects a reserved slot to `view`, resolving its placeholder.
-///
-/// # Panics
-///
-/// Panics if no view is building on the current task, if the slot or the
-/// view belongs to a different memory, or if the slot was already filled.
-pub fn __fill_view(slot: ViewSlot, view: View) {
-    with_memory(|memory| memory.fill_view(slot, view));
+pub fn reserve() -> (View, ViewSlot) {
+    with_arena(Arena::reserve_view)
 }
 
 /// Wraps an already-built view in a ready future.
 ///
 /// Splices a view without components into a joined position, like the branch
 /// of an `if` whose other branch renders components.
-pub fn __ready_view(view: View) -> futures_util::future::Ready<Result<View>> {
+pub fn ready(view: View) -> futures_util::future::Ready<Result<View>> {
     futures_util::future::ready(Ok(view))
 }
 
@@ -96,7 +114,7 @@ pub fn __ready_view(view: View) -> futures_util::future::Ready<Result<View>> {
 /// Out-of-crate macro expansions use this for compositions that span more
 /// than one position, like the runtime's JavaScript views.
 #[inline]
-pub fn __in_context<R>(
+pub fn in_context<R>(
     parts: &mut PartsWriter<'_>,
     context: HtmlContext,
     f: impl FnOnce(&mut PartsWriter<'_>) -> R,
@@ -104,82 +122,110 @@ pub fn __in_context<R>(
     parts.in_context(context, f)
 }
 
+/// Splices an already-built view through a writer.
+///
+/// The writer counterpart of [`Builder::view`], for out-of-crate macro
+/// expansions that compose views inside a `*ViewParts` implementation.
+///
+/// # Panics
+///
+/// Panics if the view was built in a different, still building arena.
 #[inline]
-pub fn __unescaped(_cx: &Cx, parts: &mut PartsWriter<'_>, s: &'static str) {
-    parts.push_static_str_unescaped(s);
-}
-
-#[inline]
-pub fn __view(_cx: &Cx, parts: &mut PartsWriter<'_>, view: View) {
+pub fn view(parts: &mut PartsWriter<'_>, view: View) {
     parts.push_view(view);
 }
 
-#[inline]
-pub fn __node(cx: &Cx, parts: &mut PartsWriter<'_>, node: impl NodeViewParts) {
-    parts.in_context(HtmlContext::Text, |parts| node.into_view_parts(cx, parts));
+/// The emission handle of a [`block`]: the request context plus a writer
+/// over the installed arena.
+///
+/// Each method pushes one of the block's parts, sealing it with the
+/// [`HtmlContext`] of the position it fills by dispatching the matching
+/// `*ViewParts` trait.
+pub struct Builder<'a, 'b, 'c> {
+    cx: &'a Cx,
+    parts: &'b mut PartsWriter<'c>,
 }
 
-#[inline]
-pub fn __element_name(
-    cx: &Cx,
-    parts: &mut PartsWriter<'_>,
-    element_name: impl ElementNameViewParts,
-) {
-    parts.in_context(HtmlContext::ElementName, |parts| {
-        element_name.into_view_parts(cx, parts);
-    });
-}
+impl Builder<'_, '_, '_> {
+    /// Appends a literal markup segment, verbatim.
+    #[inline]
+    pub fn markup(&mut self, s: &'static str) {
+        self.parts.push_static_str_unescaped(s);
+    }
 
-#[inline]
-pub fn __attribute_key(
-    cx: &Cx,
-    parts: &mut PartsWriter<'_>,
-    attribute_key: impl AttributeKeyViewParts,
-) {
-    parts.in_context(HtmlContext::AttributeKey, |parts| {
-        attribute_key.into_view_parts(cx, parts);
-    });
-}
+    /// Appends a value in a text node position.
+    #[inline]
+    pub fn node(&mut self, value: impl NodeViewParts) {
+        let cx = self.cx;
+        self.parts.in_context(HtmlContext::Text, |parts| {
+            value.into_view_parts(cx, parts);
+        });
+    }
 
-#[inline]
-pub fn __attribute_value(
-    cx: &Cx,
-    parts: &mut PartsWriter<'_>,
-    attribute_value: impl AttributeValueViewParts,
-) {
-    parts.in_context(HtmlContext::AttributeValue, |parts| {
-        attribute_value.into_view_parts(cx, parts);
-    });
-}
+    /// Appends a value in an element name position.
+    #[inline]
+    pub fn element_name(&mut self, value: impl ElementNameViewParts) {
+        let cx = self.cx;
+        self.parts.in_context(HtmlContext::ElementName, |parts| {
+            value.into_view_parts(cx, parts);
+        });
+    }
 
-#[inline]
-pub fn __attribute(
-    cx: &Cx,
-    parts: &mut PartsWriter<'_>,
-    (key, value): (impl AttributeKeyViewParts, impl AttributeValueViewParts),
-) {
-    __attributes(cx, parts, Attribute::new(key, value));
-}
+    /// Appends a value in an attribute key position.
+    #[inline]
+    pub fn attribute_key(&mut self, value: impl AttributeKeyViewParts) {
+        let cx = self.cx;
+        self.parts.in_context(HtmlContext::AttributeKey, |parts| {
+            value.into_view_parts(cx, parts);
+        });
+    }
 
-#[inline]
-pub fn __attribute_unescaped(
-    cx: &Cx,
-    parts: &mut PartsWriter<'_>,
-    (key, value): (&'static str, impl AttributeValueViewParts),
-) {
-    __attributes(
-        cx,
-        parts,
-        Attribute::new(Unescaped::new_unchecked(key), value),
-    );
-}
+    /// Appends a value in an attribute value position.
+    #[inline]
+    pub fn attribute_value(&mut self, value: impl AttributeValueViewParts) {
+        let cx = self.cx;
+        self.parts.in_context(HtmlContext::AttributeValue, |parts| {
+            value.into_view_parts(cx, parts);
+        });
+    }
 
-#[inline]
-pub fn __attributes(cx: &Cx, parts: &mut PartsWriter<'_>, attributes: impl AttributeViewParts) {
-    // Whole-attribute values do their own context transitions between
-    // keys and values; the attribute-value context here is the safe
-    // default for any text pushed directly.
-    parts.in_context(HtmlContext::AttributeValue, |parts| {
-        attributes.into_view_parts(cx, parts);
-    });
+    /// Appends a whole attribute from a key and value pair.
+    #[inline]
+    pub fn attribute(
+        &mut self,
+        (key, value): (impl AttributeKeyViewParts, impl AttributeValueViewParts),
+    ) {
+        self.attributes(Attribute::new(key, value));
+    }
+
+    /// Appends a whole attribute from a trusted literal key and a value.
+    #[inline]
+    pub fn attribute_unescaped(
+        &mut self,
+        (key, value): (&'static str, impl AttributeValueViewParts),
+    ) {
+        self.attributes(Attribute::new(Unescaped::new_unchecked(key), value));
+    }
+
+    /// Appends a value covering whole attributes, keys and values.
+    #[inline]
+    pub fn attributes(&mut self, attributes: impl AttributeViewParts) {
+        let cx = self.cx;
+        // Whole-attribute values do their own context transitions between
+        // keys and values; the attribute-value context here is the safe
+        // default for any text pushed directly.
+        self.parts.in_context(HtmlContext::AttributeValue, |parts| {
+            attributes.into_view_parts(cx, parts);
+        });
+    }
+
+    /// Splices an already-built view.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the view was built in a different, still building arena.
+    #[inline]
+    pub fn view(&mut self, view: View) {
+        self.parts.push_view(view);
+    }
 }

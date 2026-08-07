@@ -7,7 +7,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Formatter, HtmlContext, HtmlWriter,
-    render::{InstructionPtr, Machine, Memory, MemoryId, with_memory},
+    render::{Arena, ArenaId, InstructionPtr, Machine, with_arena},
 };
 
 /// A self-contained piece of HTML content.
@@ -24,9 +24,9 @@ use crate::{
 /// <div>Hello
 /// ```
 ///
-/// The outermost `view!` invocation allocates an instruction memory that the
+/// The outermost `view!` invocation allocates an instruction arena that the
 /// returned view owns; every `view!` nested inside it, such as a component
-/// body, appends to that same memory and returns a cheap handle into it. An
+/// body, appends to that same arena and returns a cheap handle into it. An
 /// owned view is a self-contained value: it can be stored, sent across
 /// tasks, spliced into another view, and rendered anywhere. A nested handle
 /// only lives while its enclosing invocation builds; one that escapes it
@@ -36,26 +36,26 @@ pub struct View {
     repr: ViewRepr,
 }
 
-/// The kinds of view: a static string independent of any memory, a handle
-/// into the memory of an enclosing `view!` invocation still building, or an
-/// owned view carrying its own memory.
+/// The kinds of view: a static string independent of any arena, a handle
+/// into the arena of an enclosing `view!` invocation still building, or an
+/// owned view carrying its own arena.
 #[derive(Debug, Clone)]
 pub(crate) enum ViewRepr {
-    /// Trusted static markup rendered verbatim, independent of any memory.
+    /// Trusted static markup rendered verbatim, independent of any arena.
     Static(&'static str),
-    /// An instruction block in the still building memory identified by
-    /// `memory`, starting at `entry`.
+    /// An instruction block in the still building arena identified by
+    /// `arena`, starting at `entry`.
     Scoped {
-        memory: MemoryId,
+        arena: ArenaId,
         entry: InstructionPtr,
         /// An estimate of the number of bytes the block writes when
         /// rendered, accumulated while the view was built.
         size_hint: usize,
     },
-    /// An instruction block starting at `entry` in a memory the view holds
+    /// An instruction block starting at `entry` in an arena the view holds
     /// on to itself.
     Owned {
-        memory: Arc<Memory>,
+        arena: Arc<Arena>,
         entry: InstructionPtr,
         /// An estimate of the number of bytes the block writes when
         /// rendered, accumulated while the view was built.
@@ -71,13 +71,13 @@ impl Default for ViewRepr {
 }
 
 impl View {
-    /// Creates the handle for an instruction block built in the memory
-    /// identified by `memory`, estimated to write `size_hint` bytes.
+    /// Creates the handle for an instruction block built in the arena
+    /// identified by `arena`, estimated to write `size_hint` bytes.
     #[inline]
-    pub(crate) fn from_scope(memory: MemoryId, entry: InstructionPtr, size_hint: usize) -> Self {
+    pub(crate) fn from_scope(arena: ArenaId, entry: InstructionPtr, size_hint: usize) -> Self {
         Self {
             repr: ViewRepr::Scoped {
-                memory,
+                arena,
                 entry,
                 size_hint,
             },
@@ -101,29 +101,29 @@ impl View {
     }
 
     /// Seals a root `view!` invocation's build: the view takes ownership of
-    /// the memory its instructions were appended to.
+    /// the arena its instructions were appended to.
     ///
     /// A static view carries no instructions, so it passes through and the
-    /// memory is dropped.
+    /// arena is dropped.
     ///
     /// # Panics
     ///
-    /// Panics if the view's instructions live in a different memory.
-    pub(crate) fn into_owned(self, memory: Memory) -> Self {
+    /// Panics if the view's instructions live in a different arena.
+    pub(crate) fn seal(self, arena: Arena) -> Self {
         match self.repr {
             ViewRepr::Static(_) | ViewRepr::Owned { .. } => self,
             ViewRepr::Scoped {
-                memory: id,
+                arena: id,
                 entry,
                 size_hint,
             } => {
                 assert!(
-                    id == memory.id(),
-                    "tried to seal a view into a memory it was not built in",
+                    id == arena.id(),
+                    "tried to seal a view into an arena it was not built in",
                 );
                 Self {
                     repr: ViewRepr::Owned {
-                        memory: Arc::new(memory),
+                        arena: Arc::new(arena),
                         entry,
                         size_hint,
                     },
@@ -178,23 +178,23 @@ impl View {
         match self.repr {
             ViewRepr::Static(body) => body.to_owned(),
             ViewRepr::Scoped {
-                memory,
+                arena,
                 entry,
                 size_hint,
             } => {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
-                Self::execute(memory, entry, cx, &mut f);
+                Self::execute(arena, entry, cx, &mut f);
                 html
             }
             ViewRepr::Owned {
-                memory,
+                arena,
                 entry,
                 size_hint,
             } => {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
-                Machine::new(&memory, entry).execute(cx, &mut f);
+                Machine::new(&arena, entry).execute(cx, &mut f);
                 html
             }
         }
@@ -227,13 +227,13 @@ impl View {
                 headers: HeaderMap::new(),
             },
             ViewRepr::Scoped {
-                memory,
+                arena,
                 entry,
                 size_hint,
             } => {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
-                Self::execute(memory, entry, cx, &mut f);
+                Self::execute(arena, entry, cx, &mut f);
                 let (status_code, headers) = f.into_recorded();
                 RenderedResponse {
                     html,
@@ -242,13 +242,13 @@ impl View {
                 }
             }
             ViewRepr::Owned {
-                memory,
+                arena,
                 entry,
                 size_hint,
             } => {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
-                Machine::new(&memory, entry).execute(cx, &mut f);
+                Machine::new(&arena, entry).execute(cx, &mut f);
                 let (status_code, headers) = f.into_recorded();
                 RenderedResponse {
                     html,
@@ -259,13 +259,13 @@ impl View {
         }
     }
 
-    /// Executes a nested view handle's instruction block against the memory
+    /// Executes a nested view handle's instruction block against the arena
     /// of the enclosing `view!` invocation still building it.
     #[track_caller]
-    fn execute(memory: MemoryId, entry: InstructionPtr, cx: &Cx, f: &mut Formatter<'_>) {
-        with_memory(|active| {
+    fn execute(arena: ArenaId, entry: InstructionPtr, cx: &Cx, f: &mut Formatter<'_>) {
+        with_arena(|active| {
             assert!(
-                active.id() == memory,
+                active.id() == arena,
                 "tried to render a view outside the `view!` invocation it was built in",
             );
             Machine::new(active, entry).execute(cx, f);
@@ -323,13 +323,13 @@ macro_rules! impl_push_primitive {
         #[inline]
         pub fn $method(&mut self, value: $ty) -> &mut Self {
             self.size_hint += $size_hint;
-            self.memory.$method(value);
+            self.arena.$method(value);
             self
         }
     };
 }
 
-/// A context-carrying writer over an instruction memory, created per
+/// A context-carrying writer over an instruction arena, created per
 /// position.
 ///
 /// The `view!` macro creates a `PartsWriter` for each dynamic position it
@@ -352,7 +352,7 @@ macro_rules! impl_push_primitive {
 /// becomes the built view's size hint, which pre-allocates the output buffer
 /// at render time.
 pub struct PartsWriter<'a> {
-    memory: &'a mut Memory,
+    arena: &'a mut Arena,
     context: HtmlContext,
     size_hint: usize,
 }
@@ -360,9 +360,9 @@ pub struct PartsWriter<'a> {
 impl<'a> PartsWriter<'a> {
     /// Creates a writer that seals everything pushed into it with `context`.
     #[inline]
-    pub fn new(memory: &'a mut Memory, context: HtmlContext) -> Self {
+    pub(crate) fn new(arena: &'a mut Arena, context: HtmlContext) -> Self {
         Self {
-            memory,
+            arena,
             context,
             size_hint: 0,
         }
@@ -406,7 +406,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_str(&mut self, value: &str) -> &mut Self {
         self.size_hint += Self::str_size_hint(value, self.context);
-        self.memory.push_str(value, self.context);
+        self.arena.push_str(value, self.context);
         self
     }
 
@@ -414,7 +414,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_static_str(&mut self, value: &'static str) -> &mut Self {
         self.size_hint += Self::str_size_hint(value, self.context);
-        self.memory.push_static_str(value, self.context);
+        self.arena.push_static_str(value, self.context);
         self
     }
 
@@ -422,7 +422,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_string(&mut self, value: String) -> &mut Self {
         self.size_hint += Self::str_size_hint(&value, self.context);
-        self.memory.push_string(value, self.context);
+        self.arena.push_string(value, self.context);
         self
     }
 
@@ -434,7 +434,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_str_unescaped(&mut self, value: &str) -> &mut Self {
         self.size_hint += value.len();
-        self.memory.push_str(value, HtmlContext::Unescaped);
+        self.arena.push_str(value, HtmlContext::Unescaped);
         self
     }
 
@@ -446,7 +446,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_static_str_unescaped(&mut self, value: &'static str) -> &mut Self {
         self.size_hint += value.len();
-        self.memory.push_static_str(value, HtmlContext::Unescaped);
+        self.arena.push_static_str(value, HtmlContext::Unescaped);
         self
     }
 
@@ -458,7 +458,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_string_unescaped(&mut self, value: String) -> &mut Self {
         self.size_hint += value.len();
-        self.memory.push_string(value, HtmlContext::Unescaped);
+        self.arena.push_string(value, HtmlContext::Unescaped);
         self
     }
 
@@ -492,7 +492,7 @@ impl<'a> PartsWriter<'a> {
     pub fn push_char(&mut self, value: char) -> &mut Self {
         // One to four UTF-8 bytes, or an escape sequence.
         self.size_hint += 3;
-        self.memory.push_char(value, self.context);
+        self.arena.push_char(value, self.context);
         self
     }
 
@@ -523,7 +523,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_dyn(&mut self, part: Box<dyn DynViewPart>) -> &mut Self {
         self.size_hint += part.size_hint();
-        self.memory.push_dyn(part, self.context);
+        self.arena.push_dyn(part, self.context);
         self
     }
 
@@ -535,11 +535,11 @@ impl<'a> PartsWriter<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if the view was built in a different, still building memory.
+    /// Panics if the view was built in a different, still building arena.
     #[inline]
     pub(crate) fn push_view(&mut self, view: View) -> &mut Self {
         self.size_hint += view.size_hint();
-        self.memory.push_view(view);
+        self.arena.push_view(view);
         self
     }
 
@@ -547,7 +547,7 @@ impl<'a> PartsWriter<'a> {
     #[cfg(feature = "http")]
     #[inline]
     pub fn push_status_code(&mut self, status_code: StatusCode) -> &mut Self {
-        self.memory.push_status_code(status_code);
+        self.arena.push_status_code(status_code);
         self
     }
 
@@ -555,7 +555,7 @@ impl<'a> PartsWriter<'a> {
     #[cfg(feature = "http")]
     #[inline]
     pub fn push_headers(&mut self, headers: HeaderMap) -> &mut Self {
-        self.memory.push_headers(headers);
+        self.arena.push_headers(headers);
         self
     }
 }
@@ -570,7 +570,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        internal::{__build_view, __fill_view, __reserve_view, __root_view},
+        internal::{build, build_sync, reserve},
         render::scope,
     };
 
@@ -579,9 +579,9 @@ mod tests {
         block_on(scope(async { f(&Cx::default()).await }))
     }
 
-    /// Builds a view in a root invocation of its own, so it owns its memory.
+    /// Builds a view outside any scope, so it owns its arena.
     fn owned(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-        block_on(__root_view(async { Ok(__build_view(f)) })).expect("the build is infallible")
+        build_sync(f)
     }
 
     /// Drives `fut` to completion on the current thread.
@@ -601,7 +601,7 @@ mod tests {
     /// Builds a view inside a fresh scope through a writer sealed with
     /// `context` and renders it.
     fn render_with(context: HtmlContext, f: impl FnOnce(&mut PartsWriter<'_>)) -> String {
-        in_scope(async |cx| __build_view(|parts| parts.in_context(context, f)).render(cx))
+        in_scope(async |cx| build_sync(|parts| parts.in_context(context, f)).render(cx))
     }
 
     #[test]
@@ -666,11 +666,11 @@ mod tests {
     #[test]
     fn push_view_splices_nested_views() {
         in_scope(async |cx| {
-            let inner = __build_view(|parts| {
+            let inner = build_sync(|parts| {
                 parts.push_str("a < b");
             });
 
-            let outer = __build_view(|parts| {
+            let outer = build_sync(|parts| {
                 parts.push_str_unescaped("<p>");
                 parts.push_view(inner);
                 parts.push_str_unescaped("</p>");
@@ -680,17 +680,17 @@ mod tests {
     }
 
     #[test]
-    fn document_order_follows_splice_order_not_memory_order() {
+    fn document_order_follows_splice_order_not_arena_order() {
         in_scope(async |cx| {
-            // Built in reverse: `second` occupies earlier memory addresses.
-            let second = __build_view(|parts| {
+            // Built in reverse: `second` occupies earlier arena addresses.
+            let second = build_sync(|parts| {
                 parts.push_str("B");
             });
-            let first = __build_view(|parts| {
+            let first = build_sync(|parts| {
                 parts.push_str("A");
             });
 
-            let outer = __build_view(|parts| {
+            let outer = build_sync(|parts| {
                 parts.push_view(first);
                 parts.push_view(second);
             });
@@ -727,7 +727,7 @@ mod tests {
         });
 
         in_scope(async |cx| {
-            let outer = __build_view(|parts| {
+            let outer = build_sync(|parts| {
                 parts.push_str_unescaped("<p>");
                 parts.push_view(inner);
                 parts.push_str_unescaped("</p>");
@@ -743,17 +743,17 @@ mod tests {
         });
 
         in_scope(async |cx| {
-            let (placeholder, slot) = __reserve_view();
-            __fill_view(slot, inner);
+            let (placeholder, slot) = reserve();
+            slot.fill(inner);
             assert_eq!(placeholder.render(cx), "a &lt; b");
         });
     }
 
     #[test]
-    fn nested_root_invocations_append_to_the_enclosing_memory() {
+    fn nested_root_invocations_append_to_the_enclosing_arena() {
         in_scope(async |cx| {
-            let inner = __root_view(async {
-                Ok(__build_view(|parts| {
+            let inner = build(async {
+                Ok(build_sync(|parts| {
                     parts.push_str("x");
                 }))
             })
@@ -761,7 +761,7 @@ mod tests {
             .expect("the build is infallible");
             assert!(matches!(inner.repr, ViewRepr::Scoped { .. }));
 
-            let outer = __build_view(|parts| {
+            let outer = build_sync(|parts| {
                 parts.push_view(inner);
             });
             assert_eq!(outer.render(cx), "x");
@@ -781,7 +781,7 @@ mod tests {
     #[test]
     fn static_views_are_spliced_verbatim() {
         in_scope(async |cx| {
-            let outer = __build_view(|parts| {
+            let outer = build_sync(|parts| {
                 parts.push_view(View::unescaped_unchecked("<hr>"));
                 parts.push_view(View::empty());
             });
@@ -792,18 +792,18 @@ mod tests {
     #[test]
     fn filled_view_slot_renders_the_resolved_view() {
         in_scope(async |cx| {
-            let (placeholder, slot) = __reserve_view();
+            let (placeholder, slot) = reserve();
             // The outer view splices the placeholder before the child exists.
-            let outer = __build_view(|parts| {
+            let outer = build_sync(|parts| {
                 parts.push_str_unescaped("<p>");
                 parts.push_view(placeholder.clone());
                 parts.push_str_unescaped("</p>");
             });
 
-            let child = __build_view(|parts| {
+            let child = build_sync(|parts| {
                 parts.push_str("a < b");
             });
-            __fill_view(slot, child);
+            slot.fill(child);
 
             assert_eq!(outer.render(cx), "<p>a &lt; b</p>");
             assert_eq!(placeholder.render(cx), "a &lt; b");
@@ -813,12 +813,12 @@ mod tests {
     #[test]
     fn static_views_fill_a_slot_like_scoped_ones() {
         in_scope(async |cx| {
-            let (placeholder, slot) = __reserve_view();
-            __fill_view(slot, View::unescaped_unchecked("<hr>"));
+            let (placeholder, slot) = reserve();
+            slot.fill(View::unescaped_unchecked("<hr>"));
             assert_eq!(placeholder.render(cx), "<hr>");
 
-            let (placeholder, slot) = __reserve_view();
-            __fill_view(slot, View::empty());
+            let (placeholder, slot) = reserve();
+            slot.fill(View::empty());
             assert_eq!(placeholder.render(cx), "");
         });
     }
@@ -827,7 +827,7 @@ mod tests {
     #[should_panic(expected = "before it was filled")]
     fn rendering_an_unfilled_placeholder_panics() {
         in_scope(async |cx| {
-            let (placeholder, _slot) = __reserve_view();
+            let (placeholder, _slot) = reserve();
             placeholder.render(cx)
         });
     }
@@ -836,27 +836,27 @@ mod tests {
     #[should_panic(expected = "tried to fill a view slot twice")]
     fn filling_a_slot_twice_panics() {
         in_scope(async |_cx| {
-            let (_placeholder, slot) = __reserve_view();
-            __fill_view(slot, View::empty());
-            __fill_view(slot, View::empty());
+            let (_placeholder, slot) = reserve();
+            slot.fill(View::empty());
+            slot.fill(View::empty());
         });
     }
 
     #[test]
     #[should_panic(expected = "outside the `view!` invocation it was reserved in")]
     fn filling_a_slot_in_a_different_root_build_panics() {
-        let slot = in_scope(async |_cx| __reserve_view().1);
-        in_scope(async |_cx| __fill_view(slot, View::empty()));
+        let slot = in_scope(async |_cx| reserve().1);
+        in_scope(async |_cx| slot.fill(View::empty()));
     }
 
     #[test]
     fn size_hint_accumulates_across_splices() {
         in_scope(async |_cx| {
-            let inner = __build_view(|parts| {
+            let inner = build_sync(|parts| {
                 parts.push_str_unescaped("12345678");
             });
 
-            let outer = __build_view(|parts| {
+            let outer = build_sync(|parts| {
                 parts.push_view(inner.clone());
                 parts.push_view(inner);
                 parts.push_view(View::unescaped_unchecked("<hr>"));
@@ -869,31 +869,40 @@ mod tests {
     }
 
     #[test]
+    fn build_sync_outside_a_root_build_owns_its_arena() {
+        let view = build_sync(|parts| {
+            parts.push_str("a < b");
+        });
+        assert!(matches!(view.repr, ViewRepr::Owned { .. }));
+        assert_eq!(view.render(&Cx::default()), "a &lt; b");
+    }
+
+    #[test]
     #[should_panic(expected = "no view is building")]
-    fn building_a_view_outside_a_root_build_panics() {
-        __build_view(|_parts| {});
+    fn emitting_a_block_outside_a_root_build_panics() {
+        crate::internal::block(&Cx::default(), |_b| {});
     }
 
     #[test]
     #[should_panic(expected = "no view is building")]
     fn rendering_an_escaped_nested_view_panics() {
-        let view = in_scope(async |_cx| __build_view(|_parts| {}));
+        let view = in_scope(async |_cx| build_sync(|_parts| {}));
         view.render(&Cx::default());
     }
 
     #[test]
     #[should_panic(expected = "outside the `view!` invocation it was built in")]
     fn rendering_a_nested_view_in_a_different_root_build_panics() {
-        let view = in_scope(async |_cx| __build_view(|_parts| {}));
+        let view = in_scope(async |_cx| build_sync(|_parts| {}));
         in_scope(async |cx| view.render(cx));
     }
 
     #[test]
     #[should_panic(expected = "outside the `view!` invocation it was built in")]
     fn splicing_a_nested_view_from_a_different_root_build_panics() {
-        let view = in_scope(async |_cx| __build_view(|_parts| {}));
+        let view = in_scope(async |_cx| build_sync(|_parts| {}));
         in_scope(async |_cx| {
-            __build_view(|parts| {
+            build_sync(|parts| {
                 parts.push_view(view);
             })
         });
@@ -916,7 +925,7 @@ mod tests {
         #[test]
         fn status_code_is_recorded_and_renders_nothing() {
             in_scope(async |cx| {
-                let view = __build_view(|parts| {
+                let view = build_sync(|parts| {
                     push_node(cx, parts, "a");
                     push_node(cx, parts, StatusCode::NOT_FOUND);
                     push_node(cx, parts, "b");
@@ -932,7 +941,7 @@ mod tests {
         #[test]
         fn render_response_without_declarations_is_empty() {
             in_scope(async |cx| {
-                let view = __build_view(|parts| {
+                let view = build_sync(|parts| {
                     push_node(cx, parts, "a");
                 });
 
@@ -946,7 +955,7 @@ mod tests {
         #[test]
         fn render_discards_declarations() {
             in_scope(async |cx| {
-                let view = __build_view(|parts| {
+                let view = build_sync(|parts| {
                     push_node(cx, parts, StatusCode::NOT_FOUND);
                     push_node(
                         cx,
@@ -963,7 +972,7 @@ mod tests {
         #[test]
         fn first_status_code_wins() {
             in_scope(async |cx| {
-                let view = __build_view(|parts| {
+                let view = build_sync(|parts| {
                     push_node(cx, parts, StatusCode::NOT_FOUND);
                     push_node(cx, parts, StatusCode::OK);
                 });
@@ -976,7 +985,7 @@ mod tests {
         #[test]
         fn first_mention_of_a_header_name_wins() {
             in_scope(async |cx| {
-                let view = __build_view(|parts| {
+                let view = build_sync(|parts| {
                     push_node(
                         cx,
                         parts,
@@ -1006,7 +1015,7 @@ mod tests {
                 let mut later = HeaderMap::new();
                 later.insert(SET_COOKIE, HeaderValue::from_static("c=3"));
 
-                let view = __build_view(|parts| {
+                let view = build_sync(|parts| {
                     push_node(cx, parts, first);
                     push_node(cx, parts, later);
                 });
@@ -1020,13 +1029,13 @@ mod tests {
         #[test]
         fn placement_decides_precedence_across_nested_views() {
             in_scope(async |cx| {
-                let inner = __build_view(|parts| {
+                let inner = build_sync(|parts| {
                     push_node(cx, parts, StatusCode::NOT_FOUND);
                     push_node(cx, parts, "inner");
                 });
 
                 // A status code before the nested view overrides it.
-                let outer = __build_view(|parts| {
+                let outer = build_sync(|parts| {
                     push_node(cx, parts, StatusCode::FORBIDDEN);
                     parts.push_view(inner.clone());
                 });
@@ -1034,7 +1043,7 @@ mod tests {
                 assert_eq!(rendered.status_code, Some(StatusCode::FORBIDDEN));
 
                 // A status code after the nested view is only a fallback.
-                let outer = __build_view(|parts| {
+                let outer = build_sync(|parts| {
                     parts.push_view(inner);
                     push_node(cx, parts, StatusCode::FORBIDDEN);
                 });

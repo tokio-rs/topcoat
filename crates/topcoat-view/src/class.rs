@@ -337,7 +337,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{AttributeValue, HtmlContext, internal::__build_view, render::scope};
+    use crate::{AttributeValue, HtmlContext, internal::build_sync, render::scope};
 
     /// Drives `fut` to completion on the current thread.
     ///
@@ -356,7 +356,7 @@ mod tests {
     fn render(class: Class<impl ClassEntries>) -> String {
         block_on(scope(async {
             let cx = Cx::default();
-            __build_view(|parts| {
+            build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
                     AttributeValueViewParts::into_view_parts(class, &cx, parts);
                 });
@@ -463,12 +463,12 @@ mod tests {
     fn attribute_value_entries_are_spliced_verbatim() {
         block_on(scope(async {
             let cx = Cx::default();
-            let value = AttributeValue::captured(__build_view(|parts| {
+            let value = AttributeValue::captured(build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
                     parts.push_str("[&>*]:mt-2");
                 });
             }));
-            let html = __build_view(|parts| {
+            let html = build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
                     AttributeValueViewParts::into_view_parts(Class(("btn", &value)), &cx, parts);
                 });

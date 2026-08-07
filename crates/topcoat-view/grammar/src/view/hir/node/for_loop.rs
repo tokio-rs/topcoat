@@ -1,6 +1,7 @@
 use proc_macro2::Span;
 use quote::quote;
 use syn::{Expr, Pat};
+use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
     Scope,
@@ -33,13 +34,13 @@ impl Emit for ForLoop {
                     for #pat in #expr {
                         __futures.push(#body);
                     }
-                    __try_join_all(__futures)
+                    #topcoat_view::internal::try_join_all(__futures)
                 }},
             );
         } else {
-            // The hoist phase builds one view per iteration; the emit phase
+            // The hoist phase builds one view per iteration; the burst phase
             // splices them into the enclosing block in iteration order.
-            let body = body.emit_expr();
+            let body = body.emit_view();
             emitter.hoist(quote! {
                 let #ident = {
                     let mut __views = ::std::vec::Vec::new();
@@ -50,9 +51,9 @@ impl Emit for ForLoop {
                 };
             });
         }
-        emitter.emit(quote! {
+        emitter.burst(quote! {
             for __loop_view in #ident {
-                __view(__cx, __parts, __loop_view);
+                __b.view(__loop_view);
             }
         });
     }

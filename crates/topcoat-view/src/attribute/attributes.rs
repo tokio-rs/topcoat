@@ -4,7 +4,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Attribute, AttributeValue, AttributeValueViewParts, AttributeViewParts, HtmlContext,
-    PartsWriter, internal::__capture_view,
+    PartsWriter, internal::build_sync,
 };
 
 /// A runtime collection of HTML attributes with unique keys.
@@ -15,8 +15,8 @@ use crate::{
 /// macro.
 ///
 /// Each value is captured as an [`AttributeValue`]: inside a `view!`
-/// invocation it lands in the enclosing instruction memory, and elsewhere it
-/// carries a memory of its own, so a collection can be built and rendered
+/// invocation it lands in the enclosing instruction arena, and elsewhere it
+/// carries an arena of its own, so a collection can be built and rendered
 /// anywhere.
 #[derive(Debug, Default, Clone)]
 pub struct Attributes {
@@ -84,7 +84,7 @@ impl Attributes {
             // A present value is always captured as an instruction block,
             // even when it writes nothing (a `true` boolean), so it is
             // never mistaken for an absent attribute.
-            AttributeValue::captured(__capture_view(|parts| {
+            AttributeValue::captured(build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
                     v.into_view_parts(cx, parts);
                 });
@@ -163,7 +163,7 @@ mod tests {
     use topcoat_core::context::Cx;
 
     use super::*;
-    use crate::{internal::__build_view, render::scope};
+    use crate::{internal::build_sync, render::scope};
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl FnOnce(&Cx) -> R) -> R {
@@ -185,7 +185,7 @@ mod tests {
     }
 
     fn render(cx: &Cx, attrs: Attributes) -> String {
-        __build_view(|parts| {
+        build_sync(|parts| {
             parts.in_context(HtmlContext::AttributeValue, |parts| {
                 attrs.into_view_parts(cx, parts);
             });

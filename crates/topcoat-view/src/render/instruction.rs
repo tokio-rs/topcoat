@@ -15,7 +15,7 @@ pub enum Instruction {
     Jmp { entry: InstructionPtr },
     /// Holds a reserved slot until it is filled; executing it panics.
     Placeholder,
-    /// Execute a spliced owned view's block in the memory it carries.
+    /// Execute a spliced owned view's block in the arena it carries.
     View { ptr: ViewPtr },
 
     /// A boolean rendered as text.

@@ -299,7 +299,7 @@ mod tests {
     fn write_view(source: &str) -> String {
         let mut builder = ViewBuilder::new();
         LowerView::lower(&parse(source), &mut builder);
-        builder.finish().emit().to_string()
+        builder.finish().emit_root().to_string()
     }
 
     /// Returns `true` if the attribute list falls back to a runtime `Attributes`

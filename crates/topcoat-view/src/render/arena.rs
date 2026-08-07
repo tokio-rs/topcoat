@@ -9,7 +9,7 @@ use crate::{
     view::ViewRepr,
 };
 
-/// The address of an instruction in a [`Memory`].
+/// The address of an instruction in a [`Arena`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InstructionPtr(usize);
 
@@ -19,41 +19,53 @@ impl InstructionPtr {
     }
 }
 
-/// The identity of a [`Memory`], unique for the lifetime of the process.
+/// The identity of a [`Arena`], unique for the lifetime of the process.
 ///
-/// A view still under construction records the id of the memory its
-/// instructions live in, so using it against a different memory fails instead
-/// of executing that memory's instructions.
+/// A view still under construction records the id of the arena its
+/// instructions live in, so using it against a different arena fails instead
+/// of executing that arena's instructions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MemoryId(u64);
+pub struct ArenaId(u64);
 
-impl MemoryId {
+impl ArenaId {
     fn next() -> Self {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         Self(COUNTER.fetch_add(1, Ordering::Relaxed))
     }
 }
 
-/// A reserved slot in a [`Memory`] that a view resolves into later.
+/// A reserved slot in an [`Arena`] that a view resolves into later.
 ///
-/// Returned by [`reserve_view`](Memory::reserve_view) alongside the
+/// Returned by [`reserve_view`](Arena::reserve_view) alongside the
 /// placeholder view pointing at the slot, and consumed by
-/// [`fill_view`](Memory::fill_view).
+/// [`fill_view`](Arena::fill_view).
 #[derive(Debug, Clone, Copy)]
 pub struct ViewSlot {
-    memory: MemoryId,
+    arena: ArenaId,
     ptr: InstructionPtr,
 }
 
-/// The instruction memory of a view arena.
+impl ViewSlot {
+    /// Redirects this slot to `view`, resolving its placeholder.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no view is building on the current task, if the slot or the
+    /// view belongs to a different arena, or if the slot was already filled.
+    pub fn fill(self, view: View) {
+        crate::render::with_arena(|arena| arena.fill_view(self, view));
+    }
+}
+
+/// The instruction arena of a build.
 ///
-/// The outermost `view!` invocation creates a memory, every `view!`
+/// The outermost `view!` invocation creates an arena, every `view!`
 /// invocation nested inside it appends its instructions here, and rendering
 /// a [`View`] executes them.
 ///
 /// # Contiguity
 ///
-/// A view is a `(memory id, entry)` pair pointing into this shared, append-
+/// A view is a `(arena id, entry)` pair pointing into this shared, append-
 /// only sequence, so the instructions of one view must form a contiguous,
 /// [`Ret`](Instruction::Ret)-terminated block. Callers uphold this by pushing
 /// a whole block in one synchronous burst: no `await` may happen between a
@@ -61,24 +73,24 @@ pub struct ViewSlot {
 /// interleave only at await points, so concurrently built sibling views each
 /// still land in one piece.
 #[derive(Debug)]
-pub struct Memory {
-    id: MemoryId,
+pub struct Arena {
+    id: ArenaId,
     instructions: Vec<Instruction>,
     pool: ConstPool,
 }
 
-impl Memory {
+impl Arena {
     pub(crate) fn new() -> Self {
         Self {
-            id: MemoryId::next(),
+            id: ArenaId::next(),
             instructions: Vec::new(),
             pool: ConstPool::new(),
         }
     }
 
-    /// Returns this memory's unique id.
+    /// Returns this arena's unique id.
     #[must_use]
-    pub fn id(&self) -> MemoryId {
+    pub fn id(&self) -> ArenaId {
         self.id
     }
 
@@ -104,21 +116,21 @@ impl Memory {
     ///
     /// # Panics
     ///
-    /// Panics if the view was built in a different, still building memory.
+    /// Panics if the view was built in a different, still building arena.
     pub fn push_view(&mut self, view: View) {
         match view.repr() {
             ViewRepr::Static(body) => {
                 self.push_static_str(body, HtmlContext::Unescaped);
             }
-            ViewRepr::Scoped { memory, entry, .. } => {
+            ViewRepr::Scoped { arena, entry, .. } => {
                 assert!(
-                    memory == self.id,
+                    arena == self.id,
                     "tried to use a view outside the `view!` invocation it was built in",
                 );
                 self.push_instruction(Instruction::Call { entry });
             }
-            ViewRepr::Owned { memory, entry, .. } => {
-                let ptr = self.pool.push_view(memory, entry);
+            ViewRepr::Owned { arena, entry, .. } => {
+                let ptr = self.pool.push_view(arena, entry);
                 self.push_instruction(Instruction::View { ptr });
             }
         }
@@ -142,7 +154,7 @@ impl Memory {
         let ptr = self.next_ptr();
         self.push_instruction(Instruction::Placeholder);
         let slot = ViewSlot {
-            memory: self.id,
+            arena: self.id,
             ptr,
         };
         (View::from_scope(self.id, ptr, 0), slot)
@@ -152,12 +164,12 @@ impl Memory {
     ///
     /// # Panics
     ///
-    /// Panics if the slot was reserved in a different memory, if the view
-    /// was built in a different, still building memory, or if the slot was
+    /// Panics if the slot was reserved in a different arena, if the view
+    /// was built in a different, still building arena, or if the slot was
     /// already filled.
     pub fn fill_view(&mut self, slot: ViewSlot, view: View) {
         assert!(
-            slot.memory == self.id,
+            slot.arena == self.id,
             "tried to fill a view slot outside the `view!` invocation it was reserved in",
         );
         let entry = match view.repr() {
@@ -169,18 +181,18 @@ impl Memory {
                 self.push_ret();
                 entry
             }
-            ViewRepr::Scoped { memory, entry, .. } => {
+            ViewRepr::Scoped { arena, entry, .. } => {
                 assert!(
-                    memory == self.id,
+                    arena == self.id,
                     "tried to use a view outside the `view!` invocation it was built in",
                 );
                 entry
             }
-            // An owned view's block lives in its own memory, so it is
+            // An owned view's block lives in its own arena, so it is
             // materialized as a block holding one splice instruction.
-            ViewRepr::Owned { memory, entry, .. } => {
+            ViewRepr::Owned { arena, entry, .. } => {
                 let block_entry = self.next_ptr();
-                let ptr = self.pool.push_view(memory, entry);
+                let ptr = self.pool.push_view(arena, entry);
                 self.push_instruction(Instruction::View { ptr });
                 self.push_ret();
                 block_entry
@@ -314,11 +326,11 @@ impl Memory {
         self.push_instruction(Instruction::Headers { ptr });
     }
 
-    /// Prints the memory's fields and how many instructions of each kind it
+    /// Prints the arena's fields and how many instructions of each kind it
     /// holds.
     #[allow(unused)]
     pub(crate) fn print_stats(&self) {
-        println!("Memory {{");
+        println!("Arena {{");
         println!("  id: {}", self.id.0);
         println!(
             "  instructions: {} ({} bytes)",

@@ -54,7 +54,7 @@ impl ToTokens for View {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut builder = ViewBuilder::new();
         self.nodes.lower(&mut builder);
-        let view = builder.finish().emit();
+        let view = builder.finish().emit_root();
 
         // When an explicit context is named, bind it to the `__cx` identifier
         // the generated code (component invocations) reads from. Inside a

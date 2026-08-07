@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     DynViewPart,
-    render::{InstructionPtr, Memory},
+    render::{Arena, InstructionPtr},
 };
 
 /// The index of a static string in a [`ConstPool`].
@@ -24,7 +24,7 @@ pub struct StrPtr {
 #[derive(Debug, Clone, Copy)]
 pub struct DynPtr(usize);
 
-/// The index of an owned view's memory and entry in a [`ConstPool`].
+/// The index of an owned view's arena and entry in a [`ConstPool`].
 #[derive(Debug, Clone, Copy)]
 pub struct ViewPtr(usize);
 
@@ -33,7 +33,7 @@ pub struct ViewPtr(usize);
 #[derive(Debug, Clone, Copy)]
 pub struct HeadersPtr(usize);
 
-/// The constant pool of a [`Memory`](crate::render::Memory): the out-of-line
+/// The constant pool of a [`Arena`](crate::render::Arena): the out-of-line
 /// operands the instruction sequence refers to by index.
 ///
 /// Instructions are fixed-size, so any operand that does not fit inline, such
@@ -45,7 +45,7 @@ pub struct ConstPool {
     strings: Vec<String>,
     strs: String,
     dyns: Vec<Box<dyn DynViewPart>>,
-    views: Vec<(Arc<Memory>, InstructionPtr)>,
+    views: Vec<(Arc<Arena>, InstructionPtr)>,
     #[cfg(feature = "http")]
     headers: Vec<http::HeaderMap>,
 }
@@ -103,17 +103,17 @@ impl ConstPool {
         &*self.dyns[ptr.0]
     }
 
-    /// Stores the memory an owned view holds together with the entry of its
+    /// Stores the arena an owned view holds together with the entry of its
     /// instruction block.
-    pub fn push_view(&mut self, memory: Arc<Memory>, entry: InstructionPtr) -> ViewPtr {
-        self.views.push((memory, entry));
+    pub fn push_view(&mut self, arena: Arc<Arena>, entry: InstructionPtr) -> ViewPtr {
+        self.views.push((arena, entry));
         ViewPtr(self.views.len() - 1)
     }
 
     #[must_use]
-    pub fn fetch_view(&self, ptr: ViewPtr) -> (&Memory, InstructionPtr) {
-        let (memory, entry) = &self.views[ptr.0];
-        (memory, *entry)
+    pub fn fetch_view(&self, ptr: ViewPtr) -> (&Arena, InstructionPtr) {
+        let (arena, entry) = &self.views[ptr.0];
+        (arena, *entry)
     }
 
     #[cfg(feature = "http")]

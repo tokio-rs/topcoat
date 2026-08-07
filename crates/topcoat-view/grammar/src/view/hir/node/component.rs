@@ -36,7 +36,7 @@ impl Component {
             quote! { .#ident(#value) }
         });
         let child = children.as_ref().map(|scope| {
-            let child = scope.emit_expr();
+            let child = scope.emit_view();
             quote! { .child(#child) }
         });
 
@@ -78,7 +78,7 @@ impl Component {
         quote_spanned! {path.span()=> {
             async {
                 use #topcoat_view::Component;
-                let (__placeholder, __slot) = __reserve_view();
+                let (__placeholder, __slot) = #topcoat_view::internal::reserve();
                 let props = #path::props_builder()#(#setters)*.child(__placeholder).build();
                 // The marker is built via `Default` so the same construction
                 // works for both unit-struct and generic (`PhantomData`) markers.
@@ -89,8 +89,9 @@ impl Component {
                     props,
                 );
                 let __child = #child;
-                let (__rendered, __child) = __try_join!(__render, __child)?;
-                __fill_view(__slot, __child);
+                let (__rendered, __child) =
+                    #topcoat_view::internal::try_join!(__render, __child)?;
+                __slot.fill(__child);
                 ::core::result::Result::<_, #topcoat_error::Error>::Ok(__rendered)
             }
         }}
@@ -113,6 +114,6 @@ impl Emit for Component {
         };
 
         emitter.hoist_future(span, &ident, &future);
-        emitter.emit(quote_spanned! {span=> __view(__cx, __parts, #ident); });
+        emitter.burst(quote_spanned! {span=> __b.view(#ident); });
     }
 }

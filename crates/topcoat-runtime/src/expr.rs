@@ -25,7 +25,7 @@ where
 {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         parts.push_static_str_unescaped("<!-- ::topcoat::expr::start(\"");
-        topcoat_view::internal::__view(cx, parts, self.js);
+        topcoat_view::internal::view(parts, self.js);
         parts.push_static_str_unescaped("\") -->");
         self.evaluated.into_view_parts(cx, parts);
         parts.push_static_str_unescaped("<!-- ::topcoat::expr::end -->");

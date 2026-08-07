@@ -30,14 +30,14 @@ pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");
 /// Macro helpers to shorten the generated source code.
 #[doc(hidden)]
 pub mod internal {
-    use topcoat_view::{HtmlContext, PartsWriter, internal::__in_context};
+    use topcoat_view::{HtmlContext, PartsWriter, internal::in_context};
 
     #[inline]
     pub fn __js(parts: &mut PartsWriter<'_>, js: impl Into<std::borrow::Cow<'static, str>>) {
         // JavaScript source renders inside comment markers and double-quoted
         // attributes; the comment context escapes the union of what both
         // positions need.
-        __in_context(parts, HtmlContext::Comment, |parts| {
+        in_context(parts, HtmlContext::Comment, |parts| {
             match js.into() {
                 std::borrow::Cow::Borrowed(js) => parts.push_static_str(js),
                 std::borrow::Cow::Owned(js) => parts.push_string(js),
@@ -52,7 +52,7 @@ pub mod internal {
 
     #[inline]
     pub fn __surrogate(parts: &mut PartsWriter<'_>, value: &(impl serde::Serialize + ?Sized)) {
-        __in_context(parts, HtmlContext::Comment, |parts| {
+        in_context(parts, HtmlContext::Comment, |parts| {
             parts.push_static_str_unescaped("cx.hydrate(");
             let json = serde_json::to_string(value).expect("failed to serialize surrogate value");
             parts.push_string(json);

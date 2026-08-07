@@ -550,7 +550,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{HtmlContext, internal::__build_view, render::scope};
+    use crate::{HtmlContext, internal::build_sync, render::scope};
 
     /// Every unit constructor paired with its rendered form. The numeric value
     /// is the same across cases so each assertion focuses on the unit suffix.
@@ -623,7 +623,7 @@ mod tests {
     fn render(value: impl AttributeValueViewParts) -> String {
         block_on(scope(async {
             let cx = Cx::default();
-            __build_view(|parts| {
+            build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
                     value.into_view_parts(&cx, parts);
                 });
