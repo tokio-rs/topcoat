@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use topcoat_core::context::Cx;
 
 use crate::{
-    Attribute, AttributeValue, AttributeValueViewParts, AttributeViewParts, HtmlContext,
-    PartsWriter, internal::build_sync,
+    Attribute, AttributeValue, AttributeValueViewParts, AttributeViewParts, PartsWriter,
+    internal::{block, build_sync},
 };
 
 /// A runtime collection of HTML attributes with unique keys.
@@ -84,11 +84,7 @@ impl Attributes {
             // A present value is always captured as an instruction block,
             // even when it writes nothing (a `true` boolean), so it is
             // never mistaken for an absent attribute.
-            AttributeValue::captured(build_sync(|parts| {
-                parts.in_context(HtmlContext::AttributeValue, |parts| {
-                    v.into_view_parts(cx, parts);
-                });
-            }))
+            AttributeValue::captured(build_sync(|| block(cx, |b| b.attribute_value(v))))
         } else {
             AttributeValue::absent()
         };
@@ -166,12 +162,7 @@ mod tests {
     }
 
     fn render(cx: &Cx, attrs: Attributes) -> String {
-        build_sync(|parts| {
-            parts.in_context(HtmlContext::AttributeValue, |parts| {
-                attrs.into_view_parts(cx, parts);
-            });
-        })
-        .render(cx)
+        build_sync(|| block(cx, |b| b.attributes(attrs))).render(cx)
     }
 
     #[test]

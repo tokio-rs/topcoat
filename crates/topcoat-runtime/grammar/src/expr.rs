@@ -70,8 +70,10 @@ impl Expr {
             Ok(quote! {{
                 use #topcoat_runtime::internal::*;
 
-                let __js_view = #topcoat_view::internal::build_sync(|__parts| {
-                    __js(__parts, #js);
+                let __js_view = #topcoat_view::internal::build_sync(|| {
+                    #topcoat_view::internal::write_block(|__parts| {
+                        __js(__parts, #js);
+                    })
                 });
                 #topcoat_runtime::Expr::new(#rust, __js_view)
             }})
@@ -108,10 +110,12 @@ impl Expr {
                 let (#(#rust_external_idents,)*) = (#(#rust_external_values,)*);
                 // The JS view serializes the surrogates by reference, so it
                 // is built before the Rust expression consumes them.
-                let __js_view = #topcoat_view::internal::build_sync(|__parts| {
-                    __js_unescaped(__parts, #js_head);
-                    #js_externals
-                    __js(__parts, #js_tail);
+                let __js_view = #topcoat_view::internal::build_sync(|| {
+                    #topcoat_view::internal::write_block(|__parts| {
+                        __js_unescaped(__parts, #js_head);
+                        #js_externals
+                        __js(__parts, #js_tail);
+                    })
                 });
                 #topcoat_runtime::Expr::new(#rust, __js_view)
             }})

@@ -544,7 +544,7 @@ impl AttributeValueViewParts for Length {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HtmlContext, arena::ArenaScope, internal::build_sync};
+    use crate::{HtmlContext, arena::ArenaScope, internal::{block, build_sync}};
 
     /// Every unit constructor paired with its rendered form. The numeric value
     /// is the same across cases so each assertion focuses on the unit suffix.
@@ -603,12 +603,7 @@ mod tests {
     fn render(value: impl AttributeValueViewParts) -> String {
         let (html, _) = ArenaScope::scope_sync(|| {
             let cx = Cx::default();
-            build_sync(|parts| {
-                parts.in_context(HtmlContext::AttributeValue, |parts| {
-                    value.into_view_parts(&cx, parts);
-                });
-            })
-            .render(&cx)
+            build_sync(|| block(&cx, |b| b.attribute_value(value))).render(&cx)
         });
         html
     }

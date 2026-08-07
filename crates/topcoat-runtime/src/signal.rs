@@ -219,7 +219,7 @@ impl EncodedSignals {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_view::internal::build_sync;
+    use topcoat_view::internal::{block, build_sync};
 
     use super::*;
 
@@ -230,9 +230,7 @@ mod tests {
         let signal = Signal::new(String::from("a-->b\"c&d"));
 
         let cx = Cx::default();
-        let view = build_sync(|parts| {
-            SignalDeclaration::new(&signal).into_view_parts(&cx, parts);
-        });
+        let view = build_sync(|| block(&cx, |b| b.node(SignalDeclaration::new(&signal))));
         let html = view.render(&cx);
 
         // The comment context escaped `>`, so the only `-->` left is the

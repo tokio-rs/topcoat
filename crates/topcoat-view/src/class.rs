@@ -331,17 +331,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AttributeValue, HtmlContext, arena::ArenaScope, internal::build_sync};
+    use crate::{AttributeValue, HtmlContext, arena::ArenaScope, internal::{block, build_sync}};
 
     fn render(class: Class<impl ClassEntries>) -> String {
         let (html, _) = ArenaScope::scope_sync(|| {
             let cx = Cx::default();
-            build_sync(|parts| {
-                parts.in_context(HtmlContext::AttributeValue, |parts| {
-                    AttributeValueViewParts::into_view_parts(class, &cx, parts);
-                });
-            })
-            .render(&cx)
+            build_sync(|| block(&cx, |b| b.attribute_value(class))).render(&cx)
         });
         html
     }
@@ -444,17 +439,10 @@ mod tests {
     fn attribute_value_entries_are_spliced_verbatim() {
         ArenaScope::scope_sync(|| {
             let cx = Cx::default();
-            let value = AttributeValue::captured(build_sync(|parts| {
-                parts.in_context(HtmlContext::AttributeValue, |parts| {
-                    parts.push_str("[&>*]:mt-2");
-                });
-            }));
-            let html = build_sync(|parts| {
-                parts.in_context(HtmlContext::AttributeValue, |parts| {
-                    AttributeValueViewParts::into_view_parts(Class(("btn", &value)), &cx, parts);
-                });
-            })
-            .render(&cx);
+            let value =
+                AttributeValue::captured(build_sync(|| block(&cx, |b| b.attribute_value("[&>*]:mt-2"))));
+            let html = build_sync(|| block(&cx, |b| b.attribute_value(Class(("btn", &value)))))
+                .render(&cx);
             assert_eq!(html, "btn [&amp;>*]:mt-2");
         });
     }

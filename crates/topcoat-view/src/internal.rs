@@ -47,12 +47,12 @@ pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Re
 /// arena when one is building on this task and in an arena of its own
 /// otherwise.
 ///
-/// The synchronous counterpart of [`build`]. Runtime collections like
-/// [`Attributes`](crate::Attributes) capture values through this, so they
-/// work standalone as well as inside a `view!`.
-pub fn build_sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-    let (view, arena) =
-        ArenaScope::scope_sync(|| ArenaScope::with(|arena| PartsWriter::block(arena, f)));
+/// The synchronous counterpart of [`build`]: `f` composes the view from
+/// blocks, usually a single [`block`] or [`write_block`]. Runtime
+/// collections like [`Attributes`](crate::Attributes) capture values
+/// through this, so they work standalone as well as inside a `view!`.
+pub fn build_sync(f: impl FnOnce() -> View) -> View {
+    let (view, arena) = ArenaScope::scope_sync(f);
     view.seal(arena)
 }
 
@@ -69,7 +69,21 @@ pub fn build_sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
 ///
 /// Panics if no view is building on the current task.
 pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> View {
-    ArenaScope::with(|arena| PartsWriter::block(arena, |parts| f(&mut Builder { cx, parts })))
+    write_block(|parts| f(&mut Builder { cx, parts }))
+}
+
+/// Appends a view's instruction block in one synchronous burst, pushing its
+/// parts through the writer handed to `f`.
+///
+/// The writer counterpart of [`block`], for compositions that push through
+/// the writer directly instead of a [`Builder`], like the runtime's
+/// JavaScript views.
+///
+/// # Panics
+///
+/// Panics if no view is building on the current task.
+pub fn write_block(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+    ArenaScope::with(|arena| PartsWriter::block(arena, f))
 }
 
 /// Reserves a slot in the installed arena for a view that resolves later.
