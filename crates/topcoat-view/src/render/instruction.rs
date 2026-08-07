@@ -12,9 +12,6 @@ pub enum Instruction {
     /// Return back to the previous call instruction, if any.
     Ret,
     /// Jump to `entry` without recording a return address.
-    ///
-    /// Fills a slot reserved by [`reserve_view`](super::Memory::reserve_view),
-    /// redirecting the placeholder to the resolved view's block.
     Jmp { entry: InstructionPtr },
     /// Holds a reserved slot until it is filled; executing it panics.
     Placeholder,

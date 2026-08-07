@@ -230,7 +230,7 @@ impl Memory {
     /// any HTML context, so no escaping applies.
     pub fn push_i128(&mut self, value: i128) {
         let mut buffer = itoa::Buffer::new();
-        self.push_string(buffer.format(value).to_owned(), HtmlContext::Unescaped);
+        self.push_str(buffer.format(value), HtmlContext::Unescaped);
     }
 
     /// Appends a `u128` rendered as text.
@@ -240,7 +240,7 @@ impl Memory {
     /// any HTML context, so no escaping applies.
     pub fn push_u128(&mut self, value: u128) {
         let mut buffer = itoa::Buffer::new();
-        self.push_string(buffer.format(value).to_owned(), HtmlContext::Unescaped);
+        self.push_str(buffer.format(value), HtmlContext::Unescaped);
     }
 
     pub fn push_f32(&mut self, value: f32) {
