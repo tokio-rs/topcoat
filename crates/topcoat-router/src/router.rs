@@ -90,7 +90,7 @@ impl Router {
         let (parts, body) = request.into_parts();
 
         let Ok(matched) = self.endpoints.at(parts.uri.path()) else {
-            return topcoat_view::scope(async { respond(&Cx::default(), not_found()) }).await;
+            return respond(&Cx::default(), not_found());
         };
 
         // The chain's terminal, reached through the endpoint's precomputed
@@ -113,17 +113,11 @@ impl Router {
         cx.insert(path_params);
         cx.insert(parts);
 
-        // The whole chain runs inside one view scope, so every view built
-        // while handling the request shares the scope's instruction memory
-        // and rendering the response can execute it.
-        let response = topcoat_view::scope(async {
-            // The origin layer wraps the whole chain, denying untrusted
-            // cross-origin requests before anything else runs.
-            let next = Next::new(&self.layers, endpoint.layers(), terminal);
-            let response = self.origin.handle(&mut cx, body, next).await;
-            respond(&cx, response)
-        })
-        .await;
+        // The origin layer wraps the whole chain, denying untrusted
+        // cross-origin requests before anything else runs.
+        let next = Next::new(&self.layers, endpoint.layers(), terminal);
+        let response = self.origin.handle(&mut cx, body, next).await;
+        let response = respond(&cx, response);
 
         // Compression runs outside every layer, so layers see uncompressed
         // bodies. The negotiation reads the request headers as the layers

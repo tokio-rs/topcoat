@@ -1,4 +1,9 @@
-use crate::DynViewPart;
+use std::sync::Arc;
+
+use crate::{
+    DynViewPart,
+    render::{InstructionPtr, Memory},
+};
 
 /// The index of a static string in a [`ConstPool`].
 #[derive(Debug, Clone, Copy)]
@@ -19,6 +24,10 @@ pub struct StrPtr {
 #[derive(Debug, Clone, Copy)]
 pub struct DynPtr(usize);
 
+/// The index of an owned view's memory and entry in a [`ConstPool`].
+#[derive(Debug, Clone, Copy)]
+pub struct ViewPtr(usize);
+
 /// The index of a header map in a [`ConstPool`].
 #[cfg(feature = "http")]
 #[derive(Debug, Clone, Copy)]
@@ -36,6 +45,7 @@ pub struct ConstPool {
     strings: Vec<String>,
     strs: String,
     dyns: Vec<Box<dyn DynViewPart>>,
+    views: Vec<(Arc<Memory>, InstructionPtr)>,
     #[cfg(feature = "http")]
     headers: Vec<http::HeaderMap>,
 }
@@ -91,6 +101,19 @@ impl ConstPool {
     #[must_use]
     pub fn fetch_dyn(&self, ptr: DynPtr) -> &dyn DynViewPart {
         &*self.dyns[ptr.0]
+    }
+
+    /// Stores the memory an owned view holds together with the entry of its
+    /// instruction block.
+    pub fn push_view(&mut self, memory: Arc<Memory>, entry: InstructionPtr) -> ViewPtr {
+        self.views.push((memory, entry));
+        ViewPtr(self.views.len() - 1)
+    }
+
+    #[must_use]
+    pub fn fetch_view(&self, ptr: ViewPtr) -> (&Memory, InstructionPtr) {
+        let (memory, entry) = &self.views[ptr.0];
+        (memory, *entry)
     }
 
     #[cfg(feature = "http")]

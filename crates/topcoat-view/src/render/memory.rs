@@ -21,9 +21,9 @@ impl InstructionPtr {
 
 /// The identity of a [`Memory`], unique for the lifetime of the process.
 ///
-/// A [`View`] records the id of the memory its instructions live in, so
-/// rendering it inside a different scope fails instead of executing another
-/// scope's instructions.
+/// A view still under construction records the id of the memory its
+/// instructions live in, so using it against a different memory fails instead
+/// of executing that memory's instructions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MemoryId(u64);
 
@@ -45,10 +45,11 @@ pub struct ViewSlot {
     ptr: InstructionPtr,
 }
 
-/// The instruction memory of a view scope.
+/// The instruction memory of a view arena.
 ///
-/// Every `view!` invocation inside a [`scope`](crate::scope) appends its
-/// instructions here, and rendering a [`View`] executes them.
+/// The outermost `view!` invocation creates a memory, every `view!`
+/// invocation nested inside it appends its instructions here, and rendering
+/// a [`View`] executes them.
 ///
 /// # Contiguity
 ///
@@ -103,7 +104,7 @@ impl Memory {
     ///
     /// # Panics
     ///
-    /// Panics if the view was built in a different scope.
+    /// Panics if the view was built in a different, still building arena.
     pub fn push_view(&mut self, view: View) {
         match view.repr() {
             ViewRepr::Static(body) => {
@@ -112,9 +113,13 @@ impl Memory {
             ViewRepr::Scoped { memory, entry, .. } => {
                 assert!(
                     memory == self.id,
-                    "tried to use a view outside the scope it was built in",
+                    "tried to use a view outside the `view!` invocation it was built in",
                 );
                 self.push_instruction(Instruction::Call { entry });
+            }
+            ViewRepr::Owned { memory, entry, .. } => {
+                let ptr = self.pool.push_view(memory, entry);
+                self.push_instruction(Instruction::View { ptr });
             }
         }
     }
@@ -166,9 +171,18 @@ impl Memory {
             ViewRepr::Scoped { memory, entry, .. } => {
                 assert!(
                     memory == self.id,
-                    "tried to use a view outside the scope it was built in",
+                    "tried to use a view outside the `view!` invocation it was built in",
                 );
                 entry
+            }
+            // An owned view's block lives in its own memory, so it is
+            // materialized as a block holding one splice instruction.
+            ViewRepr::Owned { memory, entry, .. } => {
+                let block_entry = self.next_ptr();
+                let ptr = self.pool.push_view(memory, entry);
+                self.push_instruction(Instruction::View { ptr });
+                self.push_ret();
+                block_entry
             }
         };
         let instruction = &mut self.instructions[slot.ptr.0];
@@ -317,6 +331,7 @@ impl Memory {
                 Instruction::Ret => "Ret",
                 Instruction::Jmp { .. } => "Jmp",
                 Instruction::Placeholder => "Placeholder",
+                Instruction::View { .. } => "View",
                 Instruction::Bool(_) => "Bool",
                 Instruction::I8(_) => "I8",
                 Instruction::I16(_) => "I16",

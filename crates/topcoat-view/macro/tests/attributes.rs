@@ -1,117 +1,102 @@
 #[tokio::test]
 async fn attributes_macro_builds_runtime_attributes() {
-    topcoat::view::scope(async {
-        let cx = &topcoat::context::Cx::default();
-        let id = "submit";
-        let dynamic = [
-            ("data-skip", "skip"),
-            ("data-state", "ready"),
-            ("data-stop", "stop"),
-            ("data-after", "after"),
-        ];
+    let cx = &topcoat::context::Cx::default();
+    let id = "submit";
+    let dynamic = [
+        ("data-skip", "skip"),
+        ("data-state", "ready"),
+        ("data-stop", "stop"),
+        ("data-after", "after"),
+    ];
 
-        let attrs = topcoat::view::attributes! {
-            cx =>
-            class="button"
-            id=(id)
-            :data-bound=$(id.to_owned())
-            @input="(e) => console.log(e)"
-            if true {
-                aria-label="Submit"
-            } else {
-                aria-label="Disabled"
+    let attrs = topcoat::view::attributes! {
+        cx =>
+        class="button"
+        id=(id)
+        :data-bound=$(id.to_owned())
+        @input="(e) => console.log(e)"
+        if true {
+            aria-label="Submit"
+        } else {
+            aria-label="Disabled"
+        }
+        for (key, value) in dynamic {
+            if value == "skip" {
+                continue;
             }
-            for (key, value) in dynamic {
-                if value == "skip" {
-                    continue;
-                }
-                if value == "stop" {
-                    break;
-                }
-                (key)=(value)
+            if value == "stop" {
+                break;
             }
-            match id {
-                "submit" => type="submit",
-                _ => type="button",
-            }
-        };
+            (key)=(value)
+        }
+        match id {
+            "submit" => type="submit",
+            _ => type="button",
+        }
+    };
 
-        assert!(attrs.contains_key("class"));
-        assert!(attrs.contains_key("id"));
-        assert!(attrs.contains_key("aria-label"));
-        assert!(attrs.contains_key("data-state"));
-        assert!(attrs.contains_key("type"));
-        assert!(attrs.contains_key("data-bound"));
-        assert!(attrs.contains_key("data-topcoat-bind:data-bound"));
-        assert!(attrs.contains_key("data-topcoat-on:input"));
-        assert!(!attrs.contains_key("data-skip"));
-        assert!(!attrs.contains_key("data-stop"));
-        assert!(!attrs.contains_key("data-after"));
-        assert!(attrs.get("missing").is_none());
-    })
-    .await;
+    assert!(attrs.contains_key("class"));
+    assert!(attrs.contains_key("id"));
+    assert!(attrs.contains_key("aria-label"));
+    assert!(attrs.contains_key("data-state"));
+    assert!(attrs.contains_key("type"));
+    assert!(attrs.contains_key("data-bound"));
+    assert!(attrs.contains_key("data-topcoat-bind:data-bound"));
+    assert!(attrs.contains_key("data-topcoat-on:input"));
+    assert!(!attrs.contains_key("data-skip"));
+    assert!(!attrs.contains_key("data-stop"));
+    assert!(!attrs.contains_key("data-after"));
+    assert!(attrs.get("missing").is_none());
 }
 
 #[tokio::test]
 async fn spread_inserts_attribute_fragment_into_element() {
-    topcoat::view::scope(async {
-        use topcoat::{context::Cx, view::view};
+    use topcoat::{context::Cx, view::view};
 
-        let cx = &Cx::default();
-        let attrs = topcoat::view::attributes! { cx => type="submit" };
-        let result: topcoat::Result = view! { cx => <button (attrs)>"Save"</button> };
-        let html = result.unwrap().render(cx);
+    let cx = &Cx::default();
+    let attrs = topcoat::view::attributes! { cx => type="submit" };
+    let result: topcoat::Result = view! { cx => <button (attrs)>"Save"</button> };
+    let html = result.unwrap().render(cx);
 
-        assert_eq!(html, r#"<button type="submit">Save</button>"#);
-    })
-    .await;
+    assert_eq!(html, r#"<button type="submit">Save</button>"#);
 }
 
 #[tokio::test]
 async fn spread_follows_other_attributes() {
-    topcoat::view::scope(async {
-        use topcoat::{context::Cx, view::view};
+    use topcoat::{context::Cx, view::view};
 
-        let cx = &Cx::default();
-        let attrs = topcoat::view::attributes! { cx => type="submit" };
-        let result: topcoat::Result = view! { cx => <button class="btn" (attrs)>"Save"</button> };
-        let html = result.unwrap().render(cx);
+    let cx = &Cx::default();
+    let attrs = topcoat::view::attributes! { cx => type="submit" };
+    let result: topcoat::Result = view! { cx => <button class="btn" (attrs)>"Save"</button> };
+    let html = result.unwrap().render(cx);
 
-        assert!(html.contains(r#"class="btn""#));
-        assert!(html.contains(r#"type="submit""#));
-    })
-    .await;
+    assert!(html.contains(r#"class="btn""#));
+    assert!(html.contains(r#"type="submit""#));
 }
 
 #[tokio::test]
 async fn dynamic_key_still_parses_after_spread_support() {
-    topcoat::view::scope(async {
-        // A parenthesized key followed by `=` remains a dynamic attribute, not a
-        // spread.
-        let cx = &topcoat::context::Cx::default();
-        let name = "data-state";
-        let attrs = topcoat::view::attributes! { cx => (name)="ready" };
-        assert!(attrs.contains_key("data-state"));
-    })
-    .await;
+    // A parenthesized key followed by `=` remains a dynamic attribute, not a
+    // spread.
+    let cx = &topcoat::context::Cx::default();
+    let name = "data-state";
+    let attrs = topcoat::view::attributes! { cx => (name)="ready" };
+    assert!(attrs.contains_key("data-state"));
 }
 
 #[tokio::test]
 async fn spread_merges_within_attributes_macro() {
-    topcoat::view::scope(async {
-        use topcoat::{context::Cx, view::view};
+    use topcoat::{context::Cx, view::view};
 
-        let cx = &Cx::default();
-        let base = topcoat::view::attributes! { cx => class="btn" type="button" };
-        let merged = topcoat::view::attributes! { cx => class="card" (base) };
+    let cx = &Cx::default();
+    let base = topcoat::view::attributes! { cx => class="btn" type="button" };
+    let merged = topcoat::view::attributes! { cx => class="card" (base) };
 
-        assert!(merged.contains_key("type"));
+    assert!(merged.contains_key("type"));
 
-        // The spread's keys replace earlier ones, so `class` renders as `btn`.
-        let result: topcoat::Result = view! { cx => <div (merged)></div> };
-        let html = result.unwrap().render(cx);
-        assert!(html.contains(r#"class="btn""#));
-        assert!(!html.contains(r#"class="card""#));
-    })
-    .await;
+    // The spread's keys replace earlier ones, so `class` renders as `btn`.
+    let result: topcoat::Result = view! { cx => <div (merged)></div> };
+    let html = result.unwrap().render(cx);
+    assert!(html.contains(r#"class="btn""#));
+    assert!(!html.contains(r#"class="card""#));
 }

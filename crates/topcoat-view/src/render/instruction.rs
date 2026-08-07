@@ -2,7 +2,7 @@
 use crate::render::HeadersPtr;
 use crate::{
     HtmlContext,
-    render::{DynPtr, InstructionPtr, StaticStrPtr, StringPtr},
+    render::{DynPtr, InstructionPtr, StaticStrPtr, StringPtr, ViewPtr},
 };
 
 #[derive(Debug, Clone)]
@@ -15,6 +15,8 @@ pub enum Instruction {
     Jmp { entry: InstructionPtr },
     /// Holds a reserved slot until it is filled; executing it panics.
     Placeholder,
+    /// Execute a spliced owned view's block in the memory it carries.
+    View { ptr: ViewPtr },
 
     /// A boolean rendered as text.
     #[non_exhaustive]

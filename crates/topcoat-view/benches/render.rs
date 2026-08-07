@@ -436,10 +436,7 @@ fn bench_render(c: &mut Criterion) {
     let cx = Cx::default();
     let mut group = c.benchmark_group("view_render");
 
-    // Building and rendering share one view scope. The whole body runs in a
-    // single poll of the scope future, so the timed iterations execute with
-    // the scope's instruction memory installed.
-    block_on(topcoat::view::scope(async {
+    block_on(async {
         let static_view = static_page().await.expect("render static_page");
         measure(&mut group, "static_page", &cx, &static_view);
 
@@ -468,7 +465,7 @@ fn bench_render(c: &mut Criterion) {
                 .expect("render product_grid");
             measure(&mut group, format!("product_grid/{count}"), &cx, &grid_view);
         }
-    }));
+    });
 
     group.finish();
 }

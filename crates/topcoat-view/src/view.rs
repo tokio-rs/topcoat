@@ -1,4 +1,5 @@
 use core::fmt;
+use std::sync::Arc;
 
 #[cfg(feature = "http")]
 use http::{HeaderMap, StatusCode};
@@ -23,25 +24,38 @@ use crate::{
 /// <div>Hello
 /// ```
 ///
-/// A view built by `view!` is a cheap handle into the instruction memory of
-/// the enclosing [`scope`](crate::scope): the id of that memory and the entry
-/// address of the view's instruction block. It must be nested and rendered
-/// inside the same scope; using it anywhere else panics.
+/// The outermost `view!` invocation allocates an instruction memory that the
+/// returned view owns; every `view!` nested inside it, such as a component
+/// body, appends to that same memory and returns a cheap handle into it. An
+/// owned view is a self-contained value: it can be stored, sent across
+/// tasks, spliced into another view, and rendered anywhere. A nested handle
+/// only lives while its enclosing invocation builds; one that escapes it
+/// panics when used.
 #[derive(Debug, Default, Clone)]
 pub struct View {
     repr: ViewRepr,
 }
 
-/// The two kinds of view: a handle into a scope's instruction memory, or a
-/// scope-independent static string.
-#[derive(Debug, Clone, Copy)]
+/// The kinds of view: a static string independent of any memory, a handle
+/// into the memory of an enclosing `view!` invocation still building, or an
+/// owned view carrying its own memory.
+#[derive(Debug, Clone)]
 pub(crate) enum ViewRepr {
-    /// Trusted static markup rendered verbatim, independent of any scope.
+    /// Trusted static markup rendered verbatim, independent of any memory.
     Static(&'static str),
-    /// An instruction block in the memory identified by `memory`, starting
-    /// at `entry`.
+    /// An instruction block in the still building memory identified by
+    /// `memory`, starting at `entry`.
     Scoped {
         memory: MemoryId,
+        entry: InstructionPtr,
+        /// An estimate of the number of bytes the block writes when
+        /// rendered, accumulated while the view was built.
+        size_hint: usize,
+    },
+    /// An instruction block starting at `entry` in a memory the view holds
+    /// on to itself.
+    Owned {
+        memory: Arc<Memory>,
         entry: InstructionPtr,
         /// An estimate of the number of bytes the block writes when
         /// rendered, accumulated while the view was built.
@@ -80,9 +94,41 @@ impl View {
     /// rendered.
     #[inline]
     pub(crate) fn size_hint(&self) -> usize {
-        match self.repr {
+        match &self.repr {
             ViewRepr::Static(body) => body.len(),
-            ViewRepr::Scoped { size_hint, .. } => size_hint,
+            ViewRepr::Scoped { size_hint, .. } | ViewRepr::Owned { size_hint, .. } => *size_hint,
+        }
+    }
+
+    /// Seals a root `view!` invocation's build: the view takes ownership of
+    /// the memory its instructions were appended to.
+    ///
+    /// A static view carries no instructions, so it passes through and the
+    /// memory is dropped.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the view's instructions live in a different memory.
+    pub(crate) fn into_owned(self, memory: Memory) -> Self {
+        match self.repr {
+            ViewRepr::Static(_) | ViewRepr::Owned { .. } => self,
+            ViewRepr::Scoped {
+                memory: id,
+                entry,
+                size_hint,
+            } => {
+                assert!(
+                    id == memory.id(),
+                    "tried to seal a view into a memory it was not built in",
+                );
+                Self {
+                    repr: ViewRepr::Owned {
+                        memory: Arc::new(memory),
+                        entry,
+                        size_hint,
+                    },
+                }
+            }
         }
     }
 
@@ -123,9 +169,10 @@ impl View {
     ///
     /// # Panics
     ///
-    /// Panics if the view was built in a scope that is not active on the
-    /// current task, or if a dynamic attribute key or element name in the
-    /// view contains a character that could break out of the identifier.
+    /// Panics if the view is a nested handle that escaped the `view!`
+    /// invocation it was built in, or if a dynamic attribute key or element
+    /// name in the view contains a character that could break out of the
+    /// identifier.
     #[track_caller]
     pub fn render(self, cx: &Cx) -> String {
         match self.repr {
@@ -138,6 +185,16 @@ impl View {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
                 Self::execute(memory, entry, cx, &mut f);
+                html
+            }
+            ViewRepr::Owned {
+                memory,
+                entry,
+                size_hint,
+            } => {
+                let mut html = String::with_capacity(size_hint);
+                let mut f = Formatter::new(&mut html);
+                Machine::new(&memory, entry).execute(cx, &mut f);
                 html
             }
         }
@@ -155,9 +212,10 @@ impl View {
     ///
     /// # Panics
     ///
-    /// Panics if the view was built in a scope that is not active on the
-    /// current task, or if a dynamic attribute key or element name in the
-    /// view contains a character that could break out of the identifier.
+    /// Panics if the view is a nested handle that escaped the `view!`
+    /// invocation it was built in, or if a dynamic attribute key or element
+    /// name in the view contains a character that could break out of the
+    /// identifier.
     #[cfg(feature = "http")]
     #[must_use]
     #[track_caller]
@@ -183,17 +241,32 @@ impl View {
                     headers,
                 }
             }
+            ViewRepr::Owned {
+                memory,
+                entry,
+                size_hint,
+            } => {
+                let mut html = String::with_capacity(size_hint);
+                let mut f = Formatter::new(&mut html);
+                Machine::new(&memory, entry).execute(cx, &mut f);
+                let (status_code, headers) = f.into_recorded();
+                RenderedResponse {
+                    html,
+                    status_code,
+                    headers,
+                }
+            }
         }
     }
 
-    /// Executes the view's instruction block against the active scope's
-    /// memory.
+    /// Executes a nested view handle's instruction block against the memory
+    /// of the enclosing `view!` invocation still building it.
     #[track_caller]
     fn execute(memory: MemoryId, entry: InstructionPtr, cx: &Cx, f: &mut Formatter<'_>) {
         with_memory(|active| {
             assert!(
                 active.id() == memory,
-                "tried to render a view outside the scope it was built in",
+                "tried to render a view outside the `view!` invocation it was built in",
             );
             Machine::new(active, entry).execute(cx, f);
         });
@@ -226,7 +299,7 @@ pub struct RenderedResponse {
 /// [`render`](Self::render) already carries the [`HtmlContext`] of the
 /// position the part was pushed into, so everything written through it is
 /// escaped or validated for that position.
-pub trait DynViewPart: 'static + fmt::Debug + Send {
+pub trait DynViewPart: 'static + fmt::Debug + Send + Sync {
     /// Writes this part's output into `w`.
     #[track_caller]
     fn render(&self, cx: &Cx, w: &mut HtmlWriter<'_, '_>);

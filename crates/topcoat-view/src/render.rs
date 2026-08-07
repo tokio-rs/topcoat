@@ -8,4 +8,4 @@ pub use const_pool::*;
 pub use instruction::*;
 pub use machine::*;
 pub use memory::*;
-pub use scope::*;
+pub(crate) use scope::*;

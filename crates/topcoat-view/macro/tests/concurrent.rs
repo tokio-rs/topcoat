@@ -25,10 +25,10 @@ async fn meet(barrier: &Barrier, label: &str) -> Result {
     view! { <i>(label)</i> }
 }
 
-/// Runs `fut` inside a view scope, failing instead of hanging when the
-/// expected concurrency regresses to sequential awaits.
+/// Runs `fut`, failing instead of hanging when the expected concurrency
+/// regresses to sequential awaits.
 async fn assert_concurrent<F: Future>(fut: F) -> F::Output {
-    timeout(Duration::from_secs(5), topcoat::view::scope(fut))
+    timeout(Duration::from_secs(5), fut)
         .await
         .expect("components should render concurrently")
 }
@@ -202,19 +202,16 @@ async fn echo(text: &str) -> Result {
 
 #[tokio::test]
 async fn joined_components_still_read_earlier_local_bindings() {
-    topcoat::view::scope(async {
-        let cx = empty_cx();
-        let __cx = &cx;
-        let result: Result = view! {
-            let greeting = "hello";
-            echo(text: greeting)
-            let farewell = "goodbye";
-            echo(text: farewell)
-        };
+    let cx = empty_cx();
+    let __cx = &cx;
+    let result: Result = view! {
+        let greeting = "hello";
+        echo(text: greeting)
+        let farewell = "goodbye";
+        echo(text: farewell)
+    };
 
-        assert_eq!(result.unwrap().render(__cx), "<b>hello</b><b>goodbye</b>",);
-    })
-    .await;
+    assert_eq!(result.unwrap().render(__cx), "<b>hello</b><b>goodbye</b>",);
 }
 
 #[tokio::test]

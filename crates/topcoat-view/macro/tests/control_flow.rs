@@ -6,165 +6,141 @@ fn r(v: topcoat::Result) -> String {
 
 #[tokio::test]
 async fn if_true_branch_emits_its_body() {
-    topcoat::view::scope(async {
-        let signed_in = true;
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            if signed_in {
-                <a href="/account">"Account"</a>
-            } else {
-                <a href="/login">"Sign in"</a>
-            }
-        });
+    let signed_in = true;
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        if signed_in {
+            <a href="/account">"Account"</a>
+        } else {
+            <a href="/login">"Sign in"</a>
+        }
+    });
 
-        assert_eq!(html, r#"<a href="/account">Account</a>"#);
-    })
-    .await;
+    assert_eq!(html, r#"<a href="/account">Account</a>"#);
 }
 
 #[tokio::test]
 async fn if_false_branch_emits_else_body() {
-    topcoat::view::scope(async {
-        let signed_in = false;
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            if signed_in {
-                <a href="/account">"Account"</a>
-            } else {
-                <a href="/login">"Sign in"</a>
-            }
-        });
+    let signed_in = false;
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        if signed_in {
+            <a href="/account">"Account"</a>
+        } else {
+            <a href="/login">"Sign in"</a>
+        }
+    });
 
-        assert_eq!(html, r#"<a href="/login">Sign in</a>"#);
-    })
-    .await;
+    assert_eq!(html, r#"<a href="/login">Sign in</a>"#);
 }
 
 #[tokio::test]
 async fn if_without_else_emits_nothing_on_false() {
-    topcoat::view::scope(async {
-        let show = false;
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            <div>
-                if show {
-                    <p>"shown"</p>
-                }
-            </div>
-        });
+    let show = false;
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <div>
+            if show {
+                <p>"shown"</p>
+            }
+        </div>
+    });
 
-        assert_eq!(html, "<div></div>");
-    })
-    .await;
+    assert_eq!(html, "<div></div>");
 }
 
 #[tokio::test]
 async fn if_else_if_else_chain_selects_first_match() {
-    topcoat::view::scope(async {
-        let n = 1;
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            if n == 0 {
-                <p>"zero"</p>
-            } else if n == 1 {
-                <p>"one"</p>
-            } else {
-                <p>"many"</p>
-            }
-        });
+    let n = 1;
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        if n == 0 {
+            <p>"zero"</p>
+        } else if n == 1 {
+            <p>"one"</p>
+        } else {
+            <p>"many"</p>
+        }
+    });
 
-        assert_eq!(html, "<p>one</p>");
-    })
-    .await;
+    assert_eq!(html, "<p>one</p>");
 }
 
 #[tokio::test]
 async fn if_in_attribute_list_adds_branch_attributes() {
-    topcoat::view::scope(async {
-        let current = true;
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            <a
-                href="/posts"
-                if current {
-                    aria-current="page"
-                    class="active"
-                }
-            >
-                "Posts"
-            </a>
-        });
+    let current = true;
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <a
+            href="/posts"
+            if current {
+                aria-current="page"
+                class="active"
+            }
+        >
+            "Posts"
+        </a>
+    });
 
-        assert!(html.contains(r#"href="/posts""#));
-        assert!(html.contains(r#"aria-current="page""#));
-        assert!(html.contains(r#"class="active""#));
-    })
-    .await;
+    assert!(html.contains(r#"href="/posts""#));
+    assert!(html.contains(r#"aria-current="page""#));
+    assert!(html.contains(r#"class="active""#));
 }
 
 #[tokio::test]
 async fn for_loop_renders_body_per_item() {
-    topcoat::view::scope(async {
-        let posts = ["alpha", "beta", "gamma"];
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            <ul>
-                for title in posts {
-                    <li>(title)</li>
-                }
-            </ul>
-        });
+    let posts = ["alpha", "beta", "gamma"];
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <ul>
+            for title in posts {
+                <li>(title)</li>
+            }
+        </ul>
+    });
 
-        assert_eq!(html, "<ul><li>alpha</li><li>beta</li><li>gamma</li></ul>");
-    })
-    .await;
+    assert_eq!(html, "<ul><li>alpha</li><li>beta</li><li>gamma</li></ul>");
 }
 
 #[tokio::test]
 async fn for_loop_in_attribute_list_emits_attributes_per_item() {
-    topcoat::view::scope(async {
-        let extras = [("data-a", "1"), ("data-b", "2")];
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            <div
-                for (name, value) in extras {
-                    (name)=(value)
-                }
-            ></div>
-        });
+    let extras = [("data-a", "1"), ("data-b", "2")];
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <div
+            for (name, value) in extras {
+                (name)=(value)
+            }
+        ></div>
+    });
 
-        assert!(html.contains(r#"data-a="1""#));
-        assert!(html.contains(r#"data-b="2""#));
-    })
-    .await;
+    assert!(html.contains(r#"data-a="1""#));
+    assert!(html.contains(r#"data-b="2""#));
 }
 
 #[tokio::test]
 async fn for_loop_filtering_with_if_emits_subset() {
-    topcoat::view::scope(async {
-        let items = ["keep", "drop", "keep"];
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            <ul>
-                for item in items {
-                    if item == "keep" {
-                        <li>(item)</li>
-                    }
+    let items = ["keep", "drop", "keep"];
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <ul>
+            for item in items {
+                if item == "keep" {
+                    <li>(item)</li>
                 }
-            </ul>
-        });
+            }
+        </ul>
+    });
 
-        assert_eq!(html, "<ul><li>keep</li><li>keep</li></ul>");
-    })
-    .await;
+    assert_eq!(html, "<ul><li>keep</li><li>keep</li></ul>");
 }
 
 #[derive(Clone, Copy)]
@@ -177,123 +153,105 @@ enum Status {
 
 #[tokio::test]
 async fn match_chooses_arm_body() {
-    topcoat::view::scope(async {
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            match Status::Published {
-                Status::Draft => <span>"draft"</span>,
-                Status::Published => <a href="/post">"open"</a>,
-                Status::Archived => <span>"archived"</span>,
-            }
-        });
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        match Status::Published {
+            Status::Draft => <span>"draft"</span>,
+            Status::Published => <a href="/post">"open"</a>,
+            Status::Archived => <span>"archived"</span>,
+        }
+    });
 
-        assert_eq!(html, r#"<a href="/post">open</a>"#);
-    })
-    .await;
+    assert_eq!(html, r#"<a href="/post">open</a>"#);
 }
 
 #[tokio::test]
 async fn match_arm_with_block_emits_multiple_siblings() {
-    topcoat::view::scope(async {
-        let user = Some("ada");
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            match user {
-                Some(name) => {
-                    <h1>(name)</h1>
-                    <p>"signed in"</p>
-                }
-                None => <a href="/login">"sign in"</a>,
+    let user = Some("ada");
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        match user {
+            Some(name) => {
+                <h1>(name)</h1>
+                <p>"signed in"</p>
             }
-        });
+            None => <a href="/login">"sign in"</a>,
+        }
+    });
 
-        assert_eq!(html, "<h1>ada</h1><p>signed in</p>");
-    })
-    .await;
+    assert_eq!(html, "<h1>ada</h1><p>signed in</p>");
 }
 
 #[tokio::test]
 async fn match_in_attribute_list_emits_attribute_per_arm() {
-    topcoat::view::scope(async {
-        let status = Status::Draft;
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            <article
-                match status {
-                    Status::Draft => class="draft",
-                    Status::Published => class="published",
-                    Status::Archived => class="archived",
-                }
-            ></article>
-        });
+    let status = Status::Draft;
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <article
+            match status {
+                Status::Draft => class="draft",
+                Status::Published => class="published",
+                Status::Archived => class="archived",
+            }
+        ></article>
+    });
 
-        assert_eq!(html, r#"<article class="draft"></article>"#);
-    })
-    .await;
+    assert_eq!(html, r#"<article class="draft"></article>"#);
 }
 
 #[tokio::test]
 async fn local_binding_introduces_variable_for_following_nodes() {
-    topcoat::view::scope(async {
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            <article>
-                let title = "  Hello  ".trim();
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <article>
+            let title = "  Hello  ".trim();
 
-                <h1>(title)</h1>
-                <p>(title)</p>
-            </article>
-        });
+            <h1>(title)</h1>
+            <p>(title)</p>
+        </article>
+    });
 
-        assert_eq!(html, "<article><h1>Hello</h1><p>Hello</p></article>");
-    })
-    .await;
+    assert_eq!(html, "<article><h1>Hello</h1><p>Hello</p></article>");
 }
 
 #[tokio::test]
 async fn local_binding_initializer_accepts_low_precedence_operators() {
-    topcoat::view::scope(async {
-        let admin = true;
-        let active = false;
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            <article>
-                let both = admin && active;
-                let either = admin || active;
-                let ratio: f64 = 1.0 / 2.0;
-                let range = 0..3;
+    let admin = true;
+    let active = false;
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <article>
+            let both = admin && active;
+            let either = admin || active;
+            let ratio: f64 = 1.0 / 2.0;
+            let range = 0..3;
 
-                <p>(both)</p>
-                <p>(either)</p>
-                <p>(ratio)</p>
-                <p>(range.len())</p>
-            </article>
-        });
+            <p>(both)</p>
+            <p>(either)</p>
+            <p>(ratio)</p>
+            <p>(range.len())</p>
+        </article>
+    });
 
-        assert_eq!(
-            html,
-            "<article><p>false</p><p>true</p><p>0.5</p><p>3</p></article>",
-        );
-    })
-    .await;
+    assert_eq!(
+        html,
+        "<article><p>false</p><p>true</p><p>0.5</p><p>3</p></article>",
+    );
 }
 
 #[tokio::test]
 async fn local_binding_in_attribute_list_is_in_scope_for_later_attributes() {
-    topcoat::view::scope(async {
-        let cx = &Cx::default();
-        let html = r(view! {
-            cx =>
-            <a let href = "/posts"; href=(href) data-href=(href)>"Posts"</a>
-        });
+    let cx = &Cx::default();
+    let html = r(view! {
+        cx =>
+        <a let href = "/posts"; href=(href) data-href=(href)>"Posts"</a>
+    });
 
-        assert!(html.contains(r#"href="/posts""#));
-        assert!(html.contains(r#"data-href="/posts""#));
-    })
-    .await;
+    assert!(html.contains(r#"href="/posts""#));
+    assert!(html.contains(r#"data-href="/posts""#));
 }

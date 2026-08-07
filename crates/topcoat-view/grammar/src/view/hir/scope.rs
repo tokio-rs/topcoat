@@ -19,13 +19,30 @@ impl Scope {
     }
 
     /// Emits the expansion of a top-level `view!` invocation: the view
-    /// expression wrapped in an `async` block.
+    /// expression wrapped in an `async` block, routed through `__root_view`
+    /// so the invocation owns its instruction memory unless an enclosing
+    /// invocation is already building.
+    ///
+    /// A static-only view carries no instructions, so it skips the
+    /// `__root_view` wrapper and needs no memory at all.
     pub fn emit(&self) -> TokenStream {
         let view = self.emit_expr();
-        quote! { async {
+        let body = quote! { async {
             use #topcoat_view::internal::*;
             ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#view)
-        }.await }
+        } };
+        if self.is_static() {
+            quote! { #body.await }
+        } else {
+            quote! { #topcoat_view::internal::__root_view(#body).await }
+        }
+    }
+
+    /// Whether this scope emits through an optimized static path that never
+    /// touches an instruction memory.
+    fn is_static(&self) -> bool {
+        self.nodes.is_empty()
+            || (self.nodes.len() == 1 && matches!(&self.nodes[0], Node::StaticSegment(_)))
     }
 
     /// Whether this scope renders components, directly or anywhere under its
