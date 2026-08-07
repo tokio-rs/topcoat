@@ -5,9 +5,8 @@ use std::{
 };
 
 use pin_project_lite::pin_project;
-use topcoat_core::error::Result;
 
-use crate::{View, arena::Arena};
+use crate::arena::Arena;
 
 thread_local! {
     /// The arena of the build running on the current thread, if any.
@@ -24,7 +23,7 @@ thread_local! {
 ///
 /// The associated functions are the only doors into the scope.
 /// [`scope`](Self::scope) opens one around a root `view!` invocation's
-/// future, [`enter`](Self::enter) around a synchronous build, and
+/// future, [`scope_sync`](Self::scope_sync) around a synchronous build, and
 /// [`with`](Self::with) grants access to the installed arena.
 ///
 /// An instance is the guard of one such region: creating it swaps a slot
@@ -59,17 +58,17 @@ impl<'a> ArenaScope<'a> {
         active
     }
 
-    /// Runs a root `view!` invocation's future in a scope, deciding at its
-    /// first poll who owns the arena.
+    /// Runs `fut` in a scope, deciding at its first poll who owns the arena.
     ///
     /// With a scope already active on the task, an enclosing invocation owns
     /// the build and the future polls through unwrapped. Otherwise this
     /// invocation is the root: a fresh arena is installed while the future
-    /// polls, and the resulting view takes ownership of it. Within the
-    /// future, futures that build views may run concurrently, for example
-    /// under `try_join`; they interleave only at await points, so each still
-    /// appends to the installed arena in synchronous bursts.
-    pub fn scope(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Result<View>> {
+    /// polls and returned alongside the output, so the caller can seal the
+    /// views built in it. Within the future, futures that build views may
+    /// run concurrently, for example under `try_join`; they interleave only
+    /// at await points, so each still appends to the installed arena in
+    /// synchronous bursts.
+    pub fn scope<F: Future>(fut: F) -> impl Future<Output = (F::Output, Option<Arena>)> {
         ScopeFuture {
             fut,
             arena: None,
@@ -83,8 +82,8 @@ impl<'a> ArenaScope<'a> {
     /// Returns the fresh scope's arena alongside the output, so the caller
     /// can seal the views built in it; `None` when an enclosing scope was
     /// active and `f` appended to its arena. The synchronous counterpart of
-    /// [`scope`](Self::scope), for captures that happen in a single burst.
-    pub fn enter<R>(f: impl FnOnce() -> R) -> (R, Option<Arena>) {
+    /// [`scope`](Self::scope), for builds that happen in a single burst.
+    pub fn scope_sync<R>(f: impl FnOnce() -> R) -> (R, Option<Arena>) {
         if Self::is_active() {
             return (f(), None);
         }
@@ -118,21 +117,6 @@ impl<'a> ArenaScope<'a> {
         });
         f(arena)
     }
-
-    /// Runs `fut` in a fresh scope, discarding the arena.
-    ///
-    /// Unit tests use this to build views through the internal writer API
-    /// without a `view!` invocation establishing the scope.
-    #[cfg(test)]
-    pub async fn test<F: Future>(fut: F) -> F::Output {
-        let mut fut = std::pin::pin!(fut);
-        let mut arena = Some(Box::new(Arena::new()));
-        std::future::poll_fn(|task_cx| {
-            let _scope = ArenaScope::swap(&mut arena);
-            fut.as_mut().poll(task_cx)
-        })
-        .await
-    }
 }
 
 impl Drop for ArenaScope<'_> {
@@ -161,8 +145,8 @@ enum Role {
     Nested,
 }
 
-impl<F: Future<Output = Result<View>>> Future for ScopeFuture<F> {
-    type Output = Result<View>;
+impl<F: Future> Future for ScopeFuture<F> {
+    type Output = (F::Output, Option<Arena>);
 
     fn poll(self: Pin<&mut Self>, task_cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
@@ -181,10 +165,7 @@ impl<F: Future<Output = Result<View>>> Future for ScopeFuture<F> {
             this.fut.poll(task_cx)
         };
         match output {
-            Poll::Ready(view) => Poll::Ready(match this.arena.take() {
-                Some(arena) => Ok(view?.seal(*arena)),
-                None => view,
-            }),
+            Poll::Ready(output) => Poll::Ready((output, this.arena.take().map(|arena| *arena))),
             Poll::Pending => Poll::Pending,
         }
     }

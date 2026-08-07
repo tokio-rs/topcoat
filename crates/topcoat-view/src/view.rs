@@ -100,8 +100,9 @@ impl View {
         }
     }
 
-    /// Seals a root `view!` invocation's build: the view takes ownership of
-    /// the arena its instructions were appended to.
+    /// Seals a root build: the view takes ownership of the arena its
+    /// instructions were appended to. With no arena, the build was nested
+    /// and the view stays a handle into the enclosing invocation's arena.
     ///
     /// A static view carries no instructions, so it passes through and the
     /// arena is dropped.
@@ -109,7 +110,10 @@ impl View {
     /// # Panics
     ///
     /// Panics if the view's instructions live in a different arena.
-    pub(crate) fn seal(self, arena: Arena) -> Self {
+    pub(crate) fn seal(self, arena: Option<Arena>) -> Self {
+        let Some(arena) = arena else {
+            return self;
+        };
         match self.repr {
             ViewRepr::Static(_) | ViewRepr::Owned { .. } => self,
             ViewRepr::Scoped {
@@ -573,7 +577,7 @@ mod tests {
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl AsyncFnOnce(&Cx) -> R) -> R {
-        block_on(ArenaScope::test(async { f(&Cx::default()).await }))
+        block_on(ArenaScope::scope(async { f(&Cx::default()).await })).0
     }
 
     /// Builds a view outside any scope, so it owns its arena.

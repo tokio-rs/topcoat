@@ -60,7 +60,7 @@ mod tests {
     use crate::{HtmlContext, arena::ArenaScope, internal::build_sync};
 
     fn render(value: impl AttributeValueViewParts) -> String {
-        let (html, _) = ArenaScope::enter(|| {
+        let (html, _) = ArenaScope::scope_sync(|| {
             let cx = Cx::default();
             build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {

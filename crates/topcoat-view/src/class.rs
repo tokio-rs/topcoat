@@ -334,7 +334,7 @@ mod tests {
     use crate::{AttributeValue, HtmlContext, arena::ArenaScope, internal::build_sync};
 
     fn render(class: Class<impl ClassEntries>) -> String {
-        let (html, _) = ArenaScope::enter(|| {
+        let (html, _) = ArenaScope::scope_sync(|| {
             let cx = Cx::default();
             build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn attribute_value_entries_are_spliced_verbatim() {
-        ArenaScope::enter(|| {
+        ArenaScope::scope_sync(|| {
             let cx = Cx::default();
             let value = AttributeValue::captured(build_sync(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {

@@ -39,7 +39,11 @@ use crate::{
 /// arena is installed while `fut` polls, and the returned view takes
 /// ownership of it.
 pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Result<View>> {
-    ArenaScope::scope(fut)
+    let scoped = ArenaScope::scope(fut);
+    async move {
+        let (view, arena) = scoped.await;
+        Ok(view?.seal(arena))
+    }
 }
 
 /// Builds a view in one synchronous burst, in the enclosing invocation's
@@ -50,10 +54,8 @@ pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Re
 /// [`Attributes`](crate::Attributes) capture values through this, so they
 /// work standalone as well as inside a `view!`.
 pub fn build_sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-    match ArenaScope::enter(|| framed(f)) {
-        (view, Some(arena)) => view.seal(arena),
-        (view, None) => view,
-    }
+    let (view, arena) = ArenaScope::scope_sync(|| ArenaScope::with(|arena| arena.push_block(f)));
+    view.seal(arena)
 }
 
 /// Appends a view's instruction block in one synchronous burst, pushing its
@@ -69,19 +71,7 @@ pub fn build_sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
 ///
 /// Panics if no view is building on the current task.
 pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> View {
-    framed(|parts| f(&mut Builder { cx, parts }))
-}
-
-/// Appends an instruction block filled by `f` through a text-context writer.
-fn framed(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-    ArenaScope::with(|arena| {
-        let entry = arena.next_ptr();
-        let mut parts = PartsWriter::new(arena, HtmlContext::Text);
-        f(&mut parts);
-        let size_hint = parts.size_hint();
-        arena.push_ret();
-        View::from_scope(arena.id(), entry, size_hint)
-    })
+    ArenaScope::with(|arena| arena.push_block(|parts| f(&mut Builder { cx, parts })))
 }
 
 /// Reserves a slot in the installed arena for a view that resolves later.

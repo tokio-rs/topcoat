@@ -14,7 +14,7 @@ pub use renderer::*;
 pub use scope::*;
 pub use view_slot::*;
 
-use crate::{DynViewPart, HtmlContext, View, view::ViewRepr};
+use crate::{DynViewPart, HtmlContext, PartsWriter, View, view::ViewRepr};
 
 /// The instruction arena of a build.
 ///
@@ -99,6 +99,21 @@ impl Arena {
     /// block.
     pub fn push_ret(&mut self) {
         self.push_instruction(Instruction::Ret);
+    }
+
+    /// Appends a view's instruction block, filled by `f` through a writer in
+    /// text context.
+    ///
+    /// Records the entry address, runs `f`, and terminates the block with a
+    /// return instruction. Returns the handle to the block, carrying the
+    /// writer's accumulated size hint.
+    pub fn push_block(&mut self, f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+        let entry = self.next_ptr();
+        let mut parts = PartsWriter::new(self, HtmlContext::Text);
+        f(&mut parts);
+        let size_hint = parts.size_hint();
+        self.push_ret();
+        View::from_scope(self.id, entry, size_hint)
     }
 
     /// Reserves a slot for a view that resolves later, such as the child of

@@ -162,7 +162,7 @@ mod tests {
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl FnOnce(&Cx) -> R) -> R {
-        ArenaScope::enter(|| f(&Cx::default())).0
+        ArenaScope::scope_sync(|| f(&Cx::default())).0
     }
 
     fn render(cx: &Cx, attrs: Attributes) -> String {
