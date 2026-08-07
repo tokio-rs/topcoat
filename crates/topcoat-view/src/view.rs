@@ -27,7 +27,7 @@ use crate::{
 /// the enclosing [`scope`](crate::scope): the id of that memory and the entry
 /// address of the view's instruction block. It must be nested and rendered
 /// inside the same scope; using it anywhere else panics.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct View {
     repr: ViewRepr,
 }
@@ -70,9 +70,9 @@ impl View {
         }
     }
 
-    /// Unwraps the view into its representation.
+    /// Returns the view's representation.
     #[inline]
-    pub(crate) fn repr(self) -> ViewRepr {
+    pub(crate) fn repr(&self) -> ViewRepr {
         self.repr
     }
 
@@ -606,7 +606,7 @@ mod tests {
             // The outer view splices the placeholder before the child exists.
             let outer = __build_view(|parts| {
                 parts.push_str_unescaped("<p>");
-                parts.push_view(placeholder);
+                parts.push_view(placeholder.clone());
                 parts.push_str_unescaped("</p>");
             });
 
@@ -667,7 +667,7 @@ mod tests {
             });
 
             let outer = __build_view(|parts| {
-                parts.push_view(inner);
+                parts.push_view(inner.clone());
                 parts.push_view(inner);
                 parts.push_view(View::unescaped_unchecked("<hr>"));
             });

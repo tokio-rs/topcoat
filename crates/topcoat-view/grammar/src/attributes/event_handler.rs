@@ -4,7 +4,10 @@ use syn::{
     LitStr, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime};
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_runtime, topcoat_view},
+};
 
 use crate::{
     attributes::{
@@ -112,7 +115,11 @@ impl LowerAttribute for EventHandler {
                         {
                             let __key = ::core::convert::Into::<::std::string::String>::into(#key);
                             let (_, __js) = #value.into_evaluated_and_js();
-                            __attrs.insert(__cx, ::std::format!("data-topcoat-on:{}", __key), __js);
+                            __attrs.insert(
+                                __cx,
+                                ::std::format!("data-topcoat-on:{}", __key),
+                                #topcoat_view::Unescaped::new_unchecked(__js),
+                            );
                         }
                     },
                 );

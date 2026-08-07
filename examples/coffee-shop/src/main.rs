@@ -1,7 +1,3 @@
-// Nested components render concurrently, so a deeply composed page holds the
-// render futures of its whole subtree at once.
-#![allow(clippy::large_futures)]
-
 mod app;
 mod components;
 mod customer;

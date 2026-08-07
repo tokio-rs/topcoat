@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use topcoat_core::context::Cx;
 
 use crate::{
-    Attribute, AttributeValueViewParts, AttributeViewParts, HtmlContext, PartsWriter, View,
-    internal::__build_view,
+    Attribute, AttributeValue, AttributeValueViewParts, AttributeViewParts, HtmlContext,
+    PartsWriter, internal::__build_view,
 };
 
 /// A runtime collection of HTML attributes with unique keys.
@@ -14,12 +14,12 @@ use crate::{
 /// Prefer constructing `Attributes` with the [`attributes!`](macro.attributes.html)
 /// macro.
 ///
-/// Each value is captured as a [`View`] in the active scope's instruction
-/// memory, so a collection can only be built and rendered inside a view
-/// scope.
+/// Each value is captured as an [`AttributeValue`] in the active scope's
+/// instruction memory, so a collection can only be built and rendered inside
+/// a view scope.
 #[derive(Debug, Default, Clone)]
 pub struct Attributes {
-    map: HashMap<String, View>,
+    map: HashMap<String, AttributeValue>,
 }
 
 impl Attributes {
@@ -57,20 +57,21 @@ impl Attributes {
         self.map.contains_key(k.as_ref())
     }
 
-    /// Returns the view stored for attribute key `k`, if present.
+    /// Returns the captured value stored for attribute key `k`, if present.
     #[inline]
-    pub fn get(&self, k: impl AsRef<str>) -> Option<&View> {
+    pub fn get(&self, k: impl AsRef<str>) -> Option<&AttributeValue> {
         self.map.get(k.as_ref())
     }
 
     /// Inserts or replaces an attribute.
     ///
-    /// The value is captured as a [`View`] with [`AttributeValueViewParts`].
-    /// If the key was already present, the previous captured value is
-    /// returned. If the implementation of [`AttributeValueViewParts`] for `v`
-    /// signals that the attribute should not be present, [`View::empty`] is
-    /// stored as the value instead, which causes the previous value to be
-    /// removed and the attribute not to be rendered in a `view!`.
+    /// The value is captured as an [`AttributeValue`] with
+    /// [`AttributeValueViewParts`]. If the key was already present, the
+    /// previous captured value is returned. If the implementation of
+    /// [`AttributeValueViewParts`] for `v` signals that the attribute should
+    /// not be present, an [absent](AttributeValue::absent) value is stored
+    /// instead, which causes the previous value to be replaced and the
+    /// attribute not to be rendered in a `view!`.
     ///
     /// # Panics
     ///
@@ -81,18 +82,18 @@ impl Attributes {
         cx: &Cx,
         k: impl Into<String>,
         v: impl AttributeValueViewParts,
-    ) -> Option<View> {
+    ) -> Option<AttributeValue> {
         let value = if v.attribute_present() {
             // A present value is always captured as an instruction block,
-            // even when it writes nothing (a `true` boolean), so it never
-            // collides with the empty view that marks an absent attribute.
-            __build_view(|parts| {
+            // even when it writes nothing (a `true` boolean), so it is
+            // never mistaken for an absent attribute.
+            AttributeValue::captured(__build_view(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
                     v.into_view_parts(cx, parts);
                 });
-            })
+            }))
         } else {
-            View::empty()
+            AttributeValue::absent()
         };
         self.map.insert(k.into(), value)
     }
@@ -100,7 +101,7 @@ impl Attributes {
     /// Removes an attribute, returning its captured value if the key was
     /// present.
     #[inline]
-    pub fn remove(&mut self, k: impl AsRef<str>) -> Option<View> {
+    pub fn remove(&mut self, k: impl AsRef<str>) -> Option<AttributeValue> {
         self.map.remove(k.as_ref())
     }
 
@@ -113,7 +114,7 @@ impl Attributes {
     /// Inserts every `(key, value)` entry from `iter`, replacing any keys
     /// already present.
     #[inline]
-    pub fn extend(&mut self, iter: impl IntoIterator<Item = (String, View)>) {
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = (String, AttributeValue)>) {
         self.map.extend(iter);
     }
 
@@ -134,8 +135,8 @@ impl AttributeViewParts for Attributes {
 }
 
 impl IntoIterator for Attributes {
-    type Item = (String, View);
-    type IntoIter = std::collections::hash_map::IntoIter<String, View>;
+    type Item = (String, AttributeValue);
+    type IntoIter = std::collections::hash_map::IntoIter<String, AttributeValue>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -144,8 +145,8 @@ impl IntoIterator for Attributes {
 }
 
 impl<'a> IntoIterator for &'a Attributes {
-    type Item = (&'a String, &'a View);
-    type IntoIter = std::collections::hash_map::Iter<'a, String, View>;
+    type Item = (&'a String, &'a AttributeValue);
+    type IntoIter = std::collections::hash_map::Iter<'a, String, AttributeValue>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -309,7 +310,7 @@ mod tests {
         in_scope(|cx| {
             let mut attrs = Attributes::new();
             attrs.insert(cx, "title", Option::<&str>::None);
-            assert!(attrs.get("title").unwrap().is_empty());
+            assert!(!attrs.get("title").unwrap().is_present());
             assert_eq!(render(cx, attrs), "");
         });
     }

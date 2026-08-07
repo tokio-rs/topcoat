@@ -7,7 +7,7 @@ pub use key::*;
 use topcoat_core::context::Cx;
 pub use value::*;
 
-use crate::{HtmlContext, PartsWriter, View};
+use crate::{HtmlContext, PartsWriter};
 
 /// A single HTML attribute.
 ///
@@ -67,15 +67,6 @@ where
             });
             parts.push_static_str_unescaped("\"");
         }
-    }
-}
-
-/// One or more attributes captured as a nested view, such as a rendered
-/// attribute block forwarded by a component.
-impl AttributeViewParts for View {
-    #[inline]
-    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_view(self);
     }
 }
 

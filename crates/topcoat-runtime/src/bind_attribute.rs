@@ -29,9 +29,11 @@ where
         let Expr { evaluated, js } = self.value;
 
         Attribute::new(self.key.clone(), evaluated).into_view_parts(cx, parts);
+        // The JS view was sealed with an escaping that is valid inside a
+        // double-quoted attribute value.
         Attribute::new(
             (Unescaped::new_unchecked("data-topcoat-bind:"), self.key),
-            js,
+            Unescaped::new_unchecked(js),
         )
         .into_view_parts(cx, parts);
     }
