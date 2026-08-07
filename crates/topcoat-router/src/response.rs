@@ -421,7 +421,10 @@ impl_into_response_tuples!(
 #[cfg(test)]
 mod tests {
     use http_body_util::Full;
-    use topcoat_view::{NodeViewParts, PartsWriter, internal::__build_view, scope};
+    use topcoat_view::{
+        NodeViewParts, PartsWriter,
+        internal::{__build_view, __root_view},
+    };
 
     use super::*;
     use crate::to_bytes;
@@ -543,18 +546,22 @@ mod tests {
     // -- views --
 
     /// Builds a view whose parts are pushed by `build` through a text-context
-    /// [`PartsWriter`], renders it into a response inside a view scope, and
-    /// reads the body fully into memory.
+    /// [`PartsWriter`], renders it into a response, and reads the body fully
+    /// into memory.
     fn run_view(build: impl FnOnce(&Cx, &mut PartsWriter<'_>)) -> (Parts, Bytes) {
-        block_on(scope(async {
+        block_on(async {
             let cx = Cx::default();
-            let view = __build_view(|parts| {
-                build(&cx, parts);
-            });
+            let view = __root_view(async {
+                Ok(__build_view(|parts| {
+                    build(&cx, parts);
+                }))
+            })
+            .await
+            .unwrap();
             let (parts, body) = view.into_response(&cx).unwrap().into_parts();
             let bytes = to_bytes(body, usize::MAX).await.unwrap();
             (parts, bytes)
-        }))
+        })
     }
 
     #[test]

@@ -146,7 +146,10 @@ mod tests {
         context::{Cx, CxBuilder, app_context, request_context},
         error::Result,
     };
-    use topcoat_view::{DynViewPart, HtmlWriter, View, internal::__build_view};
+    use topcoat_view::{
+        DynViewPart, HtmlWriter, View,
+        internal::{__build_view, __root_view},
+    };
 
     use super::*;
     use crate::{
@@ -266,14 +269,17 @@ mod tests {
     // Page and layout render functions for the rendering tests.
     type ViewFuture<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
 
-    fn view(text: &'static str) -> View {
-        __build_view(|parts| {
-            parts.push_str(text);
+    async fn view(text: &'static str) -> Result<View> {
+        __root_view(async {
+            Ok(__build_view(|parts| {
+                parts.push_str(text);
+            }))
         })
+        .await
     }
 
     fn render_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
-        Box::pin(async move { Ok(view("page")) })
+        Box::pin(view("page"))
     }
 
     #[derive(Debug, Clone)]
@@ -286,22 +292,25 @@ mod tests {
     }
 
     fn render_panicking_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
-        Box::pin(async move {
+        Box::pin(__root_view(async {
             Ok(__build_view(|parts| {
                 parts.push_dyn(Box::new(PanickingViewPart));
             }))
-        })
+        }))
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
     fn layout_root(_cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
-            Ok(__build_view(|parts| {
-                parts.push_str("R[");
-                parts.push_view(inner);
-                parts.push_str("]");
-            }))
+            __root_view(async {
+                Ok(__build_view(|parts| {
+                    parts.push_str("R[");
+                    parts.push_view(inner);
+                    parts.push_str("]");
+                }))
+            })
+            .await
         })
     }
 
@@ -309,11 +318,14 @@ mod tests {
     fn layout_admin(_cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
-            Ok(__build_view(|parts| {
-                parts.push_str("A[");
-                parts.push_view(inner);
-                parts.push_str("]");
-            }))
+            __root_view(async {
+                Ok(__build_view(|parts| {
+                    parts.push_str("A[");
+                    parts.push_view(inner);
+                    parts.push_str("]");
+                }))
+            })
+            .await
         })
     }
 

@@ -570,13 +570,18 @@ mod tests {
 
     use super::*;
     use crate::{
-        internal::{__build_view, __fill_view, __reserve_view},
+        internal::{__build_view, __fill_view, __reserve_view, __root_view},
         render::scope,
     };
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl AsyncFnOnce(&Cx) -> R) -> R {
         block_on(scope(async { f(&Cx::default()).await }))
+    }
+
+    /// Builds a view in a root invocation of its own, so it owns its memory.
+    fn owned(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+        block_on(__root_view(async { Ok(__build_view(f)) })).expect("the build is infallible")
     }
 
     /// Drives `fut` to completion on the current thread.
@@ -694,6 +699,86 @@ mod tests {
     }
 
     #[test]
+    fn owned_views_render_without_an_active_build() {
+        let view = owned(|parts| {
+            parts.push_str("a < b");
+        });
+        assert_eq!(view.render(&Cx::default()), "a &lt; b");
+    }
+
+    #[test]
+    fn owned_views_splice_across_memories() {
+        let inner = owned(|parts| {
+            parts.push_str("a < b");
+        });
+
+        let outer = owned(|parts| {
+            parts.push_str_unescaped("<p>");
+            parts.push_view(inner);
+            parts.push_str_unescaped("</p>");
+        });
+        assert_eq!(outer.render(&Cx::default()), "<p>a &lt; b</p>");
+    }
+
+    #[test]
+    fn owned_views_splice_into_an_active_build() {
+        let inner = owned(|parts| {
+            parts.push_str("a < b");
+        });
+
+        in_scope(async |cx| {
+            let outer = __build_view(|parts| {
+                parts.push_str_unescaped("<p>");
+                parts.push_view(inner);
+                parts.push_str_unescaped("</p>");
+            });
+            assert_eq!(outer.render(cx), "<p>a &lt; b</p>");
+        });
+    }
+
+    #[test]
+    fn owned_views_fill_a_slot_like_nested_ones() {
+        let inner = owned(|parts| {
+            parts.push_str("a < b");
+        });
+
+        in_scope(async |cx| {
+            let (placeholder, slot) = __reserve_view();
+            __fill_view(slot, inner);
+            assert_eq!(placeholder.render(cx), "a &lt; b");
+        });
+    }
+
+    #[test]
+    fn nested_root_invocations_append_to_the_enclosing_memory() {
+        in_scope(async |cx| {
+            let inner = __root_view(async {
+                Ok(__build_view(|parts| {
+                    parts.push_str("x");
+                }))
+            })
+            .await
+            .expect("the build is infallible");
+            assert!(matches!(inner.repr, ViewRepr::Scoped { .. }));
+
+            let outer = __build_view(|parts| {
+                parts.push_view(inner);
+            });
+            assert_eq!(outer.render(cx), "x");
+        });
+    }
+
+    #[test]
+    fn owned_views_are_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>(_value: &T) {}
+
+        let view = owned(|parts| {
+            parts.push_str("x");
+        });
+        assert_send_sync(&view);
+    }
+
+    #[test]
     fn static_views_are_spliced_verbatim() {
         in_scope(async |cx| {
             let outer = __build_view(|parts| {
@@ -784,28 +869,28 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "no view scope is active")]
-    fn building_a_view_outside_a_scope_panics() {
+    #[should_panic(expected = "no view is building")]
+    fn building_a_view_outside_a_root_build_panics() {
         __build_view(|_parts| {});
     }
 
     #[test]
-    #[should_panic(expected = "no view scope is active")]
-    fn rendering_a_scoped_view_outside_a_scope_panics() {
+    #[should_panic(expected = "no view is building")]
+    fn rendering_an_escaped_nested_view_panics() {
         let view = in_scope(async |_cx| __build_view(|_parts| {}));
         view.render(&Cx::default());
     }
 
     #[test]
-    #[should_panic(expected = "outside the scope it was built in")]
-    fn rendering_a_view_in_a_different_scope_panics() {
+    #[should_panic(expected = "outside the `view!` invocation it was built in")]
+    fn rendering_a_nested_view_in_a_different_root_build_panics() {
         let view = in_scope(async |_cx| __build_view(|_parts| {}));
         in_scope(async |cx| view.render(cx));
     }
 
     #[test]
-    #[should_panic(expected = "outside the scope it was built in")]
-    fn splicing_a_view_from_a_different_scope_panics() {
+    #[should_panic(expected = "outside the `view!` invocation it was built in")]
+    fn splicing_a_nested_view_from_a_different_root_build_panics() {
         let view = in_scope(async |_cx| __build_view(|_parts| {}));
         in_scope(async |_cx| {
             __build_view(|parts| {

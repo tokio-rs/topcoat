@@ -96,31 +96,26 @@ async fn additive_fields_append_in_written_order() -> Result<()> {
 
 #[tokio::test]
 async fn html_renders_dynamic_parts_against_the_named_context() -> Result<()> {
-    // A dynamic mail body is a scoped view, so it is built and rendered
-    // inside one view scope.
-    topcoat::view::scope(async {
-        let cx = &Cx::default();
-        let name = "Ada";
+    let cx = &Cx::default();
+    let name = "Ada";
 
-        let mail = mail! {
-            html: {
-                cx =>
-                <p>
-                    "Hello, "
-                    (name)
-                    "!"
-                </p>
-            },
-        }?;
+    let mail = mail! {
+        html: {
+            cx =>
+            <p>
+                "Hello, "
+                (name)
+                "!"
+            </p>
+        },
+    }?;
 
-        assert_eq!(
-            mail.html().map(|html| html.clone().render(cx)),
-            Some("<p>Hello, Ada!</p>".to_owned())
-        );
+    assert_eq!(
+        mail.html().map(|html| html.clone().render(cx)),
+        Some("<p>Hello, Ada!</p>".to_owned())
+    );
 
-        Ok(())
-    })
-    .await
+    Ok(())
 }
 
 #[tokio::test]

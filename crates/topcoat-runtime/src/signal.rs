@@ -224,7 +224,7 @@ mod tests {
         task::{Context, Poll, Waker},
     };
 
-    use topcoat_view::{internal::__build_view, scope};
+    use topcoat_view::internal::{__build_view, __root_view};
 
     use super::*;
 
@@ -246,12 +246,13 @@ mod tests {
         let signal = Signal::new(String::from("a-->b\"c&d"));
 
         let cx = Cx::default();
-        let html = block_on(scope(async {
-            __build_view(|parts| {
+        let view = block_on(__root_view(async {
+            Ok(__build_view(|parts| {
                 SignalDeclaration::new(&signal).into_view_parts(&cx, parts);
-            })
-            .render(&cx)
-        }));
+            }))
+        }))
+        .unwrap();
+        let html = view.render(&cx);
 
         // The comment context escaped `>`, so the only `-->` left is the
         // marker's own terminator; the payload cannot end the comment early.
