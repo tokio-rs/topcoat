@@ -537,7 +537,7 @@ impl<'a> PartsWriter<'a> {
     ///
     /// Panics if the view was built in a different, still building memory.
     #[inline]
-    pub fn push_view(&mut self, view: View) -> &mut Self {
+    pub(crate) fn push_view(&mut self, view: View) -> &mut Self {
         self.size_hint += view.size_hint();
         self.memory.push_view(view);
         self
