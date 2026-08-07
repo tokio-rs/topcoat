@@ -27,9 +27,6 @@ pub use render::*;
 pub use unescaped::*;
 pub use view::*;
 
-#[cfg(test)]
-mod test_util;
-
 /// Macro helpers to shorten the generated source code.
 #[doc(hidden)]
 pub mod internal;

@@ -330,18 +330,39 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        AttributeValue, HtmlContext,
-        internal::__build_view,
-        render::scope,
-        test_util::{block_on, render_with},
+    use std::{
+        future::Future,
+        pin::pin,
+        task::{Context, Poll, Waker},
     };
 
+    use super::*;
+    use crate::{AttributeValue, HtmlContext, internal::__build_view, render::scope};
+
+    /// Drives `fut` to completion on the current thread.
+    ///
+    /// The futures under test never wait on external events, so polling in a
+    /// tight loop is sufficient.
+    fn block_on<F: Future>(fut: F) -> F::Output {
+        let mut fut = pin!(fut);
+        let mut task = Context::from_waker(Waker::noop());
+        loop {
+            if let Poll::Ready(output) = fut.as_mut().poll(&mut task) {
+                return output;
+            }
+        }
+    }
+
     fn render(class: Class<impl ClassEntries>) -> String {
-        render_with(HtmlContext::AttributeValue, |cx, parts| {
-            AttributeValueViewParts::into_view_parts(class, cx, parts);
-        })
+        block_on(scope(async {
+            let cx = Cx::default();
+            __build_view(|parts| {
+                parts.in_context(HtmlContext::AttributeValue, |parts| {
+                    AttributeValueViewParts::into_view_parts(class, &cx, parts);
+                });
+            })
+            .render(&cx)
+        }))
     }
 
     #[test]

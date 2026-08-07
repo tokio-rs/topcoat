@@ -489,16 +489,41 @@ impl<'a> PartsWriter<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        future::Future,
+        pin::pin,
+        task::{Context, Poll, Waker},
+    };
+
     use super::*;
     use crate::{
         internal::{__build_view, __fill_view, __reserve_view},
         render::scope,
-        test_util::{block_on, render_with},
     };
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl AsyncFnOnce(&Cx) -> R) -> R {
         block_on(scope(async { f(&Cx::default()).await }))
+    }
+
+    /// Drives `fut` to completion on the current thread.
+    ///
+    /// The futures under test never wait on external events, so polling in a
+    /// tight loop is sufficient.
+    fn block_on<F: Future>(fut: F) -> F::Output {
+        let mut fut = pin!(fut);
+        let mut task = Context::from_waker(Waker::noop());
+        loop {
+            if let Poll::Ready(output) = fut.as_mut().poll(&mut task) {
+                return output;
+            }
+        }
+    }
+
+    /// Builds a view inside a fresh scope through a writer sealed with
+    /// `context` and renders it.
+    fn render_with(context: HtmlContext, f: impl FnOnce(&mut PartsWriter<'_>)) -> String {
+        in_scope(async |cx| __build_view(|parts| parts.in_context(context, f)).render(cx))
     }
 
     #[test]
@@ -510,12 +535,12 @@ mod tests {
 
     #[test]
     fn push_str_seals_the_writer_context() {
-        let out = render_with(HtmlContext::Text, |_cx, w| {
+        let out = render_with(HtmlContext::Text, |w| {
             w.push_str("<b> & \"q\"");
         });
         assert_eq!(out, "&lt;b&gt; &amp; \"q\"");
 
-        let out = render_with(HtmlContext::AttributeValue, |_cx, w| {
+        let out = render_with(HtmlContext::AttributeValue, |w| {
             w.push_str("<b> & \"q\"");
         });
         assert_eq!(out, "<b> &amp; &quot;q&quot;");
@@ -523,7 +548,7 @@ mod tests {
 
     #[test]
     fn push_str_unescaped_bypasses_the_context() {
-        let out = render_with(HtmlContext::Text, |_cx, w| {
+        let out = render_with(HtmlContext::Text, |w| {
             w.push_str_unescaped("<b>raw</b>");
         });
         assert_eq!(out, "<b>raw</b>");
@@ -531,7 +556,7 @@ mod tests {
 
     #[test]
     fn push_char_seals_the_writer_context() {
-        let out = render_with(HtmlContext::Text, |_cx, w| {
+        let out = render_with(HtmlContext::Text, |w| {
             w.push_char('<');
         });
         assert_eq!(out, "&lt;");
@@ -540,14 +565,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "invalid attribute key")]
     fn ident_context_panics_on_forbidden_characters_at_render() {
-        render_with(HtmlContext::AttributeKey, |_cx, w| {
+        render_with(HtmlContext::AttributeKey, |w| {
             w.push_str("on click");
         });
     }
 
     #[test]
     fn push_primitives_render_as_text() {
-        let out = render_with(HtmlContext::Text, |_cx, w| {
+        let out = render_with(HtmlContext::Text, |w| {
             w.push_i32(-42).push_str_unescaped(" ");
             w.push_bool(true).push_str_unescaped(" ");
             w.push_f64(1.5).push_str_unescaped(" ");
