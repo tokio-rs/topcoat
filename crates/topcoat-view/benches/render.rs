@@ -47,10 +47,10 @@ fn block_on<F: Future>(future: F) -> F::Output {
 /// Times `view.render(cx)` and reports throughput as the rendered byte length,
 /// so the report shows bytes per second alongside per-render latency.
 fn measure(group: &mut BenchmarkGroup<'_, WallTime>, id: impl Into<String>, cx: &Cx, view: View) {
-    group.throughput(Throughput::Bytes(view.render(cx).len() as u64));
+    group.throughput(Throughput::Bytes(view.clone().render(cx).len() as u64));
     group.bench_function(id.into(), |b| {
         b.iter_batched(
-            || view,
+            || view.clone(),
             |v| black_box(v.render(black_box(cx))),
             BatchSize::SmallInput,
         );

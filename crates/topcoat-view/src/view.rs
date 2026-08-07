@@ -838,7 +838,7 @@ mod tests {
                 // A status code before the nested view overrides it.
                 let outer = __build_view(|parts| {
                     push_node(cx, parts, StatusCode::FORBIDDEN);
-                    parts.push_view(inner);
+                    parts.push_view(inner.clone());
                 });
                 let rendered = outer.render_response(cx);
                 assert_eq!(rendered.status_code, Some(StatusCode::FORBIDDEN));
