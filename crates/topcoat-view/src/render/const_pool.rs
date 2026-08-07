@@ -106,7 +106,8 @@ impl ConstPool {
     }
 
     /// Prints how many operands of each kind the pool holds.
-    pub fn print_stats(&self) {
+    #[allow(unused)]
+    pub(crate) fn print_stats(&self) {
         println!("ConstPool {{");
         println!("  static_strs: {}", self.static_strs.len());
         println!("  strings: {}", self.strings.len());

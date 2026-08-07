@@ -301,7 +301,8 @@ impl Memory {
 
     /// Prints the memory's fields and how many instructions of each kind it
     /// holds.
-    pub fn print_stats(&self) {
+    #[allow(unused)]
+    pub(crate) fn print_stats(&self) {
         println!("Memory {{");
         println!("  id: {}", self.id.0);
         println!(
