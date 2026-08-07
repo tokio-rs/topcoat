@@ -104,7 +104,7 @@ impl Memory {
     ///
     /// # Panics
     ///
-    /// Panics if the view was built in a different, still building arena.
+    /// Panics if the view was built in a different, still building memory.
     pub fn push_view(&mut self, view: View) {
         match view.repr() {
             ViewRepr::Static(body) => {
@@ -152,12 +152,13 @@ impl Memory {
     ///
     /// # Panics
     ///
-    /// Panics if the slot was reserved in a different scope, if the view was
-    /// built in a different scope, or if the slot was already filled.
+    /// Panics if the slot was reserved in a different memory, if the view
+    /// was built in a different, still building memory, or if the slot was
+    /// already filled.
     pub fn fill_view(&mut self, slot: ViewSlot, view: View) {
         assert!(
             slot.memory == self.id,
-            "tried to fill a view slot outside the scope it was reserved in",
+            "tried to fill a view slot outside the `view!` invocation it was reserved in",
         );
         let entry = match view.repr() {
             // A static view has no block to jump to, so it is materialized

@@ -262,13 +262,13 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
 impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
-/// An attribute value captured into the active view scope.
+/// An attribute value captured as an instruction block.
 ///
 /// Produced by the [`Attributes`](crate::Attributes) collection: a present
-/// value is a handle to an instruction block sealed for the attribute value
-/// position, and an absent value marks its attribute as not rendered. Using
-/// a captured value as an attribute value or a class list entry splices the
-/// block verbatim; its content was already escaped when it was captured.
+/// value is a view holding a block sealed for the attribute value position,
+/// and an absent value marks its attribute as not rendered. Using a captured
+/// value as an attribute value or a class list entry splices the block
+/// verbatim; its content was already escaped when it was captured.
 #[derive(Debug, Default, Clone)]
 pub struct AttributeValue {
     view: Option<View>,

@@ -4,7 +4,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Attribute, AttributeValue, AttributeValueViewParts, AttributeViewParts, HtmlContext,
-    PartsWriter, internal::__build_view,
+    PartsWriter, internal::__capture_view,
 };
 
 /// A runtime collection of HTML attributes with unique keys.
@@ -14,9 +14,10 @@ use crate::{
 /// Prefer constructing `Attributes` with the [`attributes!`](macro.attributes.html)
 /// macro.
 ///
-/// Each value is captured as an [`AttributeValue`] in the active scope's
-/// instruction memory, so a collection can only be built and rendered inside
-/// a view scope.
+/// Each value is captured as an [`AttributeValue`]: inside a `view!`
+/// invocation it lands in the enclosing instruction memory, and elsewhere it
+/// carries a memory of its own, so a collection can be built and rendered
+/// anywhere.
 #[derive(Debug, Default, Clone)]
 pub struct Attributes {
     map: HashMap<String, AttributeValue>,
@@ -72,10 +73,6 @@ impl Attributes {
     /// not be present, an [absent](AttributeValue::absent) value is stored
     /// instead, which causes the previous value to be replaced and the
     /// attribute not to be rendered in a `view!`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if no view scope is active on the current task.
     #[inline]
     pub fn insert(
         &mut self,
@@ -87,7 +84,7 @@ impl Attributes {
             // A present value is always captured as an instruction block,
             // even when it writes nothing (a `true` boolean), so it is
             // never mistaken for an absent attribute.
-            AttributeValue::captured(__build_view(|parts| {
+            AttributeValue::captured(__capture_view(|parts| {
                 parts.in_context(HtmlContext::AttributeValue, |parts| {
                     v.into_view_parts(cx, parts);
                 });
@@ -166,7 +163,7 @@ mod tests {
     use topcoat_core::context::Cx;
 
     use super::*;
-    use crate::render::scope;
+    use crate::{internal::__build_view, render::scope};
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl FnOnce(&Cx) -> R) -> R {

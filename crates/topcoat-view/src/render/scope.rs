@@ -35,6 +35,21 @@ pub(crate) async fn install<F: Future>(fut: F) -> (F::Output, Memory) {
     (output, memory)
 }
 
+/// Runs `f` with a fresh instruction [`Memory`] installed and returns the
+/// memory alongside the output.
+///
+/// The synchronous counterpart of [`install`], for captures that build in a
+/// single burst outside any enclosing invocation.
+pub(crate) fn install_sync<R>(f: impl FnOnce() -> R) -> (R, Memory) {
+    let mut memory = Some(Memory::new());
+    let output = {
+        let _enter = Enter::new(&mut memory);
+        f()
+    };
+    let memory = memory.take().expect("the memory was reinstated on exit");
+    (output, memory)
+}
+
 /// Grants access to the installed memory for the duration of `f`.
 ///
 /// The memory is taken out of its slot while `f` runs, so a re-entrant call

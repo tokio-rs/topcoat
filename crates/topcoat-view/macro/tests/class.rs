@@ -10,10 +10,7 @@ fn r(v: topcoat::Result) -> String {
 #[tokio::test]
 async fn literal_entries_render_space_separated() {
     let cx = &Cx::default();
-    let html = r(view! {
-        cx =>
-        <button class=(class!("btn", "btn-lg"))>"go"</button>
-    });
+    let html = r(view! { cx => <button class=(class!("btn", "btn-lg"))>"go"</button> });
     assert_eq!(html, r#"<button class="btn btn-lg">go</button>"#);
 }
 
@@ -46,10 +43,7 @@ async fn else_branch_with_expression_renders_the_taken_side() {
     let enabled = true;
     let fallback = String::from("fallback");
     let cx = &Cx::default();
-    let html = r(view! {
-        cx =>
-        <p class=(class!("on" if enabled else fallback))></p>
-    });
+    let html = r(view! { cx => <p class=(class!("on" if enabled else fallback))></p> });
     assert_eq!(html, r#"<p class="on"></p>"#);
 }
 

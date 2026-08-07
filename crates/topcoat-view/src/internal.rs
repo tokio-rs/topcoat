@@ -7,7 +7,7 @@ use topcoat_core::{context::Cx, error::Result};
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
     ElementNameViewParts, HtmlContext, NodeViewParts, PartsWriter, Unescaped, View,
-    render::{Memory, ViewSlot, install, memory_installed, with_memory},
+    render::{Memory, ViewSlot, install, install_sync, memory_installed, with_memory},
 };
 
 /// Builds a top-level `view!` invocation, deciding who owns the memory.
@@ -25,17 +25,32 @@ pub async fn __root_view(fut: impl Future<Output = Result<View>>) -> Result<View
     Ok(view?.into_owned(memory))
 }
 
+/// Builds a view in one synchronous burst, in the enclosing invocation's
+/// memory when one is building on this task and in a memory of its own
+/// otherwise.
+///
+/// Runtime collections like [`Attributes`](crate::Attributes) capture values
+/// through this, so they work standalone as well as inside a `view!`.
+pub fn __capture_view(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+    if memory_installed() {
+        __build_view(f)
+    } else {
+        let (view, memory) = install_sync(|| __build_view(f));
+        view.into_owned(memory)
+    }
+}
+
 /// Builds a view's instruction block in one synchronous burst.
 ///
-/// Records the entry address in the active scope's memory, runs `f` to push
-/// the block's instructions through a text-context writer, and terminates the
+/// Records the entry address in the installed memory, runs `f` to push the
+/// block's instructions through a text-context writer, and terminates the
 /// block with a return instruction. The returned view handle carries the
 /// writer's accumulated size hint. `f` must not build other views; nested
 /// views are built first and spliced into the block with [`__view`].
 ///
 /// # Panics
 ///
-/// Panics if no view scope is active on the current task.
+/// Panics if no view is building on the current task.
 pub fn __build_view(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
     with_memory(|memory| {
         let entry = memory.next_ptr();
@@ -47,8 +62,7 @@ pub fn __build_view(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
     })
 }
 
-/// Reserves a slot in the active scope's memory for a view that resolves
-/// later.
+/// Reserves a slot in the installed memory for a view that resolves later.
 ///
 /// A component whose children render components of their own passes the
 /// placeholder view to its props so it can render concurrently with the
@@ -56,7 +70,7 @@ pub fn __build_view(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
 ///
 /// # Panics
 ///
-/// Panics if no view scope is active on the current task.
+/// Panics if no view is building on the current task.
 #[must_use]
 pub fn __reserve_view() -> (View, ViewSlot) {
     with_memory(Memory::reserve_view)
@@ -66,8 +80,8 @@ pub fn __reserve_view() -> (View, ViewSlot) {
 ///
 /// # Panics
 ///
-/// Panics if no view scope is active on the current task, if the slot or the
-/// view belongs to a different scope, or if the slot was already filled.
+/// Panics if no view is building on the current task, if the slot or the
+/// view belongs to a different memory, or if the slot was already filled.
 pub fn __fill_view(slot: ViewSlot, view: View) {
     with_memory(|memory| memory.fill_view(slot, view));
 }

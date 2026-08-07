@@ -329,7 +329,7 @@ macro_rules! impl_push_primitive {
     };
 }
 
-/// A context-carrying writer over a scope's instruction memory, created per
+/// A context-carrying writer over an instruction memory, created per
 /// position.
 ///
 /// The `view!` macro creates a `PartsWriter` for each dynamic position it
@@ -535,7 +535,7 @@ impl<'a> PartsWriter<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if the view was built in a different scope.
+    /// Panics if the view was built in a different, still building memory.
     #[inline]
     pub fn push_view(&mut self, view: View) -> &mut Self {
         self.size_hint += view.size_hint();
@@ -843,8 +843,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "outside the scope it was reserved in")]
-    fn filling_a_slot_in_a_different_scope_panics() {
+    #[should_panic(expected = "outside the `view!` invocation it was reserved in")]
+    fn filling_a_slot_in_a_different_root_build_panics() {
         let slot = in_scope(async |_cx| __reserve_view().1);
         in_scope(async |_cx| __fill_view(slot, View::empty()));
     }
