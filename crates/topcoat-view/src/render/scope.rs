@@ -114,5 +114,5 @@ impl Drop for Enter<'_> {
 /// without a `view!` invocation establishing the memory.
 #[cfg(test)]
 pub(crate) async fn scope<F: Future>(fut: F) -> F::Output {
-    install(fut).await.0
+    maybe_install(fut).await.0
 }

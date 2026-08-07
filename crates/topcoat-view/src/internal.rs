@@ -7,7 +7,7 @@ use topcoat_core::{context::Cx, error::Result};
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
     ElementNameViewParts, HtmlContext, NodeViewParts, PartsWriter, Unescaped, View,
-    render::{Memory, ViewSlot, install, install_sync, memory_installed, with_memory},
+    render::{Memory, ViewSlot, install_sync, maybe_install, memory_installed, with_memory},
 };
 
 /// Builds a top-level `view!` invocation, deciding who owns the memory.
@@ -18,11 +18,10 @@ use crate::{
 /// memory is installed while `fut` polls, and the returned view takes
 /// ownership of it.
 pub async fn __root_view(fut: impl Future<Output = Result<View>>) -> Result<View> {
-    if memory_installed() {
-        return fut.await;
+    match maybe_install(fut).await {
+        (view, Some(memory)) => Ok(view?.into_owned(memory)),
+        (view, None) => view,
     }
-    let (view, memory) = install(fut).await;
-    Ok(view?.into_owned(memory))
 }
 
 /// Builds a view in one synchronous burst, in the enclosing invocation's
