@@ -142,13 +142,10 @@ mod tests {
     };
 
     use http::{HeaderMap, StatusCode};
+    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, View, view};
     use topcoat_core::{
         context::{Cx, CxBuilder, app_context, request_context},
         error::Result,
-    };
-    use topcoat_view::{
-        DynViewPart, HtmlWriter, View,
-        internal::{__build_view, __root_view},
     };
 
     use super::*;
@@ -269,63 +266,48 @@ mod tests {
     // Page and layout render functions for the rendering tests.
     type ViewFuture<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
 
-    async fn view(text: &'static str) -> Result<View> {
-        __root_view(async {
-            Ok(__build_view(|parts| {
-                parts.push_str(text);
-            }))
+    fn render_page(cx: &Cx, _body: Body) -> ViewFuture<'_> {
+        Box::pin(async move {
+            view! { cx => "page" }
         })
-        .await
     }
 
-    fn render_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
-        Box::pin(view("page"))
-    }
-
+    /// A view part that panics when it renders, so the router's panic
+    /// handling during rendering is observable.
     #[derive(Debug, Clone)]
-    struct PanickingViewPart;
+    struct Panicking;
 
-    impl DynViewPart for PanickingViewPart {
+    impl NodeViewParts for Panicking {
+        fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+            parts.push_dyn(Box::new(self));
+        }
+    }
+
+    impl DynViewPart for Panicking {
         fn render(&self, _cx: &Cx, _w: &mut HtmlWriter<'_, '_>) {
             panic!("view rendering panicked");
         }
     }
 
-    fn render_panicking_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
-        Box::pin(__root_view(async {
-            Ok(__build_view(|parts| {
-                parts.push_dyn(Box::new(PanickingViewPart));
-            }))
-        }))
+    fn render_panicking_page(cx: &Cx, _body: Body) -> ViewFuture<'_> {
+        Box::pin(async move {
+            view! { cx => (Panicking) }
+        })
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
-    fn layout_root(_cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
+    fn layout_root(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
-            __root_view(async {
-                Ok(__build_view(|parts| {
-                    parts.push_str("R[");
-                    parts.push_view(inner);
-                    parts.push_str("]");
-                }))
-            })
-            .await
+            view! { cx => "R[" (inner) "]" }
         })
     }
 
     /// Wraps the child content in `A[ ... ]`.
-    fn layout_admin(_cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
+    fn layout_admin(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
-            __root_view(async {
-                Ok(__build_view(|parts| {
-                    parts.push_str("A[");
-                    parts.push_view(inner);
-                    parts.push_str("]");
-                }))
-            })
-            .await
+            view! { cx => "A[" (inner) "]" }
         })
     }
 
