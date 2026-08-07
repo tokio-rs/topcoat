@@ -7,6 +7,11 @@ use crate::expr::{Expr, name_resolver::NameResolver};
 enum OpKind {
     Arithmetic,
     Cmp,
+    /// `&&` and `||`, whose right side is compiled into a closure so that it
+    /// is only evaluated when the left side does not already decide the
+    /// result. Both languages short-circuit, so evaluating eagerly here would
+    /// change what the expression means, not just what it costs.
+    Logical,
 }
 
 impl Expr {
@@ -27,6 +32,8 @@ impl Expr {
             BinOp::Le(_) => ("le", OpKind::Cmp),
             BinOp::Gt(_) => ("gt", OpKind::Cmp),
             BinOp::Ge(_) => ("ge", OpKind::Cmp),
+            BinOp::And(_) => ("and", OpKind::Logical),
+            BinOp::Or(_) => ("or", OpKind::Logical),
             other => return Err(syn::Error::new_spanned(other, "unsupported operator")),
         };
 
@@ -36,6 +43,9 @@ impl Expr {
         js.push('.');
         js.push_str(method);
         js.push('(');
+        if matches!(kind, OpKind::Logical) {
+            js.push_str("() => ");
+        }
 
         let mut right = TokenStream::new();
         Self::dispatch(&binary.right, &mut right, js, names)?;
@@ -49,6 +59,10 @@ impl Expr {
             OpKind::Cmp => {
                 let method_ident = syn::Ident::new(method, binary.op.span());
                 quote! { (#left).#method_ident(&#right) }.to_tokens(rust);
+            }
+            OpKind::Logical => {
+                let method_ident = syn::Ident::new(method, binary.op.span());
+                quote! { (#left).#method_ident(|| #right) }.to_tokens(rust);
             }
         }
         Ok(())
