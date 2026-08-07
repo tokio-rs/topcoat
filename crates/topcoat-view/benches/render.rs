@@ -46,7 +46,7 @@ fn block_on<F: Future>(future: F) -> F::Output {
 
 /// Times `view.render(cx)` and reports throughput as the rendered byte length,
 /// so the report shows bytes per second alongside per-render latency.
-fn measure(group: &mut BenchmarkGroup<'_, WallTime>, id: impl Into<String>, cx: &Cx, view: View) {
+fn measure(group: &mut BenchmarkGroup<'_, WallTime>, id: impl Into<String>, cx: &Cx, view: &View) {
     group.throughput(Throughput::Bytes(view.clone().render(cx).len() as u64));
     group.bench_function(id.into(), |b| {
         b.iter_batched(
@@ -441,23 +441,23 @@ fn bench_render(c: &mut Criterion) {
     // the scope's instruction memory installed.
     block_on(topcoat::view::scope(async {
         let static_view = static_page().await.expect("render static_page");
-        measure(&mut group, "static_page", &cx, static_view);
+        measure(&mut group, "static_page", &cx, &static_view);
 
         let comments = make_comments(200);
         let comment_view = comment_feed(&cx, &comments)
             .await
             .expect("render comment_feed");
-        measure(&mut group, "text_escaping", &cx, comment_view);
+        measure(&mut group, "text_escaping", &cx, &comment_view);
 
         let number_rows = make_number_rows(120, 10);
         let number_view = numeric_table(&cx, &number_rows)
             .await
             .expect("render numeric_table");
-        measure(&mut group, "numeric_table", &cx, number_view);
+        measure(&mut group, "numeric_table", &cx, &number_view);
 
         let tags = make_tags(200);
         let tag_view = tag_cloud(&cx, &tags).await.expect("render tag_cloud");
-        measure(&mut group, "attributes", &cx, tag_view);
+        measure(&mut group, "attributes", &cx, &tag_view);
 
         // The realistic grid grows with the number of cards, showing how
         // render time scales with document length.
@@ -466,7 +466,7 @@ fn bench_render(c: &mut Criterion) {
             let grid_view = product_grid(&cx, &products)
                 .await
                 .expect("render product_grid");
-            measure(&mut group, format!("product_grid/{count}"), &cx, grid_view);
+            measure(&mut group, format!("product_grid/{count}"), &cx, &grid_view);
         }
     }));
 
