@@ -269,8 +269,8 @@ mod tests {
         let out = rendered(builder);
         assert!(out.contains("__reserve_view"));
         assert!(out.contains(". child (__placeholder)"));
-        assert!(out.contains("__fill_view (__slot , __child . await ?)"));
-        assert!(out.contains("__try_join"));
+        assert!(out.contains("__try_join ! (__render , __child)"));
+        assert!(out.contains("__fill_view (__slot , __child)"));
     }
 
     #[test]

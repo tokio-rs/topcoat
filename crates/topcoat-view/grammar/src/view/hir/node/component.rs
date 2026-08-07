@@ -76,23 +76,24 @@ impl Component {
         let child = children.emit_future();
 
         quote_spanned! {path.span()=> {
-            use #topcoat_view::Component;
-            let (__placeholder, __slot) = __reserve_view();
-            let __child = #child;
-            let props = #path::props_builder()#(#setters)*.child(__placeholder).build();
-            // The marker is built via `Default` so the same construction
-            // works for both unit-struct and generic (`PhantomData`) markers.
-            #[allow(clippy::default_constructed_unit_structs)]
-            let __render = Component::render(
-                #path::default(),
-                __cx,
-                props,
-            );
-            async move {
-                let (__rendered, ()) = __try_join!(__render, async move {
-                    __fill_view(__slot, __child.await?);
-                    ::core::result::Result::<(), #topcoat_error::Error>::Ok(())
-                })?;
+            async {
+                use #topcoat_view::Component;
+                let (__placeholder, __slot) = __reserve_view();
+                let props = #path::props_builder()#(#setters)*.child(__placeholder).build();
+                // The marker is built via `Default` so the same construction
+                // works for both unit-struct and generic (`PhantomData`) markers.
+                #[allow(clippy::default_constructed_unit_structs)]
+                let __render = Component::render(
+                    #path::default(),
+                    __cx,
+                    props,
+                );
+                let __child = #child;
+
+                let (__rendered, __child) = __try_join!(__render, __child)?;
+
+                __fill_view(__slot, __child);
+                
                 ::core::result::Result::<_, #topcoat_error::Error>::Ok(__rendered)
             }
         }}
