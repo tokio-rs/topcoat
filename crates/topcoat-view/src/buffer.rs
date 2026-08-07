@@ -1,3 +1,4 @@
+mod arena;
 mod const_buffer;
 mod id;
 mod instruction;
@@ -6,6 +7,7 @@ mod renderer;
 mod scope;
 mod view_slot;
 
+pub use arena::*;
 pub use const_buffer::*;
 pub use id::*;
 pub use instruction::*;
