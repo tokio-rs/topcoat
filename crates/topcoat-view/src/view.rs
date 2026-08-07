@@ -70,10 +70,20 @@ impl View {
         }
     }
 
-    /// Returns the view's representation.
+    /// Unwraps the view into its representation.
     #[inline]
-    pub(crate) fn repr(&self) -> ViewRepr {
+    pub(crate) fn repr(self) -> ViewRepr {
         self.repr
+    }
+
+    /// Returns an estimate of the number of bytes the view writes when
+    /// rendered.
+    #[inline]
+    pub(crate) fn size_hint(&self) -> usize {
+        match self.repr {
+            ViewRepr::Static(body) => body.len(),
+            ViewRepr::Scoped { size_hint, .. } => size_hint,
+        }
     }
 
     /// Returns a `View` that renders to an empty string.
@@ -455,10 +465,7 @@ impl<'a> PartsWriter<'a> {
     /// Panics if the view was built in a different scope.
     #[inline]
     pub fn push_view(&mut self, view: View) -> &mut Self {
-        self.size_hint += match view.repr() {
-            ViewRepr::Static(body) => body.len(),
-            ViewRepr::Scoped { size_hint, .. } => size_hint,
-        };
+        self.size_hint += view.size_hint();
         self.memory.push_view(view);
         self
     }
