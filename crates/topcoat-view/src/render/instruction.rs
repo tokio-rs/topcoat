@@ -63,7 +63,7 @@ pub enum Instruction {
 
     /// A static string and its context.
     StaticStr {
-        s: &'static str,
+        ptr: StaticStrPtr,
         context: HtmlContext,
     },
     /// A dynamic string and its context.
@@ -90,7 +90,7 @@ const _: () = {
         "instruction should not require Drop to improve performance"
     );
     assert!(
-        std::mem::size_of::<Instruction>() <= 24,
-        "instruction should not exceed 24 bytes"
+        std::mem::size_of::<Instruction>() <= 16,
+        "instruction should not exceed 16 bytes"
     );
 };

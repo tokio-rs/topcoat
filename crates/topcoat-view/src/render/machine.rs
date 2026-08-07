@@ -71,8 +71,8 @@ impl<'a> Machine<'a> {
                 Instruction::F64(inner) => write!(f, "{inner}").unwrap(),
                 Instruction::Char { value, context } => context.writer(f).write_char(*value),
 
-                Instruction::StaticStr { s, context } => {
-                    context.writer(f).write_str(s);
+                Instruction::StaticStr { ptr, context } => {
+                    context.writer(f).write_str(pool.fetch_static_str(*ptr));
                 }
                 Instruction::String { ptr, context } => {
                     context.writer(f).write_str(pool.fetch_string(*ptr));
