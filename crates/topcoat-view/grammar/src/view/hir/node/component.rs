@@ -59,10 +59,10 @@ impl Component {
     ///
     /// The children cannot resolve before the props build, so the props take
     /// a placeholder view holding a reserved slot in the scope's instruction
-    /// memory instead. The returned future joins the component's render with
-    /// a future that awaits the children and redirects the slot to their
-    /// view, so a component renders concurrently with its own children at
-    /// any nesting depth.
+    /// memory instead. The future joins the component's render with the
+    /// children and redirects the slot to their view once both resolve, so a
+    /// component renders concurrently with its own children at any nesting
+    /// depth.
     fn render_future_with_async_children(&self, children: &Scope) -> TokenStream {
         let Self {
             path, named_args, ..
@@ -89,11 +89,8 @@ impl Component {
                     props,
                 );
                 let __child = #child;
-
                 let (__rendered, __child) = __try_join!(__render, __child)?;
-
                 __fill_view(__slot, __child);
-                
                 ::core::result::Result::<_, #topcoat_error::Error>::Ok(__rendered)
             }
         }}
