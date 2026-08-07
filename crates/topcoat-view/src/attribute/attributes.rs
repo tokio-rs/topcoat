@@ -15,8 +15,8 @@ use crate::{
 /// macro.
 ///
 /// Each value is captured as an [`AttributeValue`]: inside a `view!`
-/// invocation it lands in the enclosing instruction arena, and elsewhere it
-/// carries an arena of its own, so a collection can be built and rendered
+/// invocation it lands in the enclosing instruction buffer, and elsewhere it
+/// carries a buffer of its own, so a collection can be built and rendered
 /// anywhere.
 #[derive(Debug, Default, Clone)]
 pub struct Attributes {
@@ -154,11 +154,11 @@ mod tests {
     use topcoat_core::context::Cx;
 
     use super::*;
-    use crate::{arena::ArenaScope, internal::build_sync};
+    use crate::{buffer::ViewBufferScope, internal::build_sync};
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl FnOnce(&Cx) -> R) -> R {
-        ArenaScope::scope_sync(|| f(&Cx::default())).0
+        ViewBufferScope::scope_sync(|| f(&Cx::default())).0
     }
 
     fn render(cx: &Cx, attrs: Attributes) -> String {

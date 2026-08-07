@@ -7,7 +7,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Formatter, HtmlContext, HtmlWriter,
-    arena::{Arena, ArenaId, ArenaScope, InstructionPtr, Renderer},
+    buffer::{InstructionPtr, Renderer, ViewBuffer, ViewBufferId, ViewBufferScope},
 };
 
 /// A self-contained piece of HTML content.
@@ -24,9 +24,9 @@ use crate::{
 /// <div>Hello
 /// ```
 ///
-/// The outermost `view!` invocation allocates an instruction arena that the
+/// The outermost `view!` invocation allocates an instruction buffer that the
 /// returned view owns; every `view!` nested inside it, such as a component
-/// body, appends to that same arena and returns a cheap handle into it. An
+/// body, appends to that same buffer and returns a cheap handle into it. An
 /// owned view is a self-contained value: it can be stored, sent across
 /// tasks, spliced into another view, and rendered anywhere. A nested handle
 /// only lives while its enclosing invocation builds; one that escapes it
@@ -36,26 +36,26 @@ pub struct View {
     repr: ViewRepr,
 }
 
-/// The kinds of view: a static string independent of any arena, a handle
-/// into the arena of an enclosing `view!` invocation still building, or an
-/// owned view carrying its own arena.
+/// The kinds of view: a static string independent of any buffer, a handle
+/// into the buffer of an enclosing `view!` invocation still building, or an
+/// owned view carrying its own buffer.
 #[derive(Debug, Clone)]
 pub(crate) enum ViewRepr {
-    /// Trusted static markup rendered verbatim, independent of any arena.
+    /// Trusted static markup rendered verbatim, independent of any buffer.
     Static(&'static str),
-    /// An instruction block in the still building arena identified by
-    /// `arena`, starting at `entry`.
+    /// An instruction block in the still building buffer identified by
+    /// `buffer`, starting at `entry`.
     Scoped {
-        arena: ArenaId,
+        buffer: ViewBufferId,
         entry: InstructionPtr,
         /// An estimate of the number of bytes the block writes when
         /// rendered, accumulated while the view was built.
         size_hint: usize,
     },
-    /// An instruction block starting at `entry` in an arena the view holds
+    /// An instruction block starting at `entry` in a buffer the view holds
     /// on to itself.
     Owned {
-        arena: Arc<Arena>,
+        buffer: Arc<ViewBuffer>,
         entry: InstructionPtr,
         /// An estimate of the number of bytes the block writes when
         /// rendered, accumulated while the view was built.
@@ -71,13 +71,17 @@ impl Default for ViewRepr {
 }
 
 impl View {
-    /// Creates the handle for an instruction block built in the arena
-    /// identified by `arena`, estimated to write `size_hint` bytes.
+    /// Creates the handle for an instruction block built in the buffer
+    /// identified by `buffer`, estimated to write `size_hint` bytes.
     #[inline]
-    pub(crate) fn from_scope(arena: ArenaId, entry: InstructionPtr, size_hint: usize) -> Self {
+    pub(crate) fn from_scope(
+        buffer: ViewBufferId,
+        entry: InstructionPtr,
+        size_hint: usize,
+    ) -> Self {
         Self {
             repr: ViewRepr::Scoped {
-                arena,
+                buffer,
                 entry,
                 size_hint,
             },
@@ -100,34 +104,34 @@ impl View {
         }
     }
 
-    /// Seals a root build: the view takes ownership of the arena its
-    /// instructions were appended to. With no arena, the build was nested
-    /// and the view stays a handle into the enclosing invocation's arena.
+    /// Seals a root build: the view takes ownership of the buffer its
+    /// instructions were appended to. With no buffer, the build was nested
+    /// and the view stays a handle into the enclosing invocation's buffer.
     ///
     /// A static view carries no instructions, so it passes through and the
-    /// arena is dropped.
+    /// buffer is dropped.
     ///
     /// # Panics
     ///
-    /// Panics if the view's instructions live in a different arena.
-    pub(crate) fn seal(self, arena: Option<Arena>) -> Self {
-        let Some(arena) = arena else {
+    /// Panics if the view's instructions live in a different buffer.
+    pub(crate) fn seal(self, buffer: Option<ViewBuffer>) -> Self {
+        let Some(buffer) = buffer else {
             return self;
         };
         match self.repr {
             ViewRepr::Static(_) | ViewRepr::Owned { .. } => self,
             ViewRepr::Scoped {
-                arena: id,
+                buffer: id,
                 entry,
                 size_hint,
             } => {
                 assert!(
-                    id == arena.id(),
-                    "tried to seal a view into an arena it was not built in",
+                    id == buffer.id(),
+                    "tried to seal a view into a buffer it was not built in",
                 );
                 Self {
                     repr: ViewRepr::Owned {
-                        arena: Arc::new(arena),
+                        buffer: Arc::new(buffer),
                         entry,
                         size_hint,
                     },
@@ -182,23 +186,23 @@ impl View {
         match self.repr {
             ViewRepr::Static(body) => body.to_owned(),
             ViewRepr::Scoped {
-                arena,
+                buffer,
                 entry,
                 size_hint,
             } => {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
-                Self::execute(arena, entry, cx, &mut f);
+                Self::execute(buffer, entry, cx, &mut f);
                 html
             }
             ViewRepr::Owned {
-                arena,
+                buffer,
                 entry,
                 size_hint,
             } => {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
-                Renderer::new(&arena, entry).execute(cx, &mut f);
+                Renderer::new(&buffer, entry).execute(cx, &mut f);
                 html
             }
         }
@@ -231,13 +235,13 @@ impl View {
                 headers: HeaderMap::new(),
             },
             ViewRepr::Scoped {
-                arena,
+                buffer,
                 entry,
                 size_hint,
             } => {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
-                Self::execute(arena, entry, cx, &mut f);
+                Self::execute(buffer, entry, cx, &mut f);
                 let (status_code, headers) = f.into_recorded();
                 RenderedResponse {
                     html,
@@ -246,13 +250,13 @@ impl View {
                 }
             }
             ViewRepr::Owned {
-                arena,
+                buffer,
                 entry,
                 size_hint,
             } => {
                 let mut html = String::with_capacity(size_hint);
                 let mut f = Formatter::new(&mut html);
-                Renderer::new(&arena, entry).execute(cx, &mut f);
+                Renderer::new(&buffer, entry).execute(cx, &mut f);
                 let (status_code, headers) = f.into_recorded();
                 RenderedResponse {
                     html,
@@ -263,13 +267,13 @@ impl View {
         }
     }
 
-    /// Executes a nested view handle's instruction block against the arena
+    /// Executes a nested view handle's instruction block against the buffer
     /// of the enclosing `view!` invocation still building it.
     #[track_caller]
-    fn execute(arena: ArenaId, entry: InstructionPtr, cx: &Cx, f: &mut Formatter<'_>) {
-        ArenaScope::with(|active| {
+    fn execute(buffer: ViewBufferId, entry: InstructionPtr, cx: &Cx, f: &mut Formatter<'_>) {
+        ViewBufferScope::with(|active| {
             assert!(
-                active.id() == arena,
+                active.id() == buffer,
                 "tried to render a view outside the `view!` invocation it was built in",
             );
             Renderer::new(active, entry).execute(cx, f);
@@ -327,13 +331,13 @@ macro_rules! impl_push_primitive {
         #[inline]
         pub fn $method(&mut self, value: $ty) -> &mut Self {
             self.size_hint += $size_hint;
-            self.arena.$method(value);
+            self.buffer.$method(value);
             self
         }
     };
 }
 
-/// A context-carrying writer over an instruction arena, created per
+/// A context-carrying writer over an instruction buffer, created per
 /// position.
 ///
 /// The `view!` macro creates a `PartsWriter` for each dynamic position it
@@ -356,7 +360,7 @@ macro_rules! impl_push_primitive {
 /// becomes the built view's size hint, which pre-allocates the output buffer
 /// at render time.
 pub struct PartsWriter<'a> {
-    arena: &'a mut Arena,
+    buffer: &'a mut ViewBuffer,
     context: HtmlContext,
     size_hint: usize,
 }
@@ -364,27 +368,27 @@ pub struct PartsWriter<'a> {
 impl<'a> PartsWriter<'a> {
     /// Creates a writer that seals everything pushed into it with `context`.
     #[inline]
-    fn new(arena: &'a mut Arena, context: HtmlContext) -> Self {
+    fn new(buffer: &'a mut ViewBuffer, context: HtmlContext) -> Self {
         Self {
-            arena,
+            buffer,
             context,
             size_hint: 0,
         }
     }
 
-    /// Appends one view's instruction block to `arena`, filled by `f`
+    /// Appends one view's instruction block to `buffer`, filled by `f`
     /// through a writer in text context.
     ///
     /// Records the entry address, runs `f`, and terminates the block with a
     /// return instruction. Returns the handle to the block, carrying the
     /// writer's accumulated size hint.
-    pub(crate) fn block(arena: &mut Arena, f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-        let entry = arena.next_ptr();
-        let mut parts = PartsWriter::new(arena, HtmlContext::Text);
+    pub(crate) fn block(buffer: &mut ViewBuffer, f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+        let entry = buffer.next_ptr();
+        let mut parts = PartsWriter::new(buffer, HtmlContext::Text);
         f(&mut parts);
         let size_hint = parts.size_hint();
-        arena.push_ret();
-        View::from_scope(arena.id(), entry, size_hint)
+        buffer.push_ret();
+        View::from_scope(buffer.id(), entry, size_hint)
     }
 
     /// Returns the accumulated size hint of everything pushed so far.
@@ -425,7 +429,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_str(&mut self, value: &str) -> &mut Self {
         self.size_hint += Self::str_size_hint(value, self.context);
-        self.arena.push_str(value, self.context);
+        self.buffer.push_str(value, self.context);
         self
     }
 
@@ -433,7 +437,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_static_str(&mut self, value: &'static str) -> &mut Self {
         self.size_hint += Self::str_size_hint(value, self.context);
-        self.arena.push_static_str(value, self.context);
+        self.buffer.push_static_str(value, self.context);
         self
     }
 
@@ -441,7 +445,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_string(&mut self, value: String) -> &mut Self {
         self.size_hint += Self::str_size_hint(&value, self.context);
-        self.arena.push_string(value, self.context);
+        self.buffer.push_string(value, self.context);
         self
     }
 
@@ -453,7 +457,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_str_unescaped(&mut self, value: &str) -> &mut Self {
         self.size_hint += value.len();
-        self.arena.push_str(value, HtmlContext::Unescaped);
+        self.buffer.push_str(value, HtmlContext::Unescaped);
         self
     }
 
@@ -465,7 +469,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_static_str_unescaped(&mut self, value: &'static str) -> &mut Self {
         self.size_hint += value.len();
-        self.arena.push_static_str(value, HtmlContext::Unescaped);
+        self.buffer.push_static_str(value, HtmlContext::Unescaped);
         self
     }
 
@@ -477,7 +481,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_string_unescaped(&mut self, value: String) -> &mut Self {
         self.size_hint += value.len();
-        self.arena.push_string(value, HtmlContext::Unescaped);
+        self.buffer.push_string(value, HtmlContext::Unescaped);
         self
     }
 
@@ -511,7 +515,7 @@ impl<'a> PartsWriter<'a> {
     pub fn push_char(&mut self, value: char) -> &mut Self {
         // One to four UTF-8 bytes, or an escape sequence.
         self.size_hint += 3;
-        self.arena.push_char(value, self.context);
+        self.buffer.push_char(value, self.context);
         self
     }
 
@@ -542,7 +546,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_dyn(&mut self, part: Box<dyn DynViewPart>) -> &mut Self {
         self.size_hint += part.size_hint();
-        self.arena.push_dyn(part, self.context);
+        self.buffer.push_dyn(part, self.context);
         self
     }
 
@@ -554,11 +558,11 @@ impl<'a> PartsWriter<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if the view was built in a different, still building arena.
+    /// Panics if the view was built in a different, still building buffer.
     #[inline]
     pub(crate) fn push_view(&mut self, view: View) -> &mut Self {
         self.size_hint += view.size_hint();
-        self.arena.push_view(view);
+        self.buffer.push_view(view);
         self
     }
 
@@ -566,7 +570,7 @@ impl<'a> PartsWriter<'a> {
     #[cfg(feature = "http")]
     #[inline]
     pub fn push_status_code(&mut self, status_code: StatusCode) -> &mut Self {
-        self.arena.push_status_code(status_code);
+        self.buffer.push_status_code(status_code);
         self
     }
 
@@ -574,7 +578,7 @@ impl<'a> PartsWriter<'a> {
     #[cfg(feature = "http")]
     #[inline]
     pub fn push_headers(&mut self, headers: HeaderMap) -> &mut Self {
-        self.arena.push_headers(headers);
+        self.buffer.push_headers(headers);
         self
     }
 }
@@ -592,12 +596,12 @@ mod tests {
 
     /// Runs `f` with a request context inside a fresh view scope.
     fn in_scope<R>(f: impl AsyncFnOnce(&Cx) -> R) -> R {
-        block_on(ArenaScope::scope(async { f(&Cx::default()).await })).0
+        block_on(ViewBufferScope::scope(async { f(&Cx::default()).await })).0
     }
 
     /// Builds a view in one synchronous burst from the parts `f` pushes.
     ///
-    /// Appends to the enclosing arena inside a root build and owns an arena
+    /// Appends to the enclosing buffer inside a root build and owns a buffer
     /// of its own outside one.
     fn sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
         build_sync(|| write_block(f))
@@ -699,9 +703,9 @@ mod tests {
     }
 
     #[test]
-    fn document_order_follows_splice_order_not_arena_order() {
+    fn document_order_follows_splice_order_not_buffer_order() {
         in_scope(async |cx| {
-            // Built in reverse: `second` occupies earlier arena addresses.
+            // Built in reverse: `second` occupies earlier buffer addresses.
             let second = sync(|parts| {
                 parts.push_str("B");
             });
@@ -726,7 +730,7 @@ mod tests {
     }
 
     #[test]
-    fn owned_views_splice_across_memories() {
+    fn owned_views_splice_across_buffers() {
         let inner = sync(|parts| {
             parts.push_str("a < b");
         });
@@ -769,7 +773,7 @@ mod tests {
     }
 
     #[test]
-    fn nested_root_invocations_append_to_the_enclosing_arena() {
+    fn nested_root_invocations_append_to_the_enclosing_buffer() {
         in_scope(async |cx| {
             let inner = build(async {
                 Ok(sync(|parts| {
@@ -888,7 +892,7 @@ mod tests {
     }
 
     #[test]
-    fn build_sync_outside_a_root_build_owns_its_arena() {
+    fn build_sync_outside_a_root_build_owns_its_buffer() {
         let view = sync(|parts| {
             parts.push_str("a < b");
         });

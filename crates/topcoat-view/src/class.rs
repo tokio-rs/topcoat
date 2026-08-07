@@ -333,12 +333,12 @@ mod tests {
     use super::*;
     use crate::{
         AttributeValue,
-        arena::ArenaScope,
+        buffer::ViewBufferScope,
         internal::{block, build_sync},
     };
 
     fn render(class: Class<impl ClassEntries>) -> String {
-        let (html, _) = ArenaScope::scope_sync(|| {
+        let (html, _) = ViewBufferScope::scope_sync(|| {
             let cx = Cx::default();
             build_sync(|| block(&cx, |b| b.attribute_value(class))).render(&cx)
         });
@@ -441,7 +441,7 @@ mod tests {
 
     #[test]
     fn attribute_value_entries_are_spliced_verbatim() {
-        ArenaScope::scope_sync(|| {
+        ViewBufferScope::scope_sync(|| {
             let cx = Cx::default();
             let value = AttributeValue::captured(build_sync(|| {
                 block(&cx, |b| b.attribute_value("[&>*]:mt-2"))

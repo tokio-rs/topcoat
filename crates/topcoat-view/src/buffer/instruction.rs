@@ -1,8 +1,8 @@
 #[cfg(feature = "http")]
-use crate::arena::HeadersPtr;
+use crate::buffer::HeadersPtr;
 use crate::{
     HtmlContext,
-    arena::{DynPtr, InstructionPtr, StaticStrPtr, StringPtr, ViewPtr},
+    buffer::{DynPtr, InstructionPtr, StaticStrPtr, StringPtr, ViewPtr},
 };
 
 #[derive(Debug, Clone)]
@@ -15,7 +15,7 @@ pub enum Instruction {
     Jmp { entry: InstructionPtr },
     /// Holds a reserved slot until it is filled; executing it panics.
     Placeholder,
-    /// Execute a spliced owned view's block in the arena it carries.
+    /// Execute a spliced owned view's block in the buffer it carries.
     View { ptr: ViewPtr },
 
     /// A boolean rendered as text.
@@ -65,10 +65,10 @@ pub enum Instruction {
         ptr: StaticStrPtr,
         context: HtmlContext,
     },
-    /// A string copied into the pool's string arena, and its context.
+    /// A string copied into the buffer's string storage, and its context.
     ///
-    /// The arena location is inlined instead of held as a
-    /// [`StrPtr`](crate::arena::StrPtr), whose trailing padding would push
+    /// The location is inlined instead of held as a
+    /// [`StrPtr`](crate::buffer::StrPtr), whose trailing padding would push
     /// the variant past the instruction size limit.
     #[non_exhaustive]
     Str {

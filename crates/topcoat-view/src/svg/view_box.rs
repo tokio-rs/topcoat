@@ -58,12 +58,12 @@ impl AttributeValueViewParts for ViewBox {
 mod tests {
     use super::*;
     use crate::{
-        arena::ArenaScope,
+        buffer::ViewBufferScope,
         internal::{block, build_sync},
     };
 
     fn render(value: impl AttributeValueViewParts) -> String {
-        let (html, _) = ArenaScope::scope_sync(|| {
+        let (html, _) = ViewBufferScope::scope_sync(|| {
             let cx = Cx::default();
             build_sync(|| block(&cx, |b| b.attribute_value(value))).render(&cx)
         });

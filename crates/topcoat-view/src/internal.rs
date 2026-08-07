@@ -7,12 +7,12 @@
 //!
 //! The module has two concerns. The build entry points (`build`,
 //! `build_sync`, `block`, `reserve`) manage who owns the instruction
-//! arena and where a view's instruction block starts and ends. The
+//! buffer and where a view's instruction block starts and ends. The
 //! `Builder` is the emission handle a `block` hands out: its methods
 //! push the block's parts, sealed with the HTML context of the position
 //! they fill.
 //!
-//! Two rules keep the arena's blocks executable. A block's instructions
+//! Two rules keep the buffer's blocks executable. A block's instructions
 //! must land contiguously, so everything pushed through a `Builder`
 //! happens in one synchronous burst with no `await` in between. A
 //! placeholder must form a block of its own, so `reserve` is called
@@ -25,26 +25,26 @@ pub use futures_util::{
 };
 use topcoat_core::{context::Cx, error::Result};
 
-pub use crate::arena::ViewSlot;
+pub use crate::buffer::ViewSlot;
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
     ElementNameViewParts, HtmlContext, NodeViewParts, PartsWriter, Unescaped, View,
-    arena::{Arena, ArenaScope},
+    buffer::{ViewBuffer, ViewBufferScope},
 };
 
-/// Builds a top-level `view!` invocation, deciding who owns the arena.
+/// Builds a top-level `view!` invocation, deciding who owns the buffer.
 ///
 /// When an enclosing invocation is already building on this task, this is a
-/// nested build: `fut` appends to the enclosing arena and the returned view
+/// nested build: `fut` appends to the enclosing buffer and the returned view
 /// stays a handle into it. Otherwise this invocation is the root: a fresh
-/// arena is installed while `fut` polls, and the returned view takes
+/// buffer is installed while `fut` polls, and the returned view takes
 /// ownership of it.
 pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Result<View>> {
-    ArenaScope::scope(fut).map(|(view, arena)| Ok(view?.seal(arena)))
+    ViewBufferScope::scope(fut).map(|(view, buffer)| Ok(view?.seal(buffer)))
 }
 
 /// Builds a view in one synchronous burst, in the enclosing invocation's
-/// arena when one is building on this task and in an arena of its own
+/// buffer when one is building on this task and in a buffer of its own
 /// otherwise.
 ///
 /// The synchronous counterpart of [`build`]: `f` composes the view from
@@ -52,14 +52,14 @@ pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Re
 /// collections like [`Attributes`](crate::Attributes) capture values
 /// through this, so they work standalone as well as inside a `view!`.
 pub fn build_sync(f: impl FnOnce() -> View) -> View {
-    let (view, arena) = ArenaScope::scope_sync(f);
-    view.seal(arena)
+    let (view, buffer) = ViewBufferScope::scope_sync(f);
+    view.seal(buffer)
 }
 
 /// Appends a view's instruction block in one synchronous burst, pushing its
 /// parts through the [`Builder`] handed to `f`.
 ///
-/// Records the entry address in the installed arena, runs `f`, and
+/// Records the entry address in the installed buffer, runs `f`, and
 /// terminates the block with a return instruction. The returned view handle
 /// carries the builder's accumulated size hint. `f` must not build other
 /// views; nested views are built first and spliced into the block with
@@ -83,10 +83,10 @@ pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> View {
 ///
 /// Panics if no view is building on the current task.
 pub fn write_block(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-    ArenaScope::with(|arena| PartsWriter::block(arena, f))
+    ViewBufferScope::with(|buffer| PartsWriter::block(buffer, f))
 }
 
-/// Reserves a slot in the installed arena for a view that resolves later.
+/// Reserves a slot in the installed buffer for a view that resolves later.
 ///
 /// A component whose children render components of their own passes the
 /// placeholder view to its props so it can render concurrently with the
@@ -97,7 +97,7 @@ pub fn write_block(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
 /// Panics if no view is building on the current task.
 #[must_use]
 pub fn reserve() -> (View, ViewSlot) {
-    ArenaScope::with(Arena::reserve_view)
+    ViewBufferScope::with(ViewBuffer::reserve_view)
 }
 
 /// Wraps an already-built view in a ready future.
@@ -129,14 +129,14 @@ pub fn in_context<R>(
 ///
 /// # Panics
 ///
-/// Panics if the view was built in a different, still building arena.
+/// Panics if the view was built in a different, still building buffer.
 #[inline]
 pub fn view(parts: &mut PartsWriter<'_>, view: View) {
     parts.push_view(view);
 }
 
 /// The emission handle of a [`block`]: the request context plus a writer
-/// over the installed arena.
+/// over the installed buffer.
 ///
 /// Each method pushes one of the block's parts, sealing it with the
 /// [`HtmlContext`] of the position it fills by dispatching the matching
@@ -223,7 +223,7 @@ impl Builder<'_, '_, '_> {
     ///
     /// # Panics
     ///
-    /// Panics if the view was built in a different, still building arena.
+    /// Panics if the view was built in a different, still building buffer.
     #[inline]
     pub fn view(&mut self, view: View) {
         self.parts.push_view(view);

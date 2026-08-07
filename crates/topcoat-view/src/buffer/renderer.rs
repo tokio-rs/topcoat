@@ -2,7 +2,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Formatter,
-    arena::{Arena, Instruction, InstructionPtr, StrPtr},
+    buffer::{Instruction, InstructionPtr, StrPtr, ViewBuffer},
 };
 
 /// Executes a view's instruction block into a [`Formatter`].
@@ -12,16 +12,16 @@ use crate::{
 /// [`Jmp`](Instruction::Jmp) redirects of filled view slots, and finishes
 /// when a [`Ret`](Instruction::Ret) is reached with an empty call stack.
 pub struct Renderer<'a> {
-    arena: &'a Arena,
+    buffer: &'a ViewBuffer,
     ptr: InstructionPtr,
     stack: Vec<InstructionPtr>,
 }
 
 impl<'a> Renderer<'a> {
     #[must_use]
-    pub fn new(arena: &'a Arena, entry: InstructionPtr) -> Self {
+    pub fn new(buffer: &'a ViewBuffer, entry: InstructionPtr) -> Self {
         Self {
-            arena,
+            buffer,
             ptr: entry,
             stack: Vec::new(),
         }
@@ -36,10 +36,10 @@ impl<'a> Renderer<'a> {
     pub fn execute(&mut self, cx: &Cx, f: &mut Formatter<'_>) {
         use std::fmt::Write;
 
-        let pool = self.arena.pool();
+        let consts = self.buffer.consts();
         let mut int_buffer = itoa::Buffer::new();
         loop {
-            let instruction = self.arena.instruction(self.ptr);
+            let instruction = self.buffer.instruction(self.ptr);
             self.ptr.increment();
 
             match instruction {
@@ -56,8 +56,8 @@ impl<'a> Renderer<'a> {
                     panic!("tried to render a placeholder view before it was filled")
                 }
                 Instruction::View { ptr } => {
-                    let (arena, entry) = pool.fetch_view(*ptr);
-                    Renderer::new(arena, entry).execute(cx, f);
+                    let (buffer, entry) = consts.fetch_view(*ptr);
+                    Renderer::new(buffer, entry).execute(cx, f);
                 }
 
                 Instruction::Bool(inner) => f.write_str(if *inner { "true" } else { "false" }),
@@ -76,7 +76,7 @@ impl<'a> Renderer<'a> {
                 Instruction::Char { value, context } => context.writer(f).write_char(*value),
 
                 Instruction::StaticStr { ptr, context } => {
-                    context.writer(f).write_str(pool.fetch_static_str(*ptr));
+                    context.writer(f).write_str(consts.fetch_static_str(*ptr));
                 }
                 Instruction::Str {
                     offset,
@@ -87,19 +87,21 @@ impl<'a> Renderer<'a> {
                         offset: *offset,
                         len: *len,
                     };
-                    context.writer(f).write_str(pool.fetch_str(ptr));
+                    context.writer(f).write_str(consts.fetch_str(ptr));
                 }
                 Instruction::String { ptr, context } => {
-                    context.writer(f).write_str(pool.fetch_string(*ptr));
+                    context.writer(f).write_str(consts.fetch_string(*ptr));
                 }
                 Instruction::Dyn { ptr, context } => {
-                    pool.fetch_dyn(*ptr).render(cx, &mut context.writer(f));
+                    consts.fetch_dyn(*ptr).render(cx, &mut context.writer(f));
                 }
 
                 #[cfg(feature = "http")]
                 Instruction::StatusCode(status_code) => f.record_status_code(*status_code),
                 #[cfg(feature = "http")]
-                Instruction::Headers { ptr } => f.record_headers(pool.fetch_headers(*ptr).clone()),
+                Instruction::Headers { ptr } => {
+                    f.record_headers(consts.fetch_headers(*ptr).clone());
+                }
             }
         }
     }

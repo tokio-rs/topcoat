@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::arena::Instruction;
+use crate::buffer::Instruction;
 
-/// The address of an instruction in an [`InstructionPool`].
+/// The address of an instruction in an [`InstructionBuffer`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InstructionPtr(usize);
 
@@ -12,14 +12,14 @@ impl InstructionPtr {
     }
 }
 
-/// The instructions of an [`Arena`](crate::arena::Arena): an append-only
-/// sequence addressed by [`InstructionPtr`].
+/// The instructions of a [`ViewBuffer`](crate::buffer::ViewBuffer): an
+/// append-only sequence addressed by [`InstructionPtr`].
 #[derive(Debug)]
-pub struct InstructionPool {
+pub struct InstructionBuffer {
     instructions: Vec<Instruction>,
 }
 
-impl InstructionPool {
+impl InstructionBuffer {
     pub(crate) fn new() -> Self {
         Self {
             instructions: Vec::new(),
@@ -44,7 +44,7 @@ impl InstructionPool {
         &mut self.instructions[ptr.0]
     }
 
-    /// Prints how many instructions of each kind the pool holds.
+    /// Prints how many instructions of each kind the buffer holds.
     #[allow(unused)]
     pub(crate) fn print_stats(&self) {
         println!(

@@ -1,7 +1,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-mod arena;
 mod attribute;
+mod buffer;
 mod class;
 mod component;
 mod element;

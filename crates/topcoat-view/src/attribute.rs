@@ -137,12 +137,12 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 mod tests {
     use super::*;
     use crate::{
-        arena::ArenaScope,
+        buffer::ViewBufferScope,
         internal::{block, build_sync},
     };
 
     fn render(attribute: impl AttributeViewParts) -> String {
-        let (html, _) = ArenaScope::scope_sync(|| {
+        let (html, _) = ViewBufferScope::scope_sync(|| {
             let cx = Cx::default();
             build_sync(|| block(&cx, |b| b.attributes(attribute))).render(&cx)
         });

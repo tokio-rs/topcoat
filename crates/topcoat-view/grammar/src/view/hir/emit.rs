@@ -16,7 +16,7 @@ pub(crate) trait Emit {
 /// block in one synchronous burst that only reads those bindings. Keeping
 /// every `await`, and every user expression that may build a view of its
 /// own, out of the burst phase is what lets the block land contiguously in
-/// the scope's shared instruction arena.
+/// the scope's shared view buffer.
 ///
 /// Component renders are futures. With inline awaits, the hoist phase awaits
 /// each one where it is bound. Without them, the hoist phase only binds the
