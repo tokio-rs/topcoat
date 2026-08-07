@@ -411,7 +411,12 @@ impl RouterBuilder {
 
             let endpoint = grouped
                 .entry(route.path().to_matchit_path())
-                .or_insert_with(|| {
+                .or_insert_with_key(|matchit_path| {
+                    // The URL path this endpoint serves, stored once and cloned
+                    // onto the context of every request matched here. It is
+                    // taken from the key rather than the route so that routes
+                    // differing only in their group segments agree on it.
+                    let path = Arc::new(Path::new(matchit_path).to_owned());
                     // Pre-compute path params for this endpoint.
                     let path_params = route
                         .path()
@@ -432,7 +437,7 @@ impl RouterBuilder {
                             })
                         })
                         .collect();
-                    Endpoint::new(path_params, layer_stack.into_boxed_slice())
+                    Endpoint::new(path, path_params, layer_stack.into_boxed_slice())
                 });
 
             // An any-method route shares its path with specific-method routes

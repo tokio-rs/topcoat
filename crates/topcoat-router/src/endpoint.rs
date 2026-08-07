@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use http::Method;
+use topcoat_core::context::{Cx, try_request_context};
 
-use crate::{LayerId, RawPathParamSpec};
+use crate::{LayerId, Path, PathBuf, RawPathParamSpec};
 
 /// The index of a registered route, with [`usize::MAX`] reserved to mean
 /// "none".
@@ -88,6 +89,10 @@ pub(crate) struct Endpoint {
     /// The route handling every method without a registration of its own.
     /// Routes registered for a specific method take precedence.
     any: RouteIndex,
+    /// The URL path this endpoint serves, shared with every request matched to
+    /// it. Group segments are stripped, since they are not part of the URL and
+    /// routes that differ only in them land on one endpoint.
+    path: Arc<PathBuf>,
     /// Interned path parameter names and capture kinds for this endpoint.
     path_params: Box<[RawPathParamSpec]>,
     /// The layers wrapping every route at this path, as ids into the router's
@@ -98,14 +103,25 @@ pub(crate) struct Endpoint {
 }
 
 impl Endpoint {
-    pub(crate) fn new(path_params: Box<[RawPathParamSpec]>, layers: Box<[LayerId]>) -> Self {
+    pub(crate) fn new(
+        path: Arc<PathBuf>,
+        path_params: Box<[RawPathParamSpec]>,
+        layers: Box<[LayerId]>,
+    ) -> Self {
         Self {
             standard: Default::default(),
             other: HashMap::new(),
             any: RouteIndex::NONE,
+            path,
             path_params,
             layers,
         }
+    }
+
+    /// Returns the URL path this endpoint serves, ready to be cloned onto a
+    /// matched request's context.
+    pub(crate) fn path(&self) -> &Arc<PathBuf> {
+        &self.path
     }
 
     /// Returns the route index registered specifically for `method`, if any.
@@ -169,8 +185,49 @@ impl Endpoint {
     }
 }
 
+/// The path of the endpoint a request matched, held on its request context.
+///
+/// The router stores one value per endpoint and hands each matched request a
+/// clone of it, so reading the path allocates nothing. Read it with
+/// [`endpoint_path`].
+#[derive(Debug, Clone)]
+pub(crate) struct EndpointPath(pub(crate) Arc<PathBuf>);
+
+/// Returns the path of the endpoint the current request matched.
+///
+/// This is the path pattern the endpoint was registered under rather than the
+/// URL that was requested, so parameters keep their `{name}` form. Group
+/// segments are not part of it: they bind layouts and layers at build time and
+/// never reach the URL. Read the requested URL with
+/// [`uri`](crate::request::uri) instead.
+///
+/// # Panics
+///
+/// Panics if the request matched no endpoint.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::endpoint_path};
+///
+/// fn log_line(cx: &Cx) -> String {
+///     // The pattern, not the URL: `/users/{id}` for a request to `/users/42`.
+///     format!("handled {}", endpoint_path(cx))
+/// }
+/// ```
+#[must_use]
+#[track_caller]
+pub fn endpoint_path(cx: &Cx) -> &Path {
+    match try_request_context::<EndpointPath>(cx) {
+        Some(EndpointPath(path)) => path,
+        None => panic!("this request matched no endpoint, so it has no endpoint path"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use topcoat_core::context::CxTestBuilder;
+
     use super::*;
 
     // -- RouteIndex --
@@ -301,5 +358,23 @@ mod tests {
         // Standard methods come first, in `STANDARD_METHODS` order, regardless of
         // insertion order; extension methods follow.
         assert_eq!(methods, vec![&Method::GET, &Method::POST, &purge]);
+    }
+
+    // -- endpoint_path --
+
+    #[test]
+    fn reads_the_matched_endpoint_path() {
+        let path = Arc::new(Path::new("/users/{id}").to_owned());
+        let cx = CxTestBuilder::new()
+            .request_context(EndpointPath(path))
+            .build();
+
+        assert_eq!(endpoint_path(&cx), Path::new("/users/{id}"));
+    }
+
+    #[test]
+    #[should_panic(expected = "matched no endpoint")]
+    fn endpoint_path_panics_without_a_match() {
+        let _ = endpoint_path(&Cx::default());
     }
 }

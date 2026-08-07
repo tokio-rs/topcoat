@@ -9,7 +9,8 @@ use std::{
 use topcoat_core::context::{ContextMap, Cx, CxBuilder};
 
 use crate::{
-    Endpoint, Layer, Layers, Next, OriginLayer, RawPathParams, Route, RouterBuilder, Terminal,
+    Endpoint, EndpointPath, Layer, Layers, Next, OriginLayer, RawPathParams, Route, RouterBuilder,
+    Terminal,
     error::{internal_server_response, not_found, respond},
     request::Request,
     response::Response,
@@ -108,6 +109,7 @@ impl Router {
         };
 
         let mut cx = CxBuilder::new(self.app_context.clone());
+        cx.insert(EndpointPath(endpoint.path().clone()));
         cx.insert(path_params);
         cx.insert(parts);
 
@@ -155,7 +157,7 @@ mod tests {
     use super::*;
     use crate::{
         Body, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn, Path, RouteFn,
-        RouteFuture, request::Bytes, response::IntoResponse, to_bytes,
+        RouteFuture, endpoint_path, request::Bytes, response::IntoResponse, to_bytes,
     };
 
     // -- Test helpers --
@@ -218,6 +220,11 @@ mod tests {
                 .join("&")
                 .into_response(cx)
         })
+    }
+
+    /// Echoes the path of the endpoint the request matched.
+    fn echo_endpoint_path(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { endpoint_path(cx).to_string().into_response(cx) })
     }
 
     /// Reads a registered app-context greeting and returns it as the body.
@@ -397,6 +404,52 @@ mod tests {
         // The raw catch-all keeps the encoded remainder, slashes included.
         let (_, _, body) = send(&router, Method::GET, "/files/a%2Fb/c%20d");
         assert_eq!(&body[..], b"rest=a%2Fb/c%20d");
+    }
+
+    #[test]
+    fn exposes_the_matched_endpoint_path() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/users/{id}"),
+                echo_endpoint_path,
+            ))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/files/{*rest}"),
+                echo_endpoint_path,
+            ))
+            .build();
+
+        // The pattern the endpoint serves, not the requested URL.
+        let (_, _, body) = send(&router, Method::GET, "/users/42");
+        assert_eq!(&body[..], b"/users/{id}");
+
+        let (_, _, body) = send(&router, Method::GET, "/files/a/b");
+        assert_eq!(&body[..], b"/files/{*rest}");
+    }
+
+    #[test]
+    fn the_endpoint_path_drops_group_segments() {
+        // Groups bind layouts and layers at build time and are not part of the
+        // URL, so routes that differ only in them agree on the path they share.
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/(a)/x"),
+                echo_endpoint_path,
+            ))
+            .route(RouteFn::new(
+                Method::POST,
+                path("/(b)/x"),
+                echo_endpoint_path,
+            ))
+            .build();
+
+        for method in [Method::GET, Method::POST] {
+            let (_, _, body) = send(&router, method, "/x");
+            assert_eq!(&body[..], b"/x");
+        }
     }
 
     #[test]
