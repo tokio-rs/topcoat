@@ -15,23 +15,26 @@ pub(crate) fn memory_installed() -> bool {
     installed
 }
 
-/// Runs `fut` with a fresh instruction [`Memory`] installed and returns the
-/// memory alongside the output.
+/// Runs `fut` with a fresh instruction [`Memory`] installed unless one
+/// already is, returning the fresh memory alongside the output.
 ///
 /// Every `view!` invocation inside `fut` appends to the installed memory.
 /// The memory is only installed while `fut` polls on the task that entered
 /// it; a future spawned onto another task builds its own memory instead.
 /// Within `fut`, futures that build views may run concurrently, for example
 /// under `try_join`.
-pub(crate) async fn install<F: Future>(fut: F) -> (F::Output, Memory) {
+pub(crate) async fn maybe_install<F: Future>(fut: F) -> (F::Output, Option<Memory>) {
+    // Checked when the wrapping future first polls: with a memory already
+    // installed, an enclosing invocation owns the build and `fut` polls
+    // through unwrapped.
+    let installing = !memory_installed();
     let mut fut = pin!(fut);
-    let mut memory = Some(Memory::new());
+    let mut memory = installing.then(Memory::new);
     let output = poll_fn(|task_cx| {
-        let _enter = Enter::new(&mut memory);
+        let _enter = installing.then(|| Enter::new(&mut memory));
         fut.as_mut().poll(task_cx)
     })
     .await;
-    let memory = memory.take().expect("the memory was reinstated on exit");
     (output, memory)
 }
 
