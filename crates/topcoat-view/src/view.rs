@@ -364,12 +364,27 @@ pub struct PartsWriter<'a> {
 impl<'a> PartsWriter<'a> {
     /// Creates a writer that seals everything pushed into it with `context`.
     #[inline]
-    pub(crate) fn new(arena: &'a mut Arena, context: HtmlContext) -> Self {
+    fn new(arena: &'a mut Arena, context: HtmlContext) -> Self {
         Self {
             arena,
             context,
             size_hint: 0,
         }
+    }
+
+    /// Appends one view's instruction block to `arena`, filled by `f`
+    /// through a writer in text context.
+    ///
+    /// Records the entry address, runs `f`, and terminates the block with a
+    /// return instruction. Returns the handle to the block, carrying the
+    /// writer's accumulated size hint.
+    pub(crate) fn block(arena: &mut Arena, f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+        let entry = arena.next_ptr();
+        let mut parts = PartsWriter::new(arena, HtmlContext::Text);
+        f(&mut parts);
+        let size_hint = parts.size_hint();
+        arena.push_ret();
+        View::from_scope(arena.id(), entry, size_hint)
     }
 
     /// Returns the accumulated size hint of everything pushed so far.

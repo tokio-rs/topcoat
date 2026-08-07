@@ -54,7 +54,8 @@ pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Re
 /// [`Attributes`](crate::Attributes) capture values through this, so they
 /// work standalone as well as inside a `view!`.
 pub fn build_sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
-    let (view, arena) = ArenaScope::scope_sync(|| ArenaScope::with(|arena| arena.push_block(f)));
+    let (view, arena) =
+        ArenaScope::scope_sync(|| ArenaScope::with(|arena| PartsWriter::block(arena, f)));
     view.seal(arena)
 }
 
@@ -71,7 +72,7 @@ pub fn build_sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
 ///
 /// Panics if no view is building on the current task.
 pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> View {
-    ArenaScope::with(|arena| arena.push_block(|parts| f(&mut Builder { cx, parts })))
+    ArenaScope::with(|arena| PartsWriter::block(arena, |parts| f(&mut Builder { cx, parts })))
 }
 
 /// Reserves a slot in the installed arena for a view that resolves later.
