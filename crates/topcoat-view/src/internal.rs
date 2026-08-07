@@ -17,9 +17,7 @@ use crate::{
 /// stays a handle into it. Otherwise this invocation is the root: a fresh
 /// memory is installed while `fut` polls, and the returned view takes
 /// ownership of it.
-pub fn __root_view(
-    fut: impl Future<Output = Result<View>>,
-) -> impl Future<Output = Result<View>> {
+pub fn __root_view(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Result<View>> {
     RootView::new(fut)
 }
 
