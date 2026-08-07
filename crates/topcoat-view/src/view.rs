@@ -1,5 +1,4 @@
 use core::fmt;
-use std::borrow::Cow;
 
 #[cfg(feature = "http")]
 use http::{HeaderMap, StatusCode};
@@ -262,8 +261,8 @@ macro_rules! impl_push_primitive {
 /// through the `push_*` methods, which seal the pushed text with the
 /// [`HtmlContext`] of the position so rendering escapes or validates it
 /// correctly, or by delegating to another implementation of the same
-/// position trait. [`push_str_unescaped`](Self::push_str_unescaped) is the
-/// only way to opt out of that protection.
+/// position trait. The `push_*_unescaped` methods are the only way to opt
+/// out of that protection.
 ///
 /// The writer also accumulates a size hint: an estimate of the number of
 /// bytes everything pushed so far will write when rendered. The estimate
@@ -320,31 +319,63 @@ impl<'a> PartsWriter<'a> {
         }
     }
 
-    /// Appends a string, sealed with this writer's context.
+    /// Appends a borrowed string, sealed with this writer's context.
     #[inline]
-    pub fn push_str(&mut self, value: impl Into<Cow<'static, str>>) -> &mut Self {
-        let value = value.into();
-        self.size_hint += Self::str_size_hint(&value, self.context);
-        match value {
-            Cow::Borrowed(value) => self.memory.push_static_str(value, self.context),
-            Cow::Owned(value) => self.memory.push_string(value, self.context),
-        }
+    pub fn push_str(&mut self, value: &str) -> &mut Self {
+        self.size_hint += Self::str_size_hint(value, self.context);
+        self.memory.push_str(value, self.context);
         self
     }
 
-    /// Appends a string that renders verbatim, bypassing this writer's
-    /// context.
+    /// Appends a static string, sealed with this writer's context.
+    #[inline]
+    pub fn push_static_str(&mut self, value: &'static str) -> &mut Self {
+        self.size_hint += Self::str_size_hint(value, self.context);
+        self.memory.push_static_str(value, self.context);
+        self
+    }
+
+    /// Appends an owned string, sealed with this writer's context.
+    #[inline]
+    pub fn push_string(&mut self, value: String) -> &mut Self {
+        self.size_hint += Self::str_size_hint(&value, self.context);
+        self.memory.push_string(value, self.context);
+        self
+    }
+
+    /// Appends a borrowed string that renders verbatim, bypassing this
+    /// writer's context.
     ///
     /// Use this only for trusted markup. Passing untrusted input defeats the
     /// runtime's escaping and can lead to XSS vulnerabilities.
     #[inline]
-    pub fn push_str_unescaped(&mut self, value: impl Into<Cow<'static, str>>) -> &mut Self {
-        let value = value.into();
+    pub fn push_str_unescaped(&mut self, value: &str) -> &mut Self {
         self.size_hint += value.len();
-        match value {
-            Cow::Borrowed(value) => self.memory.push_static_str(value, HtmlContext::Unescaped),
-            Cow::Owned(value) => self.memory.push_string(value, HtmlContext::Unescaped),
-        }
+        self.memory.push_str(value, HtmlContext::Unescaped);
+        self
+    }
+
+    /// Appends a static string that renders verbatim, bypassing this
+    /// writer's context.
+    ///
+    /// Use this only for trusted markup. Passing untrusted input defeats the
+    /// runtime's escaping and can lead to XSS vulnerabilities.
+    #[inline]
+    pub fn push_static_str_unescaped(&mut self, value: &'static str) -> &mut Self {
+        self.size_hint += value.len();
+        self.memory.push_static_str(value, HtmlContext::Unescaped);
+        self
+    }
+
+    /// Appends an owned string that renders verbatim, bypassing this
+    /// writer's context.
+    ///
+    /// Use this only for trusted markup. Passing untrusted input defeats the
+    /// runtime's escaping and can lead to XSS vulnerabilities.
+    #[inline]
+    pub fn push_string_unescaped(&mut self, value: String) -> &mut Self {
+        self.size_hint += value.len();
+        self.memory.push_string(value, HtmlContext::Unescaped);
         self
     }
 
@@ -367,9 +398,9 @@ impl<'a> PartsWriter<'a> {
             "tried to push comment in html context {:?}",
             self.context,
         );
-        self.push_str_unescaped("<!-- ");
+        self.push_static_str_unescaped("<!-- ");
         self.in_context(HtmlContext::Comment, build);
-        self.push_str_unescaped(" -->");
+        self.push_static_str_unescaped(" -->");
         self
     }
 

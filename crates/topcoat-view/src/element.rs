@@ -25,28 +25,28 @@ pub trait ElementNameViewParts {
 impl ElementNameViewParts for String {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str(self);
+        parts.push_string(self);
     }
 }
 
 impl ElementNameViewParts for &str {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str(self.to_owned());
+        parts.push_str(self);
     }
 }
 
 impl ElementNameViewParts for Unescaped<String> {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str_unescaped(self.0);
+        parts.push_string_unescaped(self.0);
     }
 }
 
 impl ElementNameViewParts for Unescaped<&'static str> {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str_unescaped(self.0);
+        parts.push_static_str_unescaped(self.0);
     }
 }
 

@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     DynViewPart, HtmlContext, View,
-    render::{ConstPool, Instruction},
+    render::{ConstPool, Instruction, StrPtr},
     view::ViewRepr,
 };
 
@@ -263,6 +263,18 @@ impl Memory {
         self.push_instruction(Instruction::StaticStr { ptr, context });
     }
 
+    pub fn push_str(&mut self, value: &str, context: HtmlContext) {
+        if value.is_empty() {
+            return;
+        }
+        let StrPtr { offset, len } = self.pool.push_str(value);
+        self.push_instruction(Instruction::Str {
+            offset,
+            len,
+            context,
+        });
+    }
+
     pub fn push_string(&mut self, value: String, context: HtmlContext) {
         if value.is_empty() {
             return;
@@ -319,6 +331,7 @@ impl Memory {
                 Instruction::F64(_) => "F64",
                 Instruction::Char { .. } => "Char",
                 Instruction::StaticStr { .. } => "StaticStr",
+                Instruction::Str { .. } => "Str",
                 Instruction::String { .. } => "String",
                 Instruction::Dyn { .. } => "Dyn",
                 #[cfg(feature = "http")]

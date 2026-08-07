@@ -537,7 +537,7 @@ impl AttributeValueViewParts for Length {
 
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         parts.push_f32(self.value);
-        parts.push_str_unescaped(self.unit.as_str());
+        parts.push_static_str_unescaped(self.unit.as_str());
     }
 }
 

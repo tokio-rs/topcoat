@@ -84,8 +84,22 @@ impl_primitive!(u128, push_u128, ref);
 impl_primitive!(usize, push_usize, ref);
 impl_primitive!(f32, push_f32, ref);
 impl_primitive!(f64, push_f64, ref);
-impl_primitive!(String, push_str);
-impl_primitive!(Cow<'static, str>, push_str);
+impl_primitive!(String, push_string);
+
+impl AttributeValueViewParts for Cow<'static, str> {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        match self {
+            Cow::Borrowed(value) => parts.push_static_str(value),
+            Cow::Owned(value) => parts.push_string(value),
+        };
+    }
+}
 
 impl AttributeValueViewParts for &str {
     #[inline]
@@ -95,7 +109,7 @@ impl AttributeValueViewParts for &str {
 
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str(self.to_owned());
+        parts.push_str(self);
     }
 }
 
@@ -107,7 +121,7 @@ impl AttributeValueViewParts for Unescaped<String> {
 
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str_unescaped(self.0);
+        parts.push_string_unescaped(self.0);
     }
 }
 
@@ -119,7 +133,7 @@ impl AttributeValueViewParts for Unescaped<&'static str> {
 
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str_unescaped(self.0);
+        parts.push_static_str_unescaped(self.0);
     }
 }
 

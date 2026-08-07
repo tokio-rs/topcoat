@@ -2,7 +2,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Formatter,
-    render::{Instruction, InstructionPtr, Memory},
+    render::{Instruction, InstructionPtr, Memory, StrPtr},
 };
 
 /// Executes a view's instruction block into a [`Formatter`].
@@ -73,6 +73,17 @@ impl<'a> Machine<'a> {
 
                 Instruction::StaticStr { ptr, context } => {
                     context.writer(f).write_str(pool.fetch_static_str(*ptr));
+                }
+                Instruction::Str {
+                    offset,
+                    len,
+                    context,
+                } => {
+                    let ptr = StrPtr {
+                        offset: *offset,
+                        len: *len,
+                    };
+                    context.writer(f).write_str(pool.fetch_str(ptr));
                 }
                 Instruction::String { ptr, context } => {
                     context.writer(f).write_str(pool.fetch_string(*ptr));

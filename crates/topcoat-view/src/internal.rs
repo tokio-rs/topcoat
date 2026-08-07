@@ -81,7 +81,7 @@ pub fn __in_context<R>(
 
 #[inline]
 pub fn __unescaped(_cx: &Cx, parts: &mut PartsWriter<'_>, s: &'static str) {
-    parts.push_str_unescaped(s);
+    parts.push_static_str_unescaped(s);
 }
 
 #[inline]

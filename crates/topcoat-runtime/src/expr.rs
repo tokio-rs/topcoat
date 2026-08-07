@@ -24,10 +24,10 @@ where
     T: NodeViewParts,
 {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str_unescaped("<!-- ::topcoat::expr::start(\"");
+        parts.push_static_str_unescaped("<!-- ::topcoat::expr::start(\"");
         parts.push_view(self.js);
-        parts.push_str_unescaped("\") -->");
+        parts.push_static_str_unescaped("\") -->");
         self.evaluated.into_view_parts(cx, parts);
-        parts.push_str_unescaped("<!-- ::topcoat::expr::end -->");
+        parts.push_static_str_unescaped("<!-- ::topcoat::expr::end -->");
     }
 }

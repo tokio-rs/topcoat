@@ -34,7 +34,7 @@ impl ClassViewParts for &str {
 
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str(self.to_owned());
+        parts.push_str(self);
     }
 }
 
@@ -46,7 +46,7 @@ impl ClassViewParts for String {
 
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str(self);
+        parts.push_string(self);
     }
 }
 
@@ -70,7 +70,10 @@ impl ClassViewParts for Cow<'static, str> {
 
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str(self);
+        match self {
+            Cow::Borrowed(value) => parts.push_static_str(value),
+            Cow::Owned(value) => parts.push_string(value),
+        };
     }
 }
 
@@ -180,7 +183,7 @@ impl<'a, 'b> ClassWriter<'a, 'b> {
     pub fn entry(&mut self, cx: &Cx, value: impl ClassViewParts) -> &mut Self {
         if value.is_present() {
             if !self.first {
-                self.parts.push_str(" ");
+                self.parts.push_static_str(" ");
             }
             value.into_view_parts(cx, self.parts);
             self.first = false;

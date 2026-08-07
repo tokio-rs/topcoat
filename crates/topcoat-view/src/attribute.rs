@@ -57,15 +57,15 @@ where
 {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         if self.value.attribute_present() {
-            parts.push_str_unescaped(" ");
+            parts.push_static_str_unescaped(" ");
             parts.in_context(HtmlContext::AttributeKey, |parts| {
                 self.key.into_view_parts(cx, parts);
             });
-            parts.push_str_unescaped("=\"");
+            parts.push_static_str_unescaped("=\"");
             parts.in_context(HtmlContext::AttributeValue, |parts| {
                 self.value.into_view_parts(cx, parts);
             });
-            parts.push_str_unescaped("\"");
+            parts.push_static_str_unescaped("\"");
         }
     }
 }

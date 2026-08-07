@@ -8,6 +8,13 @@ pub struct StaticStrPtr(usize);
 #[derive(Debug, Clone, Copy)]
 pub struct StringPtr(usize);
 
+/// The location of a string copied into a [`ConstPool`]'s string arena.
+#[derive(Debug, Clone, Copy)]
+pub struct StrPtr {
+    pub(crate) offset: usize,
+    pub(crate) len: u32,
+}
+
 /// The index of a boxed [`DynViewPart`] in a [`ConstPool`].
 #[derive(Debug, Clone, Copy)]
 pub struct DynPtr(usize);
@@ -27,6 +34,7 @@ pub struct HeadersPtr(usize);
 pub struct ConstPool {
     static_strs: Vec<&'static str>,
     strings: Vec<String>,
+    strs: String,
     dyns: Vec<Box<dyn DynViewPart>>,
     #[cfg(feature = "http")]
     headers: Vec<http::HeaderMap>,
@@ -58,6 +66,23 @@ impl ConstPool {
         &self.strings[ptr.0]
     }
 
+    /// Copies a borrowed string to the end of the string arena.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the string is longer than `u32::MAX` bytes.
+    pub fn push_str(&mut self, value: &str) -> StrPtr {
+        let offset = self.strs.len();
+        let len = u32::try_from(value.len()).expect("string exceeds the arena's length limit");
+        self.strs.push_str(value);
+        StrPtr { offset, len }
+    }
+
+    #[must_use]
+    pub fn fetch_str(&self, ptr: StrPtr) -> &str {
+        &self.strs[ptr.offset..ptr.offset + ptr.len as usize]
+    }
+
     pub fn push_dyn(&mut self, value: Box<dyn DynViewPart>) -> DynPtr {
         self.dyns.push(value);
         DynPtr(self.dyns.len() - 1)
@@ -85,6 +110,7 @@ impl ConstPool {
         println!("ConstPool {{");
         println!("  static_strs: {}", self.static_strs.len());
         println!("  strings: {}", self.strings.len());
+        println!("  strs: {} bytes", self.strs.len());
         println!("  dyns: {}", self.dyns.len());
         #[cfg(feature = "http")]
         println!("  headers: {}", self.headers.len());

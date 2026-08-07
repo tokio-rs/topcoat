@@ -66,6 +66,17 @@ pub enum Instruction {
         ptr: StaticStrPtr,
         context: HtmlContext,
     },
+    /// A string copied into the pool's string arena, and its context.
+    ///
+    /// The arena location is inlined instead of held as a
+    /// [`StrPtr`](crate::render::StrPtr), whose trailing padding would push
+    /// the variant past the instruction size limit.
+    #[non_exhaustive]
+    Str {
+        offset: usize,
+        len: u32,
+        context: HtmlContext,
+    },
     /// A dynamic string and its context.
     String {
         ptr: StringPtr,

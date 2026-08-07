@@ -54,26 +54,26 @@ impl NodeViewParts for ReactiveScope {
         // The source parts are sealed with the comment context, so any `"`
         // inside the source renders as `&quot;` and the quotes stay
         // unambiguous delimiters on the client.
-        parts.push_str_unescaped("<!-- ::topcoat::scope::start(");
-        parts.push_str_unescaped(serde_json::to_string(&self.id).unwrap());
-        parts.push_str_unescaped(", ");
-        parts.push_str_unescaped(
+        parts.push_static_str_unescaped("<!-- ::topcoat::scope::start(");
+        parts.push_string_unescaped(serde_json::to_string(&self.id).unwrap());
+        parts.push_static_str_unescaped(", ");
+        parts.push_string_unescaped(
             serde_json::to_string(&format!("{SHARD_ROUTE_PREFIX}/{shard_id}")).unwrap(),
         );
-        parts.push_str_unescaped(", [");
+        parts.push_static_str_unescaped(", [");
         let last = self.exprs.len().saturating_sub(1);
         for (index, expr) in self.exprs.into_iter().enumerate() {
-            parts.push_str_unescaped("\"");
+            parts.push_static_str_unescaped("\"");
             parts.push_view(expr);
-            parts.push_str_unescaped("\"");
+            parts.push_static_str_unescaped("\"");
             if index != last {
-                parts.push_str_unescaped(", ");
+                parts.push_static_str_unescaped(", ");
             }
         }
-        parts.push_str_unescaped("]) -->");
+        parts.push_static_str_unescaped("]) -->");
         self.placeholder.into_view_parts(cx, parts);
-        parts.push_str_unescaped("<!-- ::topcoat::scope::end(");
-        parts.push_str_unescaped(serde_json::to_string(&self.id).unwrap());
-        parts.push_str_unescaped(") -->");
+        parts.push_static_str_unescaped("<!-- ::topcoat::scope::end(");
+        parts.push_string_unescaped(serde_json::to_string(&self.id).unwrap());
+        parts.push_static_str_unescaped(") -->");
     }
 }
