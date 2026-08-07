@@ -12,7 +12,9 @@ struct PageQuery {
 
 # Reading the value
 
-[`query_params::<T>(cx)`](fn.query_params.html) parses the current request's query string with [`serde_urlencoded`](https://docs.rs/serde_urlencoded/latest/serde_urlencoded/) and returns `Result<&T, &QueryParamsError>`: a reference to the parsed struct, or to the [`QueryParamsError`](type.QueryParamsError.html) naming the key that failed. Unlike a path parameter, the struct is not tied to a route: any handler can read it. Parsing runs at most once per request; the result is then memoized.
+[`query_params::<T>(cx)`](fn.query_params.html) parses the current request's URL-encoded query string and returns `Result<&T, &QueryParamsError>`: a reference to the parsed struct, or to the [`QueryParamsError`](type.QueryParamsError.html) naming the key that failed. Unlike a path parameter, the struct is not tied to a route: any handler can read it. Parsing runs at most once per request; the result is then memoized.
+
+An empty value such as `?page=` becomes `None` when its target field is an `Option`. A required `String` field still receives an empty string.
 
 # Failing with an error response
 
