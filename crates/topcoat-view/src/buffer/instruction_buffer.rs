@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::buffer::{Arena, Instruction};
+use crate::buffer::Instruction;
 
 /// The address of an instruction in an [`InstructionBuffer`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,13 +16,13 @@ impl InstructionPtr {
 /// append-only sequence addressed by [`InstructionPtr`].
 #[derive(Debug)]
 pub struct InstructionBuffer {
-    instructions: Arena<Instruction>,
+    instructions: Vec<Instruction>,
 }
 
 impl InstructionBuffer {
     pub(crate) fn new() -> Self {
         Self {
-            instructions: Arena::new(),
+            instructions: Vec::new(),
         }
     }
 
