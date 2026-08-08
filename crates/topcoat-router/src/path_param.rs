@@ -51,7 +51,6 @@ pub fn path_param<T: PathParam + ?Sized>(cx: &Cx) -> T::Output<'_> {
 ///
 /// Panics if the request matched no endpoint.
 #[inline]
-#[must_use]
 #[track_caller]
 pub fn raw_path_params(cx: &Cx) -> RawPathParamsIter<'_> {
     let params = request_context::<RawPathParams>(cx);

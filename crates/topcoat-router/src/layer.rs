@@ -405,8 +405,7 @@ mod tests {
     fn run_resolves_the_method_not_allowed_terminal() {
         let layers = Layers::default();
         let no_layers: Box<[LayerId]> = Box::new([]);
-        let endpoint_path = std::sync::Arc::from(path("/x").as_str());
-        let mut endpoint = Endpoint::new(endpoint_path, no_layers);
+        let mut endpoint = Endpoint::new(&path("/x"), no_layers);
         endpoint.insert(Method::GET, 0);
         endpoint.insert(Method::POST, 1);
         let mut cx = Cx::default();

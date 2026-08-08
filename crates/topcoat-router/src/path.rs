@@ -201,7 +201,7 @@ impl Path {
         if self.inner.len() < other.inner.len() {
             return false;
         }
-        return self.segments().zip(other.segments()).all(|(a, b)| a == b);
+        self.segments().zip(other.segments()).all(|(a, b)| a == b)
     }
 
     /// Returns `true` if `url`, a concrete URL path, matches this route path

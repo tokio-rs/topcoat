@@ -105,12 +105,12 @@ pub(crate) struct Endpoint {
 }
 
 impl Endpoint {
-    pub(crate) fn new(path: Arc<str>, layers: Box<[LayerId]>) -> Self {
+    pub(crate) fn new(path: &Path, layers: Box<[LayerId]>) -> Self {
         Self {
             standard: Default::default(),
             other: HashMap::new(),
             any: RouteIndex::NONE,
-            path,
+            path: Arc::from(path.as_str()),
             layers,
         }
     }
