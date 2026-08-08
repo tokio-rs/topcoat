@@ -180,6 +180,7 @@ impl View {
     /// invocation it was built in, or if a dynamic attribute key or element
     /// name in the view contains a character that could break out of the
     /// identifier.
+    #[must_use]
     #[track_caller]
     pub fn render(self, cx: &Cx) -> String {
         match self.repr {
@@ -571,7 +572,7 @@ mod tests {
     #[should_panic(expected = "no view is building")]
     fn rendering_an_escaped_nested_view_panics() {
         let view = in_scope(async |_cx| sync(|_parts| {}));
-        view.render(&Cx::default());
+        let _ = view.render(&Cx::default());
     }
 
     #[test]

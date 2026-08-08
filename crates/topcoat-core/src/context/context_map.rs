@@ -65,6 +65,7 @@ where
 ///     db.fetch_user(id).await
 /// }
 /// ```
+#[must_use]
 #[track_caller]
 pub fn app_context<T>(cx: &Cx) -> &T
 where
@@ -130,6 +131,7 @@ where
 ///     &id.0
 /// }
 /// ```
+#[must_use]
 #[track_caller]
 pub fn request_context<T>(cx: &Cx) -> &T
 where

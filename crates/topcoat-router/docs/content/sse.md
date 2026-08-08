@@ -57,8 +57,6 @@ async fn greetings(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + us
 }
 ```
 
-The request context is frozen while a detached handle is alive: registering another value on it panics.
-
 # Keeping quiet streams alive
 
 Proxies and load balancers drop connections that look stale. [`keep_alive`](Sse::keep_alive) fills idle gaps with events the client ignores: [`KeepAlive::new`] sends an empty comment after 15 idle seconds, and [`interval`](KeepAlive::interval), [`text`](KeepAlive::text), and [`event`](KeepAlive::event) tune what is sent and when.

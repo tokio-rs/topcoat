@@ -48,6 +48,7 @@ impl Cx {
 
     /// Returns this context's unique [`CxId`].
     #[inline]
+    #[must_use]
     pub fn id(&self) -> CxId {
         self.inner.id
     }
@@ -169,12 +170,14 @@ impl CxTestBuilder {
 }
 
 #[inline]
+#[must_use]
 #[doc(hidden)]
 pub fn memoize_cache(cx: &Cx) -> &MemoizeCache {
     &cx.inner.memoize_cache
 }
 
 #[inline]
+#[must_use]
 #[doc(hidden)]
 pub fn abort_store(cx: &Cx) -> &AbortStore {
     &cx.inner.abort_store

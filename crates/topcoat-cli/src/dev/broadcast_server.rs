@@ -143,7 +143,7 @@ fn ws_route(cx: &Cx, body: Body) -> RouteFuture<'_> {
     Box::pin(async move {
         let upgrade = WebSocketUpgrade::from_request(cx, body).await?;
         let events = app_context::<EventBus>(cx).clone();
-        upgrade.on_upgrade(move |_cx, socket| handle_socket(socket, events))
+        upgrade.on_upgrade(move |socket| handle_socket(socket, events))
     })
 }
 

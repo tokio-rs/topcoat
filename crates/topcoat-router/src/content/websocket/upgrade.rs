@@ -50,7 +50,7 @@ use crate::{
 ///
 /// #[route(GET "/echo")]
 /// async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
-///     upgrade.on_upgrade(|_cx, mut socket| async move {
+///     upgrade.on_upgrade(|mut socket| async move {
 ///         while let Some(Ok(message)) = socket.recv().await {
 ///             if matches!(message, Message::Text(_) | Message::Binary(_))
 ///                 && socket.send(message).await.is_err()
@@ -61,9 +61,37 @@ use crate::{
 ///     })
 /// }
 /// ```
+///
+/// The callback outlives the handler, so it cannot borrow the request context.
+/// Take an owned handle with [`Cx::detach`] and move it in to read the context
+/// from the socket task:
+///
+/// ```rust
+/// use topcoat::{
+///     Result,
+///     context::{Cx, request_context},
+///     router::{
+///         content::websocket::{Message, WebSocketUpgrade},
+///         response::Response,
+///         route,
+///     },
+/// };
+///
+/// struct Customer {
+///     name: String,
+/// }
+///
+/// #[route(GET "/greet")]
+/// async fn greet(cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
+///     let cx = cx.detach();
+///     upgrade.on_upgrade(move |mut socket| async move {
+///         let customer: &Customer = request_context(&cx);
+///         let _ = socket.send(Message::text(customer.name.as_str())).await;
+///     })
+/// }
+/// ```
 #[must_use]
 pub struct WebSocketUpgrade {
-    cx: Cx,
     config: WebSocketConfig,
     protocols: Vec<Cow<'static, str>>,
     key: HeaderValue,
@@ -138,21 +166,19 @@ impl WebSocketUpgrade {
         self
     }
 
-    /// Completes the handshake, calling `callback` with the request context and
-    /// the [`WebSocket`] once the client connection has switched protocols.
+    /// Completes the handshake, calling `callback` with the [`WebSocket`] once
+    /// the client connection has switched protocols.
     ///
     /// The returned response must be the handler's return value; sending it
     /// performs the protocol switch. The callback runs on its own task, which
-    /// owns the connection for as long as it runs. Its [`Cx`] is an owned handle
-    /// to the context of the request that upgraded the connection, so the socket
-    /// task reads the same app and request context the handler saw.
+    /// owns the connection for as long as it runs.
     ///
     /// # Errors
     ///
     /// Returns an error if the handshake response cannot be assembled.
     pub fn on_upgrade<C, F>(self, callback: C) -> Result<Response>
     where
-        C: FnOnce(Cx, WebSocket) -> F + Send + 'static,
+        C: FnOnce(WebSocket) -> F + Send + 'static,
         F: Future<Output = ()> + Send + 'static,
     {
         let protocol = negotiate_protocol(&self.protocols, self.requested_protocols.as_ref());
@@ -161,7 +187,6 @@ impl WebSocketUpgrade {
         let on_upgrade = self.on_upgrade;
         let on_failed_upgrade = self.on_failed_upgrade;
         let socket_protocol = protocol.clone();
-        let cx = self.cx;
         tokio::spawn(async move {
             let upgraded = match on_upgrade.await {
                 Ok(upgraded) => upgraded,
@@ -176,7 +201,7 @@ impl WebSocketUpgrade {
                 Some(config),
             )
             .await;
-            callback(cx, WebSocket::new(stream, socket_protocol)).await;
+            callback(WebSocket::new(stream, socket_protocol)).await;
         });
 
         let mut response = Response::new(Body::empty());
@@ -242,7 +267,6 @@ impl FromRequest for WebSocketUpgrade {
         })?;
 
         Ok(Self {
-            cx: cx.detach(),
             config: WebSocketConfig::default(),
             protocols: Vec::new(),
             key,
@@ -477,7 +501,7 @@ mod tests {
             let upgrade = WebSocketUpgrade::from_request(cx, body).await?;
             upgrade
                 .protocols(["echo.v1"])
-                .on_upgrade(|_cx, mut socket| async move {
+                .on_upgrade(|mut socket| async move {
                     while let Some(Ok(message)) = socket.recv().await {
                         if matches!(message, Message::Text(_) | Message::Binary(_))
                             && socket.send(message).await.is_err()
