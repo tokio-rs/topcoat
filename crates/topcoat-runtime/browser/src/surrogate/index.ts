@@ -26,6 +26,9 @@ export type DehydratedSurrogate =
 	| { t: "i32"; v: number }
 	| { t: "str"; v: string }
 	| string
+	// A tuple. Serde writes a Rust tuple as an array, and `expr!` compiles
+	// tuple field access to array indexing, so it stays an array here.
+	| DehydratedSurrogate[]
 	| { t: "Option"; v: DehydratedSurrogate | null }
 	| { t: "Result"; ok: DehydratedSurrogate }
 	| { t: "Result"; err: DehydratedSurrogate }
@@ -51,6 +54,12 @@ export function hydrateSurrogate(
 		case "function":
 			throw new Error(`Unknown surrogate type: ${typeof value}`);
 		case "object":
+			// Checked before the tag, because an array is an object with no
+			// `t`. `expr!` indexes a tuple with `pair[0]`, so it has to stay a
+			// real array rather than become a surrogate object.
+			if (Array.isArray(value)) {
+				return value.map((element) => hydrateSurrogate(element, cx));
+			}
 			switch (value.t) {
 				case "str":
 					return new Str(value.v);

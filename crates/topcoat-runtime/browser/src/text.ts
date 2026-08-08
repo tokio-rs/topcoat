@@ -45,12 +45,16 @@ function write(start: Comment, end: Comment, value: unknown): void {
 	}
 }
 
-function toText(value: unknown): string {
+export function toText(value: unknown): string {
 	let current = value;
 	while (isRefLike(current)) {
 		current = current.deref();
 	}
 	if (current == null) return "";
+	// A tuple, which hydrates as an array. `NodeViewParts for (T1, T2)` writes
+	// its elements one after another with no separator, so joining on "" is
+	// what the server rendered; `String(array)` would insert commas.
+	if (Array.isArray(current)) return current.map(toText).join("");
 	if (isNodeViewParts(current)) return current.toNodeText();
 	return String(current);
 }
