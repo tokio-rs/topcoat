@@ -1,6 +1,8 @@
 use std::{
     borrow::{Borrow, Cow},
     fmt::{Display, Write},
+    iter::FusedIterator,
+    mem,
     ops::{AddAssign, Deref},
 };
 
@@ -131,13 +133,8 @@ impl Path {
     ///     ]
     /// );
     /// ```
-    pub fn segments(&self) -> impl Iterator<Item = PathSegment<'_>> {
-        // The path was validated on construction, so its segments need no
-        // re-validation here.
-        self.inner
-            .split('/')
-            .skip(1)
-            .map(PathSegment::new_unchecked)
+    pub fn segments(&self) -> PathSegments<'_> {
+        PathSegments::new(self)
     }
 
     /// Converts this path to a `matchit`-compatible route string, stripping group
@@ -326,6 +323,76 @@ impl<'a> From<&'a Path> for Cow<'a, Path> {
         Self::Borrowed(value)
     }
 }
+
+/// An iterator over the [`PathSegment`]s of a [`Path`], created by
+/// [`Path::segments`].
+#[derive(Debug, Clone)]
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+pub struct PathSegments<'path> {
+    /// The `/`-separated body left to walk, without a leading `/`.
+    rest: &'path str,
+    /// Whether the body is used up. It is tracked separately because the last
+    /// segment leaves `rest` empty, which is also how the root path starts out.
+    done: bool,
+}
+
+impl<'path> PathSegments<'path> {
+    fn new(path: &'path Path) -> Self {
+        match path.inner.strip_prefix('/') {
+            Some(rest) => Self { rest, done: false },
+            // The root path is backed by the empty string and has no segments.
+            None => Self {
+                rest: "",
+                done: true,
+            },
+        }
+    }
+
+    /// Marks the body as used up and returns what was left of it, the segment
+    /// at whichever end the caller was reading.
+    fn last_segment(&mut self) -> &'path str {
+        self.done = true;
+        mem::take(&mut self.rest)
+    }
+}
+
+impl<'path> Iterator for PathSegments<'path> {
+    type Item = PathSegment<'path>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        let segment = match self.rest.split_once('/') {
+            Some((segment, rest)) => {
+                self.rest = rest;
+                segment
+            }
+            None => self.last_segment(),
+        };
+        // The path was validated on construction, so its segments need no
+        // re-validation here.
+        Some(PathSegment::new_unchecked(segment))
+    }
+}
+
+impl DoubleEndedIterator for PathSegments<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        let segment = match self.rest.rsplit_once('/') {
+            Some((rest, segment)) => {
+                self.rest = rest;
+                segment
+            }
+            None => self.last_segment(),
+        };
+        Some(PathSegment::new_unchecked(segment))
+    }
+}
+
+impl FusedIterator for PathSegments<'_> {}
 
 /// The reason a string could not be parsed into a [`Path`] by
 /// [`Path::from_str`].
@@ -620,6 +687,26 @@ impl<'a> PathSegment<'a> {
             Some(v)
         } else {
             None
+        }
+    }
+
+    /// Returns the name this segment captures a value under, or `None` if it
+    /// captures nothing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use topcoat_router::PathSegment;
+    ///
+    /// assert_eq!(PathSegment::Param("id").param_name(), Some("id"));
+    /// assert_eq!(PathSegment::CatchAll("rest").param_name(), Some("rest"));
+    /// assert_eq!(PathSegment::Static("users").param_name(), None);
+    /// ```
+    #[must_use]
+    pub fn param_name(&self) -> Option<&'a str> {
+        match *self {
+            Self::Param(name) | Self::CatchAll(name) => Some(name),
+            Self::Static(_) | Self::Group(_) => None,
         }
     }
 

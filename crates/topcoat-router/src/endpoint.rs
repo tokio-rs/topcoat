@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use http::Method;
 use topcoat_core::context::{Cx, try_request_context};
 
-use crate::{LayerId, Path, RawPathParamSpec};
+use crate::{LayerId, Path};
 
 /// The index of a registered route, with [`usize::MAX`] reserved to mean
 /// "none".
@@ -97,8 +97,6 @@ pub(crate) struct Endpoint {
     /// allocation reached through one pointer; read it with
     /// [`path`](Self::path).
     path: Arc<str>,
-    /// Interned path parameter names and capture kinds for this endpoint.
-    path_params: Box<[RawPathParamSpec]>,
     /// The layers wrapping every route at this path, as ids into the router's
     /// layer table, precomputed at build time and ordered from least- to
     /// most-specific so the outermost layer runs first. Shared by every method
@@ -107,24 +105,24 @@ pub(crate) struct Endpoint {
 }
 
 impl Endpoint {
-    pub(crate) fn new(
-        path: Arc<str>,
-        path_params: Box<[RawPathParamSpec]>,
-        layers: Box<[LayerId]>,
-    ) -> Self {
+    pub(crate) fn new(path: Arc<str>, layers: Box<[LayerId]>) -> Self {
         Self {
             standard: Default::default(),
             other: HashMap::new(),
             any: RouteIndex::NONE,
             path,
-            path_params,
             layers,
         }
     }
 
-    /// Returns the URL path this endpoint serves, ready to be cloned onto a
-    /// matched request's context.
-    pub(crate) fn path(&self) -> &Arc<str> {
+    /// Returns the URL path this endpoint serves.
+    pub(crate) fn path(&self) -> &Path {
+        Path::new_unchecked(&self.path)
+    }
+
+    /// Returns the string backing [`path`](Self::path), ready to be cloned onto
+    /// a matched request's context.
+    pub(crate) fn shared_path(&self) -> &Arc<str> {
         &self.path
     }
 
@@ -175,11 +173,6 @@ impl Endpoint {
             .filter(|(slot, _)| !self.standard[*slot].is_none())
             .map(|(_, method)| method)
             .chain(self.other.keys())
-    }
-
-    /// Returns the path parameter names and capture kinds for this endpoint.
-    pub(crate) fn path_params(&self) -> &[RawPathParamSpec] {
-        &self.path_params
     }
 
     /// Returns the precomputed layer stack wrapping this path's routes, as ids

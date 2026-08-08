@@ -99,19 +99,17 @@ impl Router {
         // layer stack whether the method matches (a route) or not (405), so
         // both flow through the same layers.
         let endpoint = matched.value;
-        let path_params = {
-            debug_assert_eq!(endpoint.path_params().len(), matched.params.len());
-            let keys = endpoint.path_params().iter().cloned();
-            let values = matched.params.iter().map(|(_, value)| value);
-            RawPathParams::from_pairs(keys.zip(values))
-        };
+        let path_params = RawPathParams::from_match(
+            endpoint.path(),
+            matched.params.iter().map(|(_, value)| value),
+        );
         let terminal = match endpoint.get(&parts.method).or_else(|| endpoint.any()) {
             Some(index) => Terminal::Route(&*self.routes[index]),
             None => Terminal::MethodNotAllowed(endpoint),
         };
 
         let mut cx = Cx::new(Arc::clone(&self.app_context));
-        cx.insert(EndpointPath(endpoint.path().clone()));
+        cx.insert(EndpointPath(endpoint.shared_path().clone()));
         cx.insert(path_params);
         cx.insert(parts);
 
@@ -153,7 +151,8 @@ mod tests {
     use super::*;
     use crate::{
         Body, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn, Path, RouteFn,
-        RouteFuture, endpoint_path, request::Bytes, response::IntoResponse, to_bytes,
+        RouteFuture, endpoint_path, raw_path_params, request::Bytes, response::IntoResponse,
+        to_bytes,
     };
 
     // -- Test helpers --
@@ -208,10 +207,8 @@ mod tests {
     /// Echoes the captured path params as `key=value` pairs joined by `&`.
     fn echo_params(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
-            let params: &RawPathParams = request_context(cx);
-            params
-                .into_iter()
-                .map(|(key, value)| format!("{key}={value}"))
+            raw_path_params(cx)
+                .map(|(key, value)| format!("{key}={}", value.as_str()))
                 .collect::<Vec<_>>()
                 .join("&")
                 .into_response(cx)
