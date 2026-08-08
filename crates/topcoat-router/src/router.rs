@@ -6,7 +6,9 @@ use std::{
     task::Poll,
 };
 
-use topcoat_core::context::{ContextMap, Cx, CxBuilder};
+#[cfg(feature = "compression")]
+use topcoat_core::context::try_request_context;
+use topcoat_core::context::{ContextMap, Cx};
 
 use crate::{
     Endpoint, EndpointPath, Layer, Layers, Next, OriginLayer, RawPathParams, Route, RouterBuilder,
@@ -108,7 +110,7 @@ impl Router {
             None => Terminal::MethodNotAllowed(endpoint),
         };
 
-        let mut cx = CxBuilder::new(self.app_context.clone());
+        let mut cx = Cx::new(Arc::clone(&self.app_context));
         cx.insert(EndpointPath(endpoint.path().clone()));
         cx.insert(path_params);
         cx.insert(parts);
@@ -123,7 +125,7 @@ impl Router {
         // bodies. The negotiation reads the request headers as the layers
         // left them.
         #[cfg(feature = "compression")]
-        let response = match cx.get::<http::request::Parts>() {
+        let response = match try_request_context::<http::request::Parts>(&cx) {
             Some(parts) => self.compression.compress(&parts.headers, response).await,
             None => response,
         };
@@ -144,7 +146,7 @@ mod tests {
     use http::{HeaderMap, StatusCode};
     use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, View, view};
     use topcoat_core::{
-        context::{Cx, CxBuilder, app_context, request_context},
+        context::{Cx, app_context, request_context},
         error::Result,
     };
 
@@ -242,21 +244,21 @@ mod tests {
     // test can observe the order layers run in.
     type Trace = Mutex<Vec<&'static str>>;
 
-    fn trace_root<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn trace_root<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("root");
             next.run(cx, body).await
         })
     }
 
-    fn trace_admin<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn trace_admin<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("admin");
             next.run(cx, body).await
         })
     }
 
-    fn trace_auth<'a>(cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn trace_auth<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("auth");
             next.run(cx, body).await

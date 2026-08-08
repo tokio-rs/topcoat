@@ -25,7 +25,39 @@ async fn events() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
 }
 ```
 
-The `use<>` bound keeps the stream from capturing the request context, which a route's response must not borrow. The connection stays open until the stream ends, an `Err` item occurs, or the client disconnects; a disconnect drops the stream, so tie cleanup to the stream's `Drop`.
+The `use<>` bound keeps the stream from borrowing the request context, which a route's response must not do. The connection stays open until the stream ends, an `Err` item occurs, or the client disconnects; a disconnect drops the stream, so tie cleanup to the stream's `Drop`.
+
+# Reading the request context
+
+A stream outlives the handler that returned it, so it cannot borrow the `Cx` the route was called with. Take an owned handle with [`Cx::detach`](topcoat_core::context::Cx::detach) and move it into the stream instead; it reads the same app and request context.
+
+```rust
+use futures_core::Stream;
+use topcoat::{
+    Result,
+    context::{Cx, request_context},
+    router::{
+        content::sse::{Event, Sse},
+        route,
+    },
+};
+
+struct Customer {
+    name: String,
+}
+
+#[route(GET "/greetings")]
+async fn greetings(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
+    let cx = cx.detach();
+    let events = futures_util::stream::once(async move {
+        let customer: &Customer = request_context(&cx);
+        Ok(Event::new().data(customer.name.as_str()))
+    });
+    Ok(Sse::new(events))
+}
+```
+
+The request context is frozen while a detached handle is alive: registering another value on it panics.
 
 # Keeping quiet streams alive
 

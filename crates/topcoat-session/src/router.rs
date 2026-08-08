@@ -1,4 +1,4 @@
-use topcoat_core::context::CxBuilder;
+use topcoat_core::context::Cx;
 use topcoat_router::{Body, Layer, LayerFuture, Next, Path, RouterBuilder};
 
 use crate::{SessionConfig, SessionState};
@@ -21,7 +21,7 @@ impl Layer for SessionLayer {
         Path::new("/")
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         cx.insert(SessionState::new());
         next.run(cx, body)
     }

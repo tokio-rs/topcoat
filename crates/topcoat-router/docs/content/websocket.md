@@ -4,7 +4,7 @@ A WebSocket starts as an ordinary `GET` request that asks the server to switch p
 
 # Upgrading a request
 
-A route becomes a WebSocket endpoint by taking a [`WebSocketUpgrade`] parameter and returning the response its [`on_upgrade`](WebSocketUpgrade::on_upgrade) builds. The callback passed to `on_upgrade` receives the [`WebSocket`] once the client has switched protocols, and runs on its own task; the handler itself completes immediately with the handshake response.
+A route becomes a WebSocket endpoint by taking a [`WebSocketUpgrade`] parameter and returning the response its [`on_upgrade`](WebSocketUpgrade::on_upgrade) builds. The callback passed to `on_upgrade` receives the request context and the [`WebSocket`] once the client has switched protocols, and runs on its own task; the handler itself completes immediately with the handshake response. Its `Cx` is an owned handle to the context of the request that upgraded the connection, so the socket task reads the same app and request context the handler saw.
 
 ```rust
 use topcoat::{
@@ -18,7 +18,7 @@ use topcoat::{
 
 #[route(GET "/echo")]
 async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
-    upgrade.on_upgrade(|mut socket| async move {
+    upgrade.on_upgrade(|_cx, mut socket| async move {
         while let Some(Ok(message)) = socket.recv().await {
             if matches!(message, Message::Text(_) | Message::Binary(_))
                 && socket.send(message).await.is_err()
