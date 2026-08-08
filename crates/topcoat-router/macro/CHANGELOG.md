@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-macro-v0.5.0...topcoat-router-macro-v0.6.0) - 2026-08-08
+
+### Added
+
+- *(core)* [**breaking**] make Cx detachable, remove CxBuilder ([#322](https://github.com/tokio-rs/topcoat/pull/322))
+- *(router)* [**breaking**] add not_found macro and no longer run layers and layouts by default on unmatched requests ([#298](https://github.com/tokio-rs/topcoat/pull/298))
+- *(router)* [**breaking**] replace path parameter attribute macro ([#242](https://github.com/tokio-rs/topcoat/pull/242))
+
+### Other
+
+- *(router)* remove PathBuf Arc pointer indirection ([#323](https://github.com/tokio-rs/topcoat/pull/323))
+- make request and response dedicated modules
+
 ## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-macro-v0.4.0...topcoat-router-macro-v0.5.0) - 2026-07-27
 
 ### Added

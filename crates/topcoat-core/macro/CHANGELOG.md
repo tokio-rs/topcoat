@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-macro-v0.5.0...topcoat-core-macro-v0.6.0) - 2026-08-08
+
+### Added
+
+- *(core)* [**breaking**] specify as_ref manually on memoized functions ([#310](https://github.com/tokio-rs/topcoat/pull/310))
+
+### Fixed
+
+- *(core)* detect recursive memoized calls ([#278](https://github.com/tokio-rs/topcoat/pull/278))
+
+### Other
+
+- fix memoize docs stale example
+
 ## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-macro-v0.4.0...topcoat-core-macro-v0.5.0) - 2026-07-27
 
 ### Other
