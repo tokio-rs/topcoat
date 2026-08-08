@@ -511,10 +511,7 @@ impl Default for RouterBuilder {
 mod tests {
     use std::{future::Future, pin::Pin};
 
-    use topcoat_core::{
-        context::Cx,
-        error::Result,
-    };
+    use topcoat_core::{context::Cx, error::Result};
     use topcoat_view::View;
 
     use super::*;

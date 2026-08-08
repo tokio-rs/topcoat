@@ -122,6 +122,37 @@ fn current_customer(cx: &Cx) -> Option<&Customer> {
 }
 ```
 
+# Work that outlives the handler
+
+A [`Cx`] is a handle to state shared by everything serving one request. The router drops its own handle once the response is sent, so a streaming response body or a spawned task cannot borrow the `cx` the handler was called with. Take an owned handle with [`Cx::detach`] and move it into the work instead; it reads the same app and request context.
+
+```rust
+# async fn record(name: &str) {}
+use topcoat::{
+    Result,
+    context::{Cx, request_context},
+    router::route,
+};
+
+struct Customer {
+    name: String,
+}
+
+#[route(POST "/orders")]
+async fn place_order(cx: &Cx) -> Result<&'static str> {
+    let cx = cx.detach();
+    tokio::spawn(async move {
+        let customer: &Customer = request_context(&cx);
+        record(&customer.name).await;
+    });
+    Ok("queued")
+}
+```
+
+While a detached handle is alive the request context is frozen: registering another value on it panics. Layers register their values before calling `next.run`, so this only concerns a layer that writes to the context after the inner chain returned.
+
+A detached handle keeps reading the context after the response was sent, but it can no longer change what the client receives. Cookie changes and other response-directed writes made from work that outlives the handler are dropped.
+
 # Memoization
 
 [`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. See its documentation for the details.

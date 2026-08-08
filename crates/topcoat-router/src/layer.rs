@@ -41,12 +41,7 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 ///         Path::ROOT
 ///     }
 ///
-///     fn handle<'a>(
-///         &'a self,
-///         cx: &'a mut Cx,
-///         body: Body,
-///         next: Next<'a>,
-///     ) -> LayerFuture<'a> {
+///     fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
 ///         Box::pin(async move {
 ///             let start = std::time::Instant::now();
 ///             let response = next.run(cx, body).await?;
@@ -65,8 +60,7 @@ pub trait Layer: Send + Sync + 'static {
 }
 
 /// The handler function backing a [`LayerFn`].
-pub type LayerHandlerFn =
-    for<'a> fn(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
+pub type LayerHandlerFn = for<'a> fn(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 
 /// A [`Layer`] backed by a plain handler function.
 ///

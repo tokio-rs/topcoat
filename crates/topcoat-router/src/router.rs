@@ -810,4 +810,43 @@ mod tests {
         let (_, _, body) = send(&router, Method::GET, "/p");
         assert_eq!(&body[..], b"page");
     }
+
+    // -- Router::handle: detached contexts --
+
+    /// Registers the greeting the streaming route reads back.
+    #[cfg(feature = "sse")]
+    fn insert_greeting<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        cx.insert(Greeting("hello"));
+        next.run(cx, body)
+    }
+
+    /// Streams the request-context greeting from a body that outlives the
+    /// handler, reading it through a detached handle.
+    #[cfg(feature = "sse")]
+    fn stream_greeting(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        use crate::content::sse::{Event, Sse};
+
+        Box::pin(async move {
+            let handle = cx.detach();
+            let events = futures_util::stream::once(async move {
+                Result::<Event>::Ok(Event::new().data(request_context::<Greeting>(&handle).0))
+            });
+            Sse::new(events).into_response(cx)
+        })
+    }
+
+    #[cfg(feature = "sse")]
+    #[test]
+    fn a_detached_handle_serves_a_stream_after_the_request_returned() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/events"), stream_greeting))
+            .layer(LayerFn::new(path("/"), insert_greeting))
+            .build();
+
+        let response = block_on(router.handle(request(Method::GET, "/events")));
+        // The router dropped its own context when `handle` returned; the body
+        // still reads the request context through its detached handle.
+        let body = block_on(to_bytes(response.into_body(), usize::MAX)).unwrap();
+        assert!(body.starts_with(b"data: hello"), "{body:?}");
+    }
 }

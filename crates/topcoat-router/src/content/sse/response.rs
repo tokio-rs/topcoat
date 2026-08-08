@@ -64,7 +64,10 @@ use crate::{
 /// use topcoat::{
 ///     Result,
 ///     context::{Cx, request_context},
-///     router::{content::sse::{Event, Sse}, route},
+///     router::{
+///         content::sse::{Event, Sse},
+///         route,
+///     },
 /// };
 ///
 /// struct Customer {
