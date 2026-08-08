@@ -406,7 +406,7 @@ mod tests {
         let layers = Layers::default();
         let no_params: Box<[crate::RawPathParamSpec]> = Box::new([]);
         let no_layers: Box<[LayerId]> = Box::new([]);
-        let endpoint_path = std::sync::Arc::new(path("/x").into_owned());
+        let endpoint_path = std::sync::Arc::from(path("/x").as_str());
         let mut endpoint = Endpoint::new(endpoint_path, no_params, no_layers);
         endpoint.insert(Method::GET, 0);
         endpoint.insert(Method::POST, 1);

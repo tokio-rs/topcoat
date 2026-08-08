@@ -416,7 +416,7 @@ impl RouterBuilder {
                     // onto the context of every request matched here. It is
                     // taken from the key rather than the route so that routes
                     // differing only in their group segments agree on it.
-                    let path = Arc::new(Path::new(matchit_path).to_owned());
+                    let path: Arc<str> = Arc::from(Path::new(matchit_path).as_str());
                     // Pre-compute path params for this endpoint.
                     let path_params = route
                         .path()

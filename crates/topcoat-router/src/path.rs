@@ -273,6 +273,24 @@ impl Path {
 
     /// Returns the string backing this path.
     ///
+    /// The root path is backed by the empty string rather than `"/"`, matching
+    /// the normalization [`new`](Path::new) applies.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use topcoat_router::Path;
+    ///
+    /// assert_eq!(Path::new("/users/{id}").as_str(), "/users/{id}");
+    /// assert_eq!(Path::new("/").as_str(), "");
+    /// ```
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.inner
+    }
+
+    /// Returns the length of the string backing this path.
+    ///
     /// This length is in bytes, not [`char`]s or graphemes. In other words,
     /// it might not be what a human considers the length of the string.
     #[must_use]
