@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-macro-v0.5.0...topcoat-runtime-macro-v0.6.0) - 2026-08-08
+
+### Added
+
+- *(view)* improve new arena rendering system ([#319](https://github.com/tokio-rs/topcoat/pull/319))
+- *(view)* concurrent rendering ([#317](https://github.com/tokio-rs/topcoat/pull/317))
+
+### Fixed
+
+- *(runtime)* let push_str accept an owned string surrogate ([#269](https://github.com/tokio-rs/topcoat/pull/269))
+- *(runtime)* render f64 text the way Rust's Display does ([#245](https://github.com/tokio-rs/topcoat/pull/245))
+- *(runtime)* match Rust semantics for string comparison and trim ([#244](https://github.com/tokio-rs/topcoat/pull/244))
+
+### Other
+
+- *(runtime)* note that page guards do not cover shard endpoints ([#251](https://github.com/tokio-rs/topcoat/pull/251))
+
 ## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-macro-v0.4.0...topcoat-runtime-macro-v0.5.0) - 2026-07-27
 
 ### Added

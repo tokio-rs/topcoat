@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-font-v0.5.0...topcoat-font-v0.6.0) - 2026-08-08
+
+### Added
+
+- *(view)* concurrent rendering ([#317](https://github.com/tokio-rs/topcoat/pull/317))
+- use #[track_caller] where appropriate ([#262](https://github.com/tokio-rs/topcoat/pull/262))
+
+### Fixed
+
+- *(font)* support unicode ranges ending in E ([#307](https://github.com/tokio-rs/topcoat/pull/307))
+
+### Other
+
+- sort imports
+- make request and response dedicated modules
+
 ## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-font-v0.4.0...topcoat-font-v0.5.0) - 2026-07-27
 
 ### Added
