@@ -840,6 +840,41 @@ mod tests {
     }
 
     #[test]
+    fn path_segments_from_the_back() {
+        let path = Path::new("/dashboard/{id}/(auth)");
+        let segs: Vec<_> = path.segments().rev().collect();
+        assert_eq!(
+            segs,
+            vec![
+                PathSegment::Group("auth"),
+                PathSegment::Param("id"),
+                PathSegment::Static("dashboard"),
+            ]
+        );
+    }
+
+    #[test]
+    fn path_segments_from_both_ends_meet_in_the_middle() {
+        let path = Path::new("/a/b/c");
+        let mut segments = path.segments();
+
+        assert_eq!(segments.next(), Some(PathSegment::Static("a")));
+        assert_eq!(segments.next_back(), Some(PathSegment::Static("c")));
+        assert_eq!(segments.next(), Some(PathSegment::Static("b")));
+        // Both ends are exhausted once they meet.
+        assert_eq!(segments.next(), None);
+        assert_eq!(segments.next_back(), None);
+    }
+
+    #[test]
+    fn root_path_yields_no_segments_from_either_end() {
+        let mut segments = Path::new("/").segments();
+
+        assert_eq!(segments.next(), None);
+        assert_eq!(segments.next_back(), None);
+    }
+
+    #[test]
     fn path_to_matchit_strips_groups() {
         let path = Path::new("/(auth)/dashboard/{id}");
         assert_eq!(path.to_matchit_path(), "/dashboard/{id}");
@@ -1153,6 +1188,14 @@ mod tests {
         let seg = PathSegment::new("(auth)");
         assert!(seg.is_group());
         assert_eq!(seg.as_group(), Some(&"auth"));
+    }
+
+    #[test]
+    fn only_param_and_catch_all_segments_capture() {
+        assert_eq!(PathSegment::new("{id}").param_name(), Some("id"));
+        assert_eq!(PathSegment::new("{*rest}").param_name(), Some("rest"));
+        assert_eq!(PathSegment::new("users").param_name(), None);
+        assert_eq!(PathSegment::new("(auth)").param_name(), None);
     }
 
     #[test]
