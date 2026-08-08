@@ -43,6 +43,7 @@ Expressions operate on a fixed vocabulary of types that exist on both sides, eac
 - `f64`: arithmetic (`+`, `-`, `*`, `/`), comparisons, and negation. All numbers are `f64`, matching JavaScript; integer literals are not accepted, so write `1.0` rather than `1`. Rendered text follows Rust's `Display`, so it is always positional, however large or small: `inf`, `-inf`, and `-0` are spelled the Rust way rather than the JavaScript way.
 - `bool`: `!`, equality comparisons, `then`, and `then_some`.
 - `String` and `&str`: `len`, `is_empty`, `trim`, `trim_start`, `trim_end`, `starts_with`, `ends_with`, `contains`, `to_owned`, and comparisons.
+- `Decimal`: exact decimal numbers, so money never becomes a float. Comparisons (`eq`, `ne`, `gt`, `lt`, `ge`, `le`) are numeric, so `1.5` equals `1.50`, plus `is_zero`, `is_negative`, and `to_string`. Read one from an input with `&str`'s `to_decimal_or_zero`. There is deliberately no arithmetic: a decimal that gets stored is computed on the server.
 - `Option<T>`: `is_some`, `is_none`, `unwrap`, and `expect`.
 - `Result<T, E>`: `is_ok`, `is_err`, `ok`, `err`, `unwrap`, `expect`, `unwrap_err`, and `expect_err`.
 - Tuples of vocabulary types.

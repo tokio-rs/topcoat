@@ -100,4 +100,19 @@ impl StrSurrogate {
     pub fn contains(&self, other: &StrSurrogate) -> BoolSurrogate {
         BoolSurrogate::new(self.0.contains(&other.0))
     }
+
+    /// Reads the string as an exact [`Decimal`](crate::Decimal), yielding zero
+    /// when it is not a plain decimal number, which an empty or half-typed
+    /// input field is for most of its life.
+    ///
+    /// This is the bridge from a text input to a decimal comparison. It cannot
+    /// become decimal arithmetic: [`Decimal`](crate::Decimal) has no
+    /// operators, so a value that gets stored is still computed on the server.
+    #[inline]
+    #[must_use]
+    pub fn to_decimal_or_zero(&self) -> crate::DecimalSurrogate {
+        let trimmed = self.0.trim();
+        let candidate = if trimmed.is_empty() { "0" } else { trimmed };
+        crate::DecimalSurrogate::new(crate::Decimal::parse_or_zero(candidate))
+    }
 }
