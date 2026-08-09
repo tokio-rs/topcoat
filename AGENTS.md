@@ -19,6 +19,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, small sing
 - `topcoat-htmx`, `topcoat-alpine-ajax`, and `topcoat-datastar`: request and response helpers for those client libraries.
 - `topcoat-tailwind`: the build-script wrapper around the standalone Tailwind CLI.
 - `topcoat-ui` (+ `registry/`): the component registry behind `topcoat ui`, which copies component source into a project.
+- `topcoat-validation`: chainable form validation schemas that run on the server, the client, or both, plus a `ValidForm` extractor.
 - `topcoat-cli`: the `topcoat` binary. Each subcommand has its own module under `src/`.
 
 A crate that backs proc-macros comes as a trio. The base crate holds the runtime types the generated code calls into. Its `grammar/` crate parses the macro body and generates the code, and is only used at compile time. Its `macro/` crate is a thin proc-macro entry point over `grammar/`. Where a macro body is formattable, the `grammar/` crate's `pretty` feature adds the pretty-printer `topcoat fmt` uses.

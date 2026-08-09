@@ -30,6 +30,8 @@ members = [
     "crates/topcoat-tailwind",
     "crates/topcoat-ui",
     "crates/topcoat-ui/registry",
+    "crates/topcoat-validation",
+    "crates/topcoat-validation/macro",
     "crates/topcoat-view",
     "crates/topcoat-view/grammar",
     "crates/topcoat-view/macro",
@@ -57,8 +59,9 @@ members = [
     "examples/sse",
     "examples/tailwind",
     "examples/toasty-todo",
-    "examples/ui",
+    "examples/validation",
     "examples/websocket",
+
 
     "demos/coffee-shop",
 
@@ -140,6 +143,8 @@ topcoat-session = { version = "0.5.0", path = "crates/topcoat-session" }
 topcoat-tailwind = { version = "0.5.0", path = "crates/topcoat-tailwind" }
 topcoat-ui = { version = "0.5.0", path = "crates/topcoat-ui" }
 topcoat-ui-registry = { version = "0.5.0", path = "crates/topcoat-ui/registry" }
+topcoat-validation = { version = "0.5.0", path = "crates/topcoat-validation" }
+topcoat-validation-macro = { version = "0.5.0", path = "crates/topcoat-validation/macro" }
 topcoat-view = { version = "0.5.0", path = "crates/topcoat-view" }
 topcoat-view-grammar = { version = "0.5.0", path = "crates/topcoat-view/grammar" }
 topcoat-view-macro = { version = "0.5.0", path = "crates/topcoat-view/macro" }
