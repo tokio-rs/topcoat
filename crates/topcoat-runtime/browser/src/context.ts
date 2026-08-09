@@ -1,3 +1,4 @@
+import type { Scope } from "./scope";
 import type { SignalId, SignalRegistry } from "./signal";
 import {
 	type DehydratedSurrogate,
@@ -6,6 +7,7 @@ import {
 	Result,
 	WriteSignal,
 } from "./surrogate";
+import { type SwapOptions, swapHtml } from "./swap";
 
 /**
  * The `cx` object passed into every compiled expression. It is the only
@@ -14,6 +16,13 @@ import {
  * inaccessible from inside `new Function`.
  */
 export class Context {
+	/**
+	 * The scope swapped fragments attach to. Set by the runtime once its root
+	 * scope exists; `null` for throwaway contexts that never swap, such as the
+	 * one used to hydrate a signal marker value.
+	 */
+	swapScope: Scope | null = null;
+
 	constructor(private readonly registry: SignalRegistry) {}
 
 	getRegistry(): SignalRegistry {
@@ -42,5 +51,18 @@ export class Context {
 
 	err<T = never, E = unknown>(v: E): Result<T, E> {
 		return Result.from_err(v);
+	}
+
+	/**
+	 * Replaces a DOM region with an HTML fragment and re-attaches Topcoat
+	 * bindings and event handlers.
+	 *
+	 * See {@link swapHtml} for details.
+	 */
+	swapHtml(selector: string, html: string, opts?: SwapOptions): void {
+		if (!this.swapScope) {
+			throw new Error("swapHtml: no swap scope is attached to this context");
+		}
+		swapHtml(this.swapScope, selector, html, opts);
 	}
 }

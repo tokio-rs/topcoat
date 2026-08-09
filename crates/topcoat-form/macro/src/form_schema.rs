@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, Expr, LitStr, Token, parse::Parse, punctuated::Punctuated};
 
-enum ValidateAttr {
+pub(crate) enum ValidateAttr {
     String,
     Number,
     Bool,
@@ -107,16 +107,16 @@ pub fn derive(input: &DeriveInput) -> TokenStream {
     };
 
     quote! {
-        impl ::topcoat::validation::FormSchema for #ident {
-            fn schema() -> ::topcoat::validation::Schema {
-                ::topcoat::validation::Schema::new()
+        impl ::topcoat::form::FormSchema for #ident {
+            fn schema() -> ::topcoat::form::Schema {
+                ::topcoat::form::Schema::new()
                     #(#field_calls)*
             }
         }
     }
 }
 
-fn parse_validate_attrs(field: &syn::Field) -> Result<Vec<ValidateAttr>, syn::Error> {
+pub fn parse_validate_attrs(field: &syn::Field) -> Result<Vec<ValidateAttr>, syn::Error> {
     let mut attrs = Vec::new();
     for attr in &field.attrs {
         if attr.path().is_ident("validate") {
@@ -128,8 +128,8 @@ fn parse_validate_attrs(field: &syn::Field) -> Result<Vec<ValidateAttr>, syn::Er
     Ok(attrs)
 }
 
-fn field_chain(attrs: Vec<ValidateAttr>) -> TokenStream {
-    let mut tokens = quote! { ::topcoat::validation::Field::new() };
+pub fn field_chain(attrs: Vec<ValidateAttr>) -> TokenStream {
+    let mut tokens = quote! { ::topcoat::form::Field::new() };
     for attr in attrs {
         let call = match attr {
             ValidateAttr::String => quote! { .string() },

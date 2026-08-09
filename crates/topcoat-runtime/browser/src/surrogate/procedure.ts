@@ -17,9 +17,10 @@ export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 					body: JSON.stringify(
 						args.length === 0
 							? null
-							: args.map((arg) =>
-									(arg as { dehydrate: () => unknown }).dehydrate(),
-								),
+							: args.map((arg) => {
+									const d = (arg as { dehydrate?: () => unknown }).dehydrate;
+									return typeof d === "function" ? d.call(arg) : arg;
+								}),
 					),
 				},
 			);

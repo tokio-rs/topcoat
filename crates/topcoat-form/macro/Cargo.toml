@@ -1,5 +1,5 @@
 [package]
-name = "topcoat-validation-macro"
+name = "topcoat-form-macro"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

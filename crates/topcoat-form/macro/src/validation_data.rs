@@ -39,8 +39,8 @@ pub fn derive(input: &DeriveInput) -> TokenStream {
     });
 
     quote! {
-        impl ::topcoat::validation::ValidationData for #ident {
-            fn field(&self, name: &str) -> ::std::option::Option<::topcoat::validation::Value> {
+        impl ::topcoat::form::ValidationData for #ident {
+            fn field(&self, name: &str) -> ::std::option::Option<::topcoat::form::Value> {
                 match name {
                     #(#arms,)*
                     _ => None,
@@ -58,11 +58,11 @@ fn field_value_expr(
         let inner_expr = option_inner_value_expr(&inner)?;
         Ok(quote! { self.#field_ident.as_ref().map(|v| #inner_expr) })
     } else if is_string(ty) {
-        Ok(quote! { Some(::topcoat::validation::Value::String(self.#field_ident.clone())) })
+        Ok(quote! { Some(::topcoat::form::Value::String(self.#field_ident.clone())) })
     } else if is_bool(ty) {
-        Ok(quote! { Some(::topcoat::validation::Value::Bool(self.#field_ident)) })
+        Ok(quote! { Some(::topcoat::form::Value::Bool(self.#field_ident)) })
     } else if is_numeric(ty) {
-        Ok(quote! { Some(::topcoat::validation::Value::Number(self.#field_ident as f64)) })
+        Ok(quote! { Some(::topcoat::form::Value::Number(self.#field_ident as f64)) })
     } else {
         Err(syn::Error::new_spanned(
             ty,
@@ -73,11 +73,11 @@ fn field_value_expr(
 
 fn option_inner_value_expr(ty: &syn::Type) -> Result<TokenStream, syn::Error> {
     if is_string(ty) {
-        Ok(quote! { ::topcoat::validation::Value::String(v.clone()) })
+        Ok(quote! { ::topcoat::form::Value::String(v.clone()) })
     } else if is_bool(ty) {
-        Ok(quote! { ::topcoat::validation::Value::Bool(*v) })
+        Ok(quote! { ::topcoat::form::Value::Bool(*v) })
     } else if is_numeric(ty) {
-        Ok(quote! { ::topcoat::validation::Value::Number(*v as f64) })
+        Ok(quote! { ::topcoat::form::Value::Number(*v as f64) })
     } else {
         Err(syn::Error::new_spanned(
             ty,

@@ -1,13 +1,14 @@
 [package]
-name = "validation"
+name = "form"
 version.workspace = true
 edition.workspace = true
 publish = false
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
-topcoat = { workspace = true, features = ["validation"] }
+topcoat = { workspace = true, features = ["form"] }
 
 [lints]
 workspace = true

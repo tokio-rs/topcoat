@@ -12,7 +12,7 @@ use crate::{Schema, ValidationData, ValidationEnv, ValidationErrors};
 ///
 /// ```rust
 /// use serde::Deserialize;
-/// use topcoat_validation::{Field, FormSchema, Schema, ValidForm, ValidationData, Value};
+/// use topcoat_form::{Field, FormSchema, Schema, ValidForm, ValidationData, Value};
 ///
 /// #[derive(Deserialize)]
 /// struct SignUp {

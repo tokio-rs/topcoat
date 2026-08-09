@@ -845,6 +845,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "form"
+version = "0.5.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "form_urlencoded"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2795,6 +2805,7 @@ dependencies = [
  "topcoat-datastar",
  "topcoat-font",
  "topcoat-font-macro",
+ "topcoat-form",
  "topcoat-htmx",
  "topcoat-icon",
  "topcoat-icon-macro",
@@ -2807,7 +2818,6 @@ dependencies = [
  "topcoat-session",
  "topcoat-tailwind",
  "topcoat-ui-registry",
- "topcoat-validation",
  "topcoat-view",
  "topcoat-view-macro",
  "uuid",
@@ -2976,6 +2986,31 @@ dependencies = [
  "syn",
  "topcoat",
  "topcoat-font-grammar",
+]
+
+[[package]]
+name = "topcoat-form"
+version = "0.5.0"
+dependencies = [
+ "form_urlencoded",
+ "serde",
+ "serde_urlencoded",
+ "tokio",
+ "topcoat-core",
+ "topcoat-form-macro",
+ "topcoat-router",
+ "topcoat-view",
+ "topcoat-view-macro",
+]
+
+[[package]]
+name = "topcoat-form-macro"
+version = "0.5.0"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -3207,29 +3242,6 @@ version = "0.5.0"
 dependencies = [
  "topcoat",
  "topcoat-icon",
-]
-
-[[package]]
-name = "topcoat-validation"
-version = "0.5.0"
-dependencies = [
- "form_urlencoded",
- "serde",
- "serde_urlencoded",
- "tokio",
- "topcoat-core",
- "topcoat-router",
- "topcoat-validation-macro",
-]
-
-[[package]]
-name = "topcoat-validation-macro"
-version = "0.5.0"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -3490,15 +3502,6 @@ dependencies = [
  "rand 0.10.2",
  "serde_core",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "validation"
-version = "0.5.0"
-dependencies = [
- "serde",
- "tokio",
- "topcoat",
 ]
 
 [[package]]

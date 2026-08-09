@@ -48,7 +48,7 @@ full = [
 	"tailwind",
 	"tower",
 	"ui",
-	"validation",
+	"form",
 	"view",
 	"websocket",
 ]
@@ -149,9 +149,9 @@ sse = [
 tailwind = [
 	"dep:topcoat-tailwind",
 ]
-validation = [
-	"dep:topcoat-validation",
-	"topcoat-validation/router",
+form = [
+	"dep:topcoat-form",
+	"topcoat-form/router",
 ]
 tower = [
 	"router",
@@ -165,6 +165,7 @@ view = [
 	"dep:topcoat-view-macro",
 	"topcoat-asset?/view",
 	"topcoat-font?/view",
+	"topcoat-form?/view",
 ]
 websocket = [
 	"serve",
@@ -192,7 +193,7 @@ topcoat-runtime-macro = { workspace = true, optional = true }
 topcoat-session = { workspace = true, optional = true }
 topcoat-tailwind = { workspace = true, optional = true }
 topcoat-ui-registry = { workspace = true, optional = true }
-topcoat-validation = { workspace = true, optional = true }
+topcoat-form = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
 topcoat-view-macro = { workspace = true, optional = true }
 
