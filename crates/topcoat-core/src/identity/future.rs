@@ -8,13 +8,14 @@ use pin_project_lite::pin_project;
 use super::{Identity, IdentityGuard, IdentityKey, SiteKey};
 
 pin_project! {
-    /// Installs an identity around every poll of the wrapped future.
+    /// Installs an identity around every poll of a component's render
+    /// future.
     ///
     /// The identity is derived once, at construction, from the identity
-    /// installed at that moment: construction happens inside the parent
-    /// invocation, so the parent is captured even though the future may be
-    /// polled later, interleaved with its siblings. Each poll then installs
-    /// the derived identity for exactly its duration, so siblings running
+    /// installed at that moment: construction happens inside the parent's
+    /// body, so the parent is captured even though the future may be polled
+    /// later, interleaved with its siblings. Each poll then installs the
+    /// derived identity for exactly its duration, so siblings running
     /// concurrently on one task each see their own.
     #[must_use = "futures do nothing unless polled"]
     pub struct IdentityFuture<F> {

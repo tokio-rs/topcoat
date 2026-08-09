@@ -7,8 +7,8 @@ use super::{CURRENT, Identity, IdentityKey, SiteKey};
 /// Creating a guard derives the identity one level down from the installed
 /// one and swaps it in; dropping the guard swaps the previous identity
 /// back, also when the region panics. The guard is the synchronous
-/// counterpart of [`IdentityFuture`](super::IdentityFuture), for
-/// invocations that run in a single burst.
+/// counterpart of [`IdentityFuture`](super::IdentityFuture), for component
+/// bodies that build in a single burst.
 #[must_use = "the identity is uninstalled when the guard drops"]
 pub struct IdentityGuard {
     prev: Option<Identity>,
@@ -38,7 +38,7 @@ impl IdentityGuard {
     /// one.
     ///
     /// The door for re-entering a subtree at a known identity, for example
-    /// when resuming isolated work at an identity captured earlier.
+    /// when resuming an isolated render at an identity captured earlier.
     pub fn install(identity: Identity) -> Self {
         Self {
             prev: CURRENT.replace(Some(identity)),

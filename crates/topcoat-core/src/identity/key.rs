@@ -1,6 +1,6 @@
 use crate::fnv1a::Fnv1a;
 
-/// A value that tells repetitions of one invocation site apart.
+/// A value that tells repetitions of one component invocation site apart.
 ///
 /// A key folds itself into the identity hash through the tagged writes on
 /// [`KeyHasher`]. Two keys derive the same identity exactly when they

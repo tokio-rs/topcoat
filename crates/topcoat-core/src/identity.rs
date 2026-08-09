@@ -1,26 +1,24 @@
-//! Invocation identity: a stable id for each invocation in a tree of
-//! nested calls, derived from the chain of call sites leading down to it.
+//! Component identity: a stable id for each component invocation, derived
+//! from the chain of call sites leading down to it.
 //!
 //! An [`Identity`] is a 128-bit hash mixing the identity of the enclosing
-//! invocation with a [`SiteKey`] naming the invocation's location in
-//! source. Because derivation depends only on call sites, an identity is
-//! reproducible: the same invocation reached through the same chain of
-//! call sites hashes to the same value. This is what keeps a component's
-//! id stable from one render to the next, but nothing here is specific to
-//! components.
+//! component body with a [`SiteKey`] naming the invocation's location in
+//! source. Because derivation depends only on where a component is invoked,
+//! an identity is stable across renders: the same invocation reached through
+//! the same chain of call sites hashes to the same value.
 //!
 //! The current identity travels down the tree through a thread local
-//! installed for exactly the duration of an invocation. [`IdentityGuard`]
+//! installed for exactly the duration of a component body. [`IdentityGuard`]
 //! installs one around a synchronous region, and [`IdentityFuture`] around
-//! every poll of a future, so sibling futures interleaving on one task
-//! each see their own identity. [`Identity::current`] reads the installed
-//! identity from inside an invocation.
+//! every poll of a render future, so sibling futures interleaving on one
+//! task each see their own identity. [`Identity::current`] reads the
+//! installed identity from inside a component body.
 //!
 //! An invocation that repeats, for example inside a `for` body, shares one
 //! call site across all repetitions. A `key` argument mixes a caller-provided
 //! [`IdentityKey`] value into the identity to tell the repetitions apart.
 //! Without one the identity is ambiguous: derivation still succeeds and
-//! execution proceeds, but the ambiguity is recorded, poisons every identity
+//! rendering proceeds, but the ambiguity is recorded, poisons every identity
 //! derived below it, and [`Identity::current`] panics if a descendant
 //! actually consumes the identity, naming the invocation that is missing its
 //! `key`.
@@ -40,14 +38,14 @@ pub use site::*;
 use crate::fnv1a::Fnv1a;
 
 thread_local! {
-    /// The identity of the invocation running on the current thread, if
+    /// The identity of the component body running on the current thread, if
     /// any.
     ///
     /// [`IdentityGuard`] installs an identity here for exactly the duration
     /// of a synchronous region, and [`IdentityFuture`] for exactly the
     /// duration of each of its polls, so futures that interleave on one task
     /// never see each other's identity. An empty cell means the root: no
-    /// invocation is running.
+    /// component body is running.
     static CURRENT: Cell<Option<Identity>> = const { Cell::new(None) };
 }
 
@@ -56,13 +54,13 @@ const TAG_SITE: u8 = 0;
 /// Tag byte separating the parent hash from a keyed site.
 const TAG_KEYED: u8 = 1;
 
-/// The identity of an invocation: a hash of the chain of call sites from
-/// the root of the tree down to it.
+/// The identity of a component invocation: a hash of the chain of call
+/// sites from the root of the tree down to it.
 ///
 /// Identities form a tree. [`child`](Self::child) and
 /// [`keyed_child`](Self::keyed_child) derive the identity one level down,
 /// and [`current`](Self::current) reads the identity installed for the
-/// running invocation. An identity is a plain `Copy` value; holding one
+/// running component body. An identity is a plain `Copy` value; holding one
 /// does not keep anything installed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Identity {
@@ -72,15 +70,15 @@ pub struct Identity {
 }
 
 impl Identity {
-    /// The identity at the root of the tree, outside any invocation.
+    /// The identity at the root of the tree, outside any component body.
     pub const ROOT: Self = Self {
         hash: 0,
         ambiguity: None,
     };
 
-    /// Returns the identity of the running invocation.
+    /// Returns the identity of the running component body.
     ///
-    /// Outside any invocation this is [`ROOT`](Self::ROOT).
+    /// Outside any component body this is [`ROOT`](Self::ROOT).
     ///
     /// # Panics
     ///
@@ -97,7 +95,7 @@ impl Identity {
         }
     }
 
-    /// Returns the identity of the running invocation, or the ambiguity
+    /// Returns the identity of the running component body, or the ambiguity
     /// poisoning it.
     ///
     /// The tolerant counterpart of [`current`](Self::current), for consumers
@@ -160,12 +158,13 @@ impl Identity {
     /// Derives the identity of a child invocation at `site` whose
     /// repetitions cannot be told apart, recording `label` as the ambiguity.
     ///
-    /// Meant for an invocation that sits in a loop body without a `key`
-    /// argument; `label` names that invocation. The hash is still derived
-    /// and execution proceeds, but the ambiguity poisons this identity and
-    /// every identity derived from it, keyed or not, so consuming one
-    /// through [`current`](Self::current) panics. An ambiguity already on
-    /// `self` wins: the outermost missing key is the one to fix first.
+    /// The `view!` macro derives this for an invocation that sits in a loop
+    /// body without a `key` argument; `label` names that invocation. The
+    /// hash is still derived and rendering proceeds, but the ambiguity
+    /// poisons this identity and every identity derived from it, keyed or
+    /// not, so consuming one through [`current`](Self::current) panics. An
+    /// ambiguity already on `self` wins: the outermost missing key is the
+    /// one to fix first.
     #[must_use]
     pub const fn ambiguous_child(self, site: SiteKey, label: &'static str) -> Self {
         Self {
@@ -209,7 +208,7 @@ impl fmt::Display for AmbiguousIdentityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "ambiguous identity: {} repeats without a `key` argument; \
+            "ambiguous component identity: {} repeats without a `key` argument; \
              pass `key:` to give each repetition its own identity",
             self.label,
         )
@@ -226,7 +225,7 @@ mod tests {
     const SITE_B: SiteKey = SiteKey::new(file!(), line!(), column!(), 0);
 
     #[test]
-    fn current_is_root_outside_any_invocation() {
+    fn current_is_root_outside_any_component() {
         assert_eq!(Identity::current(), Identity::ROOT);
         assert_eq!(Identity::try_current(), Ok(Identity::ROOT));
     }

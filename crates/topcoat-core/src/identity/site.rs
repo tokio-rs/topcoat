@@ -1,13 +1,12 @@
 use crate::fnv1a::Fnv1a;
 
-/// A compile-time key for one invocation site.
+/// A compile-time key for one component invocation site.
 ///
-/// Typically built as
-/// `const { SiteKey::new(file!(), line!(), column!(), ordinal) }`. Code
-/// expanded from one macro invocation shares a single span, so `file`,
-/// `line`, and `column` alone cannot tell two sites in one macro body
-/// apart; the `ordinal` numbers them in emission order. Outside a macro it
-/// is simply 0.
+/// The `view!` macro builds one per component invocation, as
+/// `const { SiteKey::new(file!(), line!(), column!(), ordinal) }`. The
+/// macro's spans all resolve to the position of the invocation itself, so
+/// `file`, `line`, and `column` alone cannot tell two components in one
+/// macro body apart; the `ordinal` numbers them in emission order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteKey(pub(super) u64);
 
