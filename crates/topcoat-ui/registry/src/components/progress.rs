@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, class, component, view},
+    view::{Attributes, StaticClass, class, component, view},
 };
 
 /// The classes for the [`progress`] bar.
@@ -13,11 +13,13 @@ use topcoat::{
 /// `::-webkit-*` pseudo-elements only expose the filled portion while a
 /// value is set, so the indeterminate state renders as a static empty track
 /// there; Firefox keeps its animated bar.
-const PROGRESS: &str = "h-2 w-full appearance-none overflow-hidden rounded-full \
-    bg-foreground/10 [&::-webkit-progress-bar]:bg-transparent \
-    [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary \
-    [&::-webkit-progress-value]:transition-all \
-    [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary";
+const PROGRESS: StaticClass = class!(
+    "h-2 w-full appearance-none overflow-hidden rounded-full \
+     bg-foreground/10 [&::-webkit-progress-bar]:bg-transparent \
+     [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary \
+     [&::-webkit-progress-value]:transition-all \
+     [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary",
+);
 
 /// A progress component: a themed native `<progress>` bar.
 ///

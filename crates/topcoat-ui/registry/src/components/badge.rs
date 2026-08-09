@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, Class, StaticClass, View, class, component, view},
 };
 
 /// The visual style of a [`badge`].
@@ -27,12 +27,14 @@ impl BadgeVariant {
     /// transparent one from [`BASE`]: with two border-color classes on the
     /// same element, stylesheet order (not class order) would decide the
     /// winner.
-    fn classes(self) -> &'static str {
+    fn classes(self) -> StaticClass {
         match self {
-            Self::Primary => "border-transparent bg-primary text-primary-foreground",
-            Self::Secondary => "border-transparent bg-foreground/5 text-foreground",
-            Self::Outline => "border-border text-foreground",
-            Self::Destructive => "border-transparent bg-destructive text-destructive-foreground",
+            Self::Primary => class!("border-transparent bg-primary text-primary-foreground"),
+            Self::Secondary => class!("border-transparent bg-foreground/5 text-foreground"),
+            Self::Outline => class!("border-border text-foreground"),
+            Self::Destructive => {
+                class!("border-transparent bg-destructive text-destructive-foreground")
+            }
         }
     }
 }
@@ -41,10 +43,12 @@ impl BadgeVariant {
 ///
 /// Every badge carries a border (colored per variant) so that the `Outline`
 /// variant, which only recolors it, does not change the badge's dimensions.
-const BASE: &str = "inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-md \
-    border px-2 py-0.5 text-xs font-medium whitespace-nowrap";
+const BASE: StaticClass = class!(
+    "inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-md \
+     border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+);
 
-/// Builds the full class string for a badge of the given `variant`.
+/// Builds the full class list for a badge of the given `variant`.
 ///
 /// Use it to give badge styling to another element, such as a link:
 ///
@@ -54,8 +58,8 @@ const BASE: &str = "inline-flex w-fit shrink-0 items-center justify-center gap-1
 /// }
 /// ```
 #[must_use]
-pub fn badge_variants(variant: BadgeVariant) -> String {
-    format!("{BASE} {}", variant.classes())
+pub fn badge_variants(variant: BadgeVariant) -> Class<(StaticClass, StaticClass)> {
+    class!(BASE, variant.classes())
 }
 
 /// A badge component: a small inline pill for statuses, counts, and tags.

@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::Cx,
     icon::{IconData, icon, iconify::iconify_icon},
-    view::{Attributes, View, attributes, class, component, view},
+    view::{Attributes, StaticClass, View, attributes, class, component, view},
 };
 
 /// The classes for the native `<select>` inside the [`select`] component.
@@ -11,10 +11,12 @@ use topcoat::{
 /// so the component can draw its own chevron, which keeps the control looking
 /// the same across browsers; the extra right padding reserves the chevron's
 /// space.
-const SELECT: &str = "h-9 w-full appearance-none items-center rounded-lg border border-border \
-    bg-background pr-8 pl-3 text-left text-sm shadow-xs transition-colors outline-none \
-    focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
-    focus-visible:ring-offset-background disabled:pointer-events-none";
+const SELECT: StaticClass = class!(
+    "h-9 w-full appearance-none items-center rounded-lg border border-border \
+     bg-background pr-8 pl-3 text-left text-sm shadow-xs transition-colors outline-none \
+     focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
+     focus-visible:ring-offset-background disabled:pointer-events-none",
+);
 
 /// The classes restyling the drop-down picker, for browsers that support
 /// customizable selects (`appearance: base-select`, set on the `<select>` by
@@ -27,21 +29,23 @@ const SELECT: &str = "h-9 w-full appearance-none items-center rounded-lg border 
 /// (see [`checkmark_style`]). The browser's own picker icon is hidden in
 /// favor of the component's chevron. On browsers without support every rule
 /// here is inert and the operating system's picker shows instead.
-const PICKER: &str = "[&::picker(select)]:[appearance:base-select] \
-    [&::picker(select)]:mt-1 [&::picker(select)]:rounded-lg \
-    [&::picker(select)]:border [&::picker(select)]:border-border \
-    [&::picker(select)]:bg-background [&::picker(select)]:p-1 \
-    [&::picker(select)]:text-foreground [&::picker(select)]:shadow-sm \
-    [&::picker-icon]:hidden \
-    [&_option]:flex [&_option]:items-center [&_option]:gap-2 [&_option]:rounded-md \
-    [&_option]:px-2 [&_option]:py-1.5 [&_option]:text-sm [&_option]:outline-none \
-    [&_option:hover]:bg-foreground/5 [&_option:focus]:bg-foreground/5 \
-    [&_option:checked]:font-medium \
-    [&_option::checkmark]:order-1 [&_option::checkmark]:ml-auto \
-    [&_option::checkmark]:size-4 [&_option::checkmark]:shrink-0 \
-    [&_option::checkmark]:content-[''] [&_option::checkmark]:bg-muted-foreground \
-    [&_option::checkmark]:[mask-size:100%_100%] \
-    [&_option::checkmark]:[mask-image:var(--select-checkmark)]";
+const PICKER: StaticClass = class!(
+    "[&::picker(select)]:[appearance:base-select] \
+     [&::picker(select)]:mt-1 [&::picker(select)]:rounded-lg \
+     [&::picker(select)]:border [&::picker(select)]:border-border \
+     [&::picker(select)]:bg-background [&::picker(select)]:p-1 \
+     [&::picker(select)]:text-foreground [&::picker(select)]:shadow-sm \
+     [&::picker-icon]:hidden \
+     [&_option]:flex [&_option]:items-center [&_option]:gap-2 [&_option]:rounded-md \
+     [&_option]:px-2 [&_option]:py-1.5 [&_option]:text-sm [&_option]:outline-none \
+     [&_option:hover]:bg-foreground/5 [&_option:focus]:bg-foreground/5 \
+     [&_option:checked]:font-medium \
+     [&_option::checkmark]:order-1 [&_option::checkmark]:ml-auto \
+     [&_option::checkmark]:size-4 [&_option::checkmark]:shrink-0 \
+     [&_option::checkmark]:content-[''] [&_option::checkmark]:bg-muted-foreground \
+     [&_option::checkmark]:[mask-size:100%_100%] \
+     [&_option::checkmark]:[mask-image:var(--select-checkmark)]",
+);
 
 /// The icon marking the picker's checked option.
 const CHECKMARK: IconData = iconify_icon!("feather:check");

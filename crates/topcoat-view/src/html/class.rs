@@ -376,6 +376,20 @@ where
     }
 }
 
+/// The type of a class list built from string literals alone.
+///
+/// The [`class!`](../view/macro.class.html) macro merges a run of literals
+/// into one promoted string, so a list of literals has this type no matter how
+/// many entries it was written with. Write it out to hold such a list in a
+/// constant:
+///
+/// ```rust
+/// use topcoat::view::{StaticClass, class};
+///
+/// const BUTTON: StaticClass = class!("btn btn-lg rounded");
+/// ```
+pub type StaticClass = Class<Unescaped<PromotedStr>>;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{page, query_params},
-    view::{Class, PromotedStr, Unescaped, class, view},
+    view::{StaticClass, class, view},
 };
 
 use crate::{
@@ -21,9 +21,9 @@ const SORT_OPTIONS: [(Option<&str>, &str); 5] = [
     (Some("rating"), "Rating"),
 ];
 
-const CHIP_ACTIVE: Class<Unescaped<PromotedStr>> =
+const CHIP_ACTIVE: StaticClass =
     class!("rounded-full bg-slate-900 px-3 py-1 font-medium text-white");
-const CHIP_INACTIVE: Class<Unescaped<PromotedStr>> = class!(
+const CHIP_INACTIVE: StaticClass = class!(
     "rounded-full bg-white px-3 py-1 font-medium text-slate-600 shadow-sm hover:bg-slate-100",
 );
 

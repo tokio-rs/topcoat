@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, Class, StaticClass, View, class, component, view},
 };
 
 /// The visual style of a [`button`].
@@ -35,27 +35,27 @@ impl ButtonVariant {
     /// transparent one from [`BASE`]: with two border-color classes on the
     /// same element, stylesheet order (not class order) would decide the
     /// winner.
-    fn classes(self) -> &'static str {
+    fn classes(self) -> StaticClass {
         match self {
-            Self::Primary => {
+            Self::Primary => class!(
                 "border-transparent bg-primary text-primary-foreground shadow-xs \
-                 hover:bg-primary/90 active:bg-primary/80"
-            }
-            Self::Secondary => {
+                 hover:bg-primary/90 active:bg-primary/80",
+            ),
+            Self::Secondary => class!(
                 "border-transparent bg-foreground/5 text-foreground shadow-xs \
-                 hover:bg-foreground/10 active:bg-foreground/15"
-            }
-            Self::Outline => {
+                 hover:bg-foreground/10 active:bg-foreground/15",
+            ),
+            Self::Outline => class!(
                 "border-border text-foreground shadow-xs hover:bg-foreground/5 \
-                 active:bg-foreground/10"
-            }
-            Self::Ghost => {
-                "border-transparent text-foreground hover:bg-foreground/5 active:bg-foreground/10"
-            }
-            Self::Destructive => {
+                 active:bg-foreground/10",
+            ),
+            Self::Ghost => class!(
+                "border-transparent text-foreground hover:bg-foreground/5 active:bg-foreground/10",
+            ),
+            Self::Destructive => class!(
                 "border-transparent bg-destructive text-destructive-foreground shadow-xs \
-                 hover:bg-destructive/90 active:bg-destructive/80"
-            }
+                 hover:bg-destructive/90 active:bg-destructive/80",
+            ),
         }
     }
 }
@@ -82,12 +82,12 @@ impl ButtonSize {
     ///
     /// Each size sets a text size, which also scales any icons inside: the
     /// `icon` component is `1em` square by default.
-    fn classes(self) -> &'static str {
+    fn classes(self) -> StaticClass {
         match self {
-            Self::Sm => "h-8 gap-1.5 rounded-md px-3 text-xs",
-            Self::Md => "h-9 gap-2 rounded-lg px-4 text-sm",
-            Self::Lg => "h-10 gap-2 rounded-lg px-5 text-base",
-            Self::Icon => "size-9 rounded-lg text-base",
+            Self::Sm => class!("h-8 gap-1.5 rounded-md px-3 text-xs"),
+            Self::Md => class!("h-9 gap-2 rounded-lg px-4 text-sm"),
+            Self::Lg => class!("h-10 gap-2 rounded-lg px-5 text-base"),
+            Self::Icon => class!("size-9 rounded-lg text-base"),
         }
     }
 }
@@ -96,12 +96,14 @@ impl ButtonSize {
 ///
 /// Every button carries a border (colored per variant) so that the `Outline`
 /// variant, which only recolors it, does not change the button's dimensions.
-const BASE: &str = "inline-flex shrink-0 items-center justify-center border \
-    font-medium whitespace-nowrap transition-colors outline-none select-none \
-    focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
-    focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
+const BASE: StaticClass = class!(
+    "inline-flex shrink-0 items-center justify-center border \
+     font-medium whitespace-nowrap transition-colors outline-none select-none \
+     focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
+     focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+);
 
-/// Builds the full class string for a button of the given `variant` and `size`.
+/// Builds the full class list for a button of the given `variant` and `size`.
 ///
 /// Use it to give button styling to an element that is not a `<button>`, such
 /// as a link styled as a button:
@@ -114,8 +116,11 @@ const BASE: &str = "inline-flex shrink-0 items-center justify-center border \
 /// }
 /// ```
 #[must_use]
-pub fn button_variants(variant: ButtonVariant, size: ButtonSize) -> String {
-    format!("{BASE} {} {}", variant.classes(), size.classes())
+pub fn button_variants(
+    variant: ButtonVariant,
+    size: ButtonSize,
+) -> Class<(StaticClass, StaticClass, StaticClass)> {
+    class!(BASE, variant.classes(), size.classes())
 }
 
 /// A button component.
