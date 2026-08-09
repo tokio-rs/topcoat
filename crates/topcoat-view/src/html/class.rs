@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use topcoat_core::context::Cx;
 
-use crate::{AttributeValueViewParts, PartsWriter, PromotedStr, StaticStr};
+use crate::{AttributeValueViewParts, PartsWriter, PromotedStr, StaticStr, Unescaped};
 
 /// Converts a value used as a class list entry into view parts.
 ///
@@ -83,6 +83,30 @@ impl ClassViewParts for StaticStr {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         parts.push_static_str(self.0);
+    }
+}
+
+impl ClassViewParts for Unescaped<PromotedStr> {
+    #[inline]
+    fn is_present(&self) -> bool {
+        !self.0.0.is_empty()
+    }
+
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_promoted_str_unescaped(self.0.0);
+    }
+}
+
+impl ClassViewParts for Unescaped<StaticStr> {
+    #[inline]
+    fn is_present(&self) -> bool {
+        !self.0.0.is_empty()
+    }
+
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_static_str_unescaped(self.0.0);
     }
 }
 
@@ -499,6 +523,26 @@ mod tests {
     fn promoted_and_static_entries_are_escaped_for_the_attribute_value_position() {
         let class = Class((PromotedStr(&"a\"b"), StaticStr("c\"d")));
         assert_eq!(render(class), "a&quot;b c&quot;d");
+    }
+
+    #[test]
+    fn unescaped_entries_render_verbatim() {
+        let class = Class((
+            Unescaped::new_unchecked(PromotedStr(&"a&quot;b")),
+            Unescaped::new_unchecked(StaticStr("c&amp;d")),
+        ));
+        assert_eq!(render(class), "a&quot;b c&amp;d");
+    }
+
+    #[test]
+    fn empty_unescaped_entries_are_skipped_without_a_separator() {
+        let class = Class((
+            "a",
+            Unescaped::new_unchecked(PromotedStr(&"")),
+            Unescaped::new_unchecked(StaticStr("")),
+            "b",
+        ));
+        assert_eq!(render(class), "a b");
     }
 
     #[test]

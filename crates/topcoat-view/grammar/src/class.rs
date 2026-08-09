@@ -1,4 +1,4 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::{
     Expr, ExprLit, Lit, LitStr, Token,
@@ -45,8 +45,7 @@ impl ToTokens for Class {
                     index += 1;
                 }
                 if !values.is_empty() {
-                    let merged = LitStr::new(&values.join(" "), first.span());
-                    entries.push(quote! { #topcoat_view::PromotedStr(&#merged) });
+                    entries.push(entry_tokens(&values.join(" "), first.span()));
                 }
             } else {
                 entries.push(segments[index].entry_tokens());
@@ -176,13 +175,37 @@ impl topcoat_core_grammar::pretty::PrettyPrint for ClassSegment {
     }
 }
 
-/// Lowers a segment value to an entry expression, promoting string literals
-/// so they never allocate and stay out of the view's constants.
+/// Lowers a segment value to an entry expression, lowering string literals
+/// through [`entry_tokens`].
 fn value_tokens(expr: &Expr) -> TokenStream {
     match as_lit_str(expr) {
-        Some(lit) => quote! { #topcoat_view::PromotedStr(&#lit) },
+        Some(lit) => entry_tokens(&lit.value(), lit.span()),
         None => expr.to_token_stream(),
     }
+}
+
+/// Lowers a literal class list entry to a promoted string that is already
+/// escaped for the position it renders in.
+///
+/// A class list always renders in an attribute value, so the escaping a
+/// literal needs is settled here and the entry renders verbatim. Promoting
+/// the escaped literal also keeps it out of the view's constants, so the
+/// entry costs one instruction and no allocation.
+fn entry_tokens(value: &str, span: Span) -> TokenStream {
+    let escaped = LitStr::new(&escape_attribute_value(value), span);
+    quote! {
+        #topcoat_view::Unescaped::new_unchecked(#topcoat_view::PromotedStr(&#escaped))
+    }
+}
+
+/// Escapes `value` for the attribute value position.
+fn escape_attribute_value(value: &str) -> String {
+    let mut escaped = String::new();
+    let mut f = topcoat_view::Formatter::new(&mut escaped);
+    topcoat_view::HtmlContext::AttributeValue
+        .writer(&mut f)
+        .write_str(value);
+    escaped
 }
 
 /// Returns the string literal behind `expr`, if it is one.
@@ -308,6 +331,21 @@ mod tests {
     }
 
     #[test]
+    fn literals_are_escaped_for_the_attribute_value_position() {
+        let out = lower(r#""a\"b", "c&d""#);
+        assert!(
+            out.contains(r#"PromotedStr (& "a&quot;b c&amp;d")"#),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn escaped_literals_are_marked_as_unescaped() {
+        let out = lower(r#""btn""#);
+        assert!(out.contains("Unescaped :: new_unchecked"), "{out}");
+    }
+
+    #[test]
     fn conditional_segment_lowers_to_an_option() {
         let out = lower(r#""active" if is_active"#);
         assert!(out.contains("if is_active"), "{out}");
@@ -341,7 +379,9 @@ mod tests {
     fn single_entry_skips_the_tuple() {
         let out = lower(r#""btn""#);
         assert!(
-            out.contains(r#"Class (:: topcoat_view :: PromotedStr (& "btn"))"#),
+            out.contains(
+                r#"Class (:: topcoat_view :: Unescaped :: new_unchecked (:: topcoat_view :: PromotedStr (& "btn")))"#
+            ),
             "{out}"
         );
     }
