@@ -63,6 +63,18 @@ view! {
 # }
 ```
 
+# Static class lists
+
+Use `class!` for a class list that never changes too. It renders faster than the same string written as a `&'static str` constant:
+
+```rust
+use topcoat::view::{Class, PromotedStr, Unescaped, class};
+
+const BUTTON: Class<Unescaped<PromotedStr>> = class!("btn btn-lg rounded");
+```
+
+A `class!` value takes its type from its entries, so writing the type out is only practical for a list of literals like this one.
+
 [`Attributes`]: struct.Attributes.html
 [`Class`]: struct.Class.html
 [`ClassViewParts`]: trait.ClassViewParts.html
