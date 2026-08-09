@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use topcoat_core::context::Cx;
 
-use crate::{ClassViewParts, PartsWriter, Unescaped, View};
+use crate::{ClassViewParts, PartsWriter, PromotedStr, StaticStr, Unescaped, View};
 
 /// Converts a value used as an attribute value into view parts.
 ///
@@ -113,6 +113,30 @@ impl AttributeValueViewParts for &str {
     }
 }
 
+impl AttributeValueViewParts for PromotedStr {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_promoted_str(self.0);
+    }
+}
+
+impl AttributeValueViewParts for StaticStr {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_static_str(self.0);
+    }
+}
+
 impl AttributeValueViewParts for Unescaped<String> {
     #[inline]
     fn attribute_present(&self) -> bool {
@@ -134,6 +158,30 @@ impl AttributeValueViewParts for Unescaped<&'static str> {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         parts.push_static_str_unescaped(self.0);
+    }
+}
+
+impl AttributeValueViewParts for Unescaped<PromotedStr> {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_promoted_str_unescaped(self.0.0);
+    }
+}
+
+impl AttributeValueViewParts for Unescaped<StaticStr> {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_static_str_unescaped(self.0.0);
     }
 }
 

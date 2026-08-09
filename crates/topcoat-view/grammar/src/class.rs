@@ -32,7 +32,7 @@ impl ToTokens for Class {
         let mut entries: Vec<TokenStream> = Vec::new();
 
         // Runs of consecutive unconditional string literals collapse into a
-        // single borrowed literal with the separating spaces baked in.
+        // single promoted literal with the separating spaces baked in.
         let mut index = 0;
         while index < segments.len() {
             if let Some(first) = segments[index].as_unconditional_lit() {
@@ -46,7 +46,7 @@ impl ToTokens for Class {
                 }
                 if !values.is_empty() {
                     let merged = LitStr::new(&values.join(" "), first.span());
-                    entries.push(quote! { ::std::borrow::Cow::Borrowed(#merged) });
+                    entries.push(quote! { #topcoat_view::PromotedStr(&#merged) });
                 }
             } else {
                 entries.push(segments[index].entry_tokens());
@@ -135,7 +135,7 @@ impl ClassSegment {
             };
         };
         let alt = value_tokens(&else_branch.value);
-        // Two literal branches share the borrowed string type, so they lower
+        // Two literal branches share the promoted string type, so they lower
         // to a plain conditional. Anything else needs the branch enum to
         // unify the two types.
         if as_lit_str(&self.value).is_some() && as_lit_str(&else_branch.value).is_some() {
@@ -176,11 +176,11 @@ impl topcoat_core_grammar::pretty::PrettyPrint for ClassSegment {
     }
 }
 
-/// Lowers a segment value to an entry expression, borrowing string literals
-/// so they never allocate.
+/// Lowers a segment value to an entry expression, promoting string literals
+/// so they never allocate and stay out of the view's constants.
 fn value_tokens(expr: &Expr) -> TokenStream {
     match as_lit_str(expr) {
-        Some(lit) => quote! { ::std::borrow::Cow::Borrowed(#lit) },
+        Some(lit) => quote! { #topcoat_view::PromotedStr(&#lit) },
         None => expr.to_token_stream(),
     }
 }
@@ -285,10 +285,10 @@ mod tests {
     }
 
     #[test]
-    fn merges_consecutive_literals_into_one_borrowed_str() {
+    fn merges_consecutive_literals_into_one_promoted_str() {
         let out = lower(r#""btn", "btn-lg", "rounded""#);
         assert!(
-            out.contains(r#"Cow :: Borrowed ("btn btn-lg rounded")"#),
+            out.contains(r#"PromotedStr (& "btn btn-lg rounded")"#),
             "{out}"
         );
     }
@@ -296,14 +296,14 @@ mod tests {
     #[test]
     fn empty_literals_vanish_from_the_merge() {
         let out = lower(r#""btn", "", "active""#);
-        assert!(out.contains(r#"Cow :: Borrowed ("btn active")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "btn active")"#), "{out}");
     }
 
     #[test]
     fn dynamic_segments_interrupt_literal_merging() {
         let out = lower(r#""a", extra, "b""#);
-        assert!(out.contains(r#"Cow :: Borrowed ("a")"#), "{out}");
-        assert!(out.contains(r#"Cow :: Borrowed ("b")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "a")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "b")"#), "{out}");
         assert!(!out.contains(r#""a b""#), "{out}");
     }
 
@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn conditional_literals_do_not_merge() {
         let out = lower(r#""a", "b" if cond"#);
-        assert!(out.contains(r#"Cow :: Borrowed ("a")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "a")"#), "{out}");
         assert!(!out.contains(r#""a b""#), "{out}");
     }
 
@@ -326,8 +326,8 @@ mod tests {
     fn literal_else_branches_lower_to_a_plain_conditional() {
         let out = lower(r#""on" if enabled else "off""#);
         assert!(!out.contains("ClassBranch"), "{out}");
-        assert!(out.contains(r#"Cow :: Borrowed ("on")"#), "{out}");
-        assert!(out.contains(r#"Cow :: Borrowed ("off")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "on")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "off")"#), "{out}");
     }
 
     #[test]
@@ -341,7 +341,7 @@ mod tests {
     fn single_entry_skips_the_tuple() {
         let out = lower(r#""btn""#);
         assert!(
-            out.contains(r#"Class (:: std :: borrow :: Cow :: Borrowed ("btn"))"#),
+            out.contains(r#"Class (:: topcoat_view :: PromotedStr (& "btn"))"#),
             "{out}"
         );
     }

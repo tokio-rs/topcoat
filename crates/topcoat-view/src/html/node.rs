@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use topcoat_core::context::Cx;
 
-use crate::{PartsWriter, Unescaped, View};
+use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped, View};
 
 /// Converts a value used in node position into view parts.
 ///
@@ -89,10 +89,38 @@ impl NodeViewParts for &str {
     }
 }
 
+impl NodeViewParts for PromotedStr {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_promoted_str(self.0);
+    }
+}
+
+impl NodeViewParts for StaticStr {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_static_str(self.0);
+    }
+}
+
 impl NodeViewParts for Unescaped<String> {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         parts.push_string_unescaped(self.0);
+    }
+}
+
+impl NodeViewParts for Unescaped<PromotedStr> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_promoted_str_unescaped(self.0.0);
+    }
+}
+
+impl NodeViewParts for Unescaped<StaticStr> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_static_str_unescaped(self.0.0);
     }
 }
 

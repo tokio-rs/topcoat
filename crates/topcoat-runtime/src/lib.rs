@@ -53,10 +53,10 @@ pub mod internal {
     #[inline]
     pub fn __surrogate(parts: &mut PartsWriter<'_>, value: &(impl serde::Serialize + ?Sized)) {
         in_context(parts, HtmlContext::Comment, |parts| {
-            parts.push_static_str_unescaped("cx.hydrate(");
+            parts.push_promoted_str_unescaped(&"cx.hydrate(");
             let json = serde_json::to_string(value).expect("failed to serialize surrogate value");
             parts.push_string(json);
-            parts.push_static_str_unescaped(")");
+            parts.push_promoted_str_unescaped(&")");
         });
     }
 }

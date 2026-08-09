@@ -1,6 +1,6 @@
 use topcoat_core::context::Cx;
 
-use crate::{PartsWriter, Unescaped};
+use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped};
 
 /// Converts a value used as an element name into view parts.
 ///
@@ -36,6 +36,20 @@ impl ElementNameViewParts for &str {
     }
 }
 
+impl ElementNameViewParts for PromotedStr {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_promoted_str(self.0);
+    }
+}
+
+impl ElementNameViewParts for StaticStr {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_static_str(self.0);
+    }
+}
+
 impl ElementNameViewParts for Unescaped<String> {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
@@ -47,6 +61,20 @@ impl ElementNameViewParts for Unescaped<&'static str> {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         parts.push_static_str_unescaped(self.0);
+    }
+}
+
+impl ElementNameViewParts for Unescaped<PromotedStr> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_promoted_str_unescaped(self.0.0);
+    }
+}
+
+impl ElementNameViewParts for Unescaped<StaticStr> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_static_str_unescaped(self.0.0);
     }
 }
 

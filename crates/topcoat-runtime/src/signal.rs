@@ -102,9 +102,9 @@ where
         parts.push_comment(|comment| {
             // `json` is untrusted application data and must be escaped to prevent XSS attacks.
             comment
-                .push_static_str_unescaped("::topcoat::signal(")
+                .push_promoted_str_unescaped(&"::topcoat::signal(")
                 .push_string(json)
-                .push_static_str_unescaped(")");
+                .push_promoted_str_unescaped(&")");
         });
     }
 }

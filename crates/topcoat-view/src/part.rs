@@ -242,9 +242,9 @@ impl<'a> PartsWriter<'a> {
             "tried to push comment in html context {:?}",
             self.context,
         );
-        self.push_static_str_unescaped("<!-- ");
+        self.push_promoted_str_unescaped(&"<!-- ");
         self.in_context(HtmlContext::Comment, build);
-        self.push_static_str_unescaped(" -->");
+        self.push_promoted_str_unescaped(&" -->");
         self
     }
 
@@ -381,6 +381,36 @@ mod tests {
             w.push_str_unescaped("<b>raw</b>");
         });
         assert_eq!(out, "<b>raw</b>");
+    }
+
+    #[test]
+    fn push_promoted_str_seals_the_writer_context() {
+        let out = render_with(HtmlContext::Text, |w| {
+            w.push_promoted_str(&"<b> & \"q\"");
+        });
+        assert_eq!(out, "&lt;b&gt; &amp; \"q\"");
+
+        let out = render_with(HtmlContext::AttributeValue, |w| {
+            w.push_promoted_str(&"<b> & \"q\"");
+        });
+        assert_eq!(out, "<b> &amp; &quot;q&quot;");
+    }
+
+    #[test]
+    fn push_promoted_str_unescaped_bypasses_the_context() {
+        let out = render_with(HtmlContext::Text, |w| {
+            w.push_promoted_str_unescaped(&"<b>raw</b>");
+        });
+        assert_eq!(out, "<b>raw</b>");
+    }
+
+    #[test]
+    fn push_promoted_str_skips_empty_strings() {
+        let out = render_with(HtmlContext::Text, |w| {
+            w.push_promoted_str(&"a").push_promoted_str(&"");
+            w.push_promoted_str_unescaped(&"").push_promoted_str(&"b");
+        });
+        assert_eq!(out, "ab");
     }
 
     #[test]

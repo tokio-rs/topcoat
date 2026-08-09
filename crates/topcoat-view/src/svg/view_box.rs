@@ -45,11 +45,11 @@ impl AttributeValueViewParts for ViewBox {
 
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         parts.push_f32(self.min_x);
-        parts.push_static_str_unescaped(" ");
+        parts.push_promoted_str_unescaped(&" ");
         parts.push_f32(self.min_y);
-        parts.push_static_str_unescaped(" ");
+        parts.push_promoted_str_unescaped(&" ");
         parts.push_f32(self.width);
-        parts.push_static_str_unescaped(" ");
+        parts.push_promoted_str_unescaped(&" ");
         parts.push_f32(self.height);
     }
 }
