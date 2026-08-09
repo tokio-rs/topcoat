@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use topcoat_core::fnv1a;
+use topcoat_core::fnv1a::Fnv1a;
 
 use crate::{ConstReader, ConstWriter};
 
@@ -75,7 +75,7 @@ impl AssetOptions {
         w.write_str_opt(cow_as_str(self.content_type.as_ref()));
     }
 
-    pub(crate) const fn hash_into(&self, mut h: u64) -> u64 {
+    pub(crate) const fn hash_into(&self, mut h: Fnv1a<u64>) -> Fnv1a<u64> {
         h = hash_opt_str(h, cow_as_str(self.rename.as_ref()));
         h = hash_opt_str(h, cow_as_str(self.extension.as_ref()));
         h = hash_opt_str(h, cow_as_str(self.checksum.as_ref()));
@@ -101,13 +101,10 @@ const fn cow_as_str<'a>(c: Option<&'a Cow<'static, str>>) -> Option<&'a str> {
     }
 }
 
-const fn hash_opt_str(h: u64, s: Option<&str>) -> u64 {
+const fn hash_opt_str(h: Fnv1a<u64>, s: Option<&str>) -> Fnv1a<u64> {
     match s {
-        None => fnv1a::hash_continue(h, &[0]),
-        Some(s) => {
-            let h = fnv1a::hash_continue(h, &[1]);
-            fnv1a::hash_continue(h, s.as_bytes())
-        }
+        None => h.write(&[0]),
+        Some(s) => h.write(&[1]).write(s.as_bytes()),
     }
 }
 
