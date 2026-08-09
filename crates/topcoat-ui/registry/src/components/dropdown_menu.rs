@@ -42,9 +42,7 @@ pub async fn dropdown_menu(#[default] mut attrs: Attributes, #[default] child: V
 
 /// The classes making a `<summary>` a plain clickable trigger: the default
 /// disclosure marker is hidden and the cursor marks it as interactive.
-const TRIGGER: StaticClass = class!(
-    "cursor-pointer list-none [&::-webkit-details-marker]:hidden",
-);
+const TRIGGER: StaticClass = class!("cursor-pointer list-none [&::-webkit-details-marker]:hidden",);
 
 /// The trigger of a [`dropdown_menu`]: a `<summary>` that toggles the menu.
 ///

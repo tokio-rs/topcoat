@@ -1,5 +1,8 @@
 use proc_macro2::Span;
-use syn::{spanned::Spanned, visit::Visit};
+use syn::{
+    Expr, MacroDelimiter, Token, parse::Parser, punctuated::Punctuated, spanned::Spanned,
+    visit::Visit,
+};
 
 use crate::pretty::{INDENT, MARGIN};
 
@@ -9,6 +12,7 @@ pub struct MacroSnippet {
     span: Span,
     initial_space: isize,
     initial_indent: isize,
+    laid_out_by_rustfmt: bool,
 }
 
 impl MacroSnippet {
@@ -52,6 +56,19 @@ impl MacroSnippet {
     pub fn initial_indent(&self) -> isize {
         self.initial_indent
     }
+
+    /// Whether `rustfmt` lays this invocation out itself.
+    ///
+    /// `rustfmt` reflows a macro call delimited by `()` or `[]` whose body is a
+    /// comma-separated list of Rust expressions, treating it like a function
+    /// call. Laying such a body out here as well leaves the two formatters
+    /// undoing each other's work. Everything `rustfmt` copies through verbatim,
+    /// which is every braced body and every body that is not valid Rust,
+    /// belongs to this formatter.
+    #[must_use]
+    pub fn laid_out_by_rustfmt(&self) -> bool {
+        self.laid_out_by_rustfmt
+    }
 }
 
 struct Visitor {
@@ -85,6 +102,10 @@ impl<'ast> Visit<'ast> for Visitor {
         // source line reflects the column its body and closing delimiter align
         // to.
         let initial_indent = self.line_indent(span.start().line);
+        let laid_out_by_rustfmt = !matches!(i.delimiter, MacroDelimiter::Brace(_))
+            && Punctuated::<Expr, Token![,]>::parse_terminated
+                .parse2(i.tokens.clone())
+                .is_ok();
 
         self.snippets.push(MacroSnippet {
             name: name.to_string(),
@@ -92,6 +113,7 @@ impl<'ast> Visit<'ast> for Visitor {
             span,
             initial_space,
             initial_indent,
+            laid_out_by_rustfmt,
         });
 
         syn::visit::visit_macro(self, i);

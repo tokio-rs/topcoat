@@ -33,6 +33,9 @@ struct Replace {
 
 /// Pretty-prints the Topcoat macro invocations in `input`.
 ///
+/// Invocations that `rustfmt` lays out itself are left alone, so that running
+/// both formatters over a file does not have them undoing each other's work.
+///
 /// Returns the source with each macro body replaced by its formatted form, or
 /// the collection of errors encountered while parsing or formatting them. Each
 /// error's location is reported in the coordinates of `input`.
@@ -42,6 +45,31 @@ struct Replace {
 /// Returns `Err` with the accumulated [`FormatError`]s if parsing `input` or any
 /// macro body fails, or if a registered pretty-printer returns an error.
 pub fn pretty_print_str(registry: &Registry, input: &str) -> Result<String, Vec<FormatError>> {
+    pretty_print(registry, input, true)
+}
+
+/// Pretty-prints the Topcoat macro invocations in a fragment lifted out of a
+/// macro body.
+///
+/// `rustfmt` never reaches inside a macro body, so every invocation in the
+/// fragment is formatted here, including the ones that would be left to
+/// `rustfmt` at file level.
+///
+/// # Errors
+///
+/// Same as [`pretty_print_str`].
+pub(crate) fn pretty_print_fragment_str(
+    registry: &Registry,
+    input: &str,
+) -> Result<String, Vec<FormatError>> {
+    pretty_print(registry, input, false)
+}
+
+fn pretty_print(
+    registry: &Registry,
+    input: &str,
+    skip_rustfmt_layout: bool,
+) -> Result<String, Vec<FormatError>> {
     let mut output = String::new();
 
     // The whole file is parsed as a unit, so this error's span already refers to
@@ -53,6 +81,9 @@ pub fn pretty_print_str(registry: &Registry, input: &str) -> Result<String, Vec<
     let mut replacements = Vec::new();
 
     for snippet in snippets {
+        if skip_rustfmt_layout && snippet.laid_out_by_rustfmt() {
+            continue;
+        }
         let Some(replacement) = registry.pretty_print_macro(&snippet) else {
             continue;
         };
