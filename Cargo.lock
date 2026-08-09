@@ -436,6 +436,7 @@ dependencies = [
  "toasty",
  "tokio",
  "topcoat",
+ "topcoat-ui",
 ]
 
 [[package]]
