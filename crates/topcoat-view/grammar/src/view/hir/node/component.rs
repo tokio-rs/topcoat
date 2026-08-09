@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{Path, spanned::Spanned};
-use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
+use topcoat_core_grammar::paths::{topcoat_error, topcoat_identity, topcoat_view};
 
 use crate::view::{
     NamedArg,
@@ -15,11 +15,97 @@ use crate::view::{
 pub(crate) struct Component {
     pub path: Path,
     pub named_args: Vec<NamedArg>,
+    /// The `key:` argument keying the invocation's identity, if any.
+    pub key: Option<NamedArg>,
+    /// Numbers this invocation site within the expansion, telling sites
+    /// apart when their spans collapse to a single location.
+    pub ordinal: u32,
+    /// Whether the invocation sits in a `for` body, so the site repeats.
+    pub repeats: bool,
     pub children: Option<Scope>,
     pub span: Span,
 }
 
 impl Component {
+    /// Returns the site key expression naming this invocation site.
+    ///
+    /// `file!`, `line!`, and `column!` are spanned onto the component path,
+    /// so they resolve to the invocation's own location in source; the
+    /// ordinal tells sites apart when a macro-generated body collapses
+    /// their spans.
+    fn site(&self) -> TokenStream {
+        let ordinal = self.ordinal;
+        quote_spanned! {self.path.span()=>
+            const {
+                #topcoat_identity::SiteKey::new(
+                    ::core::file!(),
+                    ::core::line!(),
+                    ::core::column!(),
+                    #ordinal,
+                )
+            }
+        }
+    }
+
+    /// Returns the expression naming this invocation in the ambiguity
+    /// error: the component path and its location in source.
+    fn label(&self) -> TokenStream {
+        let name = format!(
+            "`{}`",
+            self.path.to_token_stream().to_string().replace(' ', ""),
+        );
+        quote_spanned! {self.path.span()=>
+            ::core::concat!(
+                #name,
+                " at ",
+                ::core::file!(),
+                ":",
+                ::core::line!(),
+                ":",
+                ::core::column!(),
+            )
+        }
+    }
+
+    /// Wraps `future` to install this invocation's identity around every
+    /// poll, deriving it from the identity installed at construction.
+    ///
+    /// A `key:` argument mixes its value into the identity, telling
+    /// repetitions of the site apart. The value passes through the `key`
+    /// method of a throwaway props builder, which hands it back through its
+    /// callback: a real method call gives `key:` the completion, hover, and
+    /// rename support of a prop, while the props of `future` stay untouched
+    /// and carry nothing extra. Without a key, an invocation that repeats
+    /// derives an ambiguous identity naming this invocation, so consuming
+    /// the identity, or any identity below it, errors with a pointer to the
+    /// missing `key`.
+    fn identity_future(&self, future: &TokenStream) -> TokenStream {
+        let span = self.path.span();
+        let site = self.site();
+        match (&self.key, self.repeats) {
+            (Some(arg), _) => {
+                let path = &self.path;
+                let ident = &arg.ident;
+                let value = &arg.value;
+                quote_spanned! {span=> {
+                    use #topcoat_view::Component;
+                    let mut __key = ::core::option::Option::None;
+                    #path::props_builder()
+                        .#ident(#value, |__value| __key = ::core::option::Option::Some(__value));
+                    #topcoat_identity::IdentityFuture::keyed(#site, __key.unwrap(), #future)
+                }}
+            }
+            (None, true) => {
+                let label = self.label();
+                quote_spanned! {span=>
+                    #topcoat_identity::IdentityFuture::ambiguous(#site, #label, #future)
+                }
+            }
+            (None, false) => quote_spanned! {span=>
+                #topcoat_identity::IdentityFuture::new(#site, #future)
+            },
+        }
+    }
     /// Returns the expression yielding this component's render future, with
     /// the props evaluated eagerly.
     fn render_future(&self) -> TokenStream {
@@ -112,6 +198,7 @@ impl Emit for Component {
             }
             _ => self.render_future(),
         };
+        let future = self.identity_future(&future);
 
         emitter.hoist_future(span, &ident, &future);
         emitter.burst(quote_spanned! {span=> __b.view(#ident); });

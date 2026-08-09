@@ -345,6 +345,32 @@ view! {
 
 See how to define components in the [`component`] macro guide.
 
+## Keys
+
+Each component invocation has an [`Identity`]: a stable id derived from the chain of invocation sites leading down to it in code, the same from one render to the next. The framework attaches per-invocation data such as state to it, and the component body can read it with [`Identity::current`].
+
+Inside a `for` body one invocation renders many times, and the site alone cannot tell the repetitions apart. The reserved `key:` argument mixes a value into the identity to give each repetition its own:
+
+```rust
+# use topcoat::{Result, view::*};
+# struct Post { id: u64, title: &'static str }
+# #[component]
+# async fn post_card(title: &str) -> Result { view! { <article>(title)</article> } }
+# #[component]
+# async fn example() -> Result {
+# let posts = vec![Post { id: 1, title: "A" }];
+view! {
+    for post in posts {
+        post_card(key: post.id, title: post.title)
+    }
+}
+# }
+```
+
+Key the invocation with a value that identifies the item behind it, such as its database id, not the loop index: the identity then follows the item when the list reorders. Any value implementing [`IdentityKey`] works as a key. A `key:` is also allowed outside a loop, for an invocation that repeats in ways the macro cannot see.
+
+A repeated invocation without a `key:` still renders, but its identity is ambiguous. Consuming an ambiguous identity, in the component itself or anywhere nested below it, errors with the location of the invocation that is missing its key.
+
 # Concurrent Rendering
 
 The components inside a [`view!`] render concurrently. Sibling components, the iterations of a `for` loop, the taken branch of an `if` or `match`, a component and the child nodes passed to it, and components nested at any depth all start at the same time. A component waiting on a database query or an HTTP request therefore does not hold up the rest of the view, which avoids request waterfalls.
@@ -556,5 +582,8 @@ view! {
 [`topcoat::view::Attributes`]: struct.Attributes.html
 [`topcoat::view::Class`]: struct.Class.html
 [`view!`]: macro.view.html
+[`Identity`]: ../identity/struct.Identity.html
+[`Identity::current`]: ../identity/struct.Identity.html#method.current
+[`IdentityKey`]: ../identity/trait.IdentityKey.html
 [`StatusCode`]: https://docs.rs/http/latest/http/status/struct.StatusCode.html
 [`HeaderMap`]: https://docs.rs/http/latest/http/header/struct.HeaderMap.html

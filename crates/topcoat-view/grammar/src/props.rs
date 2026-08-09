@@ -5,7 +5,7 @@ use syn::{
     Attribute, Data, DeriveInput, Expr, Fields, GenericParam, Generics, Ident, Meta, Type,
     Visibility, ext::IdentExt, parse_quote,
 };
-use topcoat_core_grammar::paths::topcoat_view;
+use topcoat_core_grammar::paths::{topcoat_identity, topcoat_view};
 
 /// A parsed `#[derive(Props)]` struct. Expands into a typestate builder where
 /// every field without `#[default]` must be set before `build()` becomes
@@ -322,6 +322,17 @@ impl ToTokens for Props {
             #[allow(non_camel_case_types, dead_code)]
             impl #state_impl_generics #builder_ident #state_ty_generics #where_clause {
                 #(#setters)*
+
+                /// Keys the identity of a `view!` invocation, telling
+                /// repetitions of one call site apart.
+                #vis fn key<__Key: #topcoat_identity::IdentityKey>(
+                    self,
+                    key: __Key,
+                    receive: impl ::core::ops::FnOnce(__Key),
+                ) -> Self {
+                    receive(key);
+                    self
+                }
 
                 /// Builds the props struct from the set properties.
                 ///

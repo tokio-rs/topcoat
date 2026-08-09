@@ -282,6 +282,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_borrows_for_generic_args)]
     fn references_hash_like_their_target() {
         assert_eq!(hash(&5u32), hash(5u32));
         assert_eq!(hash(&"a"), hash("a"));

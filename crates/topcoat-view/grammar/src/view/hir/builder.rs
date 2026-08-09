@@ -1,3 +1,5 @@
+use std::{cell::Cell, rc::Rc};
+
 use proc_macro2::{Span, TokenStream};
 use syn::{Expr, Pat, Path};
 
@@ -21,6 +23,13 @@ pub(crate) trait LowerView {
 pub(crate) struct ViewBuilder {
     nodes: Vec<Node>,
     static_segment: String,
+    /// Numbers component invocation sites in lowering order, shared across
+    /// the nested builders of one expansion so every site gets a distinct
+    /// ordinal.
+    sites: Rc<Cell<u32>>,
+    /// Whether this builder lowers a `for` body, where every invocation
+    /// site repeats.
+    repeats: bool,
 }
 
 impl ViewBuilder {
@@ -28,6 +37,19 @@ impl ViewBuilder {
         Self {
             nodes: Vec::new(),
             static_segment: String::new(),
+            sites: Rc::new(Cell::new(0)),
+            repeats: false,
+        }
+    }
+
+    /// Returns a builder for a nested scope, sharing this builder's site
+    /// numbering.
+    fn nested(&self, repeats: bool) -> Self {
+        Self {
+            nodes: Vec::new(),
+            static_segment: String::new(),
+            sites: Rc::clone(&self.sites),
+            repeats,
         }
     }
 
@@ -80,22 +102,33 @@ impl ViewBuilder {
 
     /// Lowers a component invocation, keeping the path, named arguments, and
     /// lowered children for emission by [`Scope`].
+    ///
+    /// The invocation is numbered with the next site ordinal, and remembers
+    /// whether it sits in a `for` body, where it repeats without a `key`
+    /// telling the repetitions apart. The children lower as their own
+    /// invocations below this one, so they do not repeat relative to it.
     pub fn component(
         &mut self,
         path: &Path,
-        named_args: &[NamedArg],
+        named_args: Vec<NamedArg>,
+        key: Option<&NamedArg>,
         children: &Nodes,
         span: Span,
     ) {
         self.flush();
+        let ordinal = self.sites.get();
+        self.sites.set(ordinal + 1);
         let children = (!children.is_empty()).then(|| {
-            let mut child_builder = ViewBuilder::new();
+            let mut child_builder = self.nested(false);
             children.lower(&mut child_builder);
             child_builder.finish()
         });
         self.nodes.push(Node::Component(Component {
             path: path.clone(),
-            named_args: named_args.to_vec(),
+            named_args,
+            key: key.cloned(),
+            ordinal,
+            repeats: self.repeats,
             children,
             span,
         }));
@@ -103,7 +136,7 @@ impl ViewBuilder {
 
     pub fn for_loop(&mut self, pat: &Pat, expr: &Expr, f: impl FnOnce(&mut ViewBuilder)) {
         self.flush();
-        let mut body = ViewBuilder::new();
+        let mut body = self.nested(true);
         f(&mut body);
         self.nodes.push(Node::ForLoop(ForLoop {
             pat: pat.clone(),
@@ -114,8 +147,8 @@ impl ViewBuilder {
 
     pub fn if_else(&mut self, expr: &Expr, f: impl FnOnce(&mut ViewBuilder, &mut ViewBuilder)) {
         self.flush();
-        let mut then_branch = ViewBuilder::new();
-        let mut else_branch = ViewBuilder::new();
+        let mut then_branch = self.nested(self.repeats);
+        let mut else_branch = self.nested(self.repeats);
         f(&mut then_branch, &mut else_branch);
         self.nodes.push(Node::IfElse(IfElse {
             expr: expr.clone(),
@@ -126,7 +159,10 @@ impl ViewBuilder {
 
     pub fn match_expr(&mut self, expr: &Expr, f: impl FnOnce(&mut MatchArmsBuilder)) {
         self.flush();
-        let mut builder = MatchArmsBuilder { arms: Vec::new() };
+        let mut builder = MatchArmsBuilder {
+            arms: Vec::new(),
+            template: self.nested(self.repeats),
+        };
         f(&mut builder);
         self.nodes.push(Node::MatchExpr(MatchExpr {
             expr: Box::new(expr.clone()),
@@ -145,11 +181,14 @@ impl ViewBuilder {
 /// [`Scope`].
 pub(crate) struct MatchArmsBuilder {
     arms: Vec<MatchArm>,
+    /// An empty builder in the enclosing builder's context, cloned as the
+    /// starting point of every arm body.
+    template: ViewBuilder,
 }
 
 impl MatchArmsBuilder {
     pub fn arm(&mut self, pat: &Pat, guard: Option<&Expr>, f: impl FnOnce(&mut ViewBuilder)) {
-        let mut body = ViewBuilder::new();
+        let mut body = self.template.nested(self.template.repeats);
         f(&mut body);
         self.arms.push(MatchArm {
             pat: pat.clone(),

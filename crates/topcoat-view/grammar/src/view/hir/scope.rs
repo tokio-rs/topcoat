@@ -117,10 +117,11 @@ impl Scope {
 mod tests {
     use proc_macro2::Span;
     use quote::quote;
+    use syn::Expr;
 
     use super::*;
     use crate::view::{
-        Nodes,
+        NamedArg, NamedArgValue, Nodes,
         hir::{ExprKind, ViewBuilder},
     };
 
@@ -134,7 +135,23 @@ mod tests {
 
     fn add_component_with_children(builder: &mut ViewBuilder, name: &str, children: &Nodes) {
         let path = syn::parse_str(name).unwrap();
-        builder.component(&path, &[], children, Span::call_site());
+        builder.component(&path, Vec::new(), None, children, Span::call_site());
+    }
+
+    fn add_keyed_component(builder: &mut ViewBuilder, name: &str, key: &Expr) {
+        let path = syn::parse_str(name).unwrap();
+        let key = NamedArg {
+            ident: syn::parse_quote!(key),
+            colon: Default::default(),
+            value: NamedArgValue::Expr(key.clone()),
+        };
+        builder.component(
+            &path,
+            Vec::new(),
+            Some(&key),
+            &syn::parse_quote!(),
+            Span::call_site(),
+        );
     }
 
     #[test]
@@ -301,6 +318,87 @@ mod tests {
         let out = rendered(builder);
         assert!(out.contains("try_join ! (__expr0 , __expr1)"));
         assert!(!out.contains(". await ?"));
+    }
+
+    #[test]
+    fn a_component_derives_its_identity_at_the_invocation_site() {
+        let mut builder = ViewBuilder::new();
+        add_component(&mut builder, "solo");
+        let out = rendered(builder);
+        assert!(out.contains("IdentityFuture :: new"));
+        assert!(out.contains("SiteKey :: new"));
+        assert!(out.contains("file ! ()"));
+    }
+
+    #[test]
+    fn sites_are_numbered_in_lowering_order_across_nested_scopes() {
+        let mut builder = ViewBuilder::new();
+        add_component(&mut builder, "first");
+        builder.if_else(&syn::parse_quote!(cond), |then_branch, _| {
+            add_component(then_branch, "second");
+        });
+        add_component(&mut builder, "third");
+        let out = rendered(builder);
+        for ordinal in ["0u32", "1u32", "2u32"] {
+            assert!(out.contains(ordinal), "expected site ordinal {ordinal}");
+        }
+    }
+
+    #[test]
+    fn a_keyed_component_mixes_the_key_into_its_identity() {
+        let mut builder = ViewBuilder::new();
+        add_keyed_component(&mut builder, "card", &syn::parse_quote!(item.id));
+        let out = rendered(builder);
+        assert!(out.contains("IdentityFuture :: keyed"));
+        assert!(out.contains("item . id"));
+    }
+
+    #[test]
+    fn an_unkeyed_component_in_a_for_body_is_ambiguous() {
+        let mut builder = ViewBuilder::new();
+        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
+            add_component(body, "card");
+        });
+        let out = rendered(builder);
+        assert!(out.contains("IdentityFuture :: ambiguous"));
+        assert!(out.contains("\"`card`\""));
+    }
+
+    #[test]
+    fn a_keyed_component_in_a_for_body_is_not_ambiguous() {
+        let mut builder = ViewBuilder::new();
+        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
+            add_keyed_component(body, "card", &syn::parse_quote!(x));
+        });
+        let out = rendered(builder);
+        assert!(out.contains("IdentityFuture :: keyed"));
+        assert!(!out.contains("IdentityFuture :: ambiguous"));
+    }
+
+    #[test]
+    fn branches_inside_a_for_body_still_repeat() {
+        let mut builder = ViewBuilder::new();
+        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
+            body.if_else(&syn::parse_quote!(cond), |then_branch, _| {
+                add_component(then_branch, "card");
+            });
+        });
+        let out = rendered(builder);
+        assert!(out.contains("IdentityFuture :: ambiguous"));
+    }
+
+    #[test]
+    fn children_derive_below_their_component_instead_of_repeating() {
+        let mut builder = ViewBuilder::new();
+        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
+            add_component_with_children(body, "wrapper", &syn::parse_quote!(inner()));
+        });
+        let out = rendered(builder);
+        // The wrapper repeats unkeyed, but its child does not repeat
+        // relative to it; the wrapper's ambiguity poisons the child at
+        // runtime instead.
+        assert_eq!(out.matches("IdentityFuture :: ambiguous").count(), 1);
+        assert_eq!(out.matches("IdentityFuture :: new").count(), 1);
     }
 
     #[test]
