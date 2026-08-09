@@ -8,9 +8,8 @@ mod html;
 pub mod identity;
 mod part;
 mod props;
-mod static_str;
+mod string;
 pub mod svg;
-mod unescaped;
 mod view;
 
 pub use component::*;
@@ -19,8 +18,7 @@ pub use format::*;
 pub use html::*;
 pub use part::*;
 pub use props::*;
-pub use static_str::*;
-pub use unescaped::*;
+pub use string::*;
 pub use view::*;
 
 /// Macro helpers to shorten the generated source code.
