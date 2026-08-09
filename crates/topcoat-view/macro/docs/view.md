@@ -347,9 +347,7 @@ See how to define components in the [`component`] macro guide.
 
 ## Keys
 
-Each component invocation has an [`Identity`]: a stable id derived from the chain of invocation sites leading down to it in code, the same from one render to the next. The framework attaches per-invocation data such as state to it, and the component body can read it with [`Identity::current`].
-
-Inside a `for` body one invocation renders many times, and the site alone cannot tell the repetitions apart. The reserved `key:` argument mixes a value into the identity to give each repetition its own:
+Each component invocation has a stable identity derived from the chain of invocation sites leading down to it in code, the same from one render to the next. The framework attaches per-invocation data such as state to it. Inside a `for` body one component invocation renders many times, and the site alone cannot tell the repetitions apart. Use the reserved `key` property on component to distinguish individual calls inside of the loop:
 
 ```rust
 # use topcoat::{Result, view::*};
