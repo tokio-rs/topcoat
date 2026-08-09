@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 /// A static string held by reference so a view can record it in place.
 ///
 /// This is the most efficient way to pass a `&'static str` to a `view!`.
@@ -20,18 +22,11 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PromotedStr(pub &'static &'static str);
 
-impl PromotedStr {
-    /// Wraps a promoted static string.
-    #[inline]
-    #[must_use]
-    pub const fn new(value: &'static &'static str) -> Self {
-        Self(value)
-    }
+impl Deref for PromotedStr {
+    type Target = &'static str;
 
-    /// Returns the wrapped string.
     #[inline]
-    #[must_use]
-    pub const fn get(self) -> &'static str {
+    fn deref(&self) -> &Self::Target {
         self.0
     }
 }
@@ -57,18 +52,11 @@ impl PromotedStr {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StaticStr(pub &'static str);
 
-impl StaticStr {
-    /// Wraps a static string.
-    #[inline]
-    #[must_use]
-    pub const fn new(value: &'static str) -> Self {
-        Self(value)
-    }
+impl Deref for StaticStr {
+    type Target = &'static str;
 
-    /// Returns the wrapped string.
     #[inline]
-    #[must_use]
-    pub const fn get(self) -> &'static str {
-        self.0
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
