@@ -177,35 +177,39 @@ impl ToTokens for Layout {
         // The erased layout is built once in a `const` so it can be used from
         // both the `From` impl (backing manual `router.layout(#ident)`
         // registration) and the discovery submission (which expands to a
-        // `static`, requiring a const initializer).
+        // `static`, requiring a const initializer). It is named after the
+        // layout so the render closure carries that name in backtraces and
+        // profiles.
         let erased = if let Some(path) = attr.path.as_ref() {
             quote! {
-                const ERASED: #topcoat_router::LayoutFn = #topcoat_router::LayoutFn::new(
+                #[allow(non_upper_case_globals)]
+                const #ident: #topcoat_router::LayoutFn = #topcoat_router::LayoutFn::new(
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );
 
                 impl ::core::convert::From<#ident> for #topcoat_router::LayoutFn {
                     fn from(_: #ident) -> Self {
-                        ERASED
+                        #ident
                     }
                 }
             }
         } else {
             quote! {
-                const ERASED: #topcoat_router::ModuleLayoutFn =
+                #[allow(non_upper_case_globals)]
+                const #ident: #topcoat_router::ModuleLayoutFn =
                     #topcoat_router::ModuleLayoutFn::new(module_path!(), #render);
 
                 impl ::core::convert::From<#ident> for #topcoat_router::ModuleLayoutFn {
                     fn from(_: #ident) -> Self {
-                        ERASED
+                        #ident
                     }
                 }
             }
         };
 
         let submit =
-            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { ERASED } });
+            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { #ident } });
 
         quote! {
             const _: () = {

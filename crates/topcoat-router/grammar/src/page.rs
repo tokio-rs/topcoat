@@ -102,10 +102,10 @@ impl ToTokens for Page {
         .to_tokens(tokens);
 
         // The user's function, re-emitted under its original name inside the
-        // anonymous const below to keep the module namespace clean. Its own
-        // name shadows the marker within its body, so bindings named after the
-        // page keep working. The injected `__cx` parameter carries the ambient
-        // context that `view!` bodies read.
+        // bridge below to keep the module namespace clean. Its own name shadows
+        // the marker within its body, so bindings named after the page keep
+        // working. The injected `__cx` parameter carries the ambient context
+        // that `view!` bodies read.
         let mut inner = item.clone();
         inner.vis = Visibility::Inherited;
         inner.sig.generics.params.insert(0, parse_quote! { '__cx });
@@ -117,7 +117,7 @@ impl ToTokens for Page {
             .attrs
             .push(parse_quote! { #[allow(clippy::unused_async)] });
 
-        // The bridge the component face calls: associated items are reached
+        // The bridge every caller goes through: associated items are reached
         // through the type rather than lexical scope, so `#ident::handler` is
         // callable from outside the anonymous const. It forwards to the user's
         // function positionally, in declared parameter order.
@@ -128,39 +128,45 @@ impl ToTokens for Page {
         let handler = quote! {
             impl #ident {
                 async fn handler(cx: &#topcoat_context::Cx #body_param) #output {
+                    #inner
+
                     #ident(cx #(, #forward_args)*).await
                 }
             }
         };
 
         // The render function backing the registered page: it parses the
-        // request body (when the page takes one) and calls the user's function
-        // directly.
+        // request body (when the page takes one) and hands it to the bridge.
         let parse_request = args.request().map(|request_ty| {
             let request_ident = request_ident();
             quote! {
                 let #request_ident = <#request_ty as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
             }
         });
-        let call_args = args.call_args();
+        let request_arg = args.request().map(|_| {
+            let request_ident = request_ident();
+            quote! { , #request_ident }
+        });
         let render = quote! {
             |cx, body| ::std::boxed::Box::pin(async move {
                 #parse_request
-                #ident(cx #(, #call_args)*).await
+                #ident::handler(cx #request_arg).await
             })
         };
 
         // The erased page is built once in a `const` so it can be used from
         // both the `From` impl (backing manual `router.page(#ident)`
         // registration) and the discovery submission (which expands to a
-        // `static`, requiring a const initializer).
+        // `static`, requiring a const initializer). It is named after the page
+        // so the render closure carries that name in backtraces and profiles.
         let methods = attr.methods.as_ref().map_or_else(
             || quote! { #topcoat_router::OwnedMethods::One(#topcoat_router::Method::GET) },
             ToTokens::to_token_stream,
         );
         let erased = if let Some(path) = attr.path.as_ref() {
             quote! {
-                const ERASED: #topcoat_router::PageFn = #topcoat_router::PageFn::const_new(
+                #[allow(non_upper_case_globals)]
+                const #ident: #topcoat_router::PageFn = #topcoat_router::PageFn::const_new(
                     #methods,
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
@@ -168,30 +174,29 @@ impl ToTokens for Page {
 
                 impl ::core::convert::From<#ident> for #topcoat_router::PageFn {
                     fn from(_: #ident) -> Self {
-                        ERASED
+                        #ident
                     }
                 }
             }
         } else {
             quote! {
-                const ERASED: #topcoat_router::ModulePageFn =
+                #[allow(non_upper_case_globals)]
+                const #ident: #topcoat_router::ModulePageFn =
                     #topcoat_router::ModulePageFn::new(#methods, module_path!(), #render);
 
                 impl ::core::convert::From<#ident> for #topcoat_router::ModulePageFn {
                     fn from(_: #ident) -> Self {
-                        ERASED
+                        #ident
                     }
                 }
             }
         };
 
         let submit =
-            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { ERASED } });
+            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { #ident } });
 
         quote! {
             const _: () = {
-                #inner
-
                 #handler
 
                 #erased
