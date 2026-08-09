@@ -9,7 +9,6 @@ use topcoat_core_grammar::paths::{
     topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_runtime,
     topcoat_view, topcoat_view_macro,
 };
-use uuid::Uuid;
 
 use crate::shard::{ShardAttr, ShardItem};
 
@@ -95,9 +94,25 @@ impl ToTokens for Shard {
 
         let impl_ident = format_ident!("__topcoat_shard_impl_{}", ident);
         let erased_ident = format_ident!("__TOPCOAT_SHARD_ERASED_{}", ident);
-        let id = Uuid::new_v4().to_string();
+        let id_ident = format_ident!("__TOPCOAT_SHARD_ID_{}", ident);
 
         quote! {
+            #[doc(hidden)]
+            #[allow(non_upper_case_globals)]
+            const #id_ident: &'static ::core::primitive::str = {
+                const HASH: u64 = #topcoat_runtime::endpoint_id_hash(
+                    ::core::env!("CARGO_CRATE_NAME"),
+                    ::core::module_path!(),
+                    ::core::stringify!(#ident),
+                );
+                const BYTES: [u8; #topcoat_runtime::ENDPOINT_ID_LEN] =
+                    #topcoat_runtime::endpoint_id_hex(HASH);
+                match ::core::str::from_utf8(&BYTES) {
+                    ::core::result::Result::Ok(id) => id,
+                    ::core::result::Result::Err(_) => ::core::panic!("hex is ascii"),
+                }
+            };
+
             // The user's real body. Shared by the component's initial render and
             // the server endpoint that re-renders the shard. The leading `__cx`
             // parameter makes the request context implicitly available to macros
@@ -115,7 +130,7 @@ impl ToTokens for Shard {
                 )*
                 let __placeholder = #impl_ident(__cx, #(#call_args),*).await?;
                 let __scope = #topcoat_runtime::ReactiveScope::new(
-                    #topcoat_runtime::ShardId::new(#id),
+                    #topcoat_runtime::ShardId::new(#id_ident),
                     ::std::vec![#(#js_idents),*],
                     __placeholder,
                 );
@@ -134,7 +149,7 @@ impl ToTokens for Shard {
             #[allow(non_upper_case_globals)]
             const #erased_ident: #topcoat_runtime::ErasedShard =
                 #topcoat_runtime::ErasedShard::new(
-                    #topcoat_runtime::ShardId::new(#id),
+                    #topcoat_runtime::ShardId::new(#id_ident),
                     |cx, body| ::std::boxed::Box::pin(async move {
                         type __Surrogate =
                             <(#(#value_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
@@ -162,5 +177,33 @@ impl ToTokens for Shard {
             }
             .to_tokens(tokens);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn expand(source: &str) -> String {
+        Shard::parse(TokenStream::new(), source.parse().unwrap())
+            .unwrap()
+            .to_token_stream()
+            .to_string()
+    }
+
+    const SOURCE: &str = "async fn rows(query: String) -> Result { view! { (query) } }";
+
+    #[test]
+    fn expands_to_the_same_id_every_time() {
+        assert_eq!(expand(SOURCE), expand(SOURCE));
+    }
+
+    #[test]
+    fn derives_the_id_from_the_crate_module_and_name() {
+        let expanded = expand(SOURCE);
+        assert!(expanded.contains("endpoint_id_hash"));
+        assert!(expanded.contains("CARGO_CRATE_NAME"));
+        assert!(expanded.contains("module_path ! ()"));
+        assert!(expanded.contains("stringify ! (rows)"));
     }
 }

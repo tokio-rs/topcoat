@@ -120,13 +120,29 @@ impl ToTokens for Procedure {
         };
         let return_ty = quote! { <#return_ty as #topcoat_internal::ResultExt>::T };
 
-        let id = uuid::Uuid::new_v4().to_string();
+        let id_ident = format_ident!("__TOPCOAT_PROCEDURE_ID_{}", ident);
 
         quote! {
+            #[doc(hidden)]
+            #[allow(non_upper_case_globals)]
+            const #id_ident: &'static ::core::primitive::str = {
+                const HASH: u64 = #topcoat_runtime::endpoint_id_hash(
+                    ::core::env!("CARGO_CRATE_NAME"),
+                    ::core::module_path!(),
+                    ::core::stringify!(#ident),
+                );
+                const BYTES: [u8; #topcoat_runtime::ENDPOINT_ID_LEN] =
+                    #topcoat_runtime::endpoint_id_hex(HASH);
+                match ::core::str::from_utf8(&BYTES) {
+                    ::core::result::Result::Ok(id) => id,
+                    ::core::result::Result::Err(_) => ::core::panic!("hex is ascii"),
+                }
+            };
+
             #(#docs)*
             #[allow(non_upper_case_globals)]
             #vis const #ident: &#topcoat_runtime::Procedure::<(#(#arg_tys,)*), #return_ty> = &#topcoat_runtime::Procedure::new(
-                #topcoat_runtime::ProcedureId::new(#id),
+                #topcoat_runtime::ProcedureId::new(#id_ident),
                 |cx, body| {
                     #[allow(clippy::unused_async)]
                     #item
@@ -157,6 +173,29 @@ mod tests {
             Ok(_) => panic!("expected parse error for `{source}`"),
             Err(err) => err.to_string(),
         }
+    }
+
+    fn expand(source: &str) -> String {
+        Procedure::parse(TokenStream::new(), source.parse().unwrap())
+            .unwrap()
+            .to_token_stream()
+            .to_string()
+    }
+
+    const SOURCE: &str = "async fn double(value: f64) -> Result<f64> { Ok(value * 2.0) }";
+
+    #[test]
+    fn expands_to_the_same_id_every_time() {
+        assert_eq!(expand(SOURCE), expand(SOURCE));
+    }
+
+    #[test]
+    fn derives_the_id_from_the_crate_module_and_name() {
+        let expanded = expand(SOURCE);
+        assert!(expanded.contains("endpoint_id_hash"));
+        assert!(expanded.contains("CARGO_CRATE_NAME"));
+        assert!(expanded.contains("module_path ! ()"));
+        assert!(expanded.contains("stringify ! (double)"));
     }
 
     #[test]

@@ -23,7 +23,6 @@ syn = { workspace = true, features = ["full", "visit"] }
 
 serde.workspace = true
 serde_json.workspace = true
-uuid = { workspace = true, features = ["v4"] }
 
 [lints]
 workspace = true
