@@ -127,6 +127,8 @@ fixture_test!(explicit_cx_multiline);
 
 fixture_test!(class_macro_short);
 fixture_test!(class_macro_long);
+fixture_test!(class_macro_rust_body);
+fixture_test!(class_macro_in_view);
 
 // -- Local bindings ------------------------------------------------------------
 
