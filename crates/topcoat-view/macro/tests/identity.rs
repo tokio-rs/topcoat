@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use topcoat::{
     Result,
     context::Cx,
-    identity::Identity,
-    view::{View, component, view},
+    view::{View, component, identity::Identity, view},
 };
 
 fn empty_cx() -> Cx {

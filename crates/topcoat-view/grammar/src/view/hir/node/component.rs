@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{Path, spanned::Spanned};
-use topcoat_core_grammar::paths::{topcoat_error, topcoat_identity, topcoat_view};
+use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 use crate::view::{
     NamedArg,
@@ -37,7 +37,7 @@ impl Component {
         let ordinal = self.ordinal;
         quote_spanned! {self.path.span()=>
             const {
-                #topcoat_identity::SiteKey::new(
+                #topcoat_view::identity::SiteKey::new(
                     ::core::file!(),
                     ::core::line!(),
                     ::core::column!(),
@@ -92,17 +92,17 @@ impl Component {
                     let mut __key = ::core::option::Option::None;
                     #path::props_builder()
                         .#ident(#value, |__value| __key = ::core::option::Option::Some(__value));
-                    #topcoat_identity::IdentityFuture::keyed(#site, __key.unwrap(), #future)
+                    #topcoat_view::identity::IdentityFuture::keyed(#site, __key.unwrap(), #future)
                 }}
             }
             (None, true) => {
                 let label = self.label();
                 quote_spanned! {span=>
-                    #topcoat_identity::IdentityFuture::ambiguous(#site, #label, #future)
+                    #topcoat_view::identity::IdentityFuture::ambiguous(#site, #label, #future)
                 }
             }
             (None, false) => quote_spanned! {span=>
-                #topcoat_identity::IdentityFuture::new(#site, #future)
+                #topcoat_view::identity::IdentityFuture::new(#site, #future)
             },
         }
     }

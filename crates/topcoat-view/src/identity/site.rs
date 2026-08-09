@@ -1,4 +1,4 @@
-use crate::fnv1a::Fnv1a;
+use topcoat_core::fnv1a::Fnv1a;
 
 /// A compile-time key for one component invocation site.
 ///

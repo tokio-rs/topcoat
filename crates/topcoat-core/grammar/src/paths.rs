@@ -156,10 +156,6 @@ pub const topcoat_context_macro: Crate = Crate::new("context", "topcoat-core-mac
 #[allow(non_upper_case_globals)]
 pub const topcoat_error: Crate = Crate::new("", "topcoat-core", "error");
 
-/// `::topcoat::identity`, or `topcoat_core::identity` standalone.
-#[allow(non_upper_case_globals)]
-pub const topcoat_identity: Crate = Crate::new("identity", "topcoat-core", "identity");
-
 /// `::topcoat::internal`, or `topcoat_core::internal` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_internal: Crate = Crate::new("internal", "topcoat-core", "internal");

@@ -1,4 +1,4 @@
-use crate::fnv1a::Fnv1a;
+use topcoat_core::fnv1a::Fnv1a;
 
 /// A value that tells repetitions of one component invocation site apart.
 ///
@@ -15,7 +15,7 @@ use crate::fnv1a::Fnv1a;
 /// identifying parts in order:
 ///
 /// ```
-/// use topcoat_core::identity::{IdentityKey, KeyHasher};
+/// use topcoat_view::identity::{IdentityKey, KeyHasher};
 ///
 /// struct UserId(u64);
 ///

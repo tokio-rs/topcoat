@@ -34,8 +34,7 @@ pub use future::*;
 pub use guard::*;
 pub use key::*;
 pub use site::*;
-
-use crate::fnv1a::Fnv1a;
+use topcoat_core::fnv1a::Fnv1a;
 
 thread_local! {
     /// The identity of the component body running on the current thread, if

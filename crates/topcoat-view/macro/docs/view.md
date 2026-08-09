@@ -582,8 +582,8 @@ view! {
 [`topcoat::view::Attributes`]: struct.Attributes.html
 [`topcoat::view::Class`]: struct.Class.html
 [`view!`]: macro.view.html
-[`Identity`]: ../identity/struct.Identity.html
-[`Identity::current`]: ../identity/struct.Identity.html#method.current
-[`IdentityKey`]: ../identity/trait.IdentityKey.html
+[`Identity`]: identity/struct.Identity.html
+[`Identity::current`]: identity/struct.Identity.html#method.current
+[`IdentityKey`]: identity/trait.IdentityKey.html
 [`StatusCode`]: https://docs.rs/http/latest/http/status/struct.StatusCode.html
 [`HeaderMap`]: https://docs.rs/http/latest/http/header/struct.HeaderMap.html

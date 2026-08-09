@@ -5,6 +5,7 @@ mod component;
 mod css;
 mod format;
 mod html;
+pub mod identity;
 mod part;
 mod props;
 pub mod svg;

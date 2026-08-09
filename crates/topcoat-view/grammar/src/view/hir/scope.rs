@@ -142,7 +142,7 @@ mod tests {
         let path = syn::parse_str(name).unwrap();
         let key = NamedArg {
             ident: syn::parse_quote!(key),
-            colon: Default::default(),
+            colon: syn::token::Colon::default(),
             value: NamedArgValue::Expr(key.clone()),
         };
         builder.component(
