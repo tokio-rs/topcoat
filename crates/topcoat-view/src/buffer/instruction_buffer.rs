@@ -74,6 +74,7 @@ impl InstructionBuffer {
                 Instruction::F32(_) => "F32",
                 Instruction::F64(_) => "F64",
                 Instruction::Char { .. } => "Char",
+                Instruction::PromotedStr { .. } => "PromotedStr",
                 Instruction::StaticStr { .. } => "StaticStr",
                 Instruction::Str { .. } => "Str",
                 Instruction::String { .. } => "String",

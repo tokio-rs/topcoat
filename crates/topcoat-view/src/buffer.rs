@@ -238,6 +238,19 @@ impl ViewBuffer {
         self.push_instruction(Instruction::Char { value, context });
     }
 
+    /// Appends a static string held by reference.
+    ///
+    /// Pass `&"..."`, which Rust promotes to a reference into the binary's
+    /// read-only data. The string stays out of the buffer's constants, so
+    /// prefer this over [`push_static_str`](Self::push_static_str) whenever
+    /// the string is written as a literal.
+    pub fn push_promoted_str(&mut self, value: &'static &'static str, context: HtmlContext) {
+        if value.is_empty() {
+            return;
+        }
+        self.push_instruction(Instruction::PromotedStr { value, context });
+    }
+
     pub fn push_static_str(&mut self, value: &'static str, context: HtmlContext) {
         if value.is_empty() {
             return;

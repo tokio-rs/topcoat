@@ -206,9 +206,9 @@ mod tests {
         let out = rendered(builder);
         assert!(out.contains("let __expr0 = value"));
         assert!(out.contains("internal :: block"));
-        assert!(out.contains("__b . markup (\"<p>\")"));
+        assert!(out.contains("__b . markup (& \"<p>\")"));
         assert!(out.contains("__b . node (__expr0)"));
-        assert!(out.contains("__b . markup (\"</p>\")"));
+        assert!(out.contains("__b . markup (& \"</p>\")"));
     }
 
     #[test]

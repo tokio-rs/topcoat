@@ -148,9 +148,12 @@ pub struct Builder<'a, 'b, 'c> {
 
 impl Builder<'_, '_, '_> {
     /// Appends a literal markup segment, verbatim.
+    ///
+    /// The segment is passed as `&"..."` so it stays out of the buffer's
+    /// constants.
     #[inline]
-    pub fn markup(&mut self, s: &'static str) {
-        self.parts.push_static_str_unescaped(s);
+    pub fn markup(&mut self, s: &'static &'static str) {
+        self.parts.push_promoted_str_unescaped(s);
     }
 
     /// Appends a value in a text node position.

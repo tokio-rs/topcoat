@@ -60,7 +60,21 @@ pub enum Instruction {
     /// A character rendered for the recorded context.
     Char { value: char, context: HtmlContext },
 
-    /// A static string and its context.
+    /// A static string held by reference, and its context.
+    ///
+    /// The string is held as a reference to a `&'static str` so the operand
+    /// stays one word wide, since the pointer and length pair it refers to
+    /// lives in the binary's read-only data. Callers pass `&"..."`, which
+    /// Rust promotes to the required reference.
+    PromotedStr {
+        value: &'static &'static str,
+        context: HtmlContext,
+    },
+    /// A static string recorded in the buffer's constants, and its context.
+    ///
+    /// A `&'static str` that is only known at run time cannot be promoted, so
+    /// it is held out of line instead. A string written as a literal should go
+    /// through [`PromotedStr`](Self::PromotedStr).
     StaticStr {
         ptr: StaticStrPtr,
         context: HtmlContext,

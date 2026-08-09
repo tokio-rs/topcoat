@@ -147,6 +147,20 @@ impl<'a> PartsWriter<'a> {
         self
     }
 
+    /// Appends a static string held by reference, sealed with this writer's
+    /// context.
+    ///
+    /// Pass `&"..."`, which Rust promotes to a reference into the binary's
+    /// read-only data. The string stays out of the buffer's constants, so
+    /// prefer this over [`push_static_str`](Self::push_static_str) whenever
+    /// the string is written as a literal.
+    #[inline]
+    pub fn push_promoted_str(&mut self, value: &'static &'static str) -> &mut Self {
+        self.size_hint += Self::str_size_hint(value, self.context);
+        self.buffer.push_promoted_str(value, self.context);
+        self
+    }
+
     /// Appends an owned string, sealed with this writer's context.
     #[inline]
     pub fn push_string(&mut self, value: String) -> &mut Self {
@@ -176,6 +190,24 @@ impl<'a> PartsWriter<'a> {
     pub fn push_static_str_unescaped(&mut self, value: &'static str) -> &mut Self {
         self.size_hint += value.len();
         self.buffer.push_static_str(value, HtmlContext::Unescaped);
+        self
+    }
+
+    /// Appends a static string held by reference that renders verbatim,
+    /// bypassing this writer's context.
+    ///
+    /// Pass `&"..."`, which Rust promotes to a reference into the binary's
+    /// read-only data. The string stays out of the buffer's constants, so
+    /// prefer this over
+    /// [`push_static_str_unescaped`](Self::push_static_str_unescaped)
+    /// whenever the string is written as a literal.
+    ///
+    /// Use this only for trusted markup. Passing untrusted input defeats the
+    /// runtime's escaping and can lead to XSS vulnerabilities.
+    #[inline]
+    pub fn push_promoted_str_unescaped(&mut self, value: &'static &'static str) -> &mut Self {
+        self.size_hint += value.len();
+        self.buffer.push_promoted_str(value, HtmlContext::Unescaped);
         self
     }
 

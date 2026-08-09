@@ -75,6 +75,9 @@ impl<'a> Renderer<'a> {
                 Instruction::F64(inner) => write!(f, "{inner}").unwrap(),
                 Instruction::Char { value, context } => context.writer(f).write_char(*value),
 
+                Instruction::PromotedStr { value, context } => {
+                    context.writer(f).write_str(value);
+                }
                 Instruction::StaticStr { ptr, context } => {
                     context.writer(f).write_str(consts.fetch_static_str(*ptr));
                 }
