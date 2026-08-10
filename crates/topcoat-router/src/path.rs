@@ -1,6 +1,8 @@
 use std::{
     borrow::{Borrow, Cow},
     fmt::{Display, Write},
+    iter::FusedIterator,
+    mem,
     ops::{AddAssign, Deref},
 };
 
@@ -131,13 +133,8 @@ impl Path {
     ///     ]
     /// );
     /// ```
-    pub fn segments(&self) -> impl Iterator<Item = PathSegment<'_>> {
-        // The path was validated on construction, so its segments need no
-        // re-validation here.
-        self.inner
-            .split('/')
-            .skip(1)
-            .map(PathSegment::new_unchecked)
+    pub fn segments(&self) -> PathSegments<'_> {
+        PathSegments::new(self)
     }
 
     /// Converts this path to a `matchit`-compatible route string, stripping group
@@ -204,7 +201,7 @@ impl Path {
         if self.inner.len() < other.inner.len() {
             return false;
         }
-        return self.segments().zip(other.segments()).all(|(a, b)| a == b);
+        self.segments().zip(other.segments()).all(|(a, b)| a == b)
     }
 
     /// Returns `true` if `url`, a concrete URL path, matches this route path
@@ -273,6 +270,24 @@ impl Path {
 
     /// Returns the string backing this path.
     ///
+    /// The root path is backed by the empty string rather than `"/"`, matching
+    /// the normalization [`new`](Path::new) applies.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use topcoat_router::Path;
+    ///
+    /// assert_eq!(Path::new("/users/{id}").as_str(), "/users/{id}");
+    /// assert_eq!(Path::new("/").as_str(), "");
+    /// ```
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.inner
+    }
+
+    /// Returns the length of the string backing this path.
+    ///
     /// This length is in bytes, not [`char`]s or graphemes. In other words,
     /// it might not be what a human considers the length of the string.
     #[must_use]
@@ -308,6 +323,76 @@ impl<'a> From<&'a Path> for Cow<'a, Path> {
         Self::Borrowed(value)
     }
 }
+
+/// An iterator over the [`PathSegment`]s of a [`Path`], created by
+/// [`Path::segments`].
+#[derive(Debug, Clone)]
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+pub struct PathSegments<'path> {
+    /// The `/`-separated body left to walk, without a leading `/`.
+    rest: &'path str,
+    /// Whether the body is used up. It is tracked separately because the last
+    /// segment leaves `rest` empty, which is also how the root path starts out.
+    done: bool,
+}
+
+impl<'path> PathSegments<'path> {
+    fn new(path: &'path Path) -> Self {
+        match path.inner.strip_prefix('/') {
+            Some(rest) => Self { rest, done: false },
+            // The root path is backed by the empty string and has no segments.
+            None => Self {
+                rest: "",
+                done: true,
+            },
+        }
+    }
+
+    /// Marks the body as used up and returns what was left of it, the segment
+    /// at whichever end the caller was reading.
+    fn last_segment(&mut self) -> &'path str {
+        self.done = true;
+        mem::take(&mut self.rest)
+    }
+}
+
+impl<'path> Iterator for PathSegments<'path> {
+    type Item = PathSegment<'path>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        let segment = match self.rest.split_once('/') {
+            Some((segment, rest)) => {
+                self.rest = rest;
+                segment
+            }
+            None => self.last_segment(),
+        };
+        // The path was validated on construction, so its segments need no
+        // re-validation here.
+        Some(PathSegment::new_unchecked(segment))
+    }
+}
+
+impl DoubleEndedIterator for PathSegments<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        let segment = match self.rest.rsplit_once('/') {
+            Some((rest, segment)) => {
+                self.rest = rest;
+                segment
+            }
+            None => self.last_segment(),
+        };
+        Some(PathSegment::new_unchecked(segment))
+    }
+}
+
+impl FusedIterator for PathSegments<'_> {}
 
 /// The reason a string could not be parsed into a [`Path`] by
 /// [`Path::from_str`].
@@ -605,6 +690,26 @@ impl<'a> PathSegment<'a> {
         }
     }
 
+    /// Returns the name this segment captures a value under, or `None` if it
+    /// captures nothing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use topcoat_router::PathSegment;
+    ///
+    /// assert_eq!(PathSegment::Param("id").param_name(), Some("id"));
+    /// assert_eq!(PathSegment::CatchAll("rest").param_name(), Some("rest"));
+    /// assert_eq!(PathSegment::Static("users").param_name(), None);
+    /// ```
+    #[must_use]
+    pub fn param_name(&self) -> Option<&'a str> {
+        match *self {
+            Self::Param(name) | Self::CatchAll(name) => Some(name),
+            Self::Static(_) | Self::Group(_) => None,
+        }
+    }
+
     /// Returns the inner string if this is a [`Param`](PathSegment::Param) segment.
     #[must_use]
     pub fn as_param(&self) -> Option<&&'a str> {
@@ -732,6 +837,41 @@ mod tests {
         let path = Path::new("/home");
         let segs: Vec<_> = path.segments().collect();
         assert_eq!(segs, vec![PathSegment::Static("home")]);
+    }
+
+    #[test]
+    fn path_segments_from_the_back() {
+        let path = Path::new("/dashboard/{id}/(auth)");
+        let segs: Vec<_> = path.segments().rev().collect();
+        assert_eq!(
+            segs,
+            vec![
+                PathSegment::Group("auth"),
+                PathSegment::Param("id"),
+                PathSegment::Static("dashboard"),
+            ]
+        );
+    }
+
+    #[test]
+    fn path_segments_from_both_ends_meet_in_the_middle() {
+        let path = Path::new("/a/b/c");
+        let mut segments = path.segments();
+
+        assert_eq!(segments.next(), Some(PathSegment::Static("a")));
+        assert_eq!(segments.next_back(), Some(PathSegment::Static("c")));
+        assert_eq!(segments.next(), Some(PathSegment::Static("b")));
+        // Both ends are exhausted once they meet.
+        assert_eq!(segments.next(), None);
+        assert_eq!(segments.next_back(), None);
+    }
+
+    #[test]
+    fn root_path_yields_no_segments_from_either_end() {
+        let mut segments = Path::new("/").segments();
+
+        assert_eq!(segments.next(), None);
+        assert_eq!(segments.next_back(), None);
     }
 
     #[test]
@@ -1048,6 +1188,14 @@ mod tests {
         let seg = PathSegment::new("(auth)");
         assert!(seg.is_group());
         assert_eq!(seg.as_group(), Some(&"auth"));
+    }
+
+    #[test]
+    fn only_param_and_catch_all_segments_capture() {
+        assert_eq!(PathSegment::new("{id}").param_name(), Some("id"));
+        assert_eq!(PathSegment::new("{*rest}").param_name(), Some("rest"));
+        assert_eq!(PathSegment::new("users").param_name(), None);
+        assert_eq!(PathSegment::new("(auth)").param_name(), None);
     }
 
     #[test]

@@ -42,6 +42,13 @@ impl Parse for ComponentItem {
                     ));
                 }
                 FnArg::Typed(pat_type) => match &*pat_type.pat {
+                    Pat::Ident(pat) if pat.ident == "key" => {
+                        return Err(syn::Error::new_spanned(
+                            &pat.ident,
+                            "components cannot take a `key` parameter: \
+                             `view!` reserves `key` for the invocation's identity key",
+                        ));
+                    }
                     Pat::Ident(_) => {}
                     _ => {
                         return Err(syn::Error::new_spanned(
@@ -86,6 +93,12 @@ mod tests {
     fn rejects_self_receiver() {
         let err = parse_err("async fn badge(&self) -> Result {}");
         assert!(err.contains("cannot take a `self` receiver"));
+    }
+
+    #[test]
+    fn rejects_key_parameter() {
+        let err = parse_err("async fn badge(key: &str) -> Result {}");
+        assert!(err.contains("reserves `key`"));
     }
 
     #[test]

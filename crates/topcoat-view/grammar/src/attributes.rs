@@ -4,9 +4,9 @@ mod attribute_node;
 mod attribute_nodes;
 mod attribute_spread;
 mod attribute_value;
-mod attribute_writer;
 mod bind_attribute;
 mod event_handler;
+pub(crate) mod hir;
 mod visitor;
 
 use std::collections::HashSet;
@@ -17,7 +17,6 @@ pub use attribute_node::*;
 pub use attribute_nodes::*;
 pub use attribute_spread::*;
 pub use attribute_value::*;
-pub(crate) use attribute_writer::*;
 pub use bind_attribute::*;
 pub use event_handler::*;
 use proc_macro2::{Span, TokenStream};
@@ -27,9 +26,10 @@ use topcoat_core_grammar::ParseOption;
 pub use visitor::*;
 
 use crate::{
+    attributes::hir::{AttributeBuilder, LowerAttribute},
     leading_cx::LeadingCx,
     template::{TemplateElse, TemplateForLoop, TemplateIf, TemplateMatch},
-    view::{self, ViewWriter, WriteView},
+    view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
 /// The full list of attributes attached to a single tag.
@@ -53,8 +53,8 @@ impl Attributes {
     }
 }
 
-impl WriteView for Attributes {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for Attributes {
+    fn lower(&self, builder: &mut ViewBuilder) {
         let mut visitor = DynamicAttributesVisitor::default();
         for item in &self.items {
             visitor.visit_node(item);
@@ -62,19 +62,19 @@ impl WriteView for Attributes {
         // If we cannot statically assert that all attribute keys are unique we must fall back to a
         // slower runtime map of attributes.
         if visitor.dynamic {
-            writer.write_expr(view::ExprKind::Attributes, self.to_token_stream());
+            builder.expr(ExprKind::Attributes, self.to_token_stream());
         } else {
             for item in &self.items {
-                WriteView::write(item, writer);
+                LowerView::lower(item, builder);
             }
         }
     }
 }
 
-impl WriteAttribute for Attributes {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for Attributes {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         for item in &self.items {
-            WriteAttribute::write(item, writer);
+            LowerAttribute::lower(item, builder);
         }
     }
 }
@@ -102,9 +102,9 @@ impl Parse for Attributes {
 
 impl ToTokens for Attributes {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let mut writer = AttributeWriter::new();
-        WriteAttribute::write(self, &mut writer);
-        let attrs = writer.into_token_stream();
+        let mut builder = AttributeBuilder::new();
+        LowerAttribute::lower(self, &mut builder);
+        let attrs = builder.finish().emit();
 
         // When an explicit context is named, bind it to the `__cx` identifier
         // the generated `__attrs.insert(__cx, ...)` calls read from. Inside a
@@ -295,11 +295,11 @@ mod tests {
         syn::parse_str(source).unwrap()
     }
 
-    /// Renders the `WriteView` output of an attribute list to a token string.
+    /// Renders the `LowerView` output of an attribute list to a token string.
     fn write_view(source: &str) -> String {
-        let mut writer = ViewWriter::new();
-        WriteView::write(&parse(source), &mut writer);
-        writer.into_token_stream().to_string()
+        let mut builder = ViewBuilder::new();
+        LowerView::lower(&parse(source), &mut builder);
+        builder.finish().emit_root().to_string()
     }
 
     /// Returns `true` if the attribute list falls back to a runtime `Attributes`

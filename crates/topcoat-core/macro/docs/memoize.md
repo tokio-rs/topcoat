@@ -20,9 +20,7 @@ async fn get_user(cx: &Cx, id: i64) -> User {
 }
 ```
 
-That's it. Calling `get_user(cx, 42).await` from anywhere in the request (a page, a layout, a component) runs the body the first time and returns the cached `User` for every subsequent call with `id == 42`. The function's return type `T` is rewritten to `&T` that has the same lifetime as `&cx`.
-
-Top-level `Option<T>` and `Result<T, E>` return types are borrowed ergonomically: the macro calls `.as_ref()` on the cached value and returns `Option<&T>` or `Result<&T, &E>` instead of `&Option<T>` or `&Result<T, E>`.
+That's it. Calling `get_user(cx, 42).await` from anywhere in the request (a page, a layout, a component) runs the body the first time and returns the cached `User` for every subsequent call with `id == 42`. The function's return type `T` is rewritten to `&T` that has the same lifetime as `&cx`. To borrow the contents of an `Option<T>` or `Result<T, E>` return value instead, see [`as_ref`](#borrowing-option-and-result-contents) below.
 
 # Sync and async
 
@@ -142,6 +140,31 @@ Nested memoized functions propagate dependencies into active callers on misses a
 
 App-context reads are not dependencies because app context does not change during a request. Mutation through a `Mutex`, atomic, or another interior-mutability API is also not visible to memoization. When such state affects a result, update a root value through `get_mut` before immutable rendering begins, or pass a fresh scoped binding.
 
+# Borrowing Option and Result contents
+
+By default the macro returns a reference to the cached value itself: a function returning `Option<User>` hands out `&Option<User>`. Pass `as_ref` to the attribute to borrow the cached value's contents instead:
+
+```rust
+# fn main() {}
+# struct User;
+# mod db {
+#     pub async fn load_user(_id: i64) -> Option<super::User> { None }
+# }
+use topcoat::context::{Cx, memoize};
+
+#[memoize(as_ref)]
+async fn find_user(cx: &Cx, id: i64) -> Option<User> {
+    db::load_user(id).await
+}
+
+# async fn example(cx: &Cx) {
+let user: Option<&User> = find_user(cx, 42).await;
+# let _ = user;
+# }
+```
+
+With `as_ref`, the macro rewrites the return type through the `MemoizeAsRef` trait: `Option<T>` comes back as `Option<&T>` and `Result<T, E>` as `Result<&T, &E>`. Implement the trait for your own return types to use them with `as_ref`.
+
 # Borrowed and owned arguments
 
 Arguments can be passed by value or by reference. Borrowed arguments avoid cloning on cache hits; on a miss the value is cloned once into the cache.
@@ -154,7 +177,7 @@ Arguments can be passed by value or by reference. Borrowed arguments avoid cloni
 # mod db {
 #     pub async fn find(_name: &str) -> Result<super::Record, super::Error> { Ok(super::Record) }
 # }
-#[memoize]
+#[memoize(as_ref)]
 async fn lookup(cx: &Cx, name: &str) -> Result<Record, Error> {
     db::find(name).await
 }
@@ -203,7 +226,7 @@ use topcoat::{
     view::view,
 };
 
-#[memoize]
+#[memoize(as_ref)]
 async fn current_user(cx: &Cx) -> Option<User> {
     auth::resolve(cx).await
 }

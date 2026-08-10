@@ -1,25 +1,29 @@
 use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote, quote_spanned};
+use quote::ToTokens;
 use syn::{
     Expr, Ident, Path, Token, parenthesized,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Paren,
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
+use topcoat_core_grammar::ParseOption;
 
 use crate::{
     template::RuntimeExpr,
-    view::{ExprKind, Nodes, ViewWriter, WriteView},
+    view::{
+        Nodes,
+        hir::{LowerView, ViewBuilder},
+    },
 };
 
 /// A component invocation, written as `path(name: value, ..., child_node child_node ...)`.
 ///
 /// Named arguments come first, separated by `,`. Any child nodes appear after
 /// the last named argument (separated from it by `,`) and run together without
-/// separators.
+/// separators. The `key` name is reserved: it carries the invocation's
+/// identity key rather than a prop.
 pub struct Component {
     pub path: Path,
     pub paren_token: Paren,
@@ -27,7 +31,25 @@ pub struct Component {
     pub children: Nodes,
 }
 
+impl Component {
+    /// The `key:` argument, which keys the invocation's identity rather
+    /// than setting a prop.
+    fn identity_key(&self) -> Option<&NamedArg> {
+        self.named_args.iter().find(|arg| arg.ident == "key")
+    }
+
+    /// The named arguments that set props, everything but `key`.
+    fn props(&self) -> Vec<NamedArg> {
+        self.named_args
+            .iter()
+            .filter(|arg| arg.ident != "key")
+            .cloned()
+            .collect()
+    }
+}
+
 /// A `name: value` entry in a component's argument list.
+#[derive(Clone)]
 pub struct NamedArg {
     pub ident: Ident,
     pub colon: Token![:],
@@ -36,6 +58,7 @@ pub struct NamedArg {
 
 /// The value of a [`NamedArg`]. Either a plain Rust expression or a `$(...)`
 /// runtime expression.
+#[derive(Clone)]
 pub enum NamedArgValue {
     Expr(Expr),
     Runtime(RuntimeExpr),
@@ -70,42 +93,14 @@ impl topcoat_core_grammar::pretty::PrettyPrint for NamedArgValue {
     }
 }
 
-impl WriteView for Component {
-    fn write(&self, writer: &mut ViewWriter) {
-        let name = &self.path;
-
-        let setters = self.named_args.iter().map(|arg| {
-            let ident = &arg.ident;
-            let value = &arg.value;
-            quote! { .#ident(#value) }
-        });
-        let child = (!self.children.is_empty()).then(|| {
-            let mut child_writer = ViewWriter::new_nested();
-            for child in &self.children {
-                child.write(&mut child_writer);
-            }
-            let child = child_writer.into_token_stream();
-            quote_spanned! {self.paren_token.span.span()=>
-                .child(#child)
-            }
-        });
-
-        writer.write_expr(
-            ExprKind::View,
-            quote_spanned! {self.paren_token.span.span()=>
-                {
-                    use #topcoat_view::Component;
-                    let props = #name::props_builder()#(#setters)*#child.build();
-                    // The marker is built via `Default` so the same construction
-                    // works for both unit-struct and generic (`PhantomData`) markers.
-                    #[allow(clippy::default_constructed_unit_structs)]
-                    Component::render(
-                        #name::default(),
-                        __cx,
-                        props,
-                    ).await?
-                }
-            },
+impl LowerView for Component {
+    fn lower(&self, builder: &mut ViewBuilder) {
+        builder.component(
+            &self.path,
+            self.props(),
+            self.identity_key(),
+            &self.children,
+            self.paren_token.span.span(),
         );
     }
 }
@@ -135,6 +130,13 @@ impl Parse for Component {
                     }
                     let colon: Token![:] = content.parse()?;
                     let value: NamedArgValue = content.parse()?;
+                    if ident == "key" && matches!(value, NamedArgValue::Runtime(_)) {
+                        return Err(syn::Error::new_spanned(
+                            &value,
+                            "`key` is the invocation's identity key \
+                             and must be a plain Rust expression",
+                        ));
+                    }
                     named_args.push(NamedArg {
                         ident,
                         colon,
@@ -280,6 +282,26 @@ mod tests {
         let component = parse(r"button(prop1: 5, foo::checkbox())");
         assert_eq!(component.named_args.len(), 1);
         assert_eq!(component.children.len(), 1);
+    }
+
+    #[test]
+    fn key_is_split_off_from_the_props() {
+        let component = parse(r#"card(key: item.id, title: "hi")"#);
+        assert!(component.identity_key().is_some());
+        let props = component.props();
+        assert_eq!(props.len(), 1);
+        assert_eq!(props[0].ident.to_string(), "title");
+    }
+
+    #[test]
+    fn without_a_key_argument_there_is_no_identity_key() {
+        let component = parse(r#"card(title: "hi")"#);
+        assert!(component.identity_key().is_none());
+    }
+
+    #[test]
+    fn runtime_key_is_rejected() {
+        assert!(parse_err(r"card(key: $(id))").contains("identity key"));
     }
 
     #[test]

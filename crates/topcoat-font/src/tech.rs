@@ -76,8 +76,11 @@ impl FontTech {
     }
 
     /// Folds this technology into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
-        topcoat_core::fnv1a::hash_continue(h, self.keyword().as_bytes())
+    pub(crate) const fn hash(
+        self,
+        h: topcoat_core::fnv1a::Fnv1a<u64>,
+    ) -> topcoat_core::fnv1a::Fnv1a<u64> {
+        h.write(self.keyword().as_bytes())
     }
 }
 

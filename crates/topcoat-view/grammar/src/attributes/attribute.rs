@@ -8,8 +8,11 @@ use syn::{
 use topcoat_core_grammar::ParseOption;
 
 use crate::{
-    attributes::{AttributeKey, AttributeValue, AttributeWriter, WriteAttribute},
-    view::{ExprKind, ViewWriter, WriteView},
+    attributes::{
+        AttributeKey, AttributeValue,
+        hir::{AttributeBuilder, LowerAttribute},
+    },
+    view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
 /// A `name=value` attribute on an element, or an entry in an
@@ -24,34 +27,34 @@ pub struct Attribute {
     pub value: AttributeValue,
 }
 
-impl WriteView for Attribute {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for Attribute {
+    fn lower(&self, builder: &mut ViewBuilder) {
         match self.value {
             AttributeValue::LitStr(_) => {
-                writer.write_str_unescaped(" ");
-                self.key.write(writer);
-                writer.write_str_unescaped("=\"");
-                self.value.write(writer);
-                writer.write_str_unescaped("\"");
+                builder.str_unescaped(" ");
+                self.key.lower(builder);
+                builder.str_unescaped("=\"");
+                self.value.lower(builder);
+                builder.str_unescaped("\"");
             }
             AttributeValue::Expr(_) => {
                 let key = &self.key;
                 let value = &self.value;
                 if matches!(key, AttributeKey::Expr(..)) {
-                    writer.write_expr(ExprKind::Attribute, quote! { (#key, #value) });
+                    builder.expr(ExprKind::Attribute, quote! { (#key, #value) });
                 } else {
-                    writer.write_expr(ExprKind::AttributeUnescaped, quote! { (#key, #value) });
+                    builder.expr(ExprKind::AttributeUnescaped, quote! { (#key, #value) });
                 }
             }
         }
     }
 }
 
-impl WriteAttribute for Attribute {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for Attribute {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         let key = &self.key;
         let value = &self.value;
-        writer.insert(quote! { #key }, quote! { #value });
+        builder.insert(quote! { #key }, quote! { #value });
     }
 }
 

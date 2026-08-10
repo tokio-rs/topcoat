@@ -75,7 +75,7 @@ kill_tree() {
 
 build_topcoat() {
     (cd "$ROOT" && cargo build --release -p storefront-topcoat)
-    (cd "$ROOT" && topcoat asset bundle --package storefront-topcoat)
+    (cd "$ROOT" && cargo topcoat asset bundle --release --package storefront-topcoat)
 }
 
 start_topcoat() {

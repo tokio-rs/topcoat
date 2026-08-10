@@ -60,6 +60,8 @@ members = [
     "examples/ui",
     "examples/websocket",
 
+    "demos/coffee-shop",
+
     "benchmarks/topcoat",
 ]
 exclude = [

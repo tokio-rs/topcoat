@@ -1,5 +1,5 @@
-#[test]
-fn attributes_macro_builds_runtime_attributes() {
+#[tokio::test]
+async fn attributes_macro_builds_runtime_attributes() {
     let cx = &topcoat::context::Cx::default();
     let id = "submit";
     let dynamic = [
@@ -74,8 +74,8 @@ async fn spread_follows_other_attributes() {
     assert!(html.contains(r#"type="submit""#));
 }
 
-#[test]
-fn dynamic_key_still_parses_after_spread_support() {
+#[tokio::test]
+async fn dynamic_key_still_parses_after_spread_support() {
     // A parenthesized key followed by `=` remains a dynamic attribute, not a
     // spread.
     let cx = &topcoat::context::Cx::default();

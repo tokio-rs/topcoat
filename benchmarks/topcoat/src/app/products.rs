@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{page, query_params},
-    view::{class, view},
+    view::{StaticClass, class, view},
 };
 
 use crate::{
@@ -21,9 +21,11 @@ const SORT_OPTIONS: [(Option<&str>, &str); 5] = [
     (Some("rating"), "Rating"),
 ];
 
-const CHIP_ACTIVE: &str = "rounded-full bg-slate-900 px-3 py-1 font-medium text-white";
-const CHIP_INACTIVE: &str =
-    "rounded-full bg-white px-3 py-1 font-medium text-slate-600 shadow-sm hover:bg-slate-100";
+const CHIP_ACTIVE: StaticClass =
+    class!("rounded-full bg-slate-900 px-3 py-1 font-medium text-white");
+const CHIP_INACTIVE: StaticClass = class!(
+    "rounded-full bg-white px-3 py-1 font-medium text-slate-600 shadow-sm hover:bg-slate-100",
+);
 
 #[query_params(error = bad_request)]
 struct ProductsQuery {

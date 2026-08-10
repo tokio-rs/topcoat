@@ -16,7 +16,7 @@ Small, focused pull requests are much easier to accept than large ones. If a cha
 
 ## Local setup
 
-Topcoat is a plain Cargo workspace. The framework crates live in `crates/`, runnable example apps in `examples/`.
+Topcoat is a plain Cargo workspace. The framework crates live in `crates/`, small single-feature examples in `examples/`, and complete demo applications in `demos/`.
 
 A stable toolchain is enough to build and test everything. `rust-toolchain.toml` pins stable, and a nightly toolchain is required for the formatter and the doc check:
 
@@ -34,7 +34,7 @@ Install the CLI from the workspace so `topcoat fmt` and the dev server match the
 cargo install --path crates/topcoat-cli
 ```
 
-The examples are the fastest way to try a change against a real app. Each one is a workspace member, so `topcoat dev` inside `examples/hello-world` (or any other example directory) builds and serves it.
+The examples are the fastest way to try a change against a real app. Each one is a workspace member, so `topcoat dev` inside `examples/hello-world` (or any other example directory) builds and serves it. An example covers one feature; a demo in `demos/` is a whole application that puts many of them together, which is the better place to see how a change holds up in context.
 
 ## Fork and branch
 

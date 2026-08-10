@@ -11,7 +11,8 @@ use topcoat_core::context::try_request_context;
 use topcoat_core::context::{ContextMap, Cx};
 
 use crate::{
-    Endpoint, Layer, Layers, Next, OriginLayer, RawPathParams, Route, RouterBuilder, Terminal,
+    Endpoint, EndpointPath, Layer, Layers, Next, OriginLayer, RawPathParams, Route, RouterBuilder,
+    Terminal,
     error::{internal_server_response, not_found, respond},
     request::Request,
     response::Response,
@@ -98,18 +99,17 @@ impl Router {
         // layer stack whether the method matches (a route) or not (405), so
         // both flow through the same layers.
         let endpoint = matched.value;
-        let path_params = {
-            debug_assert_eq!(endpoint.path_params().len(), matched.params.len());
-            let keys = endpoint.path_params().iter().cloned();
-            let values = matched.params.iter().map(|(_, value)| value);
-            RawPathParams::from_pairs(keys.zip(values))
-        };
+        let path_params = RawPathParams::from_match(
+            endpoint.path(),
+            matched.params.iter().map(|(_, value)| value),
+        );
         let terminal = match endpoint.get(&parts.method).or_else(|| endpoint.any()) {
             Some(index) => Terminal::Route(&*self.routes[index]),
             None => Terminal::MethodNotAllowed(endpoint),
         };
 
-        let mut cx = Cx::new(self.app_context.clone());
+        let mut cx = Cx::new(Arc::clone(&self.app_context));
+        cx.insert(EndpointPath(endpoint.shared_path().clone()));
         cx.insert(path_params);
         cx.insert(parts);
 
@@ -142,16 +142,17 @@ mod tests {
     };
 
     use http::{HeaderMap, StatusCode};
+    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, View, view};
     use topcoat_core::{
         context::{Cx, app_context, request_context},
         error::Result,
     };
-    use topcoat_view::{DynViewPart, HtmlContext, HtmlWriter, PartsWriter, View, ViewParts};
 
     use super::*;
     use crate::{
         Body, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn, Path, RouteFn,
-        RouteFuture, request::Bytes, response::IntoResponse, to_bytes,
+        RouteFuture, endpoint_path, raw_path_params, request::Bytes, response::IntoResponse,
+        to_bytes,
     };
 
     // -- Test helpers --
@@ -206,14 +207,17 @@ mod tests {
     /// Echoes the captured path params as `key=value` pairs joined by `&`.
     fn echo_params(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
-            let params: &RawPathParams = request_context(cx);
-            params
-                .into_iter()
-                .map(|(key, value)| format!("{key}={value}"))
+            raw_path_params(cx)
+                .map(|(key, value)| format!("{key}={}", value.as_str()))
                 .collect::<Vec<_>>()
                 .join("&")
                 .into_response(cx)
         })
+    }
+
+    /// Echoes the path of the endpoint the request matched.
+    fn echo_endpoint_path(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { endpoint_path(cx).to_string().into_response(cx) })
     }
 
     /// Reads a registered app-context greeting and returns it as the body.
@@ -261,58 +265,58 @@ mod tests {
     // Page and layout render functions for the rendering tests.
     type ViewFuture<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
 
-    fn view(text: &'static str) -> View {
-        let mut parts = ViewParts::new();
-        PartsWriter::new(&mut parts, HtmlContext::Text).push_str(text);
-        View::new(parts)
+    fn render_page(cx: &Cx, _body: Body) -> ViewFuture<'_> {
+        Box::pin(async move {
+            view! { cx => "page" }
+        })
     }
 
-    fn render_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
-        Box::pin(async move { Ok(view("page")) })
-    }
-
+    /// A view part that panics when it renders, so the router's panic
+    /// handling during rendering is observable.
     #[derive(Debug, Clone)]
-    struct PanickingViewPart;
+    struct Panicking;
 
-    impl DynViewPart for PanickingViewPart {
+    impl NodeViewParts for Panicking {
+        fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+            parts.push_dyn(Box::new(self));
+        }
+    }
+
+    impl DynViewPart for Panicking {
         fn render(&self, _cx: &Cx, _w: &mut HtmlWriter<'_, '_>) {
             panic!("view rendering panicked");
         }
-
-        fn clone_box(&self) -> Box<dyn DynViewPart> {
-            Box::new(self.clone())
-        }
     }
 
-    fn render_panicking_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
+    fn render_panicking_page(cx: &Cx, _body: Body) -> ViewFuture<'_> {
         Box::pin(async move {
-            let mut parts = ViewParts::new();
-            PartsWriter::new(&mut parts, HtmlContext::Text).push_dyn(Box::new(PanickingViewPart));
-            Ok(View::new(parts))
+            view! { cx => (Panicking) }
         })
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
-    fn layout_root(_cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
+    fn layout_root(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
-            let mut parts = ViewParts::new();
-            PartsWriter::new(&mut parts, HtmlContext::Text).push_str("R[");
-            parts.push_view(inner);
-            PartsWriter::new(&mut parts, HtmlContext::Text).push_str("]");
-            Ok(View::new(parts))
+            view! {
+                cx =>
+                "R["
+                (inner)
+                "]"
+            }
         })
     }
 
     /// Wraps the child content in `A[ ... ]`.
-    fn layout_admin(_cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
+    fn layout_admin(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
         Box::pin(async move {
             let inner = slot?;
-            let mut parts = ViewParts::new();
-            PartsWriter::new(&mut parts, HtmlContext::Text).push_str("A[");
-            parts.push_view(inner);
-            PartsWriter::new(&mut parts, HtmlContext::Text).push_str("]");
-            Ok(View::new(parts))
+            view! {
+                cx =>
+                "A["
+                (inner)
+                "]"
+            }
         })
     }
 
@@ -397,6 +401,52 @@ mod tests {
         // The raw catch-all keeps the encoded remainder, slashes included.
         let (_, _, body) = send(&router, Method::GET, "/files/a%2Fb/c%20d");
         assert_eq!(&body[..], b"rest=a%2Fb/c%20d");
+    }
+
+    #[test]
+    fn exposes_the_matched_endpoint_path() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/users/{id}"),
+                echo_endpoint_path,
+            ))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/files/{*rest}"),
+                echo_endpoint_path,
+            ))
+            .build();
+
+        // The pattern the endpoint serves, not the requested URL.
+        let (_, _, body) = send(&router, Method::GET, "/users/42");
+        assert_eq!(&body[..], b"/users/{id}");
+
+        let (_, _, body) = send(&router, Method::GET, "/files/a/b");
+        assert_eq!(&body[..], b"/files/{*rest}");
+    }
+
+    #[test]
+    fn the_endpoint_path_drops_group_segments() {
+        // Groups bind layouts and layers at build time and are not part of the
+        // URL, so routes that differ only in them agree on the path they share.
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/(a)/x"),
+                echo_endpoint_path,
+            ))
+            .route(RouteFn::new(
+                Method::POST,
+                path("/(b)/x"),
+                echo_endpoint_path,
+            ))
+            .build();
+
+        for method in [Method::GET, Method::POST] {
+            let (_, _, body) = send(&router, method, "/x");
+            assert_eq!(&body[..], b"/x");
+        }
     }
 
     #[test]
@@ -756,5 +806,44 @@ mod tests {
         // The `/admin` layout does not apply to a page at `/p`.
         let (_, _, body) = send(&router, Method::GET, "/p");
         assert_eq!(&body[..], b"page");
+    }
+
+    // -- Router::handle: detached contexts --
+
+    /// Registers the greeting the streaming route reads back.
+    #[cfg(feature = "sse")]
+    fn insert_greeting<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        cx.insert(Greeting("hello"));
+        next.run(cx, body)
+    }
+
+    /// Streams the request-context greeting from a body that outlives the
+    /// handler, reading it through a detached handle.
+    #[cfg(feature = "sse")]
+    fn stream_greeting(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        use crate::content::sse::{Event, Sse};
+
+        Box::pin(async move {
+            let handle = cx.detach();
+            let events = futures_util::stream::once(async move {
+                Result::<Event>::Ok(Event::new().data(request_context::<Greeting>(&handle).0))
+            });
+            Sse::new(events).into_response(cx)
+        })
+    }
+
+    #[cfg(feature = "sse")]
+    #[test]
+    fn a_detached_handle_serves_a_stream_after_the_request_returned() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/events"), stream_greeting))
+            .layer(LayerFn::new(path("/"), insert_greeting))
+            .build();
+
+        let response = block_on(router.handle(request(Method::GET, "/events")));
+        // The router dropped its own context when `handle` returned; the body
+        // still reads the request context through its detached handle.
+        let body = block_on(to_bytes(response.into_body(), usize::MAX)).unwrap();
+        assert!(body.starts_with(b"data: hello"), "{body:?}");
     }
 }

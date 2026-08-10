@@ -102,9 +102,9 @@ where
         parts.push_comment(|comment| {
             // `json` is untrusted application data and must be escaped to prevent XSS attacks.
             comment
-                .push_str_unescaped("::topcoat::signal(")
-                .push_str(json)
-                .push_str_unescaped(")");
+                .push_promoted_str_unescaped(&"::topcoat::signal(")
+                .push_string(json)
+                .push_promoted_str_unescaped(&")");
         });
     }
 }
@@ -219,7 +219,7 @@ impl EncodedSignals {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_view::{HtmlContext, PartsWriter, View, ViewParts};
+    use topcoat_view::internal::{block, build_sync};
 
     use super::*;
 
@@ -230,10 +230,8 @@ mod tests {
         let signal = Signal::new(String::from("a-->b\"c&d"));
 
         let cx = Cx::default();
-        let mut parts = ViewParts::new();
-        SignalDeclaration::new(&signal)
-            .into_view_parts(&cx, &mut PartsWriter::new(&mut parts, HtmlContext::Text));
-        let html = View::new(parts).render(&cx);
+        let view = build_sync(|| block(&cx, |b| b.node(SignalDeclaration::new(&signal))));
+        let html = view.render(&cx);
 
         // The comment context escaped `>`, so the only `-->` left is the
         // marker's own terminator; the payload cannot end the comment early.

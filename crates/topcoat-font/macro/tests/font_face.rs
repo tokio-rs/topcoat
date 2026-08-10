@@ -218,3 +218,26 @@ fn src_from_expression() {
         r#"@font-face { font-family: "Inter"; src: local("Inter") }"#,
     );
 }
+
+#[test]
+fn unicode_range_ending_in_e_with_0x_prefix() {
+    let face = font_face! {
+        font-family: "Test";
+        src: local("Test");
+        unicode-range: U+0x0001-0x000E;
+    };
+    let rendered = render(&face);
+    assert!(rendered.contains("U+0001-000E"), "rendered: {rendered}");
+}
+
+#[test]
+fn unicode_range_0x_prefix_in_list() {
+    let face = font_face! {
+        font-family: "Test";
+        src: local("Test");
+        unicode-range: U+0041-0x005A, U+0xD800-0xDFFF;
+    };
+    let rendered = render(&face);
+    assert!(rendered.contains("U+0041-005A"), "rendered: {rendered}");
+    assert!(rendered.contains("U+D800-DFFF"), "rendered: {rendered}");
+}

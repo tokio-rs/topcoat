@@ -37,6 +37,8 @@ view! {
 # }
 ```
 
+The name `key` is reserved: a `key:` argument keys the invocation's identity instead of setting a prop, so a component cannot declare a `key` parameter. See the keys section of the [`view!`] guide.
+
 # Child Content
 
 If a component accepts a parameter named `child` with type [`View`], any extra view nodes in the call are collected and passed as that child view.

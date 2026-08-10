@@ -5,8 +5,8 @@ use syn::{
 use topcoat_core_grammar::ParseOption;
 
 use crate::{
-    attributes::{AttributeWriter, WriteAttribute},
-    view::{ViewWriter, WriteView},
+    attributes::hir::{AttributeBuilder, LowerAttribute},
+    view::hir::{LowerView, ViewBuilder},
 };
 
 /// A `let pat = expr;` binding in view-body position. The binding is in scope
@@ -28,17 +28,17 @@ impl TemplateLocal {
     }
 }
 
-impl WriteView for TemplateLocal {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for TemplateLocal {
+    fn lower(&self, builder: &mut ViewBuilder) {
         let (pat, expr) = self.binding();
-        writer.local_binding(pat, expr);
+        builder.local_binding(pat, expr);
     }
 }
 
-impl WriteAttribute for TemplateLocal {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for TemplateLocal {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         let (pat, expr) = self.binding();
-        writer.local_binding(pat, expr);
+        builder.local_binding(pat, expr);
     }
 }
 

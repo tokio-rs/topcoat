@@ -6,8 +6,10 @@ use syn::{
 use topcoat_core_grammar::ParseOption;
 
 use crate::{
-    attributes::{AttributeWriter, MatchArmsBuilder as AttributeMatchArmsBuilder, WriteAttribute},
-    view::{MatchArmsBuilder, ViewWriter, WriteView},
+    attributes::hir::{
+        AttributeBuilder, LowerAttribute, MatchArmsBuilder as AttributeMatchArmsBuilder,
+    },
+    view::hir::{LowerView, MatchArmsBuilder, ViewBuilder},
 };
 
 /// A `match expr { ... }` expression in view-body position.
@@ -18,21 +20,21 @@ pub struct TemplateMatch<B> {
     pub arms: Vec<TemplateMatchArm<B>>,
 }
 
-impl<B: WriteView> WriteView for TemplateMatch<B> {
-    fn write(&self, writer: &mut ViewWriter) {
-        writer.match_expr(&self.expr, |arms| {
+impl<B: LowerView> LowerView for TemplateMatch<B> {
+    fn lower(&self, builder: &mut ViewBuilder) {
+        builder.match_expr(&self.expr, |arms| {
             for arm in &self.arms {
-                arm.write(arms);
+                arm.lower(arms);
             }
         });
     }
 }
 
-impl<B: WriteAttribute> WriteAttribute for TemplateMatch<B> {
-    fn write(&self, writer: &mut AttributeWriter) {
-        writer.match_expr(&self.expr, |arms| {
+impl<B: LowerAttribute> LowerAttribute for TemplateMatch<B> {
+    fn lower(&self, builder: &mut AttributeBuilder) {
+        builder.match_expr(&self.expr, |arms| {
             for arm in &self.arms {
-                arm.write_attribute(arms);
+                arm.lower_attribute(arms);
             }
         });
     }
@@ -108,23 +110,23 @@ pub trait MatchArmBody {
 }
 
 #[allow(private_bounds)]
-impl<B: WriteView> TemplateMatchArm<B> {
-    pub(crate) fn write(&self, arms: &mut MatchArmsBuilder) {
+impl<B: LowerView> TemplateMatchArm<B> {
+    pub(crate) fn lower(&self, arms: &mut MatchArmsBuilder) {
         arms.arm(
             &self.pat,
             self.guard.as_ref().map(|(_, expr)| expr.as_ref()),
-            |writer| self.body.write(writer),
+            |body| self.body.lower(body),
         );
     }
 }
 
 #[allow(private_bounds)]
-impl<B: WriteAttribute> TemplateMatchArm<B> {
-    pub(crate) fn write_attribute(&self, arms: &mut AttributeMatchArmsBuilder) {
+impl<B: LowerAttribute> TemplateMatchArm<B> {
+    pub(crate) fn lower_attribute(&self, arms: &mut AttributeMatchArmsBuilder) {
         arms.arm(
             &self.pat,
             self.guard.as_ref().map(|(_, expr)| expr.as_ref()),
-            |writer| self.body.write(writer),
+            |body| self.body.lower(body),
         );
     }
 }

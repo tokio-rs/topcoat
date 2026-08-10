@@ -12,7 +12,10 @@ use topcoat_core_grammar::ParseOption;
 
 use crate::{
     template::TemplateExpr,
-    view::{ExprKind, HtmlIdent, ViewWriter, WriteView},
+    view::{
+        HtmlIdent,
+        hir::{ExprKind, LowerView, ViewBuilder},
+    },
 };
 
 /// The name part of a single `name=value` attribute on an
@@ -60,12 +63,12 @@ impl AttributeKey {
     }
 }
 
-impl WriteView for AttributeKey {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for AttributeKey {
+    fn lower(&self, builder: &mut ViewBuilder) {
         match self {
-            Self::Ident(inner) => writer.write_str_unescaped(&inner.to_string()),
+            Self::Ident(inner) => builder.str_unescaped(&inner.to_string()),
             Self::Expr(inner) => {
-                writer.write_expr(ExprKind::AttributeKey, inner.expr.to_token_stream());
+                builder.expr(ExprKind::AttributeKey, inner.expr.to_token_stream());
             }
         }
     }

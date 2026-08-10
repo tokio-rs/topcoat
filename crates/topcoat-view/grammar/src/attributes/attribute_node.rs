@@ -3,14 +3,14 @@ use topcoat_core_grammar::ParseOption;
 
 use crate::{
     attributes::{
-        Attribute, AttributeNodes, AttributeSpread, AttributeWriter, BindAttribute, EventHandler,
-        WriteAttribute,
+        Attribute, AttributeNodes, AttributeSpread, BindAttribute, EventHandler,
+        hir::{AttributeBuilder, LowerAttribute},
     },
     template::{
         MatchArmBody, TemplateBlock, TemplateBreak, TemplateContinue, TemplateForLoop, TemplateIf,
         TemplateLocal, TemplateMatch,
     },
-    view::{ViewWriter, WriteView},
+    view::hir::{LowerView, ViewBuilder},
 };
 
 /// A single entry within an [`Attributes`](super::Attributes) list: the union
@@ -35,38 +35,38 @@ impl MatchArmBody for AttributeNode {
     }
 }
 
-impl WriteView for AttributeNode {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for AttributeNode {
+    fn lower(&self, builder: &mut ViewBuilder) {
         match self {
-            Self::Attribute(inner) => WriteView::write(inner, writer),
-            Self::Spread(inner) => WriteView::write(inner, writer),
-            Self::BindAttribute(inner) => WriteView::write(inner.as_ref(), writer),
-            Self::EventHandler(inner) => WriteView::write(inner, writer),
-            Self::If(inner) => WriteView::write(inner.as_ref(), writer),
-            Self::Local(inner) => WriteView::write(inner, writer),
-            Self::ForLoop(inner) => WriteView::write(inner, writer),
-            Self::Continue(inner) => WriteView::write(inner, writer),
-            Self::Break(inner) => WriteView::write(inner, writer),
-            Self::Match(inner) => WriteView::write(inner, writer),
-            Self::Block(inner) => WriteView::write(inner, writer),
+            Self::Attribute(inner) => LowerView::lower(inner, builder),
+            Self::Spread(inner) => LowerView::lower(inner, builder),
+            Self::BindAttribute(inner) => LowerView::lower(inner.as_ref(), builder),
+            Self::EventHandler(inner) => LowerView::lower(inner, builder),
+            Self::If(inner) => LowerView::lower(inner.as_ref(), builder),
+            Self::Local(inner) => LowerView::lower(inner, builder),
+            Self::ForLoop(inner) => LowerView::lower(inner, builder),
+            Self::Continue(inner) => LowerView::lower(inner, builder),
+            Self::Break(inner) => LowerView::lower(inner, builder),
+            Self::Match(inner) => LowerView::lower(inner, builder),
+            Self::Block(inner) => LowerView::lower(inner, builder),
         }
     }
 }
 
-impl WriteAttribute for AttributeNode {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for AttributeNode {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         match self {
-            Self::Attribute(inner) => WriteAttribute::write(inner, writer),
-            Self::Spread(inner) => WriteAttribute::write(inner, writer),
-            Self::BindAttribute(inner) => WriteAttribute::write(inner.as_ref(), writer),
-            Self::EventHandler(inner) => WriteAttribute::write(inner, writer),
-            Self::If(inner) => WriteAttribute::write(inner.as_ref(), writer),
-            Self::Local(inner) => WriteAttribute::write(inner, writer),
-            Self::ForLoop(inner) => WriteAttribute::write(inner, writer),
-            Self::Continue(inner) => WriteAttribute::write(inner, writer),
-            Self::Break(inner) => WriteAttribute::write(inner, writer),
-            Self::Match(inner) => WriteAttribute::write(inner, writer),
-            Self::Block(inner) => WriteAttribute::write(inner, writer),
+            Self::Attribute(inner) => LowerAttribute::lower(inner, builder),
+            Self::Spread(inner) => LowerAttribute::lower(inner, builder),
+            Self::BindAttribute(inner) => LowerAttribute::lower(inner.as_ref(), builder),
+            Self::EventHandler(inner) => LowerAttribute::lower(inner, builder),
+            Self::If(inner) => LowerAttribute::lower(inner.as_ref(), builder),
+            Self::Local(inner) => LowerAttribute::lower(inner, builder),
+            Self::ForLoop(inner) => LowerAttribute::lower(inner, builder),
+            Self::Continue(inner) => LowerAttribute::lower(inner, builder),
+            Self::Break(inner) => LowerAttribute::lower(inner, builder),
+            Self::Match(inner) => LowerAttribute::lower(inner, builder),
+            Self::Block(inner) => LowerAttribute::lower(inner, builder),
         }
     }
 }

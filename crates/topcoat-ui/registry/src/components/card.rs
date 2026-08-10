@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`card`] container.
@@ -10,8 +10,10 @@ use topcoat::{
 /// full-bleed content such as an image can span the card's width. The card
 /// casts the theme's raised-surface shadow and sets its own background and
 /// text color, so it reads as a card on any ancestor.
-const CARD: &str = "flex flex-col gap-5 rounded-xl border border-border bg-background py-6 \
-    text-foreground shadow-sm";
+const CARD: StaticClass = class!(
+    "flex flex-col gap-5 rounded-xl border border-border bg-background py-6 \
+     text-foreground shadow-sm",
+);
 
 /// A card component: a bordered, raised surface grouping related content.
 ///

@@ -11,11 +11,6 @@ impl DynViewPart for Asset {
         });
         let _ = asset_config.fmt_url(*self, w);
     }
-
-    #[inline]
-    fn clone_box(&self) -> Box<dyn DynViewPart> {
-        Box::new(*self)
-    }
 }
 
 impl AttributeValueViewParts for Asset {

@@ -323,6 +323,17 @@ impl ToTokens for Props {
             impl #state_impl_generics #builder_ident #state_ty_generics #where_clause {
                 #(#setters)*
 
+                /// Keys the identity of a `view!` invocation, telling
+                /// repetitions of one call site apart.
+                #vis fn key<__Key: #topcoat_view::identity::IdentityKey>(
+                    self,
+                    key: __Key,
+                    receive: impl ::core::ops::FnOnce(__Key),
+                ) -> Self {
+                    receive(key);
+                    self
+                }
+
                 /// Builds the props struct from the set properties.
                 ///
                 /// Only available once every required property has been set.

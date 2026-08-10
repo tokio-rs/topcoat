@@ -105,10 +105,10 @@ fn memoized_futures_are_send() {
 }
 
 #[tokio::test]
-async fn memoized_option_return_is_borrowed_ergonomically() {
+async fn memoized_option_return_is_borrowed_ergonomically_with_as_ref() {
     static CALLS: AtomicUsize = AtomicUsize::new(0);
 
-    #[memoize]
+    #[memoize(as_ref)]
     fn maybe(cx: &Cx, is_some: bool) -> Option<i32> {
         let _ = cx;
         CALLS.fetch_add(1, Ordering::SeqCst);
@@ -125,6 +125,38 @@ async fn memoized_option_return_is_borrowed_ergonomically() {
 
     maybe(&cx, true);
     assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn memoized_result_return_is_borrowed_ergonomically_with_as_ref() {
+    #[memoize(as_ref)]
+    fn fallible(cx: &Cx, fail: bool) -> Result<i32, String> {
+        let _ = cx;
+        if fail { Err("nope".to_owned()) } else { Ok(42) }
+    }
+
+    let cx = Cx::default();
+
+    let ok_value: Result<&i32, &String> = fallible(&cx, false);
+    let err_value: Result<&i32, &String> = fallible(&cx, true);
+
+    assert_eq!(ok_value, Ok(&42));
+    assert_eq!(err_value, Err(&"nope".to_owned()));
+}
+
+#[tokio::test]
+async fn memoized_option_return_is_a_plain_reference_by_default() {
+    #[memoize]
+    fn maybe(cx: &Cx, is_some: bool) -> Option<i32> {
+        let _ = cx;
+        if is_some { Some(42) } else { None }
+    }
+
+    let cx = Cx::default();
+
+    let value: &Option<i32> = maybe(&cx, true);
+
+    assert_eq!(value, &Some(42));
 }
 
 #[tokio::test]
@@ -201,7 +233,7 @@ fn calls(cx: &Cx) -> &AtomicUsize {
     app_context(cx)
 }
 
-#[memoize]
+#[memoize(as_ref)]
 fn optional_version(cx: &Cx) -> Option<u8> {
     calls(cx).fetch_add(1, Ordering::SeqCst);
     try_request_context::<Version>(cx).map(|version| version.0)

@@ -30,7 +30,7 @@ pub struct Mail {
     bcc: Vec<Mailbox>,
     reply_to: Vec<Mailbox>,
     subject: String,
-    html: Option<View>,
+    pub(crate) html: Option<View>,
     text: TextBody,
     attachments: Vec<Attachment>,
     in_reply_to: Option<String>,

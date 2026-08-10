@@ -145,7 +145,7 @@ impl PathParam {
         let map_err = self.map_err();
 
         quote! {
-            #[#topcoat_context_macro::memoize]
+            #[#topcoat_context_macro::memoize(as_ref)]
             fn parse(
                 cx: &#topcoat_context::Cx,
             ) -> ::core::result::Result<
@@ -165,7 +165,7 @@ impl PathParam {
         let map_err = self.map_err();
 
         quote! {
-            #[#topcoat_context_macro::memoize]
+            #[#topcoat_context_macro::memoize(as_ref)]
             fn parse(
                 cx: &#topcoat_context::Cx,
             ) -> ::core::result::Result<

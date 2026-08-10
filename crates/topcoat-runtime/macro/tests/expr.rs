@@ -65,7 +65,11 @@ async fn push_str_accepts_the_owned_string_from_an_event() {
         cx =>
         signal message = String::new();
 
-        <input @input=$(|e: topcoat::runtime::Event| message.push_str(e.target.value))>
+        <input
+            @input=$(|e: topcoat::runtime::Event| {
+                message.push_str(e.target.value)
+            })
+        >
     }
     .unwrap()
     .render(cx);

@@ -90,7 +90,9 @@ Each framework is measured in two modes per route:
   capacity on the heaviest route, so its tail latencies include some
   queueing; lower `RATE` for a pure service-time comparison.
 
-Defaults: 3 runs x 20s per route and mode, 32 connections, medians reported.
+Defaults: 3 runs x 20s per route and mode, 32 connections. The summary table
+reports one row per framework: the median across runs for each route, averaged
+over all routes.
 
 ### Running one app manually
 

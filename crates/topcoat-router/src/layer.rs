@@ -14,10 +14,10 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// A layer wraps every matched route whose path begins with the layer's path
 /// (the same prefix rule as layouts), so a layer at `/admin` wraps only routes
 /// under `/admin`, while a layer at `/` wraps everything. Each layer receives a
-/// mutable [`Cx`] and the request [`Body`], plus a [`Next`] representing
-/// the rest of the chain. A layer typically registers request-scoped values on
-/// the context, calls [`Next::run`] to invoke the inner layers and ultimately
-/// the route, then inspects or modifies the [`Response`].
+/// mutable [`Cx`] and the request [`Body`], plus a [`Next`] representing the
+/// rest of the chain. A layer typically registers request-scoped values on the
+/// context with [`Cx::insert`], calls [`Next::run`] to invoke the inner layers
+/// and ultimately the route, then inspects or modifies the [`Response`].
 ///
 /// When several layers match a route they nest from least-specific (outermost)
 /// to most-specific (innermost), like layouts.
@@ -411,9 +411,8 @@ mod tests {
     #[test]
     fn run_resolves_the_method_not_allowed_terminal() {
         let layers = Layers::default();
-        let no_params: Box<[crate::RawPathParamSpec]> = Box::new([]);
         let no_layers: Box<[LayerId]> = Box::new([]);
-        let mut endpoint = Endpoint::new(no_params, no_layers);
+        let mut endpoint = Endpoint::new(&path("/x"), no_layers);
         endpoint.insert(Method::GET, 0);
         endpoint.insert(Method::POST, 1);
         let mut cx = Cx::default();

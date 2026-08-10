@@ -2,7 +2,7 @@ use quote::ToTokens;
 use syn::spanned::Spanned;
 
 use super::{PrettyPrint, Printer, TextMode};
-use crate::pretty::{MacroSnippet, pretty_print_str};
+use crate::pretty::{MacroSnippet, pretty_print_fragment_str};
 
 /// Restores each macro body in `formatted` from the corresponding body in
 /// `original`.
@@ -55,7 +55,7 @@ fn format_rust_snippet(
     let file = syn::parse_file(&input).expect("failed to parse rust snippet for formatting");
     let formatted = prettyplease::unparse(&file);
     let formatted = restore_macro_bodies(&file, &formatted);
-    let formatted = pretty_print_str(printer.registry(), &formatted).unwrap();
+    let formatted = pretty_print_fragment_str(printer.registry(), &formatted).unwrap();
 
     let mut stripped = formatted.trim();
     for _ in 0..indent {

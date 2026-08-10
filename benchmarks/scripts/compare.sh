@@ -25,6 +25,13 @@ median() {
     jq -s "[.[] | $expr] | sort | .[length / 2 | floor]" "$@"
 }
 
+# Mean of a list of numbers, post-processed by a jq expression.
+mean() {
+    local expr="$1"
+    shift
+    printf '%s\n' "$@" | jq -s "add / length | $expr"
+}
+
 {
     echo "# Benchmark results"
     echo
@@ -37,50 +44,61 @@ median() {
     # are buffered so the columns can be padded to a common width; the raw
     # markdown then lines up when read as plain text, and still renders in any
     # markdown viewer.
-    headers=("Route" "Framework" "req/s (median)" "vs topcoat" "p50 ms" "p90 ms" "p99 ms" "bytes/resp" "success")
-    aligns=(l l r r r r r r r)
+    headers=("Framework" "req/s (avg)" "vs topcoat" "p50 ms" "p90 ms" "p99 ms" "bytes/resp" "success")
+    aligns=(l r r r r r r r)
     rows=()
 
-    for i in "${!ROUTE_LABELS[@]}"; do
-        label="${ROUTE_LABELS[$i]}"
-        path="${ROUTE_PATHS[$i]}"
-        base_rps=""
-        for framework in topcoat nextjs leptos axum_maud; do
+    # Per framework: the median across runs for each route, averaged over all
+    # routes. Success is the minimum seen across every run of every route.
+    base_rps=""
+    for framework in topcoat nextjs leptos axum_maud; do
+        rps_vals=() p50_vals=() p90_vals=() p99_vals=()
+        all_tput=() all_rate=()
+        for i in "${!ROUTE_LABELS[@]}"; do
+            label="${ROUTE_LABELS[$i]}"
             tput_files=("$RESULTS_DIR/${framework}_${label}_tput_"*.json)
             rate_files=("$RESULTS_DIR/${framework}_${label}_rate_"*.json)
             [ -f "${tput_files[0]}" ] || continue
+            all_tput+=("${tput_files[@]}")
+            all_rate+=("${rate_files[@]}")
 
-            rps=$(median '.summary.requestsPerSec | round' "${tput_files[@]}")
-            p50=$(median '.latencyPercentiles.p50 * 100000 | round / 100' "${rate_files[@]}")
-            p90=$(median '.latencyPercentiles.p90 * 100000 | round / 100' "${rate_files[@]}")
-            p99=$(median '.latencyPercentiles.p99 * 100000 | round / 100' "${rate_files[@]}")
-            size=$(jq -s '[.[].summary.sizePerRequest] | add / length | round' "${rate_files[@]}")
-            success=$(jq -s '[.[].summary.successRate] | min' "${tput_files[@]}" "${rate_files[@]}")
+            rps_vals+=("$(median '.summary.requestsPerSec' "${tput_files[@]}")")
+            p50_vals+=("$(median '.latencyPercentiles.p50' "${rate_files[@]}")")
+            p90_vals+=("$(median '.latencyPercentiles.p90' "${rate_files[@]}")")
+            p99_vals+=("$(median '.latencyPercentiles.p99' "${rate_files[@]}")")
 
             codes=$(jq -s '[.[].statusCodeDistribution | keys[]] | unique | join(",")' \
                 "${tput_files[@]}" "${rate_files[@]}")
             if [ "$codes" != '"200"' ]; then
                 echo "warning: $framework/$label saw status codes $codes" >&2
             fi
-
-            # Throughput relative to topcoat, the framework under test. Topcoat
-            # is the baseline; the others report how many times faster or slower
-            # they served this route (by req/s). "n/a" when topcoat is absent.
-            if [ "$framework" = topcoat ]; then
-                base_rps="$rps"
-                rel="baseline"
-            elif [ -n "$base_rps" ] && [ "$base_rps" -gt 0 ]; then
-                rel=$(awk -v a="$rps" -v b="$base_rps" 'BEGIN {
-                    if (a >= b) printf "%.2fx faster", a / b
-                    else printf "%.2fx slower", b / a
-                }')
-            else
-                rel="n/a"
-            fi
-
-            rows+=("$(printf '`%s`\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
-                "$path" "$framework" "$rps" "$rel" "$p50" "$p90" "$p99" "$size" "$success")")
         done
+        [ ${#rps_vals[@]} -gt 0 ] || continue
+
+        rps=$(mean 'round' "${rps_vals[@]}")
+        p50=$(mean '. * 100000 | round / 100' "${p50_vals[@]}")
+        p90=$(mean '. * 100000 | round / 100' "${p90_vals[@]}")
+        p99=$(mean '. * 100000 | round / 100' "${p99_vals[@]}")
+        size=$(jq -s '[.[].summary.sizePerRequest] | add / length | round' "${all_rate[@]}")
+        success=$(jq -s '[.[].summary.successRate] | min' "${all_tput[@]}" "${all_rate[@]}")
+
+        # Throughput relative to topcoat, the framework under test. Topcoat
+        # is the baseline; the others report how many times faster or slower
+        # they served on average (by req/s). "n/a" when topcoat is absent.
+        if [ "$framework" = topcoat ]; then
+            base_rps="$rps"
+            rel="baseline"
+        elif [ -n "$base_rps" ] && [ "$base_rps" -gt 0 ]; then
+            rel=$(awk -v a="$rps" -v b="$base_rps" 'BEGIN {
+                if (a >= b) printf "%.2fx faster", a / b
+                else printf "%.2fx slower", b / a
+            }')
+        else
+            rel="n/a"
+        fi
+
+        rows+=("$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
+            "$framework" "$rps" "$rel" "$p50" "$p90" "$p99" "$size" "$success")")
     done
 
     # Column widths: the widest of the header and any cell in that column.

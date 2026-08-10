@@ -1,0 +1,244 @@
+use std::borrow::Cow;
+
+#[cfg(feature = "http")]
+use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
+use topcoat_core::context::Cx;
+
+use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped, View};
+
+/// Converts a value used in node position into view parts.
+///
+/// When this trait is implemented on a type, it can be used in the node position of an element
+/// in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+///
+/// ```rust
+/// # use topcoat::view::{component, view};
+/// # #[component]
+/// # async fn example() -> topcoat::Result {
+/// # let my_value = "value";
+/// view! {
+///     <div>(my_value)</div>
+/// }
+/// # }
+/// ```
+pub trait NodeViewParts {
+    /// Appends this value to the view being built.
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
+}
+
+impl NodeViewParts for View {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_view(self);
+    }
+}
+
+macro_rules! impl_primitive {
+    ($ty:ty, $method:ident) => {
+        impl NodeViewParts for $ty {
+            #[inline]
+            fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+                parts.$method(self);
+            }
+        }
+    };
+    ($ty:ty, $method:ident, ref) => {
+        impl_primitive!($ty, $method);
+
+        impl NodeViewParts for &$ty {
+            #[inline]
+            fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+                (*self).into_view_parts(cx, parts)
+            }
+        }
+    };
+}
+
+impl_primitive!(bool, push_bool, ref);
+impl_primitive!(char, push_char, ref);
+impl_primitive!(i8, push_i8, ref);
+impl_primitive!(i16, push_i16, ref);
+impl_primitive!(i32, push_i32, ref);
+impl_primitive!(i64, push_i64, ref);
+impl_primitive!(i128, push_i128, ref);
+impl_primitive!(isize, push_isize, ref);
+impl_primitive!(u8, push_u8, ref);
+impl_primitive!(u16, push_u16, ref);
+impl_primitive!(u32, push_u32, ref);
+impl_primitive!(u64, push_u64, ref);
+impl_primitive!(u128, push_u128, ref);
+impl_primitive!(usize, push_usize, ref);
+impl_primitive!(f32, push_f32, ref);
+impl_primitive!(f64, push_f64, ref);
+impl_primitive!(String, push_string);
+
+impl NodeViewParts for Cow<'static, str> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        match self {
+            Cow::Borrowed(value) => parts.push_static_str(value),
+            Cow::Owned(value) => parts.push_string(value),
+        };
+    }
+}
+
+impl NodeViewParts for &str {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_str(self);
+    }
+}
+
+impl NodeViewParts for PromotedStr {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_promoted_str(self.0);
+    }
+}
+
+impl NodeViewParts for StaticStr {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_static_str(self.0);
+    }
+}
+
+impl NodeViewParts for Unescaped<String> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_string_unescaped(self.0);
+    }
+}
+
+impl NodeViewParts for Unescaped<PromotedStr> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_promoted_str_unescaped(self.0.0);
+    }
+}
+
+impl NodeViewParts for Unescaped<StaticStr> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_static_str_unescaped(self.0.0);
+    }
+}
+
+impl NodeViewParts for Unescaped<&'static str> {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_static_str_unescaped(self.0);
+    }
+}
+
+impl NodeViewParts for &String {
+    #[inline]
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        self.as_str().into_view_parts(cx, parts);
+    }
+}
+
+/// Sets the response status code; renders no content.
+///
+/// Competing status codes resolve by render order: the first one rendered
+/// wins. Place a status code before nested content to override whatever the
+/// content declares, or after it to provide a fallback. To display a status
+/// code as text instead, render one of its accessors, such as
+/// [`as_u16`](StatusCode::as_u16).
+#[cfg(feature = "http")]
+impl NodeViewParts for StatusCode {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_status_code(self);
+    }
+}
+
+/// Adds response headers; renders no content.
+///
+/// Competing headers resolve by render order: the first part that mentions a
+/// header name provides all of that name's values. Place headers before
+/// nested content to override the entries the content declares, or after it
+/// to provide fallbacks.
+#[cfg(feature = "http")]
+impl NodeViewParts for HeaderMap {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_headers(self);
+    }
+}
+
+/// Adds a single response header; renders no content.
+///
+/// Equivalent to a [`HeaderMap`] holding just this entry.
+#[cfg(feature = "http")]
+impl NodeViewParts for (HeaderName, HeaderValue) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        let (name, value) = self;
+        let mut headers = HeaderMap::with_capacity(1);
+        headers.insert(name, value);
+        headers.into_view_parts(cx, parts);
+    }
+}
+
+impl<'b, T: ?Sized> NodeViewParts for &&'b T
+where
+    &'b T: NodeViewParts,
+{
+    #[inline]
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        (*self).into_view_parts(cx, parts);
+    }
+}
+
+impl<T> NodeViewParts for Option<T>
+where
+    T: NodeViewParts,
+{
+    #[inline]
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        if let Some(value) = self {
+            value.into_view_parts(cx, parts);
+        }
+    }
+}
+
+impl<T> NodeViewParts for Vec<T>
+where
+    T: NodeViewParts,
+{
+    #[inline]
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        for value in self {
+            value.into_view_parts(cx, parts);
+        }
+    }
+}
+
+macro_rules! impl_tuple {
+    ($($ty:ident),+) => {
+        impl<$($ty),+> NodeViewParts for ($($ty,)+)
+        where
+            $($ty: NodeViewParts,)+
+        {
+            #[inline]
+            #[allow(non_snake_case)]
+            fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+                let ($($ty,)+) = self;
+                $($ty.into_view_parts(cx, parts);)+
+            }
+        }
+    };
+}
+
+impl_tuple!(T1);
+impl_tuple!(T1, T2);
+impl_tuple!(T1, T2, T3);
+impl_tuple!(T1, T2, T3, T4);
+impl_tuple!(T1, T2, T3, T4, T5);
+impl_tuple!(T1, T2, T3, T4, T5, T6);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);

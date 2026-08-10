@@ -1,7 +1,7 @@
 //! Font styles for building CSS `font-style` descriptors on `@font-face`
 //! rules.
 
-use topcoat_core::fnv1a;
+use topcoat_core::fnv1a::Fnv1a;
 
 /// An oblique slant angle in degrees, in `-90.0..=90.0`.
 ///
@@ -33,8 +33,8 @@ impl ObliqueAngle {
     }
 
     /// Folds this angle into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
-        fnv1a::hash_continue(h, &self.0.to_bits().to_le_bytes())
+    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
+        h.write(&self.0.to_bits().to_le_bytes())
     }
 }
 
@@ -128,7 +128,7 @@ impl ObliqueAngleRange {
     }
 
     /// Folds this range into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
+    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
         self.end.hash(self.start.hash(h))
     }
 }
@@ -196,12 +196,12 @@ impl FontStyle {
     }
 
     /// Folds this style into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
+    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
         match self {
-            Self::Normal => fnv1a::hash_continue(h, b"n"),
-            Self::Italic => fnv1a::hash_continue(h, b"i"),
-            Self::Oblique(None) => fnv1a::hash_continue(h, b"o"),
-            Self::Oblique(Some(range)) => range.hash(fnv1a::hash_continue(h, b"oa")),
+            Self::Normal => h.write(b"n"),
+            Self::Italic => h.write(b"i"),
+            Self::Oblique(None) => h.write(b"o"),
+            Self::Oblique(Some(range)) => range.hash(h.write(b"oa")),
         }
     }
 }

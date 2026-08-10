@@ -10,7 +10,10 @@ mod router;
 mod signed;
 mod store;
 
-use std::sync::OnceLock;
+use std::sync::{
+    OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
 
 pub use cookie::{Cookie, Expiration, Key, SameSite, time};
 pub use jar::*;
@@ -39,11 +42,23 @@ pub trait Cookies {
 
     /// Adds `cookie`. It is serialized into a `Set-Cookie` response header once
     /// the cookie router layer handles the response.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the response headers have already been written, which is the
+    /// case in work that outlives the handler, such as a streaming body or a
+    /// WebSocket task.
     fn add<C: Into<Cookie<'static>>>(&self, cookie: C);
 
     /// Removes `cookie`. If the request carried an original cookie with the
     /// same name, an expiring removal cookie is sent. Pass the same `Path`/
     /// `Domain` the cookie was set with.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the response headers have already been written, which is the
+    /// case in work that outlives the handler, such as a streaming body or a
+    /// WebSocket task.
     fn remove<C: Into<Cookie<'static>>>(&self, cookie: C);
 
     /// Wraps this jar so signed cookies are written and verified with `key`.
@@ -239,9 +254,14 @@ pub trait Cookies {
 /// [`cookies`] parses the incoming `Cookie` headers into a [`CookieJar`] and
 /// stores it here; response finalization reads the same cell to emit pending
 /// `Set-Cookie` headers only if the jar was actually touched.
+///
+/// Finalization also seals the cell, so a jar handed out afterwards, whether it
+/// was built during the request or on first access from a detached task, rejects
+/// writes.
 #[derive(Debug, Default)]
 pub struct CookieJarCell {
     jar: OnceLock<CookieJar>,
+    sealed: AtomicBool,
 }
 
 impl CookieJarCell {
@@ -251,11 +271,26 @@ impl CookieJarCell {
     }
 
     fn get_or_init(&self, cx: &Cx) -> &CookieJar {
-        self.jar.get_or_init(|| CookieJar::from_request(cx))
+        let jar = self.jar.get_or_init(|| CookieJar::from_request(cx));
+        // A jar built after the cell was sealed inherits the seal. Checking
+        // here rather than inside the initializer also closes the window where
+        // the seal lands while another thread is still building the jar.
+        if self.sealed.load(Ordering::Acquire) {
+            jar.seal();
+        }
+        jar
     }
 
     fn get(&self) -> Option<&CookieJar> {
         self.jar.get()
+    }
+
+    /// Closes the request's jar for writing, now and for any jar built later.
+    fn seal(&self) {
+        self.sealed.store(true, Ordering::Release);
+        if let Some(jar) = self.jar.get() {
+            jar.seal();
+        }
     }
 }
 
@@ -304,14 +339,18 @@ pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
 /// Called by the router after each handler runs. If no cookie helper was used
 /// during the request, the jar was never built, so we skip without parsing the
 /// incoming `Cookie` header at all.
+///
+/// The jar is sealed either way: from here on the response is out of the
+/// framework's hands, so a write would go nowhere and panics instead.
 #[doc(hidden)]
 pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
-    let Some(jar) = request_context::<CookieJarCell>(cx).get() else {
-        return;
-    };
-    for value in jar.delta_headers() {
-        headers.append(http::header::SET_COOKIE, value);
+    let cell = request_context::<CookieJarCell>(cx);
+    if let Some(jar) = cell.get() {
+        for value in jar.delta_headers() {
+            headers.append(http::header::SET_COOKIE, value);
+        }
     }
+    cell.seal();
 }
 
 #[cfg(test)]
@@ -460,6 +499,46 @@ mod tests {
         write_cookies(&cx, &mut headers);
 
         assert!(headers.get(header::SET_COOKIE).is_none());
+    }
+
+    #[test]
+    fn reads_still_work_after_the_response() {
+        // Work that outlives the handler, like a streaming body, may well need
+        // to look at the request's cookies.
+        let cx = cx_with(&["theme=dark"]);
+        let _ = set_cookies(&cx);
+
+        assert_eq!(cookies(&cx).get("theme").unwrap().value(), "dark");
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot add a cookie after the response")]
+    fn adding_after_the_response_panics() {
+        let cx = cx_with(&[]);
+        cookies(&cx).add(("theme", "dark"));
+        let _ = set_cookies(&cx);
+
+        cookies(&cx).add(("theme", "light"));
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot remove a cookie after the response")]
+    fn removing_after_the_response_panics() {
+        let cx = cx_with(&["session=abc123"]);
+        let _ = set_cookies(&cx);
+
+        cookies(&cx).remove(("session", ""));
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot add a cookie after the response")]
+    fn adding_through_a_jar_built_after_the_response_panics() {
+        // The handler never touched cookies, so this is the first call that
+        // builds the jar. It must still come back sealed.
+        let cx = cx_with(&["theme=dark"]);
+        let _ = set_cookies(&cx);
+
+        cookies(&cx).default_path("/").add(("theme", "light"));
     }
 
     #[test]

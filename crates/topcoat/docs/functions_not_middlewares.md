@@ -99,7 +99,7 @@ fn db(cx: &Cx) -> Db {
 }
 
 /// Fetches a user by ID, deduplicated for the duration of the request.
-#[memoize]
+#[memoize(as_ref)]
 async fn fetch_user(cx: &Cx, user_id: &str) -> Option<User> {
     User::fetch_by_id(user_id).exec(db(cx)).await
 }

@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`textarea`] control.
@@ -9,11 +9,13 @@ use topcoat::{
 /// `field-sizing-content` lets the control grow with its content, from the
 /// two-line minimum height; browsers without support keep the fixed minimum
 /// and scroll.
-const TEXTAREA: &str = "field-sizing-content min-h-16 w-full rounded-lg border border-border \
-    bg-background px-3 py-2 text-sm shadow-xs transition-colors outline-none \
-    placeholder:text-muted-foreground \
-    focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
-    focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
+const TEXTAREA: StaticClass = class!(
+    "field-sizing-content min-h-16 w-full rounded-lg border border-border \
+     bg-background px-3 py-2 text-sm shadow-xs transition-colors outline-none \
+     placeholder:text-muted-foreground \
+     focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
+     focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+);
 
 /// A multi-line text input component.
 ///

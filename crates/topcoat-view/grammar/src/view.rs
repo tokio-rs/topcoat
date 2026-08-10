@@ -3,11 +3,11 @@ mod document_type;
 mod element;
 mod element_name;
 mod element_tag;
+pub(crate) mod hir;
 mod html_ident;
 mod node;
 mod nodes;
 mod signal_declaration;
-mod view_writer;
 
 pub use component::*;
 pub use document_type::*;
@@ -22,9 +22,11 @@ use quote::{ToTokens, quote};
 pub use signal_declaration::*;
 use syn::parse::{Parse, ParseStream};
 use topcoat_core_grammar::ParseOption;
-pub(crate) use view_writer::*;
 
-use crate::leading_cx::LeadingCx;
+use crate::{
+    leading_cx::LeadingCx,
+    view::hir::{LowerView, ViewBuilder},
+};
 
 /// The parsed body of a `view!` invocation. Lowers to a
 /// [`runtime::View`](topcoat_view::View).
@@ -50,11 +52,9 @@ impl Parse for View {
 
 impl ToTokens for View {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let mut writer = ViewWriter::new();
-        for node in &self.nodes {
-            node.write(&mut writer);
-        }
-        let view = writer.into_token_stream();
+        let mut builder = ViewBuilder::new();
+        self.nodes.lower(&mut builder);
+        let view = builder.finish().emit_root();
 
         // When an explicit context is named, bind it to the `__cx` identifier
         // the generated code (component invocations) reads from. Inside a

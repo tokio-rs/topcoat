@@ -9,7 +9,10 @@ use std::{
     cell::{Cell, RefCell},
     marker::PhantomData,
     ops::Deref,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 pub use context_map::*;
@@ -19,6 +22,7 @@ use smallvec::SmallVec;
 pub use test::*;
 pub use value::ContextValues;
 
+pub use crate::memoize::MemoizeAsRef;
 use crate::{abort::AbortStore, memoize::MemoizeCache};
 
 /// The context for one request.
@@ -27,6 +31,10 @@ use crate::{abort::AbortStore, memoize::MemoizeCache};
 /// request-scoped information. Use [`app_context`] for values shared by every
 /// request, [`request_context`] for values in the current request scope, and
 /// [`Cx::with`] to create a child scope that temporarily shadows a value.
+///
+/// A `Cx` is a handle to state shared by everything serving the same request.
+/// Work that outlives the handler, such as a streaming response body or a
+/// WebSocket task, takes an owned handle with [`detach`](Self::detach).
 pub struct Cx {
     id: CxId,
     cache_id: CacheId,
@@ -54,6 +62,29 @@ impl Cx {
     #[must_use]
     pub fn id(&self) -> CxId {
         self.id
+    }
+
+    /// Returns an owned handle to this request's context.
+    ///
+    /// Every handle reads the same state: the app context, the request
+    /// bindings visible from this context, and the memoize cache. Take an
+    /// owned handle for work that outlives the handler, such as a streaming
+    /// response body or a WebSocket task.
+    ///
+    /// Detaching seals the request root: [`insert`](Self::insert) and
+    /// [`get_mut`](Self::get_mut) panic from then on, including after every
+    /// detached handle was dropped.
+    #[must_use]
+    pub fn detach(&self) -> Cx {
+        self.request_state.sealed.store(true, Ordering::Relaxed);
+
+        Self {
+            id: self.id,
+            cache_id: self.cache_id,
+            app_context: self.app_context.clone(),
+            request_state: self.request_state.clone(),
+            scoped_bindings: self.scoped_bindings.clone(),
+        }
     }
 
     /// Registers `value` at the request root, returning the displaced value.
@@ -113,6 +144,10 @@ impl Cx {
     ///
     /// This method is intended for the root context. Calling it after leaking
     /// a scoped context is an invariant violation and panics.
+    ///
+    /// # Panics
+    ///
+    /// Panics once a handle was taken with [`detach`](Self::detach).
     pub fn insert<T>(&mut self, value: T) -> Option<T>
     where
         T: Any + Send + Sync,
@@ -134,7 +169,8 @@ impl Cx {
     ///
     /// # Panics
     ///
-    /// Panics if a scoped context has been leaked with [`std::mem::forget`].
+    /// Panics once a handle was taken with [`detach`](Self::detach), or if a
+    /// scoped context has been leaked with [`std::mem::forget`].
     #[must_use]
     pub fn get_mut<T>(&mut self) -> Option<&mut T>
     where
@@ -145,13 +181,11 @@ impl Cx {
             request_state,
             ..
         } = self;
-        let state = Arc::get_mut(request_state)
-            .expect("cannot mutate the request root while a scoped context is still reachable");
         let RequestState {
             root_bindings,
             binding_ids,
             ..
-        } = state;
+        } = RequestState::exclusive(request_state);
         let (value, binding_id) = root_bindings.get_mut::<T>()?;
         let id = binding_ids.allocate();
         *binding_id = id;
@@ -216,9 +250,9 @@ impl Cx {
         }
     }
 
+    #[track_caller]
     fn request_state_mut(&mut self) -> &mut RequestState {
-        Arc::get_mut(&mut self.request_state)
-            .expect("cannot mutate the request root while a scoped context is still reachable")
+        RequestState::exclusive(&mut self.request_state)
     }
 
     fn app_context_mut(&mut self) -> &mut ContextMap {
@@ -323,6 +357,27 @@ struct RequestState {
     binding_ids: binding::IdAllocator,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
+    sealed: AtomicBool,
+}
+
+impl RequestState {
+    /// Returns exclusive access to the request state behind `state`.
+    ///
+    /// # Panics
+    ///
+    /// Panics once the request was sealed with [`Cx::detach`], or while a
+    /// leaked scoped context still shares the state.
+    #[track_caller]
+    fn exclusive(state: &mut Arc<Self>) -> &mut Self {
+        assert!(
+            !state.sealed.load(Ordering::Relaxed),
+            "cannot modify the request context after taking a handle with \
+             `Cx::detach`"
+        );
+
+        Arc::get_mut(state)
+            .expect("cannot mutate the request root while a scoped context is still reachable")
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -507,4 +562,97 @@ pub fn memoize_cache(cx: &Cx) -> &MemoizeCache {
 #[must_use]
 pub fn abort_store(cx: &Cx) -> &AbortStore {
     &cx.request_state.abort_store
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, PartialEq)]
+    struct Marker(u32);
+
+    #[test]
+    fn a_fresh_context_has_a_unique_id() {
+        let first = Cx::new(Arc::new(ContextMap::new()));
+        let second = Cx::new(Arc::new(ContextMap::new()));
+        assert_ne!(first.id(), second.id());
+    }
+
+    #[test]
+    fn insert_replaces_and_returns_the_displaced_value() {
+        let mut cx = Cx::new(Arc::new(ContextMap::new()));
+        assert_eq!(cx.insert(Marker(1)), None);
+        assert_eq!(cx.insert(Marker(2)), Some(Marker(1)));
+        assert_eq!(request_context::<Marker>(&cx), &Marker(2));
+    }
+
+    #[test]
+    fn get_mut_allows_mutation_in_place() {
+        let mut cx = Cx::new(Arc::new(ContextMap::new()));
+        assert_eq!(cx.get_mut::<Marker>(), None);
+        cx.insert(Marker(1));
+        cx.get_mut::<Marker>().unwrap().0 = 42;
+        assert_eq!(request_context::<Marker>(&cx), &Marker(42));
+    }
+
+    #[test]
+    fn detached_handles_outlive_the_original() {
+        let cx = CxTestBuilder::new().request_context(Marker(7)).build();
+        let id = cx.id();
+        let handle = cx.detach();
+        drop(cx);
+
+        assert_eq!(request_context::<Marker>(&handle).0, 7);
+        assert_eq!(handle.id(), id);
+    }
+
+    #[test]
+    fn a_detached_handle_keeps_its_scoped_bindings() {
+        let cx = CxTestBuilder::new().request_context(Marker(1)).build();
+        let scope = cx.with(Marker(2));
+        let handle = scope.detach();
+        drop(scope);
+        drop(cx);
+
+        assert_eq!(request_context::<Marker>(&handle).0, 2);
+    }
+
+    #[test]
+    fn handles_are_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<Cx>();
+    }
+
+    #[test]
+    #[should_panic(expected = "`Cx::detach`")]
+    fn inserting_after_detaching_panics() {
+        let mut cx = Cx::new(Arc::new(ContextMap::new()));
+        let _handle = cx.detach();
+        cx.insert(Marker(0));
+    }
+
+    #[test]
+    #[should_panic(expected = "`Cx::detach`")]
+    fn mutating_after_detaching_panics() {
+        let mut cx = Cx::new(Arc::new(ContextMap::new()));
+        cx.insert(Marker(0));
+        let _handle = cx.detach();
+        let _ = cx.get_mut::<Marker>();
+    }
+
+    #[test]
+    #[should_panic(expected = "`Cx::detach`")]
+    fn dropping_every_handle_keeps_the_context_sealed() {
+        let mut cx = Cx::new(Arc::new(ContextMap::new()));
+        drop(cx.detach());
+        cx.insert(Marker(0));
+    }
+
+    #[test]
+    #[should_panic(expected = "`Cx::detach`")]
+    fn a_detached_handle_cannot_write_to_the_context() {
+        let cx = Cx::new(Arc::new(ContextMap::new()));
+        let mut handle = cx.detach();
+        handle.insert(Marker(0));
+    }
 }

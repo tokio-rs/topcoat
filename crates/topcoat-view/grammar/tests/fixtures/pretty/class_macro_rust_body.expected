@@ -1,0 +1,3 @@
+fn classes() {
+    let classes = class!(  "btn" ,"btn-lg"  );
+}

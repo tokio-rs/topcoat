@@ -147,6 +147,37 @@ Request lookup starts at the nearest scope, continues through its parents, and c
 
 Layers receive `&mut Cx`, so they can register root values with [`Cx::insert`] and mutate existing ones with [`Cx::get_mut`]. A scope provides shared access only, and Rust prevents root mutation while a scope or borrowed result may still be used. Root mutation is available again after [`Next::run`](crate::router::Next::run) completes.
 
+# Work that outlives the handler
+
+A [`Cx`] is a handle to state shared by everything serving one request. The router drops its own handle once the response is sent, so a streaming response body or a spawned task cannot borrow the `cx` the handler was called with. Take an owned handle with [`Cx::detach`] and move it into the work instead; it reads the same app and request context.
+
+```rust
+# async fn record(name: &str) {}
+use topcoat::{
+    Result,
+    context::{Cx, request_context},
+    router::route,
+};
+
+struct Customer {
+    name: String,
+}
+
+#[route(POST "/orders")]
+async fn place_order(cx: &Cx) -> Result<&'static str> {
+    let cx = cx.detach();
+    tokio::spawn(async move {
+        let customer: &Customer = request_context(&cx);
+        record(&customer.name).await;
+    });
+    Ok("queued")
+}
+```
+
+Detaching seals the request context: registering another value on it panics from then on, through any handle and even after the detached handle was dropped. Layers register their values before calling `next.run`, so this only concerns a layer that writes to the context after the inner chain returned.
+
+A detached handle keeps reading the context after the response was sent, but it can no longer change what the client receives. Cookie changes and other response-directed writes made from work that outlives the handler are dropped.
+
 # Memoization
 
 [`#[memoize]`](macro@memoize) keys results by function arguments and the request bindings read during computation. Scoped bindings can select different cached results, while changing one root type invalidates only results that read it. See the macro documentation for dependency and concurrency details.

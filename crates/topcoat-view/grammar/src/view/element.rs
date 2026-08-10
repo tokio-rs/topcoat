@@ -11,8 +11,8 @@ use topcoat_core_grammar::ParseOption;
 use crate::{
     attributes::Attributes,
     view::{
-        ClosingTag, ElementName, ElementTag, ExprKind, Node, Nodes, OpeningTag, SelfClosingTag,
-        ViewWriter, WriteView,
+        ClosingTag, ElementName, ElementTag, Node, Nodes, OpeningTag, SelfClosingTag,
+        hir::{ExprKind, LowerView, ViewBuilder},
     },
 };
 
@@ -68,8 +68,8 @@ impl Element {
     }
 }
 
-impl WriteView for Element {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for Element {
+    fn lower(&self, builder: &mut ViewBuilder) {
         match self {
             Self::Normal {
                 opening_tag,
@@ -85,40 +85,40 @@ impl WriteView for Element {
                 let name_ident = name_expr
                     .map(|_| Ident::new(&format!("__element_name_{increment}"), Span::call_site()));
 
-                writer.write_str_unescaped("<");
+                builder.str_unescaped("<");
                 match (name_ident.as_ref(), name_expr) {
                     (Some(ident), Some(expr)) => {
-                        writer
+                        builder
                             .local_binding(&syn::parse_quote!(#ident), &syn::parse_quote!(&#expr));
-                        writer.write_expr(ExprKind::ElementName, quote! { #ident });
+                        builder.expr(ExprKind::ElementName, quote! { #ident });
                     }
-                    _ => opening_tag.name.write(writer),
+                    _ => opening_tag.name.lower(builder),
                 }
-                opening_tag.attributes.write(writer);
-                writer.write_str_unescaped(">");
+                opening_tag.attributes.lower(builder);
+                builder.str_unescaped(">");
 
                 for child in children {
-                    child.write(writer);
+                    child.lower(builder);
                 }
 
-                writer.write_str_unescaped("</");
+                builder.str_unescaped("</");
                 match name_ident {
-                    Some(ident) => writer.write_expr(ExprKind::ElementName, quote! { #ident }),
-                    _ => opening_tag.name.write(writer),
+                    Some(ident) => builder.expr(ExprKind::ElementName, quote! { #ident }),
+                    _ => opening_tag.name.lower(builder),
                 }
-                writer.write_str_unescaped(">");
+                builder.str_unescaped(">");
             }
             Self::SelfClosing { tag } => {
-                writer.write_str_unescaped("<");
-                tag.name.write(writer);
-                tag.attributes.write(writer);
-                writer.write_str_unescaped("/>");
+                builder.str_unescaped("<");
+                tag.name.lower(builder);
+                tag.attributes.lower(builder);
+                builder.str_unescaped("/>");
             }
             Self::Void { tag } => {
-                writer.write_str_unescaped("<");
-                tag.name.write(writer);
-                tag.attributes.write(writer);
-                writer.write_str_unescaped(">");
+                builder.str_unescaped("<");
+                tag.name.lower(builder);
+                tag.attributes.lower(builder);
+                builder.str_unescaped(">");
             }
         }
     }

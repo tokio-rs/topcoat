@@ -1,0 +1,5 @@
+view! {
+    <div class=(class!("flex flex-col gap-1.5 px-6", attrs.remove("class"))) (attrs)>
+        (child)
+    </div>
+}

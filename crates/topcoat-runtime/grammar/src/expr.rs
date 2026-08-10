@@ -70,9 +70,12 @@ impl Expr {
             Ok(quote! {{
                 use #topcoat_runtime::internal::*;
 
-                let mut __parts = #topcoat_view::ViewParts::new();
-                __js(&mut __parts, #js);
-                #topcoat_runtime::Expr::new(#rust, #topcoat_view::ViewPart::from(__parts))
+                let __js_view = #topcoat_view::internal::build_sync(|| {
+                    #topcoat_view::internal::write_block(|__parts| {
+                        __js(__parts, #js);
+                    })
+                });
+                #topcoat_runtime::Expr::new(#rust, __js_view)
             }})
         } else {
             let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
@@ -93,9 +96,9 @@ impl Expr {
             let mut js_externals = TokenStream::new();
             for (index, binding) in externals.iter().enumerate() {
                 let rust_ident = &binding.rust_ident;
-                quote! { __surrogate(&mut __parts, &#rust_ident); }.to_tokens(&mut js_externals);
+                quote! { __surrogate(__parts, &#rust_ident); }.to_tokens(&mut js_externals);
                 if index < externals.len() - 1 {
-                    quote! { __js_unescaped(&mut __parts, ", "); }.to_tokens(&mut js_externals);
+                    quote! { __js_unescaped(__parts, ", "); }.to_tokens(&mut js_externals);
                 }
             }
 
@@ -105,12 +108,16 @@ impl Expr {
                 use #topcoat_runtime::internal::*;
 
                 let (#(#rust_external_idents,)*) = (#(#rust_external_values,)*);
-                let mut __parts = #topcoat_view::ViewParts::new();
-                __js_unescaped(&mut __parts, #js_head);
-                #js_externals
-                let __rust = #rust;
-                __js(&mut __parts, #js_tail);
-                #topcoat_runtime::Expr::new(__rust, #topcoat_view::ViewPart::from(__parts))
+                // The JS view serializes the surrogates by reference, so it
+                // is built before the Rust expression consumes them.
+                let __js_view = #topcoat_view::internal::build_sync(|| {
+                    #topcoat_view::internal::write_block(|__parts| {
+                        __js_unescaped(__parts, #js_head);
+                        #js_externals
+                        __js(__parts, #js_tail);
+                    })
+                });
+                #topcoat_runtime::Expr::new(#rust, __js_view)
             }})
         }
     }

@@ -2,7 +2,7 @@
 
 ## Project structure
 
-Topcoat is a Cargo workspace. The framework crates live in `crates/`, runnable example apps in `examples/`, and the prose guides in a `docs/` directory inside the crate they document.
+Topcoat is a Cargo workspace. The framework crates live in `crates/`, small single-feature examples in `examples/`, complete demo applications in `demos/`, and the prose guides in a `docs/` directory inside the crate they document.
 
 `crates/topcoat` is the user-facing **facade** crate. It re-exports everything through feature-gated modules. Application code depends on this crate only; everything below is an implementation detail reached through it.
 

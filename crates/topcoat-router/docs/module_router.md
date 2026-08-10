@@ -197,7 +197,7 @@ Handlers read an unparsed catch-all as [`CatchAllSegments`](crate::CatchAllSegme
 
 See the [`path_param!` macro reference](https://docs.rs/topcoat/latest/topcoat/router/macro.path_param.html) for value shapes, construction, parsing, and errors.
 
-A manual `segment!(kind = CatchAll)` capture remains available through [`raw_path_params`](crate::raw_path_params). Its value is the encoded tail with `/` separators intact.
+A manual `segment!(kind = CatchAll)` capture remains available through [`raw_path_params`](crate::raw_path_params). Its value carries the encoded tail, with `/` separators intact, next to its separately decoded segments.
 
 # Query parameters
 

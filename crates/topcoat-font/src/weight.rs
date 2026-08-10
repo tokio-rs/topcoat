@@ -1,7 +1,7 @@
 //! Font weights and weight ranges for building CSS `font-weight` descriptors
 //! on `@font-face` rules.
 
-use topcoat_core::fnv1a;
+use topcoat_core::fnv1a::Fnv1a;
 
 /// A font weight: an integer in `100..=900`.
 ///
@@ -48,8 +48,8 @@ impl FontWeight {
     }
 
     /// Folds this weight into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
-        fnv1a::hash_continue(h, &self.0.to_le_bytes())
+    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
+        h.write(&self.0.to_le_bytes())
     }
 }
 
@@ -143,7 +143,7 @@ impl FontWeightRange {
     }
 
     /// Folds this range into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
+    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
         self.end.hash(self.start.hash(h))
     }
 }

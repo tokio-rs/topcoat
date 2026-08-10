@@ -55,8 +55,35 @@ use crate::{
 /// }
 /// ```
 ///
-/// The `use<>` bound keeps the stream from capturing the request context,
-/// which a route's response must not borrow.
+/// The `use<>` bound keeps the stream from borrowing the request context,
+/// which a route's response must not do. A stream that needs the context takes
+/// an owned handle with [`Cx::detach`] and moves it in:
+///
+/// ```rust
+/// use futures_core::Stream;
+/// use topcoat::{
+///     Result,
+///     context::{Cx, request_context},
+///     router::{
+///         content::sse::{Event, Sse},
+///         route,
+///     },
+/// };
+///
+/// struct Customer {
+///     name: String,
+/// }
+///
+/// #[route(GET "/greetings")]
+/// async fn greetings(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
+///     let cx = cx.detach();
+///     let events = futures_util::stream::once(async move {
+///         let customer: &Customer = request_context(&cx);
+///         Ok(Event::new().data(customer.name.as_str()))
+///     });
+///     Ok(Sse::new(events))
+/// }
+/// ```
 #[must_use]
 pub struct Sse<S> {
     stream: S,

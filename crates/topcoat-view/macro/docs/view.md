@@ -345,6 +345,38 @@ view! {
 
 See how to define components in the [`component`] macro guide.
 
+## Keys
+
+Each component invocation has a stable identity derived from the chain of invocation sites leading down to it in code, the same from one render to the next. The framework attaches per-invocation data such as state to it. Inside a `for` body one component invocation renders many times, and the site alone cannot tell the repetitions apart. Use the reserved `key` property on component to distinguish individual calls inside of the loop:
+
+```rust
+# use topcoat::{Result, view::*};
+# struct Post { id: u64, title: &'static str }
+# #[component]
+# async fn post_card(title: &str) -> Result { view! { <article>(title)</article> } }
+# #[component]
+# async fn example() -> Result {
+# let posts = vec![Post { id: 1, title: "A" }];
+view! {
+    for post in posts {
+        post_card(key: post.id, title: post.title)
+    }
+}
+# }
+```
+
+Key the invocation with a value that identifies the item behind it, such as its database id, not the loop index: the identity then follows the item when the list reorders. Any value implementing [`IdentityKey`] works as a key. A `key:` is also allowed outside a loop, for an invocation that repeats in ways the macro cannot see.
+
+A repeated invocation without a `key:` still renders, but its identity is ambiguous. Consuming an ambiguous identity, in the component itself or anywhere nested below it, errors with the location of the invocation that is missing its key.
+
+# Concurrent Rendering
+
+The components inside a [`view!`] render concurrently. Sibling components, the iterations of a `for` loop, the taken branch of an `if` or `match`, a component and the child nodes passed to it, and components nested at any depth all start at the same time. A component waiting on a database query or an HTTP request therefore does not hold up the rest of the view, which avoids request waterfalls.
+
+The rendered markup always appears in source order, no matter which component finishes first. What is unspecified is the order in which component bodies run, and that order can change between renders. Treat a [`view!`] body as a set of functions without side effects: a component takes its props, reads the request context, and returns markup. Do not rely on another component in the same view having run first, and do not communicate between components through shared mutable state.
+
+Plain Rust in the view, such as interpolated expressions, `let` bindings, loop iterators, and branch conditions, still runs in source order. Only the components render concurrently.
+
 # Boolean And Conditional Attributes
 
 [Boolean HTML attributes](https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML) such as `disabled`, `required`, and `checked` are true when the attribute is present and false when it is absent. HTML expects a present boolean attribute to have an empty value.
@@ -477,7 +509,7 @@ The macro accepts dynamic Rust values by routing them through small runtime trai
 - [`AttributeViewParts`] for values that emit one or more full attributes in APIs that accept complete attribute fragments.
 - [`ElementNameViewParts`] for values used as dynamic element names: `<(name)>...</(name)>`.
 
-Each trait method receives a [`PartsWriter`] for the position being filled. Everything pushed through its `push_*` methods is escaped or validated for that position when the view renders; [`push_str_unescaped`][PartsWriter::push_str_unescaped] is the only opt-out and must only be given trusted markup.
+Each trait method receives a [`PartsWriter`] for the position being filled. Everything pushed through its `push_*` methods is escaped or validated for that position when the view renders; the `push_*_unescaped` methods are the only opt-out and must only be given trusted markup.
 
 For example, a type can opt into child-node rendering by implementing [`NodeViewParts`]:
 
@@ -491,7 +523,7 @@ struct Badge(String);
 
 impl NodeViewParts for Badge {
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_str(self.0);
+        parts.push_string(self.0);
     }
 }
 
@@ -518,7 +550,7 @@ impl AttributeValueViewParts for DataId {
 
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         if let Some(value) = self.0 {
-            parts.push_str(value);
+            parts.push_string(value);
         }
     }
 }
@@ -536,8 +568,8 @@ view! {
 [`ElementNameViewParts`]: trait.ElementNameViewParts.html
 [`NodeViewParts`]: trait.NodeViewParts.html
 [`PartsWriter`]: struct.PartsWriter.html
-[PartsWriter::push_str_unescaped]: struct.PartsWriter.html#method.push_str_unescaped
 [`component`]: attr.component.html
+[`memoize`]: https://docs.rs/topcoat/latest/topcoat/context/attr.memoize.html
 [`attributes!`]: macro.attributes.html
 [`class!`]: macro.class.html
 [`bool`]: https://doc.rust-lang.org/std/primitive.bool.html
@@ -548,5 +580,8 @@ view! {
 [`topcoat::view::Attributes`]: struct.Attributes.html
 [`topcoat::view::Class`]: struct.Class.html
 [`view!`]: macro.view.html
+[`Identity`]: identity/struct.Identity.html
+[`Identity::current`]: identity/struct.Identity.html#method.current
+[`IdentityKey`]: identity/trait.IdentityKey.html
 [`StatusCode`]: https://docs.rs/http/latest/http/status/struct.StatusCode.html
 [`HeaderMap`]: https://docs.rs/http/latest/http/header/struct.HeaderMap.html

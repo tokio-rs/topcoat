@@ -55,6 +55,8 @@ impl RouterBuilderCookieExt for RouterBuilder {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use http::{Method, Request, header};
     use topcoat_core::{context::Cx, error::Result};
     use topcoat_router::{Body, Methods, Path, Route, RouteFuture, Router, response::Response};
@@ -98,5 +100,46 @@ mod tests {
             Some("theme=dark")
         );
         Ok(())
+    }
+
+    /// Hands an owned context handle back to the test, standing in for work
+    /// that outlives the handler, such as a streaming body or a WebSocket task.
+    struct Detach(Arc<Mutex<Option<Cx>>>);
+
+    impl Route for Detach {
+        fn methods(&self) -> Methods<'_> {
+            Methods::Only(&[Method::GET])
+        }
+
+        fn path(&self) -> &Path {
+            Path::new("/")
+        }
+
+        fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
+            Box::pin(async move {
+                *self.0.lock().expect("lock should not be poisoned") = Some(cx.detach());
+                Ok(Response::new(Body::empty()))
+            })
+        }
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "cannot add a cookie after the response")]
+    async fn writing_once_the_layer_is_done_panics() {
+        let handle = Arc::new(Mutex::new(None));
+        let router = Router::builder()
+            .route(Detach(Arc::clone(&handle)))
+            .cookies()
+            .build();
+        let request = Request::builder()
+            .uri("/")
+            .body(Body::empty())
+            .expect("request should build");
+
+        // The layer has written its `Set-Cookie` headers by the time `handle`
+        // returns, so this cookie could never reach the client.
+        let _ = router.handle(request).await;
+        let cx = handle.lock().expect("lock should not be poisoned").take();
+        cookies(cx.as_ref().expect("route should have detached")).add(("theme", "dark"));
     }
 }

@@ -10,7 +10,10 @@ use crate::{
         MatchArmBody, RuntimeExpr, TemplateBlock, TemplateBreak, TemplateContinue, TemplateExpr,
         TemplateForLoop, TemplateIf, TemplateLocal, TemplateMatch,
     },
-    view::{Component, DocumentType, Element, Nodes, SignalDeclaration, ViewWriter, WriteView},
+    view::{
+        Component, DocumentType, Element, Nodes, SignalDeclaration,
+        hir::{LowerView, ViewBuilder},
+    },
 };
 
 /// A single child within a [`View`](super::View): the union of every construct
@@ -48,23 +51,23 @@ impl MatchArmBody for Node {
     }
 }
 
-impl WriteView for Node {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for Node {
+    fn lower(&self, builder: &mut ViewBuilder) {
         match self {
-            Self::Text(inner) => writer.write_text(&inner.value()),
-            Self::DocumentType(inner) => inner.write(writer),
-            Self::Element(inner) => inner.write(writer),
-            Self::Component(inner) => inner.write(writer),
-            Self::Expr(inner) => inner.write(writer),
-            Self::RuntimeExpr(inner) => inner.write(writer),
-            Self::If(inner) => inner.write(writer),
-            Self::Local(inner) => inner.write(writer),
-            Self::ForLoop(inner) => inner.write(writer),
-            Self::Continue(inner) => inner.write(writer),
-            Self::Break(inner) => inner.write(writer),
-            Self::Match(inner) => inner.write(writer),
-            Self::Block(inner) => inner.write(writer),
-            Self::SignalDecaration(inner) => inner.write(writer),
+            Self::Text(inner) => builder.text(&inner.value()),
+            Self::DocumentType(inner) => inner.lower(builder),
+            Self::Element(inner) => inner.lower(builder),
+            Self::Component(inner) => inner.lower(builder),
+            Self::Expr(inner) => inner.lower(builder),
+            Self::RuntimeExpr(inner) => inner.lower(builder),
+            Self::If(inner) => inner.lower(builder),
+            Self::Local(inner) => inner.lower(builder),
+            Self::ForLoop(inner) => inner.lower(builder),
+            Self::Continue(inner) => inner.lower(builder),
+            Self::Break(inner) => inner.lower(builder),
+            Self::Match(inner) => inner.lower(builder),
+            Self::Block(inner) => inner.lower(builder),
+            Self::SignalDecaration(inner) => inner.lower(builder),
         }
     }
 }

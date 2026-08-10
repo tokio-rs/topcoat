@@ -51,7 +51,7 @@ async fn collects_every_field() -> Result<()> {
     assert_eq!(mail.reply_to(), [Mailbox::new("replies@example.com")?]);
     assert_eq!(mail.subject(), "Analytical engines");
     assert_eq!(
-        mail.html().map(|html| html.render(&Cx::default())),
+        mail.html().map(|html| html.clone().render(&Cx::default())),
         Some("<p>The engine weaves algebraic patterns.</p>".to_owned())
     );
     assert_eq!(
@@ -111,7 +111,7 @@ async fn html_renders_dynamic_parts_against_the_named_context() -> Result<()> {
     }?;
 
     assert_eq!(
-        mail.html().map(|html| html.render(cx)),
+        mail.html().map(|html| html.clone().render(cx)),
         Some("<p>Hello, Ada!</p>".to_owned())
     );
 
