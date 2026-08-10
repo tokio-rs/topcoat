@@ -29,14 +29,34 @@ export function setupBinding(el: Element, attr: Attr, scope: Scope): void {
 	const { context } = scope.runtime;
 	scope.run(() => {
 		effect(() => {
-			write(el, name, compute(context));
+			writeAttribute(el, name, compute(context));
 		});
 	});
 }
 
-function write(el: Element, name: string, value: unknown): void {
+export function writeAttribute(
+	el: Element,
+	name: string,
+	value: unknown,
+): void {
 	if (PROPERTY_NAMES.has(name)) {
 		(el as Element & Record<string, unknown>)[name] = value;
+	}
+	// A tuple, which hydrates as an array. `AttributeValueViewParts for
+	// (T1, T2)` is present when any element is, and writes the elements one
+	// after another; an element that is not present writes nothing, the way a
+	// `None` does. Falling through would give `String(array)` and its commas.
+	if (Array.isArray(value)) {
+		const present = value.filter(
+			(element) =>
+				isAttributeValueViewParts(element) && element.isAttributePresent(),
+		);
+		if (present.length === 0) {
+			el.removeAttribute(name);
+			return;
+		}
+		el.setAttribute(name, present.map((e) => e.toAttributeValue()).join(""));
+		return;
 	}
 	if (isAttributeValueViewParts(value)) {
 		if (!value.isAttributePresent()) {
