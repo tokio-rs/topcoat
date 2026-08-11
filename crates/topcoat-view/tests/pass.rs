@@ -23,7 +23,7 @@ use topcoat_core::{
 use topcoat_view::{
     identity::SiteKey,
     pass::{
-        Children, Deferred, Driver, PassReport, RenderBuffer, defer, defer_keyed, mount,
+        Children, Deferred, Driver, PassReport, RenderBuffer, ViewToken, defer, defer_keyed, mount,
         pass_boundary,
     },
 };
@@ -702,7 +702,8 @@ async fn slow_birth_page(cx: Cx, io1: Trigger, birth_io: Trigger, extra_io: Trig
     let mut children = Children::new();
     loop {
         let mut out = RenderBuffer::new();
-        let extra: Deferred<'_, ()> = defer(&cx, |_cx| extra_io.take().expect("the load runs once"));
+        let extra: Deferred<'_, ()> =
+            defer(&cx, |_cx| extra_io.take().expect("the load runs once"));
         out.markup(match extra {
             Deferred::Pending => "[extra?]",
             Deferred::Ready(()) => "[extra!]",
@@ -966,4 +967,313 @@ fn the_driver_and_component_futures_are_send() {
     assert_send(&fut);
     let driver = Driver::new(fut);
     assert_send(&driver);
+}
+
+// Child content: the trailing block compiles to an anonymous component owned
+// by its creator. The receiver holds only a token and places it.
+async fn content_home(cx: Cx, content_bodies: Counter, expand_io: Trigger) -> Result<()> {
+    let mount = mount();
+    let user = String::from("carl");
+    let mut children = Children::new();
+    let mut expand_io = Some(expand_io);
+    loop {
+        let mut out = RenderBuffer::new();
+        // The trailing block of `panel(..) { <p>(user)</p> }`.
+        let token = children.content(site!(), || content_block(content_bodies.clone(), &user))?;
+        let io = &mut expand_io;
+        children.advance(&mut out, site!(), || {
+            panel(cx.detach(), token, io.take().expect("born once"))
+        })?;
+        children.sweep();
+        mount.finish_render(out);
+        pass_boundary(&mount, &mut children).await?;
+    }
+}
+
+async fn content_block(bodies: Counter, user: &str) -> Result<()> {
+    let mount = mount();
+    bodies.bump();
+    let mut children = Children::new();
+    loop {
+        let mut out = RenderBuffer::new();
+        out.markup("<p>");
+        out.text(user);
+        out.markup("</p>");
+        children.sweep();
+        mount.finish_render(out);
+        pass_boundary(&mount, &mut children).await?;
+    }
+}
+
+async fn panel(cx: Cx, token: ViewToken, expand_io: Trigger) -> Result<()> {
+    let mount = mount();
+    let mut expand_io = Some(expand_io);
+    let mut children = Children::new();
+    loop {
+        let mut out = RenderBuffer::new();
+        out.markup("<section>");
+        match defer(&cx, |_cx| expand_io.take().expect("the load runs once")) {
+            Deferred::Pending => out.markup("[collapsed]"),
+            Deferred::Ready(()) => out.place(token)?,
+        }
+        out.markup("</section>");
+        children.sweep();
+        mount.finish_render(out);
+        pass_boundary(&mount, &mut children).await?;
+    }
+}
+
+#[test]
+fn content_runs_unplaced_and_placement_shows_its_current_state() {
+    let cx = cx();
+    let (expand_io, fire) = trigger();
+    let content_bodies = Counter::default();
+    let mut driver = Driver::new(content_home(cx.detach(), content_bodies.clone(), expand_io));
+
+    let p1 = sealed_pass(&mut driver);
+    assert_eq!(p1.html, "<section>[collapsed]</section>");
+    assert_eq!(content_bodies.get(), 1, "unplaced content still runs");
+
+    fire.fire();
+    let p2 = sealed_pass(&mut driver);
+    assert_eq!(p2.html, "<section><p>carl</p></section>");
+    assert_eq!(
+        content_bodies.get(),
+        1,
+        "placement shows the warm content, no rebirth"
+    );
+}
+
+// A content failure is delivered at placement, where the placer catches it
+// like a layout catches its slot.
+#[test]
+fn placement_delivers_the_content_error_to_the_placer() {
+    async fn failing_content() -> Result<()> {
+        let _mount = mount();
+        Err(boom("content boom"))
+    }
+    async fn catching_panel(token: ViewToken) -> Result<()> {
+        let mount = mount();
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            if let Err(error) = out.place(token) {
+                out.markup("[caught: ");
+                out.text(&error.to_string());
+                out.markup("]");
+            }
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+    async fn creator() -> Result<()> {
+        let mount = mount();
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            let token = children.content(site!(), failing_content)?;
+            children.advance(&mut out, site!(), || catching_panel(token))?;
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+
+    let mut driver = Driver::new(creator());
+    let p1 = sealed_pass(&mut driver);
+    assert_eq!(p1.html, "[caught: content boom]");
+    assert!(p1.page_error.is_none(), "nothing unwinds");
+}
+
+// Content that fails and is never placed hands the error back to its owner
+// on an automatic extra pass.
+#[test]
+fn unplaced_content_error_falls_back_to_the_owner() {
+    async fn failing_content() -> Result<()> {
+        let _mount = mount();
+        Err(boom("content boom"))
+    }
+    async fn never_places() -> Result<()> {
+        let mount = mount();
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            out.markup("[collapsed]");
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+    async fn creator() -> Result<()> {
+        let mount = mount();
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            let token = children.content(site!(), failing_content)?;
+            let _ = token;
+            children.advance(&mut out, site!(), never_places)?;
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+
+    let mut driver = Driver::new(creator());
+    let p2 = sealed_pass(&mut driver);
+    assert_eq!(p2.pass, 2, "custody rolls into an automatic extra pass");
+    let error = p2
+        .page_error
+        .expect("the owner propagated the content error");
+    assert_eq!(error.to_string(), "content boom");
+}
+
+// One slot cannot fill two positions.
+#[test]
+#[should_panic(expected = "placed twice")]
+fn double_placement_panics() {
+    async fn healthy_content() -> Result<()> {
+        let mount = mount();
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            out.markup("x");
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+    async fn creator() -> Result<()> {
+        let mount = mount();
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            let token = children.content(site!(), healthy_content)?;
+            out.place(token)?;
+            out.place(token)?;
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+    let mut driver = Driver::new(creator());
+    sealed_pass(&mut driver);
+}
+
+// Content contains its own streaming component: it defers, skeletons, and
+// resolves inside the placed region across passes.
+#[test]
+fn content_streams_its_own_deferred_data() {
+    async fn streaming_content(cx: Cx, io: Trigger) -> Result<()> {
+        let mount = mount();
+        let mut io = Some(io);
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            match defer(&cx, |_cx| {
+                let io = io.take().expect("the load runs once");
+                async move {
+                    io.await;
+                    String::from("loaded")
+                }
+            }) {
+                Deferred::Pending => out.markup("[content skeleton]"),
+                Deferred::Ready(value) => out.text(value),
+            }
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+    async fn creator(cx: Cx, io: Trigger) -> Result<()> {
+        let mount = mount();
+        let mut io = Some(io);
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            let content_io = &mut io;
+            let token = children.content(site!(), || {
+                streaming_content(cx.detach(), content_io.take().expect("born once"))
+            })?;
+            out.markup("<aside>");
+            out.place(token)?;
+            out.markup("</aside>");
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+
+    let cx = cx();
+    let (io, fire) = trigger();
+    let mut driver = Driver::new(creator(cx.detach(), io));
+    assert_eq!(
+        sealed_pass(&mut driver).html,
+        "<aside>[content skeleton]</aside>"
+    );
+    fire.fire();
+    assert_eq!(sealed_pass(&mut driver).html, "<aside>loaded</aside>");
+    stream_ends(&mut driver);
+}
+
+// A stale token, held after the creator swept the content away, places to
+// nothing instead of failing.
+#[test]
+fn placing_an_evicted_token_renders_empty() {
+    async fn short_content() -> Result<()> {
+        let mount = mount();
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            out.markup("gone soon");
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+    async fn late_placer(token: ViewToken) -> Result<()> {
+        let mount = mount();
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            out.markup("<section>");
+            out.place(token)?;
+            out.markup("</section>");
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+    async fn creator(cx: Cx, io: Trigger) -> Result<()> {
+        let mount = mount();
+        let mut io = Some(io);
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            let stop: Deferred<'_, ()> = defer(&cx, |_cx| io.take().expect("the load runs once"));
+            let mut token = None;
+            if matches!(stop, Deferred::Pending) {
+                token = Some(children.content(site!(), short_content)?);
+            }
+            if let Some(token) = token {
+                let placer = token;
+                children.advance(&mut out, site!(), move || late_placer(placer))?;
+            }
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+
+    let cx = cx();
+    let (io, fire) = trigger();
+    let mut driver = Driver::new(creator(cx.detach(), io));
+    assert_eq!(
+        sealed_pass(&mut driver).html,
+        "<section>gone soon</section>"
+    );
+    fire.fire();
+    // The creator swept both the content and the placer; the tree is empty.
+    assert_eq!(sealed_pass(&mut driver).html, "");
+    stream_ends(&mut driver);
 }

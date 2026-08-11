@@ -1,6 +1,13 @@
 use std::fmt::Write;
 
-use crate::{format::Formatter, html::HtmlContext, identity::Identity, pass::scope::PassScope};
+use topcoat_core::error::{Error, Result};
+
+use crate::{
+    format::Formatter,
+    html::HtmlContext,
+    identity::Identity,
+    pass::{children::ViewToken, scope::PassScope},
+};
 
 /// The output buffer of one render.
 ///
@@ -33,6 +40,42 @@ impl RenderBuffer {
     pub(crate) fn child_marker(&mut self, identity: Identity) {
         write!(self.html, "<!--tc:{:032x}-->", identity.hash())
             .expect("writing to a string cannot fail");
+    }
+
+    /// Places a content view at this position: emits its marker so its
+    /// output appears here.
+    ///
+    /// # Errors
+    ///
+    /// A content render that failed delivers its error at placement, so the
+    /// placer propagates it with `?` or catches it, the way a layout catches
+    /// its slot.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the token is placed twice in one pass: one slot cannot fill
+    /// two positions.
+    pub fn place(&mut self, token: ViewToken) -> Result<(), Error> {
+        let hash = token.identity.hash();
+        let error = PassScope::with(|state| {
+            let pass = state.pass;
+            let content_state = state.content.get_mut(&hash)?;
+            assert!(
+                content_state.placed_pass < pass,
+                "a view was placed twice in one pass"
+            );
+            content_state.placed_pass = pass;
+            let error = content_state.error.take();
+            if error.is_some() {
+                state.stashed -= 1;
+            }
+            error
+        });
+        if let Some(error) = error {
+            return Err(error);
+        }
+        self.child_marker(token.identity);
+        Ok(())
     }
 
     pub(crate) fn into_html(self) -> String {

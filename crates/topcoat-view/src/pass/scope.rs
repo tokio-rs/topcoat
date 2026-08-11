@@ -28,10 +28,28 @@ pub(crate) struct PassState {
     pub(crate) slots: HashMap<u128, Slot>,
     /// Components whose body has not finished its first render.
     pub(crate) births: HashSet<u128>,
-    /// Caught errors waiting to be consumed by their catcher's next render.
+    /// Caught errors waiting to be consumed by their catcher's next render,
+    /// including unclaimed content errors. A pass does not seal while any
+    /// remain.
     pub(crate) stashed: usize,
+    /// Bookkeeping for anonymous content components, keyed by identity hash.
+    pub(crate) content: HashMap<u128, ContentState>,
     /// Deferred futures registered during this poll, drained by the driver.
     pub(crate) deferred: Vec<Pin<Box<dyn Future<Output = ()> + Send>>>,
+}
+
+/// One content component's placement and error state.
+#[derive(Default)]
+pub(crate) struct ContentState {
+    /// The error that completed the content's future, until a placement or
+    /// the owner claims it.
+    pub(crate) error: Option<topcoat_core::error::Error>,
+    /// The pass the error was recorded on. The owner only claims errors
+    /// from earlier passes, so a placement later in the same pass wins.
+    pub(crate) error_pass: u64,
+    /// The pass the content was last placed on, enforcing one placement per
+    /// pass.
+    pub(crate) placed_pass: u64,
 }
 
 /// One component's output slot.
