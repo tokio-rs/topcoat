@@ -176,7 +176,7 @@ impl RenderBuffer {
         #[cfg(feature = "http")]
         let (status_code, headers) = f.into_recorded();
         #[cfg(not(feature = "http"))]
-        drop(f);
+        let _ = f;
         FinishedRender {
             html,
             #[cfg(feature = "http")]

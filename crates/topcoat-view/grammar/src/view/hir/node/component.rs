@@ -33,7 +33,7 @@ impl Component {
     /// so they resolve to the invocation's own location in source; the
     /// ordinal tells sites apart when a macro-generated body collapses
     /// their spans.
-    fn site(&self) -> TokenStream {
+    pub(in crate::view::hir) fn site(&self) -> TokenStream {
         let ordinal = self.ordinal;
         quote_spanned! {self.path.span()=>
             const {

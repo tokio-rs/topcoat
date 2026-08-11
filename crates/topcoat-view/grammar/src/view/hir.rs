@@ -1,6 +1,7 @@
 mod builder;
 mod emit;
 mod node;
+mod pass_emit;
 mod scope;
 
 pub(crate) use builder::*;

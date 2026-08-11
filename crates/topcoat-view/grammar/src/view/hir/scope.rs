@@ -18,6 +18,10 @@ impl Scope {
         Self { nodes }
     }
 
+    pub(super) fn nodes(&self) -> &[Node] {
+        &self.nodes
+    }
+
     pub fn emit_root(&self) -> TokenStream {
         let view = self.emit_view();
         let body = quote! {
