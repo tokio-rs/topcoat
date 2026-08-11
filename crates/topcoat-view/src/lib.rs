@@ -7,6 +7,7 @@ mod format;
 mod html;
 pub mod identity;
 mod part;
+pub mod pass;
 mod props;
 mod string;
 pub mod svg;

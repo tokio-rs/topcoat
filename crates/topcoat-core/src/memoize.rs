@@ -1,6 +1,8 @@
+mod defer_cache;
 mod eq_cache;
 mod recursion;
 
+pub use defer_cache::*;
 pub use eq_cache::*;
 
 /// All memoize cache variants grouped into one structure.
@@ -8,6 +10,7 @@ pub use eq_cache::*;
 #[doc(hidden)]
 pub struct MemoizeCache {
     eq_cache: MemoizeEqCache,
+    defer_cache: DeferCache,
 }
 
 impl MemoizeCache {
@@ -20,6 +23,11 @@ impl MemoizeCache {
     #[inline]
     pub fn eq_cache(&self) -> &MemoizeEqCache {
         &self.eq_cache
+    }
+
+    #[inline]
+    pub fn defer_cache(&self) -> &DeferCache {
+        &self.defer_cache
     }
 }
 

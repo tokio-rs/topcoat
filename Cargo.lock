@@ -3213,6 +3213,7 @@ dependencies = [
 name = "topcoat-view"
 version = "0.5.0"
 dependencies = [
+ "anyhow",
  "criterion",
  "futures-core",
  "futures-util",
