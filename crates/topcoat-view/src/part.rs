@@ -74,7 +74,7 @@ pub struct PartsWriter<'a> {
 impl<'a> PartsWriter<'a> {
     /// Creates a writer that seals everything pushed into it with `context`.
     #[inline]
-    fn new(buffer: &'a mut ViewBuffer, context: HtmlContext) -> Self {
+    pub(crate) fn new(buffer: &'a mut ViewBuffer, context: HtmlContext) -> Self {
         Self {
             buffer,
             context,

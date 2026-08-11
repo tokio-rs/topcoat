@@ -5,7 +5,10 @@ use std::{
     task::{Context, Poll},
 };
 
-use topcoat_core::error::{Error, Result};
+use topcoat_core::{
+    context::Cx,
+    error::{Error, Result},
+};
 
 use crate::{
     identity::Identity,
@@ -45,17 +48,23 @@ pub struct PassReport {
     /// Set when the root itself completed with an error: the whole page
     /// error case, with no layout left to catch it.
     pub page_error: Option<Error>,
+    /// The response status renders have declared so far.
+    #[cfg(feature = "http")]
+    pub status_code: Option<http::StatusCode>,
+    /// The response headers renders have declared so far.
+    #[cfg(feature = "http")]
+    pub headers: http::HeaderMap,
 }
 
 impl<'f> Driver<'f> {
-    /// Creates the driver over the root component's future.
-    pub fn new<F>(root: F) -> Self
+    /// Creates the driver for one request over the root component's future.
+    pub fn new<F>(cx: Cx, root: F) -> Self
     where
         F: Future<Output = Result<()>> + Send + 'f,
     {
         Driver {
             root: Some(Box::pin(InstallFuture::new(Identity::ROOT, root))),
-            state: Some(Box::default()),
+            state: Some(Box::new(PassState::new(cx))),
             deferred: Vec::new(),
             prev: HashMap::new(),
             rendering: false,
@@ -95,6 +104,10 @@ impl<'f> Driver<'f> {
                     changed: Vec::new(),
                     polls: self.pumps,
                     page_error: Some(error),
+                    #[cfg(feature = "http")]
+                    status_code: None,
+                    #[cfg(feature = "http")]
+                    headers: http::HeaderMap::new(),
                 }));
             }
             self.drain_handoff();
@@ -248,6 +261,10 @@ impl<'f> Driver<'f> {
             changed,
             polls: self.pumps,
             page_error: None,
+            #[cfg(feature = "http")]
+            status_code: state.status_code,
+            #[cfg(feature = "http")]
+            headers: state.headers.clone(),
         };
         self.prev = state
             .slots

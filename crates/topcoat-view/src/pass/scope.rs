@@ -16,8 +16,9 @@ thread_local! {
 /// Owned by the driver between polls and installed on the thread for the
 /// duration of each poll, the same shape the view buffer scope uses, so a
 /// request task stays free to migrate between worker threads.
-#[derive(Default)]
 pub(crate) struct PassState {
+    /// The request's context handle.
+    pub(crate) cx: topcoat_core::context::Cx,
     /// The current pass number. Zero before the first pass.
     pub(crate) pass: u64,
     /// The request task's waker, refreshed by the driver on every poll, so
@@ -36,6 +37,32 @@ pub(crate) struct PassState {
     pub(crate) content: HashMap<u128, ContentState>,
     /// Deferred futures registered during this poll, drained by the driver.
     pub(crate) deferred: Vec<Pin<Box<dyn Future<Output = ()> + Send>>>,
+    /// The response status a render declared. First declaration wins.
+    #[cfg(feature = "http")]
+    pub(crate) status_code: Option<http::StatusCode>,
+    /// The response headers renders declared. The first render mentioning a
+    /// name provides all of that name's values.
+    #[cfg(feature = "http")]
+    pub(crate) headers: http::HeaderMap,
+}
+
+impl PassState {
+    pub(crate) fn new(cx: topcoat_core::context::Cx) -> Self {
+        PassState {
+            cx,
+            pass: 0,
+            waker: None,
+            slots: HashMap::new(),
+            births: HashSet::new(),
+            stashed: 0,
+            content: HashMap::new(),
+            deferred: Vec::new(),
+            #[cfg(feature = "http")]
+            status_code: None,
+            #[cfg(feature = "http")]
+            headers: http::HeaderMap::new(),
+        }
+    }
 }
 
 /// One content component's placement and error state.

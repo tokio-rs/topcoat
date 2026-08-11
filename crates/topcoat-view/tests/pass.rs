@@ -161,7 +161,8 @@ async fn static_page(bodies: Counter) -> Result<()> {
 #[test]
 fn static_page_seals_in_one_pass() {
     let bodies = Counter::default();
-    let mut driver = Driver::new(static_page(bodies.clone()));
+    let cx = cx();
+    let mut driver = Driver::new(cx.detach(), static_page(bodies.clone()));
     let p1 = sealed_pass(&mut driver);
     assert_eq!(p1.pass, 1);
     assert_eq!(p1.html, "<h1>hello</h1>");
@@ -185,7 +186,8 @@ fn interpolated_text_is_escaped() {
             pass_boundary(&mount, &mut children).await?;
         }
     }
-    let mut driver = Driver::new(page());
+    let cx = cx();
+    let mut driver = Driver::new(cx.detach(), page());
     assert_eq!(sealed_pass(&mut driver).html, "a&lt;b &amp; \"c\"");
 }
 
@@ -245,7 +247,10 @@ fn deferred_load_streams_in_two_passes_and_bodies_run_once() {
     let (io, fire) = trigger();
     let bodies = Counter::default();
     let cards = Counter::default();
-    let mut driver = Driver::new(menu(cx.detach(), bodies.clone(), cards.clone(), io));
+    let mut driver = Driver::new(
+        cx.detach(),
+        menu(cx.detach(), bodies.clone(), cards.clone(), io),
+    );
 
     let p1 = sealed_pass(&mut driver);
     assert!(p1.html.contains("skeleton"));
@@ -331,7 +336,7 @@ fn sequential_chain_peels_one_layer_per_pass() {
     let cx = cx();
     let (io1, fire1) = trigger();
     let (io2, fire2) = trigger();
-    let mut driver = Driver::new(outer_chain(cx.detach(), io1, io2));
+    let mut driver = Driver::new(cx.detach(), outer_chain(cx.detach(), io1, io2));
 
     assert_eq!(sealed_pass(&mut driver).html, "[outer skeleton]");
     fire1.fire();
@@ -388,7 +393,10 @@ fn child_prop_borrows_parent_body_local_across_passes() {
     let cx = cx();
     let (io, fire) = trigger();
     let child_bodies = Counter::default();
-    let mut driver = Driver::new(lending_parent(cx.detach(), child_bodies.clone(), io));
+    let mut driver = Driver::new(
+        cx.detach(),
+        lending_parent(cx.detach(), child_bodies.clone(), io),
+    );
 
     assert_eq!(sealed_pass(&mut driver).html, "[p1]<b>borrowed</b>");
     fire.fire();
@@ -482,7 +490,7 @@ fn deferred_error_on_a_later_pass_is_caught_by_the_layout() {
     let cx = cx();
     let (io, fire) = trigger();
     let log = Log::default();
-    let mut driver = Driver::new(layout(cx.detach(), log.clone(), io));
+    let mut driver = Driver::new(cx.detach(), layout(cx.detach(), log.clone(), io));
 
     let p1 = sealed_pass(&mut driver);
     assert!(p1.html.contains("skeleton"));
@@ -534,7 +542,7 @@ fn deferred_error_can_be_handled_at_the_source() {
 
     let cx = cx();
     let (io, fire) = trigger();
-    let mut driver = Driver::new(local_handler(cx.detach(), io));
+    let mut driver = Driver::new(cx.detach(), local_handler(cx.detach(), io));
     sealed_pass(&mut driver);
     fire.fire();
     let p2 = sealed_pass(&mut driver);
@@ -602,7 +610,7 @@ fn arm_switch_evicts_the_orphan_and_drop_reads_the_borrowed_prop() {
     let cx = cx();
     let (io, fire) = trigger();
     let log = Log::default();
-    let mut driver = Driver::new(audit_parent(cx.detach(), log.clone(), io));
+    let mut driver = Driver::new(cx.detach(), audit_parent(cx.detach(), log.clone(), io));
 
     assert_eq!(sealed_pass(&mut driver).html, "[evictee:The menu]");
     fire.fire();
@@ -629,7 +637,8 @@ fn uncaught_error_becomes_a_page_error() {
         let _mount = mount();
         Err(boom("fatal"))
     }
-    let mut driver = Driver::new(fatal_root());
+    let cx = cx();
+    let mut driver = Driver::new(cx.detach(), fatal_root());
     let p1 = sealed_pass(&mut driver);
     let error = p1.page_error.expect("the root error surfaces");
     assert_eq!(error.to_string(), "fatal");
@@ -675,7 +684,10 @@ fn keyed_children_are_retained_and_settled_passes_are_one_unchanged_poll() {
     let (io1, fire1) = trigger();
     let (io2, fire2) = trigger();
     let cards = Counter::default();
-    let mut driver = Driver::new(retained_menu(cx.detach(), cards.clone(), io1, io2));
+    let mut driver = Driver::new(
+        cx.detach(),
+        retained_menu(cx.detach(), cards.clone(), io1, io2),
+    );
 
     sealed_pass(&mut driver);
     fire1.fire();
@@ -743,7 +755,10 @@ fn parked_births_block_the_seal_and_mid_pass_completions_wait_for_the_snapshot()
     let (io1, fire1) = trigger();
     let (birth_io, fire_birth) = trigger();
     let (extra_io, fire_extra) = trigger();
-    let mut driver = Driver::new(slow_birth_page(cx.detach(), io1, birth_io, extra_io));
+    let mut driver = Driver::new(
+        cx.detach(),
+        slow_birth_page(cx.detach(), io1, birth_io, extra_io),
+    );
 
     let p1 = sealed_pass(&mut driver);
     assert_eq!(p1.html, "[extra?][skeleton]");
@@ -859,7 +874,10 @@ fn mid_suspension_error_is_stashed_and_rendered_on_an_automatic_extra_pass() {
     let (io1, fire1) = trigger();
     let (inner_io, fire_inner) = trigger();
     let log = Log::default();
-    let mut driver = Driver::new(stash_layout(cx.detach(), log.clone(), io1, inner_io));
+    let mut driver = Driver::new(
+        cx.detach(),
+        stash_layout(cx.detach(), log.clone(), io1, inner_io),
+    );
 
     let p1 = sealed_pass(&mut driver);
     assert!(p1.html.contains("[page skeleton]"));
@@ -904,7 +922,7 @@ fn keyed_defers_in_a_loop_resolve_independently() {
     }
 
     let cx = cx();
-    let mut driver = Driver::new(keyed(cx.detach()));
+    let mut driver = Driver::new(cx.detach(), keyed(cx.detach()));
     assert_eq!(sealed_pass(&mut driver).html, "??");
     let p2 = sealed_pass(&mut driver);
     assert_eq!(p2.html, "010");
@@ -928,7 +946,8 @@ fn unkeyed_repeated_invocation_panics() {
             pass_boundary(&mount, &mut children).await?;
         }
     }
-    let mut driver = Driver::new(repeats());
+    let cx = cx();
+    let mut driver = Driver::new(cx.detach(), repeats());
     sealed_pass(&mut driver);
 }
 
@@ -952,7 +971,7 @@ fn render_blocking_returns_only_the_final_document() {
     }
 
     let cx = cx();
-    let mut driver = Driver::new(instant_menu(cx.detach()));
+    let mut driver = Driver::new(cx.detach(), instant_menu(cx.detach()));
     let html = block_on_noop(driver.render_blocking()).expect("renders");
     assert_eq!(html, "ready");
 }
@@ -965,7 +984,7 @@ fn the_driver_and_component_futures_are_send() {
     let (io, _fire) = trigger();
     let fut = menu(cx.detach(), Counter::default(), Counter::default(), io);
     assert_send(&fut);
-    let driver = Driver::new(fut);
+    let driver = Driver::new(cx.detach(), fut);
     assert_send(&driver);
 }
 
@@ -1028,7 +1047,10 @@ fn content_runs_unplaced_and_placement_shows_its_current_state() {
     let cx = cx();
     let (expand_io, fire) = trigger();
     let content_bodies = Counter::default();
-    let mut driver = Driver::new(content_home(cx.detach(), content_bodies.clone(), expand_io));
+    let mut driver = Driver::new(
+        cx.detach(),
+        content_home(cx.detach(), content_bodies.clone(), expand_io),
+    );
 
     let p1 = sealed_pass(&mut driver);
     assert_eq!(p1.html, "<section>[collapsed]</section>");
@@ -1080,7 +1102,8 @@ fn placement_delivers_the_content_error_to_the_placer() {
         }
     }
 
-    let mut driver = Driver::new(creator());
+    let cx = cx();
+    let mut driver = Driver::new(cx.detach(), creator());
     let p1 = sealed_pass(&mut driver);
     assert_eq!(p1.html, "[caught: content boom]");
     assert!(p1.page_error.is_none(), "nothing unwinds");
@@ -1119,7 +1142,8 @@ fn unplaced_content_error_falls_back_to_the_owner() {
         }
     }
 
-    let mut driver = Driver::new(creator());
+    let cx = cx();
+    let mut driver = Driver::new(cx.detach(), creator());
     let p2 = sealed_pass(&mut driver);
     assert_eq!(p2.pass, 2, "custody rolls into an automatic extra pass");
     let error = p2
@@ -1156,7 +1180,8 @@ fn double_placement_panics() {
             pass_boundary(&mount, &mut children).await?;
         }
     }
-    let mut driver = Driver::new(creator());
+    let cx = cx();
+    let mut driver = Driver::new(cx.detach(), creator());
     sealed_pass(&mut driver);
 }
 
@@ -1206,7 +1231,7 @@ fn content_streams_its_own_deferred_data() {
 
     let cx = cx();
     let (io, fire) = trigger();
-    let mut driver = Driver::new(creator(cx.detach(), io));
+    let mut driver = Driver::new(cx.detach(), creator(cx.detach(), io));
     assert_eq!(
         sealed_pass(&mut driver).html,
         "<aside>[content skeleton]</aside>"
@@ -1267,7 +1292,7 @@ fn placing_an_evicted_token_renders_empty() {
 
     let cx = cx();
     let (io, fire) = trigger();
-    let mut driver = Driver::new(creator(cx.detach(), io));
+    let mut driver = Driver::new(cx.detach(), creator(cx.detach(), io));
     assert_eq!(
         sealed_pass(&mut driver).html,
         "<section>gone soon</section>"
@@ -1276,4 +1301,55 @@ fn placing_an_evicted_token_renders_empty() {
     // The creator swept both the content and the placer; the tree is empty.
     assert_eq!(sealed_pass(&mut driver).html, "");
     stream_ends(&mut driver);
+}
+
+// The render positions accept the same value types the view macros support,
+// through the instruction buffer backing.
+#[test]
+fn render_positions_accept_the_view_value_types() {
+    async fn typed() -> Result<()> {
+        let mount = mount();
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            out.markup_static(&"<p data-n=\"");
+            out.attribute_value(42u32);
+            out.markup_static(&"\">");
+            out.node(7i64);
+            out.node(" & ");
+            out.node(true);
+            out.markup_static(&"</p>");
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+    let cx = cx();
+    let mut driver = Driver::new(cx.detach(), typed());
+    assert_eq!(
+        sealed_pass(&mut driver).html,
+        "<p data-n=\"42\">7 &amp; true</p>"
+    );
+}
+
+// Response metadata declared in a render is recorded and reported.
+#[test]
+fn renders_declare_response_status_and_headers() {
+    async fn page() -> Result<()> {
+        let mount = mount();
+        let mut children = Children::new();
+        loop {
+            let mut out = RenderBuffer::new();
+            out.node(http::StatusCode::NOT_FOUND);
+            out.markup("nothing here");
+            children.sweep();
+            mount.finish_render(out);
+            pass_boundary(&mount, &mut children).await?;
+        }
+    }
+    let cx = cx();
+    let mut driver = Driver::new(cx.detach(), page());
+    let p1 = sealed_pass(&mut driver);
+    assert_eq!(p1.html, "nothing here");
+    assert_eq!(p1.status_code, Some(http::StatusCode::NOT_FOUND));
 }

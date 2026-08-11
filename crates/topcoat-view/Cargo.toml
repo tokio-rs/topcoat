@@ -28,6 +28,7 @@ smallvec.workspace = true
 
 [dev-dependencies]
 anyhow = { workspace = true }
+http = { workspace = true }
 topcoat = { workspace = true, features = ["view"] }
 
 criterion = { workspace = true }
