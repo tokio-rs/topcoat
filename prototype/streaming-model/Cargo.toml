@@ -1,0 +1,9 @@
+[package]
+name = "streaming-model"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Standalone on purpose: this crate validates the streaming SSR design and is
+# not part of the framework workspace.
+[workspace]
