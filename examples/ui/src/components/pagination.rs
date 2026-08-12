@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     icon::{icon, iconify::iconify_icon},
-    view::{Attributes, View, attributes, class, component, view},
+    view::{Attributes, StaticClass, View, attributes, class, component, view},
 };
 
 use super::button::{ButtonSize, ButtonVariant, button_variants};
@@ -122,7 +122,7 @@ pub async fn pagination_link(
 /// It is only shown once the [`pagination`] is wide enough for it, which is
 /// measured against the pagination itself rather than the window: the same
 /// pagination is roomy on a page of its own and cramped in a card column.
-const LABEL: &str = "sr-only @xs:not-sr-only";
+const LABEL: StaticClass = class!("sr-only @xs:not-sr-only");
 
 /// The link to the page before the one being read.
 #[component]

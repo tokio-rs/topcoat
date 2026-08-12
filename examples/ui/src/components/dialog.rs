@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`dialog`] overlay: a layer covering the viewport,
@@ -14,9 +14,11 @@ use topcoat::{
 /// Only the open state sets a display: while the dialog is closed the
 /// browser's own `display: none` hides it, and an unconditional display would
 /// override that and leave the dialog on the page.
-const OVERLAY: &str = "fixed inset-0 z-50 size-full max-h-none max-w-none items-start \
-    justify-center overflow-y-auto bg-background/80 p-4 text-foreground backdrop-blur-sm \
-    open:flex";
+const OVERLAY: StaticClass = class!(
+    "fixed inset-0 z-50 size-full max-h-none max-w-none items-start \
+     justify-center overflow-y-auto bg-background/80 p-4 text-foreground backdrop-blur-sm \
+     open:flex",
+);
 
 /// The classes fading the veil in and out.
 ///
@@ -27,8 +29,10 @@ const OVERLAY: &str = "fixed inset-0 z-50 size-full max-h-none max-w-none items-
 /// `@starting-style` gives the layer the value to come from: an element that
 /// was not rendered a moment ago has no previous style to leave behind, so
 /// without it the fade in has nothing to run from.
-const FADE: &str = "opacity-0 open:opacity-100 starting:open:opacity-0 \
-    [transition:opacity_200ms_ease-out,display_200ms_allow-discrete]";
+const FADE: StaticClass = class!(
+    "opacity-0 open:opacity-100 starting:open:opacity-0 \
+     [transition:opacity_200ms_ease-out,display_200ms_allow-discrete]",
+);
 
 /// A dialog component: a panel over the page for a single task.
 ///
@@ -100,8 +104,10 @@ pub async fn dialog(
 /// background and text color, so it reads the same on any ancestor, and is
 /// positioned, so a control such as a close button can be placed in one of
 /// its corners.
-const CONTENT: &str = "relative my-auto flex w-full max-w-lg flex-col gap-4 rounded-xl \
-    border border-border bg-background p-6 text-foreground shadow-sm";
+const CONTENT: StaticClass = class!(
+    "relative my-auto flex w-full max-w-lg flex-col gap-4 rounded-xl \
+     border border-border bg-background p-6 text-foreground shadow-sm",
+);
 
 /// The classes bringing the panel in behind the veil.
 ///
@@ -112,9 +118,11 @@ const CONTENT: &str = "relative my-auto flex w-full max-w-lg flex-col gap-4 roun
 /// closes, for as long as the veil's fade holds the dialog on the page.
 /// `@starting-style` gives it the size to come from the first time, since a
 /// panel that was not rendered a moment ago has no previous size to leave.
-const MOTION: &str = "scale-95 opacity-0 in-[[open]]:scale-100 in-[[open]]:opacity-100 \
-    starting:in-[[open]]:scale-95 starting:in-[[open]]:opacity-0 \
-    [transition:scale_200ms_ease-out,opacity_200ms_ease-out]";
+const MOTION: StaticClass = class!(
+    "scale-95 opacity-0 in-[[open]]:scale-100 in-[[open]]:opacity-100 \
+     starting:in-[[open]]:scale-95 starting:in-[[open]]:opacity-0 \
+     [transition:scale_200ms_ease-out,opacity_200ms_ease-out]",
+);
 
 /// The panel of a [`dialog`], holding the dialog's sections.
 ///

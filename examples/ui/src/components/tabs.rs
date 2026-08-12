@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// A tabs component: one panel at a time out of several, picked by the row of
@@ -66,10 +66,12 @@ pub async fn tabs_list(#[default] mut attrs: Attributes, #[default] child: View)
 /// The trigger for the panel on show is tinted and takes the full foreground
 /// color, which is what tells it apart from the rest; the others light up on
 /// hover.
-const TRIGGER: &str = "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 \
-    rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors outline-none \
-    focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
-    focus-visible:ring-offset-background";
+const TRIGGER: StaticClass = class!(
+    "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 \
+     rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors outline-none \
+     focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
+     focus-visible:ring-offset-background",
+);
 
 /// One trigger of a [`tabs_list`]: a link to the page showing its panel.
 ///

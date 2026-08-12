@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// A radio group component: a set of options of which one can be picked.
@@ -47,14 +47,18 @@ pub async fn radio_group(#[default] mut attrs: Attributes, #[default] child: Vie
 /// browsers. The circle matches the input control's border and shadow, and
 /// picking it recolors the ring rather than filling it, which leaves room for
 /// the dot inside.
-const RADIO: &str = "peer size-4 shrink-0 appearance-none rounded-full border border-border \
-    bg-background shadow-xs transition-colors outline-none checked:border-primary \
-    focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
-    focus-visible:ring-offset-background disabled:pointer-events-none";
+const RADIO: StaticClass = class!(
+    "peer size-4 shrink-0 appearance-none rounded-full border border-border \
+     bg-background shadow-xs transition-colors outline-none checked:border-primary \
+     focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
+     focus-visible:ring-offset-background disabled:pointer-events-none",
+);
 
 /// The classes for the dot marking the picked option.
-const DOT: &str = "pointer-events-none absolute inset-0 m-auto size-2 rounded-full bg-primary \
-    opacity-0 transition-opacity peer-checked:opacity-100";
+const DOT: StaticClass = class!(
+    "pointer-events-none absolute inset-0 m-auto size-2 rounded-full bg-primary \
+     opacity-0 transition-opacity peer-checked:opacity-100",
+);
 
 /// One option of a [`radio_group`]: a themed native `<input type="radio">`.
 ///

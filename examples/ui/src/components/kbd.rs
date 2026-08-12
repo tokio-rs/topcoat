@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The classes for a [`kbd`] key cap.
@@ -9,9 +9,11 @@ use topcoat::{
 /// wide enough for its label, and at least as wide as it is tall so that a
 /// single character stays square. Browsers set a monospace family on `<kbd>`,
 /// which `font-sans` takes back so the label matches the surrounding text.
-const KBD: &str = "inline-flex h-5 w-fit min-w-5 shrink-0 items-center justify-center gap-1 \
-    rounded-sm border border-border bg-foreground/5 px-1.5 font-sans text-xs font-medium \
-    text-muted-foreground";
+const KBD: StaticClass = class!(
+    "inline-flex h-5 w-fit min-w-5 shrink-0 items-center justify-center gap-1 \
+     rounded-sm border border-border bg-foreground/5 px-1.5 font-sans text-xs font-medium \
+     text-muted-foreground",
+);
 
 /// A keyboard key component: a `<kbd>` drawn as a key cap.
 ///

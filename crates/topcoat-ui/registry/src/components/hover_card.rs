@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// A hover card component: a card of detail about its trigger, shown while
@@ -51,11 +51,13 @@ pub async fn hover_card(#[default] mut attrs: Attributes, #[default] child: View
 /// between is named in the transition with `allow-discrete`, since it has no
 /// in-between values; naming both properties one by one is what makes that
 /// work, as `all` does not carry the visibility along.
-const PANEL: &str = "invisible absolute top-full left-0 z-50 mt-2 w-64 rounded-lg border \
-    border-border bg-background p-4 text-foreground opacity-0 shadow-sm \
-    [transition:opacity_150ms_ease-out_300ms,visibility_150ms_allow-discrete_300ms] \
-    group-hover:visible group-hover:opacity-100 \
-    group-focus-within:visible group-focus-within:opacity-100";
+const PANEL: StaticClass = class!(
+    "invisible absolute top-full left-0 z-50 mt-2 w-64 rounded-lg border \
+     border-border bg-background p-4 text-foreground opacity-0 shadow-sm \
+     [transition:opacity_150ms_ease-out_300ms,visibility_150ms_allow-discrete_300ms] \
+     group-hover:visible group-hover:opacity-100 \
+     group-focus-within:visible group-focus-within:opacity-100",
+);
 
 /// The view a [`hover_card`] shows, in a panel below its trigger.
 #[component]

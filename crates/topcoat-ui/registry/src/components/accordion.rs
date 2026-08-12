@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     icon::{icon, iconify::iconify_icon},
-    view::{Attributes, View, attributes, class, component, view},
+    view::{Attributes, StaticClass, View, attributes, class, component, view},
 };
 
 /// An accordion component: sections that fold away until they are asked for.
@@ -50,10 +50,12 @@ pub async fn accordion(#[default] mut attrs: Attributes, #[default] child: View)
 ///
 /// Browsers that do not know `::details-content` drop these rules and open
 /// and close the section outright, which is what a `<details>` does anyway.
-const ANIMATION: &str = "[interpolate-size:allow-keywords] [&::details-content]:h-0 \
-    [&::details-content]:overflow-hidden \
-    [&::details-content]:[transition:height_200ms_ease-out,content-visibility_200ms_allow-discrete] \
-    [&[open]::details-content]:h-auto";
+const ANIMATION: StaticClass = class!(
+    "[interpolate-size:allow-keywords] [&::details-content]:h-0 \
+     [&::details-content]:overflow-hidden \
+     [&::details-content]:[transition:height_200ms_ease-out,content-visibility_200ms_allow-discrete] \
+     [&[open]::details-content]:h-auto",
+);
 
 /// One section of an [`accordion`], holding a trigger and the content it
 /// folds away.

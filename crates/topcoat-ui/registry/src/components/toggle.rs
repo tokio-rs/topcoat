@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// How a [`toggle`] relates to the others sharing its `name`.
@@ -49,11 +49,11 @@ impl ToggleSize {
     ///
     /// The sizes line up with the button's, so a toggle sits in a row of
     /// buttons without standing out.
-    fn classes(self) -> &'static str {
+    fn classes(self) -> StaticClass {
         match self {
-            Self::Sm => "h-8 gap-1.5 rounded-md px-2 text-xs",
-            Self::Md => "h-9 gap-2 rounded-lg px-3 text-sm",
-            Self::Lg => "h-10 gap-2 rounded-lg px-4 text-base",
+            Self::Sm => class!("h-8 gap-1.5 rounded-md px-2 text-xs"),
+            Self::Md => class!("h-9 gap-2 rounded-lg px-3 text-sm"),
+            Self::Lg => class!("h-10 gap-2 rounded-lg px-4 text-base"),
         }
     }
 }
@@ -63,13 +63,15 @@ impl ToggleSize {
 /// The state lives in an `<input>` the label wraps, so the label styles
 /// itself from the state of the control inside it: tinted while pressed, rung
 /// while the control has keyboard focus, and faded while it is disabled.
-const BASE: &str = "inline-flex shrink-0 cursor-pointer items-center justify-center border \
-    border-transparent font-medium whitespace-nowrap transition-colors select-none \
-    text-muted-foreground hover:bg-foreground/5 hover:text-foreground \
-    has-[:checked]:bg-foreground/10 has-[:checked]:text-foreground \
-    has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring \
-    has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background \
-    has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50";
+const BASE: StaticClass = class!(
+    "inline-flex shrink-0 cursor-pointer items-center justify-center border \
+     border-transparent font-medium whitespace-nowrap transition-colors select-none \
+     text-muted-foreground hover:bg-foreground/5 hover:text-foreground \
+     has-[:checked]:bg-foreground/10 has-[:checked]:text-foreground \
+     has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring \
+     has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background \
+     has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50",
+);
 
 /// A toggle component: a button that stays pressed.
 ///

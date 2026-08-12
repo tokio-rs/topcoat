@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`sheet`] overlay: a layer covering the viewport,
@@ -10,8 +10,10 @@ use topcoat::{
 /// sheet lies flush against the side it comes from; which side that is, is
 /// the panel's business. As with the dialog, only the open state sets a
 /// display, so a closed sheet stays hidden by the browser's own rule.
-const OVERLAY: &str = "fixed inset-0 z-50 size-full max-h-none max-w-none overflow-hidden \
-    bg-background/80 text-foreground backdrop-blur-sm open:flex";
+const OVERLAY: StaticClass = class!(
+    "fixed inset-0 z-50 size-full max-h-none max-w-none overflow-hidden \
+     bg-background/80 text-foreground backdrop-blur-sm open:flex",
+);
 
 /// The classes fading the veil in and out.
 ///
@@ -22,8 +24,10 @@ const OVERLAY: &str = "fixed inset-0 z-50 size-full max-h-none max-w-none overfl
 /// `@starting-style` gives the layer the value to come from: an element that
 /// was not rendered a moment ago has no previous style to leave behind, so
 /// without it the fade in has nothing to run from.
-const FADE: &str = "opacity-0 open:opacity-100 starting:open:opacity-0 \
-    [transition:opacity_200ms_ease-out,display_200ms_allow-discrete]";
+const FADE: StaticClass = class!(
+    "opacity-0 open:opacity-100 starting:open:opacity-0 \
+     [transition:opacity_200ms_ease-out,display_200ms_allow-discrete]",
+);
 
 /// A sheet component: a panel that comes in from an edge of the page.
 ///
@@ -102,12 +106,12 @@ impl SheetSide {
     /// by an automatic margin on the other, which is what leaves the veil
     /// showing on the remaining side. It is bordered only along the edge that
     /// faces the page, the one edge of it that is not against the viewport.
-    fn classes(self) -> &'static str {
+    fn classes(self) -> StaticClass {
         match self {
-            Self::Left => "mr-auto h-full w-full max-w-sm border-r",
-            Self::Right => "ml-auto h-full w-full max-w-sm border-l",
-            Self::Top => "mb-auto max-h-full w-full border-b",
-            Self::Bottom => "mt-auto max-h-full w-full border-t",
+            Self::Left => class!("mr-auto h-full w-full max-w-sm border-r"),
+            Self::Right => class!("ml-auto h-full w-full max-w-sm border-l"),
+            Self::Top => class!("mb-auto max-h-full w-full border-b"),
+            Self::Bottom => class!("mt-auto max-h-full w-full border-t"),
         }
     }
 
@@ -119,24 +123,24 @@ impl SheetSide {
     /// fade holds the sheet on the page. `@starting-style` gives it the place
     /// to come from the first time, since a panel that was not rendered a
     /// moment ago has no previous position to leave.
-    fn motion(self) -> &'static str {
+    fn motion(self) -> StaticClass {
         match self {
-            Self::Left => {
+            Self::Left => class!(
                 "-translate-x-full in-[[open]]:translate-x-0 \
-                 starting:in-[[open]]:-translate-x-full"
-            }
-            Self::Right => {
+                 starting:in-[[open]]:-translate-x-full",
+            ),
+            Self::Right => class!(
                 "translate-x-full in-[[open]]:translate-x-0 \
-                 starting:in-[[open]]:translate-x-full"
-            }
-            Self::Top => {
+                 starting:in-[[open]]:translate-x-full",
+            ),
+            Self::Top => class!(
                 "-translate-y-full in-[[open]]:translate-y-0 \
-                 starting:in-[[open]]:-translate-y-full"
-            }
-            Self::Bottom => {
+                 starting:in-[[open]]:-translate-y-full",
+            ),
+            Self::Bottom => class!(
                 "translate-y-full in-[[open]]:translate-y-0 \
-                 starting:in-[[open]]:translate-y-full"
-            }
+                 starting:in-[[open]]:translate-y-full",
+            ),
         }
     }
 }
@@ -147,8 +151,10 @@ impl SheetSide {
 /// its own background and text color, stacks its sections in a column, and
 /// scrolls within itself once there is more in it than the edge it lies
 /// against is long.
-const CONTENT: &str = "flex flex-col gap-4 overflow-y-auto border-border bg-background p-6 \
-    text-foreground shadow-sm [transition:translate_200ms_ease-out]";
+const CONTENT: StaticClass = class!(
+    "flex flex-col gap-4 overflow-y-auto border-border bg-background p-6 \
+     text-foreground shadow-sm [transition:translate_200ms_ease-out]",
+);
 
 /// The panel of a [`sheet`], holding its sections.
 ///

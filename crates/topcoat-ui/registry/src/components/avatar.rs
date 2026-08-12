@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The size of an [`avatar`].
@@ -23,11 +23,11 @@ impl AvatarSize {
     ///
     /// Each size sets a text size along with the dimensions, which is what
     /// scales the initials in an [`avatar_fallback`].
-    fn classes(self) -> &'static str {
+    fn classes(self) -> StaticClass {
         match self {
-            Self::Sm => "size-8 text-xs",
-            Self::Md => "size-10 text-sm",
-            Self::Lg => "size-12 text-base",
+            Self::Sm => class!("size-8 text-xs"),
+            Self::Md => class!("size-10 text-sm"),
+            Self::Lg => class!("size-12 text-base"),
         }
     }
 }
@@ -36,7 +36,7 @@ impl AvatarSize {
 ///
 /// The circle clips whatever is inside it, and is positioned so that an
 /// [`avatar_image`] can cover the [`avatar_fallback`] behind it.
-const AVATAR: &str = "relative flex shrink-0 overflow-hidden rounded-full";
+const AVATAR: StaticClass = class!("relative flex shrink-0 overflow-hidden rounded-full");
 
 /// An avatar component: a circular portrait of a person or an organization.
 ///

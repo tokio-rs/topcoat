@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// A tooltip component: a hint that shows while its trigger is hovered or
@@ -54,12 +54,14 @@ pub async fn tooltip(#[default] mut attrs: Attributes, #[default] child: View) -
 /// snap and the fade would play against a hint that is already gone. Naming
 /// both properties one by one is what makes that work; `all` does not carry
 /// the visibility along.
-const BUBBLE: &str = "pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 \
-    -translate-x-1/2 rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background \
-    opacity-0 shadow-sm whitespace-nowrap \
-    [transition:opacity_150ms_ease-out,visibility_150ms_allow-discrete] \
-    group-hover:visible group-hover:opacity-100 \
-    group-focus-within:visible group-focus-within:opacity-100";
+const BUBBLE: StaticClass = class!(
+    "pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 \
+     -translate-x-1/2 rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background \
+     opacity-0 shadow-sm whitespace-nowrap \
+     [transition:opacity_150ms_ease-out,visibility_150ms_allow-discrete] \
+     group-hover:visible group-hover:opacity-100 \
+     group-focus-within:visible group-focus-within:opacity-100",
+);
 
 /// The hint a [`tooltip`] shows, in a bubble above its trigger.
 #[component]

@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, class, component, view},
+    view::{Attributes, StaticClass, class, component, view},
 };
 
 /// The classes for the [`skeleton`] placeholder.
@@ -8,7 +8,7 @@ use topcoat::{
 /// The block is filled with the foreground color at low opacity, so it reads
 /// as an absence of content in both color schemes, and pulses to mark the
 /// wait as ongoing.
-const SKELETON: &str = "animate-pulse rounded-md bg-foreground/10";
+const SKELETON: StaticClass = class!("animate-pulse rounded-md bg-foreground/10");
 
 /// A skeleton component: a pulsing block standing in for content that has not
 /// arrived yet.
