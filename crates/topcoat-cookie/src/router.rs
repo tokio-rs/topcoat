@@ -21,12 +21,12 @@ impl Layer for CookieLayer {
         Path::new("/")
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
-            cx.insert(CookieJarCell::new());
+            let cx = cx.with(CookieJarCell::new());
 
-            let mut response = next.run(cx, body).await?;
-            write_cookies(cx, response.headers_mut());
+            let mut response = next.run(&cx, body).await?;
+            write_cookies(&cx, response.headers_mut());
             Ok(response)
         })
     }
@@ -117,7 +117,7 @@ mod tests {
 
         fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
             Box::pin(async move {
-                *self.0.lock().expect("lock should not be poisoned") = Some(cx.detach());
+                *self.0.lock().expect("lock should not be poisoned") = Some(cx.clone());
                 Ok(Response::new(Body::empty()))
             })
         }
@@ -140,6 +140,6 @@ mod tests {
         // returns, so this cookie could never reach the client.
         let _ = router.handle(request).await;
         let cx = handle.lock().expect("lock should not be poisoned").take();
-        cookies(cx.as_ref().expect("route should have detached")).add(("theme", "dark"));
+        cookies(cx.as_ref().expect("route should have stored a handle")).add(("theme", "dark"));
     }
 }

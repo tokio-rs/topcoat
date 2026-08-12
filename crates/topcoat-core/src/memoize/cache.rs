@@ -49,6 +49,10 @@ impl MemoizeCache {
     /// Hashes `(Marker, key)` into the 128 bit entry identity. `Marker` is the memoized
     /// function's type and partitions the cache so unrelated memoized functions cannot observe
     /// each other's entries even when they share a key shape.
+    ///
+    /// TODO: the identity does not yet cover the `BindingId`s of the request context bindings
+    /// in effect, so a memoized function that reads a value shadowed via `Cx::with` shares its
+    /// entry across scopes and can observe a result computed under different bindings.
     fn hash<Marker, K>(key: &K) -> u128
     where
         Marker: 'static,

@@ -21,9 +21,9 @@ impl Layer for SessionLayer {
         Path::new("/")
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
-        cx.insert(SessionState::new());
-        next.run(cx, body)
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        let cx = cx.with(SessionState::new());
+        Box::pin(async move { next.run(&cx, body).await })
     }
 }
 

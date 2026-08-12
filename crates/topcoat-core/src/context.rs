@@ -2,13 +2,7 @@ mod app_context;
 mod id;
 mod request_context;
 
-use std::{
-    any::Any,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-};
+use std::{any::Any, sync::Arc};
 
 pub use app_context::*;
 pub use id::*;
@@ -26,11 +20,17 @@ use crate::{abort::AbortStore, memoize::MemoizeCache};
 /// [`request_context`].
 ///
 /// A `Cx` is a handle to state shared by everything serving the same request.
-/// Work that outlives the handler, such as a streaming response body or a
-/// WebSocket task, takes an owned handle with [`detach`](Self::detach).
-#[derive(Debug, Default)]
+/// [`with`](Self::with) and [`with_many`](Self::with_many) derive a child
+/// handle whose request context holds additional values, leaving the parent
+/// untouched. Cloning a handle is cheap; work that outlives the handler, such
+/// as a streaming response body or a WebSocket task, should move an owned clone into
+/// the work.
+#[derive(Debug, Default, Clone)]
 pub struct Cx {
-    inner: Arc<CxInner>,
+    /// The state shared by every handle serving this request.
+    shared: Arc<RequestShared>,
+    /// The request context visible to this handle's scope.
+    request_context: Arc<RequestContext>,
 }
 
 impl Cx {
@@ -44,101 +44,72 @@ impl Cx {
     /// Creates a `Cx` from the given app and request contexts.
     fn from_parts(app_context: Arc<AppContext>, request_context: RequestContext) -> Self {
         Self {
-            inner: Arc::new(CxInner {
+            shared: Arc::new(RequestShared {
                 id: CxId::new(),
                 app_context,
-                request_context,
                 memoize_cache: MemoizeCache::new(),
                 abort_store: AbortStore::new(),
-                sealed: AtomicBool::new(false),
             }),
+            request_context: Arc::new(request_context),
         }
     }
 
-    /// Returns this context's unique [`CxId`].
+    /// Returns this request's unique [`CxId`].
     #[inline]
     #[must_use]
     pub fn id(&self) -> CxId {
-        self.inner.id
+        self.shared.id
     }
 
-    /// Returns an owned handle to this request's context.
+    /// Returns a child handle whose request context also holds `value`.
     ///
-    /// Every handle reads the same state: the app context, the request context,
-    /// and the memoize cache. Take an owned handle for work that outlives the
-    /// handler, such as a streaming response body or a WebSocket task.
-    ///
-    /// Detaching seals the request context: [`insert`](Self::insert) and
-    /// [`get_mut`](Self::get_mut) panic from then on, including after every
-    /// detached handle was dropped.
+    /// The child inherits every other request context value and shares the
+    /// rest of the request state, such as the app context and the memoize
+    /// cache, with `self`. Registering a type that is already present shadows
+    /// the inherited value: lookups through the child see `value`, while
+    /// lookups through `self` still see the original.
     #[must_use]
-    pub fn detach(&self) -> Cx {
-        self.inner.sealed.store(true, Ordering::Relaxed);
+    pub fn with<T>(&self, value: T) -> Cx
+    where
+        T: Any + Send + Sync,
+    {
+        let mut request_context = (*self.request_context).clone();
+        request_context.insert(value);
+        self.scope(request_context)
+    }
 
+    /// Returns a child handle whose request context also holds every value in
+    /// `values`, a tuple of context values.
+    ///
+    /// Behaves like chained [`with`](Self::with) calls, but builds the child's
+    /// request context in one step.
+    #[must_use]
+    pub fn with_many<V>(&self, values: V) -> Cx
+    where
+        V: ContextValues,
+    {
+        let mut request_context = (*self.request_context).clone();
+        values.install(&mut request_context);
+        self.scope(request_context)
+    }
+
+    /// Wraps a derived request context into a child handle sharing this
+    /// request's state.
+    fn scope(&self, request_context: RequestContext) -> Cx {
         Cx {
-            inner: Arc::clone(&self.inner),
+            shared: Arc::clone(&self.shared),
+            request_context: Arc::new(request_context),
         }
-    }
-
-    /// Registers `value` on the request context, returning the value previously
-    /// registered for `T`, if any.
-    ///
-    /// A type can hold only one value at a time, so registering a type that is
-    /// already present replaces it and hands back the displaced value.
-    ///
-    /// # Panics
-    ///
-    /// Panics once a handle was taken with [`detach`](Self::detach).
-    pub fn insert<T>(&mut self, value: T) -> Option<T>
-    where
-        T: Any + Send + Sync,
-    {
-        self.inner_mut().request_context.insert(value)
-    }
-
-    /// Returns a mutable reference to the request context value of type `T`, or
-    /// `None` if no such value has been registered.
-    ///
-    /// # Panics
-    ///
-    /// Panics once a handle was taken with [`detach`](Self::detach).
-    #[must_use]
-    pub fn get_mut<T>(&mut self) -> Option<&mut T>
-    where
-        T: Any + Send + Sync,
-    {
-        self.inner_mut().request_context.get_mut::<T>()
-    }
-
-    /// Returns exclusive access to the context state.
-    ///
-    /// # Panics
-    ///
-    /// Panics once the context is sealed, because its state is then shared with
-    /// handles this one does not know about.
-    #[track_caller]
-    fn inner_mut(&mut self) -> &mut CxInner {
-        assert!(
-            !self.inner.sealed.load(Ordering::Relaxed),
-            "cannot modify the request context after taking a handle with \
-             `Cx::detach`"
-        );
-
-        // Only `detach` shares the state, and it seals the context on the way,
-        // so an unsealed context is the sole handle to its state.
-        Arc::get_mut(&mut self.inner).expect("an unsealed context should be unique")
     }
 }
 
-/// The state behind every handle to one request's [`Cx`].
+/// The state shared by every handle to one request's [`Cx`].
 #[derive(Debug, Default)]
-struct CxInner {
+struct RequestShared {
     id: CxId,
     app_context: Arc<AppContext>,
-    request_context: RequestContext,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
-    sealed: AtomicBool,
 }
 
 /// Assembles a [`Cx`] from scratch, for tests.
@@ -189,14 +160,14 @@ impl CxTestBuilder {
 #[must_use]
 #[doc(hidden)]
 pub fn memoize_cache(cx: &Cx) -> &MemoizeCache {
-    &cx.inner.memoize_cache
+    &cx.shared.memoize_cache
 }
 
 #[inline]
 #[must_use]
 #[doc(hidden)]
 pub fn abort_store(cx: &Cx) -> &AbortStore {
-    &cx.inner.abort_store
+    &cx.shared.abort_store
 }
 
 #[cfg(test)]
@@ -206,6 +177,9 @@ mod tests {
     #[derive(Debug, PartialEq)]
     struct Marker(u32);
 
+    #[derive(Debug, PartialEq)]
+    struct Other(&'static str);
+
     #[test]
     fn a_fresh_context_has_a_unique_id() {
         let first = Cx::new(Arc::new(AppContext::new()));
@@ -214,27 +188,59 @@ mod tests {
     }
 
     #[test]
-    fn insert_replaces_and_returns_the_displaced_value() {
-        let mut cx = Cx::new(Arc::new(AppContext::new()));
-        assert_eq!(cx.insert(Marker(1)), None);
-        assert_eq!(cx.insert(Marker(2)), Some(Marker(1)));
-        assert_eq!(request_context::<Marker>(&cx), &Marker(2));
+    fn with_registers_a_value_on_the_child() {
+        let cx = Cx::default();
+        let child = cx.with(Marker(1));
+
+        assert_eq!(try_request_context::<Marker>(&cx), None);
+        assert_eq!(request_context::<Marker>(&child), &Marker(1));
     }
 
     #[test]
-    fn get_mut_allows_mutation_in_place() {
-        let mut cx = Cx::new(Arc::new(AppContext::new()));
-        assert_eq!(cx.get_mut::<Marker>(), None);
-        cx.insert(Marker(1));
-        cx.get_mut::<Marker>().unwrap().0 = 42;
-        assert_eq!(request_context::<Marker>(&cx), &Marker(42));
+    fn with_shadows_without_touching_the_parent() {
+        let cx = Cx::default().with(Marker(1));
+        let child = cx.with(Marker(2));
+
+        assert_eq!(request_context::<Marker>(&cx), &Marker(1));
+        assert_eq!(request_context::<Marker>(&child), &Marker(2));
     }
 
     #[test]
-    fn detached_handles_outlive_the_original() {
+    fn a_child_inherits_the_parent_context() {
+        let cx = CxTestBuilder::new()
+            .app_context(Other("app"))
+            .request_context(Marker(7))
+            .build();
+        let child = cx.with(Other("request"));
+
+        assert_eq!(request_context::<Marker>(&child), &Marker(7));
+        assert_eq!(request_context::<Other>(&child), &Other("request"));
+        assert_eq!(app_context::<Other>(&child), &Other("app"));
+    }
+
+    #[test]
+    fn with_many_registers_every_value() {
+        let cx = Cx::default().with_many((Marker(1), Other("many")));
+
+        assert_eq!(request_context::<Marker>(&cx), &Marker(1));
+        assert_eq!(request_context::<Other>(&cx), &Other("many"));
+    }
+
+    #[test]
+    fn a_child_shares_the_request_state() {
+        let cx = Cx::default();
+        let child = cx.with(Marker(1));
+
+        assert_eq!(child.id(), cx.id());
+        assert!(std::ptr::eq(memoize_cache(&child), memoize_cache(&cx)));
+        assert!(std::ptr::eq(abort_store(&child), abort_store(&cx)));
+    }
+
+    #[test]
+    fn clones_outlive_the_original() {
         let cx = CxTestBuilder::new().request_context(Marker(7)).build();
         let id = cx.id();
-        let handle = cx.detach();
+        let handle = cx.clone();
         drop(cx);
 
         assert_eq!(request_context::<Marker>(&handle).0, 7);
@@ -245,38 +251,5 @@ mod tests {
     fn handles_are_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<Cx>();
-    }
-
-    #[test]
-    #[should_panic(expected = "`Cx::detach`")]
-    fn inserting_after_detaching_panics() {
-        let mut cx = Cx::new(Arc::new(AppContext::new()));
-        let _handle = cx.detach();
-        cx.insert(Marker(0));
-    }
-
-    #[test]
-    #[should_panic(expected = "`Cx::detach`")]
-    fn mutating_after_detaching_panics() {
-        let mut cx = Cx::new(Arc::new(AppContext::new()));
-        cx.insert(Marker(0));
-        let _handle = cx.detach();
-        let _ = cx.get_mut::<Marker>();
-    }
-
-    #[test]
-    #[should_panic(expected = "`Cx::detach`")]
-    fn dropping_every_handle_keeps_the_context_sealed() {
-        let mut cx = Cx::new(Arc::new(AppContext::new()));
-        drop(cx.detach());
-        cx.insert(Marker(0));
-    }
-
-    #[test]
-    #[should_panic(expected = "`Cx::detach`")]
-    fn a_detached_handle_cannot_write_to_the_context() {
-        let cx = Cx::new(Arc::new(AppContext::new()));
-        let mut handle = cx.detach();
-        handle.insert(Marker(0));
     }
 }

@@ -108,15 +108,16 @@ impl Router {
             None => Terminal::MethodNotAllowed(endpoint),
         };
 
-        let mut cx = Cx::new(Arc::clone(&self.app_context));
-        cx.insert(EndpointPath(endpoint.shared_path().clone()));
-        cx.insert(path_params);
-        cx.insert(parts);
+        let cx = Cx::new(Arc::clone(&self.app_context)).with_many((
+            EndpointPath(endpoint.shared_path().clone()),
+            path_params,
+            parts,
+        ));
 
         // The origin layer wraps the whole chain, denying untrusted
         // cross-origin requests before anything else runs.
         let next = Next::new(&self.layers, endpoint.layers(), terminal);
-        let response = self.origin.handle(&mut cx, body, next).await;
+        let response = self.origin.handle(&cx, body, next).await;
         let response = respond(&cx, response);
 
         // Compression runs outside every layer, so layers see uncompressed
@@ -241,21 +242,21 @@ mod tests {
     // test can observe the order layers run in.
     type Trace = Mutex<Vec<&'static str>>;
 
-    fn trace_root<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn trace_root<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("root");
             next.run(cx, body).await
         })
     }
 
-    fn trace_admin<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn trace_admin<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("admin");
             next.run(cx, body).await
         })
     }
 
-    fn trace_auth<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn trace_auth<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("auth");
             next.run(cx, body).await
@@ -808,23 +809,23 @@ mod tests {
         assert_eq!(&body[..], b"page");
     }
 
-    // -- Router::handle: detached contexts --
+    // -- Router::handle: contexts that outlive the handler --
 
     /// Registers the greeting the streaming route reads back.
     #[cfg(feature = "sse")]
-    fn insert_greeting<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
-        cx.insert(Greeting("hello"));
-        next.run(cx, body)
+    fn insert_greeting<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        let cx = cx.with(Greeting("hello"));
+        Box::pin(async move { next.run(&cx, body).await })
     }
 
     /// Streams the request-context greeting from a body that outlives the
-    /// handler, reading it through a detached handle.
+    /// handler, reading it through an owned clone of the context.
     #[cfg(feature = "sse")]
     fn stream_greeting(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         use crate::content::sse::{Event, Sse};
 
         Box::pin(async move {
-            let handle = cx.detach();
+            let handle = cx.clone();
             let events = futures_util::stream::once(async move {
                 Result::<Event>::Ok(Event::new().data(request_context::<Greeting>(&handle).0))
             });
@@ -834,7 +835,7 @@ mod tests {
 
     #[cfg(feature = "sse")]
     #[test]
-    fn a_detached_handle_serves_a_stream_after_the_request_returned() {
+    fn a_cloned_handle_serves_a_stream_after_the_request_returned() {
         let router = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/events"), stream_greeting))
             .layer(LayerFn::new(path("/"), insert_greeting))
@@ -842,7 +843,7 @@ mod tests {
 
         let response = block_on(router.handle(request(Method::GET, "/events")));
         // The router dropped its own context when `handle` returned; the body
-        // still reads the request context through its detached handle.
+        // still reads the request context through its owned clone.
         let body = block_on(to_bytes(response.into_body(), usize::MAX)).unwrap();
         assert!(body.starts_with(b"data: hello"), "{body:?}");
     }

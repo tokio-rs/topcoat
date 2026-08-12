@@ -29,7 +29,7 @@ The `use<>` bound keeps the stream from borrowing the request context, which a r
 
 # Reading the request context
 
-A stream outlives the handler that returned it, so it cannot borrow the `Cx` the route was called with. Take an owned handle with [`Cx::detach`](topcoat_core::context::Cx::detach) and move it into the stream instead; it reads the same app and request context.
+A stream outlives the handler that returned it, so it cannot borrow the `Cx` the route was called with. Clone the `Cx` and move the owned handle into the stream instead; it reads the same app and request context.
 
 ```rust
 use futures_core::Stream;
@@ -48,7 +48,7 @@ struct Customer {
 
 #[route(GET "/greetings")]
 async fn greetings(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
-    let cx = cx.detach();
+    let cx = cx.clone();
     let events = futures_util::stream::once(async move {
         let customer: &Customer = request_context(&cx);
         Ok(Event::new().data(customer.name.as_str()))

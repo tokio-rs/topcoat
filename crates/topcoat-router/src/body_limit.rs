@@ -82,9 +82,9 @@ impl Layer for BodyLimit {
         &self.path
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
-        cx.insert(self.kind);
-        next.run(cx, body)
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        let cx = cx.with(self.kind);
+        Box::pin(async move { next.run(&cx, body).await })
     }
 }
 

@@ -27,8 +27,7 @@ impl Default for CxId {
 /// The identity of one request context binding.
 ///
 /// A fresh `BindingId` is issued whenever a value is registered on a request
-/// context or mutably borrowed from it, so equal ids always refer to the same
-/// unmodified value.
+/// context, so equal ids always refer to the same value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BindingId(u64);
 

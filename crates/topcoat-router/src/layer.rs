@@ -13,11 +13,12 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 ///
 /// A layer wraps every matched route whose path begins with the layer's path
 /// (the same prefix rule as layouts), so a layer at `/admin` wraps only routes
-/// under `/admin`, while a layer at `/` wraps everything. Each layer receives a
-/// mutable [`Cx`] and the request [`Body`], plus a [`Next`] representing the
-/// rest of the chain. A layer typically registers request-scoped values on the
-/// context with [`Cx::insert`], calls [`Next::run`] to invoke the inner layers
-/// and ultimately the route, then inspects or modifies the [`Response`].
+/// under `/admin`, while a layer at `/` wraps everything. Each layer receives
+/// the [`Cx`] and the request [`Body`], plus a [`Next`] representing the rest
+/// of the chain. A layer typically derives a child context carrying
+/// request-scoped values with [`Cx::with`], passes it to [`Next::run`] to
+/// invoke the inner layers and ultimately the route, then inspects or modifies
+/// the [`Response`].
 ///
 /// When several layers match a route they nest from least-specific (outermost)
 /// to most-specific (innermost), like layouts.
@@ -41,7 +42,7 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 ///         Path::ROOT
 ///     }
 ///
-///     fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+///     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
 ///         Box::pin(async move {
 ///             let start = std::time::Instant::now();
 ///             let response = next.run(cx, body).await?;
@@ -56,11 +57,11 @@ pub trait Layer: Send + Sync + 'static {
     fn path(&self) -> &Path;
 
     /// Handles a request, calling `next` to continue down the chain.
-    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 }
 
 /// The handler function backing a [`LayerFn`].
-pub type LayerHandlerFn = for<'a> fn(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
+pub type LayerHandlerFn = for<'a> fn(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 
 /// A [`Layer`] backed by a plain handler function.
 ///
@@ -88,7 +89,7 @@ impl Layer for LayerFn {
         &self.path
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         (self.handle)(cx, body, next)
     }
 }
@@ -193,7 +194,8 @@ impl<'a> Next<'a> {
 
     /// Runs the next layer in the chain, or the terminal handler once no layers
     /// remain.
-    pub fn run(self, cx: &'a mut Cx, body: Body) -> LayerFuture<'a> {
+    #[must_use]
+    pub fn run(self, cx: &'a Cx, body: Body) -> LayerFuture<'a> {
         match self.indices.split_first() {
             Some((&id, rest)) => self.layers[id].handle(
                 cx,
@@ -249,7 +251,7 @@ mod tests {
         Box::new(LayerFn::new(path(p), noop_layer))
     }
 
-    fn noop_layer<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn noop_layer<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         next.run(cx, body)
     }
 
@@ -269,14 +271,14 @@ mod tests {
         Cx::new(Arc::new(app))
     }
 
-    fn record_a<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn record_a<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("a");
             next.run(cx, body).await
         })
     }
 
-    fn record_b<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn record_b<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("b");
             next.run(cx, body).await
@@ -284,7 +286,7 @@ mod tests {
     }
 
     /// A layer that answers the request itself, without invoking `next`.
-    fn short_circuit<'a>(cx: &'a mut Cx, _body: Body, _next: Next<'a>) -> LayerFuture<'a> {
+    fn short_circuit<'a>(cx: &'a Cx, _body: Body, _next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move { "short".into_response(cx) })
     }
 
@@ -390,11 +392,11 @@ mod tests {
     fn run_invokes_the_route_terminal_when_no_layers_remain() {
         let layers = Layers::default();
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let mut cx = Cx::default();
+        let cx = Cx::default();
 
         let indices: &[LayerId] = &[];
         let next = Next::new(&layers, indices, Terminal::Route(&route));
-        let result = block_on(next.run(&mut cx, Body::empty()));
+        let result = block_on(next.run(&cx, Body::empty()));
         let response = respond(&cx, result);
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -408,11 +410,11 @@ mod tests {
         let mut endpoint = Endpoint::new(&path("/x"), no_layers);
         endpoint.insert(Method::GET, 0);
         endpoint.insert(Method::POST, 1);
-        let mut cx = Cx::default();
+        let cx = Cx::default();
 
         let indices: &[LayerId] = &[];
         let next = Next::new(&layers, indices, Terminal::MethodNotAllowed(&endpoint));
-        let result = block_on(next.run(&mut cx, Body::empty()));
+        let result = block_on(next.run(&cx, Body::empty()));
         let response = respond(&cx, result);
 
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
@@ -436,10 +438,10 @@ mod tests {
         let route = RouteFn::new(Method::GET, path("/x"), record_route);
 
         let trace: Arc<Trace> = Arc::new(Mutex::new(Vec::new()));
-        let mut cx = cx_with_trace(trace.clone());
+        let cx = cx_with_trace(trace.clone());
 
         let next = Next::new(&layers, &indices, Terminal::Route(&route));
-        block_on(next.run(&mut cx, Body::empty())).unwrap();
+        block_on(next.run(&cx, Body::empty())).unwrap();
 
         // The layers run in `indices` order, then the terminal route.
         assert_eq!(*trace.lock().unwrap(), vec!["a", "b", "route"]);
@@ -452,10 +454,10 @@ mod tests {
         let indices = [stop];
         // The route would answer "route", but the layer never calls `next.run`.
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let mut cx = Cx::default();
+        let cx = Cx::default();
 
         let next = Next::new(&layers, &indices, Terminal::Route(&route));
-        let result = block_on(next.run(&mut cx, Body::empty()));
+        let result = block_on(next.run(&cx, Body::empty()));
         let response = respond(&cx, result);
 
         assert_eq!(&body_bytes(response)[..], b"short");

@@ -27,7 +27,7 @@ pub fn try_app_context<T>(cx: &Cx) -> Option<&T>
 where
     T: Any + Send + Sync,
 {
-    cx.inner.app_context.get::<T>()
+    cx.shared.app_context.get::<T>()
 }
 
 /// Returns a reference to the app context value of type `T` registered on the

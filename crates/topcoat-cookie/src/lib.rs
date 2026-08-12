@@ -256,8 +256,8 @@ pub trait Cookies {
 /// `Set-Cookie` headers only if the jar was actually touched.
 ///
 /// Finalization also seals the cell, so a jar handed out afterwards, whether it
-/// was built during the request or on first access from a detached task, rejects
-/// writes.
+/// was built during the request or on first access from a task that outlives
+/// the handler, rejects writes.
 #[derive(Debug, Default)]
 pub struct CookieJarCell {
     jar: OnceLock<CookieJar>,

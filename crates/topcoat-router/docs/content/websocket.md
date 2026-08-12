@@ -34,7 +34,7 @@ A request that is not a conforming WebSocket handshake is rejected before the ha
 
 # Reading the request context
 
-The callback outlives the handler that upgraded the connection, so it cannot borrow the `Cx` the handler was called with. Take an owned handle with [`Cx::detach`](topcoat_core::context::Cx::detach) and move it into the callback instead; it reads the same app and request context.
+The callback outlives the handler that upgraded the connection, so it cannot borrow the `Cx` the handler was called with. Clone the `Cx` and move the owned handle into the callback instead; it reads the same app and request context.
 
 ```rust
 use topcoat::{
@@ -53,7 +53,7 @@ struct Customer {
 
 #[route(GET "/greet")]
 async fn greet(cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
-    let cx = cx.detach();
+    let cx = cx.clone();
     upgrade.on_upgrade(move |mut socket| async move {
         let customer: &Customer = request_context(&cx);
         let _ = socket.send(Message::text(customer.name.as_str())).await;

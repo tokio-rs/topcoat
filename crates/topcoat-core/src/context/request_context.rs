@@ -35,7 +35,7 @@ pub fn try_request_context<T>(cx: &Cx) -> Option<&T>
 where
     T: Any + Send + Sync,
 {
-    cx.inner.request_context.get::<T>()
+    cx.request_context.get::<T>()
 }
 
 /// Returns a reference to the request context value of type `T` registered on
@@ -77,14 +77,15 @@ where
     }
 }
 
-/// The type-keyed values registered for a single request.
+/// The type-keyed values registered for one scope of a request.
 ///
 /// Each value is stored under its [`TypeId`], so a given type can hold one
-/// value per request, and is tagged with a [`BindingId`] that is reissued
-/// whenever the value is replaced or mutably borrowed, giving every state of a
-/// binding a distinct identity. Within a request, values are retrieved with
-/// [`request_context`] or [`try_request_context`].
-#[derive(Default, Debug)]
+/// value per scope, and is tagged with the [`BindingId`] issued when it was
+/// registered, giving every binding a distinct identity. Cloning a
+/// `RequestContext` shares the values, which is how a child scope inherits
+/// them. Within a request, values are retrieved with [`request_context`] or
+/// [`try_request_context`].
+#[derive(Default, Debug, Clone)]
 pub struct RequestContext {
     entries: HashMap<TypeId, Binding, BuildHasherDefault<TypeIdHasher>>,
 }
@@ -96,18 +97,12 @@ impl RequestContext {
         Self::default()
     }
 
-    /// Registers `value` under its concrete type `T`, returning the value
-    /// previously registered for `T`, if any.
+    /// Registers `value` under its concrete type `T` with a fresh
+    /// [`BindingId`].
     ///
     /// A type can hold only one value at a time, so registering a type that is
-    /// already present replaces it and hands back the displaced value. The new
-    /// value is registered under a fresh [`BindingId`].
-    ///
-    /// # Panics
-    ///
-    /// Panics if the displaced value is still shared and cannot be handed back
-    /// by value.
-    pub fn insert<T>(&mut self, value: T) -> Option<T>
+    /// already present replaces the previous value.
+    pub fn insert<T>(&mut self, value: T)
     where
         T: Any + Send + Sync,
     {
@@ -115,12 +110,7 @@ impl RequestContext {
             id: BindingId::new(),
             value: Arc::new(value),
         };
-        let previous = self.entries.insert(TypeId::of::<T>(), binding)?;
-        let previous = previous
-            .value
-            .downcast::<T>()
-            .unwrap_or_else(|_| panic!("a request context binding should match its type key"));
-        Some(Arc::into_inner(previous).expect("a displaced request context value should be unique"))
+        self.entries.insert(TypeId::of::<T>(), binding);
     }
 
     /// Returns a reference to the registered value of type `T`, or `None` if
@@ -135,25 +125,44 @@ impl RequestContext {
     {
         self.entries.get(&TypeId::of::<T>())?.value.downcast_ref()
     }
-
-    /// Returns a mutable reference to the registered value of type `T`, or
-    /// `None` if no such value has been registered.
-    ///
-    /// Borrowing a value mutably reissues its [`BindingId`], since the value
-    /// may change under the new borrow.
-    #[must_use]
-    pub fn get_mut<T>(&mut self) -> Option<&mut T>
-    where
-        T: Any + Send + Sync,
-    {
-        let binding = self.entries.get_mut(&TypeId::of::<T>())?;
-        binding.id = BindingId::new();
-        Arc::get_mut(&mut binding.value)?.downcast_mut()
-    }
 }
 
+/// Values that [`Cx::with_many`](crate::context::Cx::with_many) registers on a
+/// request context in one step.
+///
+/// Implemented for tuples of context values, so several types can be
+/// registered without deriving a scope per value.
+pub trait ContextValues {
+    /// Registers every value on `context`.
+    fn install(self, context: &mut RequestContext);
+}
+
+macro_rules! impl_context_values {
+    ($($value:ident: $type:ident),+) => {
+        impl<$($type),+> ContextValues for ($($type,)+)
+        where
+            $($type: Any + Send + Sync),+
+        {
+            fn install(self, context: &mut RequestContext) {
+                let ($($value,)+) = self;
+                $(context.insert($value);)+
+            }
+        }
+    };
+}
+
+impl_context_values!(a: A);
+impl_context_values!(a: A, b: B);
+impl_context_values!(a: A, b: B, c: C);
+impl_context_values!(a: A, b: B, c: C, d: D);
+impl_context_values!(a: A, b: B, c: C, d: D, e: E);
+impl_context_values!(a: A, b: B, c: C, d: D, e: E, f: F);
+impl_context_values!(a: A, b: B, c: C, d: D, e: E, f: F, g: G);
+impl_context_values!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H);
+
 /// One registered value, tagged with the [`BindingId`] issued when it was
-/// registered or last mutably borrowed.
+/// registered.
+#[derive(Clone)]
 struct Binding {
     id: BindingId,
     value: Arc<dyn Any + Send + Sync>,
@@ -232,23 +241,11 @@ mod tests {
     }
 
     #[test]
-    fn insert_replaces_and_returns_the_displaced_value() {
+    fn insert_replaces_the_previous_value() {
         let mut context = RequestContext::new();
-        assert_eq!(context.insert(Database("primary")), None);
-        assert_eq!(
-            context.insert(Database("replica")),
-            Some(Database("primary"))
-        );
+        context.insert(Database("primary"));
+        context.insert(Database("replica"));
         assert_eq!(context.get::<Database>(), Some(&Database("replica")));
-    }
-
-    #[test]
-    fn get_mut_allows_mutation_in_place() {
-        let mut context = RequestContext::new();
-        context.insert(Config(1));
-        context.get_mut::<Config>().unwrap().0 = 42;
-        assert_eq!(context.get::<Config>(), Some(&Config(42)));
-        assert_eq!(context.get_mut::<Database>(), None);
     }
 
     #[test]
@@ -262,13 +259,36 @@ mod tests {
     }
 
     #[test]
-    fn get_mut_reissues_the_id() {
+    fn clone_shares_values_and_ids() {
         let mut context = RequestContext::new();
-        context.insert(Config(1));
-        let first = binding_id::<Config>(&context);
-        context.get_mut::<Config>().unwrap().0 = 2;
+        context.insert(Database("primary"));
+        let clone = context.clone();
 
-        assert_ne!(binding_id::<Config>(&context), first);
+        assert_eq!(clone.get::<Database>(), Some(&Database("primary")));
+        assert_eq!(
+            binding_id::<Database>(&clone),
+            binding_id::<Database>(&context)
+        );
+    }
+
+    #[test]
+    fn inserting_into_a_clone_leaves_the_original_untouched() {
+        let mut context = RequestContext::new();
+        context.insert(Database("primary"));
+        let mut clone = context.clone();
+        clone.insert(Database("replica"));
+
+        assert_eq!(context.get::<Database>(), Some(&Database("primary")));
+        assert_eq!(clone.get::<Database>(), Some(&Database("replica")));
+    }
+
+    #[test]
+    fn context_values_installs_every_tuple_element() {
+        let mut context = RequestContext::new();
+        (Database("primary"), Config(42)).install(&mut context);
+
+        assert_eq!(context.get::<Database>(), Some(&Database("primary")));
+        assert_eq!(context.get::<Config>(), Some(&Config(42)));
     }
 
     #[test]

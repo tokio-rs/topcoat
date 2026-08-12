@@ -515,7 +515,7 @@ mod tests {
     }
 
     /// A stand-in layer that continues the chain unchanged.
-    fn noop_layer<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn noop_layer<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move { next.run(cx, body).await })
     }
 

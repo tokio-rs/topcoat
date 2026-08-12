@@ -122,7 +122,7 @@ use topcoat::{
 };
 
 #[layer]
-async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;
     println!("API response: {}", response.status());
     Ok(response)
