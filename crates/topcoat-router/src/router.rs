@@ -8,7 +8,7 @@ use std::{
 
 #[cfg(feature = "compression")]
 use topcoat_core::context::try_request_context;
-use topcoat_core::context::{ContextMap, Cx};
+use topcoat_core::context::{AppContext, Cx};
 
 use crate::{
     Endpoint, EndpointPath, Layer, Layers, Next, OriginLayer, RawPathParams, Route, RouterBuilder,
@@ -48,7 +48,7 @@ pub struct Router {
     pub(crate) layers: Layers,
     /// The values shared by every request, read back via
     /// [`app_context`](topcoat_core::context::app_context).
-    pub(crate) app_context: Arc<ContextMap>,
+    pub(crate) app_context: Arc<AppContext>,
     /// The origin policy wrapping every request as the outermost layer.
     pub(crate) origin: OriginLayer,
     /// The compression applied to responses on their way out.

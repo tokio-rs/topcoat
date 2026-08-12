@@ -222,7 +222,7 @@ mod tests {
     };
 
     use http::StatusCode;
-    use topcoat_core::context::{ContextMap, Cx, app_context};
+    use topcoat_core::context::{AppContext, Cx, app_context};
 
     use super::*;
     use crate::{
@@ -264,7 +264,7 @@ mod tests {
     type Trace = Mutex<Vec<&'static str>>;
 
     fn cx_with_trace(trace: Arc<Trace>) -> Cx {
-        let mut app = ContextMap::new();
+        let mut app = AppContext::new();
         app.insert(trace);
         Cx::new(Arc::new(app))
     }

@@ -23,3 +23,20 @@ impl Default for CxId {
         Self::new()
     }
 }
+
+/// The identity of one request context binding.
+///
+/// A fresh `BindingId` is issued whenever a value is registered on a request
+/// context or mutably borrowed from it, so equal ids always refer to the same
+/// unmodified value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BindingId(u64);
+
+impl BindingId {
+    /// Returns a fresh `BindingId` that is distinct from every previously
+    /// issued id.
+    pub(crate) fn new() -> Self {
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        Self(COUNTER.fetch_add(1, Ordering::Relaxed))
+    }
+}

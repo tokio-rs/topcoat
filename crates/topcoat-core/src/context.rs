@@ -1,5 +1,6 @@
-mod context_map;
+mod app_context;
 mod id;
+mod request_context;
 
 use std::{
     any::Any,
@@ -9,8 +10,9 @@ use std::{
     },
 };
 
-pub use context_map::*;
+pub use app_context::*;
 pub use id::*;
+pub use request_context::*;
 
 pub use crate::memoize::MemoizeAsRef;
 use crate::{abort::AbortStore, memoize::MemoizeCache};
@@ -35,12 +37,12 @@ impl Cx {
     /// Creates the context for one request over the shared app context, with an
     /// empty request context.
     #[must_use]
-    pub fn new(app_context: Arc<ContextMap>) -> Self {
-        Self::from_parts(app_context, ContextMap::new())
+    pub fn new(app_context: Arc<AppContext>) -> Self {
+        Self::from_parts(app_context, RequestContext::new())
     }
 
-    /// Creates a `Cx` from the given app and request context maps.
-    fn from_parts(app_context: Arc<ContextMap>, request_context: ContextMap) -> Self {
+    /// Creates a `Cx` from the given app and request contexts.
+    fn from_parts(app_context: Arc<AppContext>, request_context: RequestContext) -> Self {
         Self {
             inner: Arc::new(CxInner {
                 id: CxId::new(),
@@ -132,8 +134,8 @@ impl Cx {
 #[derive(Debug, Default)]
 struct CxInner {
     id: CxId,
-    app_context: Arc<ContextMap>,
-    request_context: ContextMap,
+    app_context: Arc<AppContext>,
+    request_context: RequestContext,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
     sealed: AtomicBool,
@@ -145,8 +147,8 @@ struct CxInner {
 /// `CxTestBuilder` populates both app and request context.
 #[derive(Debug, Default)]
 pub struct CxTestBuilder {
-    app_context: ContextMap,
-    request_context: ContextMap,
+    app_context: AppContext,
+    request_context: RequestContext,
 }
 
 impl CxTestBuilder {
@@ -206,14 +208,14 @@ mod tests {
 
     #[test]
     fn a_fresh_context_has_a_unique_id() {
-        let first = Cx::new(Arc::new(ContextMap::new()));
-        let second = Cx::new(Arc::new(ContextMap::new()));
+        let first = Cx::new(Arc::new(AppContext::new()));
+        let second = Cx::new(Arc::new(AppContext::new()));
         assert_ne!(first.id(), second.id());
     }
 
     #[test]
     fn insert_replaces_and_returns_the_displaced_value() {
-        let mut cx = Cx::new(Arc::new(ContextMap::new()));
+        let mut cx = Cx::new(Arc::new(AppContext::new()));
         assert_eq!(cx.insert(Marker(1)), None);
         assert_eq!(cx.insert(Marker(2)), Some(Marker(1)));
         assert_eq!(request_context::<Marker>(&cx), &Marker(2));
@@ -221,7 +223,7 @@ mod tests {
 
     #[test]
     fn get_mut_allows_mutation_in_place() {
-        let mut cx = Cx::new(Arc::new(ContextMap::new()));
+        let mut cx = Cx::new(Arc::new(AppContext::new()));
         assert_eq!(cx.get_mut::<Marker>(), None);
         cx.insert(Marker(1));
         cx.get_mut::<Marker>().unwrap().0 = 42;
@@ -248,7 +250,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "`Cx::detach`")]
     fn inserting_after_detaching_panics() {
-        let mut cx = Cx::new(Arc::new(ContextMap::new()));
+        let mut cx = Cx::new(Arc::new(AppContext::new()));
         let _handle = cx.detach();
         cx.insert(Marker(0));
     }
@@ -256,7 +258,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "`Cx::detach`")]
     fn mutating_after_detaching_panics() {
-        let mut cx = Cx::new(Arc::new(ContextMap::new()));
+        let mut cx = Cx::new(Arc::new(AppContext::new()));
         cx.insert(Marker(0));
         let _handle = cx.detach();
         let _ = cx.get_mut::<Marker>();
@@ -265,7 +267,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "`Cx::detach`")]
     fn dropping_every_handle_keeps_the_context_sealed() {
-        let mut cx = Cx::new(Arc::new(ContextMap::new()));
+        let mut cx = Cx::new(Arc::new(AppContext::new()));
         drop(cx.detach());
         cx.insert(Marker(0));
     }
@@ -273,7 +275,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "`Cx::detach`")]
     fn a_detached_handle_cannot_write_to_the_context() {
-        let cx = Cx::new(Arc::new(ContextMap::new()));
+        let cx = Cx::new(Arc::new(AppContext::new()));
         let mut handle = cx.detach();
         handle.insert(Marker(0));
     }

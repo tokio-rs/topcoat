@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use topcoat_core::{base_url::BaseUrl, context::ContextMap};
+use topcoat_core::{base_url::BaseUrl, context::AppContext};
 
 use crate::{
     Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, OriginLayer, OriginPolicy, PageFn,
@@ -49,7 +49,7 @@ pub struct RouterBuilder {
     pages: Vec<PageFn>,
     layouts: Vec<LayoutFn>,
     layers: Layers,
-    context: ContextMap,
+    context: AppContext,
     origin_policy: OriginPolicy,
     #[cfg(feature = "compression")]
     compression: crate::Compression,
@@ -59,7 +59,7 @@ impl RouterBuilder {
     /// Creates an empty builder with no routes registered.
     #[must_use]
     pub fn new() -> Self {
-        let mut context = ContextMap::new();
+        let mut context = AppContext::new();
         // Register `()` so APIs generic over an app context type can default to `S = ()`.
         context.insert(());
         Self {
