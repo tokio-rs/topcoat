@@ -5,24 +5,19 @@ use topcoat::{
     view::{svg::ViewBox, view},
 };
 
-// Define an icon manually using an SVG view box and body.
-//
-// `currentColor` makes the icon inherit the surrounding text color.
+// An icon is an SVG view box plus its body. `currentColor` is what makes it
+// inherit the surrounding text color.
 const TRASH: IconData = IconData::unescaped_unchecked(
     ViewBox::new(0.0, 0.0, 24.0, 24.0),
     r#"<path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>"#,
 );
 
-// Include the Feather icon set staged by build.rs.
-//
-// The generated module contains IconData constants such as
-// feather::TARGET and feather::FEATHER.
+// Generates a `feather` module of `IconData` constants from the set staged by
+// build.rs.
 iconify::include!("feather");
 
 #[tokio::main]
 async fn main() {
-    // Discover the page and start the HTTP server.
-    // By default, the application is available at http://127.0.0.1:3000.
     topcoat::start(Router::builder().discover().build())
         .await
         .unwrap();

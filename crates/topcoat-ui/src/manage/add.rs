@@ -1,13 +1,15 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    path::{Path, PathBuf},
+};
 
+use super::{
+    Confirm, module,
+    package::Package,
+    state::{InstallState, InstalledComponent},
+    workspace::Workspace,
+};
 use crate::{DEFAULT_REGISTRY, Dependency, Registry, content_hash};
-
-use super::Confirm;
-use super::module;
-use super::package::Package;
-use super::state::{InstallState, InstalledComponent};
-use super::workspace::Workspace;
 
 /// What to add and from where.
 pub struct AddOptions {

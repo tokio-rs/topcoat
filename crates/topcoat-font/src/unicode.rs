@@ -3,7 +3,7 @@
 
 use std::ops::Deref;
 
-use topcoat_core::fnv1a;
+use topcoat_core::fnv1a::Fnv1a;
 
 /// A Unicode code point: an integer in `U+0000..=U+10FFFF`.
 ///
@@ -22,6 +22,7 @@ impl UnicodeCodePoint {
     /// Panics if `code_point` is greater than `U+10FFFF`. Use
     /// `UnicodeCodePoint::try_from` for a non-panicking conversion.
     #[must_use]
+    #[track_caller]
     pub const fn new(code_point: u32) -> Self {
         assert!(
             code_point <= 0x10_FFFF,
@@ -31,8 +32,8 @@ impl UnicodeCodePoint {
     }
 
     /// Folds this code point into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
-        fnv1a::hash_continue(h, &self.0.to_le_bytes())
+    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
+        h.write(&self.0.to_le_bytes())
     }
 }
 
@@ -90,6 +91,7 @@ impl UnicodeRange {
     ///
     /// Panics if `end` is before `start`.
     #[must_use]
+    #[track_caller]
     pub const fn new(start: UnicodeCodePoint, end: UnicodeCodePoint) -> Self {
         assert!(end.0 >= start.0, "unicode range must not be empty");
         Self { start, end }
@@ -102,6 +104,7 @@ impl UnicodeRange {
     /// Panics if either value is greater than `U+10FFFF`, or if `end` is
     /// before `start`.
     #[must_use]
+    #[track_caller]
     pub const fn from_u32(start: u32, end: u32) -> Self {
         Self::new(UnicodeCodePoint::new(start), UnicodeCodePoint::new(end))
     }
@@ -119,7 +122,7 @@ impl UnicodeRange {
     }
 
     /// Folds this range into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
+    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
         self.end.hash(self.start.hash(h))
     }
 }
@@ -151,7 +154,7 @@ impl UnicodeRanges {
     }
 
     /// Folds these ranges into a running content hash.
-    pub(crate) const fn hash(self, mut h: u64) -> u64 {
+    pub(crate) const fn hash(self, mut h: Fnv1a<u64>) -> Fnv1a<u64> {
         let mut i = 0;
         while i < self.0.len() {
             h = self.0[i].hash(h);

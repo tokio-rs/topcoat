@@ -1,5 +1,4 @@
-use std::future::Future;
-use std::{env, io};
+use std::{env, future::Future, io};
 
 use tokio::net::TcpListener;
 

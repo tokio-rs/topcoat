@@ -3,14 +3,18 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_runtime;
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_runtime, topcoat_view},
+};
 
 use crate::{
-    attributes::{AttributeKey, AttributeWriter, WriteAttribute},
+    attributes::{
+        AttributeKey,
+        hir::{AttributeBuilder, LowerAttribute},
+    },
     template::TemplateOrRuntimeExpr,
-    view::{ExprKind, ViewWriter, WriteView},
+    view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
 /// A `:name=(expr)` or `:name=$(expr)` attribute: a one-way binding to a DOM
@@ -22,11 +26,11 @@ pub struct BindAttribute {
     pub value: TemplateOrRuntimeExpr,
 }
 
-impl WriteView for BindAttribute {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for BindAttribute {
+    fn lower(&self, builder: &mut ViewBuilder) {
         let key = &self.key;
         let value = &self.value;
-        writer.write_expr(
+        builder.expr(
             ExprKind::Attributes,
             quote! {
                 #topcoat_runtime::BindAttribute::new(#key, #value)
@@ -35,18 +39,22 @@ impl WriteView for BindAttribute {
     }
 }
 
-impl WriteAttribute for BindAttribute {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for BindAttribute {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         let key = &self.key;
         let value = &self.value;
-        writer.insert_block(
+        builder.insert_block(
             2,
             quote! {
                 {
                     let __key = ::core::convert::Into::<::std::string::String>::into(#key);
                     let (__evaluated, __js) = #value.into_evaluated_and_js();
                     __attrs.insert(__cx, __key.clone(), __evaluated);
-                    __attrs.insert(__cx, ::std::format!("data-topcoat-bind:{}", __key), __js);
+                    __attrs.insert(
+                        __cx,
+                        ::std::format!("data-topcoat-bind:{}", __key),
+                        #topcoat_view::Unescaped::new_unchecked(__js),
+                    );
                 }
             },
         );

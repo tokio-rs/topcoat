@@ -1,10 +1,8 @@
-use http::HeaderValue;
-use http::response::Parts;
+use http::{HeaderValue, response::Parts};
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_router::IntoResponseParts;
+use topcoat_router::response::IntoResponseParts;
 
-use crate::SwapOption;
-use crate::header;
+use crate::{SwapOption, header};
 
 /// Pushes a new URL onto the browser history stack via the `HX-Push-Url`
 /// header.

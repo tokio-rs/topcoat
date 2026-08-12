@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     icon::{icon, iconify::iconify_icon},
-    view::{Attributes, attributes, class, component, view},
+    view::{Attributes, StaticClass, attributes, class, component, view},
 };
 
 /// The classes for the native `<input type="checkbox">` inside the
@@ -11,11 +11,13 @@ use topcoat::{
 /// draw its own checkmark, which keeps the control looking the same across
 /// browsers. The unchecked box matches the input control's border and shadow;
 /// checking it fills the box with the primary color.
-const CHECKBOX: &str = "peer size-4 shrink-0 appearance-none rounded-[4px] border border-border \
-    bg-background shadow-xs transition-colors outline-none \
-    checked:border-primary checked:bg-primary \
-    focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
-    focus-visible:ring-offset-background disabled:pointer-events-none";
+const CHECKBOX: StaticClass = class!(
+    "peer size-4 shrink-0 appearance-none rounded-[4px] border border-border \
+     bg-background shadow-xs transition-colors outline-none \
+     checked:border-primary checked:bg-primary \
+     focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
+     focus-visible:ring-offset-background disabled:pointer-events-none",
+);
 
 /// A checkbox component: a themed native `<input type="checkbox">`.
 ///

@@ -10,8 +10,7 @@ use crate::{
     catalog::{Catalog, Product, format_rating},
 };
 
-#[path_param(error = not_found)]
-struct ProductId(u32);
+path_param!(product_id: u32, error = not_found);
 
 #[page]
 async fn product_detail(cx: &Cx) -> Result {

@@ -3,8 +3,11 @@ use std::ops::Deref;
 use syn::parse::{Parse, ParseStream};
 
 use crate::{
-    attributes::{AttributeNode, AttributeWriter, WriteAttribute},
-    view::{ViewWriter, WriteView},
+    attributes::{
+        AttributeNode,
+        hir::{AttributeBuilder, LowerAttribute},
+    },
+    view::hir::{LowerView, ViewBuilder},
 };
 
 /// A sequence of sibling [`AttributeNode`]s: the attribute-position counterpart
@@ -39,18 +42,18 @@ impl Parse for AttributeNodes {
     }
 }
 
-impl WriteView for AttributeNodes {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for AttributeNodes {
+    fn lower(&self, builder: &mut ViewBuilder) {
         for node in self {
-            WriteView::write(node, writer);
+            LowerView::lower(node, builder);
         }
     }
 }
 
-impl WriteAttribute for AttributeNodes {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for AttributeNodes {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         for node in self {
-            WriteAttribute::write(node, writer);
+            LowerAttribute::lower(node, builder);
         }
     }
 }

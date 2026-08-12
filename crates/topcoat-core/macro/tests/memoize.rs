@@ -85,10 +85,10 @@ async fn async_memoized_function_returns_stable_reference() {
 }
 
 #[tokio::test]
-async fn memoized_option_return_is_borrowed_ergonomically() {
+async fn memoized_option_return_is_borrowed_ergonomically_with_as_ref() {
     static CALLS: AtomicUsize = AtomicUsize::new(0);
 
-    #[memoize]
+    #[memoize(as_ref)]
     fn maybe(cx: &Cx, is_some: bool) -> Option<i32> {
         let _ = cx;
         CALLS.fetch_add(1, Ordering::SeqCst);
@@ -105,6 +105,38 @@ async fn memoized_option_return_is_borrowed_ergonomically() {
 
     maybe(&cx, true);
     assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn memoized_result_return_is_borrowed_ergonomically_with_as_ref() {
+    #[memoize(as_ref)]
+    fn fallible(cx: &Cx, fail: bool) -> Result<i32, String> {
+        let _ = cx;
+        if fail { Err("nope".to_owned()) } else { Ok(42) }
+    }
+
+    let cx = Cx::default();
+
+    let ok_value: Result<&i32, &String> = fallible(&cx, false);
+    let err_value: Result<&i32, &String> = fallible(&cx, true);
+
+    assert_eq!(ok_value, Ok(&42));
+    assert_eq!(err_value, Err(&"nope".to_owned()));
+}
+
+#[tokio::test]
+async fn memoized_option_return_is_a_plain_reference_by_default() {
+    #[memoize]
+    fn maybe(cx: &Cx, is_some: bool) -> Option<i32> {
+        let _ = cx;
+        if is_some { Some(42) } else { None }
+    }
+
+    let cx = Cx::default();
+
+    let value: &Option<i32> = maybe(&cx, true);
+
+    assert_eq!(value, &Some(42));
 }
 
 #[tokio::test]
@@ -135,4 +167,144 @@ async fn separate_memoized_functions_have_independent_caches() {
 
     assert_eq!(A_CALLS.load(Ordering::SeqCst), 1);
     assert_eq!(B_CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn sync_direct_and_indirect_recursion_with_different_keys() {
+    #[memoize]
+    fn direct(cx: &Cx, depth: usize) -> usize {
+        if depth == 0 {
+            0
+        } else {
+            1 + *direct(cx, depth - 1)
+        }
+    }
+
+    #[memoize]
+    fn a(cx: &Cx, depth: usize) -> usize {
+        if depth == 0 { 0 } else { 1 + *b(cx, depth - 1) }
+    }
+
+    #[memoize]
+    fn b(cx: &Cx, depth: usize) -> usize {
+        if depth == 0 { 0 } else { 1 + *c(cx, depth - 1) }
+    }
+
+    #[memoize]
+    fn c(cx: &Cx, depth: usize) -> usize {
+        if depth == 0 { 0 } else { 1 + *a(cx, depth - 1) }
+    }
+
+    let cx = Cx::default();
+
+    assert_eq!(*direct(&cx, 5), 5);
+    assert_eq!(*a(&cx, 5), 5);
+}
+
+#[tokio::test]
+async fn async_direct_and_indirect_recursion_with_different_keys() {
+    #[memoize]
+    async fn direct(cx: &Cx, depth: usize) -> usize {
+        if depth == 0 {
+            0
+        } else {
+            1 + *Box::pin(direct(cx, depth - 1)).await
+        }
+    }
+
+    #[memoize]
+    async fn a(cx: &Cx, depth: usize) -> usize {
+        if depth == 0 {
+            0
+        } else {
+            1 + *b(cx, depth - 1).await
+        }
+    }
+
+    #[memoize]
+    async fn b(cx: &Cx, depth: usize) -> usize {
+        if depth == 0 {
+            0
+        } else {
+            1 + *c(cx, depth - 1).await
+        }
+    }
+
+    #[memoize]
+    async fn c(cx: &Cx, depth: usize) -> usize {
+        if depth == 0 {
+            0
+        } else {
+            1 + *Box::pin(a(cx, depth - 1)).await
+        }
+    }
+
+    let cx = Cx::default();
+
+    assert_eq!(*direct(&cx, 5).await, 5);
+    assert_eq!(*a(&cx, 5).await, 5);
+}
+
+#[tokio::test]
+#[should_panic(expected = "recursive `#[memoize]` initialization")]
+async fn sync_direct_recursion_with_same_key_panics() {
+    #[memoize]
+    fn recursive(cx: &Cx) -> usize {
+        *recursive(cx)
+    }
+
+    recursive(&Cx::default());
+}
+
+#[tokio::test]
+#[should_panic(expected = "recursive `#[memoize]` initialization")]
+async fn sync_indirect_recursion_with_same_key_panics() {
+    #[memoize]
+    fn a(cx: &Cx) -> usize {
+        *b(cx)
+    }
+
+    #[memoize]
+    fn b(cx: &Cx) -> usize {
+        *c(cx)
+    }
+
+    #[memoize]
+    fn c(cx: &Cx) -> usize {
+        *a(cx)
+    }
+
+    a(&Cx::default());
+}
+
+#[tokio::test]
+#[should_panic(expected = "recursive `#[memoize]` initialization")]
+async fn async_direct_recursion_with_same_key_panics() {
+    #[memoize]
+    async fn recursive(cx: &Cx) -> usize {
+        *Box::pin(recursive(cx)).await
+    }
+
+    recursive(&Cx::default()).await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "recursive `#[memoize]` initialization")]
+async fn async_indirect_recursion_with_same_key_panics() {
+    #[memoize]
+    async fn a(cx: &Cx) -> usize {
+        *b(cx).await
+    }
+
+    #[memoize]
+    async fn b(cx: &Cx) -> usize {
+        *c(cx).await
+    }
+
+    #[memoize]
+    async fn c(cx: &Cx) -> usize {
+        *Box::pin(a(cx)).await
+    }
+
+    a(&Cx::default()).await;
 }

@@ -8,9 +8,10 @@ use http::{
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    Body, Bytes, FromRequest, IntoResponse, OptionalFromRequest, Response, content_type,
+    Body,
     error::{bad_request, bad_request_at},
-    method, uri,
+    request::{Bytes, FromRequest, OptionalFromRequest, content_type, method, uri},
+    response::{IntoResponse, Response},
 };
 
 /// `application/x-www-form-urlencoded` request extractor and response wrapper.
@@ -196,7 +197,12 @@ mod tests {
     use topcoat_core::context::{Cx, CxTestBuilder};
 
     use super::*;
-    use crate::{Body, FromRequest, OptionalFromRequest, error::BadRequestError, to_bytes};
+    use crate::{
+        Body,
+        error::BadRequestError,
+        request::{FromRequest, OptionalFromRequest},
+        to_bytes,
+    };
 
     const FORM_CONTENT_TYPE: &str = "application/x-www-form-urlencoded";
 

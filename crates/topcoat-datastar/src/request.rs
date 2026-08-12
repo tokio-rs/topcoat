@@ -1,5 +1,5 @@
 use topcoat_core::context::Cx;
-use topcoat_router::headers;
+use topcoat_router::request::headers;
 
 use crate::header;
 
@@ -12,6 +12,7 @@ use crate::header;
 /// [`Parts`](http::request::Parts) in context).
 #[inline]
 #[must_use]
+#[track_caller]
 pub fn datastar_request(cx: &Cx) -> bool {
     headers(cx)
         .get(&header::DATASTAR_REQUEST)

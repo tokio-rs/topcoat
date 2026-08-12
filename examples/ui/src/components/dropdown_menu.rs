@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     icon::{icon, iconify::iconify_icon},
-    view::{Attributes, View, attributes, class, component, view},
+    view::{Attributes, StaticClass, View, attributes, class, component, view},
 };
 
 /// A dropdown menu: a trigger that toggles a floating panel of actions.
@@ -42,7 +42,7 @@ pub async fn dropdown_menu(#[default] mut attrs: Attributes, #[default] child: V
 
 /// The classes making a `<summary>` a plain clickable trigger: the default
 /// disclosure marker is hidden and the cursor marks it as interactive.
-const TRIGGER: &str = "cursor-pointer list-none [&::-webkit-details-marker]:hidden";
+const TRIGGER: StaticClass = class!("cursor-pointer list-none [&::-webkit-details-marker]:hidden",);
 
 /// The trigger of a [`dropdown_menu`]: a `<summary>` that toggles the menu.
 ///
@@ -84,8 +84,10 @@ pub async fn dropdown_menu_trigger(
 /// [`dropdown_menu_sub_content`] panels: a raised surface styled like a card;
 /// `z-50` lifts it over later content. It sets its own background and text
 /// color, so it reads the same on any ancestor.
-const PANEL: &str = "absolute z-50 min-w-40 rounded-lg border border-border bg-background p-1 \
-    text-foreground shadow-sm";
+const PANEL: StaticClass = class!(
+    "absolute z-50 min-w-40 rounded-lg border border-border bg-background p-1 \
+     text-foreground shadow-sm",
+);
 
 /// The floating panel of a [`dropdown_menu`], holding the menu's items.
 ///
@@ -109,9 +111,11 @@ pub async fn dropdown_menu_content(
 ///
 /// Hover, focus, and press tint the row like a ghost button, deriving the
 /// states from the foreground color so they hold up in both color schemes.
-const ITEM: &str = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm \
-    whitespace-nowrap outline-none hover:bg-foreground/5 focus-visible:bg-foreground/5 \
-    active:bg-foreground/10 disabled:pointer-events-none disabled:opacity-50";
+const ITEM: StaticClass = class!(
+    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm \
+     whitespace-nowrap outline-none hover:bg-foreground/5 focus-visible:bg-foreground/5 \
+     active:bg-foreground/10 disabled:pointer-events-none disabled:opacity-50",
+);
 
 /// One action in a [`dropdown_menu_content`], rendered as a `<button>`.
 #[component]

@@ -20,9 +20,7 @@ async fn get_user(cx: &Cx, id: i64) -> User {
 }
 ```
 
-That's it. Calling `get_user(cx, 42).await` from anywhere in the request (a page, a layout, a component) runs the body the first time and returns the cached `User` for every subsequent call with `id == 42`. The function's return type `T` is rewritten to `&T` that has the same lifetime as `&cx`.
-
-Top-level `Option<T>` and `Result<T, E>` return types are borrowed ergonomically: the macro calls `.as_ref()` on the cached value and returns `Option<&T>` or `Result<&T, &E>` instead of `&Option<T>` or `&Result<T, E>`.
+That's it. Calling `get_user(cx, 42).await` from anywhere in the request (a page, a layout, a component) runs the body the first time and returns the cached `User` for every subsequent call with `id == 42`. The function's return type `T` is rewritten to `&T` that has the same lifetime as `&cx`. To borrow the contents of an `Option<T>` or `Result<T, E>` return value instead, see [`as_ref`](#borrowing-option-and-result-contents) below.
 
 # Sync and async
 
@@ -50,6 +48,42 @@ async fn fetch_post(cx: &Cx, slug: &str) -> Post {
 
 For async functions, concurrent callers with the same arguments share a single in-flight future. If two parts of your page render in parallel and both call `fetch_post(cx, "hello")`, the database is queried once and both callers await the same result.
 
+# Recursion
+
+Memoized functions can recurse if and only if recursive calls use different arguments. Recursion with identical arguments panics.
+
+Recursion with different arguments uses a different cache entry for each call:
+
+```rust
+# use topcoat::context::{Cx, memoize};
+#[memoize]
+fn factorial(cx: &Cx, n: u64) -> u64 {
+    match n {
+        0 | 1 => 1,
+        _ => n * *factorial(cx, n - 1),
+    }
+}
+
+# fn example(cx: &Cx) {
+assert_eq!(*factorial(cx, 5), 120);
+# }
+```
+
+A nested call with the same arguments panics because it would otherwise deadlock:
+
+```should_panic
+use topcoat::context::{Cx, memoize};
+
+#[memoize]
+fn recurse(cx: &Cx, n: u64) -> u64 {
+    *recurse(cx, n)
+}
+
+fn main() {
+    recurse(&Cx::default(), 1);
+}
+```
+
 # What gets cached
 
 Every argument except `cx` is part of the cache key. Two calls hit the same cache entry if and only if every non-`cx` argument is equal.
@@ -71,6 +105,31 @@ add(cx, 1, 3); // prints "computing", returns 4 (different args)
 
 Each `#[memoize]` function has its own independent cache slot, so two functions with the same argument types don't collide.
 
+# Borrowing Option and Result contents
+
+By default the macro returns a reference to the cached value itself: a function returning `Option<User>` hands out `&Option<User>`. Pass `as_ref` to the attribute to borrow the cached value's contents instead:
+
+```rust
+# fn main() {}
+# struct User;
+# mod db {
+#     pub async fn load_user(_id: i64) -> Option<super::User> { None }
+# }
+use topcoat::context::{Cx, memoize};
+
+#[memoize(as_ref)]
+async fn find_user(cx: &Cx, id: i64) -> Option<User> {
+    db::load_user(id).await
+}
+
+# async fn example(cx: &Cx) {
+let user: Option<&User> = find_user(cx, 42).await;
+# let _ = user;
+# }
+```
+
+With `as_ref`, the macro rewrites the return type through the `MemoizeAsRef` trait: `Option<T>` comes back as `Option<&T>` and `Result<T, E>` as `Result<&T, &E>`. Implement the trait for your own return types to use them with `as_ref`.
+
 # Borrowed and owned arguments
 
 Arguments can be passed by value or by reference. Borrowed arguments avoid cloning on cache hits; on a miss the value is cloned once into the cache.
@@ -83,7 +142,7 @@ Arguments can be passed by value or by reference. Borrowed arguments avoid cloni
 # mod db {
 #     pub async fn find(_name: &str) -> Result<super::Record, super::Error> { Ok(super::Record) }
 # }
-#[memoize]
+#[memoize(as_ref)]
 async fn lookup(cx: &Cx, name: &str) -> Result<Record, Error> {
     db::find(name).await
 }
@@ -132,7 +191,7 @@ use topcoat::{
     view::view,
 };
 
-#[memoize]
+#[memoize(as_ref)]
 async fn current_user(cx: &Cx) -> Option<User> {
     auth::resolve(cx).await
 }

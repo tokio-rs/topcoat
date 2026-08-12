@@ -8,23 +8,22 @@ mod weight;
 pub use display::*;
 pub use family::*;
 pub use host::*;
-pub use style::*;
-pub use subset::*;
-pub use weight::*;
-
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
+pub use style::*;
+pub use subset::*;
 use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-
-use topcoat_core_grammar::ParseOption;
 #[cfg(feature = "asset")]
 use topcoat_core_grammar::paths::topcoat_asset;
-use topcoat_core_grammar::paths::{topcoat_font, topcoat_font_fontsource};
-
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_font, topcoat_font_fontsource},
+};
 use topcoat_font::fontsource as runtime;
+pub use weight::*;
 
 /// One `fontsource_font_face!` invocation: a single Fontsource face served from
 /// the jsDelivr CDN, or, with `host: Asset`, a bundled copy.

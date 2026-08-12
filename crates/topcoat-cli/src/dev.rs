@@ -26,12 +26,11 @@ mod watch;
 
 use std::path::Path;
 
-use clap::Args;
-use console::style;
-
 use app_server::AppServer;
 use broadcast_server::{Event, EventBus};
 use build::{BuildKind, BuildTask};
+use clap::Args;
+use console::style;
 use keyboard::Keyboard;
 use spinner::Spinner;
 use watch::{Change, SourceWatcher};

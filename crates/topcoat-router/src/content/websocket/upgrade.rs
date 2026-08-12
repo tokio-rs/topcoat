@@ -1,18 +1,27 @@
-use std::borrow::Cow;
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, header};
 use hyper::upgrade::OnUpgrade;
 use hyper_util::rt::TokioIo;
-use tokio_tungstenite::WebSocketStream;
-use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
-use tokio_tungstenite::tungstenite::protocol::{Role, WebSocketConfig};
-use topcoat_core::context::Cx;
-use topcoat_core::error::{Error, Result};
+use tokio_tungstenite::{
+    WebSocketStream,
+    tungstenite::{
+        handshake::derive_accept_key,
+        protocol::{Role, WebSocketConfig},
+    },
+};
+use topcoat_core::{
+    context::Cx,
+    error::{Error, Result},
+};
 
-use crate::content::websocket::WebSocket;
-use crate::error::{bad_request, method_not_allowed};
-use crate::{Body, FromRequest, Response, extensions, headers, method};
+use crate::{
+    Body,
+    content::websocket::WebSocket,
+    error::{bad_request, method_not_allowed},
+    request::{FromRequest, extensions, headers, method},
+    response::Response,
+};
 
 /// WebSocket handshake extractor: validates the upgrade request and hands the
 /// connection to a callback.
@@ -33,8 +42,8 @@ use crate::{Body, FromRequest, Response, extensions, headers, method};
 /// use topcoat::{
 ///     Result,
 ///     router::{
-///         Response,
 ///         content::websocket::{Message, WebSocketUpgrade},
+///         response::Response,
 ///         route,
 ///     },
 /// };
@@ -49,6 +58,35 @@ use crate::{Body, FromRequest, Response, extensions, headers, method};
 ///                 break;
 ///             }
 ///         }
+///     })
+/// }
+/// ```
+///
+/// The callback outlives the handler, so it cannot borrow the request context.
+/// Take an owned handle with [`Cx::detach`] and move it in to read the context
+/// from the socket task:
+///
+/// ```rust
+/// use topcoat::{
+///     Result,
+///     context::{Cx, request_context},
+///     router::{
+///         content::websocket::{Message, WebSocketUpgrade},
+///         response::Response,
+///         route,
+///     },
+/// };
+///
+/// struct Customer {
+///     name: String,
+/// }
+///
+/// #[route(GET "/greet")]
+/// async fn greet(cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
+///     let cx = cx.detach();
+///     upgrade.on_upgrade(move |mut socket| async move {
+///         let customer: &Customer = request_context(&cx);
+///         let _ = socket.send(Message::text(customer.name.as_str())).await;
 ///     })
 /// }
 /// ```
@@ -289,23 +327,21 @@ fn header_eq(headers: &HeaderMap, name: &HeaderName, value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-    use std::io;
-    use std::net::SocketAddr;
-    use std::time::Duration;
+    use std::{borrow::Cow, io, net::SocketAddr, time::Duration};
 
     use futures_util::{SinkExt, StreamExt};
     use http::Request;
-    use tokio::net::TcpListener;
-    use tokio::sync::oneshot;
-    use tokio::task::JoinHandle;
+    use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle};
     use tokio_tungstenite::tungstenite;
     use topcoat_core::context::CxTestBuilder;
 
     use super::*;
-    use crate::content::websocket::Message;
-    use crate::error::{BadRequestError, MethodNotAllowedError};
-    use crate::{Path, RouteFn, RouteFuture, Router, RouterService, internal_serve};
+    use crate::{
+        Path, RouteFn, RouteFuture, Router, RouterService,
+        content::websocket::Message,
+        error::{BadRequestError, MethodNotAllowedError},
+        internal_serve,
+    };
 
     /// The `Sec-WebSocket-Key` from RFC 6455's handshake example.
     const KEY: &str = "dGhlIHNhbXBsZSBub25jZQ==";

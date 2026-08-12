@@ -2,9 +2,8 @@ mod attr;
 mod item;
 
 pub use attr::*;
-pub use item::*;
-
 use heck::ToPascalCase;
+pub use item::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
@@ -14,7 +13,6 @@ use syn::{
     spanned::Spanned,
     visit_mut::{self, VisitMut},
 };
-
 use topcoat_core_grammar::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
 
 use crate::component::{ComponentAttr, ComponentItem};

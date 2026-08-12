@@ -53,3 +53,26 @@ async fn push_str_reaches_the_generated_javascript_with_its_argument() {
 
     assert!(html.contains(".push_str("), "{html}");
 }
+
+/// `push_str` takes anything that dereferences to a string, so it accepts the
+/// owned surrogate an event field yields. `Event::target.value` is a `String`,
+/// so this is the call the method mostly exists for; the test above passes a
+/// literal, which is borrowed and so never exercised the owned case.
+#[tokio::test]
+async fn push_str_accepts_the_owned_string_from_an_event() {
+    let cx = &Cx::default();
+    let html = view! {
+        cx =>
+        signal message = String::new();
+
+        <input
+            @input=$(|e: topcoat::runtime::Event| {
+                message.push_str(e.target.value)
+            })
+        >
+    }
+    .unwrap()
+    .render(cx);
+
+    assert!(html.contains(".push_str("), "{html}");
+}

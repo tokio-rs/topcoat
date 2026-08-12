@@ -1,50 +1,51 @@
 mod components;
 
-use components::accordion::{accordion, accordion_content, accordion_item, accordion_trigger};
-use components::alert::{AlertVariant, alert, alert_description, alert_title};
-use components::alert_dialog::alert_dialog;
-use components::avatar::{AvatarSize, avatar, avatar_fallback, avatar_image};
-use components::badge::{BadgeVariant, badge, badge_variants};
-use components::breadcrumb::{
-    breadcrumb, breadcrumb_ellipsis, breadcrumb_item, breadcrumb_link, breadcrumb_list,
-    breadcrumb_page, breadcrumb_separator,
+use components::{
+    accordion::{accordion, accordion_content, accordion_item, accordion_trigger},
+    alert::{AlertVariant, alert, alert_description, alert_title},
+    alert_dialog::alert_dialog,
+    avatar::{AvatarSize, avatar, avatar_fallback, avatar_image},
+    badge::{BadgeVariant, badge, badge_variants},
+    breadcrumb::{
+        breadcrumb, breadcrumb_ellipsis, breadcrumb_item, breadcrumb_link, breadcrumb_list,
+        breadcrumb_page, breadcrumb_separator,
+    },
+    button::{ButtonSize, ButtonVariant, button, button_variants},
+    card::{card, card_content, card_description, card_footer, card_header, card_title},
+    checkbox::checkbox,
+    dialog::{
+        dialog, dialog_content, dialog_description, dialog_footer, dialog_header, dialog_title,
+    },
+    dropdown_menu::{
+        dropdown_menu, dropdown_menu_content, dropdown_menu_item, dropdown_menu_label,
+        dropdown_menu_separator, dropdown_menu_sub, dropdown_menu_sub_content,
+        dropdown_menu_sub_trigger, dropdown_menu_trigger,
+    },
+    hover_card::{hover_card, hover_card_content},
+    input::input,
+    kbd::{kbd, kbd_group},
+    label::label,
+    pagination::{
+        pagination, pagination_content, pagination_ellipsis, pagination_item, pagination_link,
+        pagination_next, pagination_previous,
+    },
+    progress::progress,
+    radio_group::{radio_group, radio_group_item},
+    select::select,
+    separator::{SeparatorOrientation, separator},
+    sheet::{SheetSide, sheet, sheet_content},
+    skeleton::skeleton,
+    spinner::spinner,
+    switch::switch,
+    table::{
+        table, table_body, table_caption, table_cell, table_footer, table_head, table_header,
+        table_row,
+    },
+    tabs::{tabs, tabs_content, tabs_list, tabs_trigger},
+    textarea::textarea,
+    toggle::{ToggleKind, ToggleSize, toggle, toggle_group},
+    tooltip::{tooltip, tooltip_content},
 };
-use components::button::{ButtonSize, ButtonVariant, button, button_variants};
-use components::card::{
-    card, card_content, card_description, card_footer, card_header, card_title,
-};
-use components::checkbox::checkbox;
-use components::dialog::{
-    dialog, dialog_content, dialog_description, dialog_footer, dialog_header, dialog_title,
-};
-use components::dropdown_menu::{
-    dropdown_menu, dropdown_menu_content, dropdown_menu_item, dropdown_menu_label,
-    dropdown_menu_separator, dropdown_menu_sub, dropdown_menu_sub_content,
-    dropdown_menu_sub_trigger, dropdown_menu_trigger,
-};
-use components::hover_card::{hover_card, hover_card_content};
-use components::input::input;
-use components::kbd::{kbd, kbd_group};
-use components::label::label;
-use components::pagination::{
-    pagination, pagination_content, pagination_ellipsis, pagination_item, pagination_link,
-    pagination_next, pagination_previous,
-};
-use components::progress::progress;
-use components::radio_group::{radio_group, radio_group_item};
-use components::select::select;
-use components::separator::{SeparatorOrientation, separator};
-use components::sheet::{SheetSide, sheet, sheet_content};
-use components::skeleton::skeleton;
-use components::spinner::spinner;
-use components::switch::switch;
-use components::table::{
-    table, table_body, table_caption, table_cell, table_footer, table_head, table_header, table_row,
-};
-use components::tabs::{tabs, tabs_content, tabs_list, tabs_trigger};
-use components::textarea::textarea;
-use components::toggle::{ToggleKind, ToggleSize, toggle, toggle_group};
-use components::tooltip::{tooltip, tooltip_content};
 use topcoat::{
     Result,
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset},

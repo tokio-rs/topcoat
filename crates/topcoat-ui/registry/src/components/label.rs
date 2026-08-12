@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`label`] element.
@@ -10,9 +10,11 @@ use topcoat::{
 /// pointer events when its control is disabled: a wrapped control is matched
 /// with `has-[:disabled]`, a preceding sibling control marked `peer` with
 /// `peer-disabled`.
-const LABEL: &str = "flex items-center gap-2 text-sm leading-none font-medium select-none \
-    peer-disabled:pointer-events-none peer-disabled:opacity-50 \
-    has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50";
+const LABEL: StaticClass = class!(
+    "flex items-center gap-2 text-sm leading-none font-medium select-none \
+     peer-disabled:pointer-events-none peer-disabled:opacity-50 \
+     has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50",
+);
 
 /// A caption for a form control, rendered as a `<label>`.
 ///

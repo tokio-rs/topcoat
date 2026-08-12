@@ -129,28 +129,50 @@ where
 
 #[cfg(test)]
 mod tests {
-    use syn::parse::{Parse, ParseStream};
+    use syn::{
+        Token,
+        parse::{Parse, ParseStream},
+    };
 
     use crate::pretty::{PrettyPrint, Printer, registry::Registry};
 
-    /// A macro body used only in tests that accepts an optional identifier, so
-    /// an empty invocation such as `test! {}` still parses.
-    struct Body(Option<syn::Ident>);
+    /// A macro body used only in tests. It accepts an optional identifier, so
+    /// an empty invocation such as `test! {}` still parses, optionally behind a
+    /// `name:` prefix, which is what makes a body invalid Rust.
+    struct Body {
+        name: Option<syn::Ident>,
+        value: Option<syn::Ident>,
+    }
 
     impl Parse for Body {
         fn parse(input: ParseStream) -> syn::Result<Self> {
-            if input.is_empty() {
-                Ok(Self(None))
+            let name = if input.peek(syn::Ident) && input.peek2(Token![:]) {
+                let name = input.parse()?;
+                input.parse::<Token![:]>()?;
+                Some(name)
             } else {
-                Ok(Self(Some(input.parse()?)))
-            }
+                None
+            };
+
+            let value = if input.is_empty() {
+                None
+            } else {
+                Some(input.parse()?)
+            };
+
+            Ok(Self { name, value })
         }
     }
 
     impl PrettyPrint for Body {
         fn pretty_print(&self, printer: &mut Printer<'_>) {
-            if let Some(ident) = &self.0 {
-                ident.pretty_print(printer);
+            if let Some(name) = &self.name {
+                name.pretty_print(printer);
+                ":".pretty_print(printer);
+                " ".pretty_print(printer);
+            }
+            if let Some(value) = &self.value {
+                value.pretty_print(printer);
             }
         }
     }
@@ -169,8 +191,33 @@ mod tests {
 
     #[test]
     fn test_parenthesized_long() {
+        let source = "test!(name: this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed);";
+        let result = crate::pretty::pretty_print_str(&registry(), source);
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            r"test!(
+    name: this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed
+);"
+        );
+    }
+
+    #[test]
+    fn parenthesized_rust_body_is_left_to_rustfmt() {
+        // The body is a valid Rust expression, so `rustfmt` lays the invocation
+        // out itself and this formatter leaves it untouched, however long it is.
         let source = "test!(this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed);";
         let result = crate::pretty::pretty_print_str(&registry(), source);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), source);
+    }
+
+    #[test]
+    fn parenthesized_rust_body_is_formatted_inside_a_macro_body() {
+        // `rustfmt` never reaches inside a macro body, so the same invocation is
+        // formatted when it is part of one.
+        let source = "test!(this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed);";
+        let result = crate::pretty::pretty_print_fragment_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
@@ -257,14 +304,22 @@ fn f() {
 
     #[test]
     fn test_bracketed_long() {
-        let source = "test![this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed];";
+        let source = "test![name: this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed];";
         let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
             r"test![
-    this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed
+    name: this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed
 ];"
         );
+    }
+
+    #[test]
+    fn bracketed_rust_body_is_left_to_rustfmt() {
+        let source = "test![this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed];";
+        let result = crate::pretty::pretty_print_str(&registry(), source);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), source);
     }
 }

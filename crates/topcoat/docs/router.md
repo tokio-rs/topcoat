@@ -11,7 +11,7 @@ Explicit route paths use Topcoat's [`Path`] syntax:
 - `/docs/{*path}` for a catch-all parameter that matches one or more remaining segments.
 - `/(marketing)/pricing` for groups. Groups participate in layout and layer matching but are stripped from the served URL, so this example serves `/pricing`.
 
-The root path is `/`. Non-root paths must start with `/` and may not contain empty segments. Parameter and group names must start with an ASCII letter or `_` and contain only ASCII letters, digits, and underscores. Captured parameter values are percent-decoded after the router matches the path.
+The root path is `/`. Non-root paths must start with `/` and may not contain empty segments. Parameter and group names must start with an ASCII letter or `_` and contain only ASCII letters, digits, and underscores.
 
 # Pages
 
@@ -72,12 +72,12 @@ A layer wraps request handling under its path prefix. It receives a mutable requ
 ```rust
 use topcoat::{
     Result,
-    context::CxBuilder,
-    router::{Body, Next, Response, layer},
+    context::Cx,
+    router::{Body, Next, layer, response::Response},
 };
 
 #[layer("/")]
-async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
+async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let start = std::time::Instant::now();
     let response = next.run(cx, body).await?;
     println!("handled in {:?}", start.elapsed());
@@ -132,10 +132,10 @@ Path and query values are read from [`Cx`](crate::context::Cx), not injected as 
 
 ## Path parameters
 
-Apply [`#[path_param]`](macro@path_param) to a tuple struct with one field. The snake-cased struct name is the parameter name, so `PostId` reads `{post_id}`. The inner type controls parsing:
+Call [`path_param!`](macro@path_param) with the parameter name from the URL. The macro generates a Pascal-cased type, so `path_param!(post_id: u64)` declares `PostId` for `{post_id}`:
 
-- `str` returns the percent-decoded segment as `&str`.
-- Any other type is parsed with [`FromStr`](std::str::FromStr). The default return type is `Result<&T, &T::Err>`.
+- After `path_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str`.
+- A type after `:` is parsed with [`FromStr`](std::str::FromStr). The default return type is `Result<&T, &<T as FromStr>::Err>`.
 - `error = bad_request`, `not_found`, `unauthorized`, `forbidden`, `redirect(...)`, or `redirect_permanent(...)` maps a parse failure to that router error.
 
 ```rust
@@ -146,8 +146,7 @@ use topcoat::{
     view::view,
 };
 
-#[path_param(error = bad_request)]
-struct PostId(u64);
+path_param!(post_id: u64, error = bad_request);
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result {
@@ -156,7 +155,11 @@ async fn post(cx: &Cx) -> Result {
 }
 ```
 
-Parsing occurs once per request and the result is memoized. With [`module_router!`], declaring `#[path_param]` inside a non-root route module also changes that module's segment to the parameter. See [`module_router!`] for module structure, nested parameters, and catch-all parameters.
+Parsing occurs once per request and the result is memoized.
+
+Prefix the name with `*` to capture the remaining path as decoded segments. After `path_param!(*doc_path)`, `path_param::<DocPath>(cx)` returns [`CatchAllSegments`]. After `path_param!(*ids: u32)`, `path_param::<Ids>(cx)` returns `Result<&[u32], _>`.
+
+With [`module_router!`], a declaration inside a non-root route module also changes that module's segment to the parameter. See [`module_router!`] for module structure, nested parameters, and catch-all parameters.
 
 ## Query parameters
 
@@ -251,15 +254,19 @@ async fn root_layout(slot: Result) -> Result {
 
 See the [`view!`](crate::view::view!) macro docs for the full placement and precedence rules.
 
+# Cross-origin requests
+
+The router applies an [`OriginPolicy`] to every request before any layer or handler runs: by default, state-changing cross-origin browser requests and cross-origin WebSocket handshakes are rejected with `403 Forbidden`. Register a policy with [`origin_policy`](RouterBuilder::origin_policy) to trust cross-origin peers, to exempt individual routes, or to opt out; see [`OriginPolicy`] for the exact rules.
+
 # Manual registration
 
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
 
 ```rust
-# use topcoat::{Result, context::CxBuilder, router::{Body, Next, Response, layer, layout, page, route}, view::view};
+# use topcoat::{Result, context::Cx, router::{Body, Next, layer, layout, page, response::Response, route}, view::view};
 # #[layout("/")] async fn root_layout(slot: Result) -> Result { view! { (slot?) } }
 # #[layout("/settings")] async fn settings_layout(slot: Result) -> Result { view! { (slot?) } }
-# #[layer("/")] async fn timing(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
+# #[layer("/")] async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
 # #[page("/")] async fn home() -> Result { view! { <h1>"Home"</h1> } }
 # #[page("/about")] async fn about() -> Result { view! { <h1>"About"</h1> } }
 # #[page("/settings/profile")] async fn profile() -> Result { view! { <h1>"Profile"</h1> } }
@@ -329,7 +336,7 @@ topcoat::serve(listener, router).await
 
 The socket file of a previous run is not removed automatically, so remove any stale file before binding, as above.
 
-Serving is the only part of the framework that depends on tokio and hyper, and it sits behind the `serve` cargo feature, enabled by default. The rest (routing, views, and request handling) works without it: [`Router::handle`] turns a [`Request`] into a [`Response`] directly, with no listener involved. On a platform that receives HTTP requests for you, such as a serverless or WebAssembly runtime, build `topcoat` without default features, leave `serve` off, and call [`Router::handle`] from the platform's request handler.
+Serving is the only part of the framework that depends on tokio and hyper, and it sits behind the `serve` cargo feature, enabled by default. The rest (routing, views, and request handling) works without it: [`Router::handle`] turns a [`Request`](request::Request) into a [`Response`](response::Response) directly, with no listener involved. On a platform that receives HTTP requests for you, such as a serverless or WebAssembly runtime, build `topcoat` without default features, leave `serve` off, and call [`Router::handle`] from the platform's request handler.
 
 # Tower services
 
@@ -340,8 +347,8 @@ With the `tower` feature enabled, the [`tower`](mod@tower) module bridges the to
 ```rust
 use topcoat::{
     Result,
-    context::CxBuilder,
-    router::{Body, Next, Response, Router, content::Json, layer, layout, page, route},
+    context::Cx,
+    router::{Body, Next, Router, content::Json, layer, layout, page, response::Response, route},
     view::view,
 };
 
@@ -367,7 +374,7 @@ async fn root_layout(slot: Result) -> Result {
 }
 
 #[layer("/api")]
-async fn api_log(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
+async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;
     println!("API response: {}", response.status());
     Ok(response)

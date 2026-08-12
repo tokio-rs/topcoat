@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 use http::Uri;
 use memchr::memmem;
 use serde::{Deserialize, Serialize};
-use topcoat_core::fnv1a;
+use topcoat_core::fnv1a::Fnv1a;
 
 use crate::{AssetOptions, ConstReader, ConstWriter, Source};
 
@@ -31,6 +31,7 @@ impl Asset {
     /// Panics if the handle does not reference a valid encoded declaration;
     /// handles returned by [`asset!`](crate::asset) are always valid.
     #[must_use]
+    #[track_caller]
     pub fn id(&self) -> AssetId {
         // The bundler discovers assets by scanning the binary for these
         // bytes; reading them through black_box stops the optimizer from
@@ -80,13 +81,13 @@ impl AssetId {
         path: &str,
         options: &AssetOptions,
     ) -> Self {
-        let mut h = fnv1a::hash(crate_name.as_bytes());
-        h = fnv1a::hash_continue(h, b"\0");
-        h = fnv1a::hash_continue(h, source_file.as_bytes());
-        h = fnv1a::hash_continue(h, b"\0");
-        h = fnv1a::hash_continue(h, path.as_bytes());
-        h = options.hash_into(h);
-        Self(h)
+        let h = Fnv1a::<u64>::new()
+            .write(crate_name.as_bytes())
+            .write(b"\0")
+            .write(source_file.as_bytes())
+            .write(b"\0")
+            .write(path.as_bytes());
+        Self(options.hash_into(h).finish())
     }
 
     /// The raw `u64` backing this ID.
@@ -166,6 +167,7 @@ impl RawAsset {
         finder
             .find_iter(binary)
             .filter_map(|index| Self::decode(&binary[index..]))
+            .filter(|asset| !asset.path.is_empty())
             .collect()
     }
 
@@ -309,7 +311,12 @@ fn normalize(path: &Path) -> PathBuf {
 ///
 /// Output filenames always include a short content hash so bundles stay
 /// cache-friendly: e.g. `logo-1a2b3c4d5e6f7a8b.png`, or
-/// `1a2b3c4d5e6f7a8b.png` if the stem is empty.
+/// `1a2b3c4d5e6f7a8b.png` if the stem is empty. Declarations of one file
+/// share its output filename, and with it the single route the file is
+/// served from, so they cannot disagree about the `Content-Type`: serving
+/// one file as two content types needs a different `rename` on one of the
+/// declarations, and the [`Bundler`](crate::Bundler) rejects the bundle
+/// otherwise.
 ///
 /// # Returns
 ///

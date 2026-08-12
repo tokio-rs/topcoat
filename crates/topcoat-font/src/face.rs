@@ -2,7 +2,7 @@
 
 use std::{fmt::Write, ops::Deref};
 
-use topcoat_core::{context::Cx, fnv1a};
+use topcoat_core::{context::Cx, fnv1a::Fnv1a};
 
 use crate::{CssString, FontDisplay, FontSources, FontStyle, FontWeightRange, UnicodeRanges};
 
@@ -34,6 +34,7 @@ impl FontFace {
     ///
     /// Panics if the [`TryInto`] conversion of `src` fails.
     #[must_use]
+    #[track_caller]
     pub fn new(family: impl Into<String>, src: impl TryInto<FontSources>) -> Self {
         Self {
             family: family.into(),
@@ -80,6 +81,7 @@ impl FontFace {
     /// # Errors
     ///
     /// Returns any error produced while writing to `f`.
+    #[track_caller]
     pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         f.write_str("@font-face { font-family: \"")?;
         CssString(&mut *f).write_str(&self.family)?;
@@ -102,24 +104,24 @@ impl FontFace {
     }
 
     /// Folds this face into a running content hash.
-    pub(crate) fn hash(&self, h: u64) -> u64 {
-        let h = fnv1a::hash_continue(h, self.family.as_bytes());
+    pub(crate) fn hash(&self, h: Fnv1a<u64>) -> Fnv1a<u64> {
+        let h = h.write(self.family.as_bytes());
         let h = self.src.hash(h);
         let h = match self.weight {
-            Some(weight) => weight.hash(fnv1a::hash_continue(h, &[1])),
-            None => fnv1a::hash_continue(h, &[0]),
+            Some(weight) => weight.hash(h.write(&[1])),
+            None => h.write(&[0]),
         };
         let h = match self.style {
-            Some(style) => style.hash(fnv1a::hash_continue(h, &[1])),
-            None => fnv1a::hash_continue(h, &[0]),
+            Some(style) => style.hash(h.write(&[1])),
+            None => h.write(&[0]),
         };
         let h = match self.display {
-            Some(display) => display.hash(fnv1a::hash_continue(h, &[1])),
-            None => fnv1a::hash_continue(h, &[0]),
+            Some(display) => display.hash(h.write(&[1])),
+            None => h.write(&[0]),
         };
         match self.unicode_range {
-            Some(unicode_range) => unicode_range.hash(fnv1a::hash_continue(h, &[1])),
-            None => fnv1a::hash_continue(h, &[0]),
+            Some(unicode_range) => unicode_range.hash(h.write(&[1])),
+            None => h.write(&[0]),
         }
     }
 
@@ -173,6 +175,7 @@ impl FontFaces {
     ///
     /// Panics if `faces` is empty.
     #[must_use]
+    #[track_caller]
     pub fn new(faces: impl Into<Vec<FontFace>>) -> Self {
         let faces = faces.into();
         assert!(!faces.is_empty(), "font faces must not be empty");
@@ -180,7 +183,7 @@ impl FontFaces {
     }
 
     /// Folds these faces into a running content hash.
-    pub(crate) fn hash(&self, mut h: u64) -> u64 {
+    pub(crate) fn hash(&self, mut h: Fnv1a<u64>) -> Fnv1a<u64> {
         for face in &self.0 {
             h = face.hash(h);
         }
@@ -192,6 +195,7 @@ impl FontFaces {
     /// # Errors
     ///
     /// Returns any error produced while writing to `f`.
+    #[track_caller]
     pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         for (index, face) in self.0.iter().enumerate() {
             if index > 0 {

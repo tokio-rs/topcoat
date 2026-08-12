@@ -117,12 +117,12 @@ A layer uses its module path as a prefix:
 // src/app/api.rs: wraps handlers under /api
 use topcoat::{
     Result,
-    context::CxBuilder,
-    router::{Body, Next, Response, layer},
+    context::Cx,
+    router::{Body, Next, layer, response::Response},
 };
 
 #[layer]
-async fn api_log(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Response> {
+async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;
     println!("API response: {}", response.status());
     Ok(response)
@@ -131,7 +131,7 @@ async fn api_log(cx: &mut CxBuilder, body: Body, next: Next<'_>) -> Result<Respo
 
 # Dynamic path parameters
 
-Apply `#[path_param]` to a single-field tuple struct inside the module that should become dynamic. The macro changes that module's segment to a parameter and defines the type used to read it. The snake-cased struct name becomes the parameter name.
+Call `path_param!` inside the module that should become dynamic. The declaration names the URL parameter and may name the type used to parse each captured segment. The macro changes that module's segment to the parameter and generates the Pascal-cased type used to read it.
 
 ```text
 src/
@@ -151,8 +151,7 @@ use topcoat::{
     view::view,
 };
 
-#[path_param(error = bad_request)]
-struct PostId(u64);
+path_param!(post_id: u64, error = bad_request);
 
 #[page]
 async fn post(cx: &Cx) -> Result {
@@ -163,17 +162,17 @@ async fn post(cx: &Cx) -> Result {
 
 This page serves `/posts/{post_id}`. A request for `/posts/42` parses `42` with `u64::from_str`. A failed parse returns `400 Bad Request` because the declaration uses `error = bad_request`.
 
-The parameter name comes from `PostId`, not from the `post_id.rs` filename. The file could be named `id.rs` and would still contribute `{post_id}`.
+The parameter name comes from `post_id` in the declaration, not from the filename. The file could be named `id.rs` and would still contribute `{post_id}`.
 
 `path_param::<T>(cx)` returns a request-scoped value:
 
-- `#[path_param] struct Slug(str);` returns the percent-decoded segment as `&str` and cannot fail.
-- Any other inner type must implement `FromStr`. Without `error = ...`, the function returns `Result<&T, &T::Err>`.
+- After `path_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str` and cannot fail.
+- After `path_param!(post_id: u64)`, `path_param::<PostId>(cx)` parses with `FromStr`. Without `error = ...`, the function returns `Result<&u64, &<u64 as FromStr>::Err>`.
 - `error = bad_request`, `not_found`, `unauthorized`, `forbidden`, `redirect(...)`, or `redirect_permanent(...)` maps a parse failure to that router error.
 
 Parsing occurs once per request. Later calls return the memoized result.
 
-A module contributes one segment, so it can declare one `#[path_param]`. Use nested modules for multiple parameters:
+A module contributes one segment, so it can declare one `path_param!`. Use nested modules for multiple parameters:
 
 | Module | Route path |
 |---|---|
@@ -181,6 +180,24 @@ A module contributes one segment, so it can declare one `#[path_param]`. Use nes
 | `app::organizations::organization_id::users::user_id` | `/organizations/{organization_id}/users/{user_id}` |
 
 Handlers and layouts in descendant modules can read parameters declared by ancestor modules if the Rust types are visible there.
+
+# Catch-all parameters
+
+Prefix a parameter name with `*` when its module should capture the remaining path.
+
+```rust
+// src/app/docs/path.rs contributes /docs/{*path}.
+# use topcoat::router::path_param;
+path_param!(*path);
+```
+
+The declaration emits a `CatchAll` segment override. The module must be the last served segment, and the catch-all matches at least one segment.
+
+Handlers read an unparsed catch-all as [`CatchAllSegments`](crate::CatchAllSegments) or add a segment type to read a parsed slice.
+
+See the [`path_param!` macro reference](https://docs.rs/topcoat/latest/topcoat/router/macro.path_param.html) for value shapes, construction, parsing, and errors.
+
+A manual `segment!(kind = CatchAll)` capture remains available through [`raw_path_params`](crate::raw_path_params). Its value carries the encoded tail, with `/` separators intact, next to its separately decoded segments.
 
 # Query parameters
 
@@ -227,35 +244,7 @@ async fn posts(cx: &Cx) -> Result {
 
 `Static` is the default kind for regular modules. `Group` is the default for modules whose names start with `_`. A rename is used as written; Topcoat does not kebab-case it.
 
-`#[path_param]` emits a `Param` segment override, so do not combine it with `segment!` in the same module. A manual `Param` override creates the route capture but does not define a typed accessor.
-
-# Catch-all parameters
-
-A `CatchAll` segment captures one or more remaining URL segments, including their `/` separators. It is the last served segment in a route.
-
-```rust
-// src/app/docs/path.rs: /docs/{*path}
-use topcoat::{
-    Result,
-    context::Cx,
-    router::{page, raw_path_params, segment},
-    view::view,
-};
-
-segment!(kind = CatchAll, rename = "path");
-
-#[page]
-async fn document(cx: &Cx) -> Result {
-    let path = raw_path_params(cx)
-        .iter()
-        .find_map(|(name, value)| (name == "path").then_some(value))
-        .expect("route declares {*path}");
-
-    view! { <p>"Document: " (path)</p> }
-}
-```
-
-For `/docs/guides/start`, `path` is `"guides/start"`. `/docs` does not match because a catch-all requires a non-empty remainder. Captured values are percent-decoded before the handler reads them.
+`path_param!` emits a `Param` or `CatchAll` segment override, so do not combine it with `segment!` in the same module. A manual override creates the route capture but does not define a typed accessor.
 
 # Groups
 

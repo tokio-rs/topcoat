@@ -4,13 +4,9 @@ use topcoat_view::{AttributeValueViewParts, DynViewPart, HtmlWriter, PartsWriter
 use crate::{Font, FontResolver};
 
 impl DynViewPart for Font {
+    #[track_caller]
     fn render(&self, cx: &Cx, w: &mut HtmlWriter<'_, '_>) {
         let _ = app_context::<FontResolver>(cx).resolve(*self, w);
-    }
-
-    #[inline]
-    fn clone_box(&self) -> Box<dyn DynViewPart> {
-        Box::new(*self)
     }
 }
 

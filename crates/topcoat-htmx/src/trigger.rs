@@ -1,10 +1,8 @@
-use http::HeaderValue;
-use http::header::HeaderName;
-use http::response::Parts;
+use http::{HeaderValue, header::HeaderName, response::Parts};
 use serde::Serialize;
 use serde_json::{Map, Value};
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_router::IntoResponseParts;
+use topcoat_router::response::IntoResponseParts;
 
 use crate::header;
 

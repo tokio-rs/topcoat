@@ -1,5 +1,4 @@
-use std::fmt::Write;
-use std::path::Path;
+use std::{fmt::Write, path::Path};
 
 use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
 use topcoat_view_grammar::view::View;
@@ -95,6 +94,7 @@ fixture_test!(attributes_long);
 fixture_test!(attributes_overflow);
 fixture_test!(attributes_macro_short);
 fixture_test!(attributes_macro_long);
+fixture_test!(attributes_macro_html_ident);
 fixture_test!(attribute_expr_value);
 
 // -- Text nodes --------------------------------------------------------------
@@ -127,6 +127,8 @@ fixture_test!(explicit_cx_multiline);
 
 fixture_test!(class_macro_short);
 fixture_test!(class_macro_long);
+fixture_test!(class_macro_rust_body);
+fixture_test!(class_macro_in_view);
 
 // -- Local bindings ------------------------------------------------------------
 

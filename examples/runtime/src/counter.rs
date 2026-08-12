@@ -3,10 +3,9 @@ use topcoat::{Result, router::page, view::view};
 #[page]
 async fn counter() -> Result {
     view! {
-        // Store the counter as reactive state in the browser.
+        // The signal lives in the browser; the handlers below update it.
         signal count = 0.0;
 
-        // Update the signal when a button is clicked.
         <button @click=$(|_e| count.increment())>"increment"</button>
 
         <button @click=$(|_e| count.decrement())>"decrement"</button>
@@ -14,7 +13,7 @@ async fn counter() -> Result {
         <br>
         <br>
 
-        // Re-render the value whenever the signal changes.
+        // Renders again whenever the signal changes.
         $(count.get())
     }
 }

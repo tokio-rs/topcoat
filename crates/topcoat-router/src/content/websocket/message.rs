@@ -1,6 +1,8 @@
-use std::fmt::{self, Display};
-use std::ops::Deref;
-use std::str::Utf8Error;
+use std::{
+    fmt::{self, Display},
+    ops::Deref,
+    str::Utf8Error,
+};
 
 use bytes::Bytes;
 use tokio_tungstenite::tungstenite;

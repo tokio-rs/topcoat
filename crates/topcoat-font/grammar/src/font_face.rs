@@ -10,21 +10,18 @@ mod weight;
 pub use display::*;
 pub use family::*;
 pub use format::*;
-pub use source::*;
-pub use style::*;
-pub use tech::*;
-pub use unicode::*;
-pub use weight::*;
-
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
+pub use source::*;
+pub use style::*;
 use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::topcoat_font;
-
-use topcoat_core_grammar::ParseOption;
+pub use tech::*;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_font};
+pub use unicode::*;
+pub use weight::*;
 
 pub struct FontFace {
     /// The `font-family` descriptor. Optional in the AST because a

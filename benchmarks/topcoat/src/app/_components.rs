@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{class, component, view},
+    view::{PromotedStr, StaticClass, class, component, view},
 };
 
 use crate::{
@@ -9,11 +9,15 @@ use crate::{
 };
 
 /// The heroicons solid star, shared verbatim by every benchmark app.
-const STAR_PATH: &str = "M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.783.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.363-1.118l-2.8-2.034c-.784-.57-.381-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z";
+const STAR_PATH: PromotedStr = PromotedStr(
+    &"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.783.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.363-1.118l-2.8-2.034c-.784-.57-.381-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z",
+);
 
-const PAGE_LINK: &str = "rounded-md px-3 py-2 font-medium text-slate-600 hover:bg-slate-100";
-const PAGE_DISABLED: &str = "rounded-md px-3 py-2 font-medium text-slate-300";
-const PAGE_CURRENT: &str = "rounded-md bg-indigo-600 px-3 py-2 font-semibold text-white";
+const PAGE_LINK: StaticClass =
+    class!("rounded-md px-3 py-2 font-medium text-slate-600 hover:bg-slate-100");
+const PAGE_DISABLED: StaticClass = class!("rounded-md px-3 py-2 font-medium text-slate-300");
+const PAGE_CURRENT: StaticClass =
+    class!("rounded-md bg-indigo-600 px-3 py-2 font-semibold text-white");
 
 const FOOTER_COLUMNS: [(&str, [(&str, &str); 4]); 4] = [
     (

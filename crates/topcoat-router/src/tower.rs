@@ -1,20 +1,26 @@
 #![doc = include_str!("../docs/tower.md")]
 
-use std::borrow::Cow;
-use std::fmt::{self, Display};
-use std::future::Future;
-use std::pin::{Pin, pin};
-use std::task::{Context, Poll};
+use std::{
+    borrow::Cow,
+    fmt::{self, Display},
+    future::Future,
+    pin::{Pin, pin},
+    task::{Context, Poll},
+};
 
 use bytes::Bytes;
 use tokio::sync::{mpsc, oneshot};
-use topcoat_core::context::{Cx, CxBuilder};
-use topcoat_core::error::{Error, Result};
+use topcoat_core::{
+    context::Cx,
+    error::{Error, Result},
+};
 use tower::ServiceExt;
 
 use crate::{
-    Body, BoxError, IntoPath, Layer, LayerFuture, Methods, Next, OwnedMethods, Path, Request,
-    Response, Route, RouteFuture, parts,
+    Body, BoxError, IntoPath, Layer, LayerFuture, Methods, Next, OwnedMethods, Path, Route,
+    RouteFuture,
+    request::{Request, parts},
+    response::Response,
 };
 
 /// A [`Route`] that forwards its requests to a tower service.
@@ -44,7 +50,9 @@ use crate::{
 /// ```rust
 /// use std::convert::Infallible;
 ///
-/// use topcoat::router::{Body, Methods, Request, Response, Router, tower::TowerRoute};
+/// use topcoat::router::{
+///     Body, Methods, Router, request::Request, response::Response, tower::TowerRoute,
+/// };
 /// use tower::service_fn;
 ///
 /// // Stands in for a legacy tower application, like an axum router.
@@ -78,6 +86,7 @@ impl<S> TowerRoute<S> {
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
     #[must_use]
+    #[track_caller]
     pub fn new(methods: impl Into<OwnedMethods>, path: impl IntoPath, service: S) -> Self {
         Self {
             methods: methods.into(),
@@ -144,7 +153,7 @@ where
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use std::time::Duration;
 ///
 /// use topcoat::router::{Router, tower::TowerLayer};
@@ -173,7 +182,7 @@ impl<S> TowerLayer<S> {
         L: tower::Layer<TowerNext, Service = S>,
     {
         Self {
-            path: Cow::Borrowed(Path::new("/")),
+            path: Cow::Borrowed(Path::ROOT),
             service: layer.layer(TowerNext::new()),
         }
     }
@@ -184,6 +193,7 @@ impl<S> TowerLayer<S> {
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
     #[must_use]
+    #[track_caller]
     pub fn at(mut self, path: impl IntoPath) -> Self {
         self.path = path.into_path();
         self
@@ -202,7 +212,7 @@ where
         &self.path
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         // Clones of a tower service share its cross-request state (semaphores,
         // rate-limit windows) through the service's internal handles.
         let service = self.service.clone();
@@ -463,20 +473,26 @@ fn recover(error: BoxError) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-    use std::convert::Infallible;
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::time::Duration;
+    use std::{
+        borrow::Cow,
+        convert::Infallible,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
 
-    use http::request::Parts;
-    use http::{HeaderValue, StatusCode};
-    use topcoat_core::context::Cx;
+    use http::{HeaderValue, StatusCode, request::Parts};
+    use topcoat_core::context::{Cx, request_context, try_request_context};
 
     use super::*;
     use crate::{
-        Bytes, IntoResponse, Layers, Method, RouteFn, RouteFuture, Router, Terminal,
-        error::NotFoundError, to_bytes,
+        Layers, Method, RouteFn, RouteFuture, Router, Terminal,
+        error::{NotFoundError, not_found},
+        request::Bytes,
+        response::IntoResponse,
+        to_bytes,
     };
 
     // -- Test helpers --
@@ -494,19 +510,19 @@ mod tests {
     }
 
     /// Builds a request context carrying the parts of a GET request to `uri`.
-    fn cx_for(uri: &str) -> CxBuilder {
+    fn cx_for(uri: &str) -> Cx {
         let (parts, ()) = http::Request::builder()
             .uri(uri)
             .body(())
             .unwrap()
             .into_parts();
-        let mut cx = CxBuilder::default();
+        let mut cx = Cx::default();
         cx.insert(parts);
         cx
     }
 
     /// Runs a request through `layer` wrapped directly around `route`.
-    fn run(layer: &dyn Layer, cx: &mut CxBuilder, route: &RouteFn) -> Result<Response> {
+    fn run(layer: &dyn Layer, cx: &mut Cx, route: &RouteFn) -> Result<Response> {
         let layers = Layers::default();
         let next = Next::new(&layers, &[], Terminal::Route(route));
         block_on(layer.handle(cx, Body::empty(), next))
@@ -526,7 +542,7 @@ mod tests {
     /// edits made by middleware.
     fn echo_header(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
-            let value = crate::headers(cx)
+            let value = crate::request::headers(cx)
                 .get("x-tower")
                 .and_then(|value| value.to_str().ok())
                 .unwrap_or("missing")
@@ -538,6 +554,12 @@ mod tests {
     /// A route that never resolves, for racing against a timeout middleware.
     fn hang(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(std::future::pending())
+    }
+
+    /// A route resolving to a typed 404 error, to observe how errors cross
+    /// tower middleware.
+    fn not_found_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(not_found().into()) })
     }
 
     /// A route whose body is long enough to clear tower-http's compression
@@ -826,7 +848,11 @@ mod tests {
         // The route saw the header the middleware added, and the modified
         // request was written back to the context.
         assert_eq!(&body_bytes(response)[..], b"marked");
-        assert!(cx.get::<Parts>().unwrap().headers.contains_key("x-tower"));
+        assert!(
+            request_context::<Parts>(&cx)
+                .headers
+                .contains_key("x-tower")
+        );
     }
 
     #[test]
@@ -852,16 +878,17 @@ mod tests {
         assert_eq!(&body_bytes(response)[..], b"short");
         // The chain never ran, so the parts stay on the context for outer
         // layers and error rendering.
-        assert!(cx.get::<Parts>().is_some());
+        assert!(try_request_context::<Parts>(&cx).is_some());
     }
 
     #[test]
     fn chain_errors_tunnel_through_unchanged() {
         let layer = TowerLayer::new(tower::layer::util::Identity::new());
         let layers = Layers::default();
+        let route = RouteFn::new(Method::GET, path("/missing"), not_found_route);
         let mut cx = cx_for("/missing");
 
-        let next = Next::new(&layers, &[], Terminal::NotFound);
+        let next = Next::new(&layers, &[], Terminal::Route(&route));
         let result = block_on(layer.handle(&mut cx, Body::empty(), next));
 
         // The 404 comes back out as the original typed error, not a response.
@@ -879,9 +906,10 @@ mod tests {
         // still be recovered on the way out.
         let layer = TowerLayer::new(tower::timeout::TimeoutLayer::new(Duration::from_mins(1)));
         let layers = Layers::default();
+        let route = RouteFn::new(Method::GET, path("/missing"), not_found_route);
         let mut cx = cx_for("/missing");
 
-        let next = Next::new(&layers, &[], Terminal::NotFound);
+        let next = Next::new(&layers, &[], Terminal::Route(&route));
         let result = block_on(layer.handle(&mut cx, Body::empty(), next));
 
         assert!(

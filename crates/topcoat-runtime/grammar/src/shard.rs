@@ -3,7 +3,6 @@ mod item;
 
 pub use attr::*;
 pub use item::*;
-
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use topcoat_core_grammar::paths::{
@@ -94,18 +93,9 @@ impl ToTokens for Shard {
             #(#value_idents: #expr_ty<#value_tys>,)*
         };
 
-        let impl_ident = format_ident!("__topcoat_shard_impl_{}", ident);
-        let erased_ident = format_ident!("__TOPCOAT_SHARD_ERASED_{}", ident);
         let id = Uuid::new_v4().to_string();
 
         quote! {
-            // The user's real body. Shared by the component's initial render and
-            // the server endpoint that re-renders the shard. The leading `__cx`
-            // parameter makes the request context implicitly available to macros
-            // in the body (like `view!`), just as inside a `#[component]`.
-            #[doc(hidden)]
-            async fn #impl_ident(__cx: &#topcoat_context::Cx, #inputs) #output #block
-
             // Component face: renders the shard inline, splitting each `Expr<T>`
             // into its evaluated value (for the initial server render) and its
             // JavaScript source (tracked by the browser).
@@ -114,7 +104,7 @@ impl ToTokens for Shard {
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
-                let __placeholder = #impl_ident(__cx, #(#call_args),*).await?;
+                let __placeholder = #ident::handler(__cx, #(#call_args),*).await?;
                 let __scope = #topcoat_runtime::ReactiveScope::new(
                     #topcoat_runtime::ShardId::new(#id),
                     ::std::vec![#(#js_idents),*],
@@ -130,38 +120,48 @@ impl ToTokens for Shard {
         // and the discovery submission (which expands to a `static`, requiring a
         // const initializer). The marker the component face expands to is a unit
         // struct, so `#ident` is a value usable just like `router.page(...)`.
+        // The const is named after the shard so the render closure carries that
+        // name in backtraces and profiles.
+        let submit =
+            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { #ident } });
         quote! {
-            #[doc(hidden)]
-            #[allow(non_upper_case_globals)]
-            const #erased_ident: #topcoat_runtime::ErasedShard =
-                #topcoat_runtime::ErasedShard::new(
-                    #topcoat_runtime::ShardId::new(#id),
-                    |cx, body| ::std::boxed::Box::pin(async move {
-                        type __Surrogate =
-                            <(#(#value_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
-                        let #topcoat_router::content::Json(__args) =
-                            <#topcoat_router::content::Json<__Surrogate> as #topcoat_router::FromRequest>
-                                ::from_request(cx, body).await?;
-                        let (#(#value_idents,)*) =
-                            #topcoat_runtime::Surrogate::into_real(__args);
-                        let __view = #impl_ident(cx, #(#call_args),*).await?;
-                        #topcoat_error::Result::Ok(__view)
-                    }),
-                );
-
-            impl ::core::convert::From<#ident> for #topcoat_runtime::ErasedShard {
-                fn from(_: #ident) -> Self {
-                    #erased_ident
+            const _: () = {
+                // The user's real body, hung off the marker so both the
+                // component's initial render and the server endpoint that
+                // re-renders the shard reach it as `#ident::handler`. The
+                // leading `__cx` parameter makes the request context implicitly
+                // available to macros in the body (like `view!`), just as
+                // inside a `#[component]`.
+                impl #ident {
+                    async fn handler(__cx: &#topcoat_context::Cx, #inputs) #output #block
                 }
-            }
+
+                #[allow(non_upper_case_globals)]
+                const #ident: #topcoat_runtime::ErasedShard =
+                    #topcoat_runtime::ErasedShard::new(
+                        #topcoat_runtime::ShardId::new(#id),
+                        |cx, body| ::std::boxed::Box::pin(async move {
+                            type __Surrogate =
+                                <(#(#value_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
+                            let #topcoat_router::content::Json(__args) =
+                                <#topcoat_router::content::Json<__Surrogate> as #topcoat_router::request::FromRequest>
+                                    ::from_request(cx, body).await?;
+                            let (#(#value_idents,)*) =
+                                #topcoat_runtime::Surrogate::into_real(__args);
+                            let __view = #ident::handler(cx, #(#call_args),*).await?;
+                            #topcoat_error::Result::Ok(__view)
+                        }),
+                    );
+
+                impl ::core::convert::From<#ident> for #topcoat_runtime::ErasedShard {
+                    fn from(_: #ident) -> Self {
+                        #ident
+                    }
+                }
+
+                #submit
+            };
         }
         .to_tokens(tokens);
-
-        if cfg!(feature = "discover") {
-            quote! {
-                #topcoat_inventory::submit! { #erased_ident }
-            }
-            .to_tokens(tokens);
-        }
     }
 }

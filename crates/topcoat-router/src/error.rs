@@ -7,22 +7,30 @@ mod internal_server;
 mod method_not_allowed;
 mod not_found;
 mod redirect;
+mod service_unavailable;
+mod too_many_requests;
 mod unauthorized;
 
 pub use bad_request::*;
 pub use content_too_large::*;
 pub use forbidden::*;
+use http::StatusCode;
 pub use internal_server::*;
 pub use method_not_allowed::*;
 pub use not_found::*;
 pub use redirect::*;
+pub use service_unavailable::*;
+pub use too_many_requests::*;
+use topcoat_core::{
+    context::Cx,
+    error::{Error, Result},
+};
 pub use unauthorized::*;
 
-use http::StatusCode;
-
-use crate::{Body, IntoResponse, Response};
-use topcoat_core::context::Cx;
-use topcoat_core::error::{Error, Result};
+use crate::{
+    Body,
+    response::{IntoResponse, Response},
+};
 
 /// Renders any [`IntoResponse`] value into a [`Response`], falling back to the
 /// error's response if conversion fails. This is the terminal conversion the
@@ -31,6 +39,13 @@ pub(crate) fn respond(cx: &Cx, value: impl IntoResponse) -> Response {
     value
         .into_response(cx)
         .unwrap_or_else(|error| error_into_response(cx, error))
+}
+
+/// Builds a bare 500 response without consulting request or application code.
+pub(crate) fn internal_server_response() -> Response {
+    let mut response = Response::new(Body::from("internal server error"));
+    *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+    response
 }
 
 /// Maps the framework's error types onto their HTTP status codes, falling back
@@ -52,6 +67,8 @@ fn error_into_response(cx: &Cx, error: Error) -> Response {
     let error = try_downcast!(error as MethodNotAllowedError);
     let error = try_downcast!(error as RedirectError);
     let error = try_downcast!(error as UnauthorizedError);
+    let error = try_downcast!(error as ServiceUnavailableError);
+    let error = try_downcast!(error as TooManyRequestsError);
 
     into_response_or_500(cx, internal_server_error(error))
 }
@@ -59,11 +76,9 @@ fn error_into_response(cx: &Cx, error: Error) -> Response {
 /// Renders an error response, falling back to a bare 500 (none of the error
 /// types' responses can actually fail to build).
 fn into_response_or_500(cx: &Cx, value: impl IntoResponse) -> Response {
-    value.into_response(cx).unwrap_or_else(|_| {
-        let mut response = Response::new(Body::from("internal server error"));
-        *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-        response
-    })
+    value
+        .into_response(cx)
+        .unwrap_or_else(|_| internal_server_response())
 }
 
 /// Renders the contained value, or the framework error response on `Err`.
@@ -99,9 +114,7 @@ impl IntoResponse for Error {
 /// ```rust
 /// # struct User;
 /// # async fn lookup(_cx: &Cx, _id: u64) -> Option<User> { None }
-/// use topcoat::Result;
-/// use topcoat::context::Cx;
-/// use topcoat::router::error::RouterErrorExt;
+/// use topcoat::{Result, context::Cx, router::error::RouterErrorExt};
 ///
 /// async fn fetch_user(cx: &Cx, id: u64) -> Result<User> {
 ///     let user = lookup(cx, id).await.ok_or_redirect("/users")?;
@@ -118,6 +131,11 @@ pub trait RouterErrorExt {
     ///
     /// Returns a [`RedirectError`] performing a temporary redirect to `uri`
     /// when the value is absent.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `uri` is not a valid `Location` header value.
+    #[track_caller]
     fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError>;
 
     /// Returns `Ok(value)` if present, otherwise a permanent redirect to `uri`.
@@ -126,6 +144,11 @@ pub trait RouterErrorExt {
     ///
     /// Returns a [`RedirectError`] performing a permanent redirect to `uri`
     /// when the value is absent.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `uri` is not a valid `Location` header value.
+    #[track_caller]
     fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError>;
 
     /// Returns `Ok(value)` if present, otherwise a not-found response.
@@ -161,6 +184,7 @@ pub trait RouterErrorExt {
 impl<T> RouterErrorExt for Option<T> {
     type T = T;
 
+    #[track_caller]
     fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Some(value) => Ok(value),
@@ -168,6 +192,7 @@ impl<T> RouterErrorExt for Option<T> {
         }
     }
 
+    #[track_caller]
     fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Some(value) => Ok(value),
@@ -207,6 +232,7 @@ impl<T> RouterErrorExt for Option<T> {
 impl<T, E> RouterErrorExt for Result<T, E> {
     type T = T;
 
+    #[track_caller]
     fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Ok(value) => Ok(value),
@@ -214,6 +240,7 @@ impl<T, E> RouterErrorExt for Result<T, E> {
         }
     }
 
+    #[track_caller]
     fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError> {
         match self {
             Ok(value) => Ok(value),
@@ -247,5 +274,58 @@ impl<T, E> RouterErrorExt for Result<T, E> {
             Ok(value) => Ok(value),
             Err(_) => Err(bad_request(description)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::header::RETRY_AFTER;
+
+    use super::*;
+
+    /// The mapping is a closed list of downcasts, so an error type that is not
+    /// on it degrades to a 500 no matter what its own `IntoResponse` says. A
+    /// shed answered as "broken" rather than "busy" is the failure this guards.
+    #[test]
+    fn a_service_unavailable_error_maps_to_503_not_500() {
+        let error: Error = service_unavailable(2).into();
+
+        let response = error_into_response(&Cx::default(), error);
+
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            response
+                .headers()
+                .get(RETRY_AFTER)
+                .map(http::HeaderValue::as_bytes),
+            Some(&b"2"[..])
+        );
+    }
+
+    /// The 429 mirror: a rate limit answered as "the server is broken" is the
+    /// failure this guards.
+    #[test]
+    fn a_too_many_requests_error_maps_to_429_not_500() {
+        let error: Error = too_many_requests(60).into();
+
+        let response = error_into_response(&Cx::default(), error);
+
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            response
+                .headers()
+                .get(RETRY_AFTER)
+                .map(http::HeaderValue::as_bytes),
+            Some(&b"60"[..])
+        );
+    }
+
+    #[test]
+    fn an_error_that_is_not_on_the_list_still_maps_to_500() {
+        let error: Error = std::io::Error::other("boom").into();
+
+        let response = error_into_response(&Cx::default(), error);
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

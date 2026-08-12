@@ -1,6 +1,8 @@
-use std::future::poll_fn;
-use std::pin::Pin;
-use std::task::{Context, Poll, ready};
+use std::{
+    future::poll_fn,
+    pin::Pin,
+    task::{Context, Poll, ready},
+};
 
 use futures_core::Stream;
 use futures_sink::Sink;

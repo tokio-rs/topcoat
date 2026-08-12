@@ -23,7 +23,6 @@ pub use reactive_scope::*;
 pub use shard::*;
 pub use signal::*;
 pub use surrogate::*;
-
 use topcoat_asset::{Asset, asset};
 
 pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");
@@ -31,27 +30,33 @@ pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");
 /// Macro helpers to shorten the generated source code.
 #[doc(hidden)]
 pub mod internal {
-    use topcoat_view::{HtmlContext, PartsWriter, ViewParts};
+    use topcoat_view::{HtmlContext, PartsWriter, internal::in_context};
 
     #[inline]
-    pub fn __js(parts: &mut ViewParts, js: impl Into<std::borrow::Cow<'static, str>>) {
+    pub fn __js(parts: &mut PartsWriter<'_>, js: impl Into<std::borrow::Cow<'static, str>>) {
         // JavaScript source renders inside comment markers and double-quoted
         // attributes; the comment context escapes the union of what both
         // positions need.
-        PartsWriter::new(parts, HtmlContext::Comment).push_str(js);
+        in_context(parts, HtmlContext::Comment, |parts| {
+            match js.into() {
+                std::borrow::Cow::Borrowed(js) => parts.push_static_str(js),
+                std::borrow::Cow::Owned(js) => parts.push_string(js),
+            };
+        });
     }
 
     #[inline]
-    pub fn __js_unescaped(parts: &mut ViewParts, s: &'static str) {
-        PartsWriter::new(parts, HtmlContext::Unescaped).push_str(s);
+    pub fn __js_unescaped(parts: &mut PartsWriter<'_>, s: &'static str) {
+        parts.push_static_str_unescaped(s);
     }
 
     #[inline]
-    pub fn __surrogate(parts: &mut ViewParts, value: &(impl serde::Serialize + ?Sized)) {
-        let mut writer = PartsWriter::new(parts, HtmlContext::Comment);
-        writer.push_str_unescaped("cx.hydrate(");
-        let json = serde_json::to_string(value).expect("failed to serialize surrogate value");
-        writer.push_str(json);
-        writer.push_str_unescaped(")");
+    pub fn __surrogate(parts: &mut PartsWriter<'_>, value: &(impl serde::Serialize + ?Sized)) {
+        in_context(parts, HtmlContext::Comment, |parts| {
+            parts.push_promoted_str_unescaped(&"cx.hydrate(");
+            let json = serde_json::to_string(value).expect("failed to serialize surrogate value");
+            parts.push_string(json);
+            parts.push_promoted_str_unescaped(&")");
+        });
     }
 }

@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use ref_cast::RefCast;
 use serde::Serialize;
 
@@ -43,6 +45,7 @@ where
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
+    #[track_caller]
     pub fn set(&self, _v: T::Surrogate) {
         write_in_browser_only();
     }
@@ -54,6 +57,7 @@ impl SignalSurrogate<bool> {
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
+    #[track_caller]
     pub fn toggle(&self) {
         write_in_browser_only();
     }
@@ -65,6 +69,7 @@ impl SignalSurrogate<f64> {
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
+    #[track_caller]
     pub fn increment(&self) {
         write_in_browser_only();
     }
@@ -74,6 +79,7 @@ impl SignalSurrogate<f64> {
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
+    #[track_caller]
     pub fn decrement(&self) {
         write_in_browser_only();
     }
@@ -82,15 +88,22 @@ impl SignalSurrogate<f64> {
 impl SignalSurrogate<String> {
     /// Appends a string to the end of the value.
     ///
+    /// The argument is anything that dereferences to a string, so both a
+    /// borrowed `&str` and an owned `String` work. The owned form is what an
+    /// event field yields: `Event::target.value` is a `String`, so
+    /// `message.push_str(e.target.value)` is the common call.
+    ///
     /// # Panics
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
-    pub fn push_str(&self, _s: &StrSurrogate) {
+    #[track_caller]
+    pub fn push_str(&self, _s: impl Deref<Target = StrSurrogate>) {
         write_in_browser_only();
     }
 }
 
 /// The panic shared by every signal write evaluated on the server.
+#[track_caller]
 fn write_in_browser_only() -> ! {
     panic!("expressions in which a signal is written to cannot be run server-side");
 }

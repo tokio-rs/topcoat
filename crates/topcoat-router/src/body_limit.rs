@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use topcoat_core::context::{Cx, CxBuilder, try_request_context};
+use topcoat_core::context::{Cx, try_request_context};
 
 use crate::{Body, IntoPath, Layer, LayerFuture, Next, Path};
 
@@ -11,7 +11,7 @@ pub(crate) const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 /// A router layer that overrides the request body size limit for the routes
 /// under its path.
 ///
-/// Extractors that buffer the request body ([`Bytes`](crate::Bytes),
+/// Extractors that buffer the request body ([`Bytes`](crate::request::Bytes),
 /// [`Json`](crate::content::Json), [`Form`](crate::content::Form), and the
 /// other built-ins) read at most the request's body limit and reject a larger
 /// body with `413 Content Too Large`, so a client cannot exhaust the server's
@@ -30,7 +30,7 @@ pub(crate) const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use topcoat::router::{BodyLimit, Router};
 ///
 /// let router = Router::builder()
@@ -51,7 +51,7 @@ impl BodyLimit {
     /// Creates a layer that limits request bodies to `limit` bytes.
     pub const fn max(limit: usize) -> Self {
         Self {
-            path: Cow::Borrowed(Path::new("/")),
+            path: Cow::Borrowed(Path::ROOT),
             kind: BodyLimitKind::Limit(limit),
         }
     }
@@ -60,7 +60,7 @@ impl BodyLimit {
     /// buffer a body of any size.
     pub const fn disable() -> Self {
         Self {
-            path: Cow::Borrowed(Path::new("/")),
+            path: Cow::Borrowed(Path::ROOT),
             kind: BodyLimitKind::Disable,
         }
     }
@@ -70,6 +70,7 @@ impl BodyLimit {
     /// # Panics
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
+    #[track_caller]
     pub fn at(mut self, path: impl IntoPath) -> Self {
         self.path = path.into_path();
         self
@@ -81,7 +82,7 @@ impl Layer for BodyLimit {
         &self.path
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut CxBuilder, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         cx.insert(self.kind);
         next.run(cx, body)
     }
@@ -103,8 +104,8 @@ enum BodyLimitKind {
 /// [`usize::MAX`] when the limit is disabled.
 ///
 /// The built-in buffering extractors enforce this limit already. In a custom
-/// [`FromRequest`](crate::FromRequest) implementation, prefer delegating the
-/// buffering to [`Bytes`](crate::Bytes), which enforces it too; pass this
+/// [`FromRequest`](crate::request::FromRequest) implementation, prefer delegating the
+/// buffering to [`Bytes`](crate::request::Bytes), which enforces it too; pass this
 /// value to [`to_bytes`](crate::to_bytes) when reading the body by hand.
 ///
 /// # Examples
@@ -113,16 +114,14 @@ enum BodyLimitKind {
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
-///     router::{Body, FromRequest, body_limit, error::bad_request, to_bytes},
+///     router::{Body, body_limit, request::FromRequest, to_bytes},
 /// };
 ///
 /// struct Raw(Vec<u8>);
 ///
 /// impl FromRequest for Raw {
 ///     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
-///         let bytes = to_bytes(body, body_limit(cx))
-///             .await
-///             .map_err(|error| bad_request(format!("failed to read request body: {error}")))?;
+///         let bytes = to_bytes(body, body_limit(cx)).await?;
 ///
 ///         Ok(Self(bytes.into()))
 ///     }
@@ -144,7 +143,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        Bytes, FromRequest, IntoResponse, Response, RouteFn, RouteFuture, Router, to_bytes,
+        RouteFn, RouteFuture, Router,
+        request::{Bytes, FromRequest},
+        response::{IntoResponse, Response},
+        to_bytes,
     };
 
     // -- body_limit --

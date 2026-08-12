@@ -1,7 +1,7 @@
 use http::StatusCode;
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{IntoResponse, Response};
+use crate::response::{IntoResponse, Response};
 
 /// Builds a not-found (HTTP 404) response.
 ///
@@ -10,9 +10,7 @@ use crate::{IntoResponse, Response};
 /// ```rust
 /// # struct User;
 /// # async fn lookup(_cx: &Cx, _id: u64) -> Option<User> { None }
-/// use topcoat::Result;
-/// use topcoat::context::Cx;
-/// use topcoat::router::error::not_found;
+/// use topcoat::{Result, context::Cx, router::error::not_found};
 ///
 /// async fn fetch_user(cx: &Cx, id: u64) -> Result<User> {
 ///     let Some(user) = lookup(cx, id).await else {

@@ -1,7 +1,7 @@
 use http::StatusCode;
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{IntoResponse, Response};
+use crate::response::{IntoResponse, Response};
 
 /// Builds an unauthorized (HTTP 401) response.
 ///
@@ -12,9 +12,7 @@ use crate::{IntoResponse, Response};
 /// ```rust
 /// # struct User;
 /// # async fn session(_cx: &Cx) -> Option<User> { None }
-/// use topcoat::Result;
-/// use topcoat::context::Cx;
-/// use topcoat::router::error::unauthorized;
+/// use topcoat::{Result, context::Cx, router::error::unauthorized};
 ///
 /// async fn current_user(cx: &Cx) -> Result<User> {
 ///     let Some(user) = session(cx).await else {

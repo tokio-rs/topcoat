@@ -10,8 +10,8 @@ A route becomes a WebSocket endpoint by taking a [`WebSocketUpgrade`] parameter 
 use topcoat::{
     Result,
     router::{
-        Response,
         content::websocket::{Message, WebSocketUpgrade},
+        response::Response,
         route,
     },
 };
@@ -31,6 +31,35 @@ async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
 ```
 
 A request that is not a conforming WebSocket handshake is rejected before the handler's callback is involved: a non-`GET` method with `405 Method Not Allowed`, and missing or malformed handshake headers with `400 Bad Request`. Because the extractor runs inside the handler like any other, request-scoped functions (a session check, `cookies(cx)`) compose with it as usual -- reject the request by returning an error before calling `on_upgrade`.
+
+# Reading the request context
+
+The callback outlives the handler that upgraded the connection, so it cannot borrow the `Cx` the handler was called with. Take an owned handle with [`Cx::detach`](topcoat_core::context::Cx::detach) and move it into the callback instead; it reads the same app and request context.
+
+```rust
+use topcoat::{
+    Result,
+    context::{Cx, request_context},
+    router::{
+        content::websocket::{Message, WebSocketUpgrade},
+        response::Response,
+        route,
+    },
+};
+
+struct Customer {
+    name: String,
+}
+
+#[route(GET "/greet")]
+async fn greet(cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
+    let cx = cx.detach();
+    upgrade.on_upgrade(move |mut socket| async move {
+        let customer: &Customer = request_context(&cx);
+        let _ = socket.send(Message::text(customer.name.as_str())).await;
+    })
+}
+```
 
 # Messages
 

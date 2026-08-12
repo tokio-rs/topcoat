@@ -1,11 +1,11 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
-use syn::{Expr, ExprLit, Lit, LitStr, Token};
-
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_view;
+use syn::{
+    Expr, ExprLit, Lit, LitStr, Token,
+    parse::{Parse, ParseStream},
+    punctuated::Punctuated,
+};
+use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
 
 /// The parsed body of a `class!` invocation. Lowers to a
 /// [`runtime::Class`](topcoat_view::Class).
@@ -32,7 +32,7 @@ impl ToTokens for Class {
         let mut entries: Vec<TokenStream> = Vec::new();
 
         // Runs of consecutive unconditional string literals collapse into a
-        // single borrowed literal with the separating spaces baked in.
+        // single promoted literal with the separating spaces baked in.
         let mut index = 0;
         while index < segments.len() {
             if let Some(first) = segments[index].as_unconditional_lit() {
@@ -45,8 +45,7 @@ impl ToTokens for Class {
                     index += 1;
                 }
                 if !values.is_empty() {
-                    let merged = LitStr::new(&values.join(" "), first.span());
-                    entries.push(quote! { ::std::borrow::Cow::Borrowed(#merged) });
+                    entries.push(entry_tokens(&values.join(" "), first.span()));
                 }
             } else {
                 entries.push(segments[index].entry_tokens());
@@ -135,7 +134,7 @@ impl ClassSegment {
             };
         };
         let alt = value_tokens(&else_branch.value);
-        // Two literal branches share the borrowed string type, so they lower
+        // Two literal branches share the promoted string type, so they lower
         // to a plain conditional. Anything else needs the branch enum to
         // unify the two types.
         if as_lit_str(&self.value).is_some() && as_lit_str(&else_branch.value).is_some() {
@@ -176,13 +175,37 @@ impl topcoat_core_grammar::pretty::PrettyPrint for ClassSegment {
     }
 }
 
-/// Lowers a segment value to an entry expression, borrowing string literals
-/// so they never allocate.
+/// Lowers a segment value to an entry expression, lowering string literals
+/// through [`entry_tokens`].
 fn value_tokens(expr: &Expr) -> TokenStream {
     match as_lit_str(expr) {
-        Some(lit) => quote! { ::std::borrow::Cow::Borrowed(#lit) },
+        Some(lit) => entry_tokens(&lit.value(), lit.span()),
         None => expr.to_token_stream(),
     }
+}
+
+/// Lowers a literal class list entry to a promoted string that is already
+/// escaped for the position it renders in.
+///
+/// A class list always renders in an attribute value, so the escaping a
+/// literal needs is settled here and the entry renders verbatim. Promoting
+/// the escaped literal also keeps it out of the view's constants, so the
+/// entry costs one instruction and no allocation.
+fn entry_tokens(value: &str, span: Span) -> TokenStream {
+    let escaped = LitStr::new(&escape_attribute_value(value), span);
+    quote! {
+        #topcoat_view::Unescaped::new_unchecked(#topcoat_view::PromotedStr(&#escaped))
+    }
+}
+
+/// Escapes `value` for the attribute value position.
+fn escape_attribute_value(value: &str) -> String {
+    let mut escaped = String::new();
+    let mut f = topcoat_view::Formatter::new(&mut escaped);
+    topcoat_view::HtmlContext::AttributeValue
+        .writer(&mut f)
+        .write_str(value);
+    escaped
 }
 
 /// Returns the string literal behind `expr`, if it is one.
@@ -285,10 +308,10 @@ mod tests {
     }
 
     #[test]
-    fn merges_consecutive_literals_into_one_borrowed_str() {
+    fn merges_consecutive_literals_into_one_promoted_str() {
         let out = lower(r#""btn", "btn-lg", "rounded""#);
         assert!(
-            out.contains(r#"Cow :: Borrowed ("btn btn-lg rounded")"#),
+            out.contains(r#"PromotedStr (& "btn btn-lg rounded")"#),
             "{out}"
         );
     }
@@ -296,15 +319,30 @@ mod tests {
     #[test]
     fn empty_literals_vanish_from_the_merge() {
         let out = lower(r#""btn", "", "active""#);
-        assert!(out.contains(r#"Cow :: Borrowed ("btn active")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "btn active")"#), "{out}");
     }
 
     #[test]
     fn dynamic_segments_interrupt_literal_merging() {
         let out = lower(r#""a", extra, "b""#);
-        assert!(out.contains(r#"Cow :: Borrowed ("a")"#), "{out}");
-        assert!(out.contains(r#"Cow :: Borrowed ("b")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "a")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "b")"#), "{out}");
         assert!(!out.contains(r#""a b""#), "{out}");
+    }
+
+    #[test]
+    fn literals_are_escaped_for_the_attribute_value_position() {
+        let out = lower(r#""a\"b", "c&d""#);
+        assert!(
+            out.contains(r#"PromotedStr (& "a&quot;b c&amp;d")"#),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn escaped_literals_are_marked_as_unescaped() {
+        let out = lower(r#""btn""#);
+        assert!(out.contains("Unescaped :: new_unchecked"), "{out}");
     }
 
     #[test]
@@ -318,7 +356,7 @@ mod tests {
     #[test]
     fn conditional_literals_do_not_merge() {
         let out = lower(r#""a", "b" if cond"#);
-        assert!(out.contains(r#"Cow :: Borrowed ("a")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "a")"#), "{out}");
         assert!(!out.contains(r#""a b""#), "{out}");
     }
 
@@ -326,8 +364,8 @@ mod tests {
     fn literal_else_branches_lower_to_a_plain_conditional() {
         let out = lower(r#""on" if enabled else "off""#);
         assert!(!out.contains("ClassBranch"), "{out}");
-        assert!(out.contains(r#"Cow :: Borrowed ("on")"#), "{out}");
-        assert!(out.contains(r#"Cow :: Borrowed ("off")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "on")"#), "{out}");
+        assert!(out.contains(r#"PromotedStr (& "off")"#), "{out}");
     }
 
     #[test]
@@ -341,7 +379,9 @@ mod tests {
     fn single_entry_skips_the_tuple() {
         let out = lower(r#""btn""#);
         assert!(
-            out.contains(r#"Class (:: std :: borrow :: Cow :: Borrowed ("btn"))"#),
+            out.contains(
+                r#"Class (:: topcoat_view :: Unescaped :: new_unchecked (:: topcoat_view :: PromotedStr (& "btn")))"#
+            ),
             "{out}"
         );
     }

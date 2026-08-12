@@ -4,13 +4,12 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-
 use topcoat_core_grammar::ParseOption;
 
 use crate::{
-    attributes::{AttributeWriter, WriteAttribute},
+    attributes::hir::{AttributeBuilder, LowerAttribute},
     template::TemplateExpr,
-    view::{ExprKind, ViewWriter, WriteView},
+    view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
 /// A parenthesized expression spread into an element as a complete attribute
@@ -26,19 +25,19 @@ pub struct AttributeSpread {
     pub expr: TemplateExpr,
 }
 
-impl WriteView for AttributeSpread {
-    fn write(&self, writer: &mut ViewWriter) {
-        writer.write_expr(ExprKind::Attributes, self.expr.expr.to_token_stream());
+impl LowerView for AttributeSpread {
+    fn lower(&self, builder: &mut ViewBuilder) {
+        builder.expr(ExprKind::Attributes, self.expr.expr.to_token_stream());
     }
 }
 
-impl WriteAttribute for AttributeSpread {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl LowerAttribute for AttributeSpread {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         // A spread contributes an unknown number of attributes, so it adds no
         // static capacity. It extends the collection being built, with its keys
         // replacing any already present.
         let expr = &self.expr.expr;
-        writer.insert_block(0, quote! { __attrs.extend(#expr); });
+        builder.insert_block(0, quote! { __attrs.extend(#expr); });
     }
 }
 

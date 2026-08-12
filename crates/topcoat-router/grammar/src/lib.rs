@@ -1,10 +1,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-mod error_attr;
-mod handler_args;
+pub mod common;
 pub mod layer;
 pub mod layout;
 pub mod method;
+pub mod not_found;
 pub mod page;
 pub mod path_param;
 pub mod query_params;

@@ -8,7 +8,7 @@ use topcoat_core_grammar::paths::{
     topcoat_context, topcoat_context_macro, topcoat_router, topcoat_serde,
 };
 
-use super::error_attr::ErrorAttr;
+use super::common::ErrorAttr;
 
 pub struct QueryParamsAttr {
     error: Option<ErrorAttr>,
@@ -95,7 +95,7 @@ impl ToTokens for QueryParams {
                     cx: &#topcoat_context::Cx,
                     _: #topcoat_router::QueryParamsSealed,
                 ) -> Self::Output<'_> {
-                    #[#topcoat_context_macro::memoize]
+                    #[#topcoat_context_macro::memoize(as_ref)]
                     fn parse(cx: &#topcoat_context::Cx) -> ::core::result::Result<#ident, #topcoat_router::QueryParamsError> {
                         #topcoat_router::parse_query_params(cx)
                     }

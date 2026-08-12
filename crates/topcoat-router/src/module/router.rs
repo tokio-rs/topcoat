@@ -49,6 +49,7 @@ impl ModuleRouterBuilder {
     ///
     /// This is the key used to look up [`Segment`] overrides and to derive
     /// route path segments.
+    #[track_caller]
     fn relative_module_path(&self, module_path: &'static str) -> &'static str {
         if module_path == self.root_module_path {
             return "";
@@ -66,6 +67,7 @@ impl ModuleRouterBuilder {
     /// Panics if any pages or layouts have already been registered, since
     /// segment overrides affect path computation and must come first.
     #[must_use]
+    #[track_caller]
     pub fn segment(mut self, segment: Segment) -> Self {
         assert!(
             self.inner.is_empty(),
@@ -221,6 +223,7 @@ impl ModuleRouterBuilder {
     /// Panics if two discovered layouts resolve to the same path.
     #[cfg(feature = "discover")]
     #[must_use]
+    #[track_caller]
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
         for layout in inventory::iter::<ModuleLayoutFn>().cloned() {
@@ -260,6 +263,7 @@ impl ModuleRouterBuilder {
     /// Panics if two discovered layers resolve to the same path.
     #[cfg(feature = "discover")]
     #[must_use]
+    #[track_caller]
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
         for layer in inventory::iter::<ModuleLayerFn>().cloned() {

@@ -1,7 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::parse::{Parse, ParseStream};
-
 use topcoat_icon::iconify::ResolvedIcon;
 
 use crate::iconify::{

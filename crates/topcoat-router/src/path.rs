@@ -1,6 +1,8 @@
 use std::{
     borrow::{Borrow, Cow},
     fmt::{Display, Write},
+    iter::FusedIterator,
+    mem,
     ops::{AddAssign, Deref},
 };
 
@@ -34,6 +36,9 @@ pub struct Path {
 }
 
 impl Path {
+    // The root path "/".
+    pub const ROOT: &Path = Path::new("/");
+
     /// Creates a `&Path` from a string slice.
     ///
     /// The root path `"/"` is normalized to an empty inner representation so that
@@ -49,6 +54,7 @@ impl Path {
     /// Panics if `s` is not a well-formed path; see [`PathError`] for the
     /// conditions that are rejected.
     #[must_use]
+    #[track_caller]
     pub const fn new(s: &str) -> &Self {
         match Self::from_str(s) {
             Ok(path) => path,
@@ -127,13 +133,8 @@ impl Path {
     ///     ]
     /// );
     /// ```
-    pub fn segments(&self) -> impl Iterator<Item = PathSegment<'_>> {
-        // The path was validated on construction, so its segments need no
-        // re-validation here.
-        self.inner
-            .split('/')
-            .skip(1)
-            .map(PathSegment::new_unchecked)
+    pub fn segments(&self) -> PathSegments<'_> {
+        PathSegments::new(self)
     }
 
     /// Converts this path to a `matchit`-compatible route string, stripping group
@@ -200,7 +201,7 @@ impl Path {
         if self.inner.len() < other.inner.len() {
             return false;
         }
-        return self.segments().zip(other.segments()).all(|(a, b)| a == b);
+        self.segments().zip(other.segments()).all(|(a, b)| a == b)
     }
 
     /// Returns `true` if `url`, a concrete URL path, matches this route path
@@ -230,41 +231,6 @@ impl Path {
     /// ```
     #[must_use]
     pub fn matches(&self, url: &str) -> bool {
-        self.match_url(url, false)
-    }
-
-    /// Returns `true` if `url`, a concrete URL path, *starts with* this route
-    /// path.
-    ///
-    /// Matches segments the same way as [`matches`](Path::matches), but allows
-    /// trailing URL segments beyond this path. This is the concrete-URL
-    /// counterpart of [`starts_with`](Path::starts_with), used to select which
-    /// layouts apply to a request URL.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use topcoat_router::Path;
-    ///
-    /// let path = Path::new("/settings");
-    /// // Extra trailing segments are allowed.
-    /// assert!(path.matches_start("/settings/profile"));
-    /// assert!(!path.matches_start("/dashboard"));
-    ///
-    /// assert!(Path::new("/users/{id}").matches_start("/users/42/posts"));
-    /// ```
-    #[must_use]
-    pub fn matches_start(&self, url: &str) -> bool {
-        self.match_url(url, true)
-    }
-
-    /// Walks this path's segments against `url`, treating `Param`/`CatchAll` as
-    /// wildcards and skipping `Group` segments.
-    ///
-    /// When `prefix` is `false` the URL must be fully consumed; when `true` any
-    /// trailing URL segments are allowed. Shared by [`matches`](Path::matches)
-    /// and [`matches_start`](Path::matches_start).
-    fn match_url(&self, url: &str, prefix: bool) -> bool {
         // Splits the `/`-separated URL body into its first segment and the
         // remainder, e.g. "users/42" into ("users", "42") and "users" into
         // ("users", ""). Returns `None` when nothing is left to consume.
@@ -298,12 +264,29 @@ impl Path {
                 PathSegment::CatchAll(_) => return !rest.is_empty(),
             }
         }
-        // Every route segment matched. A full match additionally requires the
-        // URL to be exhausted; a prefix match tolerates trailing segments.
-        prefix || rest.is_empty()
+        // Every route segment matched; the URL must also be exhausted.
+        rest.is_empty()
     }
 
     /// Returns the string backing this path.
+    ///
+    /// The root path is backed by the empty string rather than `"/"`, matching
+    /// the normalization [`new`](Path::new) applies.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use topcoat_router::Path;
+    ///
+    /// assert_eq!(Path::new("/users/{id}").as_str(), "/users/{id}");
+    /// assert_eq!(Path::new("/").as_str(), "");
+    /// ```
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.inner
+    }
+
+    /// Returns the length of the string backing this path.
     ///
     /// This length is in bytes, not [`char`]s or graphemes. In other words,
     /// it might not be what a human considers the length of the string.
@@ -340,6 +323,76 @@ impl<'a> From<&'a Path> for Cow<'a, Path> {
         Self::Borrowed(value)
     }
 }
+
+/// An iterator over the [`PathSegment`]s of a [`Path`], created by
+/// [`Path::segments`].
+#[derive(Debug, Clone)]
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+pub struct PathSegments<'path> {
+    /// The `/`-separated body left to walk, without a leading `/`.
+    rest: &'path str,
+    /// Whether the body is used up. It is tracked separately because the last
+    /// segment leaves `rest` empty, which is also how the root path starts out.
+    done: bool,
+}
+
+impl<'path> PathSegments<'path> {
+    fn new(path: &'path Path) -> Self {
+        match path.inner.strip_prefix('/') {
+            Some(rest) => Self { rest, done: false },
+            // The root path is backed by the empty string and has no segments.
+            None => Self {
+                rest: "",
+                done: true,
+            },
+        }
+    }
+
+    /// Marks the body as used up and returns what was left of it, the segment
+    /// at whichever end the caller was reading.
+    fn last_segment(&mut self) -> &'path str {
+        self.done = true;
+        mem::take(&mut self.rest)
+    }
+}
+
+impl<'path> Iterator for PathSegments<'path> {
+    type Item = PathSegment<'path>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        let segment = match self.rest.split_once('/') {
+            Some((segment, rest)) => {
+                self.rest = rest;
+                segment
+            }
+            None => self.last_segment(),
+        };
+        // The path was validated on construction, so its segments need no
+        // re-validation here.
+        Some(PathSegment::new_unchecked(segment))
+    }
+}
+
+impl DoubleEndedIterator for PathSegments<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        let segment = match self.rest.rsplit_once('/') {
+            Some((rest, segment)) => {
+                self.rest = rest;
+                segment
+            }
+            None => self.last_segment(),
+        };
+        Some(PathSegment::new_unchecked(segment))
+    }
+}
+
+impl FusedIterator for PathSegments<'_> {}
 
 /// The reason a string could not be parsed into a [`Path`] by
 /// [`Path::from_str`].
@@ -463,10 +516,16 @@ impl<'a> FromIterator<PathSegment<'a>> for PathBuf {
 /// convert as they are.
 pub trait IntoPath {
     /// Converts the value into a route path.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is a string that is not a well-formed path.
+    #[track_caller]
     fn into_path(self) -> Cow<'static, Path>;
 }
 
 impl IntoPath for &'static str {
+    #[track_caller]
     fn into_path(self) -> Cow<'static, Path> {
         Cow::Borrowed(Path::new(self))
     }
@@ -532,6 +591,7 @@ impl<'a> PathSegment<'a> {
     /// Panics if `s` is not a well-formed segment; see [`PathError`] for the
     /// conditions that are rejected.
     #[must_use]
+    #[track_caller]
     pub fn new(s: &'a str) -> Self {
         match Self::from_str(s) {
             Ok(segment) => segment,
@@ -627,6 +687,26 @@ impl<'a> PathSegment<'a> {
             Some(v)
         } else {
             None
+        }
+    }
+
+    /// Returns the name this segment captures a value under, or `None` if it
+    /// captures nothing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use topcoat_router::PathSegment;
+    ///
+    /// assert_eq!(PathSegment::Param("id").param_name(), Some("id"));
+    /// assert_eq!(PathSegment::CatchAll("rest").param_name(), Some("rest"));
+    /// assert_eq!(PathSegment::Static("users").param_name(), None);
+    /// ```
+    #[must_use]
+    pub fn param_name(&self) -> Option<&'a str> {
+        match *self {
+            Self::Param(name) | Self::CatchAll(name) => Some(name),
+            Self::Static(_) | Self::Group(_) => None,
         }
     }
 
@@ -757,6 +837,41 @@ mod tests {
         let path = Path::new("/home");
         let segs: Vec<_> = path.segments().collect();
         assert_eq!(segs, vec![PathSegment::Static("home")]);
+    }
+
+    #[test]
+    fn path_segments_from_the_back() {
+        let path = Path::new("/dashboard/{id}/(auth)");
+        let segs: Vec<_> = path.segments().rev().collect();
+        assert_eq!(
+            segs,
+            vec![
+                PathSegment::Group("auth"),
+                PathSegment::Param("id"),
+                PathSegment::Static("dashboard"),
+            ]
+        );
+    }
+
+    #[test]
+    fn path_segments_from_both_ends_meet_in_the_middle() {
+        let path = Path::new("/a/b/c");
+        let mut segments = path.segments();
+
+        assert_eq!(segments.next(), Some(PathSegment::Static("a")));
+        assert_eq!(segments.next_back(), Some(PathSegment::Static("c")));
+        assert_eq!(segments.next(), Some(PathSegment::Static("b")));
+        // Both ends are exhausted once they meet.
+        assert_eq!(segments.next(), None);
+        assert_eq!(segments.next_back(), None);
+    }
+
+    #[test]
+    fn root_path_yields_no_segments_from_either_end() {
+        let mut segments = Path::new("/").segments();
+
+        assert_eq!(segments.next(), None);
+        assert_eq!(segments.next_back(), None);
     }
 
     #[test]
@@ -934,80 +1049,13 @@ mod tests {
     }
 
     #[test]
-    fn matches_start_allows_trailing_segments() {
-        let path = Path::new("/settings");
-        assert!(path.matches_start("/settings"));
-        assert!(path.matches_start("/settings/profile"));
-        assert!(path.matches_start("/settings/profile/security"));
-    }
-
-    #[test]
-    fn matches_start_mismatch() {
-        assert!(!Path::new("/settings").matches_start("/dashboard"));
-    }
-
-    #[test]
-    fn matches_start_tolerates_trailing_slash() {
-        assert!(Path::new("/admin").matches_start("/admin/"));
-        assert!(Path::new("/users/{id}").matches_start("/users/42/"));
-    }
-
-    #[test]
-    fn matches_start_rejects_partial_segment() {
-        assert!(!Path::new("/admin").matches_start("/administrator"));
-    }
-
-    #[test]
-    fn matches_start_rejects_empty_segments() {
-        assert!(!Path::new("/admin").matches_start("//admin"));
-        assert!(!Path::new("/users/{id}").matches_start("/users//edit"));
-    }
-
-    #[test]
-    fn matches_start_ignores_groups() {
-        // A path inside a group matches the URL with the group stripped, plus
-        // anything nested below it.
-        assert!(Path::new("/(admin)/panel").matches_start("/panel"));
-        assert!(Path::new("/(admin)/panel").matches_start("/panel/settings"));
-        assert!(!Path::new("/(admin)/panel").matches_start("/other"));
-        // A group-only path is URL-equivalent to the root and matches any URL.
-        assert!(Path::new("/(auth)").matches_start("/anything"));
-    }
-
-    #[test]
-    fn matches_start_catch_all() {
-        let path = Path::new("/files/{*rest}");
-        assert!(path.matches_start("/files/a/b"));
-        // The catch-all itself requires at least one segment.
-        assert!(!path.matches_start("/files"));
-        assert!(!path.matches_start("/files/"));
-    }
-
-    #[test]
-    fn matches_start_non_origin_form_urls() {
-        // An asterisk-form request (`OPTIONS *`) or an empty authority-form
-        // path still falls under the root, but under no other path.
-        assert!(Path::new("/").matches_start("*"));
-        assert!(Path::new("/").matches_start(""));
-        assert!(!Path::new("/admin").matches_start("*"));
-        assert!(!Path::new("/admin").matches_start(""));
-    }
-
-    #[test]
-    fn matches_start_with_params() {
-        assert!(Path::new("/users/{id}").matches_start("/users/42/posts"));
-    }
-
-    #[test]
-    fn matches_start_requires_full_prefix() {
-        assert!(!Path::new("/users/{id}/posts").matches_start("/users/42"));
-    }
-
-    #[test]
-    fn matches_start_root_matches_everything() {
-        let root = Path::new("/");
-        assert!(root.matches_start("/"));
-        assert!(root.matches_start("/anything/here"));
+    fn matches_non_origin_form_urls() {
+        // An asterisk-form request (`OPTIONS *`) matches no route path. An
+        // empty authority-form path is equivalent to the root URL.
+        assert!(!Path::new("/").matches("*"));
+        assert!(!Path::new("/admin").matches("*"));
+        assert!(Path::new("/").matches(""));
+        assert!(!Path::new("/admin").matches(""));
     }
 
     // -- Path validation --
@@ -1140,6 +1188,14 @@ mod tests {
         let seg = PathSegment::new("(auth)");
         assert!(seg.is_group());
         assert_eq!(seg.as_group(), Some(&"auth"));
+    }
+
+    #[test]
+    fn only_param_and_catch_all_segments_capture() {
+        assert_eq!(PathSegment::new("{id}").param_name(), Some("id"));
+        assert_eq!(PathSegment::new("{*rest}").param_name(), Some("rest"));
+        assert_eq!(PathSegment::new("users").param_name(), None);
+        assert_eq!(PathSegment::new("(auth)").param_name(), None);
     }
 
     #[test]

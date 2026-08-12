@@ -2,9 +2,8 @@ mod hash;
 mod store;
 
 pub use hash::*;
-pub use store::*;
-
 use sha2::Digest;
+pub use store::*;
 
 /// A session token: 32 bytes of cryptographically secure randomness, held by
 /// the client as its proof of a session.

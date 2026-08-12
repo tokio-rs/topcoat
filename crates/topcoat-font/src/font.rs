@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use topcoat_core::fnv1a;
+use topcoat_core::fnv1a::Fnv1a;
 
 use crate::FontFaces;
 
@@ -20,13 +20,14 @@ impl FontData {
     ///
     /// Panics if `faces` cannot be converted into a non-empty [`FontFaces`].
     #[must_use]
+    #[track_caller]
     pub fn new(family: impl Into<String>, faces: impl TryInto<FontFaces>) -> Self {
         let family = family.into();
         let faces = faces
             .try_into()
             .unwrap_or_else(|_| panic!("font faces must not be empty"));
-        let h = fnv1a::hash_continue(fnv1a::hash(family.as_bytes()), b"\0");
-        let hash = faces.hash(h);
+        let h = Fnv1a::<u64>::new().write(family.as_bytes()).write(b"\0");
+        let hash = faces.hash(h).finish();
         Self {
             family,
             faces,

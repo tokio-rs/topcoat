@@ -134,6 +134,7 @@ impl AssetConfig {
     /// # Panics
     ///
     /// Panics if the catalog does not contain `asset`.
+    #[track_caller]
     pub fn fmt_url(&self, asset: Asset, write: &mut dyn fmt::Write) -> fmt::Result {
         let Some(bundled) = self.get(asset) else {
             panic!("failed to resolve asset {asset:?} in the asset catalog");
@@ -149,6 +150,7 @@ impl AssetConfig {
     ///
     /// Panics if the catalog does not contain `asset`.
     #[must_use]
+    #[track_caller]
     pub fn resolve(&self, asset: Asset) -> String {
         let mut url = String::new();
         let _ = self.fmt_url(asset, &mut url);
@@ -170,6 +172,7 @@ impl From<AssetBundle> for AssetConfig {
 ///
 /// Panics if no [`AssetConfig`] was registered.
 #[must_use]
+#[track_caller]
 pub fn asset_config(cx: &Cx) -> &AssetConfig {
     app_context(cx)
 }
@@ -182,6 +185,7 @@ pub fn asset_config(cx: &Cx) -> &AssetConfig {
 /// Panics if no [`AssetConfig`] was registered, or if its catalog does not
 /// contain the given asset.
 #[must_use]
+#[track_caller]
 pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
     match asset_config(cx).get(asset) {
         Some(asset) => asset,

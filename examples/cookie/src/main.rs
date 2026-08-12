@@ -10,10 +10,8 @@ use topcoat::{
 #[tokio::main]
 async fn main() {
     // The key signs cookies so the client cannot forge the visit counter.
-    // A real application should load a persistent key instead of generating
-    // a new one whenever the server starts.
-    //
-    // By default, the application is available at http://127.0.0.1:3000.
+    // A real application would load a persistent key instead of generating
+    // a new one on every start.
     topcoat::start(
         Router::builder()
             .discover()
@@ -25,12 +23,7 @@ async fn main() {
     .unwrap();
 }
 
-// Build the signed cookie jar used by this application.
-//
-// Every cookie created through this helper:
-// - is available across the complete application;
-// - cannot be accessed through browser JavaScript;
-// - is sent only in a secure context.
+// The jar every handler goes through, so its attribute defaults are set once.
 fn cookies(cx: &Cx) -> impl Cookies {
     signed_cookies(cx)
         .default_path("/")
@@ -48,18 +41,14 @@ impl Visits {
     }
 }
 
-// Read the typed "visits" cookie.
-//
-// If the cookie is missing or its signature is invalid, start from the
-// default Visits value, which contains zero visits.
+// A missing or tampered cookie falls back to the default `Visits`.
 fn visits(cx: &Cx) -> CookieStore<Visits, impl Cookies> {
     cookie_store(cookies(cx), "visits").parse_or_default()
 }
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
-    // Increment the typed cookie value and add the updated cookie
-    // to the HTTP response through a Set-Cookie header.
+    // `commit` queues the updated value as a Set-Cookie response header.
     let visits = visits(cx).update(Visits::increment).commit()?;
 
     view! {

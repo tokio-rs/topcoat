@@ -1,5 +1,4 @@
-use std::future::pending;
-use std::thread;
+use std::{future::pending, thread};
 
 use console::{Key, Term};
 use tokio::sync::mpsc;

@@ -1,6 +1,5 @@
-use web_time::SystemTime;
-
 use topcoat_core::{context::Cx, error::Result};
+use web_time::SystemTime;
 
 use crate::{TokenHash, config, state, token::Token, token_store};
 

@@ -2,9 +2,8 @@ mod bundle;
 mod clean;
 mod list;
 
-use clap::{Args, Subcommand};
-
 pub(crate) use bundle::run_bundle;
+use clap::{Args, Subcommand};
 
 const OUT_SUBDIR: &str = "assets";
 /// The scope of the asset download cache inside the shared Topcoat cache.

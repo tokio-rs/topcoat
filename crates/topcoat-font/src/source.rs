@@ -2,7 +2,7 @@
 
 use std::{fmt::Write, ops::Deref};
 
-use topcoat_core::{context::Cx, fnv1a};
+use topcoat_core::{context::Cx, fnv1a::Fnv1a};
 
 use crate::{CssString, FontFormat, FontTech};
 
@@ -29,6 +29,7 @@ impl FontSourceUrl {
     ///
     /// Returns any error produced while writing to `f`.
     #[cfg_attr(not(feature = "asset"), expect(unused_variables))]
+    #[track_caller]
     pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         let mut f = CssString(f);
         match self {
@@ -80,16 +81,11 @@ impl FontSourceUrl {
     }
 
     /// Folds this URL into a running content hash.
-    pub(crate) fn hash(&self, h: u64) -> u64 {
+    pub(crate) fn hash(&self, h: Fnv1a<u64>) -> Fnv1a<u64> {
         match self {
-            Self::Str(inner) => {
-                fnv1a::hash_continue(fnv1a::hash_continue(h, b"s"), inner.as_bytes())
-            }
+            Self::Str(inner) => h.write(b"s").write(inner.as_bytes()),
             #[cfg(feature = "asset")]
-            Self::Asset(inner) => fnv1a::hash_continue(
-                fnv1a::hash_continue(h, b"a"),
-                &inner.id().as_u64().to_le_bytes(),
-            ),
+            Self::Asset(inner) => h.write(b"a").write(&inner.id().as_u64().to_le_bytes()),
         }
     }
 }
@@ -185,6 +181,7 @@ impl FontSource {
     /// # Errors
     ///
     /// Returns any error produced while writing to `f`.
+    #[track_caller]
     pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         match self {
             Self::Url { url, format, tech } => {
@@ -224,22 +221,20 @@ impl FontSource {
     }
 
     /// Folds this source into a running content hash.
-    pub(crate) fn hash(&self, h: u64) -> u64 {
+    pub(crate) fn hash(&self, h: Fnv1a<u64>) -> Fnv1a<u64> {
         match self {
             Self::Url { url, format, tech } => {
-                let h = url.hash(fnv1a::hash_continue(h, b"u"));
+                let h = url.hash(h.write(b"u"));
                 let h = match format {
-                    Some(format) => format.hash(fnv1a::hash_continue(h, &[1])),
-                    None => fnv1a::hash_continue(h, &[0]),
+                    Some(format) => format.hash(h.write(&[1])),
+                    None => h.write(&[0]),
                 };
                 match tech {
-                    Some(tech) => tech.hash(fnv1a::hash_continue(h, &[1])),
-                    None => fnv1a::hash_continue(h, &[0]),
+                    Some(tech) => tech.hash(h.write(&[1])),
+                    None => h.write(&[0]),
                 }
             }
-            Self::Local { name } => {
-                fnv1a::hash_continue(fnv1a::hash_continue(h, b"l"), name.as_bytes())
-            }
+            Self::Local { name } => h.write(b"l").write(name.as_bytes()),
         }
     }
 }
@@ -260,6 +255,7 @@ impl FontSources {
     /// Panics if `sources` is empty; a CSS `src` descriptor requires at least
     /// one source.
     #[must_use]
+    #[track_caller]
     pub fn new(sources: impl Into<Vec<FontSource>>) -> Self {
         let sources = sources.into();
         assert!(!sources.is_empty(), "font sources must not be empty");
@@ -267,7 +263,7 @@ impl FontSources {
     }
 
     /// Folds these sources into a running content hash.
-    pub(crate) fn hash(&self, mut h: u64) -> u64 {
+    pub(crate) fn hash(&self, mut h: Fnv1a<u64>) -> Fnv1a<u64> {
         for source in &self.0 {
             h = source.hash(h);
         }
@@ -279,6 +275,7 @@ impl FontSources {
     /// # Errors
     ///
     /// Returns any error produced while writing to `f`.
+    #[track_caller]
     pub fn fmt(&self, cx: &Cx, f: &mut dyn Write) -> std::fmt::Result {
         for (index, source) in self.0.iter().enumerate() {
             if index > 0 {

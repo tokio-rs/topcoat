@@ -1,8 +1,6 @@
 use futures_core::Stream;
 use futures_util::stream;
-
 use serde::{Deserialize, Serialize};
-
 use topcoat::{
     Result,
     context::Cx,
@@ -17,8 +15,6 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // Discover the page and API route, then start the HTTP server.
-    // By default, the application is available at http://127.0.0.1:3000.
     topcoat::start(Router::builder().discover().build())
         .await
         .unwrap();
@@ -26,8 +22,8 @@ async fn main() {
 
 #[page("/")]
 async fn home() -> Result {
-    // Datastar stores the counter in the browser and sends it to the server
-    // whenever the increment action is triggered.
+    // Datastar keeps the counter in the browser and sends it along with every
+    // action request.
     view! {
         <!DOCTYPE html>
         <html>
@@ -56,8 +52,7 @@ async fn home() -> Result {
     }
 }
 
-// This structure matches the signals declared by the page.
-// Datastar sends the current values with every action request.
+// Matches the signals declared by the page.
 #[derive(Deserialize, Serialize)]
 struct Counter {
     count: u64,
@@ -68,11 +63,8 @@ async fn increment(
     cx: &Cx,
     Signals(counter): Signals<Counter>,
 ) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
-    // Calculate the next counter value using the signal received
-    // from the browser.
     let count = counter.count + 1;
 
-    // Create a new log entry that will be appended to the page.
     let entry = view! {
         <li>
             "Counted to "
@@ -80,8 +72,7 @@ async fn increment(
         </li>
     }?;
 
-    // Send two Server-Sent Events:
-    // one updates the counter signal and one appends the log entry.
+    // One event updates the counter signal, the other appends the log entry.
     let events = stream::iter([
         PatchSignals::json(&Counter { count }).map(Into::into),
         Ok(PatchElements::new(entry.render(cx))

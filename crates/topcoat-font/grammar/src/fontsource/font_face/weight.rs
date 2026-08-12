@@ -4,9 +4,7 @@ use syn::{
     LitInt, Token,
     parse::{Parse, ParseStream},
 };
-
 use topcoat_core_grammar::ParseOption;
-
 use topcoat_font::fontsource as runtime;
 
 mod kw {

@@ -21,9 +21,8 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // Enable cookies and sessions, register the in-memory database,
-    // discover the routes, and start the server.
-    // The application is available at http://127.0.0.1:3000 by default.
+    // Topcoat issues and carries the session token; where the session records
+    // live is up to the application, here the in-memory `Database` below.
     topcoat::start(
         Router::builder()
             .cookies()
@@ -38,7 +37,6 @@ async fn main() {
 
 #[layout("/")]
 async fn root(slot: Result) -> Result {
-    // Wrap every page in a complete HTML document.
     view! {
         <!DOCTYPE html>
         <html>
@@ -53,7 +51,6 @@ async fn root(slot: Result) -> Result {
 
 #[page("/")]
 async fn page(cx: &Cx) -> Result {
-    // Read the current user from the active session, when one exists.
     view! {
         if let Some(user) = current_user(cx).await? {
             <div>
@@ -85,16 +82,13 @@ async fn login(cx: &Cx, Form(form): Form<LoginForm>) -> Result<SeeOther> {
     // A real application would verify credentials before starting the session.
     let session = session::start(cx).await?;
 
-    // Associate the new session with the submitted user.
     db(cx).create(session, User { name: form.name });
 
-    // Redirect the browser back to the home page.
     Ok(see_other("/"))
 }
 
 #[route(POST "/logout")]
 async fn logout(cx: &Cx) -> Result<SeeOther> {
-    // Stop the current session and delete its record from the database.
     if let Some(token_hash) = session::stop(cx).await? {
         db(cx).delete(&token_hash);
     }
@@ -109,12 +103,11 @@ struct User {
     name: String,
 }
 
-// Retrieve the database registered as application context.
 fn db(cx: &Cx) -> &Database {
     app_context(cx)
 }
 
-// Resolve the current session token to a user.
+// The session itself only carries a token hash; the user comes from the store.
 async fn current_user(cx: &Cx) -> Result<Option<User>> {
     let Some(token_hash) = session::token_hash(cx).await? else {
         return Ok(None);

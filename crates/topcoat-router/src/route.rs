@@ -2,7 +2,7 @@ use std::{borrow::Cow, pin::Pin};
 
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{Body, IntoPath, Methods, OwnedMethods, Path, Response};
+use crate::{Body, IntoPath, Methods, OwnedMethods, Path, response::Response};
 
 /// The future returned by [`Route::handle`]: a boxed, `Send` future borrowing
 /// the route and its request context.
@@ -50,8 +50,10 @@ impl RouteFn {
     /// [`Methods::Any`] to respond to every method.
     ///
     /// ```rust
-    /// use topcoat::context::Cx;
-    /// use topcoat::router::{Body, Method, RouteFn, RouteFuture};
+    /// use topcoat::{
+    ///     context::Cx,
+    ///     router::{Body, Method, RouteFn, RouteFuture},
+    /// };
     ///
     /// fn handler(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
     ///     Box::pin(async move { unimplemented!() })
@@ -63,6 +65,7 @@ impl RouteFn {
     /// # Panics
     ///
     /// Panics if `path` is a string that is not a well-formed route path.
+    #[track_caller]
     pub fn new(
         methods: impl Into<OwnedMethods>,
         path: impl IntoPath,

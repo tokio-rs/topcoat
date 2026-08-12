@@ -1,9 +1,38 @@
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
-use crate::pretty::pretty_print_str;
-
 use super::{PrettyPrint, Printer, TextMode};
+use crate::pretty::{MacroSnippet, pretty_print_fragment_str};
+
+/// Restores each macro body in `formatted` from the corresponding body in
+/// `original`.
+///
+/// `prettyplease` reprints a macro body from its token stream, which separates
+/// tokens the Topcoat grammars require to be adjacent: `aria-label` comes back
+/// as `aria - label`, which no longer parses as an HTML identifier. Neither
+/// pass formats those bodies (the caller's registry does that afterwards), so
+/// carrying the original text through the Rust pass keeps them parseable.
+fn restore_macro_bodies(original: &syn::File, formatted: &str) -> String {
+    let Ok(formatted_file) = syn::parse_file(formatted) else {
+        return formatted.to_owned();
+    };
+
+    // `prettyplease` neither adds nor removes macro invocations, so the two
+    // collections line up in source order.
+    let originals = MacroSnippet::collect_from_file(original);
+    let replacements = MacroSnippet::collect_from_file(&formatted_file);
+
+    let mut output = String::new();
+    let mut current_index = 0;
+    for (replacement, original) in replacements.iter().zip(&originals) {
+        let range = replacement.span().byte_range();
+        output.push_str(&formatted[current_index..range.start]);
+        output.push_str(original.source_text());
+        current_index = range.end;
+    }
+    output.push_str(&formatted[current_index..]);
+    output
+}
 
 fn format_rust_snippet(
     printer: &mut Printer<'_>,
@@ -25,7 +54,8 @@ fn format_rust_snippet(
 
     let file = syn::parse_file(&input).expect("failed to parse rust snippet for formatting");
     let formatted = prettyplease::unparse(&file);
-    let formatted = pretty_print_str(printer.registry(), &formatted).unwrap();
+    let formatted = restore_macro_bodies(&file, &formatted);
+    let formatted = pretty_print_fragment_str(printer.registry(), &formatted).unwrap();
 
     let mut stripped = formatted.trim();
     for _ in 0..indent {

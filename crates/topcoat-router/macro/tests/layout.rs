@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Router, layout, page, uri},
+    router::{Router, layout, page, request::uri},
     view::view,
 };
 

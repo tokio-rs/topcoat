@@ -1,5 +1,10 @@
-  max_width = 100
-  comment_width = 100
-  wrap_comments = true
-  format_code_in_doc_comments = true
-  doc_comment_code_block_width = 100
+max_width = 100
+comment_width = 100
+wrap_comments = true
+format_code_in_doc_comments = true
+doc_comment_code_block_width = 100
+
+# Imports
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_imports = true

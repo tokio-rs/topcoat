@@ -1,7 +1,7 @@
 use http::StatusCode;
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{IntoResponse, Response};
+use crate::response::{IntoResponse, Response};
 
 /// Builds a forbidden (HTTP 403) response.
 ///
@@ -15,9 +15,7 @@ use crate::{IntoResponse, Response};
 /// # struct User;
 /// # impl User { fn is_admin(&self) -> bool { true } }
 /// # fn render_admin(_cx: &Cx) -> View { View::default() }
-/// use topcoat::Result;
-/// use topcoat::context::Cx;
-/// use topcoat::router::error::forbidden;
+/// use topcoat::{Result, context::Cx, router::error::forbidden};
 ///
 /// async fn admin_panel(cx: &Cx, user: &User) -> Result<View> {
 ///     if !user.is_admin() {

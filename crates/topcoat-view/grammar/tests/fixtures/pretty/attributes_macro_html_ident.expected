@@ -1,0 +1,1 @@
+view! { button(attrs: attributes! { aria-label="Increment" data-role="counter" }, "+") }

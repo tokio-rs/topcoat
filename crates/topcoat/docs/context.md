@@ -4,12 +4,12 @@ Add `cx: &Cx` to the function signature when needed; leave it out when the funct
 
 # Router request helpers
 
-The [`router`](crate::router) module exposes small functions for reading HTTP request data from `cx`.
+The [`router::request`](crate::router::request) module exposes small functions for reading HTTP request data from `cx`.
 
 ```rust
 use topcoat::{
     context::Cx,
-    router::{headers, method, uri},
+    router::request::{headers, method, uri},
 };
 
 fn request_summary(cx: &Cx) -> String {
@@ -22,20 +22,20 @@ fn request_summary(cx: &Cx) -> String {
 }
 ```
 
-The ones you reach for most, all listed in [`topcoat::router`](crate::router):
+The ones you reach for most, all listed in [`topcoat::router::request`](crate::router::request):
 
-- [`parts(cx)`](crate::router::parts) returns the current request's `http::request::Parts`.
-- [`method(cx)`](crate::router::method) returns the HTTP method.
-- [`uri(cx)`](crate::router::uri) returns the request URI.
-- [`version(cx)`](crate::router::version) returns the HTTP version.
-- [`headers(cx)`](crate::router::headers) returns the request headers.
-- [`content_type(cx)`](crate::router::content_type) returns the request `Content-Type`.
-- [`extensions(cx)`](crate::router::extensions) returns request extensions.
+- [`parts(cx)`](crate::router::request::parts) returns the current request's `http::request::Parts`.
+- [`method(cx)`](crate::router::request::method) returns the HTTP method.
+- [`uri(cx)`](crate::router::request::uri) returns the request URI.
+- [`version(cx)`](crate::router::request::version) returns the HTTP version.
+- [`headers(cx)`](crate::router::request::headers) returns the request headers.
+- [`content_type(cx)`](crate::router::request::content_type) returns the request `Content-Type`.
+- [`extensions(cx)`](crate::router::request::extensions) returns request extensions.
 
-Use [`parts(cx)`](crate::router::parts) when you need several fields at once:
+Use [`parts(cx)`](crate::router::request::parts) when you need several fields at once:
 
 ```rust
-use topcoat::{context::Cx, router::parts};
+use topcoat::{context::Cx, router::request::parts};
 
 fn cache_key(cx: &Cx) -> String {
     let parts = parts(cx);
@@ -43,10 +43,10 @@ fn cache_key(cx: &Cx) -> String {
 }
 ```
 
-Use [`extensions(cx)`](crate::router::extensions) for typed request values attached by a lower-level request layer or service integration:
+Use [`extensions(cx)`](crate::router::request::extensions) for typed request values attached by a lower-level request layer or service integration:
 
 ```rust
-use topcoat::{context::Cx, router::extensions};
+use topcoat::{context::Cx, router::request::extensions};
 
 struct RequestId(String);
 
@@ -57,7 +57,7 @@ fn request_id(cx: &Cx) -> Option<&str> {
 
 # Path and query helpers
 
-The attribute macros [`#[path_param]`](macro@crate::router::path_param) and [`#[query_params]`](macro@crate::router::query_params) declare typed structs that you read with the [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params) functions. They parse lazily and memoize the parsed value for the request.
+The [`path_param!`](macro@crate::router::path_param) macro and [`#[query_params]`](macro@crate::router::query_params) attribute declare typed values that you read with the [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params) functions. Topcoat parses typed path parameters and query structs lazily and memoizes them for the request.
 
 ```rust
 use topcoat::{
@@ -67,8 +67,7 @@ use topcoat::{
     view::view,
 };
 
-#[path_param(error = bad_request)]
-struct PostId(uuid::Uuid);
+path_param!(post_id: uuid::Uuid, error = bad_request);
 
 #[query_params(error = bad_request)]
 struct PostQuery {
@@ -88,7 +87,7 @@ async fn post(cx: &Cx) -> Result {
 }
 ```
 
-This means your params are available anywhere you have access to a `cx`. See the attribute macro's documentation for more details.
+Any function with `&Cx` can read these values.
 
 # App and request context helpers
 
@@ -123,6 +122,37 @@ fn current_customer(cx: &Cx) -> Option<&Customer> {
 }
 ```
 
+# Work that outlives the handler
+
+A [`Cx`] is a handle to state shared by everything serving one request. The router drops its own handle once the response is sent, so a streaming response body or a spawned task cannot borrow the `cx` the handler was called with. Take an owned handle with [`Cx::detach`] and move it into the work instead; it reads the same app and request context.
+
+```rust
+# async fn record(name: &str) {}
+use topcoat::{
+    Result,
+    context::{Cx, request_context},
+    router::route,
+};
+
+struct Customer {
+    name: String,
+}
+
+#[route(POST "/orders")]
+async fn place_order(cx: &Cx) -> Result<&'static str> {
+    let cx = cx.detach();
+    tokio::spawn(async move {
+        let customer: &Customer = request_context(&cx);
+        record(&customer.name).await;
+    });
+    Ok("queued")
+}
+```
+
+Detaching seals the request context: registering another value on it panics from then on, through any handle and even after the detached handle was dropped. Layers register their values before calling `next.run`, so this only concerns a layer that writes to the context after the inner chain returned.
+
+A detached handle keeps reading the context after the response was sent, but it can no longer change what the client receives. Cookie changes and other response-directed writes made from work that outlives the handler are dropped.
+
 # Memoization
 
 [`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. See its documentation for the details.
@@ -134,7 +164,7 @@ Any helper can accept `cx: &`[`Cx`], call other helpers, and return a domain-spe
 ```rust
 use topcoat::{
     context::Cx,
-    router::{headers, uri},
+    router::request::{headers, uri},
 };
 
 fn locale(cx: &Cx) -> &str {

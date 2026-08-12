@@ -1,6 +1,4 @@
-use std::collections::BTreeMap;
-use std::io::ErrorKind;
-use std::path::PathBuf;
+use std::{collections::BTreeMap, io::ErrorKind, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 

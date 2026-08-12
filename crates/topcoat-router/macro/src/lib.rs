@@ -39,6 +39,13 @@ pub fn layer(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
+#[doc = include_str!("../docs/not_found.md")]
+#[proc_macro]
+pub fn not_found(tokens: TokenStream) -> TokenStream {
+    let not_found = syn::parse_macro_input!(tokens as topcoat_router_grammar::not_found::NotFound);
+    quote! { #not_found }.into()
+}
+
 #[doc = include_str!("../docs/segment.md")]
 #[proc_macro]
 pub fn segment(tokens: TokenStream) -> TokenStream {
@@ -47,12 +54,11 @@ pub fn segment(tokens: TokenStream) -> TokenStream {
 }
 
 #[doc = include_str!("../docs/path_param.md")]
-#[proc_macro_attribute]
-pub fn path_param(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match topcoat_router_grammar::path_param::PathParam::parse(attr.into(), item.into()) {
-        Ok(value) => quote! { #value }.into(),
-        Err(error) => error.to_compile_error().into(),
-    }
+#[proc_macro]
+pub fn path_param(tokens: TokenStream) -> TokenStream {
+    let path_param =
+        syn::parse_macro_input!(tokens as topcoat_router_grammar::path_param::PathParam);
+    quote! { #path_param }.into()
 }
 
 #[doc = include_str!("../docs/query_params.md")]

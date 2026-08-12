@@ -1,5 +1,7 @@
-use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::{
+    io::ErrorKind,
+    path::{Path, PathBuf},
+};
 
 /// The module name a component file is declared under, or `None` if the file is
 /// not an ordinary `*.rs` module (e.g. `mod.rs` itself).

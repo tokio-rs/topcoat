@@ -43,7 +43,7 @@ view! {
 # }
 ```
 
-An entry can be any value implementing [`ClassViewParts`]: string types, `Option`s of them, a `Vec` or array of entries, another [`Class`], or an attribute value ([`ViewPart`]) taken from an [`Attributes`] collection. Implement the trait for your own types to use them as entries.
+An entry can be any value implementing [`ClassViewParts`]: string types, `Option`s of them, a `Vec` or array of entries, another [`Class`], or a captured attribute value ([`AttributeValue`]) taken from an [`Attributes`] collection. Implement the trait for your own types to use them as entries.
 
 # Absent entries
 
@@ -63,9 +63,22 @@ view! {
 # }
 ```
 
+# Static class lists
+
+Use `class!` for a class list that never changes too. It renders faster than the same string written as a `&'static str` constant:
+
+```rust
+use topcoat::view::{StaticClass, class};
+
+const BUTTON: StaticClass = class!("btn btn-lg rounded");
+```
+
+A `class!` value takes its type from its entries. A list of literals always has the same one, named by [`StaticClass`]; anything else is only practical to hold in a `let` binding, whose type is inferred.
+
 [`Attributes`]: struct.Attributes.html
 [`Class`]: struct.Class.html
+[`StaticClass`]: type.StaticClass.html
 [`ClassViewParts`]: trait.ClassViewParts.html
-[`ViewPart`]: enum.ViewPart.html
+[`AttributeValue`]: struct.AttributeValue.html
 [`class!`]: macro.class.html
 [`topcoat::view::Class`]: struct.Class.html

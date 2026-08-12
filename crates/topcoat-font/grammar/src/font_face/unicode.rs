@@ -5,9 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_font;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_font};
 
 mod kw {
     use syn::custom_keyword;
@@ -225,13 +223,22 @@ pub struct UnicodeCodePoint {
 
 impl Parse for UnicodeCodePoint {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        // After `U+`, a code point lexes either as an integer literal (when it
-        // starts with a digit, e.g. `0041` or `04FF`) or as an identifier (when
-        // it starts with a hex letter, e.g. `D800`). Reconstruct the original
-        // text from whichever token shows up and read it as hexadecimal.
+        // After `U+`, a code point lexes as:
+        //   - an integer literal (starts with a digit, e.g. `0041`),
+        //   - a Rust hex literal with `0x` prefix, needed when the bare hex would be rejected by
+        //     Rust's tokenizer (e.g. `0x000E` — bare `000E` looks like a float exponent to the
+        //     tokenizer), or
+        //   - an identifier (starts with a hex letter, e.g. `D800`).
+        //
+        // Reconstruct the original text, strip any supported prefix, and
+        // read it as hexadecimal.
         let (text, span) = input.step(|cursor| {
             if let Some((literal, rest)) = cursor.literal() {
-                Ok(((literal.to_string(), literal.span()), rest))
+                let mut s = literal.to_string();
+                if let Some(stripped) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+                    s = stripped.to_string();
+                }
+                Ok(((s, literal.span()), rest))
             } else if let Some((ident, rest)) = cursor.ident() {
                 Ok(((ident.to_string(), ident.span()), rest))
             } else {
@@ -349,5 +356,32 @@ mod tests {
     #[test]
     fn rejects_non_hexadecimal_code_points() {
         assert!(parse_err("unicode-range: U+00GG").contains("hexadecimal"));
+    }
+
+    #[test]
+    fn parses_code_points_ending_in_e() {
+        let ranges = parse("unicode-range: U+0001-000E");
+        let ranges = css(&ranges.value);
+        assert_eq!(ranges[0].start.value, 0x0001);
+        assert_eq!(ranges[0].end.as_ref().unwrap().code_point.value, 0x000E);
+    }
+
+    #[test]
+    fn parses_0x_prefixed_code_points() {
+        let ranges = parse("unicode-range: U+0x0001-0x000E");
+        let ranges = css(&ranges.value);
+        assert_eq!(ranges[0].start.value, 0x0001);
+        assert_eq!(ranges[0].end.as_ref().unwrap().code_point.value, 0x000E);
+    }
+
+    #[test]
+    fn parses_mixed_prefix_code_points() {
+        let ranges = parse("unicode-range: U+0041-0x005A, U+D800-0xDFFF, U+0x10FFFF");
+        let ranges = css(&ranges.value);
+        assert_eq!(ranges[0].start.value, 0x41);
+        assert_eq!(ranges[0].end.as_ref().unwrap().code_point.value, 0x5A);
+        assert_eq!(ranges[1].start.value, 0xD800);
+        assert_eq!(ranges[1].end.as_ref().unwrap().code_point.value, 0xDFFF);
+        assert_eq!(ranges[2].start.value, 0x10_FFFF);
     }
 }

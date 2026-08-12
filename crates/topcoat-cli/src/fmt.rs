@@ -3,11 +3,10 @@
 mod error;
 
 use std::{collections::BTreeSet, io::Read, path::PathBuf, time::Instant};
-use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
 
 use clap::Args;
-
 use console::style;
+use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
 
 use crate::fmt::error::Error;
 

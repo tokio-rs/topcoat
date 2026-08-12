@@ -105,6 +105,7 @@ impl Segments {
     }
 
     /// Registers a segment for a module path. Panics on duplicates.
+    #[track_caller]
     pub fn register(&mut self, path: &'static str, segment: Segment) {
         if let Some(existing) = self.segments.insert(path, segment) {
             panic!(

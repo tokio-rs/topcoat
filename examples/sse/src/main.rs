@@ -17,13 +17,11 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // Discover the routes, load the generated browser assets, and build the router.
     let router = Router::builder()
         .discover()
         .assets(AssetBundle::load().unwrap())
         .build();
 
-    // The application is available at http://127.0.0.1:3000 by default.
     topcoat::start(router).await.unwrap();
 }
 
@@ -39,13 +37,11 @@ async fn home() -> Result {
             <body>
                 <h1>"Server-sent events"</h1>
 
-                // Start a finite stream that reports the progress of a job.
                 <button id="start">"Run a job"</button>
 
-                // Events received by the browser are appended to this list.
                 <ul id="log"></ul>
 
-                // Load the browser code that connects to the SSE endpoints.
+                // Connects to both endpoints and logs the events it receives.
                 <script src=(asset!("./feed.js"))></script>
             </body>
         </html>
@@ -54,12 +50,12 @@ async fn home() -> Result {
 
 #[route(GET "/ticks")]
 async fn ticks(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
-    // Resume after the last event received by the browser, or begin at zero.
+    // A reconnecting browser sends the last ID it saw, so the stream resumes
+    // where it left off.
     let next = last_event_id(cx)
         .and_then(|id| id.parse::<u64>().ok())
         .map_or(0, |last| last + 1);
 
-    // Produce one named `tick` event every second.
     let events = stream::unfold(next, |tick| async move {
         tokio::time::sleep(Duration::from_secs(1)).await;
 
@@ -72,7 +68,7 @@ async fn ticks(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>
         Some((Ok(event), tick + 1))
     });
 
-    // Keep the connection alive while the stream is open.
+    // Keep-alive events hold the connection open while the stream is idle.
     Ok(Sse::new(events).keep_alive(KeepAlive::new()))
 }
 
@@ -83,7 +79,8 @@ struct Progress {
 
 #[route(GET "/job")]
 async fn job() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
-    // Send progress updates from zero to 90 percent, followed by a done event.
+    // Unlike the ticks, this stream ends: the browser closes the connection
+    // once it receives the `done` event.
     let events = stream::unfold(0, |percent| async move {
         if percent > 100 {
             return None;

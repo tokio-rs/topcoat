@@ -2,13 +2,12 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-
 use topcoat_core_grammar::ParseOption;
 
 use crate::{
-    attributes::{AttributeWriter, WriteAttribute},
+    attributes::hir::{AttributeBuilder, LowerAttribute},
     template::TemplateBlock,
-    view::{ViewWriter, WriteView},
+    view::hir::{LowerView, ViewBuilder},
 };
 
 /// An `if cond { ... } else { ... }` chain in view-body position.
@@ -19,23 +18,23 @@ pub struct TemplateIf<T> {
     pub else_branch: Option<TemplateElse<T>>,
 }
 
-impl<T: WriteView> WriteView for TemplateIf<T> {
-    fn write(&self, writer: &mut ViewWriter) {
-        writer.if_else(&self.cond, |then_writer, else_writer| {
-            self.then_branch.write(then_writer);
-            if let Some(else_branch) = self.else_branch.as_ref() {
-                else_branch.write(else_writer);
+impl<T: LowerView> LowerView for TemplateIf<T> {
+    fn lower(&self, builder: &mut ViewBuilder) {
+        builder.if_else(&self.cond, |then_branch, else_branch| {
+            self.then_branch.lower(then_branch);
+            if let Some(else_) = self.else_branch.as_ref() {
+                else_.lower(else_branch);
             }
         });
     }
 }
 
-impl<T: WriteAttribute> WriteAttribute for TemplateIf<T> {
-    fn write(&self, writer: &mut AttributeWriter) {
-        writer.if_else(&self.cond, |then_writer, else_writer| {
-            self.then_branch.write(then_writer);
-            if let Some(else_branch) = self.else_branch.as_ref() {
-                else_branch.write(else_writer);
+impl<T: LowerAttribute> LowerAttribute for TemplateIf<T> {
+    fn lower(&self, builder: &mut AttributeBuilder) {
+        builder.if_else(&self.cond, |then_branch, else_branch| {
+            self.then_branch.lower(then_branch);
+            if let Some(else_) = self.else_branch.as_ref() {
+                else_.lower(else_branch);
             }
         });
     }
@@ -85,20 +84,20 @@ pub enum TemplateElse<T> {
     },
 }
 
-impl<T: WriteView> WriteView for TemplateElse<T> {
-    fn write(&self, writer: &mut ViewWriter) {
+impl<T: LowerView> LowerView for TemplateElse<T> {
+    fn lower(&self, builder: &mut ViewBuilder) {
         match self {
-            Self::ElseIf { template_if, .. } => template_if.write(writer),
-            Self::Else { then_branch, .. } => then_branch.write(writer),
+            Self::ElseIf { template_if, .. } => template_if.lower(builder),
+            Self::Else { then_branch, .. } => then_branch.lower(builder),
         }
     }
 }
 
-impl<T: WriteAttribute> WriteAttribute for TemplateElse<T> {
-    fn write(&self, writer: &mut AttributeWriter) {
+impl<T: LowerAttribute> LowerAttribute for TemplateElse<T> {
+    fn lower(&self, builder: &mut AttributeBuilder) {
         match self {
-            Self::ElseIf { template_if, .. } => template_if.write(writer),
-            Self::Else { then_branch, .. } => then_branch.write(writer),
+            Self::ElseIf { template_if, .. } => template_if.lower(builder),
+            Self::Else { then_branch, .. } => then_branch.lower(builder),
         }
     }
 }
@@ -156,9 +155,10 @@ impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty:
 
 #[cfg(test)]
 mod tests {
+    use quote::ToTokens;
+
     use super::*;
     use crate::view::Nodes;
-    use quote::ToTokens;
 
     fn parse(source: &str) -> TemplateIf<Nodes> {
         syn::parse_str(source).unwrap()

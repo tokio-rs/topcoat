@@ -1,7 +1,10 @@
 use http::{HeaderValue, Method, StatusCode};
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{Body, IntoResponse, Response};
+use crate::{
+    Body,
+    response::{IntoResponse, Response},
+};
 
 /// Builds a method-not-allowed (HTTP 405) response whose `Allow` header lists
 /// `methods`, the methods the matched path actually supports.

@@ -1,5 +1,4 @@
-use std::fmt;
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 use bytes::{Bytes, BytesMut};
 use serde::Serialize;
@@ -8,7 +7,7 @@ use topcoat_core::{
     error::{Error, Result},
 };
 
-use crate::headers;
+use crate::request::headers;
 
 /// A server-sent event, assembled field by field.
 ///

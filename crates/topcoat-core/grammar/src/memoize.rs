@@ -1,19 +1,41 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
-    FnArg, ItemFn, Pat, ReturnType, Type,
+    FnArg, ItemFn, Pat, ReturnType,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
 };
 
-use crate::paths::{topcoat_context, topcoat_internal};
+use crate::paths::topcoat_context;
 
-pub struct MemoizeAttr {}
+mod kw {
+    use syn::custom_keyword;
+
+    custom_keyword!(as_ref);
+}
+
+pub struct MemoizeAttr {
+    as_ref: Option<kw::as_ref>,
+}
+
+impl MemoizeAttr {
+    /// Whether the return value is borrowed through `.as_ref()`, exposing the
+    /// `MemoizeAsRef` associated type instead of a plain reference.
+    fn as_ref(&self) -> bool {
+        self.as_ref.is_some()
+    }
+}
 
 impl Parse for MemoizeAttr {
-    fn parse(_input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {})
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            as_ref: if input.is_empty() {
+                None
+            } else {
+                Some(input.parse()?)
+            },
+        })
     }
 }
 
@@ -134,9 +156,9 @@ impl ToTokens for Memoize {
             ReturnType::Type(_, ty) => (**ty).clone(),
         };
         let return_type = quote! { #return_ty };
-        let return_type_as_ref = is_option_or_result(&return_ty);
-        let output_type = if return_type_as_ref {
-            quote! { <&'__cx #return_type as #topcoat_internal::MemoizeAsRef>::AsRef }
+        let as_ref = self.0.as_ref();
+        let output_type = if as_ref {
+            quote! { <#return_type as #topcoat_context::MemoizeAsRef>::AsRef<'__cx> }
         } else {
             quote! { &'__cx #return_type }
         };
@@ -167,8 +189,8 @@ impl ToTokens for Memoize {
             }
         };
 
-        let output = if return_type_as_ref {
-            quote! { (#call).as_ref() }
+        let output = if as_ref {
+            quote! { #topcoat_context::MemoizeAsRef::as_ref(#call) }
         } else {
             call
         };
@@ -185,12 +207,24 @@ impl ToTokens for Memoize {
     }
 }
 
-fn is_option_or_result(ty: &Type) -> bool {
-    let Type::Path(path) = ty else {
-        return false;
-    };
-    path.path
-        .segments
-        .last()
-        .is_some_and(|segment| segment.ident == "Option" || segment.ident == "Result")
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_empty_arguments() {
+        let attr: MemoizeAttr = syn::parse_str("").unwrap();
+        assert!(!attr.as_ref());
+    }
+
+    #[test]
+    fn parses_as_ref() {
+        let attr: MemoizeAttr = syn::parse_str("as_ref").unwrap();
+        assert!(attr.as_ref());
+    }
+
+    #[test]
+    fn rejects_unknown_argument() {
+        assert!(syn::parse_str::<MemoizeAttr>("cloned").is_err());
+    }
 }

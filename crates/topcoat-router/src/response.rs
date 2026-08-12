@@ -1,16 +1,18 @@
-use std::borrow::Cow;
-use std::convert::Infallible;
+use std::{borrow::Cow, convert::Infallible};
 
 use bytes::{Bytes, BytesMut};
-use http::header::{CONTENT_TYPE, HeaderName, HeaderValue};
-use http::response::Parts;
-use http::{Extensions, HeaderMap, StatusCode};
-use topcoat_core::context::Cx;
-use topcoat_core::error::{Error, Result};
+use http::{
+    Extensions, HeaderMap, StatusCode,
+    header::{CONTENT_TYPE, HeaderName, HeaderValue},
+    response::Parts,
+};
+use topcoat_core::{
+    context::Cx,
+    error::{Error, Result},
+};
 use topcoat_view::View;
 
-use crate::content::Html;
-use crate::{Body, BoxError};
+use crate::{Body, BoxError, content::Html};
 
 pub type Response<T = Body> = http::Response<T>;
 
@@ -39,7 +41,11 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
-///     router::{Body, IntoResponse, Response, route},
+///     router::{
+///         Body,
+///         response::{IntoResponse, Response},
+///         route,
+///     },
 /// };
 ///
 /// struct Csv(String);
@@ -415,7 +421,7 @@ impl_into_response_tuples!(
 #[cfg(test)]
 mod tests {
     use http_body_util::Full;
-    use topcoat_view::{HtmlContext, NodeViewParts, PartsWriter, ViewParts};
+    use topcoat::view::{View, view};
 
     use super::*;
     use crate::to_bytes;
@@ -536,22 +542,21 @@ mod tests {
 
     // -- views --
 
-    /// Builds a view whose parts are pushed by `build` through a text-context
-    /// [`PartsWriter`].
-    fn view(build: impl FnOnce(&Cx, &mut PartsWriter<'_>)) -> View {
-        let mut parts = ViewParts::new();
-        build(
-            &Cx::default(),
-            &mut PartsWriter::new(&mut parts, HtmlContext::Text),
-        );
-        View::new(parts)
+    /// Builds a view with `build`, renders it into a response, and reads the
+    /// body fully into memory.
+    fn run_view(build: impl AsyncFnOnce(&Cx) -> Result<View>) -> (Parts, Bytes) {
+        block_on(async {
+            let cx = Cx::default();
+            let view = build(&cx).await.unwrap();
+            let (parts, body) = view.into_response(&cx).unwrap().into_parts();
+            let bytes = to_bytes(body, usize::MAX).await.unwrap();
+            (parts, bytes)
+        })
     }
 
     #[test]
     fn view_is_an_html_response() {
-        let (parts, body) = run(view(|_cx, writer| {
-            writer.push_str("hi");
-        }));
+        let (parts, body) = run_view(async |cx| view! { cx => "hi" });
         assert_eq!(parts.status, StatusCode::OK);
         assert_eq!(header(&parts, "content-type"), "text/html; charset=utf-8");
         assert_eq!(&body[..], b"hi");
@@ -559,15 +564,18 @@ mod tests {
 
     #[test]
     fn view_applies_declared_status_and_headers() {
-        let (parts, body) = run(view(|cx, writer| {
-            StatusCode::IM_A_TEAPOT.into_view_parts(cx, writer);
-            (
+        let (parts, body) = run_view(async |cx| {
+            let header = (
                 HeaderName::from_static("x-test"),
                 HeaderValue::from_static("1"),
-            )
-                .into_view_parts(cx, writer);
-            writer.push_str("hi");
-        }));
+            );
+            view! {
+                cx =>
+                (StatusCode::IM_A_TEAPOT)
+                (header)
+                "hi"
+            }
+        });
         assert_eq!(parts.status, StatusCode::IM_A_TEAPOT);
         assert_eq!(header(&parts, "content-type"), "text/html; charset=utf-8");
         assert_eq!(header(&parts, "x-test"), "1");
@@ -576,14 +584,17 @@ mod tests {
 
     #[test]
     fn view_declared_content_type_replaces_the_html_default() {
-        let (parts, _) = run(view(|cx, writer| {
-            (
+        let (parts, _) = run_view(async |cx| {
+            let header = (
                 CONTENT_TYPE,
                 HeaderValue::from_static("application/xhtml+xml"),
-            )
-                .into_view_parts(cx, writer);
-            writer.push_str("hi");
-        }));
+            );
+            view! {
+                cx =>
+                (header)
+                "hi"
+            }
+        });
         assert_eq!(header(&parts, "content-type"), "application/xhtml+xml");
     }
 

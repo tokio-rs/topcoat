@@ -1,7 +1,7 @@
 //! Font styles for building CSS `font-style` descriptors on `@font-face`
 //! rules.
 
-use topcoat_core::fnv1a;
+use topcoat_core::fnv1a::Fnv1a;
 
 /// An oblique slant angle in degrees, in `-90.0..=90.0`.
 ///
@@ -23,6 +23,7 @@ impl ObliqueAngle {
     /// Panics if `degrees` is outside `-90.0..=90.0`. Use
     /// `ObliqueAngle::try_from` for a non-panicking conversion.
     #[must_use]
+    #[track_caller]
     pub const fn new(degrees: f32) -> Self {
         assert!(
             degrees >= -90.0 && degrees <= 90.0,
@@ -32,8 +33,8 @@ impl ObliqueAngle {
     }
 
     /// Folds this angle into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
-        fnv1a::hash_continue(h, &self.0.to_bits().to_le_bytes())
+    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
+        h.write(&self.0.to_bits().to_le_bytes())
     }
 }
 
@@ -96,6 +97,7 @@ impl ObliqueAngleRange {
     ///
     /// Panics if `end` is before `start`.
     #[must_use]
+    #[track_caller]
     pub const fn new(start: ObliqueAngle, end: ObliqueAngle) -> Self {
         assert!(end.0 >= start.0, "oblique angle range must not be empty");
         Self { start, end }
@@ -108,6 +110,7 @@ impl ObliqueAngleRange {
     /// Panics if either value is outside `-90.0..=90.0`, or if `end` is before
     /// `start`.
     #[must_use]
+    #[track_caller]
     pub const fn from_degrees(start: f32, end: f32) -> Self {
         Self::new(ObliqueAngle::new(start), ObliqueAngle::new(end))
     }
@@ -125,7 +128,7 @@ impl ObliqueAngleRange {
     }
 
     /// Folds this range into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
+    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
         self.end.hash(self.start.hash(h))
     }
 }
@@ -173,6 +176,7 @@ impl FontStyle {
     ///
     /// Panics if `degrees` is outside `-90.0..=90.0`.
     #[must_use]
+    #[track_caller]
     pub const fn oblique_angle(degrees: f32) -> Self {
         let angle = ObliqueAngle::new(degrees);
         Self::Oblique(Some(ObliqueAngleRange::new(angle, angle)))
@@ -186,17 +190,18 @@ impl FontStyle {
     /// Panics if either value is outside `-90.0..=90.0`, or if `end` is before
     /// `start`.
     #[must_use]
+    #[track_caller]
     pub const fn oblique_range(start: f32, end: f32) -> Self {
         Self::Oblique(Some(ObliqueAngleRange::from_degrees(start, end)))
     }
 
     /// Folds this style into a running content hash.
-    pub(crate) const fn hash(self, h: u64) -> u64 {
+    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
         match self {
-            Self::Normal => fnv1a::hash_continue(h, b"n"),
-            Self::Italic => fnv1a::hash_continue(h, b"i"),
-            Self::Oblique(None) => fnv1a::hash_continue(h, b"o"),
-            Self::Oblique(Some(range)) => range.hash(fnv1a::hash_continue(h, b"oa")),
+            Self::Normal => h.write(b"n"),
+            Self::Italic => h.write(b"i"),
+            Self::Oblique(None) => h.write(b"o"),
+            Self::Oblique(Some(range)) => range.hash(h.write(b"oa")),
         }
     }
 }

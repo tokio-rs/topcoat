@@ -43,6 +43,31 @@ When the `query` signal changes, the current argument values are sent to the ser
 
 A shard's content is a full view: it can declare signals, attach event handlers, and contain nested shards. A re-render replaces that content wholesale, though, so state declared inside the shard -- like a `signal` in its `view!` -- resets each time. State that must survive re-renders lives outside the shard and flows in through its arguments.
 
+# Guards
+
+A shard has its own endpoint, and a request to it runs the shard function alone. Guards applied by the page or its layouts never run, so a shard that renders private content resolves authorization itself. The caller picks the argument values, so that check covers them too: confirm the current user may see the data the arguments select.
+
+```rust
+use topcoat::{Result, context::Cx, runtime::shard, view::view};
+
+#[shard]
+async fn ledger_rows(cx: &Cx, account: String) -> Result {
+    let user = require_auth(cx).await?;
+    let rows = fetch_rows(cx, &user, &account).await?;
+
+    view! {
+        for row in rows {
+            <div>(row)</div>
+        }
+    }
+}
+# struct User;
+# async fn require_auth(_cx: &Cx) -> Result<User> { Ok(User) }
+# async fn fetch_rows(_cx: &Cx, _user: &User, _account: &str) -> Result<Vec<String>> { Ok(vec![]) }
+```
+
+The [`context`] module covers writing guards as functions on [`Cx`].
+
 # Arguments And Return Type
 
 Argument types must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript. The return type is [`Result`], whose `Ok` value is the rendered view.
@@ -60,6 +85,7 @@ Each shard is served by a route on the [`Router`]. `.discover()` registers every
 let router = Router::builder().shard(search_results).build();
 ```
 
+[`context`]: ../context/index.html
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html
 [`Router`]: ../router/struct.Router.html

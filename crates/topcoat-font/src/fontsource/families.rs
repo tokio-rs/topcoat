@@ -6,8 +6,7 @@
 //! whole catalog through [`ALL`], or look a family up by id with
 //! [`Family::by_id`].
 
-use crate::{UnicodeRange, UnicodeRanges};
-
 use super::{Family, Style, Subset};
+use crate::{UnicodeRange, UnicodeRanges};
 
 include!(concat!(env!("OUT_DIR"), "/families.rs"));

@@ -1,11 +1,12 @@
 use std::path::PathBuf;
 
+use super::{
+    ChooseTheme,
+    package::Package,
+    state::{InstallState, InstalledTheme, STATE_FILE},
+    workspace::Workspace,
+};
 use crate::{DEFAULT_REGISTRY, Registry, content_hash};
-
-use super::ChooseTheme;
-use super::package::Package;
-use super::state::{InstallState, InstalledTheme, STATE_FILE};
-use super::workspace::Workspace;
 
 /// How to set up a package's install state.
 pub struct InitOptions {
@@ -52,6 +53,12 @@ pub struct Initialized {
 /// registry cannot be loaded or offers no themes, a named theme is unknown,
 /// a theme selection prompt is declined, or writing the stylesheet or install
 /// state fails.
+///
+/// # Panics
+///
+/// Panics if `choose` returns a name that was not among the ones it was
+/// offered.
+#[track_caller]
 pub fn init(
     package: &Package,
     options: InitOptions,
@@ -114,6 +121,7 @@ struct ThemePlan {
 /// reachable and offer at least one theme, and an explicitly named theme must
 /// exist. When no theme was named, the sole offered theme is taken, or `choose`
 /// picks one when the registry offers several.
+#[track_caller]
 fn plan_theme(
     package: &Package,
     requested: Option<&str>,

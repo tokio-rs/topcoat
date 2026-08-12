@@ -4,11 +4,9 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_quote,
 };
+use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime};
 
-use topcoat_core_grammar::ParseOption;
-use topcoat_core_grammar::paths::topcoat_runtime;
-
-use crate::view::{ExprKind, ViewWriter, WriteView};
+use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 
 mod kw {
     use syn::custom_keyword;
@@ -24,16 +22,16 @@ pub struct SignalDeclaration {
     pub semi_token: Token![;],
 }
 
-impl WriteView for SignalDeclaration {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for SignalDeclaration {
+    fn lower(&self, builder: &mut ViewBuilder) {
         let ident = &self.ident;
         let expr = &self.expr;
-        writer.local_binding(&parse_quote! { #ident }, expr);
-        writer.local_binding(
+        builder.local_binding(&parse_quote! { #ident }, expr);
+        builder.local_binding(
             &parse_quote! { #ident },
             &parse_quote! { &#topcoat_runtime::Signal::new(#ident) },
         );
-        writer.write_expr(
+        builder.expr(
             ExprKind::Node,
             quote! { #topcoat_runtime::SignalDeclaration::new(#ident) },
         );

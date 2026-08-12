@@ -45,29 +45,29 @@ impl AttributeValueViewParts for ViewBox {
 
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         parts.push_f32(self.min_x);
-        parts.push_str_unescaped(" ");
+        parts.push_promoted_str_unescaped(&" ");
         parts.push_f32(self.min_y);
-        parts.push_str_unescaped(" ");
+        parts.push_promoted_str_unescaped(&" ");
         parts.push_f32(self.width);
-        parts.push_str_unescaped(" ");
+        parts.push_promoted_str_unescaped(&" ");
         parts.push_f32(self.height);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use topcoat_core::context::Cx;
-
     use super::*;
-    use crate::{HtmlContext, View, ViewParts};
+    use crate::{
+        buffer::ViewBufferScope,
+        internal::{block, build_sync},
+    };
 
     fn render(value: impl AttributeValueViewParts) -> String {
-        let mut parts = ViewParts::new();
-        value.into_view_parts(
-            &Cx::default(),
-            &mut PartsWriter::new(&mut parts, HtmlContext::AttributeValue),
-        );
-        View::new(parts).render(&Cx::default())
+        let (html, _) = ViewBufferScope::scope_sync(|| {
+            let cx = Cx::default();
+            build_sync(|| block(&cx, |b| b.attribute_value(value))).render(&cx)
+        });
+        html
     }
 
     #[test]

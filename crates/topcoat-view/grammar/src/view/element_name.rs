@@ -4,6 +4,7 @@ use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{
     Expr, Ident, LitStr,
+    ext::IdentExt,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Paren,
@@ -11,7 +12,10 @@ use syn::{
 
 use crate::{
     template::TemplateExpr,
-    view::{ExprKind, HtmlIdent, ViewWriter, WriteView},
+    view::{
+        HtmlIdent,
+        hir::{ExprKind, LowerView, ViewBuilder},
+    },
 };
 
 /// The name appearing in an [`Element`](super::Element)'s tag. May be an HTML
@@ -78,13 +82,13 @@ impl ElementName {
     }
 }
 
-impl WriteView for ElementName {
-    fn write(&self, writer: &mut ViewWriter) {
+impl LowerView for ElementName {
+    fn lower(&self, builder: &mut ViewBuilder) {
         match self {
-            Self::Ident(inner) => writer.write_str_unescaped(&inner.to_string()),
-            Self::LitStr(inner) => writer.write_str_unescaped(&inner.value()),
+            Self::Ident(inner) => builder.str_unescaped(&inner.to_string()),
+            Self::LitStr(inner) => builder.str_unescaped(&inner.value()),
             Self::Expr(inner) => {
-                writer.write_expr(ExprKind::ElementName, inner.expr.to_token_stream());
+                builder.expr(ExprKind::ElementName, inner.expr.to_token_stream());
             }
         }
     }
@@ -103,7 +107,7 @@ impl Display for ElementName {
 impl Parse for ElementName {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
-        if lookahead.peek(Ident) {
+        if lookahead.peek(Ident::peek_any) {
             Ok(Self::Ident(HtmlIdent::parse_dash_only(input)?))
         } else if lookahead.peek(LitStr) {
             Ok(Self::LitStr(input.parse()?))
@@ -142,6 +146,13 @@ mod tests {
     }
 
     #[test]
+    fn rust_keyword_name_returns_string_name() {
+        let name = parse("use");
+        assert_eq!(name.string_name().as_deref(), Some("use"));
+        assert!(name.expr().is_none());
+    }
+
+    #[test]
     fn html_ident_name_allows_dashes() {
         assert_eq!(
             parse("my-component").string_name().as_deref(),
@@ -157,8 +168,7 @@ mod tests {
     fn html_ident_name_stops_at_colon_or_dot() {
         // `:` and `.` are reserved for attribute syntax (`:value`,
         // `class.active`) and must not be consumed as part of an element name.
-        use syn::Token;
-        use syn::parse::Parser;
+        use syn::{Token, parse::Parser};
 
         let parser = |input: syn::parse::ParseStream| -> syn::Result<ElementName> {
             let name = input.parse::<ElementName>()?;
