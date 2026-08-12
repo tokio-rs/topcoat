@@ -1,3 +1,3 @@
 import { Runtime } from "./runtime";
 
-new Runtime().start(document.body);
+new Runtime().start(document);
