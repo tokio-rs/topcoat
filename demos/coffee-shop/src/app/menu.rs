@@ -71,8 +71,8 @@ async fn drink_grid(cx: &Cx, query: String) -> Result {
             </p>
         } else {
             <div class="grid gap-4 sm:grid-cols-2">
-                for drink in matches {
-                    drink_card(drink: drink)
+                for drink in matches.iter().copied() {
+                    drink_card(key: &drink.slug, drink: drink)
                 }
             </div>
         }

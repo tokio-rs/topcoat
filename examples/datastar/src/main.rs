@@ -10,7 +10,7 @@ use topcoat::{
         content::sse::{Event, Sse},
         page, route,
     },
-    view::view,
+    view::{markup, view},
 };
 
 #[tokio::main]
@@ -65,7 +65,7 @@ async fn increment(
 ) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let count = counter.count + 1;
 
-    let entry = view! {
+    let entry = markup! {
         <li>
             "Counted to "
             (count)

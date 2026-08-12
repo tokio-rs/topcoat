@@ -7,8 +7,7 @@ use syn::{
     spanned::Spanned,
 };
 use topcoat_core_grammar::paths::{
-    topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_view,
-    topcoat_view_macro,
+    topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro,
 };
 
 pub struct LayoutAttr {
@@ -27,7 +26,7 @@ impl Parse for LayoutAttr {
 enum LayoutArg {
     /// The `cx: &Cx` request context parameter.
     Cx,
-    /// The `slot: Result` child content parameter.
+    /// The `slot: View` child content parameter.
     Slot,
 }
 
@@ -77,7 +76,7 @@ impl Parse for LayoutItem {
                     _ => {
                         return Err(syn::Error::new_spanned(
                             pat_type,
-                            "layout functions only accept a `slot: Result` and an optional `cx: &Cx` parameter",
+                            "layout functions only accept a `slot: View` and an optional `cx: &Cx` parameter",
                         ));
                     }
                 },
@@ -86,7 +85,7 @@ impl Parse for LayoutItem {
         if !args.iter().any(|arg| matches!(arg, LayoutArg::Slot)) {
             return Err(syn::Error::new_spanned(
                 &item.sig,
-                "layout functions must take a `slot: Result` parameter",
+                "layout functions must take a `slot: View` parameter",
             ));
         }
 
@@ -123,19 +122,18 @@ impl ToTokens for Layout {
         let ident = &item.sig.ident;
         let output = &item.sig.output;
 
-        // Component face: wraps a child view inline from `view!`. It always
-        // takes `cx` (feeding the handler's injected context parameter), and
-        // the child is already rendered, so it is passed as the `slot` prop
-        // and handed to the handler as an `Ok` result. The marker struct this
-        // expands to is a unit struct, so `#ident` stays a value usable
-        // directly in `router.layout(...)`.
+        // Component face: wraps trailing child content inline from `view!`.
+        // It always takes `cx` (feeding the handler's injected context
+        // parameter), and the child content token feeds the handler's slot.
+        // The marker struct this expands to is a unit struct, so `#ident`
+        // stays a value usable directly in `router.layout(...)`.
         let component_args = args.iter().map(|arg| match arg {
             LayoutArg::Cx => quote! { cx },
-            LayoutArg::Slot => quote! { slot },
+            LayoutArg::Slot => quote! { child },
         });
         quote! {
             #[#topcoat_view_macro::component]
-            #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_error::Result<#topcoat_view::View>) #output {
+            #vis async fn #ident(cx: &#topcoat_context::Cx, child: #topcoat_view::View) #output {
                 #ident::handler(cx #(, #component_args)*).await
             }
         }
@@ -163,6 +161,13 @@ impl ToTokens for Layout {
             .attrs
             .push(parse_quote! { #[allow(clippy::unused_async)] });
 
+        // The returning `view!` compiles through the pass emission, with a
+        // `(slot?)` interpolation lowering to a placement of the slot token.
+        topcoat_view_grammar::component::expand_tail_view_with_tokens(
+            &mut handler.block,
+            ::std::collections::HashSet::from([::std::string::String::from("slot")]),
+        );
+
         // The render function backing the registered layout passes the
         // already-rendered slot result through untouched, so the layout body
         // wraps the inner page's output.
@@ -171,7 +176,9 @@ impl ToTokens for Layout {
             LayoutArg::Slot => quote! { slot },
         });
         let render = quote! {
-            |cx, slot| ::std::boxed::Box::pin(#ident::handler(cx #(, #render_args)*))
+            |cx, slot| ::std::boxed::Box::pin(async move {
+                #ident::handler(cx #(, #render_args)*).await.map(|_| ())
+            })
         };
 
         // The erased layout is built once in a `const` so it can be used from
@@ -268,7 +275,7 @@ mod tests {
     fn rejects_missing_slot() {
         assert!(
             parse_err("async fn shell(cx: &Cx) -> Result { todo!() }")
-                .contains("must take a `slot: Result` parameter")
+                .contains("must take a `slot: View` parameter")
         );
     }
 

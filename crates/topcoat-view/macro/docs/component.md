@@ -55,7 +55,7 @@ async fn panel(title: &str, child: View) -> Result {
         <section class="panel">
             <h2>(title)</h2>
             <div class="panel-body">
-                (child)
+                (child?)
             </div>
         </section>
     }
@@ -95,7 +95,7 @@ A component's properties can be modified with attributes:
 #[component]
 async fn badge(#[into] label: String, #[default] tone: Tone, #[default(80)] max_length: usize) -> Result {
     // ...
-#     view! { <span>(label)</span> }
+#     view! { <span>(&label)</span> }
 }
 ```
 
@@ -117,7 +117,8 @@ async fn count<T: Send + Sync>(items: Vec<T>) -> Result {
 # use topcoat::{Result, view::{component, view}};
 #[component]
 async fn shout(label: impl Into<String> + Send) -> Result {
-    view! { <b>(label.into().to_uppercase())</b> }
+    let label: String = label.into();
+    view! { <b>(label.to_uppercase())</b> }
 }
 ```
 
@@ -167,7 +168,7 @@ async fn comment_thread(comment: &Comment) -> Result {
             if !comment.replies.is_empty() {
                 <ul>
                     for reply in &comment.replies {
-                        comment_thread(comment: reply)
+                        comment_thread(key: &reply.body, comment: reply)
                     }
                 </ul>
             }

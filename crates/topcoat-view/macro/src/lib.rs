@@ -10,6 +10,16 @@ pub fn view(tokens: TokenStream) -> TokenStream {
     quote! { #parsed }.into()
 }
 
+/// Builds a [`Markup`] value from component free nodes: markup that is data
+/// rather than render code, for mail bodies and patch payloads.
+///
+/// [`Markup`]: https://docs.rs/topcoat/latest/topcoat/view/struct.Markup.html
+#[proc_macro]
+pub fn markup(tokens: TokenStream) -> TokenStream {
+    let parsed = syn::parse_macro_input!(tokens as topcoat_view_grammar::view::View);
+    parsed.emit_markup().into()
+}
+
 #[doc = include_str!("../docs/attributes.md")]
 #[proc_macro]
 pub fn attributes(tokens: TokenStream) -> TokenStream {

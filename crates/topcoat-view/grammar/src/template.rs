@@ -6,6 +6,7 @@ mod template_if;
 mod template_local;
 mod template_match;
 mod template_or_runtime_expr;
+mod template_return;
 
 pub use runtime_expr::*;
 pub use template_block::*;
@@ -15,3 +16,4 @@ pub use template_if::*;
 pub use template_local::*;
 pub use template_match::*;
 pub use template_or_runtime_expr::*;
+pub use template_return::*;

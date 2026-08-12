@@ -1,6 +1,6 @@
 use serde::Serialize;
 use topcoat_core::context::Cx;
-use topcoat_view::{NodeViewParts, PartsWriter, View};
+use topcoat_view::{Markup, NodeViewParts, PartsWriter};
 use uuid::Uuid;
 
 use crate::{SHARD_ROUTE_PREFIX, ShardId};
@@ -27,14 +27,14 @@ impl Default for ReactiveScopeId {
 pub struct ReactiveScope {
     id: ReactiveScopeId,
     shard_id: ShardId,
-    exprs: Vec<View>,
-    placeholder: View,
+    exprs: Vec<Markup>,
+    placeholder: Markup,
 }
 
 impl ReactiveScope {
     #[inline]
     #[must_use]
-    pub fn new(shard_id: ShardId, exprs: Vec<View>, placeholder: View) -> Self {
+    pub fn new(shard_id: ShardId, exprs: Vec<Markup>, placeholder: Markup) -> Self {
         Self {
             id: ReactiveScopeId::new(),
             shard_id,

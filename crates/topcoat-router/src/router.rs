@@ -142,7 +142,7 @@ mod tests {
     };
 
     use http::{HeaderMap, StatusCode};
-    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, View, view};
+    use topcoat::view::{View, pass};
     use topcoat_core::{
         context::{Cx, app_context, request_context},
         error::Result,
@@ -262,62 +262,56 @@ mod tests {
         })
     }
 
-    // Page and layout render functions for the rendering tests.
-    type ViewFuture<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
+    // Page and layout render functions for the rendering tests, written
+    // against the pass runtime the way macro output is.
+    type RenderFuture<'cx> = Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>>;
 
-    fn render_page(cx: &Cx, _body: Body) -> ViewFuture<'_> {
+    fn render_page(_cx: &Cx, _body: Body) -> RenderFuture<'static> {
         Box::pin(async move {
-            view! { cx => "page" }
-        })
-    }
-
-    /// A view part that panics when it renders, so the router's panic
-    /// handling during rendering is observable.
-    #[derive(Debug, Clone)]
-    struct Panicking;
-
-    impl NodeViewParts for Panicking {
-        fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-            parts.push_dyn(Box::new(self));
-        }
-    }
-
-    impl DynViewPart for Panicking {
-        fn render(&self, _cx: &Cx, _w: &mut HtmlWriter<'_, '_>) {
-            panic!("view rendering panicked");
-        }
-    }
-
-    fn render_panicking_page(cx: &Cx, _body: Body) -> ViewFuture<'_> {
-        Box::pin(async move {
-            view! { cx => (Panicking) }
-        })
-    }
-
-    /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
-    fn layout_root(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
-        Box::pin(async move {
-            let inner = slot?;
-            view! {
-                cx =>
-                "R["
-                (inner)
-                "]"
+            let mount = pass::mount();
+            let mut children = pass::Children::new();
+            loop {
+                let mut out = pass::RenderBuffer::new();
+                out.markup("page");
+                children.sweep();
+                mount.finish_render(out);
+                pass::pass_boundary(&mount, &mut children).await?;
             }
         })
+    }
+
+    /// A page that panics when it renders, so the router's panic handling
+    /// during rendering is observable.
+    fn render_panicking_page(_cx: &Cx, _body: Body) -> RenderFuture<'static> {
+        Box::pin(async move { panic!("view rendering panicked") })
+    }
+
+    /// Wraps the child content in a marker pair so layout nesting is
+    /// observable.
+    fn wrap(slot: View, open: &'static str) -> RenderFuture<'static> {
+        Box::pin(async move {
+            let mount = pass::mount();
+            let mut children = pass::Children::new();
+            loop {
+                let mut out = pass::RenderBuffer::new();
+                out.markup(open);
+                out.place(slot)?;
+                out.markup("]");
+                children.sweep();
+                mount.finish_render(out);
+                pass::pass_boundary(&mount, &mut children).await?;
+            }
+        })
+    }
+
+    /// Wraps the child content in `R[ ... ]`.
+    fn layout_root(_cx: &Cx, slot: View) -> RenderFuture<'static> {
+        wrap(slot, "R[")
     }
 
     /// Wraps the child content in `A[ ... ]`.
-    fn layout_admin(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
-        Box::pin(async move {
-            let inner = slot?;
-            view! {
-                cx =>
-                "A["
-                (inner)
-                "]"
-            }
-        })
+    fn layout_admin(_cx: &Cx, slot: View) -> RenderFuture<'static> {
+        wrap(slot, "A[")
     }
 
     // -- Router::handle: dispatch --

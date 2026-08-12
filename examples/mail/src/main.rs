@@ -9,7 +9,7 @@ use topcoat::{
         error::{SeeOther, see_other},
         layout, page, route,
     },
-    view::view,
+    view::{View, view},
 };
 
 const OUTBOX: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/outbox");
@@ -29,7 +29,7 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(slot: Result) -> Result {
+async fn root(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -131,7 +131,7 @@ async fn sent() -> Result {
         </p>
 
         <ul>
-            for file in files {
+            for file in &files {
                 <li>(file)</li>
             }
         </ul>

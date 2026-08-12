@@ -3,11 +3,24 @@ use std::collections::HashMap;
 use topcoat::{
     Result,
     context::Cx,
-    view::{View, component, identity::Identity, view},
+    view::{Component, View, component, identity::Identity, pass::Driver, view},
 };
 
-fn empty_cx() -> Cx {
-    Cx::default()
+/// Drives a component as its own page and returns the final HTML.
+async fn render<C>(cx: &Cx, marker: C, props: C::Props) -> Result<String>
+where
+    C: Component,
+{
+    let fut = C::render(marker, cx.detach(), props);
+    let mut driver = Driver::new(cx.detach(), fut);
+    driver.render_blocking().await
+}
+
+/// Renders a component marker with `prop = value` arguments.
+macro_rules! drive {
+    ($cx:expr, $c:ident $(, $prop:ident = $value:expr)* $(,)?) => {
+        render($cx, $c::default(), $c::props_builder()$(.$prop($value))*.build())
+    };
 }
 
 /// Renders its own identity hash as `label=hash;` for the assertions to
@@ -18,18 +31,48 @@ async fn probe(label: &str) -> Result {
     view! { (format!("{label}={id:x};")) }
 }
 
-/// Renders the ambiguity error of its identity, or `ok` when there is none.
 #[component]
-async fn ambiguity() -> Result {
-    match Identity::try_current() {
-        Ok(_) => view! { "ok" },
-        Err(error) => view! { (error.to_string()) },
+async fn single_probe() -> Result {
+    view! { probe(label: "a") }
+}
+
+#[component]
+async fn sibling_probes() -> Result {
+    view! {
+        probe(label: "a")
+        probe(label: "b")
+    }
+}
+
+#[component]
+async fn keyed_probes(labels: Vec<&'static str>) -> Result {
+    view! {
+        for label in labels.iter().copied() {
+            probe(key: label, label: label)
+        }
+    }
+}
+
+#[component]
+async fn same_key_two_sites() -> Result {
+    view! {
+        probe(key: 1, label: "a")
+        probe(key: 1, label: "b")
     }
 }
 
 #[component]
 async fn wrapper(child: View) -> Result {
-    view! { (child) }
+    view! { (child?) }
+}
+
+#[component]
+async fn keyed_wrappers(items: Vec<&'static str>) -> Result {
+    view! {
+        for item in items.iter().copied() {
+            wrapper(key: item, probe(label: item))
+        }
+    }
 }
 
 /// Parses `label=hash;` pairs out of `rendered`.
@@ -45,22 +88,16 @@ fn ids(rendered: &str) -> HashMap<String, String> {
 
 #[tokio::test]
 async fn identities_are_stable_across_renders() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let render = || async { view! { probe(label: "a") }.unwrap().render(__cx) };
-    assert_eq!(render().await, render().await);
+    let cx = Cx::default();
+    let first = drive!(&cx, single_probe).await.unwrap();
+    let second = drive!(&cx, single_probe).await.unwrap();
+    assert_eq!(first, second);
 }
 
 #[tokio::test]
 async fn sibling_invocations_have_distinct_identities() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let rendered = view! {
-        probe(label: "a")
-        probe(label: "b")
-    }
-    .unwrap()
-    .render(__cx);
+    let cx = Cx::default();
+    let rendered = drive!(&cx, sibling_probes).await.unwrap();
 
     let ids = ids(&rendered);
     assert_ne!(ids["a"], ids["b"]);
@@ -68,21 +105,14 @@ async fn sibling_invocations_have_distinct_identities() {
 
 #[tokio::test]
 async fn keys_give_each_iteration_its_own_stable_identity() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let render = |labels: Vec<&'static str>| async move {
-        let rendered = view! {
-            for label in labels {
-                probe(key: label, label: label)
-            }
-        }
-        .unwrap()
-        .render(__cx);
-        ids(&rendered)
-    };
+    let cx = Cx::default();
+    let forward = ids(&drive!(&cx, keyed_probes, labels = vec!["a", "b"])
+        .await
+        .unwrap());
+    let backward = ids(&drive!(&cx, keyed_probes, labels = vec!["b", "a"])
+        .await
+        .unwrap());
 
-    let forward = render(vec!["a", "b"]).await;
-    let backward = render(vec!["b", "a"]).await;
     assert_ne!(forward["a"], forward["b"]);
     // The identity follows the key, not the position in the loop.
     assert_eq!(forward["a"], backward["a"]);
@@ -91,72 +121,19 @@ async fn keys_give_each_iteration_its_own_stable_identity() {
 
 #[tokio::test]
 async fn the_same_key_at_two_sites_stays_distinct() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let rendered = view! {
-        probe(key: 1, label: "a")
-        probe(key: 1, label: "b")
-    }
-    .unwrap()
-    .render(__cx);
+    let cx = Cx::default();
+    let rendered = drive!(&cx, same_key_two_sites).await.unwrap();
 
     let ids = ids(&rendered);
     assert_ne!(ids["a"], ids["b"]);
 }
 
 #[tokio::test]
-async fn an_unkeyed_component_outside_a_loop_is_unambiguous() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let rendered = view! { ambiguity() }.unwrap().render(__cx);
-    assert_eq!(rendered, "ok");
-}
-
-#[tokio::test]
-async fn an_unkeyed_component_in_a_loop_reports_the_missing_key() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let rendered = view! {
-        for _ in 0..1 {
-            ambiguity()
-        }
-    }
-    .unwrap()
-    .render(__cx);
-
-    assert!(rendered.contains("`ambiguity`"), "names the invocation");
-    assert!(rendered.contains("identity.rs"), "points into this file");
-    assert!(rendered.contains("`key`"), "suggests passing a key");
-}
-
-#[tokio::test]
-async fn an_ambiguous_invocation_poisons_its_children() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let rendered = view! {
-        for _ in 0..1 {
-            wrapper(ambiguity())
-        }
-    }
-    .unwrap()
-    .render(__cx);
-
-    // The child's error names the outermost invocation missing its key.
-    assert!(rendered.contains("`wrapper`"));
-}
-
-#[tokio::test]
 async fn a_key_resolves_the_children_of_a_repeated_invocation() {
-    let cx = empty_cx();
-    let __cx = &cx;
-    let items = vec!["a", "b"];
-    let rendered = view! {
-        for item in items {
-            wrapper(key: item, probe(label: item))
-        }
-    }
-    .unwrap()
-    .render(__cx);
+    let cx = Cx::default();
+    let rendered = drive!(&cx, keyed_wrappers, items = vec!["a", "b"])
+        .await
+        .unwrap();
 
     let ids = ids(&rendered);
     assert_ne!(ids["a"], ids["b"]);

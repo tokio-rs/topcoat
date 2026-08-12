@@ -26,7 +26,7 @@ impl Scope {
         let view = self.emit_view();
         let body = quote! {
             async {
-                ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#view)
+                ::core::result::Result::<#topcoat_view::Markup, #topcoat_error::Error>::Ok(#view)
             }
         };
         if self.is_static() {
@@ -50,7 +50,7 @@ impl Scope {
     }
 
     /// Emits this scope as an expression yielding a
-    /// [`View`](topcoat_view::View).
+    /// [`View`](topcoat_view::Markup).
     ///
     /// Nested scopes (control-flow bodies and component children) are emitted
     /// with this and hoisted by the enclosing scope, so their expansion runs
@@ -64,13 +64,13 @@ impl Scope {
     pub(crate) fn emit_view(&self) -> TokenStream {
         if self.nodes.is_empty() {
             // Optimized path: The view has no content.
-            quote! { #topcoat_view::View::empty() }
+            quote! { #topcoat_view::Markup::empty() }
         } else if self.nodes.len() == 1
             && let Node::StaticSegment(StaticSegment { string }) = &self.nodes[0]
         {
             // Optimized path: The view is a single static string, which needs
             // no instruction block.
-            quote! { #topcoat_view::View::unescaped_unchecked(#string) }
+            quote! { #topcoat_view::Markup::unescaped_unchecked(#string) }
         } else {
             let concurrent = self.nodes.iter().filter(|node| node.is_async()).count() >= 2;
             let mut emitter = Emitter::new(!concurrent);
@@ -162,7 +162,7 @@ mod tests {
     fn empty_top_level_view_emits_view_empty() {
         let out = rendered(ViewBuilder::new());
         assert!(out.contains("async"));
-        assert!(out.contains(&quote! { #topcoat_view::View::empty }.to_string()));
+        assert!(out.contains(&quote! { #topcoat_view::Markup::empty }.to_string()));
     }
 
     #[test]
@@ -238,7 +238,7 @@ mod tests {
         });
         let out = rendered(builder);
         assert!(out.contains("if cond"));
-        assert!(out.contains(&quote! { #topcoat_view::View::empty }.to_string()));
+        assert!(out.contains(&quote! { #topcoat_view::Markup::empty }.to_string()));
     }
 
     #[test]

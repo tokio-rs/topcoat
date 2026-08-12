@@ -30,12 +30,13 @@ use topcoat::{
 /// ```
 #[component]
 pub async fn dropdown_menu(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
+    let extra = attrs.remove("class");
     view! {
         <details
-            class=(class!("group relative inline-block", attrs.remove("class")))
-            (attrs)
+            class=(class!("group relative inline-block", extra.clone()))
+            (attrs.clone())
         >
-            (child)
+            (child?)
         </details>
     }
 }
@@ -73,9 +74,10 @@ pub async fn dropdown_menu_trigger(
     #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
+    let extra = attrs.remove("class");
     view! {
-        <summary class=(class!(TRIGGER, attrs.remove("class"))) (attrs)>
-            (child)
+        <summary class=(class!(TRIGGER, extra.clone())) (attrs.clone())>
+            (child?)
         </summary>
     }
 }
@@ -97,12 +99,13 @@ pub async fn dropdown_menu_content(
     #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
+    let extra = attrs.remove("class");
     view! {
         <div
-            class=(class!(PANEL, "top-full left-0 mt-1", attrs.remove("class")))
-            (attrs)
+            class=(class!(PANEL, "top-full left-0 mt-1", extra.clone()))
+            (attrs.clone())
         >
-            (child)
+            (child?)
         </div>
     }
 }
@@ -123,8 +126,9 @@ pub async fn dropdown_menu_item(
     #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
+    let extra = attrs.remove("class");
     view! {
-        <button class=(class!(ITEM, attrs.remove("class"))) (attrs)>(child)</button>
+        <button class=(class!(ITEM, extra.clone())) (attrs.clone())>(child?)</button>
     }
 }
 
@@ -156,9 +160,10 @@ pub async fn dropdown_menu_item(
 /// ```
 #[component]
 pub async fn dropdown_menu_sub(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
+    let extra = attrs.remove("class");
     view! {
-        <details class=(class!("group/sub relative", attrs.remove("class"))) (attrs)>
-            (child)
+        <details class=(class!("group/sub relative", extra.clone())) (attrs.clone())>
+            (child?)
         </details>
     }
 }
@@ -175,17 +180,18 @@ pub async fn dropdown_menu_sub_trigger(
     #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
+    let extra = attrs.remove("class");
     view! {
         <summary
             class=(class!(
                 ITEM,
                 TRIGGER,
                 "group-open/sub:bg-foreground/5",
-                attrs.remove("class"),
+                extra.clone(),
             ))
-            (attrs)
+            (attrs.clone())
         >
-            (child)
+            (child?)
             icon(
                 data: iconify_icon!("feather:chevron-right"),
                 attrs: attributes! { class="ml-auto size-4" }
@@ -205,12 +211,13 @@ pub async fn dropdown_menu_sub_content(
     #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
+    let extra = attrs.remove("class");
     view! {
         <div
-            class=(class!(PANEL, "top-0 left-full ml-1", attrs.remove("class")))
-            (attrs)
+            class=(class!(PANEL, "top-0 left-full ml-1", extra.clone()))
+            (attrs.clone())
         >
-            (child)
+            (child?)
         </div>
     }
 }
@@ -221,15 +228,16 @@ pub async fn dropdown_menu_label(
     #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
+    let extra = attrs.remove("class");
     view! {
         <p
             class=(class!(
                 "px-2 py-1.5 text-xs font-medium text-muted-foreground",
-                attrs.remove("class"),
+                extra.clone(),
             ))
-            (attrs)
+            (attrs.clone())
         >
-            (child)
+            (child?)
         </p>
     }
 }
@@ -237,7 +245,8 @@ pub async fn dropdown_menu_label(
 /// A hairline rule separating groups of items.
 #[component]
 pub async fn dropdown_menu_separator(#[default] mut attrs: Attributes) -> Result {
+    let extra = attrs.remove("class");
     view! {
-        <hr class=(class!("-mx-1 my-1 border-border", attrs.remove("class"))) (attrs)>
+        <hr class=(class!("-mx-1 my-1 border-border", extra.clone())) (attrs.clone())>
     }
 }

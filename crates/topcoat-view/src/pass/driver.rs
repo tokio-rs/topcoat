@@ -136,14 +136,25 @@ impl<'f> Driver<'f> {
     /// An error nothing caught: the root completed with it, so there is no
     /// document to return.
     pub async fn render_blocking(&mut self) -> Result<String> {
-        let mut html = String::new();
+        Ok(self.render_to_end().await?.html)
+    }
+
+    /// Renders to completion without streaming and returns the final sealed
+    /// pass, response metadata included.
+    ///
+    /// # Errors
+    ///
+    /// An error nothing caught: the root completed with it, so there is no
+    /// document to return.
+    pub async fn render_to_end(&mut self) -> Result<PassReport> {
+        let mut last = None;
         while let Some(report) = self.next_pass().await {
             if let Some(error) = report.page_error {
                 return Err(error);
             }
-            html = report.html;
+            last = Some(report);
         }
-        Ok(html)
+        Ok(last.expect("at least one pass seals before the stream ends"))
     }
 
     /// How many deferred loads are still in flight.

@@ -33,9 +33,10 @@ const TEXTAREA: StaticClass = class!(
 /// ```
 #[component]
 pub async fn textarea(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
+    let extra = attrs.remove("class");
     view! {
-        <textarea class=(class!(TEXTAREA, attrs.remove("class"))) (attrs)>
-            (child)
+        <textarea class=(class!(TEXTAREA, extra.clone())) (attrs.clone())>
+            (child?)
         </textarea>
     }
 }

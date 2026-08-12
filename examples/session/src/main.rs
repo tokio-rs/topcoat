@@ -16,7 +16,7 @@ use topcoat::{
         layout, page, route,
     },
     session::{self, RouterBuilderSessionExt, SessionConfig, TokenHash},
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -36,7 +36,7 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(slot: Result) -> Result {
+async fn root(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>

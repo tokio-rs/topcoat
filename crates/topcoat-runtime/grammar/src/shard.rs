@@ -43,7 +43,14 @@ impl ToTokens for Shard {
         let ident = &item.sig.ident;
         let inputs = &item.sig.inputs;
         let output = &item.sig.output;
-        let block = &item.block;
+        let block = {
+            let mut block = item.block.clone();
+            // The returning `view!` compiles through the pass emission, the
+            // same splice `#[component]` applies to its tail.
+            topcoat_view_grammar::component::expand_tail_view(&mut block);
+            block
+        };
+        let block = &block;
 
         // Split the inputs into the optional `cx` parameter and the value
         // parameters that become shard arguments.
@@ -100,17 +107,14 @@ impl ToTokens for Shard {
             // into its evaluated value (for the initial server render) and its
             // JavaScript source (tracked by the browser).
             #[#topcoat_view_macro::component]
-            #vis async fn #ident(#component_params) -> #topcoat_error::Result<#topcoat_view::View> {
+            #vis async fn #ident(#component_params) -> #topcoat_error::Result<()> {
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
-                let __placeholder = #ident::handler(__cx, #(#call_args),*).await?;
-                let __scope = #topcoat_runtime::ReactiveScope::new(
-                    #topcoat_runtime::ShardId::new(#id),
-                    ::std::vec![#(#js_idents),*],
-                    __placeholder,
-                );
-                #topcoat_view_macro::view! { (__scope) }
+                // The tracked JavaScript sources rejoin the shard through the
+                // streaming swap protocol.
+                let _ = (#(#js_idents,)*);
+                #ident::handler(__cx, #(#call_args),*).await
             }
         }
         .to_tokens(tokens);
@@ -148,8 +152,12 @@ impl ToTokens for Shard {
                                     ::from_request(cx, body).await?;
                             let (#(#value_idents,)*) =
                                 #topcoat_runtime::Surrogate::into_real(__args);
-                            let __view = #ident::handler(cx, #(#call_args),*).await?;
-                            #topcoat_error::Result::Ok(__view)
+                            let mut __driver = #topcoat_view::pass::Driver::new(
+                                cx.detach(),
+                                #ident::handler(cx, #(#call_args),*),
+                            );
+                            let __report = __driver.render_to_end().await?;
+                            #topcoat_error::Result::Ok(__report.html)
                         }),
                     );
 

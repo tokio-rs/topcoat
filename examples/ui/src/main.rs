@@ -115,7 +115,7 @@ async fn home() -> Result {
 /// A masonry cell: keeps a demo from splitting across columns.
 #[component]
 async fn demo(child: View) -> Result {
-    view! { <div class="mb-4 break-inside-avoid">(child)</div> }
+    view! { <div class="mb-4 break-inside-avoid">(child?)</div> }
 }
 
 /// A placeholder cell for a component that is not in the registry yet.
@@ -156,6 +156,7 @@ async fn team_card() -> Result {
                                 </p>
                             </div>
                             button(
+                                key: name,
                                 size: ButtonSize::Sm,
                                 variant: ButtonVariant::Outline,
                                 (role)
@@ -192,7 +193,12 @@ async fn buttons_card() -> Result {
                             (ButtonVariant::Ghost, "Ghost"),
                             (ButtonVariant::Destructive, "Destructive"),
                         ] {
-                            button(size: ButtonSize::Sm, variant: variant, (name))
+                            button(
+                                key: name,
+                                size: ButtonSize::Sm,
+                                variant: variant,
+                                (name)
+                            )
                         }
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -358,7 +364,7 @@ async fn upgrade_card() -> Result {
                         "Priority support",
                     ] {
                         <li class="flex items-center gap-2">
-                            icon(data: iconify_icon!("feather:check"))
+                            icon(key: feature, data: iconify_icon!("feather:check"))
                             (feature)
                         </li>
                     }
@@ -434,7 +440,7 @@ async fn status_card() -> Result {
                     ] {
                         <div class="flex items-center justify-between gap-4">
                             <p class="truncate font-mono text-sm">(env)</p>
-                            badge(variant: variant, (status))
+                            badge(key: env, variant: variant, (status))
                         </div>
                     }
                     <div class="flex items-center justify-between gap-4">

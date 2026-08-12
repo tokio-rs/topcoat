@@ -53,10 +53,8 @@ In child position, the expression becomes a node:
 # #[component]
 # async fn example() -> Result {
 # let user = User { name: "Ada" };
-# let sidebar = view! { <aside></aside> }?;
 view! {
     <h1>"Hello, " (user.name) "!"</h1>
-    (sidebar)
 }
 # }
 ```
@@ -160,7 +158,7 @@ Use `for pat in expr { ... }` to render the body once for each item.
 # let posts = vec![Post { url: "/a", title: "A" }];
 view! {
     <ul>
-        for post in posts {
+        for post in &posts {
             <li>
                 <a href=(post.url)>(post.title)</a>
             </li>
@@ -179,7 +177,7 @@ In attributes, a loop can emit zero or more attributes. This is useful when you 
 # let attrs = vec![("data-id", "1")];
 view! {
     <div
-        for (name, value) in attrs {
+        for (name, value) in attrs.iter().copied() {
             (name)=(value)
         }
     ></div>
@@ -199,7 +197,7 @@ Use `match` to choose markup from patterns. Match arms can also use guards.
 # let status = Status::Draft;
 # let show_archived = true;
 view! {
-    match status {
+    match &status {
         Status::Draft => <span>"Draft"</span>,
         Status::Published { title } => <a href="/posts">(title)</a>,
         Status::Archived if show_archived => <span>"Archived"</span>,
@@ -218,7 +216,7 @@ A match arm body is one view node. If a branch needs multiple sibling nodes, wra
 # async fn example() -> Result {
 # let user: Option<User> = None;
 view! {
-    match user {
+    match &user {
         Some(user) => {
             <h1>(user.name)</h1>
             <p>"Signed in"</p>
@@ -297,7 +295,7 @@ Components are called inside [`view!`] with a call syntax similar to functions. 
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn panel(title: &str, child: View) -> Result { view! { <section>(title)(child)</section> } }
+# async fn panel(title: &str, child: View) -> Result { view! { <section>(title)(child?)</section> } }
 # #[component]
 # async fn badge(label: &str, tone: &str) -> Result { view! { <span>(label)(tone)</span> } }
 # #[component]
@@ -317,33 +315,7 @@ view! {
 # }
 ```
 
-The child nodes desugar to:
-
-```rust
-# use topcoat::{Result, view::*};
-# #[component]
-# async fn panel(title: &str, child: View) -> Result { view! { <section>(title)(child)</section> } }
-# #[component]
-# async fn badge(label: &str, tone: &str) -> Result { view! { <span>(label)(tone)</span> } }
-# #[component]
-# async fn example() -> Result {
-view! {
-    panel(
-        title: "Profile",
-        // Named child parameter:
-        child: view! {
-            <p>"Account details"</p>
-            badge(
-                label: "Active",
-                tone: "success",
-            )
-        }?
-    )
-}
-# }
-```
-
-See how to define components in the [`component`] macro guide.
+The child nodes become their own anonymous component, owned by the caller, and the component receives it through its `child` parameter as a [`View`] token. The [`component`] macro guide covers defining components and placing child content.
 
 ## Keys
 
@@ -358,7 +330,7 @@ Each component invocation has a stable identity derived from the chain of invoca
 # async fn example() -> Result {
 # let posts = vec![Post { id: 1, title: "A" }];
 view! {
-    for post in posts {
+    for post in &posts {
         post_card(key: post.id, title: post.title)
     }
 }
@@ -367,7 +339,7 @@ view! {
 
 Key the invocation with a value that identifies the item behind it, such as its database id, not the loop index: the identity then follows the item when the list reorders. Any value implementing [`IdentityKey`] works as a key. A `key:` is also allowed outside a loop, for an invocation that repeats in ways the macro cannot see.
 
-A repeated invocation without a `key:` still renders, but its identity is ambiguous. Consuming an ambiguous identity, in the component itself or anywhere nested below it, errors with the location of the invocation that is missing its key.
+A component invocation inside a `for` body must pass a `key:`; without one the repetitions could not be told apart, so the macro rejects the invocation at compile time.
 
 # Concurrent Rendering
 
@@ -472,7 +444,7 @@ Competing declarations resolve by render order: the first status code rendered w
 # use topcoat::{Result, view::*};
 # use topcoat::router::{HeaderValue, header, layout};
 #[layout("/docs")]
-async fn docs_layout(slot: Result) -> Result {
+async fn docs_layout(slot: View) -> Result {
     view! {
         <main>(slot?)</main>
         ((header::CACHE_CONTROL, HeaderValue::from_static("max-age=60")))
@@ -486,16 +458,14 @@ A status code in node position never renders text. To display one, render one of
 
 These declarations require the `router` feature (or the `topcoat-view` crate's `http` feature) and take effect when the rendered view becomes a response; rendering a view to a plain string discards them.
 
-# Rendering Outside A Component
+# Markup Outside A Component
 
-Inside a [`component`], `#[page]`, `#[layout]`, or `#[shard]`, the request context is in scope implicitly, so `view!` can render components and reactive markup with no ceremony. In a plain function you pass it explicitly at the start of the `view!` macro:
+`view!` compiles only as the returning expression of a [`component`], `#[page]`, `#[layout]`, or `#[shard]` function: the expression becomes the component's render, re-run once per pass by the request's driver. For plain markup values outside a component, build a [`Markup`] with the [`markup!`](macro.markup.html) macro. It accepts the same element, interpolation, and control flow syntax, but no component invocations, and evaluates eagerly to a value:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*};
-# #[component]
-# async fn greeting(name: &str) -> Result { view! { <h1>(name)</h1> } }
-async fn render(cx: &Cx) -> Result {
-    view! { cx => greeting(name: "World") }
+async fn render(cx: &Cx) -> Result<Markup> {
+    markup! { cx => <h1>"Hello"</h1> }
 }
 ```
 

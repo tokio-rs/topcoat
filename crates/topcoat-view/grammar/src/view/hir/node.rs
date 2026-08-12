@@ -13,6 +13,7 @@ pub(crate) use for_loop::*;
 pub(crate) use if_else::*;
 pub(crate) use local::*;
 pub(crate) use match_expr::*;
+use proc_macro2::TokenStream;
 pub(crate) use statement::*;
 pub(crate) use static_segment::*;
 
@@ -37,6 +38,8 @@ pub(crate) enum Node {
     IfElse(IfElse),
     /// A `match` whose arm bodies are lowered into nested scopes.
     MatchExpr(MatchExpr),
+    /// A placement of a view token, emitted through `RenderBuffer::place`.
+    Place(TokenStream),
 }
 
 impl Node {
@@ -48,9 +51,11 @@ impl Node {
             Self::ForLoop(node) => node.body.is_async(),
             Self::IfElse(node) => node.then_branch.is_async() || node.else_branch.is_async(),
             Self::MatchExpr(node) => node.arms.iter().any(|arm| arm.body.is_async()),
-            Self::StaticSegment(_) | Self::ExprNode(_) | Self::Local(_) | Self::Statement(_) => {
-                false
-            }
+            Self::StaticSegment(_)
+            | Self::ExprNode(_)
+            | Self::Local(_)
+            | Self::Statement(_)
+            | Self::Place(_) => false,
         }
     }
 }
@@ -66,6 +71,9 @@ impl Emit for Node {
             Self::ForLoop(node) => node.emit(emitter),
             Self::IfElse(node) => node.emit(emitter),
             Self::MatchExpr(node) => node.emit(emitter),
+            Self::Place(_) => {
+                unreachable!("place nodes only lower when the pass emission is in use")
+            }
         }
     }
 }

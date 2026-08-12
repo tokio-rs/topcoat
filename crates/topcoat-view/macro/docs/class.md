@@ -36,7 +36,7 @@ view! {
     <button class=(class!(
         "btn",
         variant,
-        sizes,
+        sizes.clone(),
         "cursor-pointer" if enabled else "opacity-50",
     ))>"Save"</button>
 }

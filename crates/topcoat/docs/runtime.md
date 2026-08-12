@@ -191,7 +191,7 @@ When it is the markup itself that needs the server -- fresh search results as th
 async fn search_results(cx: &Cx, query: String) -> Result {
     let products = search_products(cx, &query).await?;
     view! {
-        for product in products {
+        for product in &products {
             <div>(product)</div>
         }
     }

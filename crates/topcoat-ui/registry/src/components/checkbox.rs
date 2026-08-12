@@ -40,14 +40,15 @@ pub async fn checkbox(#[default] mut attrs: Attributes) -> Result {
     // The checkmark cannot be drawn by the `<input>` itself, which renders no
     // children or pseudo-elements: it is a sibling icon overlaid on the
     // control, revealed by the input's `peer` state while checked.
+    let extra = attrs.remove("class");
     view! {
         <span
             class=(class!(
                 "relative inline-flex shrink-0 has-[:disabled]:opacity-50",
-                attrs.remove("class"),
+                extra.clone(),
             ))
         >
-            <input type="checkbox" class=(CHECKBOX) (attrs)>
+            <input type="checkbox" class=(CHECKBOX) (attrs.clone())>
             icon(
                 data: iconify_icon!("feather:check"),
                 attrs: attributes! {

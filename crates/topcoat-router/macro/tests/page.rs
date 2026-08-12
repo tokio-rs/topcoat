@@ -38,7 +38,7 @@ async fn search(Form(input): Form<Search>) -> Result {
     view! {
         <p>
             "searching for "
-            (input.q)
+            (&input.q)
         </p>
     }
 }
@@ -60,12 +60,13 @@ async fn shadowed() -> Result {
 // request body passed as the already-parsed `body` prop.
 #[page("/composed")]
 async fn composed() -> Result {
-    let query = Search {
-        q: String::from("topcoat"),
-    };
     view! {
         home()
-        search(body: Form(query))
+        search(
+            body: Form(Search {
+                q: String::from("topcoat"),
+            })
+        )
         whoami()
     }
 }

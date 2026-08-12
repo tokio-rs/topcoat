@@ -6,7 +6,7 @@ use topcoat::{
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset},
     context::{Cx, app_context},
     router::{Compression, Router, layout, page},
-    view::view,
+    view::{View, view},
 };
 
 use crate::{
@@ -27,7 +27,7 @@ pub fn router() -> Router {
 }
 
 #[layout]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html lang="en">
@@ -75,7 +75,7 @@ async fn home(cx: &Cx) -> Result {
             </div>
             <div class="mt-6 grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
                 for product in app_context::<Catalog>(cx).featured() {
-                    product_card(product: product)
+                    product_card(key: product.id, product: product)
                 }
             </div>
         </section>

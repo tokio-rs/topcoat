@@ -33,5 +33,8 @@ const LABEL: StaticClass = class!(
 /// ```
 #[component]
 pub async fn label(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! { <label class=(class!(LABEL, attrs.remove("class"))) (attrs)>(child)</label> }
+    let extra = attrs.remove("class");
+    view! {
+        <label class=(class!(LABEL, extra.clone())) (attrs.clone())>(child?)</label>
+    }
 }

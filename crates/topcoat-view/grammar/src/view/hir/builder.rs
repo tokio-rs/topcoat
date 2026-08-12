@@ -1,6 +1,7 @@
 use std::{cell::Cell, rc::Rc};
 
 use proc_macro2::{Span, TokenStream};
+use quote::ToTokens;
 use syn::{Expr, Pat, Path};
 
 use super::{
@@ -30,15 +31,25 @@ pub(crate) struct ViewBuilder {
     /// Whether this builder lowers a `for` body, where every invocation
     /// site repeats.
     repeats: bool,
+    /// Identifiers bound to view tokens in the enclosing function, so a bare
+    /// interpolation of one lowers to a placement.
+    tokens: Rc<std::collections::HashSet<String>>,
 }
 
 impl ViewBuilder {
     pub fn new() -> Self {
+        Self::with_tokens(std::collections::HashSet::new())
+    }
+
+    /// Returns a builder that lowers bare interpolations of the named
+    /// identifiers as view token placements.
+    pub fn with_tokens(tokens: std::collections::HashSet<String>) -> Self {
         Self {
             nodes: Vec::new(),
             static_segment: String::new(),
             sites: Rc::new(Cell::new(0)),
             repeats: false,
+            tokens: Rc::new(tokens),
         }
     }
 
@@ -50,6 +61,7 @@ impl ViewBuilder {
             static_segment: String::new(),
             sites: Rc::clone(&self.sites),
             repeats,
+            tokens: Rc::clone(&self.tokens),
         }
     }
 
@@ -84,6 +96,34 @@ impl ViewBuilder {
 
     pub fn expr(&mut self, kind: ExprKind, tokens: TokenStream) {
         self.flush();
+        if matches!(kind, ExprKind::Node) {
+            // Interpolating a view token with `?` is a placement: the token's
+            // view renders here and its error propagates through the render.
+            if let Ok(syn::Expr::Try(try_expr)) = syn::parse2::<syn::Expr>(tokens.clone())
+                && let syn::Expr::Path(path) = &*try_expr.expr
+                && let Some(ident) = path.path.get_ident()
+                && self.tokens.contains(&ident.to_string())
+            {
+                self.nodes
+                    .push(Node::Place(try_expr.expr.to_token_stream()));
+                return;
+            }
+            // A bare token hides that placement can fail, so require the `?`.
+            if let Ok(ident) = syn::parse2::<syn::Ident>(tokens.clone())
+                && self.tokens.contains(&ident.to_string())
+            {
+                let message = format!(
+                    "placing child content propagates its error: write `({ident}?)`, \
+                     or claim the error first with `{ident}.take_error()`"
+                );
+                self.nodes.push(Node::Statement(Statement {
+                    tokens: quote::quote_spanned! { ident.span() =>
+                        compile_error!(#message);
+                    },
+                }));
+                return;
+            }
+        }
         self.nodes.push(Node::ExprNode(ExprNode { kind, tokens }));
     }
 

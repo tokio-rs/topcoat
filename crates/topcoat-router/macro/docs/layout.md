@@ -6,19 +6,19 @@ A layout registers like any other handler: pass the function name to [`RouterBui
 
 # Handler signature
 
-The function is `async` and returns [`Result`](../type.Result.html). It takes the inner page's rendered output as `slot`, of type [`Result`](../type.Result.html)`<`[`View`](../view/struct.View.html)`>`, and embeds it (with `?`) somewhere in its own view. It may also take [`cx: &Cx`](../context/struct.Cx.html). Both parameters are recognized by name, may appear in either order, and no other parameters are accepted.
+The function is `async` and returns [`Result`](../type.Result.html). It takes the inner page as `slot`, of type [`View`](../view/struct.View.html), and places it with `(slot?)` somewhere in its own view, where the `?` propagates the inner render's error. It may also take [`cx: &Cx`](../context/struct.Cx.html). Both parameters are recognized by name, may appear in either order, and no other parameters are accepted.
 
-Because `slot` is a `Result`, a layout sees the inner page's error before it becomes a response. Matching on the error instead of bubbling it up with `?` replaces the error output; the [router](index.html#status-codes-and-headers) docs show a branded not-found page built this way.
+A layout sees the inner page's error before it becomes a response: `slot.take_error()` claims it, so the layout can match on the error instead of propagating it; the [router](index.html#status-codes-and-headers) docs show a branded not-found page built this way.
 
 # Examples
 
 Explicit path:
 
 ```rust
-use topcoat::{Result, router::layout, view::view};
+use topcoat::{Result, router::layout, view::{View, view}};
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -34,9 +34,9 @@ async fn root_layout(slot: Result) -> Result {
 Module-derived path (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings`):
 
 ```rust
-# use topcoat::{Result, router::layout, view::view};
+# use topcoat::{Result, router::layout, view::{View, view}};
 #[layout]
-async fn settings_layout(slot: Result) -> Result {
+async fn settings_layout(slot: View) -> Result {
     view! {
         <section>
             <nav>"Settings nav"</nav>
@@ -51,14 +51,14 @@ async fn settings_layout(slot: Result) -> Result {
 When several layouts match a page, they nest from least specific (outermost) to most specific (innermost):
 
 ```rust
-# use topcoat::{Result, router::{layout, page}, view::view};
+# use topcoat::{Result, router::{layout, page}, view::{View, view}};
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: View) -> Result {
     view! { <html><body>(slot?)</body></html> }
 }
 
 #[layout("/settings")]
-async fn settings_layout(slot: Result) -> Result {
+async fn settings_layout(slot: View) -> Result {
     view! {
         <div class="settings-shell">
             <nav>"Settings nav"</nav>
@@ -77,19 +77,20 @@ A request to `/settings/profile` renders `root_layout` > `settings_layout` > `pr
 
 # Layouts as components
 
-A layout doubles as a [component](../view/attr.component.html), taking a `Result<View>` as its `slot` property:
+A layout doubles as a [component](../view/attr.component.html): its child content feeds the `slot` parameter:
 
 ```rust
-# use topcoat::{Result, router::{layout, page}, view::view};
+# use topcoat::{Result, router::{layout, page}, view::{View, view}};
 # #[layout("/")]
-# async fn root_layout(slot: Result) -> Result {
+# async fn root_layout(slot: View) -> Result {
 #     view! { <body>(slot?)</body> }
 # }
 #[page("/standalone")]
 async fn standalone() -> Result {
-    let content = view! { <p>"content"</p> }?;
     view! {
-        root_layout(slot: Ok(content))
+        root_layout(
+            <p>"content"</p>
+        )
     }
 }
 ```

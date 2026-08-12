@@ -80,7 +80,7 @@ async fn product_detail(cx: &Cx) -> Result {
             <h2 class="text-2xl font-bold tracking-tight">"Related products"</h2>
             <div class="mt-6 grid grid-cols-2 gap-6 md:grid-cols-4">
                 for product in &related {
-                    product_card(product: product)
+                    product_card(key: product.id, product: product)
                 }
             </div>
         </section>

@@ -8,7 +8,7 @@ use topcoat_core_grammar::ParseOption;
 use crate::{
     template::{
         MatchArmBody, RuntimeExpr, TemplateBlock, TemplateBreak, TemplateContinue, TemplateExpr,
-        TemplateForLoop, TemplateIf, TemplateLocal, TemplateMatch,
+        TemplateForLoop, TemplateIf, TemplateLocal, TemplateMatch, TemplateReturn,
     },
     view::{
         Component, DocumentType, Element, Nodes, SignalDeclaration,
@@ -30,6 +30,7 @@ pub enum Node {
     ForLoop(TemplateForLoop<Nodes>),
     Continue(TemplateContinue),
     Break(TemplateBreak),
+    Return(TemplateReturn),
     Match(TemplateMatch<Node>),
     Block(TemplateBlock<Nodes>),
     SignalDecaration(SignalDeclaration),
@@ -65,6 +66,7 @@ impl LowerView for Node {
             Self::ForLoop(inner) => inner.lower(builder),
             Self::Continue(inner) => inner.lower(builder),
             Self::Break(inner) => inner.lower(builder),
+            Self::Return(inner) => inner.lower(builder),
             Self::Match(inner) => inner.lower(builder),
             Self::Block(inner) => inner.lower(builder),
             Self::SignalDecaration(inner) => inner.lower(builder),
@@ -94,6 +96,8 @@ impl Parse for Node {
             Self::Continue(input.parse()?)
         } else if TemplateBreak::peek(input) {
             Self::Break(input.parse()?)
+        } else if TemplateReturn::peek(input) {
+            Self::Return(input.parse()?)
         } else if TemplateMatch::<Node>::peek(input) {
             Self::Match(input.parse()?)
         } else if TemplateBlock::<Nodes>::peek(input) {
@@ -135,6 +139,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Node {
             Self::ForLoop(inner) => inner.pretty_print(printer),
             Self::Continue(inner) => inner.pretty_print(printer),
             Self::Break(inner) => inner.pretty_print(printer),
+            Self::Return(inner) => inner.pretty_print(printer),
             Self::Match(inner) => inner.pretty_print(printer),
             Self::Block(inner) => inner.pretty_print(printer),
             Self::SignalDecaration(inner) => inner.pretty_print(printer),

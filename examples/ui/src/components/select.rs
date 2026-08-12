@@ -105,17 +105,18 @@ pub async fn select(cx: &Cx, #[default] mut attrs: Attributes, #[default] child:
     // `appearance-none` fallback in specificity, making the outcome
     // independent of stylesheet order; browsers without support drop the
     // invalid declaration and keep the fallback.
+    let extra = attrs.remove("class");
     view! {
         <span
             class=(class!(
                 "relative block has-[:disabled]:opacity-50 \
                  [&>select]:[appearance:base-select] \
                  [&:has(select:open)>svg]:rotate-180",
-                attrs.remove("class"),
+                extra.clone(),
             ))
             style=(checkmark_style(cx))
         >
-            <select class=(class!(SELECT, PICKER)) (attrs)>(child)</select>
+            <select class=(class!(SELECT, PICKER)) (attrs.clone())>(child?)</select>
             icon(
                 data: iconify_icon!("feather:chevron-down"),
                 attrs: attributes! {

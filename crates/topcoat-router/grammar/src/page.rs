@@ -117,6 +117,10 @@ impl ToTokens for Page {
             .attrs
             .push(parse_quote! { #[allow(clippy::unused_async)] });
 
+        // The returning `view!` compiles through the pass emission, the same
+        // splice `#[component]` applies to its tail.
+        topcoat_view_grammar::component::expand_tail_view(&mut inner.block);
+
         // The bridge every caller goes through: associated items are reached
         // through the type rather than lexical scope, so `#ident::handler` is
         // callable from outside the anonymous const. It forwards to the user's
@@ -150,7 +154,7 @@ impl ToTokens for Page {
         let render = quote! {
             |cx, body| ::std::boxed::Box::pin(async move {
                 #parse_request
-                #ident::handler(cx #request_arg).await
+                #ident::handler(cx #request_arg).await.map(|_| ())
             })
         };
 

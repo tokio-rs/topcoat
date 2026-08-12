@@ -85,7 +85,7 @@ async fn products(cx: &Cx) -> Result {
         } else {
             <div class="mt-8 grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
                 for product in &page.items {
-                    product_card(product: product)
+                    product_card(key: product.id, product: product)
                 }
             </div>
             pagination(

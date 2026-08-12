@@ -18,11 +18,11 @@ Alpine AJAX is a plugin for Alpine.js core, so the browser must load both, in or
 use topcoat::{
     Result,
     router::layout,
-    view::view,
+    view::{View, view},
 };
 
 #[layout]
-async fn root(slot: Result) -> Result {
+async fn root(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -46,26 +46,26 @@ use topcoat::{
     alpine_ajax::ajax_request,
     context::Cx,
     router::layout,
-    view::view,
+    view::{View, view},
 };
 
 #[layout]
-async fn root(cx: &Cx, slot: Result) -> Result {
-    // Alpine AJAX only merges the requested target elements, so we do not
-    // need to return the full layout shell. Just the page's content is
-    // enough.
-    if ajax_request(cx) {
-        return slot;
-    }
+async fn root(cx: &Cx, slot: View) -> Result {
+    // Alpine AJAX only merges the requested target elements, so it does not
+    // need the full layout shell. Just the page's content is enough.
+    let partial = ajax_request(cx);
 
-    // Non-AJAX requests require a full page render including the layout shell.
     view! {
-        <html>
-            <body>
-                <nav> /* persistent navigation */ </nav>
-                <main>(slot?)</main>
-            </body>
-        </html>
+        if partial {
+            (slot?)
+        } else {
+            <html>
+                <body>
+                    <nav> /* persistent navigation */ </nav>
+                    <main>(slot?)</main>
+                </body>
+            </html>
+        }
     }
 }
 ```
@@ -110,7 +110,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{StatusCode, response::{IntoResponse, Response}, route},
-    view::view,
+    view::markup,
 };
 
 #[route(POST "/comments")]
@@ -120,7 +120,8 @@ async fn create_comment(cx: &Cx /* , Form(input): Form<NewComment> */) -> Result
     if let Some(message) = error {
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
-            view! {
+            markup! {
+                cx =>
                 <form id="comment_form" x-target="comment_form comments" x-target.422="comment_form">
                     <textarea name="body"></textarea>
                     <p class="error">(message)</p>

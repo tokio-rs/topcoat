@@ -5,13 +5,13 @@ use topcoat_core::{
 
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
-    ElementNameViewParts, NodeViewParts, Unescaped, View,
+    ElementNameViewParts, Markup, NodeViewParts, Unescaped,
     buffer::{InstructionPtr, Renderer, ViewBuffer},
     format::Formatter,
     html::HtmlContext,
     identity::Identity,
     part::PartsWriter,
-    pass::{children::ViewToken, scope::PassScope},
+    pass::{children::View, scope::PassScope},
 };
 
 /// The output buffer of one render.
@@ -121,7 +121,7 @@ impl RenderBuffer {
     ///
     /// Panics if the view is a handle into a still building `view!`
     /// invocation instead of a sealed value.
-    pub fn view(&mut self, view: View) {
+    pub fn view(&mut self, view: Markup) {
         self.parts(HtmlContext::Text).push_view(view);
     }
 
@@ -144,7 +144,7 @@ impl RenderBuffer {
     ///
     /// Panics if the token is placed twice in one pass: one slot cannot fill
     /// two positions.
-    pub fn place(&mut self, token: ViewToken) -> Result<(), Error> {
+    pub fn place(&mut self, token: View) -> Result<(), Error> {
         let hash = token.identity.hash();
         let error = PassScope::with(|state| {
             let pass = state.pass;

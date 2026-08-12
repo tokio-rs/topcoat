@@ -9,7 +9,7 @@ use topcoat::{
         error::{SeeOther, see_other},
         layout, page, path_param, route,
     },
-    view::{component, view},
+    view::{View, component, view},
 };
 
 #[tokio::main]
@@ -47,7 +47,7 @@ struct Todo {
 }
 
 #[layout("/")]
-async fn root(slot: Result) -> Result {
+async fn root(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -62,6 +62,12 @@ async fn root(slot: Result) -> Result {
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
+    // Loads run in the body, once; the view below renders once per pass.
+    let todos = Todo::all()
+        .order_by(Todo::fields().id().asc())
+        .exec(&mut db(cx))
+        .await?;
+
     view! {
         <h1>"Toasty Todos"</h1>
 
@@ -70,12 +76,6 @@ async fn home(cx: &Cx) -> Result {
             <button type="submit">"Add"</button>
         </form>
 
-        // A `view!` body can run statements, including awaiting a query.
-        let todos = Todo::all()
-            .order_by(Todo::fields().id().asc())
-            .exec(&mut db(cx))
-            .await?;
-
         if todos.is_empty() {
             <p>"All done!"</p>
         } else {
@@ -83,9 +83,9 @@ async fn home(cx: &Cx) -> Result {
                 style="list-style: none; padding: 0; display: flex; \
                     flex-direction: column; gap: 0.375em;"
             >
-                for todo in todos {
+                for todo in &todos {
                     <li style="display: flex; align-items: center; gap: 0.5em;">
-                        toggle_checkbox(todo: &todo)
+                        toggle_checkbox(key: todo.id, todo: &todo)
 
                         if todo.done {
                             <s>(&todo.title)</s>
@@ -93,7 +93,7 @@ async fn home(cx: &Cx) -> Result {
                             (&todo.title)
                         }
 
-                        delete_button(todo: &todo)
+                        delete_button(key: todo.id, todo: &todo)
                     </li>
                 }
             </ul>

@@ -18,6 +18,7 @@ pub use css::*;
 pub use format::*;
 pub use html::*;
 pub use part::*;
+pub use pass::View;
 pub use props::*;
 pub use string::*;
 pub use view::*;

@@ -150,17 +150,13 @@ pub async fn button(
     #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
+    let extra = attrs.remove("class");
     view! {
         <button
-            class=(class!(
-                BASE,
-                variant.classes(),
-                size.classes(),
-                attrs.remove("class"),
-            ))
-            (attrs)
+            class=(class!(BASE, variant.classes(), size.classes(), extra.clone()))
+            (attrs.clone())
         >
-            (child)
+            (child?)
         </button>
     }
 }

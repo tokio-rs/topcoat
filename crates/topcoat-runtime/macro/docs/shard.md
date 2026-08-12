@@ -7,7 +7,7 @@ use topcoat::{Result, context::Cx, runtime::shard, view::view};
 async fn search_results(cx: &Cx, query: String) -> Result {
     let products = search_products(cx, &query).await?;
     view! {
-        for product in products {
+        for product in &products {
             <div>(product)</div>
         }
     }
@@ -22,7 +22,7 @@ Inside a [`view!`] body, call a shard like a component, passing a runtime expres
 ```rust
 # use topcoat::{Result, view::*, runtime::{shard, Event}};
 # #[shard]
-# async fn search_results(query: String) -> Result { view! { (query) } }
+# async fn search_results(query: String) -> Result { view! { (&query) } }
 # #[component]
 # async fn example() -> Result {
 view! {
@@ -56,7 +56,7 @@ async fn ledger_rows(cx: &Cx, account: String) -> Result {
     let rows = fetch_rows(cx, &user, &account).await?;
 
     view! {
-        for row in rows {
+        for row in &rows {
             <div>(row)</div>
         }
     }
@@ -81,7 +81,7 @@ Each shard is served by a route on the [`Router`]. `.discover()` registers every
 ```rust
 # use topcoat::{Result, router::Router, runtime::{shard, RouterBuilderShardExt}, view::view};
 # #[shard]
-# async fn search_results(query: String) -> Result { view! { (query) } }
+# async fn search_results(query: String) -> Result { view! { (&query) } }
 let router = Router::builder().shard(search_results).build();
 ```
 

@@ -31,9 +31,9 @@ pub async fn link(
 ) -> Result<View> {
     view! {
         if preload {
-            for face in font.faces().iter() {
+            for (index, face) in font.faces().iter().enumerate() {
                 if let Some(source) = face.src().first() {
-                    preload_link(source: source)
+                    preload_link(key: index, source: source)
                 }
             }
         }

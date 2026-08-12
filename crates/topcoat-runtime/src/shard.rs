@@ -5,9 +5,9 @@ use topcoat_core::{
     error::{Error, Result},
 };
 use topcoat_router::{
-    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouterBuilder, response::IntoResponse,
+    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouterBuilder, content::Html,
+    response::IntoResponse,
 };
-use topcoat_view::View;
 
 pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/shards";
 
@@ -30,7 +30,7 @@ pub type ShardRenderFn =
     for<'cx> fn(
         cx: &'cx Cx,
         body: Body,
-    ) -> Pin<Box<dyn Future<Output = Result<View, Error>> + Send + 'cx>>;
+    ) -> Pin<Box<dyn Future<Output = Result<String, Error>> + Send + 'cx>>;
 
 #[derive(Debug, Clone)]
 pub struct ErasedShard {
@@ -57,7 +57,7 @@ impl ErasedShard {
     /// Propagates any error returned by the shard's render function, such as a
     /// failure to deserialize the request body.
     #[inline]
-    pub async fn render(&self, cx: &Cx, body: Body) -> Result<View> {
+    pub async fn render(&self, cx: &Cx, body: Body) -> Result<String> {
         (self.render)(cx, body).await
     }
 }
@@ -93,8 +93,8 @@ impl Route for ShardRoute {
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
         Box::pin(async move {
-            let view = (self.shard.render)(cx, body).await?;
-            view.into_response(cx)
+            let html = (self.shard.render)(cx, body).await?;
+            Html(html).into_response(cx)
         })
     }
 }

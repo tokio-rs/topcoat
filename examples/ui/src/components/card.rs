@@ -40,19 +40,21 @@ const CARD: StaticClass = class!(
 /// ```
 #[component]
 pub async fn card(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! { <div class=(class!(CARD, attrs.remove("class"))) (attrs)>(child)</div> }
+    let extra = attrs.remove("class");
+    view! { <div class=(class!(CARD, extra.clone())) (attrs.clone())>(child?)</div> }
 }
 
 /// The opening section of a [`card`], stacking a [`card_title`] and an
 /// optional [`card_description`].
 #[component]
 pub async fn card_header(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
+    let extra = attrs.remove("class");
     view! {
         <div
-            class=(class!("flex flex-col gap-1.5 px-6", attrs.remove("class")))
-            (attrs)
+            class=(class!("flex flex-col gap-1.5 px-6", extra.clone()))
+            (attrs.clone())
         >
-            (child)
+            (child?)
         </div>
     }
 }
@@ -60,9 +62,10 @@ pub async fn card_header(#[default] mut attrs: Attributes, #[default] child: Vie
 /// The heading of a [`card`], rendered as an `<h3>`.
 #[component]
 pub async fn card_title(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
+    let extra = attrs.remove("class");
     view! {
-        <h3 class=(class!("leading-none font-semibold", attrs.remove("class"))) (attrs)>
-            (child)
+        <h3 class=(class!("leading-none font-semibold", extra.clone())) (attrs.clone())>
+            (child?)
         </h3>
     }
 }
@@ -70,12 +73,13 @@ pub async fn card_title(#[default] mut attrs: Attributes, #[default] child: View
 /// The supporting text under a [`card_title`].
 #[component]
 pub async fn card_description(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
+    let extra = attrs.remove("class");
     view! {
         <p
-            class=(class!("text-sm text-muted-foreground", attrs.remove("class")))
-            (attrs)
+            class=(class!("text-sm text-muted-foreground", extra.clone()))
+            (attrs.clone())
         >
-            (child)
+            (child?)
         </p>
     }
 }
@@ -83,18 +87,20 @@ pub async fn card_description(#[default] mut attrs: Attributes, #[default] child
 /// The main body of a [`card`].
 #[component]
 pub async fn card_content(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! { <div class=(class!("px-6", attrs.remove("class"))) (attrs)>(child)</div> }
+    let extra = attrs.remove("class");
+    view! { <div class=(class!("px-6", extra.clone())) (attrs.clone())>(child?)</div> }
 }
 
 /// The closing section of a [`card`], a horizontal row for actions.
 #[component]
 pub async fn card_footer(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
+    let extra = attrs.remove("class");
     view! {
         <div
-            class=(class!("flex items-center gap-2 px-6", attrs.remove("class")))
-            (attrs)
+            class=(class!("flex items-center gap-2 px-6", extra.clone()))
+            (attrs.clone())
         >
-            (child)
+            (child?)
         </div>
     }
 }

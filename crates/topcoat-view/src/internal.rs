@@ -28,7 +28,7 @@ use topcoat_core::{context::Cx, error::Result};
 pub use crate::buffer::ViewSlot;
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
-    ElementNameViewParts, HtmlContext, NodeViewParts, PartsWriter, Unescaped, View,
+    ElementNameViewParts, HtmlContext, Markup, NodeViewParts, PartsWriter, Unescaped,
     buffer::{ViewBuffer, ViewBufferScope},
 };
 
@@ -39,7 +39,7 @@ use crate::{
 /// stays a handle into it. Otherwise this invocation is the root: a fresh
 /// buffer is installed while `fut` polls, and the returned view takes
 /// ownership of it.
-pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Result<View>> {
+pub fn build(fut: impl Future<Output = Result<Markup>>) -> impl Future<Output = Result<Markup>> {
     ViewBufferScope::scope(fut).map(|(view, buffer)| Ok(view?.seal(buffer)))
 }
 
@@ -51,7 +51,7 @@ pub fn build(fut: impl Future<Output = Result<View>>) -> impl Future<Output = Re
 /// blocks, usually a single [`block`] or [`write_block`]. Runtime
 /// collections like [`Attributes`](crate::Attributes) capture values
 /// through this, so they work standalone as well as inside a `view!`.
-pub fn build_sync(f: impl FnOnce() -> View) -> View {
+pub fn build_sync(f: impl FnOnce() -> Markup) -> Markup {
     let (view, buffer) = ViewBufferScope::scope_sync(f);
     view.seal(buffer)
 }
@@ -68,7 +68,7 @@ pub fn build_sync(f: impl FnOnce() -> View) -> View {
 /// # Panics
 ///
 /// Panics if no view is building on the current task.
-pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> View {
+pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> Markup {
     write_block(|parts| f(&mut Builder { cx, parts }))
 }
 
@@ -82,7 +82,7 @@ pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> View {
 /// # Panics
 ///
 /// Panics if no view is building on the current task.
-pub fn write_block(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+pub fn write_block(f: impl FnOnce(&mut PartsWriter<'_>)) -> Markup {
     ViewBufferScope::with(|buffer| PartsWriter::block(buffer, f))
 }
 
@@ -96,7 +96,7 @@ pub fn write_block(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
 ///
 /// Panics if no view is building on the current task.
 #[must_use]
-pub fn reserve() -> (View, ViewSlot) {
+pub fn reserve() -> (Markup, ViewSlot) {
     ViewBufferScope::with(ViewBuffer::reserve_view)
 }
 
@@ -104,7 +104,7 @@ pub fn reserve() -> (View, ViewSlot) {
 ///
 /// Splices a view without components into a joined position, like the branch
 /// of an `if` whose other branch renders components.
-pub fn ready(view: View) -> futures_util::future::Ready<Result<View>> {
+pub fn ready(view: Markup) -> futures_util::future::Ready<Result<Markup>> {
     futures_util::future::ready(Ok(view))
 }
 
@@ -131,7 +131,7 @@ pub fn in_context<R>(
 ///
 /// Panics if the view was built in a different, still building buffer.
 #[inline]
-pub fn view(parts: &mut PartsWriter<'_>, view: View) {
+pub fn view(parts: &mut PartsWriter<'_>, view: Markup) {
     parts.push_view(view);
 }
 
@@ -228,7 +228,7 @@ impl Builder<'_, '_, '_> {
     ///
     /// Panics if the view was built in a different, still building buffer.
     #[inline]
-    pub fn view(&mut self, view: View) {
+    pub fn view(&mut self, view: Markup) {
         self.parts.push_view(view);
     }
 }

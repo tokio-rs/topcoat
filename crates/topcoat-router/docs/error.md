@@ -42,28 +42,31 @@ The methods mirror the constructors: [`ok_or_not_found`](RouterErrorExt::ok_or_n
 
 # Catching an error
 
-An error keeps its type on the way out, so an outer handler can pick it up with `downcast_ref` and respond with a view instead. For example, a layout can replace a [`ForbiddenError`] bubbling out of any page below it with a branded access-denied page:
+An error keeps its type on the way out, so an outer handler can pick it up with `downcast_ref` and respond with a view instead. A layout claims its slot's error with `slot.take_error()`, so it can replace a [`ForbiddenError`] bubbling out of any page below it with a branded access-denied page:
 
 ```rust
 use topcoat::{
     Result,
     router::{StatusCode, error::ForbiddenError, layout},
-    view::view,
+    view::{View, view},
 };
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    let content = match slot {
-        Err(error) if error.downcast_ref::<ForbiddenError>().is_some() => view! {
-            (StatusCode::FORBIDDEN)
-            <h1>"Access denied"</h1>
-        },
-        content => content,
-    }?;
-
+async fn root_layout(slot: View) -> Result {
     view! {
         <html>
-            <body>(content)</body>
+            <body>
+                match slot.take_error() {
+                    Some(error) if error.downcast_ref::<ForbiddenError>().is_some() => {
+                        (StatusCode::FORBIDDEN)
+                        <h1>"Access denied"</h1>
+                    }
+                    Some(error) => {
+                        return Err(error);
+                    }
+                    None => (slot?)
+                }
+            </body>
         </html>
     }
 }

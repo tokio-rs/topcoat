@@ -59,7 +59,7 @@ impl InstructionBuffer {
                 Instruction::Ret => "Ret",
                 Instruction::Jmp { .. } => "Jmp",
                 Instruction::Placeholder => "Placeholder",
-                Instruction::View { .. } => "View",
+                Instruction::Markup { .. } => "Markup",
                 Instruction::Bool(_) => "Bool",
                 Instruction::I8(_) => "I8",
                 Instruction::I16(_) => "I16",

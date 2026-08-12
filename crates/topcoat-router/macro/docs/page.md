@@ -43,7 +43,7 @@ Declaring a method (a form submission answered with a rendered view):
 # struct Signup { email: String }
 #[page(POST "/signup")]
 async fn signup(Form(input): Form<Signup>) -> Result {
-    view! { <h1>"Welcome, " (input.email)</h1> }
+    view! { <h1>"Welcome, " (&input.email)</h1> }
 }
 ```
 
@@ -56,7 +56,7 @@ Reading a request body:
 # struct Search { q: String }
 #[page("/contact")]
 async fn contact(Form(input): Form<Search>) -> Result {
-    view! { <main>"searching for " (input.q)</main> }
+    view! { <main>"searching for " (&input.q)</main> }
 }
 ```
 
@@ -71,15 +71,14 @@ A page doubles as a [component](../view/attr.component.html): calling it inside 
 # struct Search { q: String }
 # #[page("/contact")]
 # async fn contact(Form(input): Form<Search>) -> Result {
-#     view! { <main>"searching for " (input.q)</main> }
+#     view! { <main>"searching for " (&input.q)</main> }
 # }
 #[page("/preview")]
 async fn preview() -> Result {
-    let query = Search {
-        q: String::from("topcoat"),
-    };
     view! {
-        contact(body: Form(query))
+        contact(body: Form(Search {
+            q: String::from("topcoat"),
+        }))
     }
 }
 ```

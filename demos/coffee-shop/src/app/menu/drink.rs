@@ -82,10 +82,12 @@ async fn drink_page(cx: &Cx) -> Result {
         <div class="mt-6 flex items-center gap-4">
             // The click handler calls the procedure on the server and puts
             // its return value into the `confirmation` signal.
+            let order_name = name.clone();
             button(
                 attrs: attributes! {
                     @click=$(async move |_e: Event| {
-                        let message = place_order(name.to_owned(), quantity.get()).await;
+                        let message = place_order(order_name.to_owned(), quantity.get())
+                            .await;
                         confirmation.set(message);
                     })
                 },

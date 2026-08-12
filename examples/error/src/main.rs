@@ -6,7 +6,7 @@ use topcoat::{
         error::{ForbiddenError, NotFoundError, RouterErrorExt, forbidden},
         layout, not_found, page, path_param,
     },
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -32,23 +32,24 @@ async fn home() -> Result {
 // An error keeps its type on the way out, so the layout can downcast it and
 // replace it with a branded error page.
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    let content = match slot {
-        Err(error) if error.downcast_ref::<NotFoundError>().is_some() => view! {
-            (StatusCode::NOT_FOUND)
-            <h1>"Page not found"</h1>
-        },
-        Err(error) if error.downcast_ref::<ForbiddenError>().is_some() => view! {
-            (StatusCode::FORBIDDEN)
-            <h1>"Access denied"</h1>
-        },
-        content => content,
-    }?;
-
+async fn root_layout(slot: View) -> Result {
     view! {
         <html>
             <body>
-                (content)
+                match slot.take_error() {
+                    Some(error) => if error.downcast_ref::<NotFoundError>().is_some() {
+                        (StatusCode::NOT_FOUND)
+                        <h1>"Page not found"</h1>
+                    }
+                    Some(error) => if error.downcast_ref::<ForbiddenError>().is_some() {
+                        (StatusCode::FORBIDDEN)
+                        <h1>"Access denied"</h1>
+                    }
+                    Some(error) => {
+                        return Err (error);
+                    }
+                    None => (slot?),
+                }
                 <p><a href="/">"Home"</a></p>
             </body>
         </html>

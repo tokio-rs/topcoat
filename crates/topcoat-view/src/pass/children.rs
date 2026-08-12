@@ -79,8 +79,44 @@ impl Drop for ChildEntry<'_> {
 /// placed with [`RenderBuffer::place`]. The token is a plain name: the
 /// content's state stays with its owner, so the token carries no borrow.
 #[derive(Clone, Copy)]
-pub struct ViewToken {
+pub struct View {
     pub(crate) identity: Identity,
+}
+
+impl View {
+    /// A token that places nothing: the default for an omitted child.
+    pub const EMPTY: Self = View {
+        identity: Identity::ROOT.child(SiteKey::new("topcoat-empty-view", 0, 0, 0)),
+    };
+
+    /// Claims the error that ended this view's render, if it failed.
+    ///
+    /// The catch surface for a slot: match on it in the render, handle the
+    /// error with custom UI, and place the view in the healthy arm.
+    /// Claiming consumes the error, so neither a later placement nor the
+    /// owner sees it again.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no pass is running on the current task.
+    #[must_use]
+    pub fn take_error(self) -> Option<Error> {
+        let hash = self.identity.hash();
+        PassScope::with(|state| {
+            let content_state = state.content.get_mut(&hash)?;
+            let error = content_state.error.take();
+            if error.is_some() {
+                state.stashed -= 1;
+            }
+            error
+        })
+    }
+}
+
+impl Default for View {
+    fn default() -> Self {
+        View::EMPTY
+    }
 }
 
 /// A component's children, keyed by invocation identity.
@@ -115,7 +151,7 @@ impl<'f> Children<'f> {
         &mut self,
         out: &mut RenderBuffer,
         site: SiteKey,
-        mk: impl FnOnce() -> F,
+        mk: impl FnOnce() -> Result<F>,
     ) -> Result<()>
     where
         F: Future<Output = Result<()>> + Send + 'f,
@@ -135,7 +171,7 @@ impl<'f> Children<'f> {
         out: &mut RenderBuffer,
         site: SiteKey,
         key: impl IdentityKey,
-        mk: impl FnOnce() -> F,
+        mk: impl FnOnce() -> Result<F>,
     ) -> Result<()>
     where
         F: Future<Output = Result<()>> + Send + 'f,
@@ -156,7 +192,7 @@ impl<'f> Children<'f> {
         &mut self,
         out: &mut RenderBuffer,
         site: SiteKey,
-        mk: impl FnOnce() -> F,
+        mk: impl FnOnce() -> Result<F>,
     ) -> Result<()>
     where
         F: Future<Output = Result<()>> + Send + 'f,
@@ -164,29 +200,84 @@ impl<'f> Children<'f> {
         self.advance_inner(out, Identity::current().child(site), true, mk)
     }
 
+    /// Whether the child invoked at `site` was already born, so the
+    /// generated render evaluates props and content only on the birth pass.
+    #[must_use]
+    pub fn has(&self, site: SiteKey) -> bool {
+        self.map
+            .contains_key(&Identity::current().child(site).hash())
+    }
+
+    /// Like [`Children::has`], for a keyed invocation.
+    #[must_use]
+    pub fn has_keyed(&self, site: SiteKey, key: impl IdentityKey) -> bool {
+        self.map
+            .contains_key(&Identity::current().keyed_child(site, key).hash())
+    }
+
+    /// Advances a child that was born on an earlier pass.
+    ///
+    /// # Errors
+    ///
+    /// A child that failed is returned here, so the caller propagates it
+    /// with `?` or catches it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the child was never born; the generated render checks
+    /// [`Children::has`] first.
+    pub fn advance_existing(&mut self, out: &mut RenderBuffer, site: SiteKey) -> Result<()> {
+        self.advance_present(out, Identity::current().child(site))
+    }
+
+    /// Like [`Children::advance_existing`], for a keyed invocation.
+    ///
+    /// # Errors
+    ///
+    /// A child that failed is returned here, so the caller propagates it
+    /// with `?` or catches it.
+    pub fn advance_existing_keyed(
+        &mut self,
+        out: &mut RenderBuffer,
+        site: SiteKey,
+        key: impl IdentityKey,
+    ) -> Result<()> {
+        self.advance_present(out, Identity::current().keyed_child(site, key))
+    }
+
     fn advance_inner<F>(
         &mut self,
         out: &mut RenderBuffer,
         identity: Identity,
         catching: bool,
-        mk: impl FnOnce() -> F,
+        mk: impl FnOnce() -> Result<F>,
     ) -> Result<()>
     where
         F: Future<Output = Result<()>> + Send + 'f,
     {
-        let pass = PassScope::with(|state| state.pass);
         let hash = identity.hash();
-        let entry = self.map.entry(hash).or_insert_with(|| {
+        if let Entry::Vacant(entry) = self.map.entry(hash) {
+            let fut = mk()?;
             PassScope::with(|state| state.births.insert(hash));
-            ChildEntry {
+            entry.insert(ChildEntry {
                 identity,
-                fut: Some(Box::pin(InstallFuture::new(identity, mk()))),
+                fut: Some(Box::pin(InstallFuture::new(identity, fut))),
                 catching,
                 content: false,
                 stashed: None,
                 advanced_pass: 0,
-            }
-        });
+            });
+        }
+        self.advance_present(out, identity)
+    }
+
+    fn advance_present(&mut self, out: &mut RenderBuffer, identity: Identity) -> Result<()> {
+        let pass = PassScope::with(|state| state.pass);
+        let hash = identity.hash();
+        let entry = self
+            .map
+            .get_mut(&hash)
+            .expect("a child advanced as existing was born on an earlier pass");
         assert!(
             entry.advanced_pass < pass,
             "a component was advanced twice in one pass: a repeated \
@@ -233,7 +324,7 @@ impl<'f> Children<'f> {
     ///
     /// Panics if the same identity is advanced twice in one pass, which means
     /// a repeated invocation is missing its `key`.
-    pub fn content<F>(&mut self, site: SiteKey, mk: impl FnOnce() -> F) -> Result<ViewToken>
+    pub fn content<F>(&mut self, site: SiteKey, mk: impl FnOnce() -> Result<F>) -> Result<View>
     where
         F: Future<Output = Result<()>> + Send + 'f,
     {
@@ -250,34 +341,74 @@ impl<'f> Children<'f> {
         &mut self,
         site: SiteKey,
         key: impl IdentityKey,
-        mk: impl FnOnce() -> F,
-    ) -> Result<ViewToken>
+        mk: impl FnOnce() -> Result<F>,
+    ) -> Result<View>
     where
         F: Future<Output = Result<()>> + Send + 'f,
     {
         self.content_inner(Identity::current().keyed_child(site, key), mk)
     }
 
-    fn content_inner<F>(&mut self, identity: Identity, mk: impl FnOnce() -> F) -> Result<ViewToken>
+    /// Advances content that was born on an earlier pass and returns its
+    /// token again.
+    ///
+    /// # Errors
+    ///
+    /// Custody of an unclaimed content error is delivered here, as from
+    /// [`Children::content`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the content was never born; the generated render checks
+    /// [`Children::has`] on its invocation first.
+    pub fn content_existing(&mut self, site: SiteKey) -> Result<View> {
+        self.content_present(Identity::current().child(site))
+    }
+
+    /// Like [`Children::content_existing`], for a keyed invocation.
+    ///
+    /// # Errors
+    ///
+    /// Custody of an unclaimed content error is delivered here, as from
+    /// [`Children::content`].
+    pub fn content_existing_keyed(&mut self, site: SiteKey, key: impl IdentityKey) -> Result<View> {
+        self.content_present(Identity::current().keyed_child(site, key))
+    }
+
+    fn content_inner<F>(
+        &mut self,
+        identity: Identity,
+        mk: impl FnOnce() -> Result<F>,
+    ) -> Result<View>
     where
         F: Future<Output = Result<()>> + Send + 'f,
     {
-        let pass = PassScope::with(|state| state.pass);
         let hash = identity.hash();
-        let entry = self.map.entry(hash).or_insert_with(|| {
+        if let Entry::Vacant(entry) = self.map.entry(hash) {
+            let fut = mk()?;
             PassScope::with(|state| {
                 state.births.insert(hash);
                 state.content.insert(hash, ContentState::default());
             });
-            ChildEntry {
+            entry.insert(ChildEntry {
                 identity,
-                fut: Some(Box::pin(InstallFuture::new(identity, mk()))),
+                fut: Some(Box::pin(InstallFuture::new(identity, fut))),
                 catching: false,
                 content: true,
                 stashed: None,
                 advanced_pass: 0,
-            }
-        });
+            });
+        }
+        self.content_present(identity)
+    }
+
+    fn content_present(&mut self, identity: Identity) -> Result<View> {
+        let pass = PassScope::with(|state| state.pass);
+        let hash = identity.hash();
+        let entry = self
+            .map
+            .get_mut(&hash)
+            .expect("content advanced as existing was born on an earlier pass");
         assert!(
             entry.advanced_pass < pass,
             "a component was advanced twice in one pass: a repeated \
@@ -310,7 +441,7 @@ impl<'f> Children<'f> {
         if let Poll::Ready(Err(error)) = poll_child(entry, &mut ctx) {
             record_content_error(hash, error);
         }
-        Ok(ViewToken { identity })
+        Ok(View { identity })
     }
 
     /// Evicts every child not advanced during the current pass. The generated

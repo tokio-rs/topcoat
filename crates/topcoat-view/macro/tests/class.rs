@@ -1,16 +1,16 @@
 use topcoat::{
     context::Cx,
-    view::{Class, class, view},
+    view::{Class, class, markup},
 };
 
-fn r(v: topcoat::Result) -> String {
+fn r(v: topcoat::Result<topcoat::view::Markup>) -> String {
     v.unwrap().render(&Cx::default())
 }
 
 #[tokio::test]
 async fn literal_entries_render_space_separated() {
     let cx = &Cx::default();
-    let html = r(view! { cx => <button class=(class!("btn", "btn-lg"))>"go"</button> });
+    let html = r(markup! { cx => <button class=(class!("btn", "btn-lg"))>"go"</button> });
     assert_eq!(html, r#"<button class="btn btn-lg">go</button>"#);
 }
 
@@ -18,7 +18,7 @@ async fn literal_entries_render_space_separated() {
 async fn true_condition_includes_the_entry() {
     let is_active = true;
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!("btn", "active" if is_active))></p> });
+    let html = r(markup! { cx => <p class=(class!("btn", "active" if is_active))></p> });
     assert_eq!(html, r#"<p class="btn active"></p>"#);
 }
 
@@ -26,7 +26,7 @@ async fn true_condition_includes_the_entry() {
 async fn false_condition_skips_the_entry_and_separator() {
     let is_active = false;
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!("btn", "active" if is_active))></p> });
+    let html = r(markup! { cx => <p class=(class!("btn", "active" if is_active))></p> });
     assert_eq!(html, r#"<p class="btn"></p>"#);
 }
 
@@ -34,7 +34,7 @@ async fn false_condition_skips_the_entry_and_separator() {
 async fn else_branch_renders_the_alternative() {
     let enabled = false;
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!("on" if enabled else "off"))></p> });
+    let html = r(markup! { cx => <p class=(class!("on" if enabled else "off"))></p> });
     assert_eq!(html, r#"<p class="off"></p>"#);
 }
 
@@ -43,7 +43,7 @@ async fn else_branch_with_expression_renders_the_taken_side() {
     let enabled = true;
     let fallback = String::from("fallback");
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!("on" if enabled else fallback))></p> });
+    let html = r(markup! { cx => <p class=(class!("on" if enabled else fallback))></p> });
     assert_eq!(html, r#"<p class="on"></p>"#);
 }
 
@@ -51,7 +51,7 @@ async fn else_branch_with_expression_renders_the_taken_side() {
 async fn none_option_is_omitted_without_separator() {
     let variant: Option<&str> = None;
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!("btn", variant, "rounded"))></p> });
+    let html = r(markup! { cx => <p class=(class!("btn", variant, "rounded"))></p> });
     assert_eq!(html, r#"<p class="btn rounded"></p>"#);
 }
 
@@ -59,14 +59,14 @@ async fn none_option_is_omitted_without_separator() {
 async fn all_entries_absent_omits_the_attribute() {
     let variant: Option<&str> = None;
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!(variant, "active" if false))></p> });
+    let html = r(markup! { cx => <p class=(class!(variant, "active" if false))></p> });
     assert_eq!(html, "<p></p>");
 }
 
 #[tokio::test]
 async fn empty_class_omits_the_attribute() {
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!())></p> });
+    let html = r(markup! { cx => <p class=(class!())></p> });
     assert_eq!(html, "<p></p>");
 }
 
@@ -74,7 +74,7 @@ async fn empty_class_omits_the_attribute() {
 async fn dynamic_entries_are_escaped() {
     let value = String::from("a\"b");
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!(value))></p> });
+    let html = r(markup! { cx => <p class=(class!(value))></p> });
     assert_eq!(html, r#"<p class="a&quot;b"></p>"#);
 }
 
@@ -82,7 +82,7 @@ async fn dynamic_entries_are_escaped() {
 async fn vec_entries_render_with_separators() {
     let sizes = vec!["px-4".to_owned(), "py-2".to_owned()];
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!("btn", sizes))></p> });
+    let html = r(markup! { cx => <p class=(class!("btn", sizes))></p> });
     assert_eq!(html, r#"<p class="btn px-4 py-2"></p>"#);
 }
 
@@ -90,14 +90,14 @@ async fn vec_entries_render_with_separators() {
 async fn nested_class_is_spliced_with_separators() {
     let base: Class<_> = class!("btn", "btn-lg");
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!("card", base))></p> });
+    let html = r(markup! { cx => <p class=(class!("card", base))></p> });
     assert_eq!(html, r#"<p class="card btn btn-lg"></p>"#);
 }
 
 #[tokio::test]
 async fn trailing_comma_is_allowed() {
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(class!("a", "b"))></p> });
+    let html = r(markup! { cx => <p class=(class!("a", "b"))></p> });
     assert_eq!(html, r#"<p class="a b"></p>"#);
 }
 
@@ -105,7 +105,7 @@ async fn trailing_comma_is_allowed() {
 async fn more_than_twelve_entries_flatten() {
     let cx = &Cx::default();
     let e = "e";
-    let html = r(view! {
+    let html = r(markup! {
         cx =>
         <p
             class=(class!(
@@ -138,6 +138,6 @@ async fn class_builds_outside_a_view() {
 
     let classes = build();
     let cx = &Cx::default();
-    let html = r(view! { cx => <p class=(classes)></p> });
+    let html = r(markup! { cx => <p class=(classes)></p> });
     assert_eq!(html, r#"<p class="btn active"></p>"#);
 }

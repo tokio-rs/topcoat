@@ -3,7 +3,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     router::{Router, layout, page},
     tailwind,
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -18,7 +18,7 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>

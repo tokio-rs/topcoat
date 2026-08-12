@@ -3107,6 +3107,7 @@ dependencies = [
  "quote",
  "syn",
  "topcoat-core-grammar",
+ "topcoat-view-grammar",
 ]
 
 [[package]]
@@ -3149,6 +3150,7 @@ dependencies = [
  "syn",
  "topcoat-core-grammar",
  "topcoat-runtime",
+ "topcoat-view-grammar",
  "uuid",
 ]
 

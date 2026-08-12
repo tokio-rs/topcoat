@@ -34,14 +34,15 @@ pub async fn spinner(
     #[default]
     mut attrs: Attributes,
 ) -> Result {
+    let extra = attrs.remove("class");
     view! {
         icon(
             data: iconify_icon!("feather:loader"),
             size: size,
-            label: label,
+            label: label.clone(),
             attrs: attributes! {
-                class=(class!("animate-spin", attrs.remove("class")))
-                (attrs)
+                class=(class!("animate-spin", extra.clone()))
+                (attrs.clone())
             }
         )
     }

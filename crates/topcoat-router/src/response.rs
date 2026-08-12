@@ -10,7 +10,7 @@ use topcoat_core::{
     context::Cx,
     error::{Error, Result},
 };
-use topcoat_view::View;
+use topcoat_view::Markup;
 
 use crate::{Body, BoxError, content::Html};
 
@@ -233,7 +233,7 @@ impl IntoResponse for Parts {
 
 /// Renders the view to HTML and applies the status code and headers it
 /// declares; a declared `Content-Type` replaces the default `text/html`.
-impl IntoResponse for View {
+impl IntoResponse for Markup {
     fn into_response(self, cx: &Cx) -> Result<Response> {
         let rendered = self.render_response(cx);
         let mut response = Html(rendered.html).into_response(cx)?;
@@ -421,7 +421,7 @@ impl_into_response_tuples!(
 #[cfg(test)]
 mod tests {
     use http_body_util::Full;
-    use topcoat::view::{View, view};
+    use topcoat::view::{Markup, markup};
 
     use super::*;
     use crate::to_bytes;
@@ -544,7 +544,7 @@ mod tests {
 
     /// Builds a view with `build`, renders it into a response, and reads the
     /// body fully into memory.
-    fn run_view(build: impl AsyncFnOnce(&Cx) -> Result<View>) -> (Parts, Bytes) {
+    fn run_view(build: impl AsyncFnOnce(&Cx) -> Result<Markup>) -> (Parts, Bytes) {
         block_on(async {
             let cx = Cx::default();
             let view = build(&cx).await.unwrap();
@@ -556,7 +556,7 @@ mod tests {
 
     #[test]
     fn view_is_an_html_response() {
-        let (parts, body) = run_view(async |cx| view! { cx => "hi" });
+        let (parts, body) = run_view(async |cx| markup! { cx => "hi" });
         assert_eq!(parts.status, StatusCode::OK);
         assert_eq!(header(&parts, "content-type"), "text/html; charset=utf-8");
         assert_eq!(&body[..], b"hi");
@@ -569,7 +569,7 @@ mod tests {
                 HeaderName::from_static("x-test"),
                 HeaderValue::from_static("1"),
             );
-            view! {
+            markup! {
                 cx =>
                 (StatusCode::IM_A_TEAPOT)
                 (header)
@@ -589,7 +589,7 @@ mod tests {
                 CONTENT_TYPE,
                 HeaderValue::from_static("application/xhtml+xml"),
             );
-            view! {
+            markup! {
                 cx =>
                 (header)
                 "hi"

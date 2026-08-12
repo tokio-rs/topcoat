@@ -309,7 +309,6 @@ mod tests {
     use std::pin::Pin;
 
     use topcoat_core::{context::Cx, error::Result};
-    use topcoat_view::View;
 
     use super::*;
     use crate::{Body, Method, ModulePageFn, OwnedMethods};
@@ -320,7 +319,7 @@ mod tests {
         fn render<'cx>(
             _cx: &'cx Cx,
             _body: Body,
-        ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>> {
+        ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>> {
             Box::pin(async { unreachable!("test render function is never called") })
         }
         ModulePageFn::new(OwnedMethods::One(Method::GET), module_path, render)

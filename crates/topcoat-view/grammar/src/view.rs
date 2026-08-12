@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// The parsed body of a `view!` invocation. Lowers to a
-/// [`runtime::View`](topcoat_view::View).
+/// [`runtime::Markup`](topcoat_view::Markup).
 pub struct View {
     /// The request context binding supplied by a leading `cx =>` argument.
     ///
@@ -52,23 +52,66 @@ impl Parse for View {
 
 impl ToTokens for View {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        // A standalone `view!` has no render loop to live in: the component
+        // macros splice the pass expansion over the returning `view!` before
+        // the body re-emits, so an invocation reaching this expansion sits
+        // in a position the component future model does not support.
+        let _ = &self.nodes;
+        quote! {
+            ::core::compile_error!(
+                "`view!` is only supported as the returning expression of a \
+                 `#[component]`, `#[page]`, or `#[layout]` function"
+            )
+        }
+        .to_tokens(tokens);
+    }
+}
+
+impl View {
+    /// Emits this view as a [`Markup`](topcoat_view::Markup) value: the
+    /// component free form behind `markup!`, for fragments that are data
+    /// rather than render code (mail bodies, patch payloads).
+    #[must_use]
+    pub fn emit_markup(&self) -> TokenStream {
         let mut builder = ViewBuilder::new();
         self.nodes.lower(&mut builder);
-        let view = builder.finish().emit_root();
+        let scope = builder.finish();
+        if scope.is_async() {
+            return quote! {
+                ::core::compile_error!(
+                    "components render through passes and cannot appear in \
+                     `markup!`; build plain markup here"
+                )
+            };
+        }
+        let markup = scope.emit_root();
+        match &self.cx {
+            Some(cx) => quote! {{ #cx #markup }},
+            None => markup,
+        }
+    }
+
+    /// Emits this view as a component's render loop: the pass expansion the
+    /// component macros splice over a returning `view!`.
+    #[must_use]
+    pub fn emit_pass(&self) -> TokenStream {
+        self.emit_pass_with_tokens(std::collections::HashSet::new())
+    }
+
+    /// Like [`View::emit_pass`], lowering bare interpolations of the named
+    /// identifiers as view token placements.
+    #[must_use]
+    pub fn emit_pass_with_tokens(&self, tokens: std::collections::HashSet<String>) -> TokenStream {
+        let mut builder = ViewBuilder::with_tokens(tokens);
+        self.nodes.lower(&mut builder);
+        let root = builder.finish().emit_pass_root();
 
         // When an explicit context is named, bind it to the `__cx` identifier
-        // the generated code (component invocations) reads from. Inside a
-        // component/page/layout this binding is already in scope, so we emit
-        // the view untouched.
+        // the generated code reads. Inside a component this binding is
+        // already in scope.
         match &self.cx {
-            Some(cx) => quote! {
-                {
-                    #cx
-                    #view
-                }
-            }
-            .to_tokens(tokens),
-            None => view.to_tokens(tokens),
+            Some(cx) => quote! {{ #cx #root }},
+            None => root,
         }
     }
 }
@@ -136,13 +179,13 @@ mod tests {
 
     #[test]
     fn explicit_cx_binds_the_context_identifier() {
-        let tokens = parse("cx => <div></div>").to_token_stream().to_string();
+        let tokens = parse("cx => <div></div>").emit_markup().to_string();
         assert!(tokens.contains("let __cx"), "{tokens}");
     }
 
     #[test]
     fn omitted_cx_emits_no_binding() {
-        let tokens = parse("<div></div>").to_token_stream().to_string();
+        let tokens = parse("<div></div>").emit_markup().to_string();
         assert!(!tokens.contains("let __cx"), "{tokens}");
     }
 }

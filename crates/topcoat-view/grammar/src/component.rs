@@ -13,7 +13,9 @@ use syn::{
     spanned::Spanned,
     visit_mut::{self, VisitMut},
 };
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
+use topcoat_core_grammar::paths::{
+    topcoat_context, topcoat_error, topcoat_view, topcoat_view_macro,
+};
 
 use crate::component::{ComponentAttr, ComponentItem};
 
@@ -86,7 +88,34 @@ impl ToTokens for Component {
             }
         }
 
-        let ReturnType::Type(_, return_ty) = &item.sig.output else {
+        // The returning `view!` compiles through the pass emission: the body
+        // above it runs once, and the loop it expands into renders once per
+        // pass. A tail that is not a `view!` is left alone, so a body that
+        // only fails still compiles. Parameters typed as view tokens lower
+        // their bare interpolations to placements.
+        let token_idents = self
+            .item
+            .item()
+            .sig
+            .inputs
+            .iter()
+            .filter_map(|input| {
+                let FnArg::Typed(pat_type) = input else {
+                    return None;
+                };
+                let Pat::Ident(pi) = &*pat_type.pat else {
+                    return None;
+                };
+                let Type::Path(path) = &*pat_type.ty else {
+                    return None;
+                };
+                let last = path.path.segments.last()?;
+                (last.ident == "View").then(|| pi.ident.to_string())
+            })
+            .collect();
+        expand_tail_view_with_tokens(&mut item.block, token_idents);
+
+        let ReturnType::Type(_, _return_ty) = &item.sig.output else {
             unreachable!("validated in Parse");
         };
 
@@ -107,7 +136,7 @@ impl ToTokens for Component {
                 unreachable!("validated in Parse");
             };
             if pi.ident == "cx" {
-                args.push(quote! { cx });
+                args.push(quote! { &cx });
             } else {
                 let mut ty = (*pat_type.ty).clone();
                 implicit_lifetime_visitor.visit_type_mut(&mut ty);
@@ -181,40 +210,46 @@ impl ToTokens for Component {
         // Refining the trait's opaque return type to the concrete boxed one is
         // deliberate and invisible to `view!` callers.
         let render = if self.attr.boxed() {
+            // The boxed future owns `props`, so the box is bounded by the
+            // props' lifetime. A trait object takes one lifetime bound, so
+            // more than one lifetime parameter cannot be expressed here.
+            let lifetimes: Vec<_> = generics.lifetimes().collect();
+            if let [_, second, ..] = lifetimes.as_slice() {
+                let message = "a boxed component takes at most one lifetime \
+                               parameter";
+                let span = second.lifetime.span();
+                quote_spanned! {span=> compile_error!(#message); }.to_tokens(tokens);
+            }
+            let bound = lifetimes
+                .first()
+                .map(|lt| &lt.lifetime)
+                .map_or_else(|| quote! {}, |lt| quote! { + #lt });
             quote! {
                 #[allow(refining_impl_trait)]
-                fn render<'__cx>(
+                fn render(
                     self,
-                    cx: &'__cx #topcoat_context::Cx,
+                    cx: #topcoat_context::Cx,
                     props: Self::Props,
                 ) -> ::core::pin::Pin<::std::boxed::Box<
-                    dyn ::core::future::Future<Output = #return_ty>
-                        + ::core::marker::Send
-                        + '__cx,
-                >>
-                where
-                    Self: '__cx,
-                    Self::Props: '__cx,
-                {
+                    dyn ::core::future::Future<
+                            Output = ::core::result::Result<(), #topcoat_error::Error>,
+                        > + ::core::marker::Send #bound,
+                >> {
                     ::std::boxed::Box::pin(async move {
                         #item
-                        #ident(cx, #(#args),*).await
+                        #ident(&cx, #(#args),*).await.map(|_| ())
                     })
                 }
             }
         } else {
             quote! {
-                async fn render<'__cx>(
+                async fn render(
                     self,
-                    cx: &'__cx #topcoat_context::Cx,
+                    cx: #topcoat_context::Cx,
                     props: Self::Props,
-                ) -> #return_ty
-                where
-                    Self: '__cx,
-                    Self::Props: '__cx,
-                {
+                ) -> ::core::result::Result<(), #topcoat_error::Error> {
                     #item
-                    #ident(cx, #(#args),*).await
+                    #ident(&cx, #(#args),*).await.map(|_| ())
                 }
             }
         };
@@ -295,4 +330,49 @@ impl VisitMut for ImplicitLifetimeVisitor {
         }
         visit_mut::visit_type_reference_mut(self, tr);
     }
+}
+
+/// Splices the pass expansion over a trailing `view!` statement, so the
+/// returning expression compiles as the component's render loop.
+/// Public for the router grammar, which splices the same expansion over
+/// page and layout tails.
+pub fn expand_tail_view(block: &mut syn::Block) {
+    expand_tail_view_with_tokens(block, std::collections::HashSet::new());
+}
+
+/// Like [`expand_tail_view`], lowering bare interpolations of the named
+/// identifiers as view token placements.
+pub fn expand_tail_view_with_tokens(
+    block: &mut syn::Block,
+    tokens: std::collections::HashSet<String>,
+) {
+    let Some(last) = block.stmts.last_mut() else {
+        return;
+    };
+    let mac = match last {
+        syn::Stmt::Expr(syn::Expr::Macro(mac_expr), None) => &mac_expr.mac,
+        syn::Stmt::Macro(stmt_mac) if stmt_mac.semi_token.is_none() => &stmt_mac.mac,
+        _ => return,
+    };
+    let Some(segment) = mac.path.segments.last() else {
+        return;
+    };
+    if segment.ident != "view" {
+        return;
+    }
+    // Reference the macro's path so the user's `view` import stays used
+    // after the call is spliced away.
+    let path = &mac.path;
+    let expansion = match syn::parse2::<crate::view::View>(mac.tokens.clone()) {
+        Ok(view) => {
+            let root = view.emit_pass_with_tokens(tokens);
+            quote::quote! {{
+                #[allow(unused_imports)]
+                use #path as _;
+                #root
+            }}
+        }
+        Err(error) => error.to_compile_error(),
+    };
+    *last = syn::Stmt::Expr(syn::Expr::Verbatim(expansion), None);
 }

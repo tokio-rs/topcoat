@@ -1,20 +1,20 @@
 use topcoat_core::context::Cx;
-use topcoat_view::{NodeViewParts, PartsWriter, View};
+use topcoat_view::{Markup, NodeViewParts, PartsWriter};
 
 #[derive(Debug, Clone)]
 pub struct Expr<T> {
     pub(crate) evaluated: T,
-    pub(crate) js: View,
+    pub(crate) js: Markup,
 }
 
 impl<T> Expr<T> {
     #[inline]
-    pub fn new(evaluated: T, js: View) -> Self {
+    pub fn new(evaluated: T, js: Markup) -> Self {
         Self { evaluated, js }
     }
 
     #[inline]
-    pub fn into_evaluated_and_js(self) -> (T, View) {
+    pub fn into_evaluated_and_js(self) -> (T, Markup) {
         (self.evaluated, self.js)
     }
 }

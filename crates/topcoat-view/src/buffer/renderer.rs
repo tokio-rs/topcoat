@@ -55,7 +55,7 @@ impl<'a> Renderer<'a> {
                 Instruction::Placeholder => {
                     panic!("tried to render a placeholder view before it was filled")
                 }
-                Instruction::View { ptr } => {
+                Instruction::Markup { ptr } => {
                     let (buffer, entry) = consts.fetch_view(*ptr);
                     Renderer::new(buffer, entry).execute(cx, f);
                 }

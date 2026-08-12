@@ -38,7 +38,7 @@ impl<K, V> Attribute<K, V> {
 /// # async fn example() -> topcoat::Result {
 /// # let my_value = Attributes::new();
 /// view! {
-///     <input (my_value)>
+///     <input (my_value.clone())>
 /// }
 /// # }
 /// ```

@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{Router, RouterBuilderDiscoverExt, layout, page, path_param, query_params},
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -15,7 +15,7 @@ async fn main() {
 // --- Layout -----------------------------------------------------------------
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>

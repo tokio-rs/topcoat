@@ -31,15 +31,15 @@ use crate::{
 /// only lives while its enclosing invocation builds; one that escapes it
 /// panics when used.
 #[derive(Debug, Default, Clone)]
-pub struct View {
-    repr: ViewRepr,
+pub struct Markup {
+    repr: MarkupRepr,
 }
 
 /// The kinds of view: a static string independent of any buffer, a handle
 /// into the buffer of an enclosing `view!` invocation still building, or an
 /// owned view carrying its own buffer.
 #[derive(Debug, Clone)]
-pub(crate) enum ViewRepr {
+pub(crate) enum MarkupRepr {
     /// Trusted static markup rendered verbatim, independent of any buffer.
     Static(&'static str),
     /// An instruction block in the still building buffer identified by
@@ -62,14 +62,14 @@ pub(crate) enum ViewRepr {
     },
 }
 
-impl Default for ViewRepr {
+impl Default for MarkupRepr {
     #[inline]
     fn default() -> Self {
         Self::Static("")
     }
 }
 
-impl View {
+impl Markup {
     /// Creates the handle for an instruction block built in the buffer
     /// identified by `buffer`, estimated to write `size_hint` bytes.
     #[inline]
@@ -79,7 +79,7 @@ impl View {
         size_hint: usize,
     ) -> Self {
         Self {
-            repr: ViewRepr::Scoped {
+            repr: MarkupRepr::Scoped {
                 buffer,
                 entry,
                 size_hint,
@@ -89,7 +89,7 @@ impl View {
 
     /// Unwraps the view into its representation.
     #[inline]
-    pub(crate) fn repr(self) -> ViewRepr {
+    pub(crate) fn repr(self) -> MarkupRepr {
         self.repr
     }
 
@@ -98,8 +98,10 @@ impl View {
     #[inline]
     pub(crate) fn size_hint(&self) -> usize {
         match &self.repr {
-            ViewRepr::Static(body) => body.len(),
-            ViewRepr::Scoped { size_hint, .. } | ViewRepr::Owned { size_hint, .. } => *size_hint,
+            MarkupRepr::Static(body) => body.len(),
+            MarkupRepr::Scoped { size_hint, .. } | MarkupRepr::Owned { size_hint, .. } => {
+                *size_hint
+            }
         }
     }
 
@@ -118,8 +120,8 @@ impl View {
             return self;
         };
         match self.repr {
-            ViewRepr::Static(_) | ViewRepr::Owned { .. } => self,
-            ViewRepr::Scoped {
+            MarkupRepr::Static(_) | MarkupRepr::Owned { .. } => self,
+            MarkupRepr::Scoped {
                 buffer: id,
                 entry,
                 size_hint,
@@ -129,7 +131,7 @@ impl View {
                     "tried to seal a view into a buffer it was not built in",
                 );
                 Self {
-                    repr: ViewRepr::Owned {
+                    repr: MarkupRepr::Owned {
                         buffer: Arc::new(buffer),
                         entry,
                         size_hint,
@@ -139,7 +141,7 @@ impl View {
         }
     }
 
-    /// Returns a `View` that renders to an empty string.
+    /// Returns a `Markup` that renders to an empty string.
     #[inline]
     #[must_use]
     pub fn empty() -> Self {
@@ -153,7 +155,7 @@ impl View {
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        matches!(self.repr, ViewRepr::Static(""))
+        matches!(self.repr, MarkupRepr::Static(""))
     }
 
     /// Creates a view from a `&'static str` without escaping it and without checking for syntax
@@ -162,7 +164,7 @@ impl View {
     #[must_use]
     pub const fn unescaped_unchecked(body: &'static str) -> Self {
         Self {
-            repr: ViewRepr::Static(body),
+            repr: MarkupRepr::Static(body),
         }
     }
 
@@ -184,8 +186,8 @@ impl View {
     #[track_caller]
     pub fn render(self, cx: &Cx) -> String {
         match self.repr {
-            ViewRepr::Static(body) => body.to_owned(),
-            ViewRepr::Scoped {
+            MarkupRepr::Static(body) => body.to_owned(),
+            MarkupRepr::Scoped {
                 buffer,
                 entry,
                 size_hint,
@@ -195,7 +197,7 @@ impl View {
                 Self::execute(buffer, entry, cx, &mut f);
                 html
             }
-            ViewRepr::Owned {
+            MarkupRepr::Owned {
                 buffer,
                 entry,
                 size_hint,
@@ -229,12 +231,12 @@ impl View {
     #[track_caller]
     pub fn render_response(self, cx: &Cx) -> RenderedResponse {
         match self.repr {
-            ViewRepr::Static(body) => RenderedResponse {
+            MarkupRepr::Static(body) => RenderedResponse {
                 html: body.to_owned(),
                 status_code: None,
                 headers: HeaderMap::new(),
             },
-            ViewRepr::Scoped {
+            MarkupRepr::Scoped {
                 buffer,
                 entry,
                 size_hint,
@@ -249,7 +251,7 @@ impl View {
                     headers,
                 }
             }
-            ViewRepr::Owned {
+            MarkupRepr::Owned {
                 buffer,
                 entry,
                 size_hint,
@@ -281,9 +283,9 @@ impl View {
     }
 }
 
-/// The output of rendering a [`View`] for an HTTP response.
+/// The output of rendering a [`Markup`] for an HTTP response.
 ///
-/// Returned by [`View::render_response`]: the rendered HTML alongside the
+/// Returned by [`Markup::render_response`]: the rendered HTML alongside the
 /// status code and headers the view declared.
 #[cfg(feature = "http")]
 #[derive(Debug)]
@@ -323,7 +325,7 @@ mod tests {
     ///
     /// Appends to the enclosing buffer inside a root build and owns a buffer
     /// of its own outside one.
-    fn sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+    fn sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> Markup {
         build_sync(|| write_block(f))
     }
 
@@ -343,8 +345,8 @@ mod tests {
 
     #[test]
     fn static_views_render_without_a_scope() {
-        assert_eq!(View::empty().render(&Cx::default()), "");
-        let view = View::unescaped_unchecked("<b>raw</b>");
+        assert_eq!(Markup::empty().render(&Cx::default()), "");
+        let view = Markup::unescaped_unchecked("<b>raw</b>");
         assert_eq!(view.render(&Cx::default()), "<b>raw</b>");
     }
 
@@ -444,7 +446,7 @@ mod tests {
             })
             .await
             .expect("the build is infallible");
-            assert!(matches!(inner.repr, ViewRepr::Scoped { .. }));
+            assert!(matches!(inner.repr, MarkupRepr::Scoped { .. }));
 
             let outer = sync(|parts| {
                 parts.push_view(inner);
@@ -467,8 +469,8 @@ mod tests {
     fn static_views_are_spliced_verbatim() {
         in_scope(async |cx| {
             let outer = sync(|parts| {
-                parts.push_view(View::unescaped_unchecked("<hr>"));
-                parts.push_view(View::empty());
+                parts.push_view(Markup::unescaped_unchecked("<hr>"));
+                parts.push_view(Markup::empty());
             });
             assert_eq!(outer.render(cx), "<hr>");
         });
@@ -499,11 +501,11 @@ mod tests {
     fn static_views_fill_a_slot_like_scoped_ones() {
         in_scope(async |cx| {
             let (placeholder, slot) = reserve();
-            slot.fill(View::unescaped_unchecked("<hr>"));
+            slot.fill(Markup::unescaped_unchecked("<hr>"));
             assert_eq!(placeholder.render(cx), "<hr>");
 
             let (placeholder, slot) = reserve();
-            slot.fill(View::empty());
+            slot.fill(Markup::empty());
             assert_eq!(placeholder.render(cx), "");
         });
     }
@@ -522,8 +524,8 @@ mod tests {
     fn filling_a_slot_twice_panics() {
         in_scope(async |_cx| {
             let (_placeholder, slot) = reserve();
-            slot.fill(View::empty());
-            slot.fill(View::empty());
+            slot.fill(Markup::empty());
+            slot.fill(Markup::empty());
         });
     }
 
@@ -531,7 +533,7 @@ mod tests {
     #[should_panic(expected = "outside the `view!` invocation it was reserved in")]
     fn filling_a_slot_in_a_different_root_build_panics() {
         let slot = in_scope(async |_cx| reserve().1);
-        in_scope(async |_cx| slot.fill(View::empty()));
+        in_scope(async |_cx| slot.fill(Markup::empty()));
     }
 
     #[test]
@@ -544,9 +546,9 @@ mod tests {
             let outer = sync(|parts| {
                 parts.push_view(inner.clone());
                 parts.push_view(inner);
-                parts.push_view(View::unescaped_unchecked("<hr>"));
+                parts.push_view(Markup::unescaped_unchecked("<hr>"));
             });
-            let ViewRepr::Scoped { size_hint, .. } = outer.repr() else {
+            let MarkupRepr::Scoped { size_hint, .. } = outer.repr() else {
                 panic!("expected a scoped view");
             };
             assert_eq!(size_hint, 8 + 8 + 4);
@@ -558,7 +560,7 @@ mod tests {
         let view = sync(|parts| {
             parts.push_str("a < b");
         });
-        assert!(matches!(view.repr, ViewRepr::Owned { .. }));
+        assert!(matches!(view.repr, MarkupRepr::Owned { .. }));
         assert_eq!(view.render(&Cx::default()), "a &lt; b");
     }
 

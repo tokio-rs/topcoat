@@ -4,9 +4,7 @@ use syn::{
     LitStr,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::{
-    topcoat_error, topcoat_router, topcoat_router_macro, topcoat_view,
-};
+use topcoat_core_grammar::paths::{topcoat_error, topcoat_router, topcoat_router_macro};
 
 /// The `not_found!` macro input: an optional URL path prefix.
 pub struct NotFound {
@@ -38,7 +36,7 @@ impl Parse for NotFound {
 
 impl ToTokens for NotFound {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let result = quote! { #topcoat_error::Result<#topcoat_view::View> };
+        let result = quote! { #topcoat_error::Result<()> };
         let page = |attr: TokenStream| {
             quote! {
                 /// The catch-all page declared by `not_found!`, resolving

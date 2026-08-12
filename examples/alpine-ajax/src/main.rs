@@ -11,7 +11,7 @@ use topcoat::{
         response::{IntoResponse, Response},
         route,
     },
-    view::view,
+    view::{View, markup, view},
 };
 
 #[tokio::main]
@@ -27,31 +27,33 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(cx: &Cx, slot: Result) -> Result {
+async fn root(cx: &Cx, slot: View) -> Result {
     // Alpine AJAX requests only need the targeted content, not the document.
-    if ajax_request(cx) {
-        return slot;
-    }
+    let partial = ajax_request(cx);
 
     view! {
-        <!DOCTYPE html>
-        <html>
-            <head>
-                // `defer` ensures that Alpine initializes after the page body
-                // has been parsed.
-                <script
-                    defer=""
-                    src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"
-                ></script>
-                <script
-                    defer=""
-                    src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"
-                ></script>
+        if partial {
+            (slot?)
+        } else {
+            <!DOCTYPE html>
+            <html>
+                <head>
+                    // `defer` ensures that Alpine initializes after the page body
+                    // has been parsed.
+                    <script
+                        defer=""
+                        src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"
+                    ></script>
+                    <script
+                        defer=""
+                        src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"
+                    ></script>
 
-                topcoat::dev::script()
-            </head>
-            <body>(slot?)</body>
-        </html>
+                    topcoat::dev::script()
+                </head>
+                <body>(slot?)</body>
+            </html>
+        }
     }
 }
 
@@ -81,7 +83,7 @@ async fn increment(cx: &Cx) -> Result<Response> {
 
     // An Alpine AJAX request only receives the targeted element.
     if ajax_request(cx) {
-        return view! { <span id="count">(count)</span> }?.into_response(cx);
+        return markup! { <span id="count">(count)</span> }?.into_response(cx);
     }
 
     // Without JavaScript, use Post/Redirect/Get and render the complete page.

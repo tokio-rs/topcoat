@@ -82,9 +82,10 @@ pub async fn badge(
     #[default] mut attrs: Attributes,
     #[default] child: View,
 ) -> Result {
+    let extra = attrs.remove("class");
     view! {
-        <span class=(class!(BASE, variant.classes(), attrs.remove("class"))) (attrs)>
-            (child)
+        <span class=(class!(BASE, variant.classes(), extra.clone())) (attrs.clone())>
+            (child?)
         </span>
     }
 }

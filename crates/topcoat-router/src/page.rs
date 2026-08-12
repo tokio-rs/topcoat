@@ -1,17 +1,20 @@
 use std::{borrow::Cow, pin::Pin};
 
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::View;
-
-use crate::{
-    Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, response::IntoResponse,
+use topcoat_view::{
+    identity::SiteKey,
+    pass::{Children, Driver, RenderBuffer, View, mount, pass_boundary},
 };
 
-/// The async render function backing a [`PageFn`].
-pub type PageRenderFn = for<'cx> fn(
-    cx: &'cx Cx,
-    body: Body,
-) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
+use crate::{
+    Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, content::Html,
+    response::IntoResponse,
+};
+
+/// The async render function backing a [`PageFn`]: the page's component
+/// future, rendering once per pass under the request's driver.
+pub type PageRenderFn =
+    for<'cx> fn(cx: &'cx Cx, body: Body) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>>;
 
 /// A page handler, backed by a plain render function, that renders a [`View`]
 /// for a specific URL path.
@@ -77,13 +80,13 @@ impl PageFn {
         &self.path
     }
 
-    /// Renders the page, returning a [`Result`].
+    /// The page's component future.
     #[must_use]
     pub fn render<'cx>(
         &self,
         cx: &'cx Cx,
         body: Body,
-    ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>> {
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>> {
         (self.render)(cx, body)
     }
 }
@@ -91,12 +94,11 @@ impl PageFn {
 #[cfg(feature = "discover")]
 inventory::collect!(PageFn);
 
-/// The async render function backing a [`LayoutFn`], receiving the rendered child content as a
-/// [`Result`]`<`[`View`]`>`.
-pub type LayoutRenderFn = for<'cx> fn(
-    cx: &'cx Cx,
-    slot: Result<View>,
-) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
+/// The async render function backing a [`LayoutFn`]: the layout's component
+/// future, receiving the token of the content it wraps and placing it in its
+/// own render.
+pub type LayoutRenderFn =
+    for<'cx> fn(cx: &'cx Cx, slot: View) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>>;
 
 /// A layout handler, backed by a plain render function, that wraps pages whose
 /// path starts with the layout's path prefix.
@@ -108,7 +110,7 @@ pub type LayoutRenderFn = for<'cx> fn(
 pub struct LayoutFn {
     /// The path prefix this layout applies to.
     path: Cow<'static, Path>,
-    /// The async render function that wraps the child content [`Result`]`<`[`View`]`>`.
+    /// The async render function that wraps the child content.
     render: LayoutRenderFn,
 }
 
@@ -124,13 +126,13 @@ impl LayoutFn {
         &self.path
     }
 
-    /// Renders the layout, embedding the given child content [`Result`]`<`[`View`]`>` as its slot.
+    /// The layout's component future, wrapping the given child content.
     #[must_use]
     pub fn render<'cx>(
         &self,
         cx: &'cx Cx,
-        slot: Result<View>,
-    ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>> {
+        slot: View,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>> {
         (self.render)(cx, slot)
     }
 }
@@ -167,11 +169,51 @@ impl Route for PageWithLayouts {
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
         Box::pin(async move {
-            let mut slot = self.page.render(cx, body).await;
-            for layout in self.layouts.iter().rev() {
-                slot = layout.render(cx, slot).await;
+            let mut driver = Driver::new(
+                cx.detach(),
+                compose(cx, self.page.render, &self.layouts, body),
+            );
+            let report = driver.render_to_end().await?;
+            let mut response = Html(report.html).into_response(cx)?;
+            if let Some(status_code) = report.status_code {
+                *response.status_mut() = status_code;
             }
-            slot.into_response(cx)
+            response.headers_mut().extend(report.headers);
+            Ok(response)
         })
+    }
+}
+
+/// The request's component tree: the page and every layout are content
+/// components of this composer, each layer placing the token of the layer
+/// inside it, the outermost placed here. Layouts advance whether or not they
+/// place their slot, so the page keeps rendering behind a layout that hides
+/// it.
+async fn compose(cx: &Cx, page: PageRenderFn, layouts: &[LayoutFn], body: Body) -> Result<()> {
+    let mount = mount();
+    let mut children = Children::new();
+    let mut body = Some(body);
+    loop {
+        let mut out = RenderBuffer::new();
+        let taken = &mut body;
+        let mut token = children.content_keyed(
+            SiteKey::new(file!(), line!(), column!(), 0),
+            u32::MAX,
+            || Ok(page(cx, taken.take().expect("the page is born once"))),
+        )?;
+        // Innermost (most specific) layout wraps first; the loop walks from
+        // the page outward.
+        for (depth, layout) in layouts.iter().enumerate().rev() {
+            let inner = token;
+            token = children.content_keyed(
+                SiteKey::new(file!(), line!(), column!(), 1),
+                depth as u32,
+                || Ok(layout.render(cx, inner)),
+            )?;
+        }
+        out.place(token)?;
+        children.sweep();
+        mount.finish_render(out);
+        pass_boundary(&mount, &mut children).await?;
     }
 }

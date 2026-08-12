@@ -48,12 +48,13 @@ pub async fn progress(
     #[default]
     mut attrs: Attributes,
 ) -> Result {
+    let extra = attrs.remove("class");
     view! {
         <progress
-            class=(class!(PROGRESS, attrs.remove("class")))
+            class=(class!(PROGRESS, extra.clone()))
             value=(value)
             max=(max)
-            (attrs)
+            (attrs.clone())
         ></progress>
     }
 }

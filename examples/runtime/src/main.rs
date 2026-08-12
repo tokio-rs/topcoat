@@ -5,7 +5,7 @@ use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
     router::{RouterBuilderDiscoverExt, error::redirect, layout, module_router, page},
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -26,7 +26,7 @@ async fn home() -> Result {
 }
 
 #[layout]
-async fn layout(slot: Result) -> Result {
+async fn layout(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>

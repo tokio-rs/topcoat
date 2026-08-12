@@ -63,9 +63,11 @@ impl MailField {
 
         match value {
             FieldValue::Html(html) => {
-                let view = &html.view;
+                // Mail bodies are markup values, not render code, so the
+                // `view!` body compiles through the component free form.
+                let markup = html.view.emit_markup();
                 quote! {
-                    let __html = #view;
+                    let __html = #markup;
                     let __builder = __builder.#method(__html?);
                 }
             }

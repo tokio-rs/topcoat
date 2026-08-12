@@ -1,5 +1,5 @@
 use topcoat_core::error::Result;
-use topcoat_view::{Attributes, Length, View};
+use topcoat_view::{Attributes, Length, Markup};
 use topcoat_view_macro::{component, view};
 
 use crate::IconData;
@@ -24,7 +24,7 @@ pub async fn icon(
     /// Extra attributes for the `<svg>` element.
     #[default]
     attrs: Attributes,
-) -> Result<View> {
+) -> Result<Markup> {
     view! {
         <svg
             viewBox=(data.view_box())
@@ -33,10 +33,10 @@ pub async fn icon(
             style="vertical-align: -0.125em"
             aria-hidden=(label.is_empty().then_some("true"))
             role=((!label.is_empty()).then_some("img"))
-            aria-label=((!label.is_empty()).then_some(label))
-            (attrs)
+            aria-label=((!label.is_empty()).then_some(label.as_str()))
+            (attrs.clone())
         >
-            (data.into_body())
+            (data.body())
         </svg>
     }
 }

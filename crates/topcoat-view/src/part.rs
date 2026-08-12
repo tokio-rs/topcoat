@@ -4,7 +4,7 @@ use core::fmt;
 use http::{HeaderMap, StatusCode};
 use topcoat_core::context::Cx;
 
-use crate::{HtmlContext, HtmlWriter, View, buffer::ViewBuffer};
+use crate::{HtmlContext, HtmlWriter, Markup, buffer::ViewBuffer};
 
 /// A boxed view part that writes its output at render time.
 ///
@@ -88,13 +88,13 @@ impl<'a> PartsWriter<'a> {
     /// Records the entry address, runs `f`, and terminates the block with a
     /// return instruction. Returns the handle to the block, carrying the
     /// writer's accumulated size hint.
-    pub(crate) fn block(buffer: &mut ViewBuffer, f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+    pub(crate) fn block(buffer: &mut ViewBuffer, f: impl FnOnce(&mut PartsWriter<'_>)) -> Markup {
         let entry = buffer.next_ptr();
         let mut parts = PartsWriter::new(buffer, HtmlContext::Text);
         f(&mut parts);
         let size_hint = parts.size_hint();
         buffer.push_ret();
-        View::from_scope(buffer.id(), entry, size_hint)
+        Markup::from_scope(buffer.id(), entry, size_hint)
     }
 
     /// Returns the accumulated size hint of everything pushed so far.
@@ -298,7 +298,7 @@ impl<'a> PartsWriter<'a> {
     ///
     /// Panics if the view was built in a different, still building buffer.
     #[inline]
-    pub(crate) fn push_view(&mut self, view: View) -> &mut Self {
+    pub(crate) fn push_view(&mut self, view: Markup) -> &mut Self {
         self.size_hint += view.size_hint();
         self.buffer.push_view(view);
         self

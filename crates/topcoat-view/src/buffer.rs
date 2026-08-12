@@ -14,13 +14,13 @@ pub use renderer::*;
 pub use scope::*;
 pub use view_slot::*;
 
-use crate::{DynViewPart, HtmlContext, View, view::ViewRepr};
+use crate::{DynViewPart, HtmlContext, Markup, view::MarkupRepr};
 
 /// The instruction buffer of a build.
 ///
 /// The outermost `view!` invocation creates a buffer, every `view!`
 /// invocation nested inside it appends its instructions here, and rendering
-/// a [`View`] executes them.
+/// a [`Markup`] executes them.
 ///
 /// # Contiguity
 ///
@@ -76,21 +76,21 @@ impl ViewBuffer {
     /// # Panics
     ///
     /// Panics if the view was built in a different, still building buffer.
-    pub fn push_view(&mut self, view: View) {
+    pub fn push_view(&mut self, view: Markup) {
         match view.repr() {
-            ViewRepr::Static(body) => {
+            MarkupRepr::Static(body) => {
                 self.push_static_str(body, HtmlContext::Unescaped);
             }
-            ViewRepr::Scoped { buffer, entry, .. } => {
+            MarkupRepr::Scoped { buffer, entry, .. } => {
                 assert!(
                     buffer == self.id,
                     "tried to use a view outside the `view!` invocation it was built in",
                 );
                 self.push_instruction(Instruction::Call { entry });
             }
-            ViewRepr::Owned { buffer, entry, .. } => {
+            MarkupRepr::Owned { buffer, entry, .. } => {
                 let ptr = self.consts.push_view(buffer, entry);
-                self.push_instruction(Instruction::View { ptr });
+                self.push_instruction(Instruction::Markup { ptr });
             }
         }
     }
@@ -109,11 +109,11 @@ impl ViewBuffer {
     /// placeholder renders the filled view's content; rendering it before
     /// that panics. The placeholder carries no size hint, since the filled
     /// view's is not known yet.
-    pub fn reserve_view(&mut self) -> (View, ViewSlot) {
+    pub fn reserve_view(&mut self) -> (Markup, ViewSlot) {
         let ptr = self.next_ptr();
         self.push_instruction(Instruction::Placeholder);
         let slot = ViewSlot::new(self.id, ptr);
-        (View::from_scope(self.id, ptr, 0), slot)
+        (Markup::from_scope(self.id, ptr, 0), slot)
     }
 
     /// Redirects a reserved slot to `view`, resolving its placeholder.
@@ -123,7 +123,7 @@ impl ViewBuffer {
     /// Panics if the slot was reserved in a different buffer, if the view
     /// was built in a different, still building buffer, or if the slot was
     /// already filled.
-    pub fn fill_view(&mut self, slot: ViewSlot, view: View) {
+    pub fn fill_view(&mut self, slot: ViewSlot, view: Markup) {
         assert!(
             slot.buffer() == self.id,
             "tried to fill a view slot outside the `view!` invocation it was reserved in",
@@ -131,13 +131,13 @@ impl ViewBuffer {
         let entry = match view.repr() {
             // A static view has no block to jump to, so it is materialized
             // as one.
-            ViewRepr::Static(body) => {
+            MarkupRepr::Static(body) => {
                 let entry = self.next_ptr();
                 self.push_static_str(body, HtmlContext::Unescaped);
                 self.push_ret();
                 entry
             }
-            ViewRepr::Scoped { buffer, entry, .. } => {
+            MarkupRepr::Scoped { buffer, entry, .. } => {
                 assert!(
                     buffer == self.id,
                     "tried to use a view outside the `view!` invocation it was built in",
@@ -146,10 +146,10 @@ impl ViewBuffer {
             }
             // An owned view's block lives in its own buffer, so it is
             // materialized as a block holding one splice instruction.
-            ViewRepr::Owned { buffer, entry, .. } => {
+            MarkupRepr::Owned { buffer, entry, .. } => {
                 let block_entry = self.next_ptr();
                 let ptr = self.consts.push_view(buffer, entry);
-                self.push_instruction(Instruction::View { ptr });
+                self.push_instruction(Instruction::Markup { ptr });
                 self.push_ret();
                 block_entry
             }

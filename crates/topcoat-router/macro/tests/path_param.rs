@@ -92,7 +92,7 @@ async fn document(cx: &Cx) -> Result {
     let path: CatchAllSegments<'_> = path_param::<DocPath>(cx);
     let path = path.collect::<Vec<_>>().join("][");
     let path = format!("[{path}]");
-    view! { (path) }
+    view! { (&path) }
 }
 
 path_param!(*number_path: u32, error = bad_request);

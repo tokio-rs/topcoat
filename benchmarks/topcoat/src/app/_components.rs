@@ -258,14 +258,18 @@ pub async fn spec_table(specs: &[Spec]) -> Result {
 pub async fn review_list(reviews: &[Review]) -> Result {
     view! {
         <div class="mt-6 space-y-6">
-            for review in reviews {
+            for (index, review) in reviews.iter().enumerate() {
                 <article class="rounded-xl border border-slate-200 bg-white p-6">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <p class="font-semibold text-slate-900">(&review.author)</p>
                         <p class="text-xs text-slate-400">(&review.date)</p>
                     </div>
                     <div class="mt-2 flex items-center gap-2">
-                        rating_stars(tenths: review.rating_tenths, size: "h-4 w-4")
+                        rating_stars(
+                            key: index,
+                            tenths: review.rating_tenths,
+                            size: "h-4 w-4"
+                        )
                         <p class="text-sm font-medium text-slate-700">
                             (&review.title)
                         </p>

@@ -489,7 +489,6 @@ mod tests {
     use std::{future::Future, pin::Pin};
 
     use topcoat_core::{context::Cx, error::Result};
-    use topcoat_view::View;
 
     use super::*;
     use crate::{
@@ -510,8 +509,8 @@ mod tests {
     fn render_page(
         _cx: &Cx,
         _body: Body,
-    ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + '_>> {
-        Box::pin(async move { Ok(View::empty()) })
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+        Box::pin(async move { Ok(()) })
     }
 
     /// A stand-in layer that continues the chain unchanged.

@@ -19,11 +19,11 @@ use topcoat::{
     Result,
     asset::asset,
     router::layout,
-    view::view,
+    view::{View, view},
 };
 
 #[layout]
-async fn root(slot: Result) -> Result {
+async fn root(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -78,12 +78,12 @@ use topcoat::{
     context::Cx,
     datastar::{ElementPatchMode, PatchElements},
     router::route,
-    view::view,
+    view::markup,
 };
 
 #[route(POST "/entries")]
 async fn create(cx: &Cx) -> Result<PatchElements> {
-    let entry = view! { <li>"A new entry"</li> }?;
+    let entry = markup! { cx => <li>"A new entry"</li> }?;
     Ok(PatchElements::new(entry.render(cx))
         .selector("#feed")
         .mode(ElementPatchMode::Prepend))
@@ -147,14 +147,15 @@ Simple request-response updates do not need an event stream: Datastar also patch
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     datastar::{DatastarMode, DatastarSelector, ElementPatchMode},
     router::route,
-    view::{View, view},
+    view::{Markup, markup},
 };
 
 #[route(POST "/save")]
-async fn save() -> Result<(DatastarSelector, DatastarMode, View)> {
-    let status = view! { <p>"Saved!"</p> }?;
+async fn save(cx: &Cx) -> Result<(DatastarSelector, DatastarMode, Markup)> {
+    let status = markup! { cx => <p>"Saved!"</p> }?;
     Ok((
         DatastarSelector::from("#status"),
         DatastarMode(ElementPatchMode::Inner),

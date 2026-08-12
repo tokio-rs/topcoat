@@ -15,7 +15,7 @@ use topcoat::{
         layout, module_router, page, route,
     },
     tailwind,
-    view::{attributes, view},
+    view::{View, attributes, view},
 };
 
 use crate::{
@@ -45,7 +45,11 @@ pub fn router(db: Db) -> Router {
 
 // The layout in the root module wraps every page.
 #[layout]
-async fn shell(cx: &Cx, slot: Result) -> Result {
+async fn shell(cx: &Cx, slot: View) -> Result {
+    // `drinks` is request-memoized, so this shares a menu query with pages
+    // that already loaded it.
+    let drink_count = drinks(cx).await?.len();
+
     view! {
         <!DOCTYPE html>
         <html>
@@ -90,9 +94,7 @@ async fn shell(cx: &Cx, slot: Result) -> Result {
                     <p
                         class="mx-auto w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground"
                     >
-                        // `drinks` is request-memoized, so this shares a menu
-                        // query with pages that already loaded it.
-                        (drinks(cx).await?.len())
+                        (drink_count)
                         " drinks brewed fresh daily."
                     </p>
                 </footer>
@@ -126,14 +128,20 @@ async fn home(cx: &Cx) -> Result {
             match current_customer(cx) {
                 Some(name) => {
                     card(
+                        // Child content captures its values when it is born,
+                        // so each level clones before handing the name down.
+                        let title_name = name.clone();
                         card_header(
+                            let title_name = title_name.clone();
                             card_title(
                                 "Welcome back, "
-                                (&name)
+                                (&title_name)
                             )
                             card_description("Your usual table is free.")
                         )
+                        let footer_name = name.clone();
                         card_footer(
+                            let footer_name = footer_name.clone();
                             // Submitting an empty name clears the cookie.
                             <form method="post" action="/">
                                 button(
@@ -141,7 +149,7 @@ async fn home(cx: &Cx) -> Result {
                                     size: ButtonSize::Sm,
                                     attrs: attributes! { name="name" value="" },
                                     "Not "
-                                    (&name)
+                                    (&footer_name)
                                     "?"
                                 )
                             </form>

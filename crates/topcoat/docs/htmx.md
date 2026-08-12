@@ -19,11 +19,11 @@ use topcoat::{
     Result,
     asset::asset,
     router::layout,
-    view::view,
+    view::{View, view},
 };
 
 #[layout]
-async fn root(slot: Result) -> Result {
+async fn root(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -48,25 +48,26 @@ use topcoat::{
     context::Cx,
     htmx::hx_request,
     router::layout,
-    view::view,
+    view::{View, view},
 };
 
 #[layout]
-async fn root(cx: &Cx, slot: Result) -> Result {
-    // htmx only swaps out the target element, so we do not need to return
-    // the full layout shell. Just the page's content is enough.
-    if hx_request(cx) {
-        return slot;
-    }
+async fn root(cx: &Cx, slot: View) -> Result {
+    // htmx only swaps out the target element, so it does not need the full
+    // layout shell. Just the page's content is enough.
+    let partial = hx_request(cx);
 
-    // Non-htmx requests require a full page render including the layout shell.
     view! {
-        <html>
-            <body>
-                <nav> /* persistent navigation */ </nav>
-                <main>(slot?)</main>
-            </body>
-        </html>
+        if partial {
+            (slot?)
+        } else {
+            <html>
+                <body>
+                    <nav> /* persistent navigation */ </nav>
+                    <main>(slot?)</main>
+                </body>
+            </html>
+        }
     }
 }
 ```
@@ -95,12 +96,12 @@ use topcoat::{
     context::Cx,
     htmx::{HxRetarget, HxReswap, SwapOption},
     router::route,
-    view::{View, view},
+    view::{Markup, markup},
 };
 
 #[route(POST "/save")]
-async fn save(cx: &Cx) -> Result<(HxRetarget, HxReswap, View)> {
-    let body = view! { <div>"Saved!"</div> }?;
+async fn save(cx: &Cx) -> Result<(HxRetarget, HxReswap, Markup)> {
+    let body = markup! { cx => <div>"Saved!"</div> }?;
     Ok((
         HxRetarget::from("#status"),
         HxReswap(SwapOption::InnerHtml),

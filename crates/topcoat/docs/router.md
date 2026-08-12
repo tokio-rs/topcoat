@@ -37,17 +37,17 @@ See [`#[page]`](page) for the handler signature, module-derived paths, and using
 
 # Layouts
 
-A layout wraps pages. It receives the rendered inner page (or nested layout) as a `Result<View>`, to embed in its own view. Annotate it with [`#[layout]`](layout):
+A layout wraps pages. It receives the inner page (or nested layout) as a `slot: View` token and places it with `(slot?)`, where the `?` propagates any error the inner render raised. Annotate it with [`#[layout]`](layout):
 
 ```rust
 use topcoat::{
     Result,
     router::layout,
-    view::view,
+    view::{View, view},
 };
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -212,7 +212,7 @@ See the [`error`](mod@error) module docs for how to raise, convert, and catch th
 
 # Status codes and headers
 
-A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. This pairs with error handling. A layout can catch a page's [`NotFoundError`](error::NotFoundError) and replace it with a branded not-found page:
+A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. This pairs with error handling. A layout can claim the slot's error with [`View::take_error`](crate::view::View::take_error), catch a page's [`NotFoundError`](error::NotFoundError), and replace it with a branded not-found page:
 
 ```rust
 use topcoat::{
@@ -223,7 +223,7 @@ use topcoat::{
         error::{NotFoundError, RouterErrorExt},
         layout, page,
     },
-    view::view,
+    view::{View, view},
 };
 
 # struct Post { title: String }
@@ -231,22 +231,25 @@ use topcoat::{
 #[page("/posts/{id}")]
 async fn post(cx: &Cx) -> Result {
     let post = find_post(cx).await.ok_or_not_found()?;
-    view! { <h1>(post.title)</h1> }
+    view! { <h1>(&post.title)</h1> }
 }
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    let content = match slot {
-        Err(error) if error.downcast_ref::<NotFoundError>().is_some() => view! {
-            (StatusCode::NOT_FOUND)
-            <h1>"Page not found"</h1>
-        },
-        content => content,
-    }?;
-
+async fn root_layout(slot: View) -> Result {
     view! {
         <html>
-            <body>(content)</body>
+            <body>
+                match slot.take_error() {
+                    Some(error) if error.downcast_ref::<NotFoundError>().is_some() => {
+                        (StatusCode::NOT_FOUND)
+                        <h1>"Page not found"</h1>
+                    }
+                    Some(error) => {
+                        return Err(error);
+                    }
+                    None => (slot?)
+                }
+            </body>
         </html>
     }
 }
@@ -263,9 +266,9 @@ The router applies an [`OriginPolicy`] to every request before any layer or hand
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
 
 ```rust
-# use topcoat::{Result, context::Cx, router::{Body, Next, layer, layout, page, response::Response, route}, view::view};
-# #[layout("/")] async fn root_layout(slot: Result) -> Result { view! { (slot?) } }
-# #[layout("/settings")] async fn settings_layout(slot: Result) -> Result { view! { (slot?) } }
+# use topcoat::{Result, context::Cx, router::{Body, Next, layer, layout, page, response::Response, route}, view::{View, view}};
+# #[layout("/")] async fn root_layout(slot: View) -> Result { view! { (slot?) } }
+# #[layout("/settings")] async fn settings_layout(slot: View) -> Result { view! { (slot?) } }
 # #[layer("/")] async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
 # #[page("/")] async fn home() -> Result { view! { <h1>"Home"</h1> } }
 # #[page("/about")] async fn about() -> Result { view! { <h1>"About"</h1> } }
@@ -349,7 +352,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{Body, Next, Router, content::Json, layer, layout, page, response::Response, route},
-    view::view,
+    view::{View, view},
 };
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -358,7 +361,7 @@ struct NewUser {
 }
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: View) -> Result {
     view! {
         <!DOCTYPE html>
         <html>

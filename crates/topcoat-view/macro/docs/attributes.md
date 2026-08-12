@@ -14,7 +14,7 @@ let attrs = attributes! {
 };
 
 view! {
-    <button (attrs)>"Save"</button>
+    <button (attrs.clone())>"Save"</button>
 }
 # }
 ```
@@ -57,7 +57,7 @@ let attrs = attributes! {
         _ => aria-label="Button",
     }
 };
-# view! { <button (attrs)></button> }
+# view! { <button (attrs.clone())></button> }
 # }
 ```
 
@@ -82,7 +82,7 @@ attrs.insert(cx, "data-state", "loading");
 attrs.insert(cx, "disabled", true);
 
 assert!(attrs.contains_key("class"));
-# view! { <div (attrs)></div> }
+# view! { <div (attrs.clone())></div> }
 # }
 ```
 
@@ -103,7 +103,7 @@ let attrs = attributes! {
 };
 
 view! {
-    <article (attrs)>
+    <article (attrs.clone())>
         <h2>"Summary"</h2>
     </article>
 }
@@ -127,8 +127,8 @@ use topcoat::{
 #[component]
 async fn panel(attrs: Attributes, child: View) -> Result {
     view! {
-        <section (attrs)>
-            (child)
+        <section (attrs.clone())>
+            (child?)
         </section>
     }
 }

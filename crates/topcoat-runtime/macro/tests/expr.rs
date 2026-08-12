@@ -5,12 +5,12 @@
 //! interface to the browser runtime: nothing maps it on the way out, so a
 //! rename on one side alone would fail only in the browser, at click time.
 
-use topcoat::{context::Cx, view::view};
+use topcoat::{context::Cx, view::markup};
 
 #[tokio::test]
 async fn toggle_reaches_the_generated_javascript() {
     let cx = &Cx::default();
-    let html = view! {
+    let html = markup! {
         cx =>
         signal open = false;
 
@@ -25,7 +25,7 @@ async fn toggle_reaches_the_generated_javascript() {
 #[tokio::test]
 async fn increment_and_decrement_reach_the_generated_javascript() {
     let cx = &Cx::default();
-    let html = view! {
+    let html = markup! {
         cx =>
         signal count = 0.0;
 
@@ -42,7 +42,7 @@ async fn increment_and_decrement_reach_the_generated_javascript() {
 #[tokio::test]
 async fn push_str_reaches_the_generated_javascript_with_its_argument() {
     let cx = &Cx::default();
-    let html = view! {
+    let html = markup! {
         cx =>
         signal name = String::new();
 
@@ -61,7 +61,7 @@ async fn push_str_reaches_the_generated_javascript_with_its_argument() {
 #[tokio::test]
 async fn push_str_accepts_the_owned_string_from_an_event() {
     let cx = &Cx::default();
-    let html = view! {
+    let html = markup! {
         cx =>
         signal message = String::new();
 

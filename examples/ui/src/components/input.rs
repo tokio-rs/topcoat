@@ -31,5 +31,6 @@ const INPUT: StaticClass = class!(
 /// ```
 #[component]
 pub async fn input(#[default] mut attrs: Attributes) -> Result {
-    view! { <input class=(class!(INPUT, attrs.remove("class"))) (attrs)> }
+    let extra = attrs.remove("class");
+    view! { <input class=(class!(INPUT, extra.clone())) (attrs.clone())> }
 }

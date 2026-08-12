@@ -74,9 +74,22 @@ fn emit_pass_node(node: &Node, body: &mut TokenStream) {
             body.extend(quote! { __out.#method(#value); });
         }
         Node::Local(local) => {
+            // A binding emits plainly so temporary lifetime extension keeps
+            // working (`let s = &Signal::new(..)`); the await guard runs at
+            // expansion time instead.
             let pat = &local.pat;
-            let expr = render_expr(&local.expr.to_token_stream());
-            body.extend(quote! { let #pat = #expr; });
+            let expr = &local.expr;
+            let tokens = expr.to_token_stream();
+            if tokens_contain_await(&tokens) {
+                body.extend(quote! {
+                    ::core::compile_error!(
+                        "`.await` is not allowed in render code: loads run in \
+                         the body, once, or through `defer`"
+                    );
+                });
+            } else {
+                body.extend(quote! { let #pat = #tokens; });
+            }
         }
         Node::Statement(statement) => {
             let tokens = &statement.tokens;
@@ -93,7 +106,13 @@ fn emit_pass_node(node: &Node, body: &mut TokenStream) {
             });
         }
         Node::IfElse(if_else) => {
-            let condition = render_expr(&if_else.expr.to_token_stream());
+            // A `let` condition binds into the branch, so it cannot move into
+            // the render closure; it emits unwrapped.
+            let condition = if contains_let(&if_else.expr) {
+                if_else.expr.to_token_stream()
+            } else {
+                render_expr(&if_else.expr.to_token_stream())
+            };
             let then_branch = if_else.then_branch.emit_pass_statements();
             let else_branch = if_else.else_branch.emit_pass_statements();
             body.extend(quote! {
@@ -119,54 +138,129 @@ fn emit_pass_node(node: &Node, body: &mut TokenStream) {
             });
         }
         Node::Component(component) => emit_pass_component(component, body),
+        Node::Place(tokens) => {
+            body.extend(quote! { __out.place(#tokens)?; });
+        }
     }
 }
 
 fn emit_pass_component(component: &Component, body: &mut TokenStream) {
     let span = component.span;
     let path = &component.path;
+
+    // A component's identity comes from its invocation site, so a site that
+    // repeats cannot tell its repetitions apart without a key.
+    if component.key.is_none() && component.repeats {
+        let label = path
+            .to_token_stream()
+            .to_string()
+            .replace(char::is_whitespace, "");
+        let message = format!(
+            "`{label}` repeats without a `key` argument: pass `key:` to give \
+             each repetition its own identity"
+        );
+        body.extend(quote_spanned! {span=> compile_error!(#message); });
+        return;
+    }
+
     let site = component.site();
+    let content_site = content_site(component);
     let setters = component.named_args.iter().map(|arg| {
         let ident = &arg.ident;
         let value = render_expr(&arg.value.to_token_stream());
         quote! { .#ident(#value) }
     });
-    let child = component.children.as_ref().map(|children| {
-        let content = children.emit_pass_content();
-        quote_spanned! {span=>
-            .child(__children.content(#site, || #content)?)
-        }
-    });
+    let content = component.children.as_ref().map(Scope::emit_pass_content);
+
+    // Props and content evaluate once, on the birth pass; later passes only
+    // advance what was born, so expressions that move values run once.
+    let (existing_content, birth_content, child_setter) = match &content {
+        Some(content) => (
+            quote_spanned! {span=>
+                let _ = __children.content_existing(#content_site)?;
+            },
+            quote_spanned! {span=>
+                let __content = __children
+                    .content(#content_site, || ::core::result::Result::Ok(#content))?;
+            },
+            quote_spanned! {span=> .child(__content) },
+        ),
+        None => (TokenStream::new(), TokenStream::new(), TokenStream::new()),
+    };
 
     let render = quote_spanned! {span=> {
         use #topcoat_view::Component;
-        let props = #path::props_builder()#(#setters)*#child.build();
+        let props = #path::props_builder()#(#setters)*#child_setter.build();
         // The marker is built via `Default` so the same construction works
         // for both unit-struct and generic (`PhantomData`) markers.
         #[allow(clippy::default_constructed_unit_structs)]
-        Component::render(
+        ::core::result::Result::Ok(Component::render(
             #path::default(),
             __cx.detach(),
             props,
-        )
+        ))
     }};
 
     let advance = if let Some(arg) = &component.key {
         let ident = &arg.ident;
         let value = &arg.value;
+        let (existing_content, birth_content) = match &content {
+            Some(_) => (
+                quote_spanned! {span=>
+                    let _ = __children.content_existing_keyed(#content_site, &__key)?;
+                },
+                quote_spanned! {span=>
+                    let __content = __children
+                        .content_keyed(#content_site, &__key, || {
+                            ::core::result::Result::Ok(#content)
+                        })?;
+                },
+            ),
+            None => (TokenStream::new(), TokenStream::new()),
+        };
         quote_spanned! {span=> {
             use #topcoat_view::Component;
             let mut __key = ::core::option::Option::None;
             #path::props_builder()
                 .#ident(#value, |__value| __key = ::core::option::Option::Some(__value));
-            __children.advance_keyed(&mut __out, #site, __key.unwrap(), || #render)?;
+            let __key = __key.unwrap();
+            if __children.has_keyed(#site, &__key) {
+                #existing_content
+                __children.advance_existing_keyed(&mut __out, #site, __key)?;
+            } else {
+                #birth_content
+                __children.advance_keyed(&mut __out, #site, __key, || #render)?;
+            }
         }}
     } else {
-        quote_spanned! {span=>
-            __children.advance(&mut __out, #site, || #render)?;
-        }
+        quote_spanned! {span=> {
+            if __children.has(#site) {
+                #existing_content
+                __children.advance_existing(&mut __out, #site)?;
+            } else {
+                #birth_content
+                __children.advance(&mut __out, #site, || #render)?;
+            }
+        }}
     };
     body.extend(advance);
+}
+
+/// The content block's own invocation site: the component's site with the
+/// high ordinal bit set, so the content and the invocation never share an
+/// identity.
+fn content_site(component: &Component) -> TokenStream {
+    let ordinal = component.ordinal | 0x8000_0000;
+    quote_spanned! {component.span=>
+        const {
+            #topcoat_view::identity::SiteKey::new(
+                ::core::file!(),
+                ::core::line!(),
+                ::core::column!(),
+                #ordinal,
+            )
+        }
+    }
 }
 
 impl Scope {
@@ -175,8 +269,11 @@ impl Scope {
     /// its creator, placed by the receiver through its token.
     fn emit_pass_content(&self) -> TokenStream {
         let statements = self.emit_pass_statements();
+        // Content captures by move, the way props do: what the block reads
+        // from the creator travels in, cloned by the creator if it also
+        // keeps it.
         quote! {
-            async {
+            async move {
                 let __mount = #topcoat_view::pass::mount();
                 let mut __children = #topcoat_view::pass::Children::new();
                 loop {
@@ -189,6 +286,15 @@ impl Scope {
             }
         }
     }
+}
+
+/// Whether the tokens contain an `await`, at any nesting depth.
+fn tokens_contain_await(tokens: &TokenStream) -> bool {
+    tokens.clone().into_iter().any(|tt| match tt {
+        proc_macro2::TokenTree::Ident(ident) => ident == "await",
+        proc_macro2::TokenTree::Group(group) => tokens_contain_await(&group.stream()),
+        _ => false,
+    })
 }
 
 fn pass_method(kind: ExprKind) -> proc_macro2::Ident {
@@ -275,5 +381,18 @@ mod tests {
         );
         assert!(output.contains("Component :: render"), "{output}");
         assert!(output.contains("__cx . detach ()"), "{output}");
+    }
+}
+
+/// Whether a condition contains a `let` binding, including through the
+/// operands of a let chain.
+fn contains_let(expr: &syn::Expr) -> bool {
+    match expr {
+        syn::Expr::Let(_) => true,
+        syn::Expr::Binary(binary) => contains_let(&binary.left) || contains_let(&binary.right),
+        syn::Expr::Paren(paren) => contains_let(&paren.expr),
+        syn::Expr::Group(group) => contains_let(&group.expr),
+        syn::Expr::Unary(unary) => contains_let(&unary.expr),
+        _ => false,
     }
 }

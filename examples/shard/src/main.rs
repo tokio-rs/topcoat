@@ -61,7 +61,7 @@ async fn combobox_content(cx: &Cx, input: String) -> Result {
         <div>
             <b>"results:"</b>
 
-            for item in results {
+            for item in &results {
                 <div>(item)</div>
             }
         </div>

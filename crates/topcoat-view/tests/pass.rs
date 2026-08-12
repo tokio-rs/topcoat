@@ -23,7 +23,7 @@ use topcoat_core::{
 use topcoat_view::{
     identity::SiteKey,
     pass::{
-        Children, Deferred, Driver, PassReport, RenderBuffer, ViewToken, defer, defer_keyed, mount,
+        Children, Deferred, Driver, PassReport, RenderBuffer, View, defer, defer_keyed, mount,
         pass_boundary,
     },
 };
@@ -214,7 +214,7 @@ async fn menu(cx: Cx, bodies: Counter, cards: Counter, io: Trigger) -> Result<()
                 out.markup("<ul>");
                 for name in list {
                     children.advance_keyed(&mut out, site!(), name.as_str(), || {
-                        card(cards.clone(), name)
+                        Ok(card(cards.clone(), name))
                     })?;
                 }
                 out.markup("</ul>");
@@ -298,7 +298,7 @@ async fn outer_chain(cx: Cx, io1: Trigger, io2: Trigger) -> Result<()> {
                 out.text(value);
                 let io = &mut io2;
                 children.advance(&mut out, site!(), || {
-                    inner_chain(cx.detach(), io.take().expect("born once"))
+                    Ok(inner_chain(cx.detach(), io.take().expect("born once")))
                 })?;
             }
         }
@@ -365,7 +365,7 @@ async fn lending_parent(cx: Cx, child_bodies: Counter, io: Trigger) -> Result<()
             Deferred::Ready(()) => out.markup("[p2]"),
         }
         children.advance(&mut out, site!(), || {
-            borrowing_child(child_bodies.clone(), &title)
+            Ok(borrowing_child(child_bodies.clone(), &title))
         })?;
         children.sweep();
         mount.finish_render(out);
@@ -415,7 +415,7 @@ async fn layout(cx: Cx, log: Log, io: Trigger) -> Result<()> {
     loop {
         let mut out = RenderBuffer::new();
         out.markup("<nav>");
-        children.advance(&mut out, site!(), nav_widget)?;
+        children.advance(&mut out, site!(), || Ok(nav_widget()))?;
         out.markup("</nav>");
         if let Some(error) = &failed {
             out.markup("<h1>error: ");
@@ -424,7 +424,11 @@ async fn layout(cx: Cx, log: Log, io: Trigger) -> Result<()> {
         } else {
             let io = &mut io;
             let slot = children.advance_catching(&mut out, site!(), || {
-                grid(cx.detach(), log.clone(), io.take().expect("born once"))
+                Ok(grid(
+                    cx.detach(),
+                    log.clone(),
+                    io.take().expect("born once"),
+                ))
             });
             if let Err(error) = slot {
                 out.markup("<h1>error: ");
@@ -592,11 +596,13 @@ async fn audit_parent(cx: Cx, log: Log, io: Trigger) -> Result<()> {
         match switch {
             Deferred::Pending => {
                 children.advance(&mut out, site!(), || {
-                    audited(log.clone(), "evictee", &title)
+                    Ok(audited(log.clone(), "evictee", &title))
                 })?;
             }
             Deferred::Ready(()) => {
-                children.advance(&mut out, site!(), || audited(log.clone(), "keeper", &title))?;
+                children.advance(&mut out, site!(), || {
+                    Ok(audited(log.clone(), "keeper", &title))
+                })?;
             }
         }
         children.sweep();
@@ -667,7 +673,7 @@ async fn retained_menu(cx: Cx, cards: Counter, io1: Trigger, io2: Trigger) -> Re
             Deferred::Ready(list) => {
                 for name in list {
                     children.advance_keyed(&mut out, site!(), name.as_str(), || {
-                        card(cards.clone(), name)
+                        Ok(card(cards.clone(), name))
                     })?;
                 }
             }
@@ -726,7 +732,7 @@ async fn slow_birth_page(cx: Cx, io1: Trigger, birth_io: Trigger, extra_io: Trig
             Deferred::Ready(()) => {
                 let io = &mut birth_io;
                 children.advance(&mut out, site!(), || {
-                    slow_child(io.take().expect("born once"))
+                    Ok(slow_child(io.take().expect("born once")))
                 })?;
             }
         }
@@ -802,7 +808,7 @@ async fn stash_layout(cx: Cx, log: Log, io1: Trigger, inner_io: Trigger) -> Resu
             let props = &mut props;
             let slot = children.advance_catching(&mut out, site!(), || {
                 let (io1, inner_io) = props.take().expect("born once");
-                stash_page(cx.detach(), log.clone(), io1, inner_io)
+                Ok(stash_page(cx.detach(), log.clone(), io1, inner_io))
             });
             if let Err(error) = slot {
                 out.markup("<h1>error: ");
@@ -832,10 +838,10 @@ async fn stash_page(cx: Cx, log: Log, io1: Trigger, inner_io: Trigger) -> Result
         match first {
             Deferred::Pending => out.markup("[page skeleton]"),
             Deferred::Ready(()) => {
-                children.advance(&mut out, site!(), || sibling(log.clone()))?;
+                children.advance(&mut out, site!(), || Ok(sibling(log.clone())))?;
                 let io = &mut inner_io;
                 children.advance(&mut out, site!(), || {
-                    failing_inner(log.clone(), io.take().expect("born once"))
+                    Ok(failing_inner(log.clone(), io.take().expect("born once")))
                 })?;
             }
         }
@@ -939,7 +945,7 @@ fn unkeyed_repeated_invocation_panics() {
         loop {
             let mut out = RenderBuffer::new();
             for _ in 0..2 {
-                children.advance(&mut out, SiteKey::new("same", 1, 1, 0), nav_widget)?;
+                children.advance(&mut out, SiteKey::new("same", 1, 1, 0), || Ok(nav_widget()))?;
             }
             children.sweep();
             mount.finish_render(out);
@@ -998,10 +1004,11 @@ async fn content_home(cx: Cx, content_bodies: Counter, expand_io: Trigger) -> Re
     loop {
         let mut out = RenderBuffer::new();
         // The trailing block of `panel(..) { <p>(user)</p> }`.
-        let token = children.content(site!(), || content_block(content_bodies.clone(), &user))?;
+        let token =
+            children.content(site!(), || Ok(content_block(content_bodies.clone(), &user)))?;
         let io = &mut expand_io;
         children.advance(&mut out, site!(), || {
-            panel(cx.detach(), token, io.take().expect("born once"))
+            Ok(panel(cx.detach(), token, io.take().expect("born once")))
         })?;
         children.sweep();
         mount.finish_render(out);
@@ -1024,7 +1031,7 @@ async fn content_block(bodies: Counter, user: &str) -> Result<()> {
     }
 }
 
-async fn panel(cx: Cx, token: ViewToken, expand_io: Trigger) -> Result<()> {
+async fn panel(cx: Cx, token: View, expand_io: Trigger) -> Result<()> {
     let mount = mount();
     let mut expand_io = Some(expand_io);
     let mut children = Children::new();
@@ -1074,7 +1081,7 @@ fn placement_delivers_the_content_error_to_the_placer() {
         let _mount = mount();
         Err(boom("content boom"))
     }
-    async fn catching_panel(token: ViewToken) -> Result<()> {
+    async fn catching_panel(token: View) -> Result<()> {
         let mount = mount();
         let mut children = Children::new();
         loop {
@@ -1094,8 +1101,8 @@ fn placement_delivers_the_content_error_to_the_placer() {
         let mut children = Children::new();
         loop {
             let mut out = RenderBuffer::new();
-            let token = children.content(site!(), failing_content)?;
-            children.advance(&mut out, site!(), || catching_panel(token))?;
+            let token = children.content(site!(), || Ok(failing_content()))?;
+            children.advance(&mut out, site!(), || Ok(catching_panel(token)))?;
             children.sweep();
             mount.finish_render(out);
             pass_boundary(&mount, &mut children).await?;
@@ -1133,9 +1140,9 @@ fn unplaced_content_error_falls_back_to_the_owner() {
         let mut children = Children::new();
         loop {
             let mut out = RenderBuffer::new();
-            let token = children.content(site!(), failing_content)?;
+            let token = children.content(site!(), || Ok(failing_content()))?;
             let _ = token;
-            children.advance(&mut out, site!(), never_places)?;
+            children.advance(&mut out, site!(), || Ok(never_places()))?;
             children.sweep();
             mount.finish_render(out);
             pass_boundary(&mount, &mut children).await?;
@@ -1172,7 +1179,7 @@ fn double_placement_panics() {
         let mut children = Children::new();
         loop {
             let mut out = RenderBuffer::new();
-            let token = children.content(site!(), healthy_content)?;
+            let token = children.content(site!(), || Ok(healthy_content()))?;
             out.place(token)?;
             out.place(token)?;
             children.sweep();
@@ -1218,7 +1225,10 @@ fn content_streams_its_own_deferred_data() {
             let mut out = RenderBuffer::new();
             let content_io = &mut io;
             let token = children.content(site!(), || {
-                streaming_content(cx.detach(), content_io.take().expect("born once"))
+                Ok(streaming_content(
+                    cx.detach(),
+                    content_io.take().expect("born once"),
+                ))
             })?;
             out.markup("<aside>");
             out.place(token)?;
@@ -1256,7 +1266,7 @@ fn placing_an_evicted_token_renders_empty() {
             pass_boundary(&mount, &mut children).await?;
         }
     }
-    async fn late_placer(token: ViewToken) -> Result<()> {
+    async fn late_placer(token: View) -> Result<()> {
         let mount = mount();
         let mut children = Children::new();
         loop {
@@ -1278,11 +1288,11 @@ fn placing_an_evicted_token_renders_empty() {
             let stop: Deferred<'_, ()> = defer(&cx, |_cx| io.take().expect("the load runs once"));
             let mut token = None;
             if matches!(stop, Deferred::Pending) {
-                token = Some(children.content(site!(), short_content)?);
+                token = Some(children.content(site!(), || Ok(short_content()))?);
             }
             if let Some(token) = token {
                 let placer = token;
-                children.advance(&mut out, site!(), move || late_placer(placer))?;
+                children.advance(&mut out, site!(), move || Ok(late_placer(placer)))?;
             }
             children.sweep();
             mount.finish_render(out);
