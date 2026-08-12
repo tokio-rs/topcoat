@@ -79,7 +79,7 @@ The first building block is `defer`, a plain function that wraps a future instea
 pub fn defer<F: Future>(cx: &Cx, future: F) -> Defer<F>
 ```
 
-Awaiting a slow query stops the component until the data arrives. `defer` returns immediately instead, with a `Defer`: a value that stands for the data before it exists. At any moment it is in one of two states, described by a plain enum:
+Awaiting a slow query stops the component until the data arrives. `defer` returns immediately instead, with a `Defer`: a value that stands for the data before it exists. Inside a view the macro supplies the `cx` argument, the same wiring a component invocation gets, so a view writes `defer(drinks(cx))`; outside a view, `cx` is passed explicitly, as the signature shows. At any moment it is in one of two states, described by a plain enum:
 
 ```rust
 pub enum Deferred<T> {
@@ -88,7 +88,7 @@ pub enum Deferred<T> {
 }
 ```
 
-A `Defer` is the first example of a reactive expression: a value with a state to render now, and possibly new states later. For `Defer` the states are exactly two: `Pending` now, and `Ready` once, when the future completes. On its own it renders nothing; a view has to consume it.
+A `Defer` is the first example of a reactive expression: a value with a state to render now, and possibly new states later. For `Defer` the states are exactly two: `Pending` now, and `Ready` once, when the future completes. The change happens at most once, and the value is inert afterwards: content never re-renders once it is on the page. On its own a `Defer` renders nothing; a view has to consume it.
 
 ### `live`: Control Flow That Re-Renders
 
@@ -105,7 +105,7 @@ use topcoat::{
 async fn drink_grid(cx: &Cx) -> Result {
     view! {
         <div class="grid gap-4 sm:grid-cols-2">
-            live match defer(cx, drinks(cx)) {
+            live match defer(drinks(cx)) {
                 Deferred::Pending => {
                     for _ in 0..6 {
                         <div class="h-32 animate-pulse rounded-lg bg-muted"></div>
@@ -126,7 +126,7 @@ The first render sees `Pending` and renders the skeleton grid. When `drinks(cx)`
 
 Both arms are ordinary code with full access to the surrounding scope, and the `?` on the deferred `Result` is a real `?` that bubbles like any other.
 
-The value can also be created earlier and consumed where it is rendered:
+The value can also be created earlier and consumed where it is rendered; outside a view there is no macro to supply `cx`, so it appears explicitly:
 
 ```rust
 let drinks = defer(cx, drinks(cx));
@@ -141,6 +141,8 @@ view! {
 ```
 
 A `Defer` follows normal Rust rules. It is a value: create it anywhere, name it, or pass it as a prop. The `match` moves it, so each `Defer` is consumed exactly once; the borrow checker enforces this. And like every Rust future it is lazy: it runs only once a view consumes it, so deferring a query earlier in the body does not start it earlier. A `Defer` dropped without being consumed never runs at all; the type is `#[must_use]`, so the compiler catches the usual mistake of creating one and not using it.
+
+Data that is already at hand, a cache hit or a memoized call another component already made, reports `Ready` on the first poll: the ready arm renders on the first paint and nothing streams. `defer` on fast data costs nothing but a skeleton that is never shown, so it is safe to use whenever data might be slow.
 
 The `live` keyword is there for the macro. A plain `match` and a `live match` compile differently, and the macro cannot tell them apart from the expression alone, so the keyword does it. The value a `live` construct consumes must implement a small contract, described in the implementation section; `Defer` is its first implementation.
 
@@ -164,12 +166,12 @@ async fn profile(cx: &Cx) -> Result {
     view! {
         <h1>(&user.name)</h1>
 
-        live match defer(cx, orders(cx, &user)) {
+        live match defer(orders(cx, &user)) {
             Deferred::Pending => order_skeleton(),
             Deferred::Ready(orders) => order_list(orders: orders?),
         }
 
-        live match defer(cx, recommendations(cx, &user)) {
+        live match defer(recommendations(cx, &user)) {
             Deferred::Pending => reco_skeleton(),
             Deferred::Ready(recos) => reco_list(recos: recos?),
         }
@@ -184,7 +186,7 @@ The two queries are also in flight at the same time, just as sibling components 
 `live if let` fits when the pending state should render nothing:
 
 ```rust
-live if let Deferred::Ready(count) = defer(cx, unread_count(cx)) {
+live if let Deferred::Ready(count) = defer(unread_count(cx)) {
     <span class="badge">(count?)</span>
 }
 ```
@@ -204,7 +206,7 @@ view! {
     // `title` moves into the output.
     <h1>(title)</h1>
 
-    live match defer(cx, orders(cx, &user)) {
+    live match defer(orders(cx, &user)) {
         // Borrowing an outside value costs nothing.
         Deferred::Pending => {
             <h2>(&heading)</h2>
@@ -226,15 +228,41 @@ The rejection is the point. Each run of an arm that keeps an outside value in it
 
 Everywhere else move semantics hold: content outside `live` constructs, values created inside an arm, and the deferred output itself, which arrives owned.
 
-### Loading in Layers
+### The Reactive View Handle
 
-An arm is a full view scope: it can declare locals, loop, and invoke components, and those components can defer data of their own. It is also an async scope, so it can load data of its own with a plain `.await`; the await delays only that arm's output. That last point makes one practice worth avoiding: the pending arm renders before the page is sent to the browser, so an `.await` there delays the first response it exists to unblock. Await in the ready arm; the skeleton should render without waiting on anything.
+A `Defer` is not the only reactive expression. The second is the value views themselves evaluate to: a `view!` expression and a component call both evaluate to a reactive view handle, the same type. A handle is not rendered output; it stands for one render of its content, and it is an ordinary value: bind it, pass it as a prop, splice it into a view.
+
+```rust
+let feed = view! { activity_feed() };
+
+view! {
+    <aside>
+        (feed)
+    </aside>
+}
+```
+
+A `view!` expression is an anonymous component: the handle it evaluates to is exactly what a call like `activity_feed()` evaluates to, minus the name and the props. Three consequences follow from the handle standing for a render instead of containing one.
+
+There is no `?` on the binding, unlike today. Nothing has failed when a handle is created. A failure happens inside the render the handle stands for and travels through the handle, bubbling out where the handle is spliced, just as a plain component invocation bubbles its errors today. Catching it somewhere other than the splice point is the errors section's topic.
+
+A handle follows the same start rule as a `Defer`: it is lazy, and the render runs once a view consumes it. Splicing `(feed)` is that consumption.
+
+And a handle is cheap to clone. A clone is another reference to the same render, never a second run, so a handle can be spliced in more than one place while its content renders exactly once.
+
+### What Re-Runs
+
+A reactive expression delivering a new state is a reactive event. When one fires, the arms of the consuming construct re-run with the new state, and nothing else runs. Every other expression, component body, and sibling region ran exactly once; the swap splices the new arm output into their existing output by reference. The framework never re-runs code behind your back. Whether anything else on the page defers cannot change how often a component's code runs.
+
+An arm, in turn, is a full view scope: it can declare locals, loop, and invoke components, and those components can defer data of their own. It is also an async scope, so it can load data of its own with a plain `.await`; the await delays only that arm's output. That last point makes one practice worth avoiding: the pending arm renders before the page is sent to the browser, so an `.await` there delays the first response it exists to unblock. Await in the ready arm; the skeleton should render without waiting on anything.
+
+Let's work through some specific examples. First, arms nest. A component invoked from a ready arm can defer data of its own, and the page loads in layers:
 
 ```rust
 #[component]
 async fn product_page(cx: &Cx) -> Result {
     view! {
-        live match defer(cx, product(cx)) {
+        live match defer(product(cx)) {
             Deferred::Pending => product_skeleton(),
             Deferred::Ready(product) => {
                 let product = product?;
@@ -249,7 +277,7 @@ async fn product_page(cx: &Cx) -> Result {
 #[component]
 async fn reviews(cx: &Cx, product_id: ProductId) -> Result {
     view! {
-        live match defer(cx, reviews_for(cx, product_id)) {
+        live match defer(reviews_for(cx, product_id)) {
             Deferred::Pending => review_skeleton(),
             Deferred::Ready(reviews) => {
                 for review in reviews? {
@@ -271,17 +299,13 @@ second swap    the reviews
 
 Each layer paints as soon as it can. Anything unrelated elsewhere on the page streams on its own schedule; regions never wait on one another.
 
-### What Re-Runs
-
-A fire, a reactive expression delivering a new state to its construct, re-runs the arms of that construct and nothing else. Every other expression, component body, and sibling region ran exactly once; the swap splices the new arm output into their existing output by reference. The framework never re-runs code behind your back. Whether anything else on the page defers cannot change how often a component's code runs.
-
-The flip side: everything inside the arms is inside the re-run scope, whether or not it depends on the deferred data:
+The next example is the flip side of "only the arms re-run": everything inside the arms is inside the re-run scope, whether or not it depends on the deferred data:
 
 ```rust
 #[component]
 async fn dashboard(cx: &Cx) -> Result {
     view! {
-        live match defer(cx, drinks(cx)) {
+        live match defer(drinks(cx)) {
             Deferred::Pending => {
                 <div>
                     activity_feed()
@@ -299,13 +323,13 @@ async fn dashboard(cx: &Cx) -> Result {
 }
 ```
 
-`activity_feed` loads from the database and appears in both arms, so the fire creates a fresh instance and runs its body again, database call included. The re-run scope is exactly the arms, so the fix is visible in the source too: shrink the arms to the region that depends on the data.
+`activity_feed` loads from the database and appears in both arms, so the reactive event creates a fresh instance and runs its body again, database call included. The re-run scope is exactly the arms, so the fix is visible in the source too: shrink the arms to the region that depends on the data.
 
 ```rust
 view! {
     <div>
         activity_feed()
-        live match defer(cx, drinks(cx)) {
+        live match defer(drinks(cx)) {
             Deferred::Pending => { <div>"loading"</div> }
             Deferred::Ready(drinks) => { <div>"done"</div> }
         }
@@ -315,13 +339,13 @@ view! {
 
 Now the database call runs exactly once for the whole response, no matter when the `defer` fires: the first render started `activity_feed`, its output is in the buffer, and the swap changes only the match's slot next to it. The answer to "how often does this run" is once, and the code says so.
 
-When the arms need to wrap shared content differently, build it once and splice the handle into both:
+When the arms need to wrap shared content differently, build the handle once and splice a clone into both:
 
 ```rust
-let feed = view! { activity_feed() }?;
+let feed = view! { activity_feed() };
 
 view! {
-    live match defer(cx, drinks(cx)) {
+    live match defer(drinks(cx)) {
         Deferred::Pending => {
             <div class="opacity-50">(feed.clone()) <div>"loading"</div></div>
         }
@@ -332,23 +356,17 @@ view! {
 }
 ```
 
-A `View` is a cheap handle to an already built block, so the splice reuses the rendered output and `activity_feed` still ran once. This holds even if `activity_feed` has `defer`s of its own. Work is cancelled only when nothing references its output anymore, and `feed` stays referenced, by the local and by whichever arm is showing, so an outer swap neither cancels nor restarts it, and its own swaps keep landing in the arm on the page.
+The clones share one render, so `activity_feed` still ran once no matter which arm shows it; the first splice, in the pending arm, is what started it. This holds even if `activity_feed` has `defer`s of its own. Work is cancelled only when nothing references its output anymore, and `feed` stays referenced, by the local and by whichever arm is showing, so an outer swap neither cancels nor restarts it, and its own swaps keep landing in the arm on the page.
 
 When the duplicate work hides inside functions called from both arms, `#[memoize]` removes it, in its intended role: an opt-in cache, not a page-wide requirement. It also covers duplication inside a single evaluation, such as racing two calls of the same query: memoized functions share one in-flight future among concurrent callers.
 
 A future option is to make this automatic at the component level. The component identity system can already tell that the `activity_feed()` in the new arm is the same invocation as the one in the replaced arm. When the props also compare equal, the framework could carry the existing instance across the swap, output and pending work included, instead of running the body again. Memoization only skips runs, so it cannot break the rules above; it is a caching layer the design leaves room for, not something the first cut needs.
 
-### When Data Is Already Fast
-
-A deferred future is polled for the first time when the `live` construct consumes it. Data that is already at hand, a cache hit or a memoized call another component already made, reports `Ready` on that first poll: the ready arm renders on the first paint and nothing streams. `defer` on fast data costs nothing but a skeleton that is never shown, so it is safe to use whenever data might be slow.
-
-A `defer` fires at most once, when it moves from `Pending` to `Ready`, and is inert afterwards: content never re-renders once it is on the page. And because the `Defer` owns its future, it needs no bookkeeping: no call-site identity, no `key:` argument, no `#[memoize]` requirement. The alternatives section shows the design that would need all three.
-
 ### Errors
 
 The `?` in the examples above is the whole error story on the way up: a failed load bubbles out of the component, through the page, into the layouts, as today. This holds whether the failure happens before the response starts or halfway through the stream: where an error lands does not depend on when it happens.
 
-What is new is where errors can be caught, and it needs no new construct, only a second reactive expression. A component call is a reactive expression like `defer`, but different reactive expressions carry different states: a component call's state is not `Pending` or `Ready` but the call's `Result`. The `Ok` arrives when the component hands over its view, the same wait as a plain invocation today, so there is no pending arm to write; a failure that climbs out of the component later arrives as an `Err`. Written plainly, `drink_grid()` bubbles its errors implicitly, and consumed with `live match`, its `Result` is handled in place:
+What is new is where errors can be caught, and it needs no new construct: a reactive view handle is a reactive expression like `defer`, so a `live match` can consume one. Different reactive expressions carry different states, and a handle's states are the component's declared return type, `Result<View>`: the `Ok`, carrying the rendered view, arrives when the component hands its view over, the same wait as a plain invocation today, so there is no pending arm to write; a failure that climbs out of the component later arrives as an `Err`. The declared signature is the reactive contract in miniature: a `#[component]` written `-> Result<View>` states exactly what a `live match` on its invocation will see. Written plainly, `drink_grid()` bubbles its errors implicitly, and consumed with `live match`, its `Result` is handled in place:
 
 ```rust
 live match drink_grid() {
@@ -361,7 +379,7 @@ live match drink_grid() {
 
 Before the first paint this is an ordinary catch. After it, a failing load inside the grid climbs to this construct, the `Err` arm runs, and the swap replaces the grid; every load still pending inside the replaced region is cancelled.
 
-Layouts catch the same way. A layout's slot is the page's handle, the same kind of reactive value as a component call, so its type changes spelling from `Result` to `Slot`; what happens to layouts written against today's `slot: Result` signature is listed with the open questions:
+Layouts catch the same way. A layout's slot is the page's reactive view handle, so its type changes spelling from `Result` to `Slot`; what happens to layouts written against today's `slot: Result` signature is listed with the open questions:
 
 ```rust
 #[layout("/")]
@@ -423,7 +441,7 @@ live match settled((drink_grid(), activity_feed())) {
 }
 ```
 
-The components start immediately and load concurrently; there is no waterfall. Their own pending arms never ship: the section renders as one skeleton and swaps in once, complete. The first chunk does not even wait for these components to render, since the skeleton is ready immediately.
+Both components start during the first render, when the construct consumes them, and load concurrently; there is no waterfall. Their own pending arms never ship: the section renders as one skeleton and swaps in once, complete. The first chunk does not even wait for these components to render, since the skeleton is ready immediately.
 
 A leaf that leaves its loading UI entirely to its parents renders nothing while pending:
 
@@ -431,7 +449,7 @@ A leaf that leaves its loading UI entirely to its parents renders nothing while 
 #[component]
 async fn drink_grid(cx: &Cx) -> Result {
     view! {
-        live if let Deferred::Ready(drinks) = defer(cx, drinks(cx)) {
+        live if let Deferred::Ready(drinks) = defer(drinks(cx)) {
             for drink in drinks? {
                 drink_card(key: &drink.slug, drink: drink)
             }
@@ -444,7 +462,7 @@ The same shape scales to the whole page: a layout that consumes `settled(slot)` 
 
 ### Streaming Behavior
 
-When a render finishes with no `Pending` in it, the response is built and sent whole, exactly as today; a page without `defer` pays nothing. Otherwise the first chunk goes out as soon as the page has rendered around its skeletons, carrying the status code and headers that render declared, and the connection stays open. Each fired `defer` becomes a swap; fires that happen close together coalesce into one chunk. When nothing deferred remains, the stream closes.
+When a render finishes with no `Pending` in it, the response is built and sent whole, exactly as today; a page without `defer` pays nothing. Otherwise the first chunk goes out as soon as the page has rendered around its skeletons, carrying the status code and headers that render declared, and the connection stays open. Each fired `defer` becomes a swap; reactive events that happen close together coalesce into one chunk. When nothing deferred remains, the stream closes.
 
 Two constraints are inherent to streaming. The status code and headers are locked in by the first chunk, so declarations from later content are discarded. And a redirect that surfaces mid-stream cannot become a `Location` header, so it is delivered as a swap instruction that makes the client navigate.
 
@@ -578,7 +596,7 @@ Today `view!` expands to three phases: a hoist that evaluates every expression i
     // arms as a closure that can run for any of its states. The set
     // argument is where components started by an arm adopt.
     let (__node0, __node0_slot) = internal::reserve();
-    let mut __r0 = defer(cx, orders(cx, &user));
+    let mut __r0 = defer(__cx, orders(cx, &user));
     let __node0_arms = async |__state: Deferred<_>, __set: &mut RefreshSet<'_>| {
         Ok(match __state {
             Deferred::Pending => internal::block(__cx, |__b| {
@@ -671,9 +689,15 @@ States are delivered by value. The `Ready` arm receives the future's output owne
 
 Component calls are the second implementation. A call like `drink_grid()` evaluates to a handle that owns the marker and props and implements `Reactive` with `State = Result<View>`: the first state arrives when the component hands over its view, the same wait as the barrier, and an error climbing out of the component later arrives as an `Err` state. A plain invocation in a view is sugar for consuming the handle in bubble mode, render the `Ok`, pass the `Err` up; `live match` on the call is the catch. Outside a view, the props builder produces the same handle.
 
+The handle clarifies the split between the proposal's two view types. `View` is the rendered view: the inert, ref-counted block handle it is today, appearing as the payload inside a state. The reactive view handle is the value in circulation, and it is one concrete type, provisionally `ViewHandle<'a>`: component calls, `view!` expressions, and the layout slot all evaluate to it. No per-component handle type is needed, because a call's props move into the handle at creation and the future is boxed there; the box is the same one allocation per child the `RefreshSet` already pays, moved from consumption to creation. `'a` is the borrow of the caller's frame. `State = Result<View>` is the component's declared return type verbatim, so the signature the user writes documents the states while the macro rewrites the function to the handover form below; a `view!` expression produces the anonymous case, the same type with no component marker.
+
+One start rule follows: a handle is lazy exactly like a `Defer`, and its render runs once a view consumes it. This also removes any special case for a component body's trailing `view!`: the body returns a handle like any other expression, and the generated epilogue consumes it, awaits its first state, and fills the handover. The expansions in this section show the fused form of that rule: a plain invocation and a tail-position `view!` are consumed by the surrounding view the moment they are created, so the macro inlines creation and consumption; a handle bound to a local is the unfused case.
+
+Handles are cheap to clone; a clone is another reference to the same render through the same counts that keep it alive, so cloning never re-runs a body, and embedding clones in several places is plain bubble-mode consumption. Only `live` consumption is exclusive: states are delivered by value to one construct, which is the sharing question below.
+
 Adapters compose on top, because handles are just `Reactive` values. `settled` lifts a handle, or a tuple of them, into a `Deferred`-shaped state that stays `Pending` until nothing beneath the handles is still loading, which the liveness machinery already tracks; that is the group-skeleton pattern in the guide. One wrinkle for prototyping: a handle's first state is not available synchronously, so `current` becomes an await, or the contract grows a first-state step. `Defer` is unaffected either way.
 
-The trait is also the extension point. A signal read is a `Reactive` whose `changed` keeps yielding as the client changes the value, and retires when the connection closes. Multi-fire expressions need one refinement the `defer` node skips: a new state should cancel the replaced arm's pending work instead of waiting for it, so `changed` must be raced against the nested set rather than run after it. That refinement arrives with signals, not with `defer`.
+The trait is also the extension point. A signal read is a `Reactive` whose `changed` keeps yielding as the client changes the value, and retires when the connection closes. Expressions that fire more than once need one refinement the `defer` node skips: a new state should cancel the replaced arm's pending work instead of waiting for it, so `changed` must be raced against the nested set rather than run after it. That refinement arrives with signals, not with `defer`.
 
 ### Inside `#[component]`
 
@@ -804,7 +828,7 @@ Work should stop when its output can no longer reach the page, and reference cou
 
 Counts fall at `refill`. Replacing a slot's block releases that block's references, recursively through everything it spliced. A skeleton's children lose their last reference the moment the ready arm replaces them, so their loads stop. The shared `feed` from the guide keeps references, one from the local and one from whichever arm is showing, so it keeps running. Reachable means alive, with no marking pass and no special cases.
 
-Two consequences follow. A view bound to a variable and never spliced stays alive until the variable drops, at the end of the component's future; that is ordinary Rust drop timing, and the unused-variable lint flags the common mistake. And a block at count zero is known garbage, which gives buffer compaction a place to start.
+Two consequences follow. A handle held in a variable keeps its render alive even while no arm shows it, until the variable drops at the end of the component's future; that is ordinary Rust drop timing, and the shared `feed` relies on it. And a block at count zero is known garbage, which gives buffer compaction a place to start.
 
 ### The Driver
 
@@ -832,7 +856,7 @@ while let Some(_changed) = render.next_change().await? {
 // The render future completed: everything resolved and shipped.
 ```
 
-Change signaling is not the `RefreshSet`'s job. `ViewSlot::refill` marks the shared instruction buffer dirty, and `next_change` polls the live render, reports when the dirty bit is set, and ends when the future completes. Fires that land in the same poll pass coalesce into one chunk for free. The instruction buffer stays with the live render for the whole response, since refills keep writing to it.
+Change signaling is not the `RefreshSet`'s job. `ViewSlot::refill` marks the shared instruction buffer dirty, and `next_change` polls the live render, reports when the dirty bit is set, and ends when the future completes. Reactive events that land in the same poll pass coalesce into one chunk for free. The instruction buffer stays with the live render for the whole response, since refills keep writing to it.
 
 ### Error Transitions
 
@@ -840,7 +864,7 @@ On the first render, a failure is the `?` before the yield in the `#[component]`
 
 After the first paint, a failure is the `?` inside a pushed refresh: `orders?` failing when the `Ready` arm runs. The node's refresh future produces the error, so the component's `run()` produces it, so the component's future produces it, and so on up the join tree that mirrors the call chain. A component that invoked the failing child as a plain call passes the error along without any of its code re-running, the same as the implicit `?` on a first render.
 
-Catching is a fire. A `live match` on a component call owns that component's handle; an error climbing out of the component arrives as the handle's next state, the node re-runs its arms with `Err`, and the swap replaces the region, dropping the replaced subtree's remaining work. A layout's slot is such a handle, so layouts catch with the same construct and no special machinery. No component body anywhere re-runs to deliver an error, and if nothing catches, the framework's error view swaps in as a whole-page update.
+Catching is a reactive event. A `live match` on a component call owns that component's handle; an error climbing out of the component arrives as the handle's next state, the node re-runs its arms with `Err`, and the swap replaces the region, dropping the replaced subtree's remaining work. A layout's slot is such a handle, so layouts catch with the same construct and no special machinery. No component body anywhere re-runs to deliver an error, and if nothing catches, the framework's error view swaps in as a whole-page update.
 
 ## Requirements on Application Code
 
@@ -854,15 +878,17 @@ Boundary diffing adds a softer expectation: renders should be deterministic, bec
 
 **Generated-code plumbing.** The `RefreshSet` sketch settles the shape; the generated code around it needs prototyping. The borrow checker must accept the collector-before-locals pattern in real bodies, the arms closure needs a workable `async` closure signature, and `Component::render` changes from return-once to yield-then-continue. In a `view!` outside a `#[component]`/`#[page]`/`#[layout]` transform, reactive nodes should be a compile error, and component invocations should keep completion semantics: the expression awaits the whole subtree, which is the blocking mode above.
 
-**Reference counting details.** Liveness and cancellation rest on ref-counted views and blocks. To settle: the cost of the release walk at `refill`; whether the pathological cycle, two slots filled with views that reference each other's placeholders, needs a runtime check or just a documented rule; and whether a view held in a variable but never spliced deserves more than the unused-variable lint, since it keeps its producer alive until the variable drops.
+**Reference counting details.** Liveness and cancellation rest on ref-counted views and blocks. To settle: the cost of the release walk at `refill`; whether the pathological cycle, two slots filled with views that reference each other's placeholders, needs a runtime check or just a documented rule; and whether a handle still held in a variable after its content left the page needs tooling, since the variable keeps the producer alive and running until it drops.
 
 **Component handles.** A component call evaluating to a `Reactive` handle needs: the spelling for building one outside a view (probably the props builder); the contract change for a first state that is not synchronously available; the `settled` adapter's subtree observation, fed by the reference counts; the rethrow arm in a catching `live match`, since view matches stay exhaustive; the layout slot's move from `Result` to a handle type, including what happens to layouts written against today's signature; and names for the adapter set, `settled` and any joins, which are working syntax throughout.
+
+**The `view!` expression type.** A `view!` expression evaluating to a handle instead of today's `Result<View>` changes what a binding like `let feed = view! { ... };` means: the `?` disappears and errors travel through the handle. To settle: the handle type's name and exact shape (`ViewHandle<'a>` is provisional); confirming the macro can fuse creation and consumption for plain invocations and tail-position `view!`, as the expansion sketches assume; and whether two `live` constructs may consume clones of the same handle, the sharing question from the reactive contract.
 
 **Batching.** Completions that arrive in one poll pass already coalesce into one chunk. Whether to add a short window that also coalesces near-simultaneous completions across wakes is undecided.
 
 **Limits.** A deadline per request is probably wanted: when it expires, the framework stops polling the render, the stream closes, and pending regions keep their skeletons. Dropping the render future cancels all outstanding work, so enforcement is one drop.
 
-**Buffer growth.** Every refill appends new blocks and orphans the ones they replace. For streaming this is bounded by the number of fires, but if the live render later services long-lived updates, compaction or block reuse becomes worth designing.
+**Buffer growth.** Every refill appends new blocks and orphans the ones they replace. For streaming this is bounded by the number of reactive events, but if the live render later services long-lived updates, compaction or block reuse becomes worth designing.
 
 ## Why This Pays Off Later
 
