@@ -8,7 +8,7 @@ The system is three building blocks, and the proposal introduces them in order, 
 
 - A reactive expression is a value with a state to render now and possibly new states later. `defer`, which wraps a slow future instead of awaiting it, is the first one.
 - A `live` construct is view control flow, such as `live match`, that consumes a reactive expression and re-renders its arms in place when the state changes. Nothing else re-renders.
-- A `boundary` marks a region of the page as independently swappable, so an update ships only the regions that actually changed.
+- A `boundary` marks a region of the page as independently swappable, so an update sends only the regions that actually changed.
 
 ## Background
 
@@ -150,7 +150,7 @@ The example raises the question the design turns on. By the time `drinks(cx)` co
 
 The answer is the one structural change in this proposal. Today the future that renders a page runs until the view is built, returns it, and is dropped. Under this proposal the same future hands its view over and keeps running until nothing inside it can change anymore. The component's locals stay alive on the future's frame, the deferred future makes progress inside it, and when the data arrives the render wakes up, re-runs the arms of the one construct that owns the `Defer`, and splices the new output into the already-rendered page. Every enclosing component embedded that region by reference, so the page's output changes without any of the page's code re-running.
 
-Over the wire this becomes streaming. The first chunk is the page with skeletons where pending arms rendered, sent as soon as the page has rendered around them. The connection stays open; each re-render becomes a later chunk on the same response, and a small script swaps the new content into place. When nothing deferred remains, the stream closes. A page with no `defer` finishes its render in one pass and ships whole, exactly as today. What a chunk carries is settled at the end of the proposal: the whole page by default, and only the regions that actually changed once `boundary`, the third building block, is in play. Until then, the examples only need "the arms re-run and the region updates in place".
+Over the wire this becomes streaming. The first chunk is the page with skeletons where pending arms rendered, sent as soon as the page has rendered around them. The connection stays open; each re-render becomes a later chunk on the same response, and a small script swaps the new content into place. When nothing deferred remains, the stream closes. A page with no `defer` finishes its render in one pass and is sent as one response, exactly as today. What a chunk carries is settled at the end of the proposal: the whole page by default, and only the regions that actually changed once `boundary`, the third building block, is introduced. Until then, the examples only need "the arms re-run and the region updates in place".
 
 ### Deferred Values Are Ordinary Values
 
@@ -177,7 +177,9 @@ async fn profile(cx: &Cx) -> Result {
 }
 ```
 
-Both futures and both `Ready` arms borrow `user`. Nothing is cloned, and no `'static` bound or `Arc` appears; the implementation section explains why that works. The two loads run concurrently and fire independently: whichever finishes first swaps in first.
+Both futures and both `Ready` arms borrow `user`. Nothing is cloned, and no `'static` bound or `Arc` appears; the implementation section explains why that works.
+
+The two queries are also in flight at the same time, just as sibling components already render concurrently today. And the two constructs do not coordinate: each one re-renders when its own future completes, without waiting for the other. If recommendations resolve before orders, the recommendations list swaps in while the orders skeleton is still showing.
 
 `live if let` fits when the pending state should render nothing:
 
@@ -220,13 +222,13 @@ view! {
 
 Arms run once per state, so an owned value from outside the construct cannot move into an arm's output; the compiler rejects it. Borrow it instead, which is free, or `.clone()` it where the arm needs its own copy, like the prop above.
 
-The rejection is the point. Each run of an arm that keeps an outside value in its output needs a copy of it, and the clone makes every copy visible in the source. Duplication only happens where the code says `.clone()`.
+The rejection is the point. Each run of an arm that keeps an outside value in its output needs a copy of it, and the clone makes every copy visible in the source. Duplication only happens where the code says `.clone()`. This is the rule for Rust's `Fn` closures, and not by analogy: the arms compile to a closure that runs once per state, so a body that may run again can borrow its surroundings but not consume them.
 
 Everywhere else move semantics hold: content outside `live` constructs, values created inside an arm, and the deferred output itself, which arrives owned.
 
 ### Loading in Layers
 
-An arm is a full view scope: it can declare locals, loop, and invoke components, and those components can defer data of their own.
+An arm is a full view scope: it can declare locals, loop, and invoke components, and those components can defer data of their own. It is also an async scope, so it can load data of its own with a plain `.await`; the await delays only that arm's output. That last point makes one practice worth avoiding: the pending arm renders before the page is sent to the browser, so an `.await` there delays the first response it exists to unblock. Await in the ready arm; the skeleton should render without waiting on anything.
 
 ```rust
 #[component]
