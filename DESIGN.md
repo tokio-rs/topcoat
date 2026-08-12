@@ -213,6 +213,41 @@ live if let Deferred::Ready(count) = defer(cx, unread_count(cx)) {
 
 The badge appears when the count arrives.
 
+### Ownership
+
+A view consumes the values it renders: interpolating an owned value moves it into the output, and props move. That stays true everywhere except one place, the inside of a `live` construct.
+
+```rust
+let title = page_title(&user);
+let heading = orders_heading(&user);
+
+view! {
+    // Outside a live construct, a view consumes values as today:
+    // `title` moves into the output.
+    <h1>(title)</h1>
+
+    live match defer(cx, orders(cx, &user)) {
+        // Borrowing an outside value costs nothing.
+        Deferred::Pending => {
+            <h2>(&heading)</h2>
+            <div class="h-32 animate-pulse rounded-lg bg-muted"></div>
+        }
+        // Moving one in does not compile: `(heading)` would consume a
+        // value the arm does not own. A prop that takes ownership gets
+        // an explicit copy.
+        Deferred::Ready(orders) => {
+            order_panel(heading: heading.clone(), orders: orders?)
+        }
+    }
+}
+```
+
+Arms run once per state, so an owned value from outside the construct cannot move into an arm's output; the compiler rejects it. Borrow it instead, which is free, or `.clone()` it where the arm needs its own copy, like the prop above.
+
+The rejection is the point. Each run of an arm that keeps an outside value in its output needs a copy of it, and the clone makes every copy visible in the source. The re-render design made the same copies and more, invisibly: every pass rebuilt every value on the page. Here duplication only happens where the code says `.clone()`.
+
+Everywhere else move semantics hold: content outside `live` constructs, values created inside an arm, and the deferred output itself, which arrives owned.
+
 ### Loading in Layers
 
 An arm is a full view scope: it can declare locals, loop, and invoke components, and those components can defer data of their own.
