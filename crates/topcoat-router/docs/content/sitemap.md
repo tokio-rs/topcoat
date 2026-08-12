@@ -54,7 +54,7 @@ let url = SitemapUrl::new("/posts/42")
 
 # The path under `module_router!`
 
-A module-derived path cannot contain a dot, because module names are converted to kebab-case. To serve the sitemap from a module tree, declare a `sitemap` module and override its segment with [`segment!`](macro@crate::segment); a rename is used as written.
+A module-derived path cannot contain a dot, because module names are converted to kebab-case. To serve the sitemap from a module tree, declare a `sitemap` module and override its segment with `segment!`; a rename is used as written.
 
 ```rust
 // src/app/sitemap.rs: serves /sitemap.xml
