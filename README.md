@@ -254,7 +254,6 @@ Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](ht
 - [ ] Validations
 - [ ] Localization support
 - [ ] `OpenAPI` endpoints
-- [ ] Sitemaps
 - [ ] Docs for how to deploy Topcoat
 - [ ] Pre-rendering for static pages
 - [ ] Streaming SSR / Suspense
