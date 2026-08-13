@@ -17,10 +17,10 @@ build = []
 [dependencies]
 anyhow.workspace = true
 anymap3.workspace = true
-boxcar.workspace = true
-hashbrown.workspace = true
+elsa.workspace = true
 http.workspace = true
 pin-project-lite.workspace = true
+siphasher.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 

@@ -44,6 +44,7 @@ full = [
 	"runtime",
 	"serve",
 	"session",
+	"sitemap",
 	"sse",
 	"tailwind",
 	"tower",
@@ -140,6 +141,10 @@ runtime = [
 ]
 session = [
 	"dep:topcoat-session",
+]
+sitemap = [
+	"router",
+	"topcoat-router/sitemap",
 ]
 sse = [
 	"router",

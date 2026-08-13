@@ -1,6 +1,6 @@
 Request extractors and response types for Topcoat handlers.
 
-A handler declares the request body it accepts and the response it sends through its own signature. This module holds the types that fill those two roles, from a JSON body to a multipart upload, a WebSocket connection, or a stream of server-sent events.
+A handler declares the request body it accepts and the response it sends through its own signature. This module holds the types that fill those two roles, from a JSON body to a multipart upload, a WebSocket connection, a stream of server-sent events, or an XML sitemap.
 
 # Reading a request body
 
@@ -83,3 +83,9 @@ See the [`websocket`](mod@websocket) module docs for the handshake, messages, su
 Server-sent events push a one-way stream of events from the server to the client over a plain HTTP response. Behind the `sse` feature, a route becomes such a stream by returning [`Sse`](sse::Sse) wrapping a stream of [`Event`](sse::Event)s.
 
 See the [`sse`](mod@sse) module docs for building events, keeping idle streams alive, and resuming after a reconnect.
+
+# Sitemaps
+
+A sitemap lists the URLs of a site for crawlers. Behind the `sitemap` feature, a route serves one by building a [`Sitemap`](sitemap::Sitemap) entry by entry and returning it; relative entries are resolved against the base URL registered on the router.
+
+See the [`sitemap`](mod@sitemap) module docs for serving the sitemap at `/sitemap.xml` and the fields of an entry.

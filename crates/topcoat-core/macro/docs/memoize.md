@@ -132,7 +132,7 @@ With `as_ref`, the macro rewrites the return type through the `MemoizeAsRef` tra
 
 # Borrowed and owned arguments
 
-Arguments can be passed by value or by reference. Borrowed arguments avoid cloning on cache hits; on a miss the value is cloned once into the cache.
+Arguments can be passed by value or by reference. The cache never stores a copy of the arguments: an entry is identified by a hash of them, so borrowed arguments are only hashed, never cloned.
 
 ```rust
 # fn main() {}
@@ -148,7 +148,7 @@ async fn lookup(cx: &Cx, name: &str) -> Result<Record, Error> {
 }
 
 # async fn example(cx: &Cx) -> Result<(), &Error> {
-let record = lookup(cx, "alice").await?; // computes; stores "alice".to_owned() as the key
+let record = lookup(cx, "alice").await?; // computes; caches under the hash of "alice"
 let record = lookup(cx, "alice").await?; // cache hit, no allocation
 # let _ = record;
 # Ok(())
@@ -161,11 +161,12 @@ The macro enforces these at compile time:
 
 - The function must take a parameter literally named `cx` of type `&Cx`.
 - The function cannot take a `self` receiver.
-- For an owned argument of type `P`: `P: Clone + Hash + Eq + Send + Sync + 'static`.
-- For a borrowed argument of type `&P`: `P: ToOwned` with `P::Owned: Hash + Eq + Send + Sync + 'static`.
+- Every argument except `cx` must implement `Hash`, whether passed by value or by reference.
 - The return type `T` must be `Send + Sync + 'static`.
 
-Most everyday types (`i32`, `String`, `&str`, `Uuid`, your own `#[derive(Hash, Eq, PartialEq, Clone)]` structs) satisfy these out of the box.
+Most everyday types (`i32`, `String`, `&str`, `Uuid`, your own `#[derive(Hash)]` structs) satisfy these out of the box.
+
+The hash of the arguments is the entire cache key, so the cache is only correct if every argument's `Hash` impl distinguishes values that are not equal. A hand-written impl that hashes only some of a type's fields makes calls that differ in the skipped fields collide, and a collision silently returns the cached value of a different call. Derived and standard library impls are always safe.
 
 # When to reach for it
 

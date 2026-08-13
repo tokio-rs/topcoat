@@ -165,7 +165,7 @@ impl ToTokens for Memoize {
 
         let call = if asyncness.is_some() {
             quote! {
-                #topcoat_context::memoize_cache(cx).eq_cache().memoize_async(
+                #topcoat_context::memoize_cache(cx).memoize_async(
                     cx,
                     (#(#borrowed_keys,)*),
                     (#(#key_idents,)*),
@@ -177,7 +177,7 @@ impl ToTokens for Memoize {
             }
         } else {
             quote! {
-                #topcoat_context::memoize_cache(cx).eq_cache().memoize(
+                #topcoat_context::memoize_cache(cx).memoize(
                     cx,
                     (#(#borrowed_keys,)*),
                     (#(#key_idents,)*),
