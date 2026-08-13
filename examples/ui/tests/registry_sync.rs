@@ -8,13 +8,12 @@
 //! example does not showcase yet), these tests fail until the example is
 //! refreshed against the registry.
 
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
-use topcoat_ui::{DEFAULT_REGISTRY, Registry};
+use topcoat_ui::{
+    DEFAULT_REGISTRY, Registry,
+    manage::{InstallStatus, Package, list},
+};
 
 /// This example package's root, where `topcoat ui` installed the theme and
 /// components.
@@ -39,47 +38,7 @@ fn read_installed(path: &PathBuf, hint: Option<&str>) -> String {
 
 /// What to run when the component `name` has drifted from the registry.
 fn component_hint(name: &str) -> String {
-    format!(
-        "run `topcoat ui add {name} --overwrite` in examples/ui \
-         (and showcase the component if it is new)"
-    )
-}
-
-/// The parts of this example's `components.toml` these tests read. The file
-/// records more than this; the rest is `topcoat ui`'s business.
-#[derive(Deserialize)]
-struct InstallState {
-    theme: InstalledTheme,
-    registries: BTreeMap<String, InstalledRegistry>,
-}
-
-/// The theme this example installed: which of the registry's themes it came
-/// from, and the hash of that theme's source at the time.
-#[derive(Deserialize)]
-struct InstalledTheme {
-    name: String,
-    hash: String,
-}
-
-/// The components this example installed from one registry, by name.
-#[derive(Deserialize)]
-struct InstalledRegistry {
-    components: BTreeMap<String, InstalledComponent>,
-}
-
-/// One installed component: the hash of the registry source it came from.
-#[derive(Deserialize)]
-struct InstalledComponent {
-    hash: String,
-}
-
-/// The install state `topcoat ui` wrote at this example's package root.
-fn install_state() -> InstallState {
-    let path = package_root().join("components.toml");
-    let hint = "install the theme and components by running \
-        `topcoat ui init --theme neutral` in examples/ui";
-    let raw = read_installed(&path, Some(hint));
-    toml::from_str(&raw).unwrap_or_else(|error| panic!("cannot parse {}: {error}", path.display()))
+    format!("run `topcoat ui add {name} --overwrite` in examples/ui")
 }
 
 #[test]
@@ -116,42 +75,33 @@ fn components_match_registry() {
 }
 
 #[test]
-fn recorded_hashes_match_registry() {
-    let registry = registry();
-    let state = install_state();
+fn components_are_up_to_date() {
+    let package = Package::locate(Some(String::from("ui"))).expect("the ui example is a package");
+    let listings =
+        list(&package, Some(DEFAULT_REGISTRY)).expect("the built-in registry can be listed");
+    let statuses = listings
+        .into_iter()
+        .next()
+        .expect("listing the built-in registry yields it")
+        .outcome
+        .expect("the built-in registry loads");
 
-    let theme = registry
-        .theme(&state.theme.name)
-        .expect("the registry offers the theme this example installed");
-    assert!(
-        state.theme.hash == theme.hash().unwrap(),
-        "components.toml records a stale hash for the `{}` theme",
-        state.theme.name,
-    );
-
-    let tracked = &state
-        .registries
-        .get(DEFAULT_REGISTRY)
-        .expect("the example tracks its components under the built-in registry")
-        .components;
-
-    for name in registry.names() {
-        let component = registry.get(name).expect("name came from the registry");
-        let hint = component_hint(name);
-        let recorded = tracked
-            .get(name)
-            .unwrap_or_else(|| panic!("components.toml does not track `{name}`; {hint}"));
-        assert!(
-            recorded.hash == component.hash().unwrap(),
-            "components.toml records a stale hash for `{name}`; {hint}",
-        );
-    }
-
-    for name in tracked.keys() {
-        assert!(
-            registry.get(name).is_some(),
-            "components.toml tracks `{name}`, which the registry no longer offers; \
-             run `topcoat ui remove {name}` in examples/ui",
-        );
+    for status in statuses {
+        let name = &status.name;
+        match status.status {
+            InstallStatus::UpToDate { .. } => {}
+            InstallStatus::Update { .. } => panic!(
+                "`{name}` has an update available; {hint}",
+                hint = component_hint(name),
+            ),
+            InstallStatus::Available { .. } => panic!(
+                "the registry offers `{name}`, which this example has not installed; \
+                 run `topcoat ui add {name}` in examples/ui and showcase it",
+            ),
+            InstallStatus::Orphaned { .. } => panic!(
+                "this example has `{name}` installed, which the registry no longer offers; \
+                 run `topcoat ui remove {name}` in examples/ui",
+            ),
+        }
     }
 }
