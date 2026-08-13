@@ -708,25 +708,34 @@ fn render<'frame>(
     __fill: Fill,
 ) -> impl Future<Output = Result<()>> + Send + 'frame {
     async move {
-        // Collects this frame's live work: tenders and nodes. `view!`
-        // expansions in the body register into it.
-        let mut __refresh = RefreshSet::new();
-
-        // The body, unchanged. A `?` here returns before the fill:
-        // fused, it surfaces at the consuming frame's barrier, and
-        // unfused, the tender posts it to the cell.
+        // The body, unchanged: its locals live in the outer scope. A
+        // `?` here returns before the fill: fused, it surfaces at the
+        // consuming frame's barrier, and unfused, the tender posts it
+        // to the cell.
         let user = current_user(cx).await?;
-        let __view = { /* the `view!` expansion above */ };
 
-        // The yield: deliver the first state, then keep going. This is
-        // the line where today's generated code returns.
-        __fill.fill(__view);
+        // The tail `view!` expansion is an inner block entered after
+        // the body's locals, and it owns this frame's set. The set
+        // cannot be declared above the locals its entries borrow: drop
+        // analysis is not path-sensitive, and any `?` before the
+        // epilogue leaves a path where the set would drop in scope.
+        {
+            let mut __refresh = RefreshSet::new();
+            let __view = { /* the `view!` expansion above */ };
 
-        // The refresh phase: drive this frame's live work until none
-        // is left. With nothing registered, this completes immediately
-        // and the whole future was today's behavior. `user` is alive
-        // across this await; that is the point of not returning.
-        __refresh.run().await
+            // The yield: deliver the first state, then keep going. This
+            // is the line where today's generated code returns.
+            __fill.fill(__view);
+
+            // The refresh phase: drive this frame's live work until
+            // none is left. With nothing registered, this completes
+            // immediately and the whole future was today's behavior.
+            // `user` is alive across this await; that is the point of
+            // not returning. Bound, not left in tail position: tail
+            // temporaries outlive locals.
+            let __done = __refresh.run().await;
+            __done
+        }
     }
 }
 ```
@@ -797,7 +806,7 @@ Polling is a sweep, not a waker dance. A frame's `barrier` and `run` poll their 
 
 Three properties matter:
 
-- `run(self)` must consume the set. It is declared at the top of the frame but holds borrows of locals declared after it; the borrow checker only accepts that if the set is consumed before those locals drop, and the epilogue's `run()` is that consumption. Consuming also makes dropping a frame one cancellation: the entry `Vec` takes every future with it, recursively through nested frames.
+- The set lives in an inner scope below the locals its entries borrow: the tail `view!` expansion's block, entered after the body runs. Declaring it above them does not compile, because drop analysis is not path-sensitive and any `?` between a push and the epilogue leaves a path where the set drops in scope while holding those borrows. `run(self)` consumes the set there, and dropping a frame is one cancellation: the entry `Vec` takes every future with it, recursively through nested frames.
 - Loops do not multiply entries. A `for` over components drives all its iteration futures from one entry holding one homogeneous `Vec`, today's exact allocation profile for loops.
 - The allocation count is honest: today's render allocates nothing per component, and this design adds one box per statement-level component and per reactive construct, one `Vec` per loop, and cells that are bytes in the scope's slab.
 
@@ -849,7 +858,7 @@ A fused invocation writes a cell born `Started` with its one slot registered and
 
 `Fill::fill` runs inside some entry's poll: it caches the first state in the cell, fills every registered slot, credits the waiting tickets, and sets the progress flag.
 
-Tickets go through the same door. A `Ticket` is the frame's `FrameId` plus a done flag; `hand_over` decrements the frame's counter through the scope and is idempotent, since the arms closure runs it on every arm run. The counter cannot live on the `RefreshSet` itself: the code that decrements it runs inside entries the set owns, and safe Rust does not let an entry hold a mutable path into its owner.
+Tickets go through the same door. A `Ticket` is `Copy`, the frame plus a ticket index, with its done flag on the scope, so every arm run can hold the ticket and `hand_over` stays idempotent; it decrements the frame's counter through the scope. The counter cannot live on the `RefreshSet` itself: the code that decrements it runs inside entries the set owns, and safe Rust does not let an entry hold a mutable path into its owner.
 
 Cells are records, not owners: a cell never holds a future, so there is no reference cycle to leak, and dropping the creating frame drops the tender and the render future with it, which is what cancellation means below.
 
@@ -903,17 +912,15 @@ Boundary diffing adds a softer expectation: renders should be deterministic, bec
 
 ## Open Questions
 
-**Reactive syntax.** `live` is working syntax, not final. As a contextual modifier keyword it follows Rust's own pattern (`async`, `unsafe`, `const`, and `gen` blocks), with C#'s `await foreach` and JavaScript's `for await` as cross-language precedent; runner-up spellings are a `#[live]` attribute and a Maud-style sigil such as `@match`. Also to settle: which constructs can be `live` (`match` and `if let` first); whether a reactive expression in node position, for a deferred fragment of text, is worth having; the name and final shape of the `Reactive` trait; and whether a `Defer` should also be consumable by reference, so one load can render in more than one place.
+**Reactive syntax.** `live` is working syntax, not final. As a contextual modifier keyword it follows Rust's own pattern (`async`, `unsafe`, `const`, and `gen` blocks), with C#'s `await foreach` and JavaScript's `for await` as cross-language precedent; runner-up spellings are a `#[live]` attribute and a Maud-style sigil such as `@match`. Also to settle: which constructs can be `live` (`match` and `if let` first); whether a reactive expression in node position, for a deferred fragment of text, is worth having; and the name and final shape of the `Reactive` trait. A `Defer` is consumable by move only; sharing belongs to `View` clones.
 
-**Generated-code plumbing.** The sketches settle the shape; the generated code needs prototyping. The borrow checker must accept the set-before-locals pattern in real bodies and arm frames, the arms closure needs a workable `async` closure signature, `run_node`'s race needs a careful poll implementation, the loop emission path must batch iteration futures into one entry as today's `try_join_all` path does, and `Component::render` changes from return-once to fill-then-continue. In a `view!` outside a `#[component]`/`#[page]`/`#[layout]` transform, reactive constructs should be a compile error, and component invocations should keep completion semantics: the macro expands a self-contained frame and drives it to completion, which is the blocking mode above.
+**Generated-code plumbing.** A hand-written spike (`spike/reactive-render`) has verified the core shapes compile and stream: the inner-block set placement, arm frames borrowing body locals through per-call copies, `run_node`'s race in safe code with the arm frame dropped on a new state, the fill-then-continue future under `'frame`, and the thread-local scope keeping the render `Send` with no locks. Still for the macro work: the arms closure is a plain `FnMut` returning a `Send` future, not an `async` closure, because `AsyncFnMut` cannot carry a `Send` bound on its returned future today, so captures must be per-call copies (`Copy` slots and tickets, handle clones); mid-body `let x = view! { ... };` bindings need a pending-adopt desugar, creating the future at the binding and registering it with the set the tail expansion creates, and the desugar only reaches direct statements of the body, so whether `view!` expressions in nested positions (built inside a block and moved out, collected in a loop, stored in a struct) are supported or a compile error is an API question the macro work must settle; the loop emission path must batch iteration futures into one entry as today's `try_join_all` path does; and in a `view!` outside a `#[component]`/`#[page]`/`#[layout]` transform, reactive constructs should be a compile error, with component invocations keeping completion semantics: the macro expands a self-contained frame and drives it to completion, which is the blocking mode above.
 
 **Cancellation eagerness.** The first cut cancels by frame drop alone: a render started from an outer frame whose only splice was since replaced keeps running until its owning frame ends, wasted but never sent. Whether real workloads produce enough of this waste to justify layering reference-counted views and blocks back on top, with their release-walk cost and cycle questions, is deferred until the live render serves long-lived updates.
 
 **Component handles.** A group-skeleton adapter over handles (`settled` in earlier drafts) is punted past the MVP, along with its open questions. The rethrow arm needed no design of its own: an arm's `?` fails the construct and the failure climbs to the next catcher, so the catch-all arm `other => (other?)` mirrors today's plain match and view matches stay exhaustive.
 
 **The `view!` expression type.** A `view!` expression evaluating to a handle instead of today's `Result<View>` changes what a binding like `let feed = view! { ... };` means: the `?` disappears and errors travel through the handle. To settle: the names and exact split between the handle, the cell, and the tender, all provisional; the slab index hygiene, a generation bit against stale `CellId`s or debug assertions; and whether two `live` constructs may consume clones of the same handle, the sharing question from the reactive contract.
-
-**Batching.** Completions that arrive in one poll pass already coalesce into one chunk. Whether to add a short window that also coalesces near-simultaneous completions across wakes is undecided.
 
 **Limits.** A deadline per request is probably wanted: when it expires, the framework stops polling the render, the stream closes, and pending regions keep their skeletons. Dropping the render future cancels all outstanding work, so enforcement is one drop.
 

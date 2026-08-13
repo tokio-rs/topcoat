@@ -1,0 +1,11 @@
+[package]
+name = "reactive-render-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Detached from the Topcoat workspace on purpose: this is a throwaway
+# spike proving the DESIGN.md machinery shapes compile and stream.
+[workspace]
+
+[dependencies]
