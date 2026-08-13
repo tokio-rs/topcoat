@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, View, class, component, view},
+    view::{Attributes, PromotedStr, StaticClass, View, class, component, view},
 };
 
 /// How a [`toggle`] relates to the others sharing its `name`.
@@ -21,10 +21,10 @@ pub enum ToggleKind {
 impl ToggleKind {
     /// The `type` of the underlying `<input>`, which is what makes the
     /// browser keep the pressed state this kind calls for.
-    fn input_type(self) -> &'static str {
+    fn input_type(self) -> PromotedStr {
         match self {
-            Self::Independent => "checkbox",
-            Self::Exclusive => "radio",
+            Self::Independent => PromotedStr(&"checkbox"),
+            Self::Exclusive => PromotedStr(&"radio"),
         }
     }
 }

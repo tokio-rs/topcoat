@@ -85,7 +85,7 @@ hash = "sha256:19d7779d8e7e75a2db78904232fa3db11f8e0e49cfca8a1852c4dcd686ac2d69"
 file = "src/components/select.rs"
 
 [registries.topcoat.components.separator]
-hash = "sha256:d5810775ddf608adc99a7c16f6cfb7b09722da19d666e558fc60c7dedd261c56"
+hash = "sha256:2504fa590bcf7d32ca4737c35fe57aee0ff95b3595e502f3eb59ebac2d704175"
 file = "src/components/separator.rs"
 
 [registries.topcoat.components.sheet]
@@ -117,7 +117,7 @@ hash = "sha256:49952715ff3cfc1b8c0372a70745c33a81521a46422695d7a62206e1a3d4b626"
 file = "src/components/textarea.rs"
 
 [registries.topcoat.components.toggle]
-hash = "sha256:d2df3671028786459d8fda7b8e6ee0f6808d6c48a5be015fc238aa1b04eb00e5"
+hash = "sha256:d061afc50d0478803a95ba9b0c44816735fae7aeb6047d7272f69d7cd4b60e43"
 file = "src/components/toggle.rs"
 
 [registries.topcoat.components.tooltip]

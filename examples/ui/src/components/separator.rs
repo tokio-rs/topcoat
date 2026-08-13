@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, class, component, view},
+    view::{Attributes, PromotedStr, StaticClass, class, component, view},
 };
 
 /// The direction a [`separator`] runs in.
@@ -32,10 +32,10 @@ impl SeparatorOrientation {
 
     /// The value of the `aria-orientation` attribute, or `None` for the
     /// horizontal default assistive technology already assumes.
-    fn aria(self) -> Option<&'static str> {
+    fn aria(self) -> Option<PromotedStr> {
         match self {
             Self::Horizontal => None,
-            Self::Vertical => Some("vertical"),
+            Self::Vertical => Some(PromotedStr(&"vertical")),
         }
     }
 }
