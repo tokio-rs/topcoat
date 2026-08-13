@@ -53,7 +53,7 @@ In child position, the expression becomes a node:
 # #[component]
 # async fn example() -> Result {
 # let user = User { name: "Ada" };
-# let sidebar = view! { <aside></aside> }?;
+# let sidebar = view! { <aside></aside> };
 view! {
     <h1>"Hello, " (user.name) "!"</h1>
     (sidebar)
@@ -377,6 +377,72 @@ The rendered markup always appears in source order, no matter which component fi
 
 Plain Rust in the view, such as interpolated expressions, `let` bindings, loop iterators, and branch conditions, still runs in source order. Only the components render concurrently.
 
+# Reactive Markup
+
+A `live` construct consumes a reactive expression and re-renders its arms in place when the expression's state changes; nothing else on the page runs again. The first reactive expression is [`defer`], which wraps a slow future instead of awaiting it. Its states are [`Deferred::Pending`] now and [`Deferred::Ready`] once, when the future completes, so a page renders a skeleton immediately and swaps in the real content when the data arrives:
+
+```rust
+# use topcoat::{Result, context::Cx, view::*};
+# struct Drink { slug: String, title: String }
+# async fn drinks(_cx: &Cx) -> Result<Vec<Drink>> { Ok(Vec::new()) }
+# #[component]
+# async fn drink_card(drink: Drink) -> Result { view! { <p>(drink.title)</p> } }
+# #[component]
+# async fn example(cx: &Cx) -> Result {
+view! {
+    <div class="grid">
+        live match defer(drinks(cx)) {
+            Deferred::Pending => {
+                <div class="skeleton"></div>
+            }
+            Deferred::Ready(drinks) => {
+                for drink in drinks? {
+                    drink_card(key: &drink.slug, drink: drink)
+                }
+            }
+        }
+    </div>
+}
+# }
+```
+
+The macro supplies `defer`'s context argument inside a view; outside one, call [`defer`] with the context explicitly. `live if let` fits when the missing state should render nothing. Both arms are full view scopes with access to the surrounding function's locals, and a `?` inside an arm is a real `?`: the failure fails the construct and climbs to the enclosing scope.
+
+Because the arms may run again, an arm can borrow values from the surrounding function but not consume them; a prop that takes ownership gets an explicit `.clone()`.
+
+A component invocation and a `view!` expression both evaluate to a [`ViewHandle`], a reactive expression whose states are the component's declared `Result`. Interpolating the handle splices the content and lets its errors bubble; a `live match` on it catches them in place, which is how a layout owns the error page for whatever it wraps:
+
+```rust
+# use topcoat::{Result, router::error::NotFoundError, view::*};
+# #[component]
+# async fn drink_grid() -> Result { view! { <p>"grid"</p> } }
+# #[component]
+# async fn example() -> Result {
+view! {
+    live match drink_grid() {
+        Ok(grid) => { (grid) }
+        Err(error) if error.downcast_ref::<NotFoundError>().is_some() => {
+            <p>"The menu is unavailable right now."</p>
+        }
+        other => { (other?) }
+    }
+}
+# }
+```
+
+A `live` construct needs the live render a `#[component]`, `#[page]`, or `#[layout]` provides; anywhere else it does not compile:
+
+```compile_fail
+# use topcoat::{Result, context::Cx, view::*};
+async fn render(cx: &Cx) -> Result {
+    view! { cx =>
+        live if let Deferred::Ready(n) = defer(std::future::ready(1)) {
+            (n)
+        }
+    }
+}
+```
+
 # Boolean And Conditional Attributes
 
 [Boolean HTML attributes](https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML) such as `disabled`, `required`, and `checked` are true when the attribute is present and false when it is absent. HTML expects a present boolean attribute to have an empty value.
@@ -472,9 +538,9 @@ Competing declarations resolve by render order: the first status code rendered w
 # use topcoat::{Result, view::*};
 # use topcoat::router::{HeaderValue, header, layout};
 #[layout("/docs")]
-async fn docs_layout(slot: Result) -> Result {
+async fn docs_layout(slot: ViewHandle<'_>) -> Result {
     view! {
-        <main>(slot?)</main>
+        <main>(slot)</main>
         ((header::CACHE_CONTROL, HeaderValue::from_static("max-age=60")))
     }
 }
@@ -585,3 +651,7 @@ view! {
 [`IdentityKey`]: identity/trait.IdentityKey.html
 [`StatusCode`]: https://docs.rs/http/latest/http/status/struct.StatusCode.html
 [`HeaderMap`]: https://docs.rs/http/latest/http/header/struct.HeaderMap.html
+[`defer`]: fn.defer.html
+[`Deferred::Pending`]: enum.Deferred.html#variant.Pending
+[`Deferred::Ready`]: enum.Deferred.html#variant.Ready
+[`ViewHandle`]: struct.ViewHandle.html

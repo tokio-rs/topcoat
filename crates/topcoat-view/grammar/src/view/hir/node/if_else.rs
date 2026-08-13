@@ -24,6 +24,19 @@ impl Emit for IfElse {
             else_branch,
         } = self;
 
+        if emitter.live() {
+            // Live branches build synchronously: invocations and reactive
+            // nodes inside them register with the frame and resolve through
+            // reserved slots, so nothing is awaited here.
+            let then_branch = then_branch.emit_view_live();
+            let else_branch = else_branch.emit_view_live();
+            emitter.hoist(quote! {
+                let #ident = if #expr { #then_branch } else { #else_branch };
+            });
+            emitter.burst(quote! { __b.view(#ident); });
+            return;
+        }
+
         let renders_components = then_branch.is_async() || else_branch.is_async();
         if emitter.inline_await() || !renders_components {
             let then_branch = then_branch.emit_view();

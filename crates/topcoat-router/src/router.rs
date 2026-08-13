@@ -142,10 +142,14 @@ mod tests {
     };
 
     use http::{HeaderMap, StatusCode};
-    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, View, view};
+    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, view};
     use topcoat_core::{
         context::{Cx, app_context, request_context},
         error::Result,
+    };
+    use topcoat_view::{
+        ViewHandle,
+        live::{Fill, RefreshSet},
     };
 
     use super::*;
@@ -262,12 +266,14 @@ mod tests {
         })
     }
 
-    // Page and layout render functions for the rendering tests.
-    type ViewFuture<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
+    // Page and layout render functions for the rendering tests, written in
+    // the fill-then-continue form the macros generate.
+    type RenderFuture<'cx> = Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>>;
 
-    fn render_page(cx: &Cx, _body: Body) -> ViewFuture<'_> {
+    fn render_page(cx: &Cx, _body: Body, fill: Fill) -> RenderFuture<'_> {
         Box::pin(async move {
-            view! { cx => "page" }
+            fill.fill(view! { cx => "page" }?);
+            Ok(())
         })
     }
 
@@ -288,35 +294,44 @@ mod tests {
         }
     }
 
-    fn render_panicking_page(cx: &Cx, _body: Body) -> ViewFuture<'_> {
+    fn render_panicking_page(cx: &Cx, _body: Body, fill: Fill) -> RenderFuture<'_> {
         Box::pin(async move {
-            view! { cx => (Panicking) }
+            fill.fill(view! { cx => (Panicking) }?);
+            Ok(())
         })
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
-    fn layout_root(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
+    fn layout_root<'cx>(cx: &'cx Cx, slot: ViewHandle<'cx>, fill: Fill) -> RenderFuture<'cx> {
         Box::pin(async move {
-            let inner = slot?;
-            view! {
+            let mut refresh = RefreshSet::new();
+            let inner = refresh.splice(slot);
+            let view = view! {
                 cx =>
                 "R["
                 (inner)
                 "]"
-            }
+            }?;
+            refresh.barrier().await?;
+            fill.fill(view);
+            refresh.run().await
         })
     }
 
     /// Wraps the child content in `A[ ... ]`.
-    fn layout_admin(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
+    fn layout_admin<'cx>(cx: &'cx Cx, slot: ViewHandle<'cx>, fill: Fill) -> RenderFuture<'cx> {
         Box::pin(async move {
-            let inner = slot?;
-            view! {
+            let mut refresh = RefreshSet::new();
+            let inner = refresh.splice(slot);
+            let view = view! {
                 cx =>
                 "A["
                 (inner)
                 "]"
-            }
+            }?;
+            refresh.barrier().await?;
+            fill.fill(view);
+            refresh.run().await
         })
     }
 

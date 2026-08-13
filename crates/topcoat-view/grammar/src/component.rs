@@ -1,4 +1,5 @@
 mod attr;
+mod body;
 mod item;
 
 pub use attr::*;
@@ -13,7 +14,9 @@ use syn::{
     spanned::Spanned,
     visit_mut::{self, VisitMut},
 };
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
+use topcoat_core_grammar::paths::{
+    topcoat_context, topcoat_error, topcoat_view, topcoat_view_macro,
+};
 
 use crate::component::{ComponentAttr, ComponentItem};
 
@@ -70,7 +73,7 @@ impl ToTokens for Component {
         );
 
         let attrs = item.attrs;
-        item.attrs = vec![];
+        item.attrs = vec![parse_quote! { #[allow(clippy::unused_async)] }];
         item.sig.generics.params.insert(0, parse_quote! { '__cx });
         item.sig
             .inputs
@@ -86,9 +89,28 @@ impl ToTokens for Component {
             }
         }
 
-        let ReturnType::Type(_, return_ty) = &item.sig.output else {
+        let ReturnType::Type(_, return_ty) = item.sig.output.clone() else {
             unreachable!("validated in Parse");
         };
+        // The declared return type no longer appears in the generated
+        // signatures, but the names it uses must still count as used, or a
+        // plain `-> Result<View>` would orphan its imports.
+        let declared = quote! {
+            let _: ::core::marker::PhantomData<#return_ty> = ::core::marker::PhantomData;
+        };
+
+        // The declared return type documents the component's states; the
+        // render future's own output is its final status. The body is
+        // rewritten onto the live render: the tail `view!` delivers through
+        // the fill and keeps the frame running.
+        item.sig
+            .inputs
+            .push(parse_quote! { __fill: #topcoat_view::internal::Fill });
+        item.sig.output = parse_quote! { -> ::core::result::Result<(), #topcoat_error::Error> };
+        if let Err(error) = body::transform(item.block.as_mut()) {
+            error.to_compile_error().to_tokens(tokens);
+            return;
+        }
 
         let mut fields = Vec::new();
         let mut args = Vec::new();
@@ -122,16 +144,24 @@ impl ToTokens for Component {
             }
         }
 
-        if implicit_lifetime_visitor.used {
-            generics.params.insert(0, parse_quote! { '__implicit });
-        }
+        // The marker stays free of the implicit props lifetime: props are a
+        // generic associated type over the invoking frame, so a component
+        // whose props borrow (like a layout's slot handle) still gets a
+        // plain marker that registration APIs can take by value.
         generics.params.extend(
             impl_traits_visitor
                 .params
                 .into_iter()
                 .map(GenericParam::Type),
         );
+        let mut props_generics = generics.clone();
+        if implicit_lifetime_visitor.used {
+            props_generics
+                .params
+                .insert(0, parse_quote! { '__implicit });
+        }
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+        let (props_impl_generics, props_ty_generics, _) = props_generics.split_for_impl();
 
         let phantom_args = generics
             .params
@@ -183,38 +213,42 @@ impl ToTokens for Component {
         let render = if self.attr.boxed() {
             quote! {
                 #[allow(refining_impl_trait)]
-                fn render<'__cx>(
+                fn render<'__frame>(
                     self,
-                    cx: &'__cx #topcoat_context::Cx,
-                    props: Self::Props,
+                    cx: &'__frame #topcoat_context::Cx,
+                    props: Self::Props<'__frame>,
+                    __fill: #topcoat_view::internal::Fill,
                 ) -> ::core::pin::Pin<::std::boxed::Box<
-                    dyn ::core::future::Future<Output = #return_ty>
+                    dyn ::core::future::Future<
+                        Output = ::core::result::Result<(), #topcoat_error::Error>,
+                    >
                         + ::core::marker::Send
-                        + '__cx,
+                        + '__frame,
                 >>
                 where
-                    Self: '__cx,
-                    Self::Props: '__cx,
+                    Self: '__frame,
                 {
+                    #declared
                     ::std::boxed::Box::pin(async move {
                         #item
-                        #ident(cx, #(#args),*).await
+                        #ident(cx, #(#args,)* __fill).await
                     })
                 }
             }
         } else {
             quote! {
-                async fn render<'__cx>(
+                async fn render<'__frame>(
                     self,
-                    cx: &'__cx #topcoat_context::Cx,
-                    props: Self::Props,
-                ) -> #return_ty
+                    cx: &'__frame #topcoat_context::Cx,
+                    props: Self::Props<'__frame>,
+                    __fill: #topcoat_view::internal::Fill,
+                ) -> ::core::result::Result<(), #topcoat_error::Error>
                 where
-                    Self: '__cx,
-                    Self::Props: '__cx,
+                    Self: '__frame,
                 {
+                    #declared
                     #item
-                    #ident(cx, #(#args),*).await
+                    #ident(cx, #(#args,)* __fill).await
                 }
             }
         };
@@ -228,14 +262,17 @@ impl ToTokens for Component {
             }
 
             impl #impl_generics #topcoat_view::Component for #ident #ty_generics #where_clause {
-                type Props = #props_ident #ty_generics;
+                type Props<'__implicit>
+                    = #props_ident #props_ty_generics
+                where
+                    Self: '__implicit;
 
                 #render
             }
 
             #(#attrs)*
             #[derive(#topcoat_view_macro::Props)]
-            #vis struct #props_ident #impl_generics #where_clause {
+            #vis struct #props_ident #props_impl_generics #where_clause {
                 #(#fields),*
             }
         }

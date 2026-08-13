@@ -3,16 +3,16 @@ mod install;
 use topcoat::{
     Result,
     router::{layout, page},
-    view::view,
+    view::{ViewHandle, view},
 };
 
 // A layout in app::docs wraps /docs and child routes such as /docs/install.
 #[layout]
-async fn docs_layout(slot: Result) -> Result {
+async fn docs_layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <section>
             <p>"docs layout"</p>
-            (slot?)
+            (slot)
         </section>
     }
 }

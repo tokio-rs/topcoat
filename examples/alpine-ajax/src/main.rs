@@ -11,7 +11,7 @@ use topcoat::{
         response::{IntoResponse, Response},
         route,
     },
-    view::view,
+    view::{ViewHandle, view},
 };
 
 #[tokio::main]
@@ -27,10 +27,10 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(cx: &Cx, slot: Result) -> Result {
+async fn root(cx: &Cx, slot: ViewHandle<'_>) -> Result {
     // Alpine AJAX requests only need the targeted content, not the document.
     if ajax_request(cx) {
-        return slot;
+        return view! { (slot) };
     }
 
     view! {
@@ -50,7 +50,7 @@ async fn root(cx: &Cx, slot: Result) -> Result {
 
                 topcoat::dev::script()
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
     }
 }

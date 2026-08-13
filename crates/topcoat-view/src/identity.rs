@@ -119,6 +119,18 @@ impl Identity {
         CURRENT.get().unwrap_or(Self::ROOT)
     }
 
+    /// Derives the identity of a keyed invocation at `site` under the
+    /// running component body.
+    ///
+    /// The standalone form of [`IdentityFuture::keyed`]: generated code
+    /// derives the identity before building the invocation's props, since
+    /// the key may borrow values the props then consume, and wraps the
+    /// render future with [`IdentityFuture::carrying`].
+    #[must_use]
+    pub fn keyed_invocation(site: SiteKey, key: impl IdentityKey) -> Self {
+        Self::current_raw().keyed_child(site, key)
+    }
+
     /// The hash value of this identity.
     #[must_use]
     pub const fn hash(self) -> u128 {

@@ -18,11 +18,11 @@ Alpine AJAX is a plugin for Alpine.js core, so the browser must load both, in or
 use topcoat::{
     Result,
     router::layout,
-    view::view,
+    view::{ViewHandle, view},
 };
 
 #[layout]
-async fn root(slot: Result) -> Result {
+async fn root(slot: ViewHandle<'_>) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -30,7 +30,7 @@ async fn root(slot: Result) -> Result {
                 <script defer="" src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"></script>
                 <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"></script>
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
     }
 }
@@ -46,16 +46,16 @@ use topcoat::{
     alpine_ajax::ajax_request,
     context::Cx,
     router::layout,
-    view::view,
+    view::{ViewHandle, view},
 };
 
 #[layout]
-async fn root(cx: &Cx, slot: Result) -> Result {
+async fn root(cx: &Cx, slot: ViewHandle<'_>) -> Result {
     // Alpine AJAX only merges the requested target elements, so we do not
     // need to return the full layout shell. Just the page's content is
     // enough.
     if ajax_request(cx) {
-        return slot;
+        return view! { (slot) };
     }
 
     // Non-AJAX requests require a full page render including the layout shell.
@@ -63,7 +63,7 @@ async fn root(cx: &Cx, slot: Result) -> Result {
         <html>
             <body>
                 <nav> /* persistent navigation */ </nav>
-                <main>(slot?)</main>
+                <main>(slot)</main>
             </body>
         </html>
     }

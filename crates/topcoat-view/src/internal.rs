@@ -18,6 +18,8 @@
 //! placeholder must form a block of its own, so `reserve` is called
 //! between blocks, never while one is building.
 
+use std::fmt;
+
 use futures_util::FutureExt;
 pub use futures_util::{
     future::{Either, try_join_all},
@@ -25,11 +27,15 @@ pub use futures_util::{
 };
 use topcoat_core::{context::Cx, error::Result};
 
-pub use crate::buffer::ViewSlot;
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
     ElementNameViewParts, HtmlContext, NodeViewParts, PartsWriter, Unescaped, View,
     buffer::{ViewBuffer, ViewBufferScope},
+    live::ViewHandle,
+};
+pub use crate::{
+    buffer::{FrameId, ViewSlot},
+    live::{Fill, Raced, Reactive, RefreshSet, Ticket, pending, race_node, run_node},
 };
 
 /// Builds a top-level `view!` invocation, deciding who owns the buffer.
@@ -106,6 +112,121 @@ pub fn reserve() -> (View, ViewSlot) {
 /// of an `if` whose other branch renders components.
 pub fn ready(view: View) -> futures_util::future::Ready<Result<View>> {
     futures_util::future::ready(Ok(view))
+}
+
+/// Registers a live frame on the installed buffer, ahead of its
+/// [`RefreshSet`].
+///
+/// A frame expansion registers the frame, its reserved slots, and its
+/// tickets before constructing the set with
+/// [`RefreshSet::with_frame`], so the entries capture those `Copy` values
+/// without borrowing locals the set outlives.
+///
+/// # Panics
+///
+/// Panics if no view is building on the current task.
+#[must_use]
+pub fn new_frame() -> FrameId {
+    ViewBufferScope::with(ViewBuffer::new_frame)
+}
+
+/// Counts a first-paint ticket for a frame registered with [`new_frame`].
+///
+/// # Panics
+///
+/// Panics if no view is building on the current task.
+#[must_use]
+pub fn new_ticket(frame: FrameId) -> Ticket {
+    Ticket::new(
+        frame,
+        ViewBufferScope::with(|buffer| buffer.new_ticket(frame)),
+    )
+}
+
+/// Runs one component render to completion and returns the delivered view.
+///
+/// The blocking form of an invocation, for a `view!` outside a component
+/// transform: the component keeps its fill-then-continue shape, and this
+/// wrapper awaits the whole render, deferred work included, before handing
+/// the finished view back.
+///
+/// # Errors
+///
+/// Returns the error the render reported, or an internal error when the
+/// future completed without delivering a view.
+///
+/// # Panics
+///
+/// Panics if no view is building on the current task.
+pub async fn complete<F>(render: impl FnOnce(Fill) -> F) -> Result<View>
+where
+    F: Future<Output = Result<()>>,
+{
+    let cell = ViewBufferScope::with(|buffer| buffer.new_cell(true));
+    render(Fill::new(cell)).await?;
+    ViewBufferScope::with(|buffer| buffer.delivered_view(cell))
+        .ok_or_else(|| ComponentNeverDelivered.into())
+}
+
+/// The error reported when a component's render future completed without
+/// delivering a view through its fill.
+#[derive(Debug)]
+struct ComponentNeverDelivered;
+
+impl fmt::Display for ComponentNeverDelivered {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("the component completed without delivering a view")
+    }
+}
+
+impl std::error::Error for ComponentNeverDelivered {}
+
+/// Forces a by-value capture of the wrapped value.
+///
+/// A reactive node's future is a plain `async` block, which captures a
+/// `Copy` value it reads by reference. Passing the value through this
+/// wrapper, which is never `Copy`, makes the block take it by value, so the
+/// entry holds no borrow of the frame's locals.
+pub struct Own<T>(pub T);
+
+/// Dispatches an interpolated node expression by type at hoist time.
+///
+/// Most values pass through untouched and render in the burst. A
+/// [`ViewHandle`] cannot: splicing it is frame bookkeeping that must happen
+/// before the frame's barrier. The wrapper's inherent method on the handle
+/// instantiation takes precedence over the [`InterpolateValue`] fallback,
+/// which is how the generated code tells the two apart without knowing the
+/// expression's type.
+pub struct Interpolate<T>(Option<T>);
+
+impl<T> Interpolate<T> {
+    pub fn new(value: T) -> Self {
+        Self(Some(value))
+    }
+}
+
+impl Interpolate<ViewHandle<'_>> {
+    /// Splices the handle into the frame, consuming it, and hands back the
+    /// placeholder view to render in the burst.
+    pub fn prepare(&mut self, refresh: &mut RefreshSet<'_>) -> View {
+        refresh.splice(self.0.take().expect("an interpolation prepares once"))
+    }
+}
+
+/// The fallback for [`Interpolate`]: everything that is not a view handle
+/// passes through to the burst untouched.
+pub trait InterpolateValue {
+    type Value;
+
+    fn prepare(&mut self, refresh: &mut RefreshSet<'_>) -> Self::Value;
+}
+
+impl<T> InterpolateValue for Interpolate<T> {
+    type Value = T;
+
+    fn prepare(&mut self, _refresh: &mut RefreshSet<'_>) -> T {
+        self.0.take().expect("an interpolation prepares once")
+    }
 }
 
 /// Runs `f` with the writer sealing for a different context, then restores

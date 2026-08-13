@@ -30,11 +30,11 @@ use topcoat::{
     Result,
     router::layout,
     tailwind,
-    view::view,
+    view::{ViewHandle, view},
 };
 
 #[layout]
-async fn layout(slot: Result) -> Result {
+async fn layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -42,7 +42,7 @@ async fn layout(slot: Result) -> Result {
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
             </head>
             <body>
-                (slot?)
+                (slot)
             </body>
         </html>
     }

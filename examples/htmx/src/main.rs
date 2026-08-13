@@ -5,7 +5,7 @@ use topcoat::{
     context::{Cx, app_context},
     htmx::{HxResponseTrigger, hx_request},
     router::{Router, RouterBuilderDiscoverExt, layout, page, route},
-    view::{View, view},
+    view::{View, ViewHandle, view},
 };
 
 #[tokio::main]
@@ -21,10 +21,10 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(cx: &Cx, slot: Result) -> Result {
+async fn root(cx: &Cx, slot: ViewHandle<'_>) -> Result {
     // htmx requests only need the page fragment, not the document.
     if hx_request(cx) {
-        return slot;
+        return view! { (slot) };
     }
 
     view! {
@@ -39,7 +39,7 @@ async fn root(cx: &Cx, slot: Result) -> Result {
             </head>
 
             // Boost links and forms so htmx can handle navigation.
-            <body hx-boost="true">(slot?)</body>
+            <body hx-boost="true">(slot)</body>
         </html>
     }
 }

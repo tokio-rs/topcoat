@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     router::{Router, layout, page, route},
-    view::view,
+    view::{ViewHandle, view},
 };
 
 // --- Server -----------------------------------------------------------------
@@ -30,7 +30,7 @@ fn router() -> Router {
 
 // Wraps every page, because every page path starts with `/`.
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <html>
             <head>topcoat::dev::script()</head>
@@ -48,7 +48,7 @@ async fn root_layout(slot: Result) -> Result {
                 <hr>
 
                 // The page, or the nested layout wrapping it.
-                (slot?)
+                (slot)
             </body>
         </html>
     }
@@ -56,11 +56,11 @@ async fn root_layout(slot: Result) -> Result {
 
 // Wraps `/docs` and every page below it.
 #[layout("/docs")]
-async fn docs_layout(slot: Result) -> Result {
+async fn docs_layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <section>
             <p>"docs layout"</p>
-            (slot?)
+            (slot)
         </section>
     }
 }

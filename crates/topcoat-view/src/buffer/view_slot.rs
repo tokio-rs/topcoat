@@ -38,4 +38,18 @@ impl ViewSlot {
     pub fn fill(self, view: View) {
         ViewBufferScope::with(|buffer| buffer.fill_view(self, view));
     }
+
+    /// Redirects this slot to `view`, replacing whatever it held, and marks
+    /// the buffer dirty so the driver sends a chunk.
+    ///
+    /// The live counterpart of [`fill`](Self::fill): the first fill of a
+    /// reactive node's slot and every swap after it go through here.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no view is building on the current task, or if the slot or
+    /// the view belongs to a different buffer.
+    pub fn refill(self, view: View) {
+        ViewBufferScope::with(|buffer| buffer.refill_view(self, view));
+    }
 }

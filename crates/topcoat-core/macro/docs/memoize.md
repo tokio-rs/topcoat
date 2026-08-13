@@ -188,7 +188,7 @@ use topcoat::{
     context::{Cx, memoize},
     Result,
     router::{layout, page},
-    view::view,
+    view::{ViewHandle, view},
 };
 
 #[memoize(as_ref)]
@@ -203,7 +203,7 @@ async fn dashboard(cx: &Cx) -> Result {
 }
 
 #[layout]
-async fn root(cx: &Cx, slot: Result) -> Result {
+async fn root(cx: &Cx, slot: ViewHandle<'_>) -> Result {
     let user = current_user(cx).await; // cache hit, no extra DB query
     view! {
         <header>
@@ -214,7 +214,7 @@ async fn root(cx: &Cx, slot: Result) -> Result {
                 None => <a href="/login">"Sign in"</a>,
             }
         </header>
-        (slot?)
+        (slot)
     }
 }
 ```

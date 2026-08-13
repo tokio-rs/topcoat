@@ -1,6 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Ident;
+use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::emit::{Emit, Emitter};
 
@@ -16,7 +17,22 @@ impl Emit for ExprNode {
         let tokens = &self.tokens;
         let method = self.kind.builder_method();
 
-        emitter.hoist(quote! { let #ident = #tokens; });
+        if emitter.live() && matches!(self.kind, ExprKind::Node) {
+            // A node-position value may be a view handle, whose splice is
+            // frame bookkeeping that must happen before the barrier. The
+            // interpolation wrapper dispatches by type: handles splice here
+            // and hand back the placeholder, everything else passes through
+            // to the burst untouched.
+            emitter.hoist(quote! {
+                let #ident = {
+                    use #topcoat_view::internal::InterpolateValue as _;
+                    let mut __interpolate = #topcoat_view::internal::Interpolate::new(#tokens);
+                    __interpolate.prepare(&mut __refresh)
+                };
+            });
+        } else {
+            emitter.hoist(quote! { let #ident = #tokens; });
+        }
         emitter.burst(quote! { __b.#method(#ident); });
     }
 }

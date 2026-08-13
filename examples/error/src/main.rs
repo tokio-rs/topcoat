@@ -6,7 +6,7 @@ use topcoat::{
         error::{ForbiddenError, NotFoundError, RouterErrorExt, forbidden},
         layout, not_found, page, path_param,
     },
-    view::view,
+    view::{ViewHandle, view},
 };
 
 #[tokio::main]
@@ -30,25 +30,28 @@ async fn home() -> Result {
 }
 
 // An error keeps its type on the way out, so the layout can downcast it and
-// replace it with a branded error page.
+// replace it with a branded error page. The slot is the page's reactive view
+// handle; `live match` consumes it and catches the error in place.
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    let content = match slot {
-        Err(error) if error.downcast_ref::<NotFoundError>().is_some() => view! {
-            (StatusCode::NOT_FOUND)
-            <h1>"Page not found"</h1>
-        },
-        Err(error) if error.downcast_ref::<ForbiddenError>().is_some() => view! {
-            (StatusCode::FORBIDDEN)
-            <h1>"Access denied"</h1>
-        },
-        content => content,
-    }?;
-
+async fn root_layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <html>
             <body>
-                (content)
+                live match slot {
+                    Err(error) if error.downcast_ref::<NotFoundError>().is_some() => {
+                        (StatusCode::NOT_FOUND)
+                        <h1>"Page not found"</h1>
+                    }
+                    Err(error) if error.downcast_ref::<ForbiddenError>().is_some() => {
+                        (StatusCode::FORBIDDEN)
+                        <h1>"Access denied"</h1>
+                    }
+                    other => {
+                        // The rethrow is a plain `?`: anything else fails this
+                        // construct and climbs to the next catcher out.
+                        (other?)
+                    }
+                }
                 <p><a href="/">"Home"</a></p>
             </body>
         </html>

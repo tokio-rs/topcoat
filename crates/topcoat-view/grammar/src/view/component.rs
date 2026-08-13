@@ -34,12 +34,12 @@ pub struct Component {
 impl Component {
     /// The `key:` argument, which keys the invocation's identity rather
     /// than setting a prop.
-    fn identity_key(&self) -> Option<&NamedArg> {
+    pub(crate) fn identity_key(&self) -> Option<&NamedArg> {
         self.named_args.iter().find(|arg| arg.ident == "key")
     }
 
     /// The named arguments that set props, everything but `key`.
-    fn props(&self) -> Vec<NamedArg> {
+    pub(crate) fn props(&self) -> Vec<NamedArg> {
         self.named_args
             .iter()
             .filter(|arg| arg.ident != "key")

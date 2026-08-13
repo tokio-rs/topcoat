@@ -2,6 +2,7 @@ mod const_buffer;
 mod id;
 mod instruction;
 mod instruction_buffer;
+mod live_state;
 mod renderer;
 mod scope;
 mod view_slot;
@@ -10,6 +11,7 @@ pub use const_buffer::*;
 pub use id::*;
 pub use instruction::*;
 pub use instruction_buffer::*;
+pub use live_state::*;
 pub use renderer::*;
 pub use scope::*;
 pub use view_slot::*;
@@ -36,6 +38,9 @@ pub struct ViewBuffer {
     id: ViewBufferId,
     instructions: InstructionBuffer,
     consts: ConstBuffer,
+    /// The live-render state of the build: handle cells, ticket counters,
+    /// and the dirty and progress flags.
+    live: LiveState,
 }
 
 impl ViewBuffer {
@@ -44,6 +49,7 @@ impl ViewBuffer {
             id: ViewBufferId::next(),
             instructions: InstructionBuffer::new(),
             consts: ConstBuffer::new(),
+            live: LiveState::default(),
         }
     }
 
@@ -128,7 +134,23 @@ impl ViewBuffer {
             slot.buffer() == self.id,
             "tried to fill a view slot outside the `view!` invocation it was reserved in",
         );
-        let entry = match view.repr() {
+        let entry = self.view_block_entry(view);
+        let instruction = self.instructions.fetch_mut(slot.ptr());
+        assert!(
+            matches!(instruction, Instruction::Placeholder),
+            "tried to fill a view slot twice",
+        );
+        *instruction = Instruction::Jmp { entry };
+    }
+
+    /// Returns the entry of an instruction block executing `view`,
+    /// materializing one when the view does not point into this buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the view was built in a different, still building buffer.
+    fn view_block_entry(&mut self, view: View) -> InstructionPtr {
+        match view.repr() {
             // A static view has no block to jump to, so it is materialized
             // as one.
             ViewRepr::Static(body) => {
@@ -153,13 +175,7 @@ impl ViewBuffer {
                 self.push_ret();
                 block_entry
             }
-        };
-        let instruction = self.instructions.fetch_mut(slot.ptr());
-        assert!(
-            matches!(instruction, Instruction::Placeholder),
-            "tried to fill a view slot twice",
-        );
-        *instruction = Instruction::Jmp { entry };
+        }
     }
 
     pub fn push_bool(&mut self, value: bool) {

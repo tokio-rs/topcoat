@@ -19,6 +19,25 @@ impl Emit for MatchExpr {
         let ident = emitter.fresh_ident();
         let expr = &self.expr;
 
+        if emitter.live() {
+            // Live arms build synchronously: invocations and reactive nodes
+            // inside them register with the frame and resolve through
+            // reserved slots, so nothing is awaited here.
+            let arms = self.arms.iter().map(|arm| {
+                let pat = &arm.pat;
+                let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
+                let body = arm.body.emit_view_live();
+                quote! { #pat #guard => #body }
+            });
+            emitter.hoist(quote! {
+                let #ident = match #expr {
+                    #(#arms,)*
+                };
+            });
+            emitter.burst(quote! { __b.view(#ident); });
+            return;
+        }
+
         let renders_components = self.arms.iter().any(|arm| arm.body.is_async());
         if emitter.inline_await() || !renders_components {
             let arms = self.arms.iter().map(|arm| {

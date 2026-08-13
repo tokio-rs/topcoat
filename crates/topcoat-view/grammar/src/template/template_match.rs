@@ -169,14 +169,14 @@ where
 {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.pat.pretty_print(printer);
-        " ".pretty_print(printer);
-        self.fat_arrow_token.pretty_print(printer);
         if let Some((if_token, expr)) = &self.guard {
             " ".pretty_print(printer);
             if_token.pretty_print(printer);
             " ".pretty_print(printer);
             expr.pretty_print(printer);
         }
+        " ".pretty_print(printer);
+        self.fat_arrow_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.body.pretty_print(printer);
         // Block bodies are self-delimiting, so only single-node bodies get a

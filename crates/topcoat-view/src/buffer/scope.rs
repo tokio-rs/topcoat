@@ -117,6 +117,27 @@ impl<'a> ViewBufferScope<'a> {
         });
         f(buffer)
     }
+
+    /// Grants access to the installed buffer like [`with`](Self::with), but
+    /// returns `None` instead of panicking when no scope is active.
+    ///
+    /// For `Drop` implementations of values carrying live-render state: such
+    /// a value can be dropped with the root future after the driver stops
+    /// polling, when no buffer is installed and its accounting no longer
+    /// matters.
+    pub(crate) fn try_with<R>(f: impl FnOnce(&mut ViewBuffer) -> R) -> Option<R> {
+        let mut slot = None;
+        let mut scope = ViewBufferScope::swap(&mut slot);
+        let buffer = scope.buffer()?;
+        Some(f(buffer))
+    }
+
+    /// Installs the buffer held in `slot` for the duration of `f`, for a
+    /// driver that owns the buffer between polls.
+    pub(crate) fn install<R>(slot: &mut Option<Box<ViewBuffer>>, f: impl FnOnce() -> R) -> R {
+        let _scope = ViewBufferScope::swap(slot);
+        f()
+    }
 }
 
 impl Drop for ViewBufferScope<'_> {
@@ -159,8 +180,35 @@ impl<F: Future> Future for ScopeFuture<F> {
             };
         }
         let output = if *this.role == Role::Root {
-            let _scope = ViewBufferScope::swap(this.buffer);
-            this.fut.poll(task_cx)
+            // The root sweeps: internal completions, like a component's fill
+            // releasing a barrier elsewhere, carry no waker and are observed
+            // by re-polling while a pass made progress. External futures
+            // register the task's waker as usual, so a pass without progress
+            // suspends until one of them wakes the task.
+            let mut fut = this.fut;
+            loop {
+                this.buffer
+                    .as_deref_mut()
+                    .expect("the root scope owns its buffer between polls")
+                    .clear_progress();
+                let poll = {
+                    let _scope = ViewBufferScope::swap(this.buffer);
+                    fut.as_mut().poll(task_cx)
+                };
+                match poll {
+                    Poll::Ready(output) => break Poll::Ready(output),
+                    Poll::Pending => {
+                        let progressed = this
+                            .buffer
+                            .as_deref()
+                            .expect("the root scope owns its buffer between polls")
+                            .progress();
+                        if !progressed {
+                            break Poll::Pending;
+                        }
+                    }
+                }
+            }
         } else {
             this.fut.poll(task_cx)
         };

@@ -1,5 +1,5 @@
 use syn::{
-    LitStr,
+    LitStr, Token,
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
@@ -11,8 +11,9 @@ use crate::{
         TemplateForLoop, TemplateIf, TemplateLocal, TemplateMatch,
     },
     view::{
-        Component, DocumentType, Element, Nodes, SignalDeclaration,
+        Component, DocumentType, Element, LiveIfLet, LiveMatch, Nodes, SignalDeclaration,
         hir::{LowerView, ViewBuilder},
+        live_construct::kw,
     },
 };
 
@@ -31,6 +32,8 @@ pub enum Node {
     Continue(TemplateContinue),
     Break(TemplateBreak),
     Match(TemplateMatch<Node>),
+    LiveMatch(Box<LiveMatch>),
+    LiveIfLet(Box<LiveIfLet>),
     Block(TemplateBlock<Nodes>),
     SignalDecaration(SignalDeclaration),
 }
@@ -66,6 +69,8 @@ impl LowerView for Node {
             Self::Continue(inner) => inner.lower(builder),
             Self::Break(inner) => inner.lower(builder),
             Self::Match(inner) => inner.lower(builder),
+            Self::LiveMatch(inner) => inner.lower(builder),
+            Self::LiveIfLet(inner) => inner.lower(builder),
             Self::Block(inner) => inner.lower(builder),
             Self::SignalDecaration(inner) => inner.lower(builder),
         }
@@ -74,7 +79,30 @@ impl LowerView for Node {
 
 impl Parse for Node {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let result = if input.peek(LitStr) {
+        let result = if input.peek(kw::live) && !input.peek2(syn::token::Paren) {
+            // A visible `live` marker: the construct compiles differently
+            // from its plain counterpart, so the keyword tells them apart.
+            // `live(...)` stays a component invocation.
+            if input.peek2(Token![match]) {
+                Self::LiveMatch(input.parse()?)
+            } else if input.peek2(Token![if]) {
+                let fork = input.fork();
+                fork.parse::<kw::live>()?;
+                fork.parse::<Token![if]>()?;
+                if !fork.peek(Token![let]) {
+                    return Err(syn::Error::new(
+                        input.span(),
+                        "`live if` needs a pattern: write `live if let`",
+                    ));
+                }
+                Self::LiveIfLet(input.parse()?)
+            } else {
+                return Err(syn::Error::new(
+                    input.span(),
+                    "only `match` and `if let` can be `live`",
+                ));
+            }
+        } else if input.peek(LitStr) {
             Self::Text(input.parse()?)
         } else if DocumentType::peek(input) {
             Self::DocumentType(input.parse()?)
@@ -136,6 +164,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Node {
             Self::Continue(inner) => inner.pretty_print(printer),
             Self::Break(inner) => inner.pretty_print(printer),
             Self::Match(inner) => inner.pretty_print(printer),
+            Self::LiveMatch(inner) => inner.pretty_print(printer),
+            Self::LiveIfLet(inner) => inner.pretty_print(printer),
             Self::Block(inner) => inner.pretty_print(printer),
             Self::SignalDecaration(inner) => inner.pretty_print(printer),
         }

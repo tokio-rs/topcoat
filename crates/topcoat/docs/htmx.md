@@ -19,18 +19,18 @@ use topcoat::{
     Result,
     asset::asset,
     router::layout,
-    view::view,
+    view::{ViewHandle, view},
 };
 
 #[layout]
-async fn root(slot: Result) -> Result {
+async fn root(slot: ViewHandle<'_>) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
             <head>
                 <script src=(asset!("https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"))></script>
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
     }
 }
@@ -48,15 +48,15 @@ use topcoat::{
     context::Cx,
     htmx::hx_request,
     router::layout,
-    view::view,
+    view::{ViewHandle, view},
 };
 
 #[layout]
-async fn root(cx: &Cx, slot: Result) -> Result {
+async fn root(cx: &Cx, slot: ViewHandle<'_>) -> Result {
     // htmx only swaps out the target element, so we do not need to return
     // the full layout shell. Just the page's content is enough.
     if hx_request(cx) {
-        return slot;
+        return view! { (slot) };
     }
 
     // Non-htmx requests require a full page render including the layout shell.
@@ -64,7 +64,7 @@ async fn root(cx: &Cx, slot: Result) -> Result {
         <html>
             <body>
                 <nav> /* persistent navigation */ </nav>
-                <main>(slot?)</main>
+                <main>(slot)</main>
             </body>
         </html>
     }

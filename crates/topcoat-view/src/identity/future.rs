@@ -42,6 +42,12 @@ impl<F> IdentityFuture<F> {
         }
     }
 
+    /// Wraps `fut` with an identity derived earlier, such as one from
+    /// [`Identity::keyed_invocation`].
+    pub fn carrying(identity: Identity, fut: F) -> Self {
+        Self { fut, identity }
+    }
+
     /// Wraps `fut` as a child invocation at `site` whose repetitions cannot
     /// be told apart, recording `label` as the ambiguity.
     pub fn ambiguous(site: SiteKey, label: &'static str, fut: F) -> Self {

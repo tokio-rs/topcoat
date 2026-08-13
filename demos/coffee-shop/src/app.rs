@@ -15,7 +15,7 @@ use topcoat::{
         layout, module_router, page, route,
     },
     tailwind,
-    view::{attributes, view},
+    view::{ViewHandle, attributes, view},
 };
 
 use crate::{
@@ -45,7 +45,7 @@ pub fn router(db: Db) -> Router {
 
 // The layout in the root module wraps every page.
 #[layout]
-async fn shell(cx: &Cx, slot: Result) -> Result {
+async fn shell(cx: &Cx, slot: ViewHandle<'_>) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -84,7 +84,7 @@ async fn shell(cx: &Cx, slot: Result) -> Result {
                     </nav>
                 </header>
 
-                <main class="mx-auto w-full max-w-3xl flex-1 px-6 py-10">(slot?)</main>
+                <main class="mx-auto w-full max-w-3xl flex-1 px-6 py-10">(slot)</main>
 
                 <footer class="border-t border-border">
                     <p

@@ -1,10 +1,10 @@
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 use super::{
-    Node, StaticSegment,
-    emit::{Emit, Emitter},
+    LiveNode, Node, StaticSegment,
+    emit::{Emit, EmitMode, Emitter},
 };
 
 /// The lowered form of a `view!` invocation: the HIR between the view AST and
@@ -34,13 +34,13 @@ impl Scope {
 
     /// Whether this scope emits through an optimized static path that never
     /// touches an instruction memory.
-    fn is_static(&self) -> bool {
+    pub(crate) fn is_static(&self) -> bool {
         self.nodes.is_empty()
             || (self.nodes.len() == 1 && matches!(&self.nodes[0], Node::StaticSegment(_)))
     }
 
-    /// Whether this scope renders components, directly or anywhere under its
-    /// nested scopes.
+    /// Whether this scope renders components or reactive nodes, directly or
+    /// anywhere under its nested scopes.
     pub(crate) fn is_async(&self) -> bool {
         self.nodes.iter().any(Node::is_async)
     }
@@ -58,22 +58,141 @@ impl Scope {
     /// most one such node there is nothing to overlap, and the node awaits
     /// inline.
     pub(crate) fn emit_view(&self) -> TokenStream {
+        if let Some(optimized) = self.emit_static() {
+            optimized
+        } else {
+            let concurrent = self.nodes.iter().filter(|node| node.is_async()).count() >= 2;
+            let mut emitter = Emitter::new(EmitMode::Blocking, !concurrent);
+            for node in &self.nodes {
+                node.emit(&mut emitter);
+            }
+            emitter.finish()
+        }
+    }
+
+    /// Emits the optimized expression for a scope with no dynamic content,
+    /// which needs no instruction block; `None` when the scope has some.
+    fn emit_static(&self) -> Option<TokenStream> {
         if self.nodes.is_empty() {
             // Optimized path: The view has no content.
-            quote! { #topcoat_view::View::empty() }
+            Some(quote! { #topcoat_view::View::empty() })
         } else if self.nodes.len() == 1
             && let Node::StaticSegment(StaticSegment { string }) = &self.nodes[0]
         {
             // Optimized path: The view is a single static string, which needs
             // no instruction block.
-            quote! { #topcoat_view::View::unescaped_unchecked(#string) }
+            Some(quote! { #topcoat_view::View::unescaped_unchecked(#string) })
         } else {
-            let concurrent = self.nodes.iter().filter(|node| node.is_async()).count() >= 2;
-            let mut emitter = Emitter::new(!concurrent);
+            None
+        }
+    }
+
+    /// Emits this scope as an expression yielding a
+    /// [`View`](topcoat_view::View) in a nested position of a live frame.
+    ///
+    /// The scope's invocations and reactive nodes register with the
+    /// enclosing frame's `__refresh`, so the expression is synchronous:
+    /// placeholders stand in for everything that resolves later, and the
+    /// frame's barrier is the join.
+    pub(crate) fn emit_view_live(&self) -> TokenStream {
+        if let Some(optimized) = self.emit_static() {
+            optimized
+        } else {
+            let mut emitter = Emitter::new(EmitMode::Live, false);
+            for node in &self.nodes {
+                node.emit(&mut emitter);
+            }
+            emitter.finish_nested()
+        }
+    }
+
+    /// Emits this scope as one live frame: an expression of the frame's
+    /// final status that builds the view, delivers it through `delivery`,
+    /// and drives the frame's live work to completion.
+    ///
+    /// The frame's slots and tickets are registered before its `RefreshSet`,
+    /// so the set's entries capture them without borrowing locals the set
+    /// outlives; `attach` adopts work created before the frame existed, such
+    /// as a `view!` bound mid-body.
+    pub(crate) fn emit_frame_live(
+        &self,
+        attach: &TokenStream,
+        delivery: &TokenStream,
+    ) -> TokenStream {
+        if attach.is_empty()
+            && let Some(optimized) = self.emit_static()
+        {
+            // A frame with no dynamic content and nothing attached delivers
+            // its static view and is done; no set is needed.
+            return quote! {{
+                let __view = #optimized;
+                #delivery
+                ::core::result::Result::<(), #topcoat_error::Error>::Ok(())
+            }};
+        }
+        let preludes = self.live_preludes();
+        let view = {
+            let mut emitter = Emitter::new(EmitMode::Live, false);
             for node in &self.nodes {
                 node.emit(&mut emitter);
             }
             emitter.finish()
+        };
+        quote! {{
+            let __frame = #topcoat_view::internal::new_frame();
+            #preludes
+            let mut __refresh = #topcoat_view::internal::RefreshSet::with_frame(__frame);
+            #attach
+            let __view = #view;
+            #delivery
+            let __done = __refresh.run().await;
+            __done
+        }}
+    }
+
+    /// Returns the statements registering this frame's reactive nodes'
+    /// slots and tickets, ahead of the frame's set.
+    fn live_preludes(&self) -> TokenStream {
+        let mut preludes = TokenStream::new();
+        self.collect_live(&mut |node| {
+            let view = format_ident!("__node{}", node.ordinal);
+            let slot = format_ident!("__node_slot{}", node.ordinal);
+            let ticket = format_ident!("__node_ticket{}", node.ordinal);
+            preludes.extend(quote! {
+                let (#view, #slot) = #topcoat_view::internal::reserve();
+                let #ticket = #topcoat_view::internal::new_ticket(__frame);
+            });
+        });
+        preludes
+    }
+
+    /// Walks the reactive nodes belonging to this frame: the scope's own and
+    /// those of nested scopes emitted inline, stopping at sub-frames (arm
+    /// bodies and loop iterations), which register their own.
+    fn collect_live(&self, f: &mut impl FnMut(&LiveNode)) {
+        for node in &self.nodes {
+            match node {
+                Node::Live(live) => f(live),
+                Node::IfElse(node) => {
+                    node.then_branch.collect_live(f);
+                    node.else_branch.collect_live(f);
+                }
+                Node::MatchExpr(node) => {
+                    for arm in &node.arms {
+                        arm.body.collect_live(f);
+                    }
+                }
+                Node::Component(node) => {
+                    if let Some(children) = &node.children {
+                        children.collect_live(f);
+                    }
+                }
+                Node::ForLoop(_)
+                | Node::StaticSegment(_)
+                | Node::ExprNode(_)
+                | Node::Local(_)
+                | Node::Statement(_) => {}
+            }
         }
     }
 

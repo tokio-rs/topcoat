@@ -1,6 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{FnArg, Ident, ItemFn, Type};
+use syn::{FnArg, Ident, ItemFn, Pat, Type};
 
 pub struct HandlerArgs {
     args: Vec<HandlerArg>,
@@ -10,8 +10,8 @@ pub struct HandlerArgs {
 pub enum HandlerArg {
     /// The `cx: &Cx` request context parameter.
     Cx,
-    /// The request body parameter, with its declared type.
-    Request(Box<Type>),
+    /// The request body parameter, with its declared pattern and type.
+    Request(Box<Pat>, Box<Type>),
 }
 
 impl HandlerArgs {
@@ -38,7 +38,10 @@ impl HandlerArgs {
                         }
                         args.push(HandlerArg::Cx);
                     } else {
-                        if args.iter().any(|arg| matches!(arg, HandlerArg::Request(_))) {
+                        if args
+                            .iter()
+                            .any(|arg| matches!(arg, HandlerArg::Request(..)))
+                        {
                             return Err(syn::Error::new_spanned(
                                 pat_type,
                                 format!(
@@ -46,7 +49,10 @@ impl HandlerArgs {
                                 ),
                             ));
                         }
-                        args.push(HandlerArg::Request(pat_type.ty.clone()));
+                        args.push(HandlerArg::Request(
+                            pat_type.pat.clone(),
+                            pat_type.ty.clone(),
+                        ));
                     }
                 }
             }
@@ -64,7 +70,16 @@ impl HandlerArgs {
     #[must_use]
     pub fn request(&self) -> Option<&Type> {
         self.args.iter().find_map(|arg| match arg {
-            HandlerArg::Request(ty) => Some(&**ty),
+            HandlerArg::Request(_, ty) => Some(&**ty),
+            HandlerArg::Cx => None,
+        })
+    }
+
+    /// The declared pattern of the request body parameter, if any.
+    #[must_use]
+    pub fn request_pat(&self) -> Option<&Pat> {
+        self.args.iter().find_map(|arg| match arg {
+            HandlerArg::Request(pat, _) => Some(&**pat),
             HandlerArg::Cx => None,
         })
     }
@@ -75,7 +90,7 @@ impl HandlerArgs {
             .iter()
             .map(|arg| match arg {
                 HandlerArg::Cx => quote! { cx },
-                HandlerArg::Request(_) => {
+                HandlerArg::Request(..) => {
                     let ident = request_ident();
                     quote! { #ident }
                 }

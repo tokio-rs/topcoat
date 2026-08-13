@@ -1,14 +1,12 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{ToTokens, quote};
 use syn::{
-    FnArg, ItemFn, LitStr, Pat, ReturnType, Visibility,
+    FnArg, ItemFn, LitStr, Pat, ReturnType,
     parse::{Parse, ParseStream},
-    parse_quote,
     spanned::Spanned,
 };
 use topcoat_core_grammar::paths::{
-    topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_view,
-    topcoat_view_macro,
+    topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro,
 };
 
 pub struct LayoutAttr {
@@ -23,17 +21,8 @@ impl Parse for LayoutAttr {
     }
 }
 
-/// A layout function parameter, classified by name.
-enum LayoutArg {
-    /// The `cx: &Cx` request context parameter.
-    Cx,
-    /// The `slot: Result` child content parameter.
-    Slot,
-}
-
 pub struct LayoutItem {
     item: ItemFn,
-    args: Vec<LayoutArg>,
 }
 
 impl Parse for LayoutItem {
@@ -52,7 +41,8 @@ impl Parse for LayoutItem {
             ));
         }
 
-        let mut args: Vec<LayoutArg> = Vec::new();
+        let mut has_slot = false;
+        let mut has_cx = false;
         for arg in &item.sig.inputs {
             match arg {
                 FnArg::Receiver(receiver) => {
@@ -62,35 +52,30 @@ impl Parse for LayoutItem {
                     ));
                 }
                 FnArg::Typed(pat_type) => match &*pat_type.pat {
-                    Pat::Ident(pi)
-                        if pi.ident == "slot"
-                            && !args.iter().any(|arg| matches!(arg, LayoutArg::Slot)) =>
-                    {
-                        args.push(LayoutArg::Slot);
+                    Pat::Ident(pi) if pi.ident == "slot" && !has_slot => {
+                        has_slot = true;
                     }
-                    Pat::Ident(pi)
-                        if pi.ident == "cx"
-                            && !args.iter().any(|arg| matches!(arg, LayoutArg::Cx)) =>
-                    {
-                        args.push(LayoutArg::Cx);
+                    Pat::Ident(pi) if pi.ident == "cx" && !has_cx => {
+                        has_cx = true;
                     }
                     _ => {
                         return Err(syn::Error::new_spanned(
                             pat_type,
-                            "layout functions only accept a `slot: Result` and an optional `cx: &Cx` parameter",
+                            "layout functions only accept a `slot: ViewHandle<'_>` \
+                             and an optional `cx: &Cx` parameter",
                         ));
                     }
                 },
             }
         }
-        if !args.iter().any(|arg| matches!(arg, LayoutArg::Slot)) {
+        if !has_slot {
             return Err(syn::Error::new_spanned(
                 &item.sig,
-                "layout functions must take a `slot: Result` parameter",
+                "layout functions must take a `slot: ViewHandle<'_>` parameter",
             ));
         }
 
-        Ok(Self { item, args })
+        Ok(Self { item })
     }
 }
 
@@ -118,60 +103,38 @@ impl ToTokens for Layout {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let attr = &self.0;
         let item = &self.1.item;
-        let args = &self.1.args;
         let vis = &item.vis;
         let ident = &item.sig.ident;
+        let inputs = &item.sig.inputs;
         let output = &item.sig.output;
 
-        // Component face: wraps a child view inline from `view!`. It always
-        // takes `cx` (feeding the handler's injected context parameter), and
-        // the child is already rendered, so it is passed as the `slot` prop
-        // and handed to the handler as an `Ok` result. The marker struct this
-        // expands to is a unit struct, so `#ident` stays a value usable
-        // directly in `router.layout(...)`.
-        let component_args = args.iter().map(|arg| match arg {
-            LayoutArg::Cx => quote! { cx },
-            LayoutArg::Slot => quote! { slot },
-        });
+        // Component face: the user's body becomes the component body with
+        // its parameters as declared, so its tail `view!` compiles onto the
+        // live render. The `slot` prop is the handle of the wrapped content,
+        // spliced to bubble its errors or consumed with `live match` to
+        // catch them. The marker struct this expands to is a unit struct, so
+        // `#ident` stays a value usable directly in `router.layout(...)`.
+        let stmts = &item.block.stmts;
+        let attrs = &item.attrs;
         quote! {
+            #(#attrs)*
             #[#topcoat_view_macro::component]
-            #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_error::Result<#topcoat_view::View>) #output {
-                #ident::handler(cx #(, #component_args)*).await
+            #vis async fn #ident(#inputs) #output {
+                #(#stmts)*
             }
         }
         .to_tokens(tokens);
 
-        // The user's real body, attached to the marker as an associated
-        // function. Associated items are reached through the type rather than
-        // lexical scope, so hiding the impl inside the anonymous const below
-        // keeps the module namespace clean while both the component face and
-        // the render function can call `#ident::handler`. The injected `__cx`
-        // parameter carries the ambient context that `view!` bodies read.
-        let mut handler = item.clone();
-        handler.sig.ident = format_ident!("handler", span = ident.span());
-        handler.vis = Visibility::Inherited;
-        handler
-            .sig
-            .generics
-            .params
-            .insert(0, parse_quote! { '__cx });
-        handler
-            .sig
-            .inputs
-            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
-        handler
-            .attrs
-            .push(parse_quote! { #[allow(clippy::unused_async)] });
-
-        // The render function backing the registered layout passes the
-        // already-rendered slot result through untouched, so the layout body
-        // wraps the inner page's output.
-        let render_args = args.iter().map(|arg| match arg {
-            LayoutArg::Cx => quote! { cx },
-            LayoutArg::Slot => quote! { slot },
-        });
+        // The render function backing the registered layout hands the
+        // framework-minted handle of the inner content to the component as
+        // its `slot` prop.
         let render = quote! {
-            |cx, slot| ::std::boxed::Box::pin(#ident::handler(cx #(, #render_args)*))
+            |cx, slot, fill| ::std::boxed::Box::pin(async move {
+                use #topcoat_view::Component;
+                let props = #ident::props_builder().slot(slot).build();
+                #[allow(clippy::default_constructed_unit_structs)]
+                Component::render(#ident::default(), cx, props, fill).await
+            })
         };
 
         // The erased layout is built once in a `const` so it can be used from
@@ -213,10 +176,6 @@ impl ToTokens for Layout {
 
         quote! {
             const _: () = {
-                impl #ident {
-                    #handler
-                }
-
                 #erased
 
                 #submit
@@ -268,7 +227,7 @@ mod tests {
     fn rejects_missing_slot() {
         assert!(
             parse_err("async fn shell(cx: &Cx) -> Result { todo!() }")
-                .contains("must take a `slot: Result` parameter")
+                .contains("must take a `slot: ViewHandle")
         );
     }
 

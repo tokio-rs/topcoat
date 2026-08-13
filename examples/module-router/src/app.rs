@@ -5,7 +5,7 @@ mod docs;
 use topcoat::{
     Result,
     router::{layout, page},
-    view::view,
+    view::{ViewHandle, view},
 };
 
 // The `module_router!()` macro call must be placed at the root of your route structure.
@@ -16,7 +16,7 @@ pub fn router() -> topcoat::router::Router {
 
 // A layout in the root app module wraps every page.
 #[layout]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <html>
             <head>topcoat::dev::script()</head>
@@ -33,7 +33,7 @@ async fn root_layout(slot: Result) -> Result {
                     <a href="/pricing">"pricing"</a>
                 </nav>
                 <hr>
-                (slot?)
+                (slot)
             </body>
         </html>
     }

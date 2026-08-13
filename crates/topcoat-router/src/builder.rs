@@ -510,8 +510,12 @@ mod tests {
     fn render_page(
         _cx: &Cx,
         _body: Body,
-    ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + '_>> {
-        Box::pin(async move { Ok(View::empty()) })
+        fill: topcoat_view::live::Fill,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>> {
+        Box::pin(async move {
+            fill.fill(View::empty());
+            Ok(())
+        })
     }
 
     /// A stand-in layer that continues the chain unchanged.

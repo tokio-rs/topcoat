@@ -2,6 +2,7 @@ mod component;
 mod expr_node;
 mod for_loop;
 mod if_else;
+mod live_node;
 mod local;
 mod match_expr;
 mod statement;
@@ -11,6 +12,7 @@ pub(crate) use component::*;
 pub(crate) use expr_node::*;
 pub(crate) use for_loop::*;
 pub(crate) use if_else::*;
+pub(crate) use live_node::*;
 pub(crate) use local::*;
 pub(crate) use match_expr::*;
 pub(crate) use statement::*;
@@ -37,14 +39,17 @@ pub(crate) enum Node {
     IfElse(IfElse),
     /// A `match` whose arm bodies are lowered into nested scopes.
     MatchExpr(MatchExpr),
+    /// A `live` construct, compiled to a reactive node.
+    Live(LiveNode),
 }
 
 impl Node {
-    /// Whether this node renders components, in the node itself or anywhere
-    /// under its nested scopes, so emitting it produces a future to await.
+    /// Whether this node renders components or reactive nodes, in the node
+    /// itself or anywhere under its nested scopes, so emitting it either
+    /// produces a future to await or registers work with the frame.
     pub(crate) fn is_async(&self) -> bool {
         match self {
-            Self::Component(_) => true,
+            Self::Component(_) | Self::Live(_) => true,
             Self::ForLoop(node) => node.body.is_async(),
             Self::IfElse(node) => node.then_branch.is_async() || node.else_branch.is_async(),
             Self::MatchExpr(node) => node.arms.iter().any(|arm| arm.body.is_async()),
@@ -66,6 +71,7 @@ impl Emit for Node {
             Self::ForLoop(node) => node.emit(emitter),
             Self::IfElse(node) => node.emit(emitter),
             Self::MatchExpr(node) => node.emit(emitter),
+            Self::Live(node) => node.emit(emitter),
         }
     }
 }

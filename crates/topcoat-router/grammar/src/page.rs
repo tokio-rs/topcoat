@@ -1,14 +1,13 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    ItemFn, LitStr, ReturnType, Visibility,
+    ItemFn, LitStr, ReturnType,
     parse::{Parse, ParseStream},
-    parse_quote,
     spanned::Spanned,
 };
 use topcoat_core_grammar::{
     ParseOption,
-    paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view_macro},
+    paths::{topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro},
 };
 
 use super::{
@@ -85,72 +84,58 @@ impl ToTokens for Page {
         let ident = &item.sig.ident;
         let output = &item.sig.output;
 
-        // Component face: renders the page inline from `view!`. It always
-        // takes `cx` (feeding the function's injected context parameter), and
-        // a page that reads a request body takes the already-parsed value as a
-        // `body` prop instead. The marker struct this expands to is a unit
-        // struct, so `#ident` stays a value usable directly in
-        // `router.page(...)`.
-        let body_param = args.request().map(|ty| quote! { , body: #ty });
-        let body_arg = args.request().map(|_| quote! { , body });
+        // Component face: the user's body becomes the component body, so its
+        // tail `view!` compiles onto the live render. It takes `cx` when the
+        // page declares it, and a page that reads a request body takes the
+        // already-parsed value as a `body` prop, rebound to the declared
+        // pattern. The marker struct this expands to is a unit struct, so
+        // `#ident` stays a value usable directly in `router.page(...)`.
+        // The context parameter is re-emitted as the user wrote it, so the
+        // type path they imported stays used.
+        let cx_param = args
+            .iter()
+            .zip(&item.sig.inputs)
+            .find_map(|(arg, input)| matches!(arg, HandlerArg::Cx).then(|| quote! { #input, }));
+        let body_param = args.request().map(|ty| quote! { body: #ty, });
+        let rebind_body = args.request_pat().and_then(|pat| match pat {
+            syn::Pat::Ident(pat) if pat.ident == "body" => None,
+            pat => Some(quote! { let #pat = body; }),
+        });
+        // The body's statements are spliced directly, not as a nested block,
+        // so a direct `let x = view! { ... };` stays a direct statement of
+        // the component body.
+        let stmts = &item.block.stmts;
+        let attrs = &item.attrs;
         quote! {
+            #(#attrs)*
             #[#topcoat_view_macro::component]
-            #vis async fn #ident(cx: &#topcoat_context::Cx #body_param) #output {
-                #ident::handler(cx #body_arg).await
+            #vis async fn #ident(#cx_param #body_param) #output {
+                #rebind_body
+                #(#stmts)*
             }
         }
         .to_tokens(tokens);
 
-        // The user's function, re-emitted under its original name inside the
-        // bridge below to keep the module namespace clean. Its own name shadows
-        // the marker within its body, so bindings named after the page keep
-        // working. The injected `__cx` parameter carries the ambient context
-        // that `view!` bodies read.
-        let mut inner = item.clone();
-        inner.vis = Visibility::Inherited;
-        inner.sig.generics.params.insert(0, parse_quote! { '__cx });
-        inner
-            .sig
-            .inputs
-            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
-        inner
-            .attrs
-            .push(parse_quote! { #[allow(clippy::unused_async)] });
-
-        // The bridge every caller goes through: associated items are reached
-        // through the type rather than lexical scope, so `#ident::handler` is
-        // callable from outside the anonymous const. It forwards to the user's
-        // function positionally, in declared parameter order.
-        let forward_args = args.iter().map(|arg| match arg {
-            HandlerArg::Cx => quote! { cx },
-            HandlerArg::Request(_) => quote! { body },
-        });
-        let handler = quote! {
-            impl #ident {
-                async fn handler(cx: &#topcoat_context::Cx #body_param) #output {
-                    #inner
-
-                    #ident(cx #(, #forward_args)*).await
-                }
-            }
-        };
-
         // The render function backing the registered page: it parses the
-        // request body (when the page takes one) and hands it to the bridge.
+        // request body (when the page takes one) and starts the component's
+        // render with the fill the router minted.
         let parse_request = args.request().map(|request_ty| {
             let request_ident = request_ident();
             quote! {
                 let #request_ident = <#request_ty as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
             }
         });
-        let request_arg = args.request().map(|_| {
+        let body_setter = args.request().map(|_| {
             let request_ident = request_ident();
-            quote! { , #request_ident }
+            quote! { .body(#request_ident) }
         });
         let render = quote! {
-            |cx, body| ::std::boxed::Box::pin(async move {
+            |cx, body, fill| ::std::boxed::Box::pin(async move {
+                use #topcoat_view::Component;
                 #parse_request
-                #ident::handler(cx #request_arg).await
+                let props = #ident::props_builder()#body_setter.build();
+                #[allow(clippy::default_constructed_unit_structs)]
+                Component::render(#ident::default(), cx, props, fill).await
             })
         };
 
@@ -197,8 +182,6 @@ impl ToTokens for Page {
 
         quote! {
             const _: () = {
-                #handler
-
                 #erased
 
                 #submit

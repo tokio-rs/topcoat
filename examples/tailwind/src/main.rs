@@ -3,7 +3,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     router::{Router, layout, page},
     tailwind,
-    view::view,
+    view::{ViewHandle, view},
 };
 
 #[tokio::main]
@@ -18,7 +18,7 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -32,7 +32,7 @@ async fn root_layout(slot: Result) -> Result {
             <body
                 class="flex min-h-screen items-center justify-center bg-slate-100 font-sans"
             >
-                (slot?)
+                (slot)
             </body>
         </html>
     }

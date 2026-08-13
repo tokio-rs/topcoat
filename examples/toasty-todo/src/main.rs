@@ -9,7 +9,7 @@ use topcoat::{
         error::{SeeOther, see_other},
         layout, page, path_param, route,
     },
-    view::{component, view},
+    view::{ViewHandle, component, view},
 };
 
 #[tokio::main]
@@ -47,7 +47,7 @@ struct Todo {
 }
 
 #[layout("/")]
-async fn root(slot: Result) -> Result {
+async fn root(slot: ViewHandle<'_>) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -55,7 +55,7 @@ async fn root(slot: Result) -> Result {
                 <title>"Toasty Todos"</title>
                 topcoat::dev::script()
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
     }
 }

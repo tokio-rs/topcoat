@@ -76,12 +76,12 @@ The function name does not affect the path. Two module-derived handlers in the s
 A `#[page]` serves `GET` unless the attribute declares other methods, such as `#[page(POST)]`. A `#[layout]` wraps pages in its module and descendant modules.
 
 ```rust
-# use topcoat::{Result, router::{layout, page}, view::view};
+# use topcoat::{Result, router::{layout, page}, view::{ViewHandle, view}};
 // src/app.rs: both handlers use "/"
 #[layout]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: ViewHandle<'_>) -> Result {
     view! {
-        <html><body>(slot?)</body></html>
+        <html><body>(slot)</body></html>
     }
 }
 

@@ -9,7 +9,7 @@ use topcoat::{
         error::{SeeOther, see_other},
         layout, page, route,
     },
-    view::view,
+    view::{ViewHandle, view},
 };
 
 const OUTBOX: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/outbox");
@@ -29,7 +29,7 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(slot: Result) -> Result {
+async fn root(slot: ViewHandle<'_>) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -37,7 +37,7 @@ async fn root(slot: Result) -> Result {
                 <title>"Mail"</title>
                 topcoat::dev::script()
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
     }
 }

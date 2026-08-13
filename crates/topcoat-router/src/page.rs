@@ -1,19 +1,25 @@
 use std::{borrow::Cow, pin::Pin};
 
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::View;
+use topcoat_view::{
+    ViewHandle,
+    live::{Fill, LiveRender, RefreshSet},
+};
 
 use crate::{
     Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, response::IntoResponse,
 };
 
-/// The async render function backing a [`PageFn`].
+/// The render function backing a [`PageFn`]: the page's live render future,
+/// delivering its view through the [`Fill`] and running until nothing inside
+/// it can change anymore.
 pub type PageRenderFn = for<'cx> fn(
     cx: &'cx Cx,
     body: Body,
-) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
+    fill: Fill,
+) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>>;
 
-/// A page handler, backed by a plain render function, that renders a [`View`]
+/// A page handler, backed by a plain render function, that renders a view
 /// for a specific URL path.
 ///
 /// Created either manually via `#[page("/path")]` or by the module router
@@ -29,7 +35,7 @@ pub struct PageFn {
     methods: OwnedMethods,
     /// The URL path this page handles.
     path: Cow<'static, Path>,
-    /// The async render function that produces the page [`View`].
+    /// The page's live render function.
     render: PageRenderFn,
 }
 
@@ -77,26 +83,29 @@ impl PageFn {
         &self.path
     }
 
-    /// Renders the page, returning a [`Result`].
+    /// Starts the page's render, delivering its view through `fill`.
     #[must_use]
     pub fn render<'cx>(
         &self,
         cx: &'cx Cx,
         body: Body,
-    ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>> {
-        (self.render)(cx, body)
+        fill: Fill,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>> {
+        (self.render)(cx, body, fill)
     }
 }
 
 #[cfg(feature = "discover")]
 inventory::collect!(PageFn);
 
-/// The async render function backing a [`LayoutFn`], receiving the rendered child content as a
-/// [`Result`]`<`[`View`]`>`.
+/// The render function backing a [`LayoutFn`]: the layout's live render
+/// future, receiving the wrapped content as a [`ViewHandle`] to splice or
+/// catch.
 pub type LayoutRenderFn = for<'cx> fn(
     cx: &'cx Cx,
-    slot: Result<View>,
-) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
+    slot: ViewHandle<'cx>,
+    fill: Fill,
+) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>>;
 
 /// A layout handler, backed by a plain render function, that wraps pages whose
 /// path starts with the layout's path prefix.
@@ -108,7 +117,7 @@ pub type LayoutRenderFn = for<'cx> fn(
 pub struct LayoutFn {
     /// The path prefix this layout applies to.
     path: Cow<'static, Path>,
-    /// The async render function that wraps the child content [`Result`]`<`[`View`]`>`.
+    /// The layout's live render function.
     render: LayoutRenderFn,
 }
 
@@ -124,14 +133,16 @@ impl LayoutFn {
         &self.path
     }
 
-    /// Renders the layout, embedding the given child content [`Result`]`<`[`View`]`>` as its slot.
+    /// Starts the layout's render around `slot`, the handle of the content
+    /// it wraps, delivering its view through `fill`.
     #[must_use]
     pub fn render<'cx>(
         &self,
         cx: &'cx Cx,
-        slot: Result<View>,
-    ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>> {
-        (self.render)(cx, slot)
+        slot: ViewHandle<'cx>,
+        fill: Fill,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'cx>> {
+        (self.render)(cx, slot, fill)
     }
 }
 
@@ -167,11 +178,24 @@ impl Route for PageWithLayouts {
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
         Box::pin(async move {
-            let mut slot = self.page.render(cx, body).await;
-            for layout in self.layouts.iter().rev() {
-                slot = layout.render(cx, slot).await;
-            }
-            slot.into_response(cx)
+            // One live render for the whole response: the page renders
+            // innermost, each layout wraps the handle of the content below
+            // it, and the root splices the outermost handle, so an error
+            // nothing catches climbs to the root future's output. Since this
+            // context does not stream, the render is driven to completion
+            // and the response carries the final document.
+            let render = LiveRender::new(|fill| async move {
+                let mut refresh = RefreshSet::new();
+                let mut slot = refresh.adopt(|fill| self.page.render(cx, body, fill));
+                for layout in self.layouts.iter().rev() {
+                    slot = refresh.adopt(|fill| layout.render(cx, slot, fill));
+                }
+                let root = refresh.splice(slot);
+                refresh.barrier().await?;
+                fill.fill(root);
+                refresh.run().await
+            });
+            render.to_completion().await.into_response(cx)
         })
     }
 }

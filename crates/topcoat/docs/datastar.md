@@ -19,11 +19,11 @@ use topcoat::{
     Result,
     asset::asset,
     router::layout,
-    view::view,
+    view::{ViewHandle, view},
 };
 
 #[layout]
-async fn root(slot: Result) -> Result {
+async fn root(slot: ViewHandle<'_>) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
@@ -33,7 +33,7 @@ async fn root(slot: Result) -> Result {
                     src=(asset!("https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.2/bundles/datastar.js"))
                 ></script>
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
     }
 }

@@ -15,16 +15,16 @@ Because `slot` is a `Result`, a layout sees the inner page's error before it bec
 Explicit path:
 
 ```rust
-use topcoat::{Result, router::layout, view::view};
+use topcoat::{Result, router::layout, view::{ViewHandle, view}};
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
+async fn root_layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <!DOCTYPE html>
         <html>
             <body>
                 <nav><a href="/">"Home"</a></nav>
-                (slot?)
+                (slot)
             </body>
         </html>
     }
@@ -34,13 +34,13 @@ async fn root_layout(slot: Result) -> Result {
 Module-derived path (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings`):
 
 ```rust
-# use topcoat::{Result, router::layout, view::view};
+# use topcoat::{Result, router::layout, view::{ViewHandle, view}};
 #[layout]
-async fn settings_layout(slot: Result) -> Result {
+async fn settings_layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <section>
             <nav>"Settings nav"</nav>
-            (slot?)
+            (slot)
         </section>
     }
 }
@@ -51,18 +51,18 @@ async fn settings_layout(slot: Result) -> Result {
 When several layouts match a page, they nest from least specific (outermost) to most specific (innermost):
 
 ```rust
-# use topcoat::{Result, router::{layout, page}, view::view};
+# use topcoat::{Result, router::{layout, page}, view::{ViewHandle, view}};
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    view! { <html><body>(slot?)</body></html> }
+async fn root_layout(slot: ViewHandle<'_>) -> Result {
+    view! { <html><body>(slot)</body></html> }
 }
 
 #[layout("/settings")]
-async fn settings_layout(slot: Result) -> Result {
+async fn settings_layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <div class="settings-shell">
             <nav>"Settings nav"</nav>
-            (slot?)
+            (slot)
         </div>
     }
 }
@@ -77,19 +77,18 @@ A request to `/settings/profile` renders `root_layout` > `settings_layout` > `pr
 
 # Layouts as components
 
-A layout doubles as a [component](../view/attr.component.html), taking a `Result<View>` as its `slot` property:
+A layout doubles as a [component](../view/attr.component.html), taking a `ViewHandle` as its `slot` property; a `view!` block in argument position evaluates to exactly that:
 
 ```rust
-# use topcoat::{Result, router::{layout, page}, view::view};
+# use topcoat::{Result, router::{layout, page}, view::{ViewHandle, view}};
 # #[layout("/")]
-# async fn root_layout(slot: Result) -> Result {
-#     view! { <body>(slot?)</body> }
+# async fn root_layout(slot: ViewHandle<'_>) -> Result {
+#     view! { <body>(slot)</body> }
 # }
 #[page("/standalone")]
 async fn standalone() -> Result {
-    let content = view! { <p>"content"</p> }?;
     view! {
-        root_layout(slot: Ok(content))
+        root_layout(slot: view! { <p>"content"</p> })
     }
 }
 ```
