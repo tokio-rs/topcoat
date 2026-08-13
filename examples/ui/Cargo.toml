@@ -15,5 +15,8 @@ topcoat = { path = "../../crates/topcoat/", default-features = false, features =
 [dev-dependencies]
 topcoat-ui.workspace = true
 
+serde = { workspace = true, features = ["derive"] }
+toml.workspace = true
+
 [lints]
 workspace = true
