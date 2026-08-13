@@ -67,7 +67,7 @@ The well-known fix is streaming: send the fast parts immediately with skeleton p
 
 ## Proposal
 
-A page opts into streaming by marking a slow load with `defer` and rendering something in its place; the framework sends the page immediately, keeps the render alive, and swaps the real content in when it arrives. This section builds the model up one piece at a time: the two constructs application code touches, then how reactive values behave as ordinary Rust values, how regions nest and compose, how errors travel, and finally how updates reach the browser. The machinery underneath comes later, in the implementation section.
+A page opts into streaming by marking a slow load with `defer` and rendering something in its place; the framework sends the page immediately, keeps the render alive, and swaps the real content in when it arrives. This section builds the model up one piece at a time: the two constructs application code touches, then how reactive values behave as ordinary Rust values, how regions nest and compose, how errors travel, how views pass between components, and finally how updates reach the browser. The machinery underneath comes later, in the implementation section.
 
 **A note before the examples: the syntax is not final, and it is not what this proposal is about.** The examples mark a reactive construct with the `live` keyword, as in `live match`; treat it as working syntax. All the design requires is that some visible marker tells a reactive construct apart from a plain one, because the two compile differently. The spelling can be settled last; read the examples for the semantics.
 
@@ -230,7 +230,7 @@ Everywhere else move semantics hold: content outside `live` constructs, values c
 
 ### The Reactive View Handle
 
-A `Defer` is not the only reactive expression. The second is the value views themselves evaluate to: a `view!` expression and a component call both evaluate to a reactive view handle, the same type. A handle is not rendered output; it stands for one render of its content, and it is an ordinary value: bind it, pass it as a prop, splice it into a view.
+A `Defer` is not the only reactive expression. The second is the value views themselves evaluate to: a `view!` expression and a component call both evaluate to a reactive view handle, `ViewHandle<'_>`, the same type. A handle is not rendered output; it stands for one render of its content, and it is an ordinary value: bind it, pass it as a prop, splice it into a view.
 
 ```rust
 let feed = view! { activity_feed() };
@@ -356,7 +356,7 @@ view! {
 }
 ```
 
-The clones share one render, so `activity_feed` still ran once no matter which arm shows it; the first splice, in the pending arm, is what started it. This holds even if `activity_feed` has `defer`s of its own. Work is cancelled only when nothing references its output anymore, and `feed` stays referenced, by the local and by whichever arm is showing, so an outer swap neither cancels nor restarts it, and its own swaps keep landing in the arm on the page.
+The clones share one render, so `activity_feed` still ran once no matter which arm shows it; the first splice, in the pending arm, is what started it. This holds even if `activity_feed` has `defer`s of its own. Work is cancelled when the frame that owns it ends, and `feed` belongs to the surrounding body, not to either arm, so an outer swap neither cancels nor restarts it, and its own swaps keep landing in the arm on the page.
 
 When the duplicate work hides inside functions called from both arms, `#[memoize]` removes it, in its intended role: an opt-in cache, not a page-wide requirement. It also covers duplication inside a single evaluation, such as racing two calls of the same query: memoized functions share one in-flight future among concurrent callers.
 
@@ -379,11 +379,11 @@ live match drink_grid() {
 
 Before the first paint this is an ordinary catch. After it, a failing load inside the grid climbs to this construct, the `Err` arm runs, and the swap replaces the grid; every load still pending inside the replaced region is cancelled.
 
-Layouts catch the same way. A layout's slot is the page's reactive view handle, so its type changes spelling from `Result` to `Slot`; what happens to layouts written against today's `slot: Result` signature is listed with the open questions:
+Layouts catch the same way. A layout's slot is the page's reactive view handle, so its type changes spelling from `Result` to `ViewHandle<'_>`; what happens to layouts written against today's `slot: Result` signature is listed with the open questions:
 
 ```rust
 #[layout("/")]
-async fn root_layout(slot: Slot) -> Result {
+async fn root_layout(slot: ViewHandle<'_>) -> Result {
     view! {
         <html>
             <body>
@@ -393,10 +393,10 @@ async fn root_layout(slot: Slot) -> Result {
                         (StatusCode::NOT_FOUND)
                         <h1>"Nothing here"</h1>
                     }
-                    // The last arm rethrows by evaluating to the error,
-                    // which moves the catch to the next layout out; its
-                    // spelling is an open question.
-                    Err(error) => { ... }
+                    // The rethrow is a plain `?`: the remaining `Result`
+                    // fails this construct, and the error climbs to the
+                    // next catcher out, exactly as in today's example.
+                    other => { (other?) }
                 }
             </body>
         </html>
@@ -427,38 +427,45 @@ Deferred::Ready(drinks) => {
 
 No error boundary component, no second mechanism: `Result`, `match`, and `?`.
 
-### One Skeleton for Many Loads
+### Passing Views to Components
 
-Leaf components should load their own data, but the loading UI often belongs higher up: one skeleton covering a section, not a spinner per leaf. Component calls being reactive values make this a composition. A `settled` adapter (working syntax, like `live`) wraps one handle or a tuple of them and reports `Pending` until nothing beneath is still loading:
-
-```rust
-live match settled((drink_grid(), activity_feed())) {
-    Deferred::Pending => { section_skeleton() }
-    Deferred::Ready((grid, feed)) => {
-        (grid?)
-        (feed?)
-    }
-}
-```
-
-Both components start during the first render, when the construct consumes them, and load concurrently; there is no waterfall. Their own pending arms never ship: the section renders as one skeleton and swaps in once, complete. The first chunk does not even wait for these components to render, since the skeleton is ready immediately.
-
-A leaf that leaves its loading UI entirely to its parents renders nothing while pending:
+A component can take views as arguments, and the prop type is the reactive view handle itself, `ViewHandle<'_>`. The caller writes a `view!` block or a component call in argument position; both already evaluate to exactly that type, so nothing about argument position is special:
 
 ```rust
 #[component]
-async fn drink_grid(cx: &Cx) -> Result {
+async fn card(cx: &Cx, title: ViewHandle<'_>, children: ViewHandle<'_>) -> Result {
     view! {
-        live if let Deferred::Ready(drinks) = defer(drinks(cx)) {
-            for drink in drinks? {
-                drink_card(key: &drink.slug, drink: drink)
-            }
-        }
+        <section class="card">
+            <header>(title)</header>
+            (children)
+        </section>
     }
 }
 ```
 
-The same shape scales to the whole page: a layout that consumes `settled(slot)` renders one loading page until the content beneath it settles. Pending stays in `Deferred`, errors stay in `Result`, and an ancestor opts in by wrapping.
+```rust
+view! {
+    card(
+        title: view! { <h2>"Orders"</h2> },
+        order_table(),
+    )
+}
+```
+
+The handle moves into the props like any other value, and the receiving component decides what its content means. Every consumption mode from the sections above does something useful here. Splicing `(children)` shows the content and adopts its failures: the wrapper fails with its content, exactly as a plain invocation would. A `live match` catches instead, so a wrapper can own the error UI for whatever it wraps:
+
+```rust
+live match children {
+    Ok(content) => { (content) }
+    Err(_) => { <p class="text-muted">"This section failed to load."</p> }
+}
+```
+
+Dropping the handle discards the content, and laziness makes the discard free: a tabs component that receives three panels and splices the active one never runs the other two. And cloning shows one render in more than one place, as with the shared `feed`.
+
+Reactivity flows through the argument. The content belongs to the frame that wrote it, so it can borrow the caller's locals; its `defer`s stream through the wrapper's markup as if the wrapper were not there; and the first paint waits only for content that is actually spliced, so a panel the receiver never shows delays nothing and never runs.
+
+This is also all a layout is: a component whose one view argument is filled by the framework instead of written by a caller. The catch a layout does on its slot is the catch any wrapper can do on its content, which is why the slot in the previous section has the same `ViewHandle` type.
 
 ### Streaming Behavior
 
@@ -558,7 +565,7 @@ The cost follows. If everything may run many times, every data-loading call must
 
 Rust has a close precedent: async cancellation. Any `.await` is a point where the enclosing future may be silently dropped, the caller decides, and years of subtle cancellation bugs show what happens when code cannot tell locally how it will be executed. Re-rendering from the root builds the same kind of hazard into rendering.
 
-The contrast surfaces throughout the proposal above. Ownership: every pass of a root re-render rebuilt every value on the page invisibly, where a `live` arm makes each copy it keeps a visible `.clone()`. Execution count: the answer to "how often does this run" was once per pass unless everything was memoized, where the reactive render's answer is once, decided by the code. Group loading UI: the only way to express a section-wide skeleton was to make "still loading" an error, caught in layouts behind an `is_deferred()` check, which put pending and failure in one channel; `settled` keeps pending in `Deferred` and errors in `Result`. And bookkeeping: a `Defer` that owns its future needs no call-site identity and no `key:`, where root re-rendering had to re-associate every `defer` with its previous pass.
+The contrast surfaces throughout the proposal above. Ownership: every pass of a root re-render rebuilt every value on the page invisibly, where a `live` arm makes each copy it keeps a visible `.clone()`. Execution count: the answer to "how often does this run" was once per pass unless everything was memoized, where the reactive render's answer is once, decided by the code. And bookkeeping: a `Defer` that owns its future needs no call-site identity and no `key:`, where root re-rendering had to re-associate every `defer` with its previous pass.
 
 ## Implementation
 
@@ -576,7 +583,7 @@ This answers the questions a stored-closure design cannot. Where is the continua
 
 ### Inside `view!`
 
-Today `view!` expands to three phases: a hoist that evaluates every expression in source order and binds component render futures, a `try_join!` that awaits the components together, and a synchronous burst that lays down the view's instruction block. The new expansion keeps all three, routes live work through the frame's `RefreshSet`, and never awaits a reactive construct inline. The pieces named here, `adopt`, `splice`, tickets, tenders, and cells, are defined in the sections after the contract. For the `profile` component from the guide, reduced to the `<h1>`, an `avatar(user: &user)` child, and the orders `defer`:
+Today `view!` expands to three phases: a hoist that evaluates every expression in source order and binds component render futures, a `try_join!` that awaits the components together, and a synchronous burst that lays down the view's instruction block. The new expansion keeps all three, routes live work through the frame's `RefreshSet`, and never awaits a reactive construct inline. The pieces named here, `invoke`, tickets, and cells, are defined in the sections after the contract. For the `profile` component from the guide, reduced to the `<h1>`, an `avatar(user: &user)` child, and the orders `defer`:
 
 ```rust
 // Simplified: what the `view!` in `profile` expands to.
@@ -584,14 +591,12 @@ Today `view!` expands to three phases: a hoist that evaluates every expression i
     // Hoist: evaluate expressions in source order, as today.
     let __expr0 = &user.name;
 
-    // A component invocation, fused: `adopt` creates the handle, boxing
-    // the render future into this frame's set as a parked tender, and
-    // `splice` consumes it: reserve a slot, register it with the
-    // handle's cell, signal start, and push a watcher that hands over
-    // when the first state arrives.
+    // A component invocation, fused: reserve the slot, write a cell
+    // born started with that slot registered, and push the render
+    // future itself as this frame's entry. No tender and no parked
+    // state; the cell is where the future's `Fill` delivers.
     let __props0 = avatar::props_builder().user(&user).build();
-    let __handle0 = __refresh.adopt(avatar::render(__cx, __props0));
-    let __child0 = __refresh.splice(__handle0);
+    let __child0 = __refresh.invoke(|__fill| avatar::render(__cx, __props0, __fill));
 
     // A reactive node: a reserved slot and one pushed future owning the
     // reactive expression and the arms. Nothing is awaited here; a
@@ -634,9 +639,8 @@ Today `view!` expands to three phases: a hoist that evaluates every expression i
         internal::run_node(__r0, __arms).await
     });
 
-    // Join: wait for every ticket handed out above. Tenders, watchers,
-    // and nodes keep running in the set. This replaces today's
-    // `try_join!`.
+    // Join: wait for every ticket handed out above. Tenders and nodes
+    // keep running in the set. This replaces today's `try_join!`.
     __refresh.barrier().await?;
 
     // Burst: lay down this view's instruction block, as today.
@@ -650,15 +654,15 @@ Today `view!` expands to three phases: a hoist that evaluates every expression i
 }
 ```
 
-Three things changed. A component invocation split into creation and consumption: `adopt` boxes the render future into this frame's set as a parked tender, `splice` consumes the handle, and in this fused case the two run back to back; an unfused handle is the same two calls separated by arbitrary code, with the `splice` in whichever frame consumes it. The `match` became one pushed node future, so nothing reactive is awaited during the hoist: siblings keep starting no matter how slow a first state is, which is also what lets a node consume a component handle, whose first state arrives only at handover, without stalling anything. And each run of the arms is a frame of its own with a set of its own, which is what makes arm scopes sound: children started by an arm borrow the arm's locals and the deferred state, so the set that owns them must live on the arm's frame and drop with it.
+Three things changed. A component invocation became `invoke`: reserve the slot, write the cell, push the render future as a plain entry, which is today's shape plus one record write; the unfused form splits the same operation into `adopt`, which parks the boxed future behind an unstarted cell, and a splice in whichever frame consumes the handle. The `match` became one pushed node future, so nothing reactive is awaited during the hoist: siblings keep starting no matter how slow a first state is, which is also what lets a node consume a component handle, whose first state arrives only at the fill, without stalling anything. And each run of the arms is a frame of its own with a set of its own, which is what makes arm scopes sound: children started by an arm borrow the arm's locals and the deferred state, so the set that owns them must live on the arm's frame and drop with it.
 
-The `__arm.barrier()` before the `refill` still guarantees a swap ships complete content: the arm's subtree has handed over, even if it contains fresh skeletons of its own. A chain like the product page in the guide is this structure nested twice.
+The `__arm.barrier()` before the `refill` still guarantees a swap ships complete content: the arm's subtree has handed over, even if it contains fresh skeletons of its own. A chain like the product page in the guide is this structure nested twice. One shape is deliberately not one entry per item: a `for` loop over components collects its iteration futures into one homogeneous `Vec`, each filling its own reserved slot, and pushes a single entry that drives them all, first error wins, exactly as `try_join_all` behaves today.
 
-`run_node` is where states meet the arms: it evaluates the current state, then races the shown arm's remaining `run` against the expression's `changed`. A new state drops the arm frame, cancelling the replaced subtree's outstanding work, and evaluates the arms again. A `Defer` changes at most once, so its race resolves at most one way; a component handle uses the same loop for an `Err` transition, and a signal read will use it for every change.
+`run_node` is where states meet the arms, and with one contract method the loop is uniform: await `next_state`, evaluate the arms, then race the shown arm's remaining `run` against the following `next_state`. A new state drops the arm frame, cancelling the replaced subtree's outstanding work, and evaluates the arms again; `None` retires the node. A `Defer` changes at most once, so its race resolves at most one way; a component handle uses the same loop for an `Err` transition, and a signal read will use it for every change.
 
 ### The Reactive Contract
 
-The expansion consumes `__r0` through two methods. That pair is the entire interface between a reactive expression and the view that consumes it:
+The expansion consumes `__r0` through one method, the entire interface between a reactive expression and the view that consumes it:
 
 ```rust
 /// A value a view can consume reactively: a state to render now, and zero
@@ -667,31 +671,30 @@ pub trait Reactive {
     /// The state the consuming construct's arms are written against.
     type State;
 
-    /// The state to render now. Called once, by the consuming node's
-    /// first evaluation.
-    fn current(&mut self) -> Self::State;
-
-    /// The next state, or `None` once no further change is possible.
-    /// Retiring is what lets the node, and eventually the page, complete.
-    async fn changed(&mut self) -> Option<Self::State>;
+    /// The first call yields the state to render now; later calls yield
+    /// replacements; `None` means no further change is possible, and
+    /// retiring is what lets the node, and eventually the page,
+    /// complete. Async because a handle's first state arrives only at
+    /// its fill; `Defer`'s first call returns immediately.
+    async fn next_state(&mut self) -> Option<Self::State>;
 }
 ```
 
-`Defer` is the first implementation: it owns its future, `current` gives the future its first poll and reports `Pending` or `Ready`, and `changed` awaits the future, yields `Ready` once, and retires. Laziness falls out of the ownership: nothing polls the future before a consuming node calls `current`. The methods are for generated code, not applications; that is what keeps a `Defer` opaque outside a view. Nothing in the node's compilation is specific to `defer`: a reactive expression is a stream of states, and a reactive node renders each state into the same slot.
+`Defer` is the first implementation: it owns its future. The first `next_state` gives the future its first poll and yields `Pending` or `Ready` without waiting; after `Pending`, the next call awaits the future and yields `Ready`; after `Ready`, it yields `None` and the node retires. Laziness falls out of the ownership: nothing polls the future before a consuming node calls `next_state`. The methods are for generated code, not applications; that is what keeps a `Defer` opaque outside a view. Nothing in the node's compilation is specific to `defer`: a reactive expression is a stream of states, and a reactive node renders each state into the same slot.
 
 States are delivered by value. The `Ready` arm receives the future's output owned, just as `.await` would deliver it, with no `Clone` bound and no cached copy; that works because each state is consumed exactly once, by one run of the arms. Rendering one `Defer` in two places would need sharing, which is the open question about consuming by reference.
 
-Component calls are the second implementation. A call like `drink_grid()` evaluates to a handle implementing `Reactive` with `State = Result<View>`: the first state arrives when the component hands its view over, and an error climbing out of the component later arrives as an `Err` state. A plain invocation in a view is sugar for `adopt` plus `splice`, bubble mode: render the `Ok`, pass the `Err` up. A `live match` takes the handle instead of splicing it, and is the catch. `current` is allowed to await for a handle: a node is a pushed future, not a hoist-time await, so a first state that arrives late stalls nothing but its own construct.
+Component calls are the second implementation. A call like `drink_grid()` evaluates to a handle implementing `Reactive` with `State = Result<View>`: the first state arrives when the component hands its view over, and an error climbing out of the component later arrives as an `Err` state. A plain invocation in a view is sugar for `adopt` plus `splice`, bubble mode: render the `Ok`, pass the `Err` up. A `live match` takes the handle instead of splicing it, and is the catch. `next_state` genuinely awaits for a handle's first state: a node is a pushed future, not a hoist-time await, so a first state that arrives late stalls nothing but its own construct.
 
-The handle clarifies the split between the proposal's two view types. `View` is the rendered view: the inert, ref-counted block handle it is today, appearing as the payload inside a state. The reactive view handle is the value in circulation, one concrete type, provisionally `ViewHandle<'a>`: a shared reference to the handle's cell, defined below, with `'a` the creating frame. No per-component type is needed, because props move into the render future at `adopt` and the future is boxed there. `State = Result<View>` is the component's declared return type verbatim, so the signature the user writes documents the states while the macro rewrites the function to the fill form below; a `view!` expression produces the anonymous case, the same type with no component marker.
+The handle clarifies the split between the proposal's two view types. `View` is the rendered view: the inert block handle it is today, appearing as the payload inside a state. The reactive view handle is the value in circulation, one concrete type, `ViewHandle<'a>`: a cheap `Clone` index into the handle's cell, a record on the render scope defined below, with `'a` the creating frame. Clone and drop adjust the cell's consumer count, which is how dropping an unshown view argument, or every clone of an unstarted handle, is observed. No per-component type is needed, because props move into the render future at creation and the future is boxed there. `State = Result<View>` is the component's declared return type verbatim, so the signature the user writes documents the states while the macro rewrites the function to the fill form below; a `view!` expression produces the anonymous case, the same type with no component marker.
 
-Creation is only possible inside a `view!`. That is not a temporary restriction but the rule that keeps ownership sound: a handle's render future must be owned by the frame whose locals it borrows, and a frame's set is in scope exactly inside the macro's expansions. Plain Rust code cannot invoke a component today either; under this proposal it still cannot, and a helper that produces content is a component or returns data. The layout slot is the framework-made handle for the page, minted in the router's own frame, which is why `Slot` and the handle type are one design.
+Creation is only possible inside a `view!`. That is not a temporary restriction but the rule that keeps ownership sound: a handle's render future must be owned by the frame whose locals it borrows, and a frame's set is in scope exactly inside the macro's expansions. Plain Rust code cannot invoke a component today either; under this proposal it still cannot, and a helper that produces content is a component or returns data. A view in argument position is the unfused path's common case, not a corner: it compiles to `adopt` in the caller's frame, and the handle moves through the props to wherever the receiving component splices it. The layout slot is the framework-made handle for the page, minted in the router's own frame: the same `ViewHandle` any view argument is.
 
 One start rule holds everywhere: a handle is lazy exactly like a `Defer`. `adopt` registers the future parked; a `splice` or a consuming `live` construct signals start; a handle whose clones all drop unstarted never runs, and its tender resolves as a no-op. A component body's trailing `view!` needs no special case: the body evaluates to a handle and the generated epilogue consumes it, with the expansion above showing the fused, inlined form of the same semantics. Handles are cheap to clone: a clone is another reference to the same cell, each splice registers its own slot, and the render runs once no matter how many places show it. Only `live` consumption is exclusive: states are delivered by value to one construct, which is the sharing question below.
 
-Adapters compose on top, because handles are just `Reactive` values. `settled` lifts a handle, or a tuple of them, into a `Deferred`-shaped state that stays `Pending` until nothing beneath the handles is still loading, which the liveness machinery already tracks; that is the group-skeleton pattern in the guide.
+Adapters can compose on top, because handles are just `Reactive` values; a group-skeleton adapter that stays `Pending` until a whole subtree has finished loading is deliberately left for after the MVP.
 
-The trait is also the extension point. A signal read is a `Reactive` whose `changed` keeps yielding as the client changes the value, and retires when the connection closes. It needs no refinement of its own: `run_node` already races the shown arm's work against the next state, so a change cancels the replaced arm instead of waiting for it, for signals exactly as for a component handle's error transition.
+The trait is also the extension point. A signal read is a `Reactive` whose `next_state` keeps yielding as the client changes the value, and retires when the connection closes. It needs no refinement of its own: `run_node` already races the shown arm's work against the next state, so a change cancels the replaced arm instead of waiting for it, for signals exactly as for a component handle's error transition.
 
 ### Inside `#[component]`
 
@@ -705,13 +708,13 @@ fn render<'frame>(
     __fill: Fill,
 ) -> impl Future<Output = Result<()>> + Send + 'frame {
     async move {
-        // Collects this frame's live work: tenders, watchers, and
-        // nodes. `view!` expansions in the body register into it.
+        // Collects this frame's live work: tenders and nodes. `view!`
+        // expansions in the body register into it.
         let mut __refresh = RefreshSet::new();
 
-        // The body, unchanged. A `?` here returns before the fill; the
-        // tender posts the error to the cell, and it surfaces wherever
-        // the handle is consumed.
+        // The body, unchanged. A `?` here returns before the fill:
+        // fused, it surfaces at the consuming frame's barrier, and
+        // unfused, the tender posts it to the cell.
         let user = current_user(cx).await?;
         let __view = { /* the `view!` expansion above */ };
 
@@ -728,120 +731,135 @@ fn render<'frame>(
 }
 ```
 
-The view travels through the fill, not the return value; the future's output is the component's final status, read only by its tender. `'frame` is the invoking frame's lifetime: props may borrow the caller's locals, which live shorter than the request, so the signature is generic over the frame rather than over the request-scoped `'cx`, and the `cx` reference reborrows down to it. The future completes when nothing inside it can change anymore, so a page without `defer` completes on its first pass and streaming costs nothing.
+The view travels through the fill, not the return value; the future's output is the component's final status, read by the frame that polls it, or by the tender when unfused. `'frame` is the invoking frame's lifetime: props may borrow the caller's locals, which live shorter than the request, so the signature is generic over the frame rather than over the request-scoped `'cx`, and the `cx` reference reborrows down to it. The future completes when nothing inside it can change anymore, so a page without `defer` completes on its first pass and streaming costs nothing.
 
 ### The `RefreshSet`
 
-One set exists per frame that can own live work: a component body or one run of a `live` arm. The set is small: a `FuturesUnordered` of boxed, deliberately non-`'static` futures, plus ticket accounting for the barrier. It lives in `topcoat_view::internal` next to `reserve()`:
+One set exists per frame that can own live work: a component body or one run of a `live` arm. The set is small, and empty until the frame actually starts something, so a frame with no live work allocates nothing and its `barrier` and `run` reduce to a branch. It lives in `topcoat_view::internal` next to `reserve()`:
 
 ```rust
-/// Collects a frame's live work: tenders, watchers, and reactive nodes.
-///
-/// `'frame` is the owning frame's lifetime. Everything in here may
-/// borrow the frame's locals, which is legal because the set is itself
-/// one of them and never escapes.
+/// Collects a frame's live work. `'frame` is the owning frame's
+/// lifetime: everything in here may borrow the frame's locals, which is
+/// legal because the set is itself one of them and never escapes.
 pub struct RefreshSet<'frame> {
-    /// Boxed entries, polled FuturesUnordered style: only entries whose
-    /// waker fired get re-polled, so one completion does not re-poll
-    /// fifty pending siblings.
-    entries: FuturesUnordered<Pin<Box<dyn Future<Output = Result<()>> + Send + 'frame>>>,
-    /// One flag per ticket handed out. The barrier is down when every
-    /// flag is set.
-    tickets: Vec<Arc<AtomicBool>>,
+    /// Boxed entries: fused render futures, node futures, one driver
+    /// per loop, and tenders. Polled in order on every sweep; completed
+    /// entries are dropped.
+    entries: Vec<Pin<Box<dyn Future<Output = Result<()>> + Send + 'frame>>>,
+    /// This frame's index into the scope's ticket counters; the
+    /// barrier is down when the counter reads zero. The counter lives
+    /// on the scope because entries decrement it; see the machinery.
+    tickets: FrameId,
+    /// Cells spliced into this frame from elsewhere. The frame reports
+    /// their posted errors and stays live until they retire.
+    spliced: Vec<CellId>,
 }
 
 impl<'frame> RefreshSet<'frame> {
-    /// Creates a handle owned by this frame: boxes the render future
-    /// into a parked tender, pushes it, and returns the handle to its
-    /// cell.
-    pub fn adopt(
-        &mut self,
-        render: impl Future<Output = Result<()>> + Send + 'frame,
-    ) -> ViewHandle<'frame> { /* ... */ }
+    /// A fused component invocation: reserve the slot, write a cell
+    /// born started with that slot registered, push the render future
+    /// as a plain entry, and count a ticket. Returns the placeholder.
+    pub fn invoke<F>(&mut self, render: impl FnOnce(Fill) -> F) -> View
+    where
+        F: Future<Output = Result<()>> + Send + 'frame,
+    { /* ... */ }
 
-    /// Consumes a handle here, bubble mode: reserves a slot, registers
-    /// it with the cell, signals start, and pushes a watcher that hands
-    /// its ticket over when the first state arrives and yields any
-    /// later error into this frame. Returns the placeholder for the
-    /// burst.
+    /// The unfused split of `invoke`: park the boxed future behind an
+    /// unstarted cell, pushed as a tender.
+    pub fn adopt<F>(&mut self, render: impl FnOnce(Fill) -> F) -> ViewHandle<'frame>
+    where
+        F: Future<Output = Result<()>> + Send + 'frame,
+    { /* ... */ }
+
+    /// Consumes a handle here, bubble mode: reserve a slot, register it
+    /// with the cell, signal start, count a ticket, and remember the
+    /// cell in `spliced`. Returns the placeholder.
     pub fn splice(&mut self, handle: ViewHandle<'_>) -> View { /* ... */ }
 
-    /// Registers other live work: a reactive node's future.
-    pub fn push(&mut self, work: impl Future<Output = Result<()>> + Send + 'frame) {
-        self.entries.push(Box::pin(work));
-    }
+    /// Registers other live work: a node future or a loop driver.
+    pub fn push(&mut self, work: impl Future<Output = Result<()>> + Send + 'frame) { /* ... */ }
 
-    /// A first-paint flag for manually pushed work.
+    /// Counts a first-paint ticket for manually pushed work.
     pub fn ticket(&mut self) -> Ticket { /* ... */ }
 
-    /// Drives the set until every ticket is handed over. An `Err` from
-    /// any entry surfaces here first.
+    /// Drives the set until the ticket count is zero, reporting the
+    /// first error from an entry or a spliced cell.
     pub async fn barrier(&mut self) -> Result<()> { /* ... */ }
 
-    /// Drives the set to completion. Empty set: completes immediately,
-    /// which is the non-streaming fast path.
-    pub async fn run(mut self) -> Result<()> {
-        while let Some(done) = self.entries.next().await {
-            done?; // first error wins; dropping `self` cancels the rest
-        }
-        Ok(())
-    }
+    /// Drives the set until every entry is done and every spliced cell
+    /// has retired. Empty frame: completes immediately, which is the
+    /// non-streaming fast path.
+    pub async fn run(self) -> Result<()> { /* ... */ }
 }
 ```
+
+Polling is a sweep, not a waker dance. A frame's `barrier` and `run` poll their live entries in order, and nested frames are polled through their parent's entries. Any fill sets a progress flag on the render scope; the driver polls the whole render again while a pass set the flag, and suspends the task only when a pass made no progress, until an external completion wakes it. A fill in one frame is therefore observed by every frame that cares on the next sweep, with no stored wakers and no cross-frame signalling: the whole render is one task, and sweeping until quiescent is what makes that sufficient. If long-lived connections later make sets large and events frequent, a waker-gated queue is a drop-in replacement; the entry shape is identical.
 
 Three properties matter:
 
-- `run(self)` must consume the set. It is declared at the top of the frame but holds borrows of locals declared after it; the borrow checker only accepts that if the set is consumed before those locals drop, and the epilogue's `run()` is that consumption. Consuming also makes dropping a frame one cancellation: `FuturesUnordered` takes every entry with it, recursively through nested frames.
-- The allocation count stays comparable to today: one boxed tender per handle, one boxed node per reactive construct, and a small boxed watcher per splice. The `Vec<Arc<AtomicBool>>` could collapse into one shared counter; the flags are just easier to follow.
-- Fills need real wakers. A tender may live in one frame while the watcher awaiting its first state lives in another, the shared `feed`'s tender in the body and its watcher in an arm, so a fill can happen outside the poll sweep of the set that waits on it. The cell stores the wakers; there is no same-task shortcut that avoids them.
+- `run(self)` must consume the set. It is declared at the top of the frame but holds borrows of locals declared after it; the borrow checker only accepts that if the set is consumed before those locals drop, and the epilogue's `run()` is that consumption. Consuming also makes dropping a frame one cancellation: the entry `Vec` takes every future with it, recursively through nested frames.
+- Loops do not multiply entries. A `for` over components drives all its iteration futures from one entry holding one homogeneous `Vec`, today's exact allocation profile for loops.
+- The allocation count is honest: today's render allocates nothing per component, and this design adds one box per statement-level component and per reactive construct, one `Vec` per loop, and cells that are bytes in the scope's slab.
 
 ### The Handle Machinery
 
-A handle is three cooperating pieces around one shared cell:
+Handle state lives where the instruction buffer already lives: on the render scope. Today the buffer is owned by the root future, installed into a thread local for the duration of each poll, and reached as `&mut`; `ViewSlot::refill` already goes through that door. The scope grows a slab of cells and two flags, and every piece of the handle machinery becomes a `Copy` index into it:
 
 ```rust
-/// The state a handle's clones, its splice points, and its tender
-/// share. One per handle. The mutexes satisfy `Send`; the render is one
-/// task, so they are never contended.
-struct Cell {
-    /// Unstarted -> Running -> Delivered -> Retired. Errors, before or
-    /// after delivery, are posted here as states.
-    lifecycle: Mutex<Lifecycle>,
-    /// Slots to fill when the first state arrives, one per splice. A
+/// Owned by the root future, installed per poll, reached as `&mut`.
+/// Nothing is aliased across threads, so the render stays `Send` with
+/// no locks and no atomics.
+struct RenderScope {
+    buffer: ViewBuffer,
+    /// Set by `refill`; the driver sends a chunk when it is set.
+    dirty: bool,
+    /// Set by any fill; the sweep runs until a pass leaves it unset.
+    progress: bool,
+    /// One cell per handle, alive for the whole render.
+    cells: Slab<CellRecord>,
+    /// Outstanding first-paint tickets, one counter per frame.
+    tickets: Slab<usize>,
+}
+
+/// A handle's cell: its lifecycle, the slots splices registered, and
+/// the consumer count that feeds the lazy no-op rule.
+struct CellRecord {
+    /// Unstarted -> Started -> Delivered -> Completed; Failed can
+    /// follow any started state. The tender writes Completed when the
+    /// render future finishes, which is what retiring means.
+    lifecycle: Lifecycle,
+    /// Slots to fill at delivery; empty until spliced, usually one. A
     /// splice after delivery is served from the cached state instead.
-    slots: Mutex<Vec<ViewSlot>>,
-    /// Wakers of consumers waiting on a state change.
-    wakers: Mutex<Vec<Waker>>,
+    slots: Vec<ViewSlot>,
+    /// Live handle clones; at zero while still unstarted, the render
+    /// never runs.
+    consumers: usize,
 }
 
-/// The user-facing handle: a shared reference to the cell, carrying the
-/// creating frame's lifetime.
-pub struct ViewHandle<'frame> { cell: Arc<Cell>, /* ... */ }
-
-/// The entry `adopt` pushes into the creating frame's set: owns the
-/// boxed render future and drives the cell's lifecycle.
-struct Tender<'frame> {
-    render: Pin<Box<dyn Future<Output = Result<()>> + Send + 'frame>>,
-    cell: Arc<Cell>,
-}
-
-/// What the render future fills instead of returning its view.
-pub struct Fill { cell: Arc<Cell> }
+/// Indices into the scope. `CellId`, `FrameId`, and `Fill` are `Copy`;
+/// `ViewHandle` is `Clone` but deliberately not `Copy`: clone and drop
+/// adjust the cell's consumer count through the scope.
+pub struct CellId(u32);
+pub struct FrameId(u32);
+pub struct ViewHandle<'frame> { cell: CellId, /* lifetime marker */ }
+pub struct Fill { cell: CellId }
 ```
 
-Polling a tender walks the lifecycle. Unstarted with a live handle or a registered consumer: park; the cell wakes the tender when a consumer signals start. Unstarted with neither left: resolve, and the render never ran, which is the lazy rule. Started: poll the render future; its `Fill` posts the first state, filling every registered slot and handing the watchers' tickets over. A render future that returns `Err`, before or after the fill, does not fail the tender: the tender posts the error to the cell as a state, and it surfaces at the consumption sites. And a tender whose output has become unreachable, no live handle and no spliced slot in a reachable block, resolves and drops the render future, which cancels its whole subtree.
+A fused invocation writes a cell born `Started` with its one slot registered and pushes the render future itself; nothing else exists for it. An unfused `adopt` writes an `Unstarted` cell and pushes a tender: a thin wrapper that owns the boxed render future, reports `Pending` while the cell is unstarted, resolves as a no-op if every handle clone drops first, and once started polls the future to completion, posting a returned `Err` to the cell instead of failing itself, so errors surface at the consumption sites and the tender's own result is always `Ok`. When the future finishes, the tender writes the terminal `Completed` state: that is what a spliced cell retiring means for `run`, and what makes a consumed handle's `next_state` return `None`.
 
-The tender's own result is therefore always `Ok`; errors travel through cells exclusively. The cell's cached state does not count as a reference for the unreachable check, or nothing would ever cancel.
+`Fill::fill` runs inside some entry's poll: it caches the first state in the cell, fills every registered slot, credits the waiting tickets, and sets the progress flag.
+
+Tickets go through the same door. A `Ticket` is the frame's `FrameId` plus a done flag; `hand_over` decrements the frame's counter through the scope and is idempotent, since the arms closure runs it on every arm run. The counter cannot live on the `RefreshSet` itself: the code that decrements it runs inside entries the set owns, and safe Rust does not let an entry hold a mutable path into its owner.
+
+Cells are records, not owners: a cell never holds a future, so there is no reference cycle to leak, and dropping the creating frame drops the tender and the render future with it, which is what cancellation means below.
 
 ### Liveness and Cancellation
 
-Cancellation has two mechanisms and one rule: work stops when its output can no longer reach the page.
+Cancellation is frame drop, and only frame drop, in the first cut. Whatever a frame started lives in that frame's set, so when `run_node` replaces a shown arm, dropping the arm frame cancels the replaced subtree, entries, nested frames, and their tenders included, in one drop; the request deadline is the same drop applied at the root. This covers the guide's promise for replaced regions, because a replaced region is exactly an arm frame.
 
-The structural mechanism is frame drop. Whatever a frame started lives in that frame's set, so when `run_node` replaces a shown arm, dropping the arm frame cancels the replaced subtree, watchers, nodes, and nested frames included, in one drop. The request deadline is the same drop applied at the root.
+What frame drop does not cover is eagerness for shared handles. A handle created in an outer frame and spliced only into a since-replaced arm keeps rendering until its owning frame's `run` ends, at worst until the response completes. The work is wasted but never wrong: its slots live in orphaned blocks, the document no longer contains them, and no chunk carries them. The shared `feed` from the guide needs nothing more than this: it belongs to the body's frame, so an arm swap neither cancels nor restarts it, and a handle held in a variable keeps its render alive until the variable drops at the end of the frame, which is ordinary Rust drop timing.
 
-The reference-counting mechanism covers handles, whose render may outlive any one consumer. `View` handles and blocks stay ref-counted: splicing is a reference, and so is holding a `ViewHandle`. A tender resolves, dropping the render future, when neither remains. Counts fall at `refill`: replacing a slot's block releases its references recursively, so a handle spliced only inside a skeleton loses its last reference the moment the ready arm lands, and its tender retires. The shared `feed` from the guide survives the same swap because the local and the newly shown arm still reference it; only the replaced arm's watcher died. Reachable means alive, with no marking pass and no special cases.
-
-Two consequences follow. A handle held in a variable keeps its render alive even while no arm shows it, until the variable drops at the end of the frame; that is ordinary Rust drop timing, and the shared `feed` relies on it. And a block at count zero is known garbage, which gives buffer compaction a place to start.
+Reference-counting views and blocks would make orphan cancellation eager and give buffer compaction a starting point. It is left out of the first cut deliberately, and the open questions keep the door open.
 
 ### The Driver
 
@@ -873,9 +891,9 @@ Change signaling is not the `RefreshSet`'s job. `ViewSlot::refill` marks the sha
 
 ### Error Transitions
 
-Every error travels through a cell. On a first render, a `?` before the fill makes the render future return `Err`; the tender posts it as the handle's `Err` state, the splice's watcher yields it into the consuming frame, and that frame's barrier propagates it, the same climb as today's call chain. After the first paint, a failure in a refresh phase, `orders?` when a ready arm runs, reaches the component's own future through the arm frame's `run` and the body's `run`, and posts the same way, as an error transition on the component's cell. Watchers pass it along, so a component that invoked the failing child as a plain call forwards the error without any of its code re-running.
+An error surfaces in the frame that consumed the failing content. For a fused invocation the render future is an entry of that frame, so a `?` before the fill is the entry's `Err`, seen directly by the frame's `barrier`, exactly today's `try_join!` semantics; after the first paint the same route runs through the arm frame's `run` and the body's `run`, so the error climbs the frame tree the way it climbs the call chain today. For an unfused handle the tender posts the error to the cell, and every consuming frame reports it from its `barrier` or `run` through its spliced list. Either way, a component that invoked the failing child as a plain call forwards the error without any of its code re-running.
 
-Catching is a reactive event. A `live match` owns its handle instead of splicing it, so the `Err` state arrives at the node, the arms re-run with `Err`, and the swap replaces the region while the dropped arm frame cancels its remaining work. A layout's slot is such a handle, so layouts catch with the same construct and no special machinery. If nothing catches, the framework's error view swaps in as a whole-page update.
+Catching is a reactive event. A `live match` owns its handle instead of splicing it, so the `Err` arrives at the node as a state, the arms re-run with `Err`, and the swap replaces the region while the dropped arm frame cancels its remaining work. A layout's slot is such a handle, so layouts catch with the same construct and no special machinery. If nothing catches, the framework's error view swaps in as a whole-page update.
 
 ## Requirements on Application Code
 
@@ -887,13 +905,13 @@ Boundary diffing adds a softer expectation: renders should be deterministic, bec
 
 **Reactive syntax.** `live` is working syntax, not final. As a contextual modifier keyword it follows Rust's own pattern (`async`, `unsafe`, `const`, and `gen` blocks), with C#'s `await foreach` and JavaScript's `for await` as cross-language precedent; runner-up spellings are a `#[live]` attribute and a Maud-style sigil such as `@match`. Also to settle: which constructs can be `live` (`match` and `if let` first); whether a reactive expression in node position, for a deferred fragment of text, is worth having; the name and final shape of the `Reactive` trait; and whether a `Defer` should also be consumable by reference, so one load can render in more than one place.
 
-**Generated-code plumbing.** The sketches settle the shape; the generated code needs prototyping. The borrow checker must accept the set-before-locals pattern in real bodies and arm frames, the arms closure needs a workable `async` closure signature, `run_node`'s race needs a careful poll implementation, and `Component::render` changes from return-once to fill-then-continue. In a `view!` outside a `#[component]`/`#[page]`/`#[layout]` transform, reactive constructs should be a compile error, and component invocations should keep completion semantics: the macro expands a self-contained frame and drives it to completion, which is the blocking mode above.
+**Generated-code plumbing.** The sketches settle the shape; the generated code needs prototyping. The borrow checker must accept the set-before-locals pattern in real bodies and arm frames, the arms closure needs a workable `async` closure signature, `run_node`'s race needs a careful poll implementation, the loop emission path must batch iteration futures into one entry as today's `try_join_all` path does, and `Component::render` changes from return-once to fill-then-continue. In a `view!` outside a `#[component]`/`#[page]`/`#[layout]` transform, reactive constructs should be a compile error, and component invocations should keep completion semantics: the macro expands a self-contained frame and drives it to completion, which is the blocking mode above.
 
-**Reference counting details.** Liveness and cancellation rest on ref-counted views and blocks. To settle: the cost of the release walk at `refill`; how the tender's reachability check is fed, a count on the cell against a walk at `refill`; whether the pathological cycle, two slots filled with views that reference each other's placeholders, needs a runtime check or just a documented rule; and whether a handle still held in a variable after its content left the page needs tooling, since the variable keeps the producer alive and running until it drops.
+**Cancellation eagerness.** The first cut cancels by frame drop alone: a render started from an outer frame whose only splice was since replaced keeps running until its owning frame ends, wasted but never sent. Whether real workloads produce enough of this waste to justify layering reference-counted views and blocks back on top, with their release-walk cost and cycle questions, is deferred until the live render serves long-lived updates.
 
-**Component handles.** Still to settle around the handle: the `settled` adapter's subtree observation, fed by the reference counts; the rethrow arm in a catching `live match`, since view matches stay exhaustive; the layout slot's move from `Result` to the handle type, including what happens to layouts written against today's signature; and names for the adapter set, `settled` and any joins, which are working syntax throughout.
+**Component handles.** A group-skeleton adapter over handles (`settled` in earlier drafts) is punted past the MVP, along with its open questions. The rethrow arm needed no design of its own: an arm's `?` fails the construct and the failure climbs to the next catcher, so the catch-all arm `other => (other?)` mirrors today's plain match and view matches stay exhaustive.
 
-**The `view!` expression type.** A `view!` expression evaluating to a handle instead of today's `Result<View>` changes what a binding like `let feed = view! { ... };` means: the `?` disappears and errors travel through the handle. To settle: the handle type's name and the exact split between it, the cell, and the tender, all provisional; whether the watcher per splice can fold into the slot registration; and whether two `live` constructs may consume clones of the same handle, the sharing question from the reactive contract.
+**The `view!` expression type.** A `view!` expression evaluating to a handle instead of today's `Result<View>` changes what a binding like `let feed = view! { ... };` means: the `?` disappears and errors travel through the handle. To settle: the names and exact split between the handle, the cell, and the tender, all provisional; the slab index hygiene, a generation bit against stale `CellId`s or debug assertions; and whether two `live` constructs may consume clones of the same handle, the sharing question from the reactive contract.
 
 **Batching.** Completions that arrive in one poll pass already coalesce into one chunk. Whether to add a short window that also coalesces near-simultaneous completions across wakes is undecided.
 
@@ -919,7 +937,7 @@ Shards exist because sometimes the markup itself needs the server: fresh search 
 
 The refetch model absorbs this. The server can track which signals a page reads during a render. When one of them changes in the browser, the client refetches the page itself, sending the current signal values up in a header. The server prefills the signal reads with the client's state and re-renders the page, which is just an ordinary render of ordinary code. The boundary diff then does what it always does: regions whose output did not depend on the changed signal hash identically and stay untouched, and only the regions that genuinely changed travel back.
 
-The live render adds a second route to the same destination. A signal read inside `view!` is just another implementation of the reactive contract: one whose `changed` keeps yielding as the client updates the value. Over a connection that keeps the render alive, a signal change would re-run only the arms that read it, with no refetch at all. Whether refetch or a live connection fits better, and where shards end up, are later discussions; both ride the same boundary diff and the same reactive nodes.
+The live render adds a second route to the same destination. A signal read inside `view!` is just another implementation of the reactive contract: one whose `next_state` keeps yielding as the client updates the value. Over a connection that keeps the render alive, a signal change would re-run only the arms that read it, with no refetch at all. Whether refetch or a live connection fits better, and where shards end up, are later discussions; both ride the same boundary diff and the same reactive nodes.
 
 ### One Model for Everything
 
