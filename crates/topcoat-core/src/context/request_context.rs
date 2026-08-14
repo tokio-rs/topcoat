@@ -133,9 +133,8 @@ impl RequestContext {
     /// Returns the registered value of type `T` together with the id of the
     /// binding holding it, or `None` if no such value has been registered.
     ///
-    /// Resolving both in one lookup keeps a tracked read, which needs the id to
-    /// record what it observed and the value to hand back, from hashing `T`
-    /// twice.
+    /// A tracked read needs both: the id to record what it observed, and the
+    /// value to hand back. Resolving them together keeps that to one lookup.
     pub(crate) fn lookup<T>(&self) -> Option<(BindingId, &T)>
     where
         T: Any + Send + Sync,
