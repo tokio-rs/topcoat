@@ -89,8 +89,6 @@ impl ContextTracker {
     }
 
     /// Returns the reads recorded so far.
-    // TODO: unused only until the memoize integration lands; remove with it.
-    #[allow(dead_code)]
     pub(crate) fn reads(&self) -> Vec<ContextRead> {
         self.reads
             .lock()

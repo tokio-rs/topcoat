@@ -66,6 +66,12 @@ impl Cx {
         self.shared.id
     }
 
+    /// Returns the request context visible to this handle's scope.
+    #[inline]
+    pub(crate) fn request_context(&self) -> &RequestContext {
+        &self.request_context
+    }
+
     /// Returns a child handle whose request context also holds `value`.
     ///
     /// The child inherits every other request context value and shares the
@@ -115,8 +121,6 @@ impl Cx {
     /// tracker's entry scope. A tracker inherited from an enclosing `track`
     /// call is replaced, not stacked: reads made through the child and its
     /// descendants are recorded by the new tracker only.
-    // TODO: unused only until the memoize integration lands; remove with it.
-    #[allow(dead_code)]
     pub(crate) fn track(&self) -> (Cx, Arc<ContextTracker>) {
         let tracker = Arc::new(ContextTracker::new(Arc::clone(&self.request_context)));
         let child = Cx {
