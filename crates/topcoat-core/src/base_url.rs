@@ -84,6 +84,30 @@ impl BaseUrl {
         format!("{}/{}", self.url, path.trim_start_matches('/'))
     }
 
+    /// The path prefix of an application mounted under one, or the empty
+    /// string for an application mounted at the host root.
+    ///
+    /// The prefix starts with a slash and never ends with one, matching the
+    /// normalization [`new`](BaseUrl::new) applies.
+    ///
+    /// ```
+    /// use topcoat::context::BaseUrl;
+    ///
+    /// assert_eq!(BaseUrl::new("https://example.com/app")?.prefix(), "/app");
+    /// assert_eq!(BaseUrl::new("https://example.com")?.prefix(), "");
+    /// # Ok::<(), topcoat::context::BaseUrlError>(())
+    /// ```
+    #[must_use]
+    pub fn prefix(&self) -> &str {
+        // The base is normalized to `scheme://authority[/prefix]`, so the
+        // prefix begins at the first slash after the `://`.
+        let authority = self.url.find("://").map_or(0, |index| index + 3);
+        match self.url[authority..].find('/') {
+            Some(index) => &self.url[authority + index..],
+            None => "",
+        }
+    }
+
     /// The base URL as a string, without a trailing slash.
     #[must_use]
     pub fn as_str(&self) -> &str {
@@ -264,6 +288,18 @@ mod tests {
             "https://example.com/app/assets/logo.png"
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn prefix_is_the_mounted_path() -> Result<(), BaseUrlError> {
+        assert_eq!(BaseUrl::new("https://example.com")?.prefix(), "");
+        assert_eq!(BaseUrl::new("https://example.com/")?.prefix(), "");
+        assert_eq!(BaseUrl::new("https://example.com/app")?.prefix(), "/app");
+        assert_eq!(
+            BaseUrl::new("http://localhost:3000/a/b/")?.prefix(),
+            "/a/b"
+        );
         Ok(())
     }
 
