@@ -72,6 +72,13 @@ impl Cx {
         &self.request_context
     }
 
+    /// Returns the tracker recording this handle's request context reads, if
+    /// one is installed.
+    #[inline]
+    pub(crate) fn tracker(&self) -> Option<&ContextTracker> {
+        self.tracker.as_deref()
+    }
+
     /// Returns a child handle whose request context also holds `value`.
     ///
     /// The child inherits every other request context value and shares the

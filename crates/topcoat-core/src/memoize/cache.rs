@@ -8,7 +8,6 @@ use std::{
 
 use elsa::sync::{FrozenMap, FrozenVec};
 use siphasher::sip128::{Hasher128, SipHasher13};
-use tokio::sync::OnceCell;
 
 use super::recursion;
 use crate::context::{ContextRead, Cx, RequestContext};
@@ -26,18 +25,55 @@ struct Variant<V> {
 }
 
 impl<V> Variant<V> {
+    /// Returns whether the scope `context` still resolves every recorded
+    /// read to the binding that was observed.
     fn matches(&self, context: &RequestContext) -> bool {
         self.reads.iter().all(|read| read.matches(context))
     }
+
+    /// Hands out the cached value, replaying the variant's reads into the
+    /// tracker of an enclosing tracked call so that nested memoized calls
+    /// propagate their dependencies.
+    fn reuse(&self, cx: &Cx) -> &V {
+        if let Some(outer) = cx.tracker() {
+            outer.merge(&self.reads);
+        }
+        &self.value
+    }
 }
 
-/// The cell behind one synchronous `(function, arguments)` entry: the
-/// variants computed so far, one per set of context bindings the body was
-/// observed under.
-struct SyncMemoizeCell<V> {
+/// The variants computed for one `(function, arguments)` entry, one per set
+/// of context bindings the body was observed under.
+struct Variants<V> {
     /// Variants are boxed so their addresses stay stable while the list
     /// grows, letting the cell hand out `&V` references tied to the cache.
-    variants: FrozenVec<Box<Variant<V>>>,
+    entries: FrozenVec<Box<Variant<V>>>,
+}
+
+impl<V> Variants<V> {
+    /// Returns the first variant reusable from the scope `context`.
+    fn find(&self, context: &RequestContext) -> Option<&Variant<V>> {
+        self.entries.iter().find(|variant| variant.matches(context))
+    }
+
+    /// Stores a computed value and the reads observed while computing it.
+    fn insert(&self, value: V, reads: Vec<ContextRead>) -> &Variant<V> {
+        self.entries.push_get(Box::new(Variant { value, reads }))
+    }
+}
+
+// Not derived: the derive would needlessly bound `V: Default`.
+impl<V> Default for Variants<V> {
+    fn default() -> Self {
+        Self {
+            entries: FrozenVec::new(),
+        }
+    }
+}
+
+/// The cell behind one synchronous `(function, arguments)` entry.
+struct SyncMemoizeCell<V> {
+    variants: Variants<V>,
     /// Serializes misses so concurrent callers with the same scope run the
     /// body once. The gate guards no data, so a poisoned lock (a panicked
     /// body) is safe to keep using.
@@ -45,39 +81,36 @@ struct SyncMemoizeCell<V> {
     recursion: recursion::Guard,
 }
 
-impl<V> SyncMemoizeCell<V> {
-    /// Returns the first variant reusable from the scope `context`.
-    fn find(&self, context: &RequestContext) -> Option<&V> {
-        self.variants
-            .iter()
-            .find(|variant| variant.matches(context))
-            .map(|variant| &variant.value)
-    }
-}
-
 // Not derived: the derive would needlessly bound `V: Default`.
 impl<V> Default for SyncMemoizeCell<V> {
     fn default() -> Self {
         Self {
-            variants: FrozenVec::new(),
+            variants: Variants::default(),
             gate: Mutex::new(()),
             recursion: recursion::Guard::default(),
         }
     }
 }
 
-/// A cached value and the guard detecting recursive initialization of it.
-///
-/// Backs the async path only.
-///
-/// TODO: the async path does not yet track request context reads, so an async
-/// memoized function that reads a value shadowed via `Cx::with` shares its
-/// entry across scopes and can observe a result computed under different
-/// bindings.
-#[derive(Default)]
-struct MemoizeCell<T> {
-    value: T,
+/// The cell behind one asynchronous `(function, arguments)` entry.
+struct AsyncMemoizeCell<V> {
+    variants: Variants<V>,
+    /// Serializes misses so concurrent callers with the same scope share one
+    /// in-flight computation. Async so waiting callers do not block the
+    /// executor.
+    gate: tokio::sync::Mutex<()>,
     recursion: recursion::Guard,
+}
+
+// Not derived: the derive would needlessly bound `V: Default`.
+impl<V> Default for AsyncMemoizeCell<V> {
+    fn default() -> Self {
+        Self {
+            variants: Variants::default(),
+            gate: tokio::sync::Mutex::new(()),
+            recursion: recursion::Guard::default(),
+        }
+    }
 }
 
 /// The per-request store backing `#[memoize]`.
@@ -92,9 +125,9 @@ struct MemoizeCell<T> {
 /// values its `Eq` distinguishes would make those values share an entry. Derived and standard
 /// library impls distinguish everything they compare.
 ///
-/// Request context is not part of the hash. A synchronous entry instead holds one [`Variant`]
-/// per set of context bindings its body was observed under, validated against the caller's
-/// scope on every lookup.
+/// Request context is not part of the hash. An entry instead holds one [`Variant`] per set
+/// of context bindings its body was observed under, validated against the caller's scope on
+/// every lookup.
 #[derive(Default)]
 #[doc(hidden)]
 pub struct MemoizeCache {
@@ -150,9 +183,8 @@ impl MemoizeCache {
     /// by callers whose scope still resolves every read the body made to the binding it
     /// observed; a caller whose scope disagrees (a value shadowed or added via `Cx::with`)
     /// computes its own variant. Bindings the body registers itself are not dependencies.
-    ///
-    /// TODO: reads made by nested memoized calls are not yet propagated to the enclosing
-    /// tracker, so an enclosing variant can under-report its dependencies.
+    /// A reused or freshly computed variant replays its reads into an enclosing tracked
+    /// call, so nested memoized calls propagate their dependencies outward.
     pub fn memoize<'a, K, P, V, F>(&'a self, cx: &'a Cx, key: K, params: P, f: F) -> &'a V
     where
         K: Hash,
@@ -160,22 +192,18 @@ impl MemoizeCache {
         F: (for<'cx> FnOnce(&'cx Cx, P) -> V) + 'static,
     {
         let cell = self.get_or_insert_cell::<F, _, SyncMemoizeCell<V>>(&key);
-        if let Some(value) = cell.find(cx.request_context()) {
-            return value;
+        if let Some(variant) = cell.variants.find(cx.request_context()) {
+            return variant.reuse(cx);
         }
         // Asserted before taking the gate so reentry panics instead of deadlocking on it.
         cell.recursion.assert_not_recursive::<F>();
         let _gate = cell.gate.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(value) = cell.find(cx.request_context()) {
-            return value;
+        if let Some(variant) = cell.variants.find(cx.request_context()) {
+            return variant.reuse(cx);
         }
         let (child, tracker) = cx.track();
         let value = cell.recursion.scope(|| f(&child, params));
-        let variant = cell.variants.push_get(Box::new(Variant {
-            value,
-            reads: tracker.reads(),
-        }));
-        &variant.value
+        cell.variants.insert(value, tracker.reads()).reuse(cx)
     }
 
     /// Returns the already-computed value for `(F, key)` that is valid for `cx`'s scope, or
@@ -206,12 +234,14 @@ impl MemoizeCache {
             .get(&Self::hash::<F, K>(&key))?
             .downcast_ref()
             .expect("memoized value type does not match the marker's return type");
-        cell.find(cx.request_context())
+        cell.variants
+            .find(cx.request_context())
+            .map(|variant| variant.reuse(cx))
     }
 
     /// Async counterpart to [`memoize`](Self::memoize). Concurrent callers with the same key
-    /// share a single in-flight future via `tokio::sync::OnceCell`.
-    pub async fn memoize_async<'a, K, P, V, F, Fut>(
+    /// and scope share a single in-flight computation via the cell's gate.
+    pub async fn memoize_async<'a, K, P, V, F>(
         &'a self,
         cx: &'a Cx,
         key: K,
@@ -221,22 +251,24 @@ impl MemoizeCache {
     where
         K: Hash,
         V: Send + Sync + 'static,
-        F: (FnOnce(&'a Cx, P) -> Fut) + 'static,
-        Fut: Future<Output = V>,
+        F: AsyncFnOnce(&Cx, P) -> V + 'static,
     {
-        let cell = self.get_or_insert_cell::<F, _, MemoizeCell<OnceCell<V>>>(&key);
-        if let Some(value) = cell.value.get() {
-            return value;
+        let cell = self.get_or_insert_cell::<F, _, AsyncMemoizeCell<V>>(&key);
+        if let Some(variant) = cell.variants.find(cx.request_context()) {
+            return variant.reuse(cx);
         }
+        // Asserted before taking the gate so reentry panics instead of deadlocking on it.
         cell.recursion.assert_not_recursive::<F>();
-        cell.value
-            .get_or_init(|| async {
-                let mut future = std::pin::pin!(cell.recursion.scope(|| f(cx, params)));
-                // Clear ownership after every poll so sibling futures can wait on this cell and
-                // the initializer can move between executor threads.
-                poll_fn(|task| cell.recursion.scope(|| future.as_mut().poll(task))).await
-            })
-            .await
+        let _gate = cell.gate.lock().await;
+        if let Some(variant) = cell.variants.find(cx.request_context()) {
+            return variant.reuse(cx);
+        }
+        let (child, tracker) = cx.track();
+        let mut future = std::pin::pin!(cell.recursion.scope(|| f(&child, params)));
+        // Clear ownership after every poll so sibling futures can wait on this cell and
+        // the initializer can move between executor threads.
+        let value = poll_fn(|task| cell.recursion.scope(|| future.as_mut().poll(task))).await;
+        cell.variants.insert(value, tracker.reads()).reuse(cx)
     }
 }
 
@@ -497,6 +529,68 @@ mod tests {
     }
 
     #[test]
+    fn sync_nested_miss_propagates_reads() {
+        let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
+        let n_outer = counter();
+        let n_inner = counter();
+        let inner = move |cx: &Cx, (): ()| {
+            n_inner.fetch_add(1, Ordering::SeqCst);
+            request_context::<Setting>(cx).0
+        };
+        let outer = move |cx: &Cx, (): ()| {
+            n_outer.fetch_add(1, Ordering::SeqCst);
+            *cache.memoize(cx, (), (), inner) * 10
+        };
+
+        let cx = Cx::default().with(Setting(1));
+        assert_eq!(*cache.memoize(&cx, (), (), outer), 10);
+        // The outer body never reads `Setting` itself, but depends on it
+        // through the nested call, so shadowing must recompute both.
+        assert_eq!(*cache.memoize(&cx.with(Setting(2)), (), (), outer), 20);
+        assert_eq!(n_outer.load(Ordering::SeqCst), 2);
+        assert_eq!(n_inner.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn sync_nested_hit_propagates_reads() {
+        let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
+        let n_outer = counter();
+        let inner = move |cx: &Cx, (): ()| request_context::<Setting>(cx).0;
+        let outer = move |cx: &Cx, (): ()| {
+            n_outer.fetch_add(1, Ordering::SeqCst);
+            *cache.memoize(cx, (), (), inner) * 10
+        };
+
+        let cx = Cx::default().with(Setting(1));
+        // Compute the inner value up front, so the outer body's nested call
+        // is a cache hit whose stored reads must still be replayed.
+        cache.memoize(&cx, (), (), inner);
+        assert_eq!(*cache.memoize(&cx, (), (), outer), 10);
+        assert_eq!(*cache.memoize(&cx.with(Setting(2)), (), (), outer), 20);
+        assert_eq!(n_outer.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn sync_nested_internal_scope_is_not_a_dependency() {
+        let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
+        let n_outer = counter();
+        let inner = move |cx: &Cx, (): ()| request_context::<Setting>(cx).0;
+        let outer = move |cx: &Cx, (): ()| {
+            n_outer.fetch_add(1, Ordering::SeqCst);
+            let scoped = cx.with(Setting(7));
+            *cache.memoize(&scoped, (), (), inner)
+        };
+
+        let cx = Cx::default();
+        assert_eq!(*cache.memoize(&cx, (), (), outer), 7);
+        // The nested call depends on `Setting`, but through a binding the
+        // outer body created itself, so callers shadowing the type still
+        // reuse the outer variant.
+        assert_eq!(*cache.memoize(&cx.with(Setting(9)), (), (), outer), 7);
+        assert_eq!(n_outer.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
     fn sync_internal_binding_is_not_a_dependency() {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
@@ -550,6 +644,48 @@ mod tests {
         cache.memoize_async(&cx, (&1i32, &2i32), (1, 2), f).await;
 
         assert_eq!(n.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn async_shadowed_read_computes_a_new_variant() {
+        let cache = MemoizeCache::new();
+        let cx = Cx::default().with(Setting(1));
+        let n = counter();
+        let f = async move |cx: &Cx, (): ()| {
+            n.fetch_add(1, Ordering::SeqCst);
+            tokio::task::yield_now().await;
+            request_context::<Setting>(cx).0
+        };
+
+        let shadowed = cx.with(Setting(2));
+        assert_eq!(*cache.memoize_async(&cx, (), (), f).await, 1);
+        assert_eq!(*cache.memoize_async(&shadowed, (), (), f).await, 2);
+        assert_eq!(*cache.memoize_async(&cx, (), (), f).await, 1);
+        assert_eq!(n.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn async_nested_hit_propagates_reads() {
+        let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
+        let n_outer = counter();
+        let inner = async move |cx: &Cx, (): ()| request_context::<Setting>(cx).0;
+        let outer = async move |cx: &Cx, (): ()| {
+            n_outer.fetch_add(1, Ordering::SeqCst);
+            *cache.memoize_async(cx, (), (), inner).await * 10
+        };
+
+        let cx = Cx::default().with(Setting(1));
+        // Compute the inner value up front, so the outer body's nested call
+        // is a cache hit whose stored reads must still be replayed.
+        cache.memoize_async(&cx, (), (), inner).await;
+        assert_eq!(*cache.memoize_async(&cx, (), (), outer).await, 10);
+        assert_eq!(
+            *cache
+                .memoize_async(&cx.with(Setting(2)), (), (), outer)
+                .await,
+            20
+        );
+        assert_eq!(n_outer.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]

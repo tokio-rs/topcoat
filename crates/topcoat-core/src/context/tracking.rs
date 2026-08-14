@@ -76,15 +76,23 @@ impl ContextTracker {
     where
         T: Any,
     {
-        let read = ContextRead::observe::<T>(context);
-        if !read.matches(&self.entry) {
-            // The context value has been shadowed since tracking started,
-            // so we do not need to track this particular read.
-            return;
-        }
-        let mut reads = self.reads.lock().expect("context tracker lock poisoned");
-        if !reads.contains(&read) {
-            reads.push(read);
+        self.merge(&[ContextRead::observe::<T>(context)]);
+    }
+
+    /// Records every read in `reads` that passes the entry filter, skipping
+    /// reads already recorded.
+    ///
+    /// Replaying a nested tracked call's reads through this re-expresses them
+    /// relative to this tracker's own entry scope: a read whose value was
+    /// shadowed after tracking started resolves through a binding the tracked
+    /// call created itself, so it is not a dependency and is dropped, even
+    /// where it was a genuine dependency of the nested call.
+    pub(crate) fn merge(&self, reads: &[ContextRead]) {
+        let mut own = self.reads.lock().expect("context tracker lock poisoned");
+        for read in reads {
+            if read.matches(&self.entry) && !own.contains(read) {
+                own.push(*read);
+            }
         }
     }
 
@@ -282,6 +290,19 @@ mod tests {
         .expect("tracked thread panicked");
 
         assert_eq!(tracker.reads(), [expected::<Session>(&cx)]);
+    }
+
+    #[test]
+    fn merge_applies_the_entry_filter_and_deduplicates() {
+        let cx = Cx::default().with(Session);
+        let (child, tracker) = cx.track();
+        let scoped = child.with(Theme);
+        let inherited = expected::<Session>(&cx);
+        let internal = expected::<Theme>(&scoped);
+
+        tracker.merge(&[inherited, internal, inherited]);
+
+        assert_eq!(tracker.reads(), [inherited]);
     }
 
     #[test]
