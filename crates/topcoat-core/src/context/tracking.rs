@@ -23,15 +23,14 @@ pub(crate) struct ContextRead {
 }
 
 impl ContextRead {
-    /// Records what `context` currently resolves `T` to.
-    pub(crate) fn observe<T>(context: &RequestContext) -> Self
+    /// Records that `T` resolved to `binding_id`, or to nothing at all.
+    pub(crate) fn new<T>(binding_id: Option<BindingId>) -> Self
     where
         T: Any,
     {
-        let type_id = TypeId::of::<T>();
         Self {
-            type_id,
-            binding_id: context.binding_id(type_id),
+            type_id: TypeId::of::<T>(),
+            binding_id,
         }
     }
 
@@ -69,14 +68,10 @@ impl ContextTracker {
         }
     }
 
-    /// Records that `T` was read through a handle whose scope is `context`,
-    /// unless the read resolved through a binding the tracked call created
-    /// itself.
-    pub(crate) fn record<T>(&self, context: &RequestContext)
-    where
-        T: Any,
-    {
-        self.merge(&[ContextRead::observe::<T>(context)]);
+    /// Records `read`, unless it resolved through a binding the tracked call
+    /// created itself.
+    pub(crate) fn record(&self, read: ContextRead) {
+        self.merge(&[read]);
     }
 
     /// Records every read in `reads` that passes the entry filter, skipping
@@ -88,6 +83,11 @@ impl ContextTracker {
     /// call created itself, so it is not a dependency and is dropped, even
     /// where it was a genuine dependency of the nested call.
     pub(crate) fn merge(&self, reads: &[ContextRead]) {
+        // A body that read no request context has nothing to contribute, and is
+        // common enough to be worth keeping off the lock.
+        if reads.is_empty() {
+            return;
+        }
         let mut own = self.reads.lock().expect("context tracker lock poisoned");
         for read in reads {
             if read.matches(&self.entry) && !own.contains(read) {
@@ -96,12 +96,13 @@ impl ContextTracker {
         }
     }
 
-    /// Returns the reads recorded so far.
-    pub(crate) fn reads(&self) -> Vec<ContextRead> {
-        self.reads
-            .lock()
-            .expect("context tracker lock poisoned")
-            .clone()
+    /// Returns the reads recorded so far, leaving the tracker empty.
+    ///
+    /// Called once, when the tracked call is done and its reads are handed to
+    /// the variant they belong to, so the recorded reads are moved out rather
+    /// than copied.
+    pub(crate) fn take_reads(&self) -> Vec<ContextRead> {
+        std::mem::take(&mut *self.reads.lock().expect("context tracker lock poisoned"))
     }
 }
 
@@ -113,10 +114,15 @@ mod tests {
     struct Session;
     struct Theme;
 
+    /// Records what `context` currently resolves `T` to.
+    fn observe<T: Any>(context: &RequestContext) -> ContextRead {
+        ContextRead::new::<T>(context.binding_id(TypeId::of::<T>()))
+    }
+
     /// Observes what `cx`'s scope currently resolves `T` to, for building
     /// expected reads.
     fn expected<T: Any>(cx: &Cx) -> ContextRead {
-        ContextRead::observe::<T>(&cx.request_context)
+        observe::<T>(&cx.request_context)
     }
 
     #[test]
@@ -124,7 +130,7 @@ mod tests {
         let mut context = RequestContext::new();
         context.insert(Session);
 
-        let read = ContextRead::observe::<Session>(&context);
+        let read = observe::<Session>(&context);
         assert!(read.matches(&context));
     }
 
@@ -132,7 +138,7 @@ mod tests {
     fn shadowing_invalidates_a_present_read() {
         let mut context = RequestContext::new();
         context.insert(Session);
-        let read = ContextRead::observe::<Session>(&context);
+        let read = observe::<Session>(&context);
 
         let mut shadowed = context.clone();
         shadowed.insert(Session);
@@ -144,14 +150,14 @@ mod tests {
     #[test]
     fn an_absence_read_matches_while_the_type_is_absent() {
         let context = RequestContext::new();
-        let read = ContextRead::observe::<Session>(&context);
+        let read = observe::<Session>(&context);
         assert!(read.matches(&context));
     }
 
     #[test]
     fn registering_the_type_invalidates_an_absence_read() {
         let context = RequestContext::new();
-        let read = ContextRead::observe::<Session>(&context);
+        let read = observe::<Session>(&context);
 
         let mut extended = context.clone();
         extended.insert(Session);
@@ -164,7 +170,7 @@ mod tests {
     fn an_unrelated_binding_leaves_a_read_valid() {
         let mut context = RequestContext::new();
         context.insert(Session);
-        let read = ContextRead::observe::<Session>(&context);
+        let read = observe::<Session>(&context);
 
         let mut extended = context.clone();
         extended.insert(Theme);
@@ -176,7 +182,7 @@ mod tests {
     fn a_cloned_context_keeps_reads_valid() {
         let mut context = RequestContext::new();
         context.insert(Session);
-        let read = ContextRead::observe::<Session>(&context);
+        let read = observe::<Session>(&context);
 
         assert!(read.matches(&context.clone()));
     }
@@ -188,7 +194,7 @@ mod tests {
 
         let _: &Session = request_context(&child);
 
-        assert_eq!(tracker.reads(), [expected::<Session>(&cx)]);
+        assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
 
     #[test]
@@ -197,7 +203,7 @@ mod tests {
         let (child, tracker) = cx.track();
 
         assert!(try_request_context::<Session>(&child).is_none());
-        assert_eq!(tracker.reads(), [expected::<Session>(&cx)]);
+        assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
 
     #[test]
@@ -208,7 +214,7 @@ mod tests {
         let _ = try_request_context::<Session>(&child);
         let _ = try_request_context::<Session>(&child);
 
-        assert_eq!(tracker.reads(), [expected::<Session>(&cx)]);
+        assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
 
     #[test]
@@ -220,7 +226,7 @@ mod tests {
         let _ = try_request_context::<Theme>(&child);
 
         assert_eq!(
-            tracker.reads(),
+            tracker.take_reads(),
             [expected::<Session>(&cx), expected::<Theme>(&cx)]
         );
     }
@@ -233,7 +239,7 @@ mod tests {
 
         let _ = try_request_context::<Session>(&derived);
 
-        assert_eq!(tracker.reads(), [expected::<Session>(&cx)]);
+        assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
 
     #[test]
@@ -244,7 +250,7 @@ mod tests {
 
         let _ = try_request_context::<Theme>(&derived);
 
-        assert_eq!(tracker.reads(), []);
+        assert_eq!(tracker.take_reads(), []);
     }
 
     #[test]
@@ -255,7 +261,7 @@ mod tests {
 
         let _ = try_request_context::<Session>(&derived);
 
-        assert_eq!(tracker.reads(), []);
+        assert_eq!(tracker.take_reads(), []);
     }
 
     #[test]
@@ -265,7 +271,7 @@ mod tests {
 
         let _ = try_request_context::<Session>(&cx);
 
-        assert_eq!(tracker.reads(), []);
+        assert_eq!(tracker.take_reads(), []);
     }
 
     #[test]
@@ -275,7 +281,7 @@ mod tests {
 
         let _ = try_request_context::<Session>(&child.clone());
 
-        assert_eq!(tracker.reads(), [expected::<Session>(&cx)]);
+        assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
 
     #[test]
@@ -289,7 +295,7 @@ mod tests {
         .join()
         .expect("tracked thread panicked");
 
-        assert_eq!(tracker.reads(), [expected::<Session>(&cx)]);
+        assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
 
     #[test]
@@ -302,7 +308,7 @@ mod tests {
 
         tracker.merge(&[inherited, internal, inherited]);
 
-        assert_eq!(tracker.reads(), [inherited]);
+        assert_eq!(tracker.take_reads(), [inherited]);
     }
 
     #[test]
@@ -313,7 +319,7 @@ mod tests {
 
         let _ = try_request_context::<Session>(&nested);
 
-        assert_eq!(outer.reads(), []);
-        assert_eq!(inner.reads(), [expected::<Session>(&cx)]);
+        assert_eq!(outer.take_reads(), []);
+        assert_eq!(inner.take_reads(), [expected::<Session>(&cx)]);
     }
 }

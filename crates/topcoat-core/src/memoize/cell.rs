@@ -1,7 +1,7 @@
 use std::{
     future::{Future, poll_fn},
     pin::pin,
-    sync::{Mutex, PoisonError},
+    sync::{Mutex, OnceLock, PoisonError},
 };
 
 use elsa::sync::FrozenVec;
@@ -42,15 +42,23 @@ impl<V> Variant<V> {
 /// The variants computed for one `(function, arguments)` entry, one per set
 /// of context bindings the body was observed under.
 struct Variants<V> {
-    /// Variants are boxed so their addresses stay stable while the list
-    /// grows, letting the cell hand out `&V` references tied to the cache.
-    entries: FrozenVec<Box<Variant<V>>>,
+    /// The first variant is held inline. An entry rarely gets a second one, so
+    /// the lookup that matters reads it through an atomic load, without taking
+    /// the lock the list below needs or boxing the variant.
+    first: OnceLock<Variant<V>>,
+    /// Further variants are boxed so their addresses stay stable while the
+    /// list grows, letting the cell hand out `&V` references tied to the cache.
+    rest: FrozenVec<Box<Variant<V>>>,
 }
 
 impl<V> Variants<V> {
     /// Returns the value of the first variant reusable from `cx`'s scope.
     fn reuse(&self, cx: &Cx) -> Option<&V> {
-        self.entries
+        let first = self.first.get()?;
+        if first.matches(cx.request_context()) {
+            return Some(first.reuse(cx));
+        }
+        self.rest
             .iter()
             .find(|variant| variant.matches(cx.request_context()))
             .map(|variant| variant.reuse(cx))
@@ -59,9 +67,12 @@ impl<V> Variants<V> {
     /// Stores a computed value together with the reads observed while
     /// computing it, handing the value back out.
     fn insert(&self, cx: &Cx, value: V, reads: Vec<ContextRead>) -> &V {
-        self.entries
-            .push_get(Box::new(Variant { value, reads }))
-            .reuse(cx)
+        let variant = Variant { value, reads };
+        let stored = match self.first.set(variant) {
+            Ok(()) => self.first.get().expect("the first variant was just set"),
+            Err(variant) => self.rest.push_get(Box::new(variant)),
+        };
+        stored.reuse(cx)
     }
 }
 
@@ -69,7 +80,8 @@ impl<V> Variants<V> {
 impl<V> Default for Variants<V> {
     fn default() -> Self {
         Self {
-            entries: FrozenVec::new(),
+            first: OnceLock::new(),
+            rest: FrozenVec::new(),
         }
     }
 }
@@ -111,7 +123,7 @@ impl<V> SyncMemoizeCell<V> {
         }
         let (child, tracker) = cx.track();
         let value = self.recursion.scope(|| initialize(&child));
-        self.variants.insert(cx, value, tracker.reads())
+        self.variants.insert(cx, value, tracker.take_reads())
     }
 }
 
@@ -161,7 +173,7 @@ impl<V> AsyncMemoizeCell<V> {
         // Clear ownership after every poll so sibling futures can wait on this cell and
         // the initializer can move between executor threads.
         let value = poll_fn(|task| self.recursion.scope(|| future.as_mut().poll(task))).await;
-        self.variants.insert(cx, value, tracker.reads())
+        self.variants.insert(cx, value, tracker.take_reads())
     }
 }
 

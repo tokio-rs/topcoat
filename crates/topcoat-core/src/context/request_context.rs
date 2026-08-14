@@ -9,7 +9,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::context::{BindingId, Cx};
+use crate::context::{BindingId, ContextRead, Cx};
 
 /// Returns a reference to the request context value of type `T` registered on
 /// the current request's [`Cx`], or `None` if no such value has been registered.
@@ -35,10 +35,11 @@ pub fn try_request_context<T>(cx: &Cx) -> Option<&T>
 where
     T: Any + Send + Sync,
 {
+    let binding = cx.request_context.lookup::<T>();
     if let Some(tracker) = &cx.tracker {
-        tracker.record::<T>(&cx.request_context);
+        tracker.record(ContextRead::new::<T>(binding.map(|(id, _)| id)));
     }
-    cx.request_context.get::<T>()
+    binding.map(|(_, value)| value)
 }
 
 /// Returns a reference to the request context value of type `T` registered on
@@ -126,7 +127,21 @@ impl RequestContext {
     where
         T: Any + Send + Sync,
     {
-        self.entries.get(&TypeId::of::<T>())?.value.downcast_ref()
+        Some(self.lookup::<T>()?.1)
+    }
+
+    /// Returns the registered value of type `T` together with the id of the
+    /// binding holding it, or `None` if no such value has been registered.
+    ///
+    /// Resolving both in one lookup keeps a tracked read, which needs the id to
+    /// record what it observed and the value to hand back, from hashing `T`
+    /// twice.
+    pub(crate) fn lookup<T>(&self) -> Option<(BindingId, &T)>
+    where
+        T: Any + Send + Sync,
+    {
+        let binding = self.entries.get(&TypeId::of::<T>())?;
+        Some((binding.id, binding.value.downcast_ref()?))
     }
 
     /// Returns the id of the binding currently registered for `type_id`, or
