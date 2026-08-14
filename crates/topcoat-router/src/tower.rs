@@ -18,7 +18,7 @@ use tower::ServiceExt;
 
 use crate::{
     Body, BoxError, IntoPath, Layer, LayerFuture, Methods, Next, OwnedMethods, Path, Route,
-    RouteFuture,
+    RouteFuture, RouteId,
     request::{Request, parts},
     response::Response,
 };
@@ -65,6 +65,8 @@ use crate::{
 ///     .build();
 /// ```
 pub struct TowerRoute<S> {
+    /// The identity of this route's handler.
+    id: RouteId,
     /// The HTTP methods this route responds to.
     methods: OwnedMethods,
     /// The URL path this route handles.
@@ -89,6 +91,7 @@ impl<S> TowerRoute<S> {
     #[track_caller]
     pub fn new(methods: impl Into<OwnedMethods>, path: impl IntoPath, service: S) -> Self {
         Self {
+            id: RouteId::new(),
             methods: methods.into(),
             path: path.into_path(),
             service,
@@ -104,6 +107,10 @@ where
     ResBody: http_body::Body<Data = Bytes> + Send + 'static,
     ResBody::Error: Into<BoxError>,
 {
+    fn id(&self) -> RouteId {
+        self.id
+    }
+
     fn methods(&self) -> Methods<'_> {
         self.methods.as_methods()
     }

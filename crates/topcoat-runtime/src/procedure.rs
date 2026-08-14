@@ -4,7 +4,8 @@ use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
-    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouterBuilder, response::Response,
+    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId, RouterBuilder,
+    response::Response,
 };
 
 use crate::Surrogated;
@@ -108,6 +109,7 @@ inventory::collect!(ErasedProcedure);
 /// A [`Route`] that handles calls to one server procedure.
 #[derive(Debug, Clone)]
 pub struct ProcedureRoute {
+    id: RouteId,
     path: PathBuf,
     procedure: ErasedProcedure,
 }
@@ -117,6 +119,7 @@ impl ProcedureRoute {
     pub fn new(procedure: impl Into<ErasedProcedure>) -> Self {
         let procedure = procedure.into();
         Self {
+            id: RouteId::new(),
             path: Path::new(&format!(
                 "{PROCEDURE_ROUTE_PREFIX}/{}",
                 procedure.id().as_str()
@@ -128,6 +131,10 @@ impl ProcedureRoute {
 }
 
 impl Route for ProcedureRoute {
+    fn id(&self) -> RouteId {
+        self.id
+    }
+
     fn methods(&self) -> Methods<'_> {
         Methods::Only(&[Method::POST])
     }

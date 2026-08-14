@@ -20,8 +20,8 @@ impl RouterBuilderMailExt for RouterBuilder {
 mod tests {
     use topcoat_core::{context::Cx, error::Result};
     use topcoat_router::{
-        Body, Method, Methods, Path, Route, RouteFuture, Router, request::Request,
-        response::Response,
+        Body, Method, Methods, Path, Route, RouteFuture, RouteId, RouteIdCell, Router,
+        request::Request, response::Response,
     };
 
     use crate::{Mail, MailConfig, Mailbox, MemoryTransport, RouterBuilderMailExt, send};
@@ -29,6 +29,11 @@ mod tests {
     struct SendMail;
 
     impl Route for SendMail {
+        fn id(&self) -> RouteId {
+            static ID: RouteIdCell = RouteIdCell::new();
+            ID.get()
+        }
+
         fn methods(&self) -> Methods<'_> {
             Methods::Only(&[Method::GET])
         }

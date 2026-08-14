@@ -376,7 +376,7 @@ impl RouterBuilder {
             pages,
             layouts,
             layers,
-            context,
+            mut context,
             origin_policy,
             #[cfg(feature = "compression")]
             compression,

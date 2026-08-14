@@ -4,7 +4,8 @@ use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::View;
 
 use crate::{
-    Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, response::IntoResponse,
+    Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId, RouteIdCell,
+    response::IntoResponse,
 };
 
 /// The async render function backing a [`PageFn`].
@@ -25,6 +26,8 @@ pub type PageRenderFn = for<'cx> fn(
 /// (`#[page(POST "/path")]`) or through [`PageFn::new`].
 #[derive(Debug, Clone)]
 pub struct PageFn {
+    /// The identity of this page's handler.
+    id: RouteIdCell,
     /// The HTTP methods this page responds to.
     methods: OwnedMethods,
     /// The URL path this page handles.
@@ -59,10 +62,17 @@ impl PageFn {
         render: PageRenderFn,
     ) -> Self {
         Self {
+            id: RouteIdCell::new(),
             methods,
             path,
             render,
         }
+    }
+
+    /// Returns the identity of this page's handler.
+    #[must_use]
+    pub fn id(&self) -> RouteId {
+        self.id.get()
     }
 
     /// Returns the HTTP methods this page responds to.
@@ -157,6 +167,10 @@ impl PageWithLayouts {
 }
 
 impl Route for PageWithLayouts {
+    fn id(&self) -> RouteId {
+        self.page.id()
+    }
+
     fn methods(&self) -> Methods<'_> {
         self.page.methods()
     }

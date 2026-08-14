@@ -5,7 +5,8 @@ use topcoat_core::{
     error::{Error, Result},
 };
 use topcoat_router::{
-    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouterBuilder, response::IntoResponse,
+    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId, RouterBuilder,
+    response::IntoResponse,
 };
 use topcoat_view::View;
 
@@ -66,6 +67,7 @@ impl ErasedShard {
 inventory::collect!(ErasedShard);
 
 pub struct ShardRoute {
+    id: RouteId,
     path: PathBuf,
     shard: ErasedShard,
 }
@@ -75,6 +77,7 @@ impl ShardRoute {
     pub fn new(shard: impl Into<ErasedShard>) -> Self {
         let shard = shard.into();
         Self {
+            id: RouteId::new(),
             path: Path::new(&format!("{SHARD_ROUTE_PREFIX}/{}", shard.id().as_str())).to_owned(),
             shard,
         }
@@ -82,6 +85,10 @@ impl ShardRoute {
 }
 
 impl Route for ShardRoute {
+    fn id(&self) -> RouteId {
+        self.id
+    }
+
     fn methods(&self) -> Methods<'_> {
         // Avoids URL length limits for large parameters.
         Methods::Only(&[Method::POST])

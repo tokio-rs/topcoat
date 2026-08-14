@@ -59,13 +59,20 @@ mod tests {
 
     use http::{Method, Request, header};
     use topcoat_core::{context::Cx, error::Result};
-    use topcoat_router::{Body, Methods, Path, Route, RouteFuture, Router, response::Response};
+    use topcoat_router::{
+        Body, Methods, Path, Route, RouteFuture, RouteId, RouteIdCell, Router, response::Response,
+    };
 
     use crate::{Cookies, RouterBuilderCookieExt, cookies};
 
     struct AddCookie;
 
     impl Route for AddCookie {
+        fn id(&self) -> RouteId {
+            static ID: RouteIdCell = RouteIdCell::new();
+            ID.get()
+        }
+
         fn methods(&self) -> Methods<'_> {
             Methods::Only(&[Method::GET])
         }
@@ -107,6 +114,11 @@ mod tests {
     struct Detach(Arc<Mutex<Option<Cx>>>);
 
     impl Route for Detach {
+        fn id(&self) -> RouteId {
+            static ID: RouteIdCell = RouteIdCell::new();
+            ID.get()
+        }
+
         fn methods(&self) -> Methods<'_> {
             Methods::Only(&[Method::GET])
         }
