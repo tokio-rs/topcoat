@@ -12,6 +12,8 @@ When several layers wrap a handler, they nest from least specific (outermost) to
 
 The function is `async` and takes [`cx: &mut Cx`](../context/struct.Cx.html), the request [`body: Body`](struct.Body.html), and a [`next: Next<'_>`](struct.Next.html), returning `Result<T>` where `T` implements [`IntoResponse`](trait.IntoResponse.html). Call [`next.run(cx, body)`](struct.Next.html#method.run) to invoke the inner layers and ultimately the handler. Returning without calling `next.run` short-circuits the request: the layer's return value becomes the response.
 
+A layer can mutate the request root before and after `next.run`. It can create a scoped context for work it performs itself, but `next.run` requires the mutable root context.
+
 # Examples
 
 Explicit path:

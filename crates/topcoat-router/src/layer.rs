@@ -222,7 +222,7 @@ mod tests {
     };
 
     use http::StatusCode;
-    use topcoat_core::context::{ContextMap, Cx, app_context};
+    use topcoat_core::context::{ContextMap, Cx, app_context, request_context};
 
     use super::*;
     use crate::{
@@ -263,6 +263,9 @@ mod tests {
     /// test can observe the order the chain executes in.
     type Trace = Mutex<Vec<&'static str>>;
 
+    #[derive(Debug, PartialEq)]
+    struct LayerState(&'static str);
+
     fn cx_with_trace(trace: Arc<Trace>) -> Cx {
         let mut app = ContextMap::new();
         app.insert(trace);
@@ -270,9 +273,12 @@ mod tests {
     }
 
     fn record_a<'a>(cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        cx.insert(LayerState("before"));
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("a");
-            next.run(cx, body).await
+            let response = next.run(cx, body).await?;
+            *cx.get_mut::<LayerState>().unwrap() = LayerState("after");
+            Ok(response)
         })
     }
 
@@ -294,6 +300,7 @@ mod tests {
 
     fn record_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
+            assert_eq!(request_context::<LayerState>(cx), &LayerState("before"));
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("route");
             "route".into_response(cx)
         })
@@ -443,6 +450,7 @@ mod tests {
 
         // The layers run in `indices` order, then the terminal route.
         assert_eq!(*trace.lock().unwrap(), vec!["a", "b", "route"]);
+        assert_eq!(request_context::<LayerState>(&cx), &LayerState("after"));
     }
 
     #[test]

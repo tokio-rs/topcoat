@@ -1,4 +1,4 @@
-The `#[memoize]` attribute caches the result of a function for the duration of a single request, keyed by its arguments. Call the same function twice with the same arguments inside one request and the body runs only once: the second call returns the cached value.
+The `#[memoize]` attribute caches the result of a function for one request, keyed by its arguments and the request-context bindings it reads. Call the same function twice with the same arguments and visible bindings and the second call returns the cached value.
 
 This is the per-request equivalent of memoization in libraries like React's `cache`: it's not a global cache and it's not persisted across requests. Each new request starts with an empty cache.
 
@@ -46,7 +46,9 @@ async fn fetch_post(cx: &Cx, slug: &str) -> Post {
 }
 ```
 
-For async functions, concurrent callers with the same arguments share a single in-flight future. If two parts of your page render in parallel and both call `fetch_post(cx, "hello")`, the database is queried once and both callers await the same result.
+For async functions, concurrent callers with the same arguments and matching context dependencies share one computation. If two parts of your page render in parallel and both call `fetch_post(cx, "hello")` through the same context, the database is queried once.
+
+Cache misses for one function and argument key run one at a time, even when callers use different scoped bindings. Calls with different argument keys or to different memoized functions can run concurrently. Cancelling or panicking during a computation stores no value and lets another caller retry.
 
 # Recursion
 
@@ -104,6 +106,39 @@ add(cx, 1, 3); // prints "computing", returns 4 (different args)
 ```
 
 Each `#[memoize]` function has its own independent cache slot, so two functions with the same argument types don't collide.
+
+# Request context dependencies
+
+Every `request_context` or `try_request_context` lookup becomes a dependency. A result is reused only while each lookup resolves to the same binding. A missing lookup matches any scope in the request where that type remains missing, including scopes created before the lookup.
+
+Dependency tracking does not propagate into separately spawned threads or tasks. When spawned work affects the result, read request context before spawning and pass the value into that work.
+
+```rust
+# use topcoat::context::{Cx, memoize, request_context};
+#[derive(Clone, Copy)]
+struct DocsVersion(u8);
+
+#[memoize]
+fn version_label(cx: &Cx) -> String {
+    format!("v{}", request_context::<DocsVersion>(cx).0)
+}
+
+# fn example(cx: &Cx) {
+let stable = cx.with(DocsVersion(1));
+let next = cx.with(DocsVersion(2));
+
+assert_eq!(version_label(&stable), "v1");
+assert_eq!(version_label(&next), "v2");
+# }
+```
+
+Bindings are compared by identity, not value. Sibling scopes that each contain `DocsVersion(1)` compute separate variants, while a child that adds an unrelated type can reuse its parent's variant. Completed variants remain cached for the request.
+
+Calling `Cx::insert` or successfully calling `Cx::get_mut` gives that root type a fresh binding identity. This lazily invalidates only cached results that read the old identity. A failed `get_mut` changes nothing, and replacing a value with an equal value still creates a new identity.
+
+Nested memoized functions propagate dependencies into active callers on misses and hits. Bindings created inside an outer function are not outer dependencies because they were not visible from its input `Cx`. Missing lookups propagate when the type was also missing from that input.
+
+App-context reads are not dependencies because app context does not change during a request. Mutation through a `Mutex`, atomic, or another interior-mutability API is also not visible to memoization. When such state affects a result, update a root value through `get_mut` before immutable rendering begins, or pass a fresh scoped binding.
 
 # Borrowing Option and Result contents
 
