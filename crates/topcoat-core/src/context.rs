@@ -1,12 +1,16 @@
 mod app_context;
 mod id;
 mod request_context;
+mod tracking;
 
 use std::{any::Any, sync::Arc};
 
 pub use app_context::*;
 pub use id::*;
 pub use request_context::*;
+// TODO: unused only until the memoize integration lands; remove with it.
+#[allow(unused_imports)]
+pub(crate) use tracking::*;
 
 pub use crate::memoize::MemoizeAsRef;
 use crate::{abort::AbortStore, memoize::MemoizeCache};

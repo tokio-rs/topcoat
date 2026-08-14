@@ -125,6 +125,15 @@ impl RequestContext {
     {
         self.entries.get(&TypeId::of::<T>())?.value.downcast_ref()
     }
+
+    /// Returns the id of the binding currently registered for `type_id`, or
+    /// `None` if the type is not registered.
+    ///
+    /// Unlike [`get`](Self::get), this works from a runtime [`TypeId`], so a
+    /// recorded read can be revalidated without naming its type.
+    pub(crate) fn binding_id(&self, type_id: TypeId) -> Option<BindingId> {
+        Some(self.entries.get(&type_id)?.id)
+    }
 }
 
 /// Values that [`Cx::with_many`](crate::context::Cx::with_many) registers on a
@@ -213,7 +222,9 @@ mod tests {
 
     /// Returns the id of the binding currently registered for `T`.
     fn binding_id<T: Any>(context: &RequestContext) -> BindingId {
-        context.entries[&TypeId::of::<T>()].id
+        context
+            .binding_id(TypeId::of::<T>())
+            .expect("binding is registered")
     }
 
     #[test]
