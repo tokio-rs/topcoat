@@ -35,6 +35,9 @@ pub fn try_request_context<T>(cx: &Cx) -> Option<&T>
 where
     T: Any + Send + Sync,
 {
+    if let Some(tracker) = &cx.tracker {
+        tracker.record::<T>(&cx.request_context);
+    }
     cx.request_context.get::<T>()
 }
 

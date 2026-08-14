@@ -8,8 +8,6 @@ use std::{any::Any, sync::Arc};
 pub use app_context::*;
 pub use id::*;
 pub use request_context::*;
-// TODO: unused only until the memoize integration lands; remove with it.
-#[allow(unused_imports)]
 pub(crate) use tracking::*;
 
 pub use crate::memoize::MemoizeAsRef;
@@ -35,6 +33,8 @@ pub struct Cx {
     shared: Arc<RequestShared>,
     /// The request context visible to this handle's scope.
     request_context: Arc<RequestContext>,
+    /// The tracker recording this handle's request context reads, if any.
+    tracker: Option<Arc<ContextTracker>>,
 }
 
 impl Cx {
@@ -55,6 +55,7 @@ impl Cx {
                 abort_store: AbortStore::new(),
             }),
             request_context: Arc::new(request_context),
+            tracker: None,
         }
     }
 
@@ -103,7 +104,27 @@ impl Cx {
         Cx {
             shared: Arc::clone(&self.shared),
             request_context: Arc::new(request_context),
+            tracker: self.tracker.clone(),
         }
+    }
+
+    /// Returns a child handle whose request context reads are recorded, along
+    /// with the tracker collecting them.
+    ///
+    /// The child shares this handle's scope, and that scope is also the
+    /// tracker's entry scope. A tracker inherited from an enclosing `track`
+    /// call is replaced, not stacked: reads made through the child and its
+    /// descendants are recorded by the new tracker only.
+    // TODO: unused only until the memoize integration lands; remove with it.
+    #[allow(dead_code)]
+    pub(crate) fn track(&self) -> (Cx, Arc<ContextTracker>) {
+        let tracker = Arc::new(ContextTracker::new(Arc::clone(&self.request_context)));
+        let child = Cx {
+            shared: Arc::clone(&self.shared),
+            request_context: Arc::clone(&self.request_context),
+            tracker: Some(Arc::clone(&tracker)),
+        };
+        (child, tracker)
     }
 }
 
