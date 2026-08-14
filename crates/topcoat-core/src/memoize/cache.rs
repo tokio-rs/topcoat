@@ -1,117 +1,15 @@
 use std::{
     any::{Any, TypeId},
     collections::hash_map::RandomState,
-    future::{Future, poll_fn},
     hash::{BuildHasher, Hash},
-    sync::{Mutex, OnceLock, PoisonError},
+    sync::OnceLock,
 };
 
-use elsa::sync::{FrozenMap, FrozenVec};
+use elsa::sync::FrozenMap;
 use siphasher::sip128::{Hasher128, SipHasher13};
 
-use super::recursion;
-use crate::context::{ContextRead, Cx, RequestContext};
-
-/// One cached result together with the request context reads that produced
-/// it.
-///
-/// A variant is reusable for a caller whose scope still resolves every
-/// recorded read to the binding that was observed. A body that read no
-/// request context has an empty read list, so its variant is reusable from
-/// every scope.
-struct Variant<V> {
-    value: V,
-    reads: Vec<ContextRead>,
-}
-
-impl<V> Variant<V> {
-    /// Returns whether the scope `context` still resolves every recorded
-    /// read to the binding that was observed.
-    fn matches(&self, context: &RequestContext) -> bool {
-        self.reads.iter().all(|read| read.matches(context))
-    }
-
-    /// Hands out the cached value, replaying the variant's reads into the
-    /// tracker of an enclosing tracked call so that nested memoized calls
-    /// propagate their dependencies.
-    fn reuse(&self, cx: &Cx) -> &V {
-        if let Some(outer) = cx.tracker() {
-            outer.merge(&self.reads);
-        }
-        &self.value
-    }
-}
-
-/// The variants computed for one `(function, arguments)` entry, one per set
-/// of context bindings the body was observed under.
-struct Variants<V> {
-    /// Variants are boxed so their addresses stay stable while the list
-    /// grows, letting the cell hand out `&V` references tied to the cache.
-    entries: FrozenVec<Box<Variant<V>>>,
-}
-
-impl<V> Variants<V> {
-    /// Returns the first variant reusable from the scope `context`.
-    fn find(&self, context: &RequestContext) -> Option<&Variant<V>> {
-        self.entries.iter().find(|variant| variant.matches(context))
-    }
-
-    /// Stores a computed value and the reads observed while computing it.
-    fn insert(&self, value: V, reads: Vec<ContextRead>) -> &Variant<V> {
-        self.entries.push_get(Box::new(Variant { value, reads }))
-    }
-}
-
-// Not derived: the derive would needlessly bound `V: Default`.
-impl<V> Default for Variants<V> {
-    fn default() -> Self {
-        Self {
-            entries: FrozenVec::new(),
-        }
-    }
-}
-
-/// The cell behind one synchronous `(function, arguments)` entry.
-struct SyncMemoizeCell<V> {
-    variants: Variants<V>,
-    /// Serializes misses so concurrent callers with the same scope run the
-    /// body once. The gate guards no data, so a poisoned lock (a panicked
-    /// body) is safe to keep using.
-    gate: Mutex<()>,
-    recursion: recursion::Guard,
-}
-
-// Not derived: the derive would needlessly bound `V: Default`.
-impl<V> Default for SyncMemoizeCell<V> {
-    fn default() -> Self {
-        Self {
-            variants: Variants::default(),
-            gate: Mutex::new(()),
-            recursion: recursion::Guard::default(),
-        }
-    }
-}
-
-/// The cell behind one asynchronous `(function, arguments)` entry.
-struct AsyncMemoizeCell<V> {
-    variants: Variants<V>,
-    /// Serializes misses so concurrent callers with the same scope share one
-    /// in-flight computation. Async so waiting callers do not block the
-    /// executor.
-    gate: tokio::sync::Mutex<()>,
-    recursion: recursion::Guard,
-}
-
-// Not derived: the derive would needlessly bound `V: Default`.
-impl<V> Default for AsyncMemoizeCell<V> {
-    fn default() -> Self {
-        Self {
-            variants: Variants::default(),
-            gate: tokio::sync::Mutex::new(()),
-            recursion: recursion::Guard::default(),
-        }
-    }
-}
+use super::cell::{AsyncMemoizeCell, SyncMemoizeCell};
+use crate::context::Cx;
 
 /// The per-request store backing `#[memoize]`.
 ///
@@ -125,8 +23,8 @@ impl<V> Default for AsyncMemoizeCell<V> {
 /// values its `Eq` distinguishes would make those values share an entry. Derived and standard
 /// library impls distinguish everything they compare.
 ///
-/// Request context is not part of the hash. An entry instead holds one [`Variant`] per set
-/// of context bindings its body was observed under, validated against the caller's scope on
+/// Request context is not part of the hash. An entry instead holds one variant per set of
+/// context bindings its body was observed under, validated against the caller's scope on
 /// every lookup.
 #[derive(Default)]
 #[doc(hidden)]
@@ -191,19 +89,8 @@ impl MemoizeCache {
         V: Send + Sync + 'static,
         F: (for<'cx> FnOnce(&'cx Cx, P) -> V) + 'static,
     {
-        let cell = self.get_or_insert_cell::<F, _, SyncMemoizeCell<V>>(&key);
-        if let Some(variant) = cell.variants.find(cx.request_context()) {
-            return variant.reuse(cx);
-        }
-        // Asserted before taking the gate so reentry panics instead of deadlocking on it.
-        cell.recursion.assert_not_recursive::<F>();
-        let _gate = cell.gate.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(variant) = cell.variants.find(cx.request_context()) {
-            return variant.reuse(cx);
-        }
-        let (child, tracker) = cx.track();
-        let value = cell.recursion.scope(|| f(&child, params));
-        cell.variants.insert(value, tracker.reads()).reuse(cx)
+        self.get_or_insert_cell::<F, _, SyncMemoizeCell<V>>(&key)
+            .get_or_init::<F, _>(cx, |cx| f(cx, params))
     }
 
     /// Returns the already-computed value for `(F, key)` that is valid for `cx`'s scope, or
@@ -234,9 +121,7 @@ impl MemoizeCache {
             .get(&Self::hash::<F, K>(&key))?
             .downcast_ref()
             .expect("memoized value type does not match the marker's return type");
-        cell.variants
-            .find(cx.request_context())
-            .map(|variant| variant.reuse(cx))
+        cell.reuse(cx)
     }
 
     /// Async counterpart to [`memoize`](Self::memoize). Concurrent callers with the same key
@@ -253,22 +138,9 @@ impl MemoizeCache {
         V: Send + Sync + 'static,
         F: AsyncFnOnce(&Cx, P) -> V + 'static,
     {
-        let cell = self.get_or_insert_cell::<F, _, AsyncMemoizeCell<V>>(&key);
-        if let Some(variant) = cell.variants.find(cx.request_context()) {
-            return variant.reuse(cx);
-        }
-        // Asserted before taking the gate so reentry panics instead of deadlocking on it.
-        cell.recursion.assert_not_recursive::<F>();
-        let _gate = cell.gate.lock().await;
-        if let Some(variant) = cell.variants.find(cx.request_context()) {
-            return variant.reuse(cx);
-        }
-        let (child, tracker) = cx.track();
-        let mut future = std::pin::pin!(cell.recursion.scope(|| f(&child, params)));
-        // Clear ownership after every poll so sibling futures can wait on this cell and
-        // the initializer can move between executor threads.
-        let value = poll_fn(|task| cell.recursion.scope(|| future.as_mut().poll(task))).await;
-        cell.variants.insert(value, tracker.reads()).reuse(cx)
+        self.get_or_insert_cell::<F, _, AsyncMemoizeCell<V>>(&key)
+            .get_or_init::<F, _>(cx, async |cx| f(cx, params).await)
+            .await
     }
 }
 
@@ -292,7 +164,10 @@ fn sip_keys() -> (u64, u64) {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::{
+        future::{Future, poll_fn},
+        sync::atomic::{AtomicUsize, Ordering},
+    };
 
     use super::*;
     use crate::context::{request_context, try_request_context};
