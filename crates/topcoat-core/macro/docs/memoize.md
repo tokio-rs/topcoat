@@ -46,7 +46,7 @@ async fn fetch_post(cx: &Cx, slug: &str) -> Post {
 }
 ```
 
-For async functions, concurrent callers with the same arguments share a single in-flight future. If two parts of your page render in parallel and both call `fetch_post(cx, "hello")`, the database is queried once and both callers await the same result.
+For async functions, concurrent callers that resolve to the same cache entry share a single in-flight future. If two parts of your page render in parallel and both call `fetch_post(cx, "hello")`, the database is queried once and both callers await the same result.
 
 # Recursion
 
@@ -104,6 +104,73 @@ add(cx, 1, 3); // prints "computing", returns 4 (different args)
 ```
 
 Each `#[memoize]` function has its own independent cache slot, so two functions with the same argument types don't collide.
+
+The arguments are not the only thing that decides whether a call is a hit; the request context the body reads matters too, see [request context dependencies](#request-context-dependencies) below.
+
+# Request context dependencies
+
+Request context is not part of the cache key, but it still decides who may reuse a cached value. `#[memoize]` records every request context value the body reads while it runs, and hands a cached result only to callers whose scope resolves those reads to the same values.
+
+This matters because `Cx::with` derives a child scope holding additional values, so the same function can see a different value depending on the `cx` it is called with:
+
+```rust
+# fn main() {}
+use topcoat::context::{Cx, memoize, request_context};
+
+struct Locale(&'static str);
+
+#[memoize]
+fn greeting(cx: &Cx) -> String {
+    format!("hello in {}", request_context::<Locale>(cx).0)
+}
+
+# fn example(cx: &Cx) {
+greeting(cx); // computes, reading the Locale registered for the request
+
+let scoped = cx.with(Locale("de"));
+greeting(&scoped); // a different Locale, so the body runs again
+# }
+```
+
+The first call ran under the request's own `Locale`, so the call through `scoped` cannot reuse its result and computes its own. Both results stay cached, and a later call through either scope hits the one computed for it. Without this a scoped value would leak out of its scope, or worse, the first caller would decide what every later caller sees.
+
+Only the values the body actually reads count. Registering a value the body never looks up changes nothing, and a body that reads no request context at all is reusable from every scope. A lookup that found nothing is a dependency too: if the body read a type that was absent, a caller whose scope registers that type recomputes.
+
+Values the body registers itself are not dependencies:
+
+```rust
+# fn main() {}
+# use topcoat::context::{Cx, memoize, request_context};
+# struct Locale(&'static str);
+#[memoize]
+fn banner(cx: &Cx) -> String {
+    let scoped = cx.with(Locale("en"));
+    format!("banner in {}", request_context::<Locale>(&scoped).0)
+}
+```
+
+That read resolves through a binding the body created, which no caller can see, so it never keeps a caller from reusing the result.
+
+Dependencies also propagate through nested memoized calls:
+
+```rust
+# fn main() {}
+# use topcoat::context::{Cx, memoize, request_context};
+# struct Locale(&'static str);
+#[memoize]
+fn locale(cx: &Cx) -> String {
+    request_context::<Locale>(cx).0.to_owned()
+}
+
+#[memoize]
+fn greeting(cx: &Cx) -> String {
+    format!("hello in {}", locale(cx))
+}
+```
+
+`greeting` never reads `Locale` itself, but it depends on it through `locale`, so a caller that scopes a different `Locale` recomputes both. This holds whether the nested call computed or hit the cache.
+
+App context is not tracked. It is registered once for the application and cannot be scoped per request, so reading it never constrains reuse.
 
 # Borrowing Option and Result contents
 

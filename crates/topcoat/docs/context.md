@@ -176,7 +176,7 @@ A cloned handle keeps reading the context after the response was sent, but it ca
 
 # Memoization
 
-[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. See its documentation for the details.
+[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. A memoized body that reads request context keeps a result per set of values it observed, so a cached value never leaks out of the scope it was computed in. See its documentation for the details.
 
 # Composing helpers
 
