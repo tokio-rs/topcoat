@@ -223,12 +223,13 @@ mod tests {
         Arc::new(LayerFn::new(path(p), noop_layer))
     }
 
-    /// The paths of the layers `layers_for_path` selected, in order.
-    fn selected_paths(layers: &[Arc<dyn Layer>], p: &Path) -> Vec<String> {
-        layers_for_path(layers, p)
-            .iter()
-            .map(|layer| layer.path().to_string())
-            .collect()
+    /// Asserts that `layers_for_path` selects the layers at the `expected`
+    /// paths, in order.
+    fn assert_selects(layers: &[Arc<dyn Layer>], p: &'static str, expected: &[&'static str]) {
+        let selected = layers_for_path(layers, Path::new(p));
+        let paths: Vec<&Path> = selected.iter().map(|layer| layer.path()).collect();
+        let expected: Vec<&Path> = expected.iter().map(|e| Path::new(e)).collect();
+        assert_eq!(paths, expected);
     }
 
     fn noop_layer<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -296,10 +297,7 @@ mod tests {
         let layers = [layer_at("/"), layer_at("/users"), layer_at("/posts")];
         // The route at /users/{id} is wrapped by the root and /users layers, in
         // that order; the /posts layer does not prefix it.
-        assert_eq!(
-            selected_paths(&layers, Path::new("/users/{id}")),
-            ["/", "/users"],
-        );
+        assert_selects(&layers, "/users/{id}", &["/", "/users"]);
     }
 
     #[test]
@@ -324,10 +322,7 @@ mod tests {
         let layers = [layer_at("/(auth)"), layer_at("/dashboard")];
         // Groups are part of the logical path: the layer inside `(auth)` wraps
         // the endpoint, while the URL-lookalike `/dashboard` layer does not.
-        assert_eq!(
-            selected_paths(&layers, Path::new("/(auth)/dashboard")),
-            ["/(auth)"],
-        );
+        assert_selects(&layers, "/(auth)/dashboard", &["/(auth)"]);
     }
 
     #[test]
@@ -335,10 +330,7 @@ mod tests {
         let layers = [layer_at("/users/{id}"), layer_at("/users/{user_id}")];
         // Prefix matching compares segments, so `{id}` only wraps endpoints
         // spelled with the same parameter name.
-        assert_eq!(
-            selected_paths(&layers, Path::new("/users/{id}/posts")),
-            ["/users/{id}"],
-        );
+        assert_selects(&layers, "/users/{id}/posts", &["/users/{id}"]);
     }
 
     // -- Next --
