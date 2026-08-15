@@ -31,7 +31,7 @@ async fn user_profile() -> Result {
 }
 ```
 
-A page serves `GET` by default; naming methods before the path (e.g., `#[page(POST "/signup")]`) overrides that, with the same method forms as [`#[route]`](route).
+A page serves `GET` by default; naming methods before the path (e.g., `#[page(POST "/signup")]`) overrides that, with the same method forms as [`#[route]`](attribute@route).
 
 See [`#[page]`](page) for the handler signature, module-derived paths, and using pages as components.
 
@@ -89,7 +89,7 @@ Layers follow the same prefix rule as layouts and nest from least specific (oute
 
 # API routes
 
-An API route is an async function annotated with [`#[route]`](route) and an explicit HTTP method:
+An API route is an async function annotated with [`#[route]`](attribute@route) and an explicit HTTP method:
 
 ```rust
 use topcoat::{Result, router::route};
@@ -102,7 +102,7 @@ async fn health() -> Result<&'static str> {
 
 The method can also be a bracketed list (`#[route([GET, POST] "/form")]`) registering the handler for each listed method, or `*` (`#[route(* "/webhook")]`) registering it for every method. A route declaring a specific method takes precedence over a `*` route at the same path.
 
-See [`#[route]`](route) for the handler signature and how return values convert into responses.
+See [`#[route]`](attribute@route) for the handler signature and how return values convert into responses.
 
 # Request and response bodies
 
@@ -290,7 +290,7 @@ Layout and layer matching is based on path prefixes, not registration order; see
 
 # Auto-discovery with `discover()`
 
-With the `discover` feature enabled, every [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](route) is collected at link time. Instead of listing each item by hand, call [`discover`](RouterBuilderDiscoverExt::discover) on the builder:
+With the `discover` feature enabled, every [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](attribute@route) is collected at link time. Instead of listing each item by hand, call [`discover`](RouterBuilderDiscoverExt::discover) on the builder:
 
 ```rust
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
@@ -431,4 +431,4 @@ pub fn router() -> Router {
 }
 ```
 
-All [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](route) items from the example above are picked up automatically.
+All [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](attribute@route) items from the example above are picked up automatically.
