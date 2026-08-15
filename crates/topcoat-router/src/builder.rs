@@ -164,7 +164,8 @@ impl RouterBuilder {
     }
 
     /// Registers a [`Layer`] that wraps every matched route whose path begins
-    /// with the layer's path, like a layout.
+    /// with the layer's path, like a layout. A layer at the root path wraps
+    /// every request, including one that matches no route (a 404 or 405).
     ///
     /// When layers at *different* paths match a route they nest from
     /// least-specific (outermost) to most-specific (innermost). Multiple layers
@@ -402,12 +403,7 @@ impl RouterBuilder {
             let endpoint_index = *grouped
                 .entry(route.path().to_matchit_path())
                 .or_insert_with_key(|key| {
-                    // The endpoint's own stack wraps its 405 fallback, which
-                    // belongs to no route; it is selected against the URL
-                    // path, which carries no group segments.
-                    let path = Path::new(key);
-                    let endpoint = Endpoint::new(path, layers_for_path(&self.layers, path));
-                    endpoints.push(key.clone(), endpoint)
+                    endpoints.push(key.clone(), Endpoint::new(Path::new(key)))
                 });
 
             let route_index = routes.push(route, endpoint_index, layer_stack);
@@ -444,7 +440,8 @@ impl RouterBuilder {
             }
         }
 
-        // Sanity check for unused layers.
+        // Sanity check for unused layers. Root layers are exempt: they wrap
+        // every request whether or not a route matches.
         for (layer, used) in self.layers.iter().zip(layers_used) {
             assert!(
                 used || layer.path() == Path::ROOT,
@@ -460,6 +457,9 @@ impl RouterBuilder {
         Router::new(RouterInner {
             routes,
             endpoints,
+            // Root layers wrap every request, so requests that matched no
+            // route still run them.
+            root_layers: layers_for_path(&self.layers, Path::ROOT),
             app_context: Arc::new(self.context),
             origin: OriginLayer::new(self.origin_policy),
             #[cfg(feature = "compression")]

@@ -312,11 +312,14 @@ mod tests {
 
     /// A [`ModulePage`] whose render function is never invoked; used to
     /// exercise registration and path computation without running a page.
-    struct PageAt(&'static str);
+    struct PageAt {
+        id: RouteId,
+        module_path: &'static str,
+    }
 
     impl ModulePage for PageAt {
         fn id(&self) -> RouteId {
-            RouteId::new()
+            self.id
         }
 
         fn methods(&self) -> Methods<'_> {
@@ -324,7 +327,7 @@ mod tests {
         }
 
         fn module_path(&self) -> &'static str {
-            self.0
+            self.module_path
         }
 
         fn render<'cx>(&'cx self, _cx: &'cx Cx, _body: Body) -> ViewFuture<'cx> {
@@ -333,7 +336,10 @@ mod tests {
     }
 
     fn page_at(module_path: &'static str) -> PageAt {
-        PageAt(module_path)
+        PageAt {
+            id: RouteId::new(),
+            module_path,
+        }
     }
 
     fn builder() -> ModuleRouterBuilder {

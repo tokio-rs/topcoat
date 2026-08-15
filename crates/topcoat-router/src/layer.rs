@@ -2,7 +2,11 @@ use std::{borrow::Cow, pin::Pin, sync::Arc};
 
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{Body, Endpoint, IntoPath, Path, Route, error::method_not_allowed, response::Response};
+use crate::{
+    Body, Endpoint, IntoPath, Path, Route,
+    error::{method_not_allowed, not_found},
+    response::Response,
+};
 
 /// The future returned by [`Layer::handle`] and [`Next::run`]: a boxed, `Send`
 /// future borrowing the chain and the request context.
@@ -13,12 +17,14 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 ///
 /// A layer wraps every matched route whose path begins with the layer's path
 /// (the same prefix rule as layouts), so a layer at `/admin` wraps only routes
-/// under `/admin`, while a layer at `/` wraps everything. Each layer receives
-/// the [`Cx`] and the request [`Body`], plus a [`Next`] representing the rest
-/// of the chain. A layer typically derives a child context carrying
-/// request-scoped values with [`Cx::with`], passes it to [`Next::run`] to
-/// invoke the inner layers and ultimately the route, then inspects or modifies
-/// the [`Response`].
+/// under `/admin`. A layer at the root path wraps every request, including one
+/// that matches no route: the chain then resolves to the not-found or
+/// method-not-allowed error, which the layer receives as the `Err` returned by
+/// [`Next::run`]. Each layer receives the [`Cx`] and the request [`Body`],
+/// plus a [`Next`] representing the rest of the chain. A layer typically
+/// derives a child context carrying request-scoped values with [`Cx::with`],
+/// passes it to [`Next::run`] to invoke the inner layers and ultimately the
+/// route, then inspects or modifies the [`Response`].
 ///
 /// When several layers match a route they nest from least-specific (outermost)
 /// to most-specific (innermost), like layouts.
@@ -129,10 +135,10 @@ pub(crate) fn layers_for_path(layers: &[Arc<dyn Layer>], path: &Path) -> Box<[Ar
 /// What a [`Next`] chain runs once its layers are exhausted.
 ///
 /// A matched route runs inside the layer stack selected for its own path,
-/// group segments included. When the path matches but the method does not,
-/// the 405 runs inside the stack selected for the endpoint's URL path, so a
-/// layer sees a matched route handler's result, or the method-not-allowed
-/// error, uniformly as the `Result` returned by [`Next::run`].
+/// group segments included. A request that matched no route runs inside the
+/// root layers only, and its chain resolves to the not-found or
+/// method-not-allowed error, so a layer sees a matched route handler's
+/// result, or the error, uniformly as the `Result` returned by [`Next::run`].
 #[derive(Clone, Copy)]
 pub(crate) enum Terminal<'a> {
     /// A matched route handles the request.
@@ -140,6 +146,8 @@ pub(crate) enum Terminal<'a> {
     /// The path matched but the method did not; the chain resolves to a
     /// method-not-allowed error listing the endpoint's supported methods.
     MethodNotAllowed(&'a Endpoint),
+    /// The path matched no endpoint; the chain resolves to a not-found error.
+    NotFound,
 }
 
 /// The continuation of a [`Layer`] chain: the remaining layers followed by the
@@ -183,6 +191,7 @@ impl<'a> Next<'a> {
                     let error = method_not_allowed(endpoint.methods().cloned());
                     Box::pin(async move { Err(error.into()) })
                 }
+                Terminal::NotFound => Box::pin(async { Err(not_found().into()) }),
             },
         }
     }
@@ -350,7 +359,7 @@ mod tests {
 
     #[test]
     fn run_resolves_the_method_not_allowed_terminal() {
-        let mut endpoint = Endpoint::new(&path("/x"), Box::new([]));
+        let mut endpoint = Endpoint::new(&path("/x"));
         endpoint.insert(Method::GET, RouteIndex::new(0));
         endpoint.insert(Method::POST, RouteIndex::new(1));
         let cx = Cx::default();

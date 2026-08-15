@@ -215,6 +215,12 @@ pub(crate) struct Routes {
 impl Routes {
     /// Registers `route` as served by `endpoint` and wrapped by `layers`,
     /// returning the [`RouteIndex`] that now identifies the registration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a route with the same [`RouteId`] is already registered,
+    /// since a route's identity must resolve to one registration.
+    #[track_caller]
     pub(crate) fn push(
         &mut self,
         route: Box<dyn Route>,
@@ -222,7 +228,12 @@ impl Routes {
         layers: Box<[Arc<dyn Layer>]>,
     ) -> RouteIndex {
         let index = RouteIndex::new(self.routes.len());
-        self.by_id.insert(route.id(), index);
+        let previous = self.by_id.insert(route.id(), index);
+        assert!(
+            previous.is_none(),
+            "route `{}` is registered more than once",
+            route.path()
+        );
         self.routes.push(RegisteredRoute {
             route,
             endpoint,

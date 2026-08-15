@@ -1,14 +1,12 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
-    fmt,
     ops::{Index, IndexMut},
-    sync::Arc,
 };
 
 use http::Method;
 
-use crate::{Layer, Path, RouteIndex};
+use crate::{Path, RouteIndex};
 
 /// The standard HTTP methods, in the order their route slots appear in
 /// [`Endpoint::standard`]. Used only to name methods on the cold `Allow`-header
@@ -53,6 +51,7 @@ fn standard_slot(method: &Method) -> Option<usize> {
 ///
 /// The standard methods occupy a fixed-size array for O(1), allocation-free
 /// lookup; the rare custom methods spill into a map that is usually empty.
+#[derive(Debug)]
 pub struct Endpoint {
     standard: [Option<RouteIndex>; STANDARD_METHODS.len()],
     other: HashMap<Method, RouteIndex>,
@@ -63,22 +62,15 @@ pub struct Endpoint {
     /// they are not part of the URL and routes that differ only in them land
     /// on one endpoint.
     path: Box<str>,
-    /// The layers wrapping requests whose path matched this endpoint but
-    /// whose method matched no route, precomputed at build time from the
-    /// endpoint's URL path and ordered from least- to most-specific so the
-    /// outermost layer runs first. Matched routes carry their own stacks;
-    /// this one only wraps the `405` fallback.
-    layers: Box<[Arc<dyn Layer>]>,
 }
 
 impl Endpoint {
-    pub(crate) fn new(path: &Path, layers: Box<[Arc<dyn Layer>]>) -> Self {
+    pub(crate) fn new(path: &Path) -> Self {
         Self {
             standard: [None; STANDARD_METHODS.len()],
             other: HashMap::new(),
             any: None,
             path: path.as_str().into(),
-            layers,
         }
     }
 
@@ -131,31 +123,16 @@ impl Endpoint {
         }
     }
 
-    /// Iterates over the methods this path supports.
-    pub(crate) fn methods(&self) -> impl Iterator<Item = &Method> {
+    /// Iterates over the methods with a route registered at this endpoint,
+    /// standard methods first.
+    #[must_use]
+    pub fn methods(&self) -> impl Iterator<Item = &Method> {
         STANDARD_METHODS
             .iter()
             .enumerate()
             .filter(|(slot, _)| self.standard[*slot].is_some())
             .map(|(_, method)| method)
             .chain(self.other.keys())
-    }
-
-    /// Returns the precomputed layer stack wrapping this endpoint's `405`
-    /// fallback.
-    pub(crate) fn layers(&self) -> &[Arc<dyn Layer>] {
-        &self.layers
-    }
-}
-
-impl fmt::Debug for Endpoint {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Endpoint")
-            .field("standard", &self.standard)
-            .field("other", &self.other)
-            .field("any", &self.any)
-            .field("path", &self.path)
-            .finish_non_exhaustive()
     }
 }
 
@@ -228,7 +205,7 @@ mod tests {
 
     /// An endpoint with no routes registered, at a path no test cares about.
     fn empty() -> Endpoint {
-        Endpoint::new(Path::new("/x"), Box::new([]))
+        Endpoint::new(Path::new("/x"))
     }
 
     // -- Endpoint: standard methods --
@@ -341,7 +318,7 @@ mod tests {
 
     fn endpoint_at(path: &'static str) -> (Cow<'static, str>, Endpoint) {
         let path = Path::new(path);
-        (path.to_matchit_path(), Endpoint::new(path, Box::new([])))
+        (path.to_matchit_path(), Endpoint::new(path))
     }
 
     #[test]

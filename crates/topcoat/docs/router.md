@@ -85,7 +85,7 @@ async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 ```
 
-Layers follow the same prefix rule as layouts and nest from least specific (outermost) to most specific (innermost). See [`#[layer]`](layer) for the exact matching and ordering rules.
+Layers follow the same prefix rule as layouts and nest from least specific (outermost) to most specific (innermost). A layer at the root path wraps every request, including one that matches no route: its 404 or 405 error comes back through the root layers as the `Err` returned by `next.run`. See [`#[layer]`](layer) for the exact matching and ordering rules.
 
 # API routes
 
