@@ -60,7 +60,7 @@ mod tests {
     use http::{Method, Request, header};
     use topcoat_core::{context::Cx, error::Result};
     use topcoat_router::{
-        Body, Methods, Path, Route, RouteFuture, RouteId, RouteIdCell, Router, response::Response,
+        Body, Methods, Path, Route, RouteFuture, RouteId, Router, response::Response,
     };
 
     use crate::{Cookies, RouterBuilderCookieExt, cookies};
@@ -69,8 +69,8 @@ mod tests {
 
     impl Route for AddCookie {
         fn id(&self) -> RouteId {
-            static ID: RouteIdCell = RouteIdCell::new();
-            ID.get()
+            static ID: std::sync::LazyLock<RouteId> = std::sync::LazyLock::new(RouteId::new);
+            *ID
         }
 
         fn methods(&self) -> Methods<'_> {
@@ -115,8 +115,8 @@ mod tests {
 
     impl Route for Detach {
         fn id(&self) -> RouteId {
-            static ID: RouteIdCell = RouteIdCell::new();
-            ID.get()
+            static ID: std::sync::LazyLock<RouteId> = std::sync::LazyLock::new(RouteId::new);
+            *ID
         }
 
         fn methods(&self) -> Methods<'_> {

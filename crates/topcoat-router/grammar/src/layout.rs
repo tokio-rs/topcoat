@@ -123,102 +123,101 @@ impl ToTokens for Layout {
         let ident = &item.sig.ident;
         let output = &item.sig.output;
 
-        // Component face: wraps a child view inline from `view!`. It always
+        // Marker: the value users register and reference, expanded from the
+        // component face. It wraps a child view inline from `view!`, always
         // takes `cx` (feeding the handler's injected context parameter), and
         // the child is already rendered, so it is passed as the `slot` prop
-        // and handed to the handler as an `Ok` result. The marker struct this
-        // expands to is a unit struct, so `#ident` stays a value usable
+        // and handed to the handler as an `Ok` result. The marker struct the
+        // face expands to is a unit struct, so `#ident` stays a value usable
         // directly in `router.layout(...)`.
         let component_args = args.iter().map(|arg| match arg {
             LayoutArg::Cx => quote! { cx },
             LayoutArg::Slot => quote! { slot },
         });
-        let component = quote! {
+        let marker = quote! {
             #[#topcoat_view_macro::component]
             #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_error::Result<#topcoat_view::View>) #output {
                 #ident::handler(cx #(, #component_args)*).await
             }
         };
 
-        // The user's real body, attached to the marker as an associated
+        // The user's function, re-emitted as the marker's `handler` associated
         // function. Associated items are reached through the type rather than
-        // lexical scope, so hiding the impl inside the anonymous const below
-        // keeps the module namespace clean while both the component face and
-        // the render function can call `#ident::handler`. The injected `__cx`
+        // lexical scope, so `#ident::handler` is callable from the component
+        // face and the trait implementation below. The injected `__cx`
         // parameter carries the ambient context that `view!` bodies read.
-        let mut handler = item.clone();
-        handler.sig.ident = format_ident!("handler", span = ident.span());
-        handler.vis = Visibility::Inherited;
-        handler
-            .sig
-            .generics
-            .params
-            .insert(0, parse_quote! { '__cx });
-        handler
+        let mut inner = item.clone();
+        inner.sig.ident = format_ident!("handler", span = ident.span());
+        inner.vis = Visibility::Inherited;
+        inner.sig.generics.params.insert(0, parse_quote! { '__cx });
+        inner
             .sig
             .inputs
             .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
-        handler
+        inner
             .attrs
             .push(parse_quote! { #[allow(clippy::unused_async)] });
+        let handler = quote! {
+            impl #ident {
+                #inner
+            }
+        };
 
-        // The render function backing the registered layout passes the
-        // already-rendered slot result through untouched, so the layout body
-        // wraps the inner page's output.
+        // The trait implementation dispatching requests to the handler: it
+        // passes the already-rendered slot result through untouched, so the
+        // layout body wraps the inner page's output. A layout with an explicit
+        // path is a `Layout`; one without derives its path from the module
+        // tree through the module router as a `ModuleLayout`.
         let render_args = args.iter().map(|arg| match arg {
             LayoutArg::Cx => quote! { cx },
             LayoutArg::Slot => quote! { slot },
         });
         let render = quote! {
-            |cx, slot| ::std::boxed::Box::pin(#ident::handler(cx #(, #render_args)*))
-        };
-
-        // The erased layout is built once in a `const` so it can be used from
-        // both the `From` impl (backing manual `router.layout(#ident)`
-        // registration) and the discovery submission (which expands to a
-        // `static`, requiring a const initializer). It is named after the
-        // layout so the render closure carries that name in backtraces and
-        // profiles.
-        let erased = if let Some(path) = attr.path.as_ref() {
-            quote! {
-                #[allow(non_upper_case_globals)]
-                static #ident: #topcoat_router::LayoutFn = #topcoat_router::LayoutFn::new(
-                    ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
-                    #render,
-                );
-
-                impl ::core::convert::From<#ident> for #topcoat_router::LayoutFn {
-                    fn from(_: #ident) -> Self {
-                        #ident.clone()
-                    }
-                }
+            fn render<'cx>(
+                &'cx self,
+                cx: &'cx #topcoat_context::Cx,
+                slot: #topcoat_error::Result<#topcoat_view::View>,
+            ) -> #topcoat_router::ViewFuture<'cx> {
+                ::std::boxed::Box::pin(#ident::handler(cx #(, #render_args)*))
             }
+        };
+        let (layout, submit_as) = if let Some(path) = attr.path.as_ref() {
+            let layout = quote! {
+                impl #topcoat_router::Layout for #ident {
+                    fn path(&self) -> &#topcoat_router::Path {
+                        const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
+                        PATH
+                    }
+
+                    #render
+                }
+            };
+            (layout, quote! { #topcoat_router::Layout })
         } else {
-            quote! {
-                #[allow(non_upper_case_globals)]
-                static #ident: #topcoat_router::ModuleLayoutFn =
-                    #topcoat_router::ModuleLayoutFn::new(module_path!(), #render);
-
-                impl ::core::convert::From<#ident> for #topcoat_router::ModuleLayoutFn {
-                    fn from(_: #ident) -> Self {
-                        #ident.clone()
+            let layout = quote! {
+                impl #topcoat_router::ModuleLayout for #ident {
+                    fn module_path(&self) -> &'static str {
+                        ::core::module_path!()
                     }
+
+                    #render
                 }
-            }
+            };
+            (layout, quote! { #topcoat_router::ModuleLayout })
         };
 
-        let submit =
-            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { &#ident } });
+        // Discovery collects the marker erased behind its trait.
+        let submit = cfg!(feature = "discover").then(|| {
+            quote! { #topcoat_inventory::submit! { &#ident as &'static dyn #submit_as } }
+        });
 
         quote! {
-            #component
+            #marker
 
             const _: () = {
-                impl #ident {
-                    #handler
-                }
+                #handler
 
-                #erased
+                #layout
 
                 #submit
             };

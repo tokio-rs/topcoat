@@ -3,10 +3,12 @@ use quote::{ToTokens, format_ident, quote};
 use syn::{
     FnArg, ItemFn, Pat, PatIdent, PatType, ReturnType, Visibility,
     parse::{Parse, ParseStream},
+    parse_quote,
     spanned::Spanned,
 };
 use topcoat_core_grammar::paths::{
-    topcoat_internal, topcoat_inventory, topcoat_router, topcoat_runtime,
+    topcoat_context, topcoat_error, topcoat_internal, topcoat_inventory, topcoat_router,
+    topcoat_runtime,
 };
 
 pub struct ProcedureAttr {}
@@ -72,18 +74,34 @@ impl Procedure {
 
 impl ToTokens for Procedure {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let ident = &self.1.item.sig.ident;
+        let item = &self.1.item;
+        let vis = &item.vis;
+        let ident = &item.sig.ident;
+        let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
 
-        let vis = &self.1.item.vis;
-        let docs = self
-            .1
-            .item
+        // Marker: the value users register and reference. A unit struct, so
+        // `#ident` stays a value usable directly in `router.procedure(...)`
+        // and capturable in runtime expressions.
+        let marker = quote! {
+            #(#docs)*
+            #[allow(non_camel_case_types)]
+            #vis struct #ident;
+        };
+
+        // The user's function, re-emitted under its original name inside the
+        // bridge below to keep the module namespace clean. Its own name
+        // shadows the marker within its body, so bindings named after the
+        // procedure keep working.
+        let mut inner = item.clone();
+        inner.vis = Visibility::Inherited;
+        inner
             .attrs
-            .iter()
-            .filter(|attr| attr.path().is_ident("doc"));
-        let mut item = self.1.item.clone();
-        item.vis = Visibility::Inherited;
+            .push(parse_quote! { #[allow(clippy::unused_async)] });
 
+        // The bridge every caller goes through: it deserializes the surrogate
+        // argument tuple from the request body, forwards to the user's
+        // function positionally, and serializes the returned value back into
+        // a surrogate response.
         let mut args = Vec::new();
         let mut args_with_cx = Vec::new();
         let mut arg_index = 0;
@@ -102,7 +120,6 @@ impl ToTokens for Procedure {
                 FnArg::Receiver(_) => unreachable!("validated by ProcedureItem"),
             }
         }
-
         let arg_tys = item
             .sig
             .inputs
@@ -115,44 +132,77 @@ impl ToTokens for Procedure {
                 FnArg::Receiver(_) => None,
             })
             .collect::<Vec<_>>();
+        let handler = quote! {
+            impl #ident {
+                async fn handler(
+                    cx: &#topcoat_context::Cx,
+                    body: #topcoat_router::Body,
+                ) -> #topcoat_error::Result<#topcoat_router::response::Response> {
+                    #inner
+
+                    type Surrogate = <(#(#arg_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
+                    let #topcoat_router::content::Json(args) = <#topcoat_router::content::Json<Surrogate> as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
+                    let (#(#args,)*) = #topcoat_runtime::Surrogate::into_real(args);
+                    let response = #topcoat_runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
+                    #topcoat_router::response::IntoResponse::into_response(#topcoat_router::content::Json(response), cx)
+                }
+            }
+        };
+
+        // The trait implementation dispatching calls to the bridge.
+        let id = uuid::Uuid::new_v4().to_string();
+        let procedure = quote! {
+            impl #topcoat_runtime::Procedure for #ident {
+                fn id(&self) -> #topcoat_runtime::ProcedureId {
+                    #topcoat_runtime::ProcedureId::new(#id)
+                }
+
+                fn handle<'cx>(
+                    &'cx self,
+                    cx: &'cx #topcoat_context::Cx,
+                    body: #topcoat_router::Body,
+                ) -> #topcoat_runtime::ProcedureFuture<'cx> {
+                    ::std::boxed::Box::pin(#ident::handler(cx, body))
+                }
+            }
+        };
+
+        // Runtime expressions capture the marker as a typed surrogate, so
+        // calls in `expr!` bodies check their arguments against the declared
+        // parameter types.
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("validated by ProcedureItem")
         };
         let return_ty = quote! { <#return_ty as #topcoat_internal::ResultExt>::T };
+        let typed = quote! {
+            impl #topcoat_runtime::TypedProcedure for #ident {
+                type Args = (#(#arg_tys,)*);
+                type Output = #return_ty;
+            }
 
-        let id = uuid::Uuid::new_v4().to_string();
+            impl #topcoat_runtime::Surrogated for #ident {
+                type Surrogate = #topcoat_runtime::ProcedureSurrogate<#ident>;
 
-        let procedure = quote! {
-            #(#docs)*
-            #[allow(non_upper_case_globals)]
-            #vis static #ident: &#topcoat_runtime::Procedure::<(#(#arg_tys,)*), #return_ty> = &#topcoat_runtime::Procedure::new(
-                #topcoat_runtime::ProcedureId::new(#id),
-                |cx, body| {
-                    #[allow(clippy::unused_async)]
-                    #item
-                    Box::pin(async {
-                        type Surrogate = <(#(#arg_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
-                        let #topcoat_router::content::Json(args) = <#topcoat_router::content::Json<Surrogate> as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
-                        let (#(#args,)*) = #topcoat_runtime::Surrogate::into_real(args);
-                        let response = #topcoat_runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
-                        #topcoat_router::response::IntoResponse::into_response(#topcoat_router::content::Json(response), cx)
-                    })
-                },
-            );
+                fn into_surrogate(self) -> Self::Surrogate {
+                    #topcoat_runtime::ProcedureSurrogate::new(self)
+                }
+            }
         };
 
-        let submit =
-            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { &ERASED } });
-
-        let erased = quote! {
-            static ERASED: #topcoat_runtime::ErasedProcedure = #topcoat_runtime::ErasedProcedure::new(#ident);
-        };
+        // Discovery collects the marker erased behind its trait.
+        let submit = cfg!(feature = "discover").then(|| {
+            quote! { #topcoat_inventory::submit! { &#ident as &'static dyn #topcoat_runtime::Procedure } }
+        });
 
         quote! {
-            #procedure
+            #marker
 
             const _: () = {
-                #erased
+                #handler
+
+                #procedure
+
+                #typed
 
                 #submit
             };

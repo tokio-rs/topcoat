@@ -20,7 +20,7 @@ impl RouterBuilderMailExt for RouterBuilder {
 mod tests {
     use topcoat_core::{context::Cx, error::Result};
     use topcoat_router::{
-        Body, Method, Methods, Path, Route, RouteFuture, RouteId, RouteIdCell, Router,
+        Body, Method, Methods, Path, Route, RouteFuture, RouteId, Router,
         request::Request, response::Response,
     };
 
@@ -30,8 +30,8 @@ mod tests {
 
     impl Route for SendMail {
         fn id(&self) -> RouteId {
-            static ID: RouteIdCell = RouteIdCell::new();
-            ID.get()
+            static ID: std::sync::LazyLock<RouteId> = std::sync::LazyLock::new(RouteId::new);
+            *ID
         }
 
         fn methods(&self) -> Methods<'_> {

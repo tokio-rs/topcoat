@@ -7,7 +7,7 @@ use topcoat_router::{
     response::Response,
 };
 
-use crate::Surrogated;
+use crate::{Surrogate, Surrogated};
 
 const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/procedures";
 
@@ -144,14 +144,8 @@ pub struct ProcedureSurrogate<P>(P);
 
 impl<P: TypedProcedure> ProcedureSurrogate<P> {
     #[must_use]
-    pub fn new(procedure: P) -> Self {
+    pub const fn new(procedure: P) -> Self {
         Self(procedure)
-    }
-
-    /// Returns the procedure this surrogate stands in for.
-    #[must_use]
-    pub fn into_procedure(self) -> P {
-        self.0
     }
 
     /// Invokes the procedure from the client side.
@@ -165,6 +159,17 @@ impl<P: TypedProcedure> ProcedureSurrogate<P> {
         _args: <P::Args as Surrogated>::Surrogate,
     ) -> <P::Output as Surrogated>::Surrogate {
         panic!("procedures cannot be executed on the server");
+    }
+}
+
+impl<P> Surrogate for ProcedureSurrogate<P>
+where
+    P: TypedProcedure + Surrogated<Surrogate = ProcedureSurrogate<P>>,
+{
+    type Real = P;
+
+    fn into_real(self) -> Self::Real {
+        self.0
     }
 }
 
