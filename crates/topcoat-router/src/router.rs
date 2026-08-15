@@ -11,8 +11,8 @@ use topcoat_core::context::{AppContext, Cx, try_request_context};
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
     RouteIndex, RouterBuilder, Routes, Terminal,
-    error::{internal_server_response, respond},
-    request::Request,
+    error::{REWRITE_LIMIT, RewriteError, RewriteLoopError, internal_server_response, respond},
+    request::{OriginalUri, Request},
     response::Response,
 };
 
@@ -82,45 +82,96 @@ impl Router {
     /// Handles one request inside the panic isolation boundary.
     async fn handle_inner(&self, request: Request) -> Response {
         let inner = &*self.inner;
-        let (parts, body) = request.into_parts();
+        let (mut parts, mut body) = request.into_parts();
 
-        // The chain's terminal and the layer stack wrapping it: a matched
-        // route carries its own precomputed stack, while a request that
-        // matched no route resolves to a 404 or 405 through the layers
-        // without a path, which wrap every request.
-        let cx = Cx::new(Arc::clone(&inner.app_context)).with(Arc::clone(&self.inner));
-        let (terminal, layer_stack, cx) = match inner.endpoints.at(parts.uri.path()) {
-            Some((endpoint_index, endpoint, params)) => {
-                let path_params = RawPathParams::from_match(
-                    endpoint.path(),
-                    params.iter().map(|(_, value)| value),
-                );
-                let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
-                let (terminal, layer_stack) = match route_index {
-                    Some(index) => {
-                        let registered = &inner.routes[index];
-                        (Terminal::Route(&*registered.route), &*registered.layers)
-                    }
-                    None => (Terminal::MethodNotAllowed(endpoint), &*inner.always_layers),
-                };
-                let matched = Matched {
-                    endpoint: endpoint_index,
-                    route: route_index,
-                };
-                (
-                    terminal,
-                    layer_stack,
-                    cx.with_many((matched, path_params, parts)),
-                )
+        // The paths this request has already been dispatched under, filled in
+        // only once a rewrite happens; a request served in one dispatch never
+        // touches it.
+        let mut visited: Vec<String> = Vec::new();
+        // The URI of the first dispatch, carried on every rewritten dispatch's
+        // context so its handler can read the client-visible URL.
+        let mut original: Option<http::Uri> = None;
+
+        let (cx, result) = loop {
+            // The chain's terminal and the layer stack wrapping it: a matched
+            // route carries its own precomputed stack, while a request that
+            // matched no route resolves to a 404 or 405 through the layers
+            // without a path, which wrap every request.
+            let cx = Cx::new(Arc::clone(&inner.app_context)).with(Arc::clone(&self.inner));
+            let cx = match &original {
+                Some(uri) => cx.with(OriginalUri(uri.clone())),
+                None => cx,
+            };
+            let (terminal, layer_stack, cx) = match inner.endpoints.at(parts.uri.path()) {
+                Some((endpoint_index, endpoint, params)) => {
+                    let path_params = RawPathParams::from_match(
+                        endpoint.path(),
+                        params.iter().map(|(_, value)| value),
+                    );
+                    let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
+                    let (terminal, layer_stack) = match route_index {
+                        Some(index) => {
+                            let registered = &inner.routes[index];
+                            (Terminal::Route(&*registered.route), &*registered.layers)
+                        }
+                        None => (Terminal::MethodNotAllowed(endpoint), &*inner.always_layers),
+                    };
+                    let matched = Matched {
+                        endpoint: endpoint_index,
+                        route: route_index,
+                    };
+                    (
+                        terminal,
+                        layer_stack,
+                        cx.with_many((matched, path_params, parts)),
+                    )
+                }
+                None => (Terminal::NotFound, &*inner.always_layers, cx.with(parts)),
+            };
+
+            // The origin layer wraps the whole chain, denying untrusted
+            // cross-origin requests before anything else runs.
+            let next = Next::new(layer_stack, terminal);
+            let result = inner.origin.handle(&cx, body, next).await;
+
+            // A rewrite bubbling out of the chain discards this dispatch,
+            // response and request context both, and goes around again with
+            // the new path; any other outcome ends the loop.
+            let rewrite = match result {
+                Ok(response) => break (cx, Ok(response)),
+                Err(error) => match error.downcast::<RewriteError>() {
+                    Ok(rewrite) => rewrite,
+                    Err(error) => break (cx, Err(error)),
+                },
+            };
+            let (target, rewrite_body) = rewrite.into_parts();
+
+            let previous = try_request_context::<http::request::Parts>(&cx)
+                .expect("a dispatched request carries its parts");
+            visited.push(dispatched_path(&previous.uri));
+            if visited.iter().any(|path| path == target.as_str()) {
+                let error = RewriteLoopError::cycle(&visited, target.as_str());
+                break (cx, Err(error.into()));
             }
-            None => (Terminal::NotFound, &*inner.always_layers, cx.with(parts)),
-        };
+            if visited.len() > REWRITE_LIMIT {
+                let error = RewriteLoopError::limit(&visited, target.as_str());
+                break (cx, Err(error.into()));
+            }
 
-        // The origin layer wraps the whole chain, denying untrusted
-        // cross-origin requests before anything else runs.
-        let next = Next::new(layer_stack, terminal);
-        let response = inner.origin.handle(&cx, body, next).await;
-        let response = respond(&cx, response);
+            // The next dispatch keeps the method and headers, swapping only
+            // the path and query into the URI.
+            let mut next_parts = previous.clone();
+            if original.is_none() {
+                original = Some(next_parts.uri.clone());
+            }
+            let mut uri_parts = std::mem::take(&mut next_parts.uri).into_parts();
+            uri_parts.path_and_query = Some(target);
+            next_parts.uri = http::Uri::from_parts(uri_parts)
+                .expect("replacing the path of a valid request uri keeps it valid");
+            parts = next_parts;
+            body = rewrite_body;
+        };
+        let response = respond(&cx, result);
 
         // Compression runs outside every layer, so layers see uncompressed
         // bodies. The negotiation reads the request headers as the layers
@@ -158,6 +209,14 @@ pub(crate) struct RouterInner {
     /// The compression applied to responses on their way out.
     #[cfg(feature = "compression")]
     pub(crate) compression: crate::Compression,
+}
+
+/// The path and query a request was dispatched under, as recorded in a
+/// rewrite chain.
+fn dispatched_path(uri: &http::Uri) -> String {
+    uri.path_and_query()
+        .map_or(uri.path(), http::uri::PathAndQuery::as_str)
+        .to_owned()
 }
 
 /// What a request was dispatched to, stored on its context.
@@ -299,7 +358,11 @@ mod tests {
     use super::*;
     use crate::{
         Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn,
-        Path, Route, RouteFn, RouteFuture, raw_path_params, request::Bytes, response::IntoResponse,
+        Path, Route, RouteFn, RouteFuture,
+        error::rewrite,
+        raw_path_params,
+        request::{Bytes, original_uri, uri},
+        response::IntoResponse,
         to_bytes,
     };
 
@@ -632,6 +695,187 @@ mod tests {
         let (status, _, body) = send(&router, Method::GET, "/x");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"route");
+    }
+
+    // -- Router::handle: rewrites --
+
+    // Rewriting handlers, one per target, since routes are plain `fn`
+    // pointers.
+
+    fn rewrite_to_x(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(rewrite("/x", Body::empty()).into()) })
+    }
+
+    fn rewrite_to_missing(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(rewrite("/missing", Body::empty()).into()) })
+    }
+
+    fn rewrite_with_body(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(rewrite("/echo-body", "carried").into()) })
+    }
+
+    fn rewrite_to_new_query(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(rewrite("/new?q=2", Body::empty()).into()) })
+    }
+
+    fn rewrite_to_cycle_a(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(rewrite("/cycle/a", Body::empty()).into()) })
+    }
+
+    fn rewrite_to_cycle_b(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(rewrite("/cycle/b", Body::empty()).into()) })
+    }
+
+    /// Rewrites `/step/{n}` to `/step/{n + 1}`, a chain that never repeats a
+    /// path.
+    fn rewrite_to_next_step(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            let step: usize = raw_path_params(cx)
+                .next()
+                .unwrap()
+                .1
+                .as_str()
+                .parse()
+                .unwrap();
+            Err(rewrite(&format!("/step/{}", step + 1), Body::empty()).into())
+        })
+    }
+
+    /// Echoes the request body back as the response.
+    fn echo_body(cx: &Cx, body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            let bytes = to_bytes(body, usize::MAX).await?;
+            String::from_utf8_lossy(&bytes)
+                .into_owned()
+                .into_response(cx)
+        })
+    }
+
+    /// Echoes the dispatched and original URIs, separated by a space.
+    fn echo_uris(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { format!("{} {}", uri(cx), original_uri(cx)).into_response(cx) })
+    }
+
+    #[test]
+    fn a_rewrite_serves_the_new_path() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/old"), rewrite_to_x))
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/old");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"route");
+    }
+
+    #[test]
+    fn a_rewrite_keeps_the_request_method() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::POST, path("/old"), rewrite_to_x))
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .build();
+
+        // The rewritten dispatch is still a `POST`, which `/x` does not serve.
+        let (status, _, _) = send(&router, Method::POST, "/old");
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn a_rewrite_carries_its_body() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/form"), rewrite_with_body))
+            .route(RouteFn::new(Method::GET, path("/echo-body"), echo_body))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/form");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"carried");
+    }
+
+    #[test]
+    fn a_rewrite_swaps_the_query_and_keeps_the_original_uri_readable() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/old"),
+                rewrite_to_new_query,
+            ))
+            .route(RouteFn::new(Method::GET, path("/new"), echo_uris))
+            .build();
+
+        let (_, _, body) = send(&router, Method::GET, "/old?client=1");
+        assert_eq!(&body[..], b"/new?q=2 /old?client=1");
+    }
+
+    #[test]
+    fn original_uri_is_the_request_uri_without_a_rewrite() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/new"), echo_uris))
+            .build();
+
+        let (_, _, body) = send(&router, Method::GET, "/new?q=2");
+        assert_eq!(&body[..], b"/new?q=2 /new?q=2");
+    }
+
+    #[test]
+    fn a_rewrite_to_an_unmatched_path_is_not_found() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/old"), rewrite_to_missing))
+            .build();
+
+        let (status, _, _) = send(&router, Method::GET, "/old");
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn a_rewrite_reruns_pathless_layers() {
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/old"), rewrite_to_x))
+                .route(RouteFn::new(Method::GET, path("/x"), say_route))
+                .layer(LayerFn::new(None::<&Path>, trace_always)),
+        );
+
+        let (status, _, _) = send(&router, Method::GET, "/old");
+        assert_eq!(status, StatusCode::OK);
+        // Once around the abandoned dispatch, once around the rewritten one.
+        assert_eq!(*trace.lock().unwrap(), vec!["always", "always"]);
+    }
+
+    #[test]
+    fn a_rewrite_cycle_is_an_internal_server_error() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/cycle/a"),
+                rewrite_to_cycle_b,
+            ))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/cycle/b"),
+                rewrite_to_cycle_a,
+            ))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/cycle/a");
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        // The chain never leaks to the client.
+        assert_eq!(&body[..], b"internal server error");
+    }
+
+    #[test]
+    fn a_runaway_rewrite_chain_stops_at_the_limit() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/step/{n}"),
+                rewrite_to_next_step,
+            ))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/step/0");
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(&body[..], b"internal server error");
     }
 
     // -- endpoint / route accessors --

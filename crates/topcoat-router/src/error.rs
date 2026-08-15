@@ -7,6 +7,7 @@ mod internal_server;
 mod method_not_allowed;
 mod not_found;
 mod redirect;
+mod rewrite;
 mod service_unavailable;
 mod too_many_requests;
 mod unauthorized;
@@ -19,6 +20,7 @@ pub use internal_server::*;
 pub use method_not_allowed::*;
 pub use not_found::*;
 pub use redirect::*;
+pub use rewrite::*;
 pub use service_unavailable::*;
 pub use too_many_requests::*;
 use topcoat_core::{
