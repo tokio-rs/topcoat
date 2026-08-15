@@ -62,10 +62,12 @@ pub struct Endpoint {
     /// they are not part of the URL and routes that differ only in them land
     /// on one endpoint.
     path: Box<str>,
-    /// The layers wrapping every route at this path, as indices into the
-    /// router's layer table, precomputed at build time and ordered from least-
-    /// to most-specific so the outermost layer runs first. Shared by every
-    /// method at the path, including the `405` fallback.
+    /// The layers wrapping requests whose path matched this endpoint but
+    /// whose method matched no route, as indices into the router's layer
+    /// table, precomputed at build time from the endpoint's URL path and
+    /// ordered from least- to most-specific so the outermost layer runs
+    /// first. Matched routes carry their own stacks; this one only wraps the
+    /// `405` fallback.
     layers: Box<[LayerIndex]>,
 }
 
@@ -139,8 +141,8 @@ impl Endpoint {
             .chain(self.other.keys())
     }
 
-    /// Returns the precomputed layer stack wrapping this path's routes, as
-    /// indices into the router's layer table.
+    /// Returns the precomputed layer stack wrapping this endpoint's `405`
+    /// fallback, as indices into the router's layer table.
     pub(crate) fn layers(&self) -> &[LayerIndex] {
         &self.layers
     }

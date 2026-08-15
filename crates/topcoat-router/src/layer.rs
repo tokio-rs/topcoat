@@ -121,9 +121,8 @@ pub(crate) struct LayerIndex(pub(crate) usize);
 /// [`LayerIndex`].
 ///
 /// Layers are [`push`](Self::push)ed as the router is built, then only queried:
-/// [`for_endpoint`](Self::for_endpoint) selects the layers wrapping an
-/// endpoint's path, and indexing by [`LayerIndex`] resolves a selected index
-/// back to its layer.
+/// [`for_path`](Self::for_path) selects the layers wrapping a path, and
+/// indexing by [`LayerIndex`] resolves a selected index back to its layer.
 #[derive(Default)]
 pub(crate) struct Layers {
     layers: Vec<Box<dyn Layer>>,
@@ -137,10 +136,10 @@ impl Layers {
         index
     }
 
-    /// Selects the layers whose path is a prefix of the endpoint `path`, ordered
-    /// least- to most-specific so the outermost layer runs first. Among layers
-    /// that share a path, the most recently registered runs first.
-    pub(crate) fn for_endpoint(&self, path: &Path) -> Vec<LayerIndex> {
+    /// Selects the layers whose path is a prefix of `path`, ordered least- to
+    /// most-specific so the outermost layer runs first. Among layers that
+    /// share a path, the most recently registered runs first.
+    pub(crate) fn for_path(&self, path: &Path) -> Vec<LayerIndex> {
         let mut indices: Vec<LayerIndex> = (0..self.layers.len())
             .map(LayerIndex)
             .filter(|index| path.starts_with(self[*index].path()))
@@ -166,10 +165,11 @@ impl Index<LayerIndex> for Layers {
 
 /// What a [`Next`] chain runs once its layers are exhausted.
 ///
-/// The layers wrapping a matched path are the same whichever method the
-/// request uses, so 405 responses flow through them too: a layer sees a
-/// matched route handler's result, or the method-not-allowed error, uniformly
-/// as the `Result` returned by [`Next::run`].
+/// A matched route runs inside the layer stack selected for its own path,
+/// group segments included. When the path matches but the method does not,
+/// the 405 runs inside the stack selected for the endpoint's URL path, so a
+/// layer sees a matched route handler's result, or the method-not-allowed
+/// error, uniformly as the `Result` returned by [`Next::run`].
 #[derive(Clone, Copy)]
 pub(crate) enum Terminal<'a> {
     /// A matched route handles the request.
@@ -349,61 +349,52 @@ mod tests {
     }
 
     #[test]
-    fn for_endpoint_orders_prefix_layers_least_to_most_specific() {
+    fn for_path_orders_prefix_layers_least_to_most_specific() {
         let mut layers = Layers::default();
         let root = layers.push(layer_at("/"));
         let users = layers.push(layer_at("/users"));
         let _posts = layers.push(layer_at("/posts"));
         // The route at /users/{id} is wrapped by the root and /users layers, in
         // that order; the /posts layer does not prefix it.
-        assert_eq!(
-            layers.for_endpoint(Path::new("/users/{id}")),
-            vec![root, users],
-        );
+        assert_eq!(layers.for_path(Path::new("/users/{id}")), vec![root, users],);
     }
 
     #[test]
-    fn for_endpoint_runs_most_recent_of_a_shared_path_first() {
+    fn for_path_runs_most_recent_of_a_shared_path_first() {
         let mut layers = Layers::default();
         let first = layers.push(layer_at("/admin"));
         let second = layers.push(layer_at("/admin"));
         assert_eq!(
-            layers.for_endpoint(Path::new("/admin/users")),
+            layers.for_path(Path::new("/admin/users")),
             vec![second, first],
         );
     }
 
     #[test]
-    fn for_endpoint_rejects_partial_segments() {
+    fn for_path_rejects_partial_segments() {
         let mut layers = Layers::default();
         let _admin = layers.push(layer_at("/admin"));
-        assert!(layers.for_endpoint(Path::new("/administrator")).is_empty());
+        assert!(layers.for_path(Path::new("/administrator")).is_empty());
     }
 
     #[test]
-    fn for_endpoint_includes_group_segments() {
+    fn for_path_includes_group_segments() {
         let mut layers = Layers::default();
         let auth = layers.push(layer_at("/(auth)"));
         let _dashboard = layers.push(layer_at("/dashboard"));
         // Groups are part of the logical path: the layer inside `(auth)` wraps
         // the endpoint, while the URL-lookalike `/dashboard` layer does not.
-        assert_eq!(
-            layers.for_endpoint(Path::new("/(auth)/dashboard")),
-            vec![auth],
-        );
+        assert_eq!(layers.for_path(Path::new("/(auth)/dashboard")), vec![auth],);
     }
 
     #[test]
-    fn for_endpoint_distinguishes_param_names() {
+    fn for_path_distinguishes_param_names() {
         let mut layers = Layers::default();
         let id = layers.push(layer_at("/users/{id}"));
         let _user_id = layers.push(layer_at("/users/{user_id}"));
         // Prefix matching compares segments, so `{id}` only wraps endpoints
         // spelled with the same parameter name.
-        assert_eq!(
-            layers.for_endpoint(Path::new("/users/{id}/posts")),
-            vec![id]
-        );
+        assert_eq!(layers.for_path(Path::new("/users/{id}/posts")), vec![id]);
     }
 
     // -- Next --

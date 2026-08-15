@@ -91,13 +91,17 @@ impl Router {
         let path_params =
             RawPathParams::from_match(endpoint.path(), params.iter().map(|(_, value)| value));
 
-        // The chain's terminal, reached through the endpoint's precomputed
-        // layer stack whether the method matches (a route) or not (405), so
-        // both flow through the same layers.
+        // The chain's terminal and the precomputed layer stack wrapping it: a
+        // matched route carries its own stack, while a request whose method
+        // matched no route resolves to a 405 through the endpoint's fallback
+        // stack.
         let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
-        let terminal = match route_index {
-            Some(index) => Terminal::Route(&*inner.routes[index].route),
-            None => Terminal::MethodNotAllowed(endpoint),
+        let (terminal, layer_stack) = match route_index {
+            Some(index) => {
+                let registered = &inner.routes[index];
+                (Terminal::Route(&*registered.route), &*registered.layers)
+            }
+            None => (Terminal::MethodNotAllowed(endpoint), endpoint.layers()),
         };
 
         let cx = Cx::new(Arc::clone(&inner.app_context)).with_many((
@@ -112,7 +116,7 @@ impl Router {
 
         // The origin layer wraps the whole chain, denying untrusted
         // cross-origin requests before anything else runs.
-        let next = Next::new(&inner.layers, endpoint.layers(), terminal);
+        let next = Next::new(&inner.layers, layer_stack, terminal);
         let response = inner.origin.handle(&cx, body, next).await;
         let response = respond(&cx, response);
 
@@ -920,6 +924,44 @@ mod tests {
         let (status, _, body) = send(&router, Method::POST, "/x");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"posted");
+        assert_eq!(*trace.lock().unwrap(), vec!["root"]);
+    }
+
+    #[test]
+    fn routes_sharing_a_url_keep_their_own_layers() {
+        // Both routes serve `/x`, but the layer inside `(auth)` wraps only
+        // the route registered through that group.
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/(auth)/x"), say_route))
+                .route(RouteFn::new(Method::POST, path("/(open)/x"), say_posted))
+                .layer(LayerFn::new(path("/(auth)"), trace_auth)),
+        );
+
+        let (status, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"route");
+        assert_eq!(*trace.lock().unwrap(), vec!["auth"]);
+
+        trace.lock().unwrap().clear();
+        let (status, _, body) = send(&router, Method::POST, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"posted");
+        assert!(trace.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn method_not_allowed_runs_the_url_path_layers() {
+        // A 405 belongs to no route, so only layers on the endpoint's URL
+        // path wrap it; the layer inside the group does not run.
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/(auth)/x"), say_route))
+                .layer(LayerFn::new(path("/(auth)"), trace_auth))
+                .layer(LayerFn::new(path("/"), trace_root)),
+        );
+        let (status, _, _) = send(&router, Method::POST, "/x");
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
         assert_eq!(*trace.lock().unwrap(), vec!["root"]);
     }
 

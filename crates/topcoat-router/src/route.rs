@@ -10,8 +10,8 @@ use std::{
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    Body, EndpointIndex, HrefTarget, IntoPath, Methods, OwnedMethods, Path, response::Response,
-    route_endpoint,
+    Body, EndpointIndex, HrefTarget, IntoPath, LayerIndex, Methods, OwnedMethods, Path,
+    response::Response, route_endpoint,
 };
 
 /// The future returned by [`Route::handle`]: a boxed, `Send` future borrowing
@@ -190,6 +190,11 @@ pub(crate) struct RegisteredRoute {
     pub(crate) route: Box<dyn Route>,
     /// The endpoint the route's path resolved to, where its URL path lives.
     pub(crate) endpoint: EndpointIndex,
+    /// The layers wrapping this route, as indices into the router's layer
+    /// table, precomputed at build time from the route's path (group segments
+    /// included) and ordered from least- to most-specific so the outermost
+    /// layer runs first.
+    pub(crate) layers: Box<[LayerIndex]>,
 }
 
 /// The routes registered on a router, in registration order, indexed by
@@ -206,12 +211,21 @@ pub(crate) struct Routes {
 }
 
 impl Routes {
-    /// Registers `route` as served by `endpoint`, returning the [`RouteIndex`]
-    /// that now identifies the registration.
-    pub(crate) fn push(&mut self, route: Box<dyn Route>, endpoint: EndpointIndex) -> RouteIndex {
+    /// Registers `route` as served by `endpoint` and wrapped by `layers`,
+    /// returning the [`RouteIndex`] that now identifies the registration.
+    pub(crate) fn push(
+        &mut self,
+        route: Box<dyn Route>,
+        endpoint: EndpointIndex,
+        layers: Box<[LayerIndex]>,
+    ) -> RouteIndex {
         let index = RouteIndex::new(self.routes.len());
         self.by_id.insert(route.id(), index);
-        self.routes.push(RegisteredRoute { route, endpoint });
+        self.routes.push(RegisteredRoute {
+            route,
+            endpoint,
+            layers,
+        });
         index
     }
 

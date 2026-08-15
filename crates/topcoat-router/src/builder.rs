@@ -1,7 +1,7 @@
 use std::{
     any::{Any, type_name},
     borrow::Cow,
-    collections::{HashMap, hash_map::Entry},
+    collections::HashMap,
     fmt,
     sync::Arc,
 };
@@ -362,12 +362,6 @@ impl RouterBuilder {
     /// respond to every method at the same path), since the router would have
     /// no way to choose between them, and if a route declares an empty method
     /// set, since it could never be dispatched to.
-    ///
-    /// Also panics if two routes resolve to the same path but different layers
-    /// wrap them (possible when their group segments differ, e.g. `/(a)/x` and
-    /// `/(b)/x` with a layer at `/(a)`): every route at a path shares one layer
-    /// stack, so the divergence is rejected rather than resolved by
-    /// registration order.
     #[must_use]
     #[track_caller]
     pub fn build(self) -> Router {
@@ -395,33 +389,28 @@ impl RouterBuilder {
         let mut grouped: HashMap<Cow<'static, str>, EndpointIndex> = HashMap::new();
         let mut layers_used = vec![false; self.layers.len()];
         for route in registrations {
-            let layer_stack = self.layers.for_endpoint(route.path());
+            // The layers wrapping a route are selected against its own path,
+            // group segments included, so a layer inside a group wraps only
+            // the routes registered through that group.
+            let layer_stack = self.layers.for_path(route.path());
             // Mark layers as used.
             for layer_index in &layer_stack {
                 layers_used[layer_index.0] = true;
             }
 
-            let endpoint_index = match grouped.entry(route.path().to_matchit_path()) {
-                Entry::Vacant(entry) => {
+            let endpoint_index = *grouped
+                .entry(route.path().to_matchit_path())
+                .or_insert_with_key(|key| {
+                    // The endpoint's own stack wraps its 405 fallback, which
+                    // belongs to no route; it is selected against the URL
+                    // path, which carries no group segments.
+                    let path = Path::new(key);
                     let endpoint =
-                        Endpoint::new(Path::new(entry.key()), layer_stack.into_boxed_slice());
-                    let endpoint_index = endpoints.push(entry.key().clone(), endpoint);
-                    *entry.insert(endpoint_index)
-                }
-                Entry::Occupied(entry) => {
-                    // Every route at a path shares one layer stack, so reject
-                    // a divergence (possible when group segments differ)
-                    // rather than resolve it by registration order.
-                    assert!(
-                        endpoints[*entry.get()].layers() == &layer_stack[..],
-                        "routes registered for `{}` are wrapped by different layers",
-                        entry.key()
-                    );
-                    *entry.get()
-                }
-            };
+                        Endpoint::new(path, self.layers.for_path(path).into_boxed_slice());
+                    endpoints.push(key.clone(), endpoint)
+                });
 
-            let route_index = routes.push(route, endpoint_index);
+            let route_index = routes.push(route, endpoint_index, layer_stack.into_boxed_slice());
             let route = &routes[route_index].route;
             let endpoint = &mut endpoints[endpoint_index];
 
@@ -623,10 +612,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "routes registered for `/x` are wrapped by different layers")]
-    fn routes_sharing_a_url_with_diverging_layers_panic_on_build() {
-        // Both routes serve `/x`, but the layer inside `(a)` wraps only one of
-        // them, so the shared endpoint has no single layer stack.
+    fn routes_sharing_a_url_with_diverging_layers_build() {
+        // Both routes serve `/x`, but each carries its own layer stack, so
+        // the layer inside `(a)` wrapping only one of them is fine.
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/(a)/x"), handler))
             .route(RouteFn::new(Method::POST, path("/(b)/x"), handler))
