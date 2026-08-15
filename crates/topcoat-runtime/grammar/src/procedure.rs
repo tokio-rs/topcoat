@@ -122,10 +122,10 @@ impl ToTokens for Procedure {
 
         let id = uuid::Uuid::new_v4().to_string();
 
-        quote! {
+        let procedure = quote! {
             #(#docs)*
             #[allow(non_upper_case_globals)]
-            #vis const #ident: &#topcoat_runtime::Procedure::<(#(#arg_tys,)*), #return_ty> = &#topcoat_runtime::Procedure::new(
+            #vis static #ident: &#topcoat_runtime::Procedure::<(#(#arg_tys,)*), #return_ty> = &#topcoat_runtime::Procedure::new(
                 #topcoat_runtime::ProcedureId::new(#id),
                 |cx, body| {
                     #[allow(clippy::unused_async)]
@@ -139,12 +139,25 @@ impl ToTokens for Procedure {
                     })
                 },
             );
+        };
+
+        let submit =
+            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { &ERASED } });
+
+        let erased = quote! {
+            static ERASED: #topcoat_runtime::ErasedProcedure = #topcoat_runtime::ErasedProcedure::new(#ident);
+        };
+
+        quote! {
+            #procedure
+
+            const _: () = {
+                #erased
+
+                #submit
+            };
         }
         .to_tokens(tokens);
-
-        if cfg!(feature = "discover") {
-            quote! { #topcoat_inventory::submit! { #topcoat_runtime::ErasedProcedure::new(#ident) } }.to_tokens(tokens);
-        }
     }
 }
 

@@ -64,7 +64,7 @@ impl ErasedShard {
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ErasedShard);
+inventory::collect!(&'static ErasedShard);
 
 pub struct ShardRoute {
     id: RouteId,
@@ -125,8 +125,8 @@ impl RouterBuilderShardExt for RouterBuilder {
 
     #[cfg(feature = "discover")]
     fn discover_shards(mut self) -> Self {
-        for shard in inventory::iter::<ErasedShard>().cloned() {
-            self = self.shard(shard);
+        for &shard in inventory::iter::<&'static ErasedShard>() {
+            self = self.shard(shard.clone());
         }
         self
     }

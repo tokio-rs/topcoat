@@ -104,7 +104,7 @@ impl<A, R> From<&Procedure<A, R>> for ErasedProcedure {
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ErasedProcedure);
+inventory::collect!(&'static ErasedProcedure);
 
 /// A [`Route`] that handles calls to one server procedure.
 #[derive(Debug, Clone)]
@@ -167,8 +167,8 @@ impl RouterBuilderProcedureExt for RouterBuilder {
 
     #[cfg(feature = "discover")]
     fn discover_procedures(mut self) -> Self {
-        for procedure in inventory::iter::<ErasedProcedure>().cloned() {
-            self = self.procedure(procedure);
+        for &procedure in inventory::iter::<&'static ErasedProcedure>() {
+            self = self.procedure(procedure.clone());
         }
         self
     }

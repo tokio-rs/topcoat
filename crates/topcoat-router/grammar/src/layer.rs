@@ -78,7 +78,7 @@ impl ToTokens for Layer {
             quote! {
                 #(#docs)*
                 #[allow(non_upper_case_globals)]
-                #vis const #ident: #topcoat_router::LayerFn = #topcoat_router::LayerFn::new(
+                #vis static #ident: #topcoat_router::LayerFn = #topcoat_router::LayerFn::new(
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );
@@ -87,13 +87,13 @@ impl ToTokens for Layer {
             quote! {
                 #(#docs)*
                 #[allow(non_upper_case_globals)]
-                #vis const #ident: #topcoat_router::ModuleLayerFn = #topcoat_router::ModuleLayerFn::new(module_path!(), #render);
+                #vis static #ident: #topcoat_router::ModuleLayerFn = #topcoat_router::ModuleLayerFn::new(module_path!(), #render);
             }
         }
         .to_tokens(tokens);
 
         if cfg!(feature = "discover") {
-            quote! { #topcoat_inventory::submit! { #ident } }.to_tokens(tokens);
+            quote! { #topcoat_inventory::submit! { &#ident } }.to_tokens(tokens);
         }
     }
 }

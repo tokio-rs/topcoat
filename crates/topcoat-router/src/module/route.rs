@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{OwnedMethods, Path, RouteFn, RouteHandlerFn};
+use crate::{HrefTarget, OwnedMethods, Path, RouteFn, RouteHandlerFn, RouteId, RouteIdCell};
 
 /// A route discovered by the module router, produced by the `#[route]` macro.
 ///
@@ -10,6 +10,8 @@ use crate::{OwnedMethods, Path, RouteFn, RouteHandlerFn};
 #[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct ModuleRouteFn {
+    /// The identity of this route's handler.
+    id: RouteIdCell,
     /// The HTTP methods triggering this route.
     methods: OwnedMethods,
     /// Module path where `#[route]` was declared, used to derive the URL path.
@@ -26,16 +28,22 @@ impl ModuleRouteFn {
         render: RouteHandlerFn,
     ) -> Self {
         Self {
+            id: RouteIdCell::new(),
             methods,
             module_path,
             render,
         }
     }
 
+    /// Returns the identity of this route's handler.
+    pub fn id(&self) -> RouteId {
+        self.id.get()
+    }
+
     /// Converts into a [`RouteFn`] with the given resolved URL path.
     #[must_use]
     pub fn into_route(self, path: Cow<'static, Path>) -> RouteFn {
-        RouteFn::new(self.methods, path, self.render)
+        RouteFn::new(self.methods, path, self.render).with_id(self.id)
     }
 
     /// Returns the module path used to derive the URL.
@@ -46,4 +54,10 @@ impl ModuleRouteFn {
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModuleRouteFn);
+inventory::collect!(&'static ModuleRouteFn);
+
+impl HrefTarget for ModuleRouteFn {
+    fn route_id(&self) -> RouteId {
+        self.id.get()
+    }
+}

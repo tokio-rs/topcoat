@@ -39,4 +39,4 @@ impl ModuleLayerFn {
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModuleLayerFn);
+inventory::collect!(&'static ModuleLayerFn);

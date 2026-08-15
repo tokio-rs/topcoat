@@ -9,7 +9,7 @@ use std::{
 
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{Body, IntoPath, Methods, OwnedMethods, Path, response::Response};
+use crate::{Body, HrefTarget, IntoPath, Methods, OwnedMethods, Path, response::Response};
 
 /// The future returned by [`Route::handle`]: a boxed, `Send` future borrowing
 /// the route and its request context.
@@ -149,7 +149,17 @@ impl RouteFn {
             handle,
         }
     }
+
+    /// Overrides the automaticaly generated route ID with a custom one.
+    #[must_use]
+    pub fn with_id(mut self, id: RouteIdCell) -> Self {
+        self.id = id;
+        self
+    }
 }
+
+#[cfg(feature = "discover")]
+inventory::collect!(&'static RouteFn);
 
 impl Route for RouteFn {
     fn id(&self) -> RouteId {
@@ -169,5 +179,8 @@ impl Route for RouteFn {
     }
 }
 
-#[cfg(feature = "discover")]
-inventory::collect!(RouteFn);
+impl HrefTarget for RouteFn {
+    fn route_id(&self) -> RouteId {
+        self.id.get()
+    }
+}

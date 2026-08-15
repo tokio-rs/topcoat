@@ -8,6 +8,7 @@ mod compression;
 pub mod content;
 mod endpoint;
 pub mod error;
+mod href;
 mod layer;
 #[cfg(feature = "serve")]
 mod listener;
@@ -33,6 +34,7 @@ pub use builder::*;
 #[cfg(feature = "compression")]
 pub use compression::*;
 pub use endpoint::*;
+pub use href::*;
 pub use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};
 pub use layer::*;
 #[cfg(feature = "serve")]

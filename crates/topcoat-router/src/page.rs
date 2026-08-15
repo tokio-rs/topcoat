@@ -75,6 +75,13 @@ impl PageFn {
         self.id.get()
     }
 
+    /// Overrides the automaticaly generated route ID with a custom one.
+    #[must_use]
+    pub fn with_id(mut self, id: RouteIdCell) -> Self {
+        self.id = id;
+        self
+    }
+
     /// Returns the HTTP methods this page responds to.
     #[must_use]
     pub fn methods(&self) -> Methods<'_> {
@@ -99,7 +106,7 @@ impl PageFn {
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(PageFn);
+inventory::collect!(&'static PageFn);
 
 /// The async render function backing a [`LayoutFn`], receiving the rendered child content as a
 /// [`Result`]`<`[`View`]`>`.
@@ -146,7 +153,7 @@ impl LayoutFn {
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(LayoutFn);
+inventory::collect!(&'static LayoutFn);
 
 /// A [`PageFn`] paired with the [`LayoutFn`]s that wrap it.
 pub struct PageWithLayouts {

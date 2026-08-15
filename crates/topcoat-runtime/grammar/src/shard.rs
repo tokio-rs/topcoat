@@ -123,7 +123,7 @@ impl ToTokens for Shard {
         // The const is named after the shard so the render closure carries that
         // name in backtraces and profiles.
         let submit =
-            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { #ident } });
+            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { &#ident } });
         quote! {
             const _: () = {
                 // The user's real body, hung off the marker so both the
@@ -137,7 +137,7 @@ impl ToTokens for Shard {
                 }
 
                 #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_runtime::ErasedShard =
+                static #ident: #topcoat_runtime::ErasedShard =
                     #topcoat_runtime::ErasedShard::new(
                         #topcoat_runtime::ShardId::new(#id),
                         |cx, body| ::std::boxed::Box::pin(async move {
@@ -155,7 +155,7 @@ impl ToTokens for Shard {
 
                 impl ::core::convert::From<#ident> for #topcoat_runtime::ErasedShard {
                     fn from(_: #ident) -> Self {
-                        #ident
+                        #ident.clone()
                     }
                 }
 

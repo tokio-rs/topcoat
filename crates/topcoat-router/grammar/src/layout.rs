@@ -133,13 +133,12 @@ impl ToTokens for Layout {
             LayoutArg::Cx => quote! { cx },
             LayoutArg::Slot => quote! { slot },
         });
-        quote! {
+        let component = quote! {
             #[#topcoat_view_macro::component]
             #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_error::Result<#topcoat_view::View>) #output {
                 #ident::handler(cx #(, #component_args)*).await
             }
-        }
-        .to_tokens(tokens);
+        };
 
         // The user's real body, attached to the marker as an associated
         // function. Associated items are reached through the type rather than
@@ -183,35 +182,37 @@ impl ToTokens for Layout {
         let erased = if let Some(path) = attr.path.as_ref() {
             quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_router::LayoutFn = #topcoat_router::LayoutFn::new(
+                static #ident: #topcoat_router::LayoutFn = #topcoat_router::LayoutFn::new(
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
                 );
 
                 impl ::core::convert::From<#ident> for #topcoat_router::LayoutFn {
                     fn from(_: #ident) -> Self {
-                        #ident
+                        #ident.clone()
                     }
                 }
             }
         } else {
             quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_router::ModuleLayoutFn =
+                static #ident: #topcoat_router::ModuleLayoutFn =
                     #topcoat_router::ModuleLayoutFn::new(module_path!(), #render);
 
                 impl ::core::convert::From<#ident> for #topcoat_router::ModuleLayoutFn {
                     fn from(_: #ident) -> Self {
-                        #ident
+                        #ident.clone()
                     }
                 }
             }
         };
 
         let submit =
-            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { #ident } });
+            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { &#ident } });
 
         quote! {
+            #component
+
             const _: () = {
                 impl #ident {
                     #handler

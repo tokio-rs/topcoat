@@ -36,7 +36,9 @@ pub enum UrlForm {
 #[inline]
 #[must_use]
 pub fn url_form(cx: &Cx) -> UrlForm {
-    try_request_context::<UrlForm>(cx).copied().unwrap_or_default()
+    try_request_context::<UrlForm>(cx)
+        .copied()
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

@@ -109,11 +109,11 @@ impl ToTokens for Route {
         };
 
         let methods = &attr.methods;
-        if let Some(path) = attr.path.as_ref() {
+        let erased = if let Some(path) = attr.path.as_ref() {
             quote! {
                 #(#docs)*
                 #[allow(non_upper_case_globals)]
-                #vis const #ident: #topcoat_router::RouteFn = #topcoat_router::RouteFn::const_new(
+                #vis static #ident: #topcoat_router::RouteFn = #topcoat_router::RouteFn::const_new(
                     #methods,
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
@@ -123,18 +123,23 @@ impl ToTokens for Route {
             quote! {
                 #(#docs)*
                 #[allow(non_upper_case_globals)]
-                #vis const #ident: #topcoat_router::ModuleRouteFn = #topcoat_router::ModuleRouteFn::new(
+                #vis static #ident: #topcoat_router::ModuleRouteFn = #topcoat_router::ModuleRouteFn::new(
                     #methods,
                     module_path!(),
                     #render,
                 );
             }
+        };
+
+        let submit =
+            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { &#ident } });
+
+        quote! {
+            #erased
+
+            #submit
         }
         .to_tokens(tokens);
-
-        if cfg!(feature = "discover") {
-            quote! { #topcoat_inventory::submit! { #ident } }.to_tokens(tokens);
-        }
     }
 }
 

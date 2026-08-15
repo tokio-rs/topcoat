@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
-use crate::{LayoutFn, LayoutRenderFn, OwnedMethods, PageFn, PageRenderFn, Path};
+use crate::{
+    LayoutFn, LayoutRenderFn, OwnedMethods, PageFn, PageRenderFn, Path, RouteId, RouteIdCell,
+};
 
 /// A page discovered by the module router, produced by the `#[page]` macro.
 ///
@@ -10,6 +12,8 @@ use crate::{LayoutFn, LayoutRenderFn, OwnedMethods, PageFn, PageRenderFn, Path};
 #[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct ModulePageFn {
+    /// The identity of this page's handler.
+    id: RouteIdCell,
     /// The HTTP methods this page responds to.
     methods: OwnedMethods,
     /// Module path where `#[page]` was declared, used to derive the URL path.
@@ -26,16 +30,22 @@ impl ModulePageFn {
         render: PageRenderFn,
     ) -> Self {
         Self {
+            id: RouteIdCell::new(),
             methods,
             module_path,
             render,
         }
     }
 
+    /// Returns the identity of this page's handler.
+    pub fn id(&self) -> RouteId {
+        self.id.get()
+    }
+
     /// Converts into a [`PageFn`] with the given resolved URL path.
     #[must_use]
     pub fn into_page(self, path: Cow<'static, Path>) -> PageFn {
-        PageFn::new(self.methods, path, self.render)
+        PageFn::new(self.methods, path, self.render).with_id(self.id)
     }
 
     /// Returns the module path used to derive the URL.
@@ -46,7 +56,7 @@ impl ModulePageFn {
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModulePageFn);
+inventory::collect!(&'static ModulePageFn);
 
 /// A layout discovered by the module router, produced by the `#[layout]` macro.
 ///
@@ -86,4 +96,4 @@ impl ModuleLayoutFn {
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModuleLayoutFn);
+inventory::collect!(&'static ModuleLayoutFn);

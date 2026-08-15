@@ -296,10 +296,7 @@ mod tests {
         assert_eq!(BaseUrl::new("https://example.com")?.prefix(), "");
         assert_eq!(BaseUrl::new("https://example.com/")?.prefix(), "");
         assert_eq!(BaseUrl::new("https://example.com/app")?.prefix(), "/app");
-        assert_eq!(
-            BaseUrl::new("http://localhost:3000/a/b/")?.prefix(),
-            "/a/b"
-        );
+        assert_eq!(BaseUrl::new("http://localhost:3000/a/b/")?.prefix(), "/a/b");
         Ok(())
     }
 

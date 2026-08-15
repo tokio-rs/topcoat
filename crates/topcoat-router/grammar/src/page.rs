@@ -93,13 +93,12 @@ impl ToTokens for Page {
         // `router.page(...)`.
         let body_param = args.request().map(|ty| quote! { , body: #ty });
         let body_arg = args.request().map(|_| quote! { , body });
-        quote! {
+        let component = quote! {
             #[#topcoat_view_macro::component]
             #vis async fn #ident(cx: &#topcoat_context::Cx #body_param) #output {
                 #ident::handler(cx #body_arg).await
             }
-        }
-        .to_tokens(tokens);
+        };
 
         // The user's function, re-emitted under its original name inside the
         // bridge below to keep the module namespace clean. Its own name shadows
@@ -166,7 +165,7 @@ impl ToTokens for Page {
         let erased = if let Some(path) = attr.path.as_ref() {
             quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_router::PageFn = #topcoat_router::PageFn::const_new(
+                static #ident: #topcoat_router::PageFn = #topcoat_router::PageFn::const_new(
                     #methods,
                     ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
                     #render,
@@ -174,34 +173,42 @@ impl ToTokens for Page {
 
                 impl ::core::convert::From<#ident> for #topcoat_router::PageFn {
                     fn from(_: #ident) -> Self {
-                        #ident
+                        #ident.clone()
                     }
                 }
             }
         } else {
             quote! {
                 #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_router::ModulePageFn =
+                static #ident: #topcoat_router::ModulePageFn =
                     #topcoat_router::ModulePageFn::new(#methods, module_path!(), #render);
 
                 impl ::core::convert::From<#ident> for #topcoat_router::ModulePageFn {
                     fn from(_: #ident) -> Self {
-                        #ident
+                        #ident.clone()
                     }
                 }
             }
         };
 
         let submit =
-            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { #ident } });
+            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { &#ident } });
 
         quote! {
+            #component
+
             const _: () = {
                 #handler
 
                 #erased
 
                 #submit
+
+                impl #topcoat_router::HrefTarget for #ident {
+                    fn route_id(&self) -> #topcoat_router::RouteId {
+                        #ident.id()
+                    }
+                }
             };
         }
         .to_tokens(tokens);

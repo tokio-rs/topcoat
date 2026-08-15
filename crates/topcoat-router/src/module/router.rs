@@ -204,8 +204,8 @@ impl ModuleRouterBuilder {
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_pages(mut self) -> Self {
-        for page in inventory::iter::<ModulePageFn>().cloned() {
-            self = self.page(page);
+        for &page in inventory::iter::<&'static ModulePageFn>() {
+            self = self.page(page.clone());
         }
         self
     }
@@ -226,13 +226,13 @@ impl ModuleRouterBuilder {
     #[track_caller]
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
-        for layout in inventory::iter::<ModuleLayoutFn>().cloned() {
+        for &layout in inventory::iter::<&'static ModuleLayoutFn>() {
             assert!(
                 seen.insert(self.module_path_to_path(layout.module_path())),
                 "multiple discovered layouts registered for the same path \"{}\"",
                 self.module_path_to_path(layout.module_path())
             );
-            self = self.layout(layout);
+            self = self.layout(layout.clone());
         }
         self
     }
@@ -242,8 +242,8 @@ impl ModuleRouterBuilder {
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_routes(mut self) -> Self {
-        for route in inventory::iter::<ModuleRouteFn>().cloned() {
-            self = self.route(route);
+        for &route in inventory::iter::<&'static ModuleRouteFn>() {
+            self = self.route(route.clone());
         }
         self
     }
@@ -266,13 +266,13 @@ impl ModuleRouterBuilder {
     #[track_caller]
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
-        for layer in inventory::iter::<ModuleLayerFn>().cloned() {
+        for &layer in inventory::iter::<&'static ModuleLayerFn>() {
             assert!(
                 seen.insert(self.module_path_to_path(layer.module_path())),
                 "multiple discovered layers registered for the same path \"{}\"",
                 self.module_path_to_path(layer.module_path())
             );
-            self = self.layer(layer);
+            self = self.layer(layer.clone());
         }
         self
     }

@@ -98,8 +98,8 @@ impl RouterBuilder {
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_routes(mut self) -> Self {
-        for route in inventory::iter::<crate::RouteFn>().cloned() {
-            self = self.route(route);
+        for &route in inventory::iter::<&'static crate::RouteFn>() {
+            self = self.route(route.clone());
         }
         self
     }
@@ -121,8 +121,8 @@ impl RouterBuilder {
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_pages(mut self) -> Self {
-        for page in inventory::iter::<PageFn>().cloned() {
-            self = self.page(page);
+        for &page in inventory::iter::<&'static PageFn>() {
+            self = self.page(page.clone());
         }
         self
     }
@@ -152,13 +152,13 @@ impl RouterBuilder {
     #[track_caller]
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::<crate::PathBuf>::new();
-        for layout in inventory::iter::<LayoutFn>().cloned() {
+        for &layout in inventory::iter::<&'static LayoutFn>() {
             assert!(
                 seen.insert(layout.path().to_owned()),
                 "multiple discovered layouts registered for the same path \"{}\"",
                 layout.path()
             );
-            self = self.layout(layout);
+            self = self.layout(layout.clone());
         }
         self
     }
@@ -195,13 +195,13 @@ impl RouterBuilder {
     #[track_caller]
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::<crate::PathBuf>::new();
-        for layer in inventory::iter::<crate::LayerFn>().cloned() {
+        for &layer in inventory::iter::<&'static crate::LayerFn>() {
             assert!(
                 seen.insert(layer.path().to_owned()),
                 "multiple discovered layers registered for the same path \"{}\"",
                 layer.path()
             );
-            self = self.layer(layer);
+            self = self.layer(layer.clone());
         }
         self
     }

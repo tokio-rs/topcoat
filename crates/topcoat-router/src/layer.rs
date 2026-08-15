@@ -95,7 +95,7 @@ impl Layer for LayerFn {
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(LayerFn);
+inventory::collect!(&'static LayerFn);
 
 /// The identifier of a [`Layer`] registered on a router.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
