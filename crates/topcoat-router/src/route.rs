@@ -4,13 +4,16 @@ use std::{
     num::NonZeroUsize,
     ops::Index,
     pin::Pin,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    Body, EndpointIndex, HrefTarget, IntoPath, LayerIndex, Methods, OwnedMethods, Path,
+    Body, EndpointIndex, HrefTarget, IntoPath, Layer, Methods, OwnedMethods, Path,
     response::Response, route_endpoint,
 };
 
@@ -190,11 +193,10 @@ pub(crate) struct RegisteredRoute {
     pub(crate) route: Box<dyn Route>,
     /// The endpoint the route's path resolved to, where its URL path lives.
     pub(crate) endpoint: EndpointIndex,
-    /// The layers wrapping this route, as indices into the router's layer
-    /// table, precomputed at build time from the route's path (group segments
-    /// included) and ordered from least- to most-specific so the outermost
-    /// layer runs first.
-    pub(crate) layers: Box<[LayerIndex]>,
+    /// The layers wrapping this route, precomputed at build time from the
+    /// route's path (group segments included) and ordered from least- to
+    /// most-specific so the outermost layer runs first.
+    pub(crate) layers: Box<[Arc<dyn Layer>]>,
 }
 
 /// The routes registered on a router, in registration order, indexed by
@@ -217,7 +219,7 @@ impl Routes {
         &mut self,
         route: Box<dyn Route>,
         endpoint: EndpointIndex,
-        layers: Box<[LayerIndex]>,
+        layers: Box<[Arc<dyn Layer>]>,
     ) -> RouteIndex {
         let index = RouteIndex::new(self.routes.len());
         self.by_id.insert(route.id(), index);

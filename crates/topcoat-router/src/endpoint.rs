@@ -1,12 +1,14 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
+    fmt,
     ops::{Index, IndexMut},
+    sync::Arc,
 };
 
 use http::Method;
 
-use crate::{LayerIndex, Path, RouteIndex};
+use crate::{Layer, Path, RouteIndex};
 
 /// The standard HTTP methods, in the order their route slots appear in
 /// [`Endpoint::standard`]. Used only to name methods on the cold `Allow`-header
@@ -51,7 +53,6 @@ fn standard_slot(method: &Method) -> Option<usize> {
 ///
 /// The standard methods occupy a fixed-size array for O(1), allocation-free
 /// lookup; the rare custom methods spill into a map that is usually empty.
-#[derive(Debug)]
 pub struct Endpoint {
     standard: [Option<RouteIndex>; STANDARD_METHODS.len()],
     other: HashMap<Method, RouteIndex>,
@@ -63,16 +64,15 @@ pub struct Endpoint {
     /// on one endpoint.
     path: Box<str>,
     /// The layers wrapping requests whose path matched this endpoint but
-    /// whose method matched no route, as indices into the router's layer
-    /// table, precomputed at build time from the endpoint's URL path and
-    /// ordered from least- to most-specific so the outermost layer runs
-    /// first. Matched routes carry their own stacks; this one only wraps the
-    /// `405` fallback.
-    layers: Box<[LayerIndex]>,
+    /// whose method matched no route, precomputed at build time from the
+    /// endpoint's URL path and ordered from least- to most-specific so the
+    /// outermost layer runs first. Matched routes carry their own stacks;
+    /// this one only wraps the `405` fallback.
+    layers: Box<[Arc<dyn Layer>]>,
 }
 
 impl Endpoint {
-    pub(crate) fn new(path: &Path, layers: Box<[LayerIndex]>) -> Self {
+    pub(crate) fn new(path: &Path, layers: Box<[Arc<dyn Layer>]>) -> Self {
         Self {
             standard: [None; STANDARD_METHODS.len()],
             other: HashMap::new(),
@@ -142,9 +142,20 @@ impl Endpoint {
     }
 
     /// Returns the precomputed layer stack wrapping this endpoint's `405`
-    /// fallback, as indices into the router's layer table.
-    pub(crate) fn layers(&self) -> &[LayerIndex] {
+    /// fallback.
+    pub(crate) fn layers(&self) -> &[Arc<dyn Layer>] {
         &self.layers
+    }
+}
+
+impl fmt::Debug for Endpoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Endpoint")
+            .field("standard", &self.standard)
+            .field("other", &self.other)
+            .field("any", &self.any)
+            .field("path", &self.path)
+            .finish_non_exhaustive()
     }
 }
 

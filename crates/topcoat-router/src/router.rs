@@ -9,8 +9,8 @@ use std::{
 use topcoat_core::context::{AppContext, Cx, try_request_context};
 
 use crate::{
-    Endpoint, EndpointIndex, Endpoints, Layer, Layers, Next, OriginLayer, RawPathParams, Route,
-    RouteId, RouteIndex, RouterBuilder, Routes, Terminal,
+    Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
+    RouteIndex, RouterBuilder, Routes, Terminal,
     error::{internal_server_response, not_found, respond},
     request::Request,
     response::Response,
@@ -116,7 +116,7 @@ impl Router {
 
         // The origin layer wraps the whole chain, denying untrusted
         // cross-origin requests before anything else runs.
-        let next = Next::new(&inner.layers, layer_stack, terminal);
+        let next = Next::new(layer_stack, terminal);
         let response = inner.origin.handle(&cx, body, next).await;
         let response = respond(&cx, response);
 
@@ -144,9 +144,6 @@ pub(crate) struct RouterInner {
     /// The registered endpoints and the matcher resolving a request URL to
     /// one of them.
     pub(crate) endpoints: Endpoints,
-    /// The layers registered on this router, wrapping matched routes by path
-    /// prefix.
-    pub(crate) layers: Layers,
     /// The values shared by every request, read back via
     /// [`app_context`](topcoat_core::context::app_context).
     pub(crate) app_context: Arc<AppContext>,
@@ -245,7 +242,6 @@ pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
     let inner = RouterInner {
         routes: Routes::default(),
         endpoints,
-        layers: Layers::default(),
         app_context: Arc::new(AppContext::new()),
         origin: OriginLayer::new(OriginPolicy::new()),
         #[cfg(feature = "compression")]

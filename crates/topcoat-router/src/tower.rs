@@ -494,7 +494,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        Layers, Method, RouteFn, RouteFuture, Router, Terminal,
+        Method, RouteFn, RouteFuture, Router, Terminal,
         error::{NotFoundError, not_found},
         request::Bytes,
         response::IntoResponse,
@@ -527,8 +527,7 @@ mod tests {
 
     /// Runs a request through `layer` wrapped directly around `route`.
     fn run(layer: &dyn Layer, cx: &Cx, route: &RouteFn) -> Result<Response> {
-        let layers = Layers::default();
-        let next = Next::new(&layers, &[], Terminal::Route(route));
+        let next = Next::new(&[], Terminal::Route(route));
         block_on(layer.handle(cx, Body::empty(), next))
     }
 
@@ -889,11 +888,10 @@ mod tests {
     #[test]
     fn chain_errors_tunnel_through_unchanged() {
         let layer = TowerLayer::new(tower::layer::util::Identity::new());
-        let layers = Layers::default();
         let route = RouteFn::new(Method::GET, path("/missing"), not_found_route);
         let cx = cx_for("/missing");
 
-        let next = Next::new(&layers, &[], Terminal::Route(&route));
+        let next = Next::new(&[], Terminal::Route(&route));
         let result = block_on(layer.handle(&cx, Body::empty(), next));
 
         // The 404 comes back out as the original typed error, not a response.
@@ -910,11 +908,10 @@ mod tests {
         // `Timeout` boxes its inner service's errors; the original error must
         // still be recovered on the way out.
         let layer = TowerLayer::new(tower::timeout::TimeoutLayer::new(Duration::from_mins(1)));
-        let layers = Layers::default();
         let route = RouteFn::new(Method::GET, path("/missing"), not_found_route);
         let cx = cx_for("/missing");
 
-        let next = Next::new(&layers, &[], Terminal::Route(&route));
+        let next = Next::new(&[], Terminal::Route(&route));
         let result = block_on(layer.handle(&cx, Body::empty(), next));
 
         assert!(

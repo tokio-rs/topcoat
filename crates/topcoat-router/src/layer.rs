@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ops::Index, pin::Pin};
+use std::{borrow::Cow, pin::Pin, sync::Arc};
 
 use topcoat_core::{context::Cx, error::Result};
 
@@ -113,54 +113,17 @@ impl Layer for LayerFn {
     }
 }
 
-/// The position of a [`Layer`] in a router's [`Layers`] table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct LayerIndex(pub(crate) usize);
-
-/// The layers registered on a router, in registration order, indexed by
-/// [`LayerIndex`].
-///
-/// Layers are [`push`](Self::push)ed as the router is built, then only queried:
-/// [`for_path`](Self::for_path) selects the layers wrapping a path, and
-/// indexing by [`LayerIndex`] resolves a selected index back to its layer.
-#[derive(Default)]
-pub(crate) struct Layers {
-    layers: Vec<Box<dyn Layer>>,
-}
-
-impl Layers {
-    /// Registers `layer`, returning the [`LayerIndex`] that now identifies it.
-    pub(crate) fn push(&mut self, layer: Box<dyn Layer>) -> LayerIndex {
-        let index = LayerIndex(self.layers.len());
-        self.layers.push(layer);
-        index
-    }
-
-    /// Selects the layers whose path is a prefix of `path`, ordered least- to
-    /// most-specific so the outermost layer runs first. Among layers that
-    /// share a path, the most recently registered runs first.
-    pub(crate) fn for_path(&self, path: &Path) -> Vec<LayerIndex> {
-        let mut indices: Vec<LayerIndex> = (0..self.layers.len())
-            .map(LayerIndex)
-            .filter(|index| path.starts_with(self[*index].path()))
-            .rev()
-            .collect();
-        indices.sort_by_key(|index| self[*index].path().len());
-        indices
-    }
-
-    /// Returns the number of registered layers.
-    pub(crate) fn len(&self) -> usize {
-        self.layers.len()
-    }
-}
-
-impl Index<LayerIndex> for Layers {
-    type Output = dyn Layer;
-
-    fn index(&self, LayerIndex(index): LayerIndex) -> &Self::Output {
-        &*self.layers[index]
-    }
+/// Selects the layers in `layers` whose path is a prefix of `path`, ordered
+/// least- to most-specific so the outermost layer runs first. Among layers
+/// that share a path, the later one in `layers` runs first.
+pub(crate) fn layers_for_path(layers: &[Arc<dyn Layer>], path: &Path) -> Box<[Arc<dyn Layer>]> {
+    let mut matching: Vec<&Arc<dyn Layer>> = layers
+        .iter()
+        .filter(|layer| path.starts_with(layer.path()))
+        .rev()
+        .collect();
+    matching.sort_by_key(|layer| layer.path().len());
+    matching.into_iter().cloned().collect()
 }
 
 /// What a [`Next`] chain runs once its layers are exhausted.
@@ -185,43 +148,32 @@ pub(crate) enum Terminal<'a> {
 /// Passed as the `next` argument to [`Layer::handle`]. Call [`run`](Self::run)
 /// to invoke the next layer, or the terminal once the layers are exhausted.
 pub struct Next<'a> {
-    /// The router's full layer table, indexed by `indices`.
-    layers: &'a Layers,
-    /// The layers wrapping this request, as indices into `layers`, ordered
-    /// from least- to most-specific so the outermost layer runs first.
-    indices: &'a [LayerIndex],
+    /// The layers wrapping this request, ordered from least- to most-specific
+    /// so the outermost layer runs first.
+    layers: &'a [Arc<dyn Layer>],
     /// What runs once the layers are exhausted.
     terminal: Terminal<'a>,
 }
 
 impl<'a> Next<'a> {
-    /// Creates a chain that runs `indices` (in order) into `layers`, then
-    /// `terminal`.
+    /// Creates a chain that runs `layers` (in order), then `terminal`.
     ///
-    /// `indices` must be ordered from least- to most-specific (ascending path
+    /// `layers` must be ordered from least- to most-specific (ascending path
     /// length), so the outermost layer runs first.
-    pub(crate) fn new(
-        layers: &'a Layers,
-        indices: &'a [LayerIndex],
-        terminal: Terminal<'a>,
-    ) -> Self {
-        Self {
-            layers,
-            indices,
-            terminal,
-        }
+    pub(crate) fn new(layers: &'a [Arc<dyn Layer>], terminal: Terminal<'a>) -> Self {
+        Self { layers, terminal }
     }
 
     /// Runs the next layer in the chain, or the terminal handler once no layers
     /// remain.
     #[must_use]
     pub fn run(self, cx: &'a Cx, body: Body) -> LayerFuture<'a> {
-        match self.indices.split_first() {
-            Some((&id, rest)) => self.layers[id].handle(
+        match self.layers.split_first() {
+            Some((layer, rest)) => layer.handle(
                 cx,
                 body,
                 Next {
-                    indices: rest,
+                    layers: rest,
                     ..self
                 },
             ),
@@ -267,8 +219,16 @@ mod tests {
 
     /// A layer whose path is all a test cares about; its handler just forwards
     /// to the rest of the chain and never runs in the selection tests.
-    fn layer_at(p: &'static str) -> Box<dyn Layer> {
-        Box::new(LayerFn::new(path(p), noop_layer))
+    fn layer_at(p: &'static str) -> Arc<dyn Layer> {
+        Arc::new(LayerFn::new(path(p), noop_layer))
+    }
+
+    /// The paths of the layers `layers_for_path` selected, in order.
+    fn selected_paths(layers: &[Arc<dyn Layer>], p: &Path) -> Vec<String> {
+        layers_for_path(layers, p)
+            .iter()
+            .map(|layer| layer.path().to_string())
+            .collect()
     }
 
     fn noop_layer<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -329,84 +289,66 @@ mod tests {
         assert_eq!(layer.path(), Path::new("/admin"));
     }
 
-    // -- Layers --
-
-    #[test]
-    fn push_assigns_sequential_ids() {
-        let mut layers = Layers::default();
-        assert_eq!(layers.push(layer_at("/")), LayerIndex(0));
-        assert_eq!(layers.push(layer_at("/admin")), LayerIndex(1));
-        assert_eq!(layers.push(layer_at("/admin/x")), LayerIndex(2));
-    }
-
-    #[test]
-    fn index_resolves_an_id_to_its_layer() {
-        let mut layers = Layers::default();
-        let root = layers.push(layer_at("/"));
-        let admin = layers.push(layer_at("/admin"));
-        assert_eq!(layers[root].path(), Path::new("/"));
-        assert_eq!(layers[admin].path(), Path::new("/admin"));
-    }
+    // -- layers_for_path --
 
     #[test]
     fn for_path_orders_prefix_layers_least_to_most_specific() {
-        let mut layers = Layers::default();
-        let root = layers.push(layer_at("/"));
-        let users = layers.push(layer_at("/users"));
-        let _posts = layers.push(layer_at("/posts"));
+        let layers = [layer_at("/"), layer_at("/users"), layer_at("/posts")];
         // The route at /users/{id} is wrapped by the root and /users layers, in
         // that order; the /posts layer does not prefix it.
-        assert_eq!(layers.for_path(Path::new("/users/{id}")), vec![root, users],);
-    }
-
-    #[test]
-    fn for_path_runs_most_recent_of_a_shared_path_first() {
-        let mut layers = Layers::default();
-        let first = layers.push(layer_at("/admin"));
-        let second = layers.push(layer_at("/admin"));
         assert_eq!(
-            layers.for_path(Path::new("/admin/users")),
-            vec![second, first],
+            selected_paths(&layers, Path::new("/users/{id}")),
+            ["/", "/users"],
         );
     }
 
     #[test]
+    fn for_path_runs_the_later_of_a_shared_path_first() {
+        let first = layer_at("/admin");
+        let second = layer_at("/admin");
+        let layers = [Arc::clone(&first), Arc::clone(&second)];
+        let selected = layers_for_path(&layers, Path::new("/admin/users"));
+        assert_eq!(selected.len(), 2);
+        assert!(Arc::ptr_eq(&selected[0], &second));
+        assert!(Arc::ptr_eq(&selected[1], &first));
+    }
+
+    #[test]
     fn for_path_rejects_partial_segments() {
-        let mut layers = Layers::default();
-        let _admin = layers.push(layer_at("/admin"));
-        assert!(layers.for_path(Path::new("/administrator")).is_empty());
+        let layers = [layer_at("/admin")];
+        assert!(layers_for_path(&layers, Path::new("/administrator")).is_empty());
     }
 
     #[test]
     fn for_path_includes_group_segments() {
-        let mut layers = Layers::default();
-        let auth = layers.push(layer_at("/(auth)"));
-        let _dashboard = layers.push(layer_at("/dashboard"));
+        let layers = [layer_at("/(auth)"), layer_at("/dashboard")];
         // Groups are part of the logical path: the layer inside `(auth)` wraps
         // the endpoint, while the URL-lookalike `/dashboard` layer does not.
-        assert_eq!(layers.for_path(Path::new("/(auth)/dashboard")), vec![auth],);
+        assert_eq!(
+            selected_paths(&layers, Path::new("/(auth)/dashboard")),
+            ["/(auth)"],
+        );
     }
 
     #[test]
     fn for_path_distinguishes_param_names() {
-        let mut layers = Layers::default();
-        let id = layers.push(layer_at("/users/{id}"));
-        let _user_id = layers.push(layer_at("/users/{user_id}"));
+        let layers = [layer_at("/users/{id}"), layer_at("/users/{user_id}")];
         // Prefix matching compares segments, so `{id}` only wraps endpoints
         // spelled with the same parameter name.
-        assert_eq!(layers.for_path(Path::new("/users/{id}/posts")), vec![id]);
+        assert_eq!(
+            selected_paths(&layers, Path::new("/users/{id}/posts")),
+            ["/users/{id}"],
+        );
     }
 
     // -- Next --
 
     #[test]
     fn run_invokes_the_route_terminal_when_no_layers_remain() {
-        let layers = Layers::default();
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
         let cx = Cx::default();
 
-        let indices: &[LayerIndex] = &[];
-        let next = Next::new(&layers, indices, Terminal::Route(&route));
+        let next = Next::new(&[], Terminal::Route(&route));
         let result = block_on(next.run(&cx, Body::empty()));
         let response = respond(&cx, result);
 
@@ -416,15 +358,12 @@ mod tests {
 
     #[test]
     fn run_resolves_the_method_not_allowed_terminal() {
-        let layers = Layers::default();
-        let no_layers: Box<[LayerIndex]> = Box::new([]);
-        let mut endpoint = Endpoint::new(&path("/x"), no_layers);
+        let mut endpoint = Endpoint::new(&path("/x"), Box::new([]));
         endpoint.insert(Method::GET, RouteIndex::new(0));
         endpoint.insert(Method::POST, RouteIndex::new(1));
         let cx = Cx::default();
 
-        let indices: &[LayerIndex] = &[];
-        let next = Next::new(&layers, indices, Terminal::MethodNotAllowed(&endpoint));
+        let next = Next::new(&[], Terminal::MethodNotAllowed(&endpoint));
         let result = block_on(next.run(&cx, Body::empty()));
         let response = respond(&cx, result);
 
@@ -442,32 +381,30 @@ mod tests {
 
     #[test]
     fn run_walks_layers_in_order_before_the_terminal() {
-        let mut layers = Layers::default();
-        let a = layers.push(Box::new(LayerFn::new(path("/"), record_a)));
-        let b = layers.push(Box::new(LayerFn::new(path("/"), record_b)));
-        let indices = [a, b];
+        let layers: [Arc<dyn Layer>; 2] = [
+            Arc::new(LayerFn::new(path("/"), record_a)),
+            Arc::new(LayerFn::new(path("/"), record_b)),
+        ];
         let route = RouteFn::new(Method::GET, path("/x"), record_route);
 
         let trace: Arc<Trace> = Arc::new(Mutex::new(Vec::new()));
         let cx = cx_with_trace(trace.clone());
 
-        let next = Next::new(&layers, &indices, Terminal::Route(&route));
+        let next = Next::new(&layers, Terminal::Route(&route));
         block_on(next.run(&cx, Body::empty())).unwrap();
 
-        // The layers run in `indices` order, then the terminal route.
+        // The layers run in slice order, then the terminal route.
         assert_eq!(*trace.lock().unwrap(), vec!["a", "b", "route"]);
     }
 
     #[test]
     fn run_lets_a_layer_short_circuit_without_calling_next() {
-        let mut layers = Layers::default();
-        let stop = layers.push(Box::new(LayerFn::new(path("/"), short_circuit)));
-        let indices = [stop];
+        let layers: [Arc<dyn Layer>; 1] = [Arc::new(LayerFn::new(path("/"), short_circuit))];
         // The route would answer "route", but the layer never calls `next.run`.
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
         let cx = Cx::default();
 
-        let next = Next::new(&layers, &indices, Terminal::Route(&route));
+        let next = Next::new(&layers, Terminal::Route(&route));
         let result = block_on(next.run(&cx, Body::empty()));
         let response = respond(&cx, result);
 

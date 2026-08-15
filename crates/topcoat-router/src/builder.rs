@@ -9,8 +9,8 @@ use std::{
 use topcoat_core::{base_url::BaseUrl, context::AppContext};
 
 use crate::{
-    Endpoint, EndpointIndex, Endpoints, Layer, LayerIndex, Layers, Layout, Methods, OriginLayer,
-    OriginPolicy, Page, PageWithLayouts, Path, Route, Router, RouterInner, Routes,
+    Endpoint, EndpointIndex, Endpoints, Layer, Layout, Methods, OriginLayer, OriginPolicy, Page,
+    PageWithLayouts, Path, Route, Router, RouterInner, Routes, layers_for_path,
 };
 
 /// Builds a [`Router`] for a Topcoat application.
@@ -48,7 +48,7 @@ pub struct RouterBuilder {
     routes: Vec<Box<dyn Route>>,
     pages: Vec<Box<dyn Page>>,
     layouts: Vec<Arc<dyn Layout>>,
-    layers: Layers,
+    layers: Vec<Arc<dyn Layer>>,
     context: AppContext,
     origin_policy: OriginPolicy,
     #[cfg(feature = "compression")]
@@ -66,7 +66,7 @@ impl RouterBuilder {
             routes: Vec::new(),
             pages: Vec::new(),
             layouts: Vec::new(),
-            layers: Layers::default(),
+            layers: Vec::new(),
             context,
             origin_policy: OriginPolicy::new(),
             #[cfg(feature = "compression")]
@@ -173,7 +173,7 @@ impl RouterBuilder {
     /// sit at the same path.
     #[must_use]
     pub fn layer(mut self, layer: impl Layer) -> Self {
-        self.layers.push(Box::new(layer));
+        self.layers.push(Arc::new(layer));
         self
     }
 
@@ -392,10 +392,11 @@ impl RouterBuilder {
             // The layers wrapping a route are selected against its own path,
             // group segments included, so a layer inside a group wraps only
             // the routes registered through that group.
-            let layer_stack = self.layers.for_path(route.path());
-            // Mark layers as used.
-            for layer_index in &layer_stack {
-                layers_used[layer_index.0] = true;
+            let layer_stack = layers_for_path(&self.layers, route.path());
+            // Mark layers as used, with the same prefix rule the selection
+            // applies.
+            for (layer, used) in self.layers.iter().zip(&mut layers_used) {
+                *used |= route.path().starts_with(layer.path());
             }
 
             let endpoint_index = *grouped
@@ -405,12 +406,11 @@ impl RouterBuilder {
                     // belongs to no route; it is selected against the URL
                     // path, which carries no group segments.
                     let path = Path::new(key);
-                    let endpoint =
-                        Endpoint::new(path, self.layers.for_path(path).into_boxed_slice());
+                    let endpoint = Endpoint::new(path, layers_for_path(&self.layers, path));
                     endpoints.push(key.clone(), endpoint)
                 });
 
-            let route_index = routes.push(route, endpoint_index, layer_stack.into_boxed_slice());
+            let route_index = routes.push(route, endpoint_index, layer_stack);
             let route = &routes[route_index].route;
             let endpoint = &mut endpoints[endpoint_index];
 
@@ -445,8 +445,7 @@ impl RouterBuilder {
         }
 
         // Sanity check for unused layers.
-        for (layer_index, used) in layers_used.into_iter().enumerate() {
-            let layer = &self.layers[LayerIndex(layer_index)];
+        for (layer, used) in self.layers.iter().zip(layers_used) {
             assert!(
                 used || layer.path() == Path::ROOT,
                 "layer with path `{}` did not match any route, this is likely a mistake",
@@ -461,7 +460,6 @@ impl RouterBuilder {
         Router::new(RouterInner {
             routes,
             endpoints,
-            layers: self.layers,
             app_context: Arc::new(self.context),
             origin: OriginLayer::new(self.origin_policy),
             #[cfg(feature = "compression")]
