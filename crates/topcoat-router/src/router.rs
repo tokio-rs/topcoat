@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     future::{Future, poll_fn},
     panic::{AssertUnwindSafe, catch_unwind},
     pin::pin,
@@ -11,8 +12,8 @@ use topcoat_core::context::try_request_context;
 use topcoat_core::context::{AppContext, Cx};
 
 use crate::{
-    Endpoint, EndpointPath, Layer, Layers, Next, OriginLayer, RawPathParams, Route, RouterBuilder,
-    Terminal,
+    Endpoint, EndpointPath, Layer, Layers, Next, OriginLayer, RawPathParams, Route, RouteId,
+    RouterBuilder, Terminal,
     error::{internal_server_response, not_found, respond},
     request::Request,
     response::Response,
@@ -40,6 +41,8 @@ use crate::{
 pub struct Router {
     /// The registered routes, indexed by the values stored in `endpoints`.
     pub(crate) routes: Vec<Box<dyn Route>>,
+    /// The index of each route in `routes`, keyed by its [`RouteId`].
+    pub(crate) route_ids: HashMap<RouteId, usize>,
     /// The endpoint handling each path, matched against the request URL and
     /// indexing into `routes` by HTTP method.
     pub(crate) endpoints: matchit::Router<Endpoint>,
@@ -61,6 +64,12 @@ impl Router {
     #[must_use]
     pub fn builder() -> RouterBuilder {
         RouterBuilder::new()
+    }
+
+    /// Returns the route registered under `id`, or `None` if this router
+    /// holds no route with that identity.
+    pub(crate) fn route_by_id(&self, id: RouteId) -> Option<&dyn Route> {
+        self.route_ids.get(&id).map(|&index| &*self.routes[index])
     }
 
     /// Dispatches a request to the route registered for its path and method,

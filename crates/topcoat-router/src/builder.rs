@@ -376,7 +376,7 @@ impl RouterBuilder {
             pages,
             layouts,
             layers,
-            mut context,
+            context,
             origin_policy,
             #[cfg(feature = "compression")]
             compression,
@@ -466,8 +466,15 @@ impl RouterBuilder {
                 .unwrap_or_else(|error| panic!("failed to register route {path:?}: {error}"));
         }
 
+        let route_ids = routes
+            .iter()
+            .enumerate()
+            .map(|(index, route)| (route.id(), index))
+            .collect();
+
         Router {
             routes,
+            route_ids,
             endpoints,
             layers,
             app_context: Arc::new(context),
