@@ -500,7 +500,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, LayerFn, LayerFuture, Method, Next, Path, PageFn, RouteFn, RouteFuture,
+        Body, LayerFn, LayerFuture, Method, Next, PageFn, Path, RouteFn, RouteFuture,
         response::IntoResponse,
     };
 

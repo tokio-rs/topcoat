@@ -2,9 +2,7 @@ use std::{borrow::Cow, ops::Index, pin::Pin};
 
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{
-    Body, Endpoint, IntoPath, Path, Route, error::method_not_allowed, response::Response,
-};
+use crate::{Body, Endpoint, IntoPath, Path, Route, error::method_not_allowed, response::Response};
 
 /// The future returned by [`Layer::handle`] and [`Next::run`]: a boxed, `Send`
 /// future borrowing the chain and the request context.
