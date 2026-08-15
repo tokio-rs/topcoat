@@ -138,8 +138,10 @@ impl RouterBuilderProcedureExt for RouterBuilder {
 /// The surrogate a [`Procedure`] value turns into inside a runtime
 /// expression.
 ///
-/// Serializes as the procedure's id, so the browser can call it back, and
-/// exposes the typed [`call`](Self::call) that runtime expressions invoke.
+/// Captured as a `&'static` reference, so closures inside the expression can
+/// hold it without borrowing a local. Serializes as the procedure's id, so
+/// the browser can call it back, and exposes the typed [`call`](Self::call)
+/// that runtime expressions invoke.
 pub struct ProcedureSurrogate<P>(P);
 
 impl<P: TypedProcedure> ProcedureSurrogate<P> {
@@ -162,9 +164,9 @@ impl<P: TypedProcedure> ProcedureSurrogate<P> {
     }
 }
 
-impl<P> Surrogate for ProcedureSurrogate<P>
+impl<P> Surrogate for &'static ProcedureSurrogate<P>
 where
-    P: TypedProcedure + Surrogated<Surrogate = ProcedureSurrogate<P>>,
+    P: TypedProcedure + Copy + Surrogated<Surrogate = Self>,
 {
     type Real = P;
 

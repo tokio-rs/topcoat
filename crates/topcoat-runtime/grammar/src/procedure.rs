@@ -81,10 +81,12 @@ impl ToTokens for Procedure {
 
         // Marker: the value users register and reference. A unit struct, so
         // `#ident` stays a value usable directly in `router.procedure(...)`
-        // and capturable in runtime expressions.
+        // and capturable in runtime expressions. `Copy` lets the surrogate
+        // hand the marker back out of its `&'static` reference.
         let marker = quote! {
             #(#docs)*
             #[allow(non_camel_case_types)]
+            #[derive(Clone, Copy)]
             #vis struct #ident;
         };
 
@@ -181,10 +183,12 @@ impl ToTokens for Procedure {
             }
 
             impl #topcoat_runtime::Surrogated for #ident {
-                type Surrogate = #topcoat_runtime::ProcedureSurrogate<#ident>;
+                type Surrogate = &'static #topcoat_runtime::ProcedureSurrogate<#ident>;
 
                 fn into_surrogate(self) -> Self::Surrogate {
-                    #topcoat_runtime::ProcedureSurrogate::new(self)
+                    static SURROGATE: #topcoat_runtime::ProcedureSurrogate<#ident> =
+                        #topcoat_runtime::ProcedureSurrogate::new(#ident);
+                    &SURROGATE
                 }
             }
         };
