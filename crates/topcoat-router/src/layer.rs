@@ -2,7 +2,9 @@ use std::{borrow::Cow, ops::Index, pin::Pin};
 
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{Body, Endpoint, Path, Route, error::method_not_allowed, response::Response};
+use crate::{
+    Body, Endpoint, IntoPath, Path, Route, error::method_not_allowed, response::Response,
+};
 
 /// The future returned by [`Layer::handle`] and [`Next::run`]: a boxed, `Send`
 /// future borrowing the chain and the request context.
@@ -60,15 +62,26 @@ pub trait Layer: Send + Sync + 'static {
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 }
 
+impl<L: Layer + ?Sized> Layer for &'static L {
+    fn path(&self) -> &Path {
+        (**self).path()
+    }
+
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        (**self).handle(cx, body, next)
+    }
+}
+
+#[cfg(feature = "discover")]
+inventory::collect!(&'static dyn Layer);
+
 /// The handler function backing a [`LayerFn`].
 pub type LayerHandlerFn = for<'a> fn(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 
 /// A [`Layer`] backed by a plain handler function.
 ///
-/// Created either manually via `#[layer("/path")]` or by the module router
-/// (which derives the path from the module tree). Registered into a
-/// [`RouterBuilder`](crate::RouterBuilder) with
-/// [`layer`](crate::RouterBuilder::layer).
+/// Turns a function into a layer without implementing [`Layer`] on a struct,
+/// pairing it with the path prefix it applies to.
 #[derive(Debug, Clone)]
 pub struct LayerFn {
     /// The URL path prefix whose routes this layer wraps.
@@ -79,8 +92,16 @@ pub struct LayerFn {
 
 impl LayerFn {
     /// Creates a new layer with an explicit path prefix and handler function.
-    pub const fn new(path: Cow<'static, Path>, handle: LayerHandlerFn) -> Self {
-        Self { path, handle }
+    ///
+    /// # Panics
+    ///
+    /// Panics if `path` is a string that is not a well-formed route path.
+    #[track_caller]
+    pub fn new(path: impl IntoPath, handle: LayerHandlerFn) -> Self {
+        Self {
+            path: path.into_path(),
+            handle,
+        }
     }
 }
 

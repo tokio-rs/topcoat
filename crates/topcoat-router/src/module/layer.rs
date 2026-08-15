@@ -1,42 +1,52 @@
-use std::borrow::Cow;
+use topcoat_core::context::Cx;
 
-use crate::{LayerFn, LayerHandlerFn, Path};
+use crate::{Body, Layer, LayerFuture, Next, Path, PathBuf};
 
-/// A layer discovered by the module router, produced by the `#[layer]` macro.
+/// A layer discovered by the module router, declared without an explicit path.
 ///
-/// Holds the module path (for deriving the URL prefix from the module tree)
-/// and the handler function. The module router converts each `ModuleLayerFn`
-/// into a [`LayerFn`] once the URL path has been computed.
+/// Holds the module path the layer was declared in; the module router derives
+/// the URL prefix from the module tree and registers the layer under it.
 #[doc(hidden)]
-#[derive(Debug, Clone)]
-pub struct ModuleLayerFn {
-    /// Module path where `#[layer]` was declared, used to derive the URL path.
-    module_path: &'static str,
-    /// The layer's handler function, wrapping the inner chain.
-    render: LayerHandlerFn,
+pub trait ModuleLayer: Send + Sync + 'static {
+    /// The module path where the layer was declared, used to derive the URL.
+    fn module_path(&self) -> &'static str;
+
+    /// Handles a request, calling `next` to continue down the chain.
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 }
 
-impl ModuleLayerFn {
-    /// Creates a new module layer. Called by the expanded `#[layer]` macro.
-    pub const fn new(module_path: &'static str, render: LayerHandlerFn) -> Self {
-        Self {
-            module_path,
-            render,
-        }
+impl<L: ModuleLayer + ?Sized> ModuleLayer for &'static L {
+    fn module_path(&self) -> &'static str {
+        (**self).module_path()
     }
 
-    /// Converts into a [`LayerFn`] with the given resolved URL path.
-    #[must_use]
-    pub fn into_layer(self, path: Cow<'static, Path>) -> LayerFn {
-        LayerFn::new(path, self.render)
-    }
-
-    /// Returns the module path used to derive the URL.
-    #[must_use]
-    pub fn module_path(&self) -> &'static str {
-        self.module_path
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        (**self).handle(cx, body, next)
     }
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(&'static ModuleLayerFn);
+inventory::collect!(&'static dyn ModuleLayer);
+
+/// A [`ModuleLayer`] bound to the URL prefix derived from its module tree,
+/// registered into the inner builder as a [`Layer`].
+pub(super) struct ResolvedLayer<L> {
+    layer: L,
+    path: PathBuf,
+}
+
+impl<L: ModuleLayer> ResolvedLayer<L> {
+    pub(super) fn new(layer: L, path: PathBuf) -> Self {
+        Self { layer, path }
+    }
+}
+
+impl<L: ModuleLayer> Layer for ResolvedLayer<L> {
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        self.layer.handle(cx, body, next)
+    }
+}

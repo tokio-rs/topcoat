@@ -9,7 +9,7 @@ use std::{
 use topcoat_core::{base_url::BaseUrl, context::AppContext};
 
 use crate::{
-    Endpoint, Layer, LayerId, Layers, LayoutFn, Methods, OriginLayer, OriginPolicy, PageFn,
+    Endpoint, Layer, LayerId, Layers, Layout, Methods, OriginLayer, OriginPolicy, Page,
     PageWithLayouts, Path, Route, Router,
 };
 
@@ -46,8 +46,8 @@ use crate::{
 /// ```
 pub struct RouterBuilder {
     routes: Vec<Box<dyn Route>>,
-    pages: Vec<PageFn>,
-    layouts: Vec<LayoutFn>,
+    pages: Vec<Box<dyn Page>>,
+    layouts: Vec<Arc<dyn Layout>>,
     layers: Layers,
     context: AppContext,
     origin_policy: OriginPolicy,
@@ -98,45 +98,45 @@ impl RouterBuilder {
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_routes(mut self) -> Self {
-        for &route in inventory::iter::<&'static crate::RouteFn>() {
-            self = self.route(route.clone());
+        for &route in inventory::iter::<&'static dyn Route>() {
+            self = self.route(route);
         }
         self
     }
 
-    /// Registers a page: anything convertible into a [`PageFn`], like the
-    /// marker `#[page]` generates. Order doesn't matter: layout matching is
-    /// based on path prefixes, not registration order.
+    /// Registers a [`Page`], like the marker `#[page]` generates. Order
+    /// doesn't matter: layout matching is based on path prefixes, not
+    /// registration order.
     ///
-    /// A page serves the methods its [`PageFn`] declares (`GET` unless the
-    /// page opts into others).
+    /// A page serves the methods its [`Page::methods`] declares (`GET` unless
+    /// the page opts into others).
     #[must_use]
-    pub fn page(mut self, page: impl Into<PageFn>) -> Self {
-        self.pages.push(page.into());
+    pub fn page(mut self, page: impl Page) -> Self {
+        self.pages.push(Box::new(page));
         self
     }
 
-    /// Registers every [`PageFn`] annotated with `#[page]` and collected at
+    /// Registers every [`Page`] annotated with `#[page]` and collected at
     /// link time.
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_pages(mut self) -> Self {
-        for &page in inventory::iter::<&'static PageFn>() {
-            self = self.page(page.clone());
+        for &page in inventory::iter::<&'static dyn Page>() {
+            self = self.page(page);
         }
         self
     }
 
-    /// Registers a layout: anything convertible into a [`LayoutFn`], like the
-    /// marker `#[layout]` generates. A layout applies to every page whose path
-    /// starts with the layout's path prefix.
+    /// Registers a [`Layout`], like the marker `#[layout]` generates. A
+    /// layout applies to every page whose path starts with the layout's path
+    /// prefix.
     #[must_use]
-    pub fn layout(mut self, layout: impl Into<LayoutFn>) -> Self {
-        self.layouts.push(layout.into());
+    pub fn layout(mut self, layout: impl Layout) -> Self {
+        self.layouts.push(Arc::new(layout));
         self
     }
 
-    /// Registers every [`LayoutFn`] annotated with `#[layout]` and collected at
+    /// Registers every [`Layout`] annotated with `#[layout]` and collected at
     /// link time.
     ///
     /// At most one discovered layout is allowed per path: a page's layouts nest
@@ -152,13 +152,13 @@ impl RouterBuilder {
     #[track_caller]
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::<crate::PathBuf>::new();
-        for &layout in inventory::iter::<&'static LayoutFn>() {
+        for &layout in inventory::iter::<&'static dyn Layout>() {
             assert!(
                 seen.insert(layout.path().to_owned()),
                 "multiple discovered layouts registered for the same path \"{}\"",
                 layout.path()
             );
-            self = self.layout(layout.clone());
+            self = self.layout(layout);
         }
         self
     }
@@ -195,13 +195,13 @@ impl RouterBuilder {
     #[track_caller]
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::<crate::PathBuf>::new();
-        for &layer in inventory::iter::<&'static crate::LayerFn>() {
+        for &layer in inventory::iter::<&'static dyn Layer>() {
             assert!(
                 seen.insert(layer.path().to_owned()),
                 "multiple discovered layers registered for the same path \"{}\"",
                 layer.path()
             );
-            self = self.layer(layer.clone());
+            self = self.layer(layer);
         }
         self
     }
@@ -385,7 +385,7 @@ impl RouterBuilder {
         // Wire each page to the layouts whose path is a prefix of the page's,
         // ordered from least- to most-specific so the page nests innermost.
         for page in pages {
-            let mut matching: Vec<LayoutFn> = layouts
+            let mut matching: Vec<Arc<dyn Layout>> = layouts
                 .iter()
                 .filter(|layout| page.path().starts_with(layout.path()))
                 .cloned()
@@ -500,7 +500,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, LayerFn, LayerFuture, Method, Next, Path, RouteFn, RouteFuture,
+        Body, LayerFn, LayerFuture, Method, Next, Path, PageFn, RouteFn, RouteFuture,
         response::IntoResponse,
     };
 

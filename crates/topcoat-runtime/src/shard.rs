@@ -1,9 +1,6 @@
 use std::{hash::Hash, pin::Pin};
 
-use topcoat_core::{
-    context::Cx,
-    error::{Error, Result},
-};
+use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
     Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId, RouterBuilder,
     response::IntoResponse,
@@ -12,6 +9,7 @@ use topcoat_view::View;
 
 pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/shards";
 
+/// The identity of a shard, stable across the server and the client runtime.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct ShardId(&'static str);
 
@@ -27,59 +25,52 @@ impl ShardId {
     }
 }
 
-pub type ShardRenderFn =
-    for<'cx> fn(
-        cx: &'cx Cx,
-        body: Body,
-    ) -> Pin<Box<dyn Future<Output = Result<View, Error>> + Send + 'cx>>;
+/// The future returned by [`Shard::render`]: a boxed, `Send` future borrowing
+/// the shard and its request context.
+pub type ShardFuture<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
 
-#[derive(Debug, Clone)]
-pub struct ErasedShard {
-    id: ShardId,
-    render: ShardRenderFn,
-}
-
-impl ErasedShard {
-    #[must_use]
-    pub const fn new(id: ShardId, render: ShardRenderFn) -> Self {
-        Self { id, render }
-    }
-
-    #[must_use]
-    pub fn id(&self) -> ShardId {
-        self.id
-    }
+/// A component that re-renders on the server when its runtime expression
+/// arguments change.
+///
+/// Registered into a [`RouterBuilder`] with
+/// [`shard`](RouterBuilderShardExt::shard), which serves it as a route
+/// dispatched by [`ShardId`].
+pub trait Shard: Send + Sync + 'static {
+    /// The identity of this shard.
+    fn id(&self) -> ShardId;
 
     /// Renders the shard for an endpoint request, deserializing its arguments
     /// from `body`.
-    ///
-    /// # Errors
-    ///
-    /// Propagates any error returned by the shard's render function, such as a
-    /// failure to deserialize the request body.
-    #[inline]
-    pub async fn render(&self, cx: &Cx, body: Body) -> Result<View> {
-        (self.render)(cx, body).await
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ShardFuture<'cx>;
+}
+
+impl<S: Shard + ?Sized> Shard for &'static S {
+    fn id(&self) -> ShardId {
+        (**self).id()
+    }
+
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ShardFuture<'cx> {
+        (**self).render(cx, body)
     }
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(&'static ErasedShard);
+inventory::collect!(&'static dyn Shard);
 
+/// A [`Route`] that re-renders one shard.
 pub struct ShardRoute {
     id: RouteId,
     path: PathBuf,
-    shard: ErasedShard,
+    shard: Box<dyn Shard>,
 }
 
 impl ShardRoute {
     /// Builds the route that serves a shard.
-    pub fn new(shard: impl Into<ErasedShard>) -> Self {
-        let shard = shard.into();
+    pub fn new(shard: impl Shard) -> Self {
         Self {
             id: RouteId::new(),
             path: Path::new(&format!("{SHARD_ROUTE_PREFIX}/{}", shard.id().as_str())).to_owned(),
-            shard,
+            shard: Box::new(shard),
         }
     }
 }
@@ -100,7 +91,7 @@ impl Route for ShardRoute {
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
         Box::pin(async move {
-            let view = (self.shard.render)(cx, body).await?;
+            let view = self.shard.render(cx, body).await?;
             view.into_response(cx)
         })
     }
@@ -110,7 +101,7 @@ impl Route for ShardRoute {
 pub trait RouterBuilderShardExt {
     /// Mounts a shard route.
     #[must_use]
-    fn shard(self, shard: impl Into<ErasedShard>) -> Self;
+    fn shard(self, shard: impl Shard) -> Self;
 
     /// Registers every shard linked into the binary.
     #[cfg(feature = "discover")]
@@ -119,14 +110,14 @@ pub trait RouterBuilderShardExt {
 }
 
 impl RouterBuilderShardExt for RouterBuilder {
-    fn shard(self, shard: impl Into<ErasedShard>) -> Self {
+    fn shard(self, shard: impl Shard) -> Self {
         self.route(ShardRoute::new(shard))
     }
 
     #[cfg(feature = "discover")]
     fn discover_shards(mut self) -> Self {
-        for &shard in inventory::iter::<&'static ErasedShard>() {
-            self = self.shard(shard.clone());
+        for &shard in inventory::iter::<&'static dyn Shard>() {
+            self = self.shard(shard);
         }
         self
     }
