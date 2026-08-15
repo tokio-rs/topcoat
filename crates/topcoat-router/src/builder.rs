@@ -445,11 +445,12 @@ impl RouterBuilder {
         }
 
         // Sanity check for unused layers. Layers without a path always run,
-        // so only layers with one can go unused.
+        // and the root path prefixes every route path, so neither can be a
+        // mistyped path; only narrower paths can go unused.
         for (layer, used) in self.layers.iter().zip(layers_used) {
             if let Some(path) = layer.path() {
                 assert!(
-                    used,
+                    used || path == Path::ROOT,
                     "layer with path `{path}` did not match any route, this is likely a mistake"
                 );
             }

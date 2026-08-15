@@ -134,8 +134,8 @@ where
     }
 }
 
-/// A [`Layer`] that wraps the routes nested under its path in a
-/// [`tower::Layer`]'s middleware.
+/// A [`Layer`] that wraps request handling in a [`tower::Layer`]'s
+/// middleware.
 ///
 /// This adapter runs middleware from the tower ecosystem (a timeout, a rate
 /// limit, CORS, compression) inside a topcoat router. The middleware behaves
@@ -171,15 +171,18 @@ where
 ///     .build();
 /// ```
 pub struct TowerLayer<S> {
-    /// The URL path prefix whose routes this layer wraps.
-    path: Cow<'static, Path>,
+    /// The URL path prefix whose matched routes this layer wraps, or `None`
+    /// to wrap every request.
+    path: Option<Cow<'static, Path>>,
     /// The composed tower service, built once and cloned per request.
     service: S,
 }
 
 impl<S> TowerLayer<S> {
-    /// Wraps every route in the middleware `layer` builds; scope the layer
-    /// to a path prefix with [`at`](Self::at).
+    /// Wraps every request in the middleware `layer` builds, including one
+    /// that matches no route, so middleware answering requests on its own
+    /// (like a CORS preflight) sees them all. Scope the layer to a path
+    /// prefix with [`at`](Self::at).
     ///
     /// The middleware is built immediately and shared by every request
     /// passing through this layer.
@@ -189,12 +192,12 @@ impl<S> TowerLayer<S> {
         L: tower::Layer<TowerNext, Service = S>,
     {
         Self {
-            path: Cow::Borrowed(Path::ROOT),
+            path: None,
             service: layer.layer(TowerNext::new()),
         }
     }
 
-    /// Scopes the layer to the routes under `path`.
+    /// Scopes the layer to the matched routes under `path`.
     ///
     /// # Panics
     ///
@@ -202,7 +205,7 @@ impl<S> TowerLayer<S> {
     #[must_use]
     #[track_caller]
     pub fn at(mut self, path: impl IntoPath) -> Self {
-        self.path = path.into_path();
+        self.path = Some(path.into_path());
         self
     }
 }
@@ -216,7 +219,7 @@ where
     ResBody::Error: Into<BoxError>,
 {
     fn path(&self) -> Option<&Path> {
-        Some(&self.path)
+        self.path.as_deref()
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
