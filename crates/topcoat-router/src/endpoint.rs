@@ -174,9 +174,9 @@ impl Endpoints {
     #[track_caller]
     pub(crate) fn push(&mut self, path: Cow<'static, str>, endpoint: Endpoint) -> EndpointIndex {
         let index = EndpointIndex(self.endpoints.len());
-        self.matcher
-            .insert(path.clone(), index)
-            .unwrap_or_else(|error| panic!("failed to register route {path:?}: {error}"));
+        if let Err(error) = self.matcher.insert(path, index) {
+            panic!("failed to register route: {error}");
+        }
         self.endpoints.push(endpoint);
         index
     }

@@ -40,6 +40,7 @@ pub struct RouterService {
 
 impl RouterService {
     /// Wraps `router` in a cloneable service with the default configuration.
+    #[must_use]
     pub fn new(router: Router) -> Self {
         /// How long in-flight requests get to finish by default.
         const DEFAULT_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
