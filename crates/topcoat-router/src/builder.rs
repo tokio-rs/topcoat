@@ -164,14 +164,16 @@ impl RouterBuilder {
     }
 
     /// Registers a [`Layer`] that wraps every matched route whose path begins
-    /// with the layer's path, like a layout. A layer at the root path wraps
-    /// every request, including one that matches no route (a 404 or 405).
+    /// with the layer's path, like a layout. A layer without a path
+    /// ([`Layer::path`] returns `None`) wraps every request, including one
+    /// that matches no route (a 404 or 405).
     ///
     /// When layers at *different* paths match a route they nest from
-    /// least-specific (outermost) to most-specific (innermost). Multiple layers
-    /// may share the same path; among those, the most recently registered runs
-    /// first (outermost), so `.layer(a).layer(b)` runs `b` around `a` when both
-    /// sit at the same path.
+    /// least-specific (outermost) to most-specific (innermost), with pathless
+    /// layers outside them all. Multiple layers may share the same path; among
+    /// those, the most recently registered runs first (outermost), so
+    /// `.layer(a).layer(b)` runs `b` around `a` when both sit at the same
+    /// path.
     #[must_use]
     pub fn layer(mut self, layer: impl Layer) -> Self {
         self.layers.push(Arc::new(layer));
@@ -195,12 +197,12 @@ impl RouterBuilder {
     #[must_use]
     #[track_caller]
     pub fn discover_layers(mut self) -> Self {
-        let mut seen = std::collections::HashSet::<crate::PathBuf>::new();
+        let mut seen = std::collections::HashSet::<Option<crate::PathBuf>>::new();
         for &layer in inventory::iter::<&'static dyn Layer>() {
             assert!(
-                seen.insert(layer.path().to_owned()),
+                seen.insert(layer.path().map(Path::to_owned)),
                 "multiple discovered layers registered for the same path \"{}\"",
-                layer.path()
+                layer.path().map_or("<none>", Path::as_str)
             );
             self = self.layer(layer);
         }
@@ -397,7 +399,9 @@ impl RouterBuilder {
             // Mark layers as used, with the same prefix rule the selection
             // applies.
             for (layer, used) in self.layers.iter().zip(&mut layers_used) {
-                *used |= route.path().starts_with(layer.path());
+                *used |= layer
+                    .path()
+                    .is_none_or(|prefix| route.path().starts_with(prefix));
             }
 
             let endpoint_index = *grouped
@@ -440,26 +444,36 @@ impl RouterBuilder {
             }
         }
 
-        // Sanity check for unused layers. Root layers are exempt: they wrap
-        // every request whether or not a route matches.
+        // Sanity check for unused layers. Layers without a path always run,
+        // so only layers with one can go unused.
         for (layer, used) in self.layers.iter().zip(layers_used) {
-            assert!(
-                used || layer.path() == Path::ROOT,
-                "layer with path `{}` did not match any route, this is likely a mistake",
-                layer.path()
-            );
+            if let Some(path) = layer.path() {
+                assert!(
+                    used,
+                    "layer with path `{path}` did not match any route, this is likely a mistake"
+                );
+            }
         }
 
         for &endpoint_index in grouped.values() {
             endpoints[endpoint_index].alias_head_to_get();
         }
 
+        // Layers without a path wrap every request, so requests that matched
+        // no route still run them. Among them the most recently registered
+        // runs first, like layers sharing a path.
+        let always_layers: Box<[Arc<dyn Layer>]> = self
+            .layers
+            .iter()
+            .filter(|layer| layer.path().is_none())
+            .rev()
+            .cloned()
+            .collect();
+
         Router::new(RouterInner {
             routes,
             endpoints,
-            // Root layers wrap every request, so requests that matched no
-            // route still run them.
-            root_layers: layers_for_path(&self.layers, Path::ROOT),
+            always_layers,
             app_context: Arc::new(self.context),
             origin: OriginLayer::new(self.origin_policy),
             #[cfg(feature = "compression")]
@@ -566,7 +580,7 @@ mod tests {
     fn layer_wrapping_a_route_builds() {
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/admin/users"), handler))
-            .layer(LayerFn::new(path("/admin"), noop_layer))
+            .layer(LayerFn::new(Some(path("/admin")), noop_layer))
             .build();
     }
 
@@ -576,7 +590,7 @@ mod tests {
         // over a page's path counts as used.
         let _ = RouterBuilder::new()
             .page(PageFn::new(Method::GET, path("/admin/p"), render_page))
-            .layer(LayerFn::new(path("/admin"), noop_layer))
+            .layer(LayerFn::new(Some(path("/admin")), noop_layer))
             .build();
     }
 
@@ -585,7 +599,7 @@ mod tests {
         // A layer at the root path wraps whatever the router serves, so it is
         // exempt from the check even with nothing registered.
         let _ = RouterBuilder::new()
-            .layer(LayerFn::new(path("/"), noop_layer))
+            .layer(LayerFn::new(Some(path("/")), noop_layer))
             .build();
     }
 
@@ -594,7 +608,7 @@ mod tests {
     fn layer_matching_no_route_panics() {
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/x"), handler))
-            .layer(LayerFn::new(path("/admin"), noop_layer))
+            .layer(LayerFn::new(Some(path("/admin")), noop_layer))
             .build();
     }
 
@@ -605,7 +619,7 @@ mod tests {
         // `/administrator`.
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/administrator"), handler))
-            .layer(LayerFn::new(path("/admin"), noop_layer))
+            .layer(LayerFn::new(Some(path("/admin")), noop_layer))
             .build();
     }
 
@@ -616,7 +630,7 @@ mod tests {
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/(a)/x"), handler))
             .route(RouteFn::new(Method::POST, path("/(b)/x"), handler))
-            .layer(LayerFn::new(path("/(a)"), noop_layer))
+            .layer(LayerFn::new(Some(path("/(a)")), noop_layer))
             .build();
     }
 
@@ -627,7 +641,7 @@ mod tests {
         // the route in `(b)`, even though both serve `/x`.
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/(b)/x"), handler))
-            .layer(LayerFn::new(path("/(a)"), noop_layer))
+            .layer(LayerFn::new(Some(path("/(a)")), noop_layer))
             .build();
     }
 
@@ -642,7 +656,7 @@ mod tests {
                 path("/users/{user_id}/posts"),
                 handler,
             ))
-            .layer(LayerFn::new(path("/users/{id}"), noop_layer))
+            .layer(LayerFn::new(Some(path("/users/{id}")), noop_layer))
             .build();
     }
 
@@ -651,9 +665,9 @@ mod tests {
     fn one_unused_layer_among_used_ones_panics() {
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/users"), handler))
-            .layer(LayerFn::new(path("/"), noop_layer))
-            .layer(LayerFn::new(path("/users"), noop_layer))
-            .layer(LayerFn::new(path("/posts"), noop_layer))
+            .layer(LayerFn::new(Some(path("/")), noop_layer))
+            .layer(LayerFn::new(Some(path("/users")), noop_layer))
+            .layer(LayerFn::new(Some(path("/posts")), noop_layer))
             .build();
     }
 

@@ -17,8 +17,8 @@ impl CookieLayer {
 }
 
 impl Layer for CookieLayer {
-    fn path(&self) -> &Path {
-        Path::new("/")
+    fn path(&self) -> Option<&Path> {
+        Some(Path::new("/"))
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {

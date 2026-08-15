@@ -125,7 +125,6 @@ impl Endpoint {
 
     /// Iterates over the methods with a route registered at this endpoint,
     /// standard methods first.
-    #[must_use]
     pub fn methods(&self) -> impl Iterator<Item = &Method> {
         STANDARD_METHODS
             .iter()

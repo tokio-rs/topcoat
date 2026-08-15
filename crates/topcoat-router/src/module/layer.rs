@@ -42,8 +42,8 @@ impl<L: ModuleLayer> ResolvedLayer<L> {
 }
 
 impl<L: ModuleLayer> Layer for ResolvedLayer<L> {
-    fn path(&self) -> &Path {
-        &self.path
+    fn path(&self) -> Option<&Path> {
+        Some(&self.path)
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {

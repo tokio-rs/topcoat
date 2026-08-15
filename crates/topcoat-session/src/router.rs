@@ -17,8 +17,8 @@ impl SessionLayer {
 }
 
 impl Layer for SessionLayer {
-    fn path(&self) -> &Path {
-        Path::new("/")
+    fn path(&self) -> Option<&Path> {
+        Some(Path::new("/"))
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {

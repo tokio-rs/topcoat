@@ -15,19 +15,21 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// A request-processing layer that wraps the routes nested under its path,
 /// similar to a tower middleware.
 ///
-/// A layer wraps every matched route whose path begins with the layer's path
+/// A layer with a path wraps every matched route whose path begins with it
 /// (the same prefix rule as layouts), so a layer at `/admin` wraps only routes
-/// under `/admin`. A layer at the root path wraps every request, including one
-/// that matches no route: the chain then resolves to the not-found or
-/// method-not-allowed error, which the layer receives as the `Err` returned by
-/// [`Next::run`]. Each layer receives the [`Cx`] and the request [`Body`],
-/// plus a [`Next`] representing the rest of the chain. A layer typically
-/// derives a child context carrying request-scoped values with [`Cx::with`],
-/// passes it to [`Next::run`] to invoke the inner layers and ultimately the
-/// route, then inspects or modifies the [`Response`].
+/// under `/admin`, and one at `/` wraps every matched route. A layer without a
+/// path wraps every request, including one that matches no route: the chain
+/// then resolves to the not-found or method-not-allowed error, which the layer
+/// receives as the `Err` returned by [`Next::run`]. Each layer receives the
+/// [`Cx`] and the request [`Body`], plus a [`Next`] representing the rest of
+/// the chain. A layer typically derives a child context carrying
+/// request-scoped values with [`Cx::with`], passes it to [`Next::run`] to
+/// invoke the inner layers and ultimately the route, then inspects or modifies
+/// the [`Response`].
 ///
 /// When several layers match a route they nest from least-specific (outermost)
-/// to most-specific (innermost), like layouts.
+/// to most-specific (innermost), like layouts; a layer without a path runs
+/// outside every layer with one.
 ///
 /// Register layers with [`RouterBuilder::layer`](crate::RouterBuilder::layer).
 ///
@@ -44,8 +46,8 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// struct Timing;
 ///
 /// impl Layer for Timing {
-///     fn path(&self) -> &Path {
-///         Path::ROOT
+///     fn path(&self) -> Option<&Path> {
+///         None
 ///     }
 ///
 ///     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -59,15 +61,16 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// }
 /// ```
 pub trait Layer: Send + Sync + 'static {
-    /// The URL path prefix whose routes this layer wraps.
-    fn path(&self) -> &Path;
+    /// The URL path prefix whose matched routes this layer wraps, or `None`
+    /// to wrap every request.
+    fn path(&self) -> Option<&Path>;
 
     /// Handles a request, calling `next` to continue down the chain.
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 }
 
 impl<L: Layer + ?Sized> Layer for &'static L {
-    fn path(&self) -> &Path {
+    fn path(&self) -> Option<&Path> {
         (**self).path()
     }
 
@@ -88,30 +91,32 @@ pub type LayerHandlerFn = for<'a> fn(cx: &'a Cx, body: Body, next: Next<'a>) -> 
 /// pairing it with the path prefix it applies to.
 #[derive(Debug, Clone)]
 pub struct LayerFn {
-    /// The URL path prefix whose routes this layer wraps.
-    path: Cow<'static, Path>,
+    /// The URL path prefix whose matched routes this layer wraps, or `None`
+    /// to wrap every request.
+    path: Option<Cow<'static, Path>>,
     /// The handler function that wraps the inner chain.
     handle: LayerHandlerFn,
 }
 
 impl LayerFn {
-    /// Creates a new layer with an explicit path prefix and handler function.
+    /// Creates a new layer from a handler function: pass a path prefix to
+    /// wrap the matched routes under it, or `None` to wrap every request.
     ///
     /// # Panics
     ///
-    /// Panics if `path` is a string that is not a well-formed route path.
+    /// Panics if the path is a string that is not a well-formed route path.
     #[track_caller]
-    pub fn new(path: impl IntoPath, handle: LayerHandlerFn) -> Self {
+    pub fn new(path: Option<impl IntoPath>, handle: LayerHandlerFn) -> Self {
         Self {
-            path: path.into_path(),
+            path: path.map(IntoPath::into_path),
             handle,
         }
     }
 }
 
 impl Layer for LayerFn {
-    fn path(&self) -> &Path {
-        &self.path
+    fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -119,16 +124,18 @@ impl Layer for LayerFn {
     }
 }
 
-/// Selects the layers in `layers` whose path is a prefix of `path`, ordered
-/// least- to most-specific so the outermost layer runs first. Among layers
-/// that share a path, the later one in `layers` runs first.
+/// Selects the layers in `layers` wrapping a route at `path`: those without a
+/// path and those whose path is a prefix of `path`, ordered least- to
+/// most-specific so the outermost layer runs first. A layer without a path is
+/// the least specific of all; among layers that share a path, the later one
+/// in `layers` runs first.
 pub(crate) fn layers_for_path(layers: &[Arc<dyn Layer>], path: &Path) -> Box<[Arc<dyn Layer>]> {
     let mut matching: Vec<&Arc<dyn Layer>> = layers
         .iter()
-        .filter(|layer| path.starts_with(layer.path()))
+        .filter(|layer| layer.path().is_none_or(|prefix| path.starts_with(prefix)))
         .rev()
         .collect();
-    matching.sort_by_key(|layer| layer.path().len());
+    matching.sort_by_key(|layer| layer.path().map_or(0, Path::len));
     matching.into_iter().cloned().collect()
 }
 
@@ -136,7 +143,7 @@ pub(crate) fn layers_for_path(layers: &[Arc<dyn Layer>], path: &Path) -> Box<[Ar
 ///
 /// A matched route runs inside the layer stack selected for its own path,
 /// group segments included. A request that matched no route runs inside the
-/// root layers only, and its chain resolves to the not-found or
+/// layers without a path only, and its chain resolves to the not-found or
 /// method-not-allowed error, so a layer sees a matched route handler's
 /// result, or the error, uniformly as the `Result` returned by [`Next::run`].
 #[derive(Clone, Copy)]
@@ -229,15 +236,24 @@ mod tests {
     /// A layer whose path is all a test cares about; its handler just forwards
     /// to the rest of the chain and never runs in the selection tests.
     fn layer_at(p: &'static str) -> Arc<dyn Layer> {
-        Arc::new(LayerFn::new(path(p), noop_layer))
+        Arc::new(LayerFn::new(Some(path(p)), noop_layer))
+    }
+
+    /// A layer without a path, wrapping every request in the selection tests.
+    fn layer_always() -> Arc<dyn Layer> {
+        Arc::new(LayerFn::new(None::<&Path>, noop_layer))
     }
 
     /// Asserts that `layers_for_path` selects the layers at the `expected`
-    /// paths, in order.
-    fn assert_selects(layers: &[Arc<dyn Layer>], p: &'static str, expected: &[&'static str]) {
+    /// paths (`None` for a layer without one), in order.
+    fn assert_selects(
+        layers: &[Arc<dyn Layer>],
+        p: &'static str,
+        expected: &[Option<&'static str>],
+    ) {
         let selected = layers_for_path(layers, Path::new(p));
-        let paths: Vec<&Path> = selected.iter().map(|layer| layer.path()).collect();
-        let expected: Vec<&Path> = expected.iter().map(|e| Path::new(e)).collect();
+        let paths: Vec<Option<&Path>> = selected.iter().map(|layer| layer.path()).collect();
+        let expected: Vec<Option<&Path>> = expected.iter().map(|e| e.map(Path::new)).collect();
         assert_eq!(paths, expected);
     }
 
@@ -295,8 +311,11 @@ mod tests {
 
     #[test]
     fn layer_fn_exposes_its_path() {
-        let layer = LayerFn::new(path("/admin"), noop_layer);
-        assert_eq!(layer.path(), Path::new("/admin"));
+        let layer = LayerFn::new(Some(path("/admin")), noop_layer);
+        assert_eq!(layer.path(), Some(Path::new("/admin")));
+
+        let layer = LayerFn::new(None::<&Path>, noop_layer);
+        assert_eq!(layer.path(), None);
     }
 
     // -- layers_for_path --
@@ -306,7 +325,15 @@ mod tests {
         let layers = [layer_at("/"), layer_at("/users"), layer_at("/posts")];
         // The route at /users/{id} is wrapped by the root and /users layers, in
         // that order; the /posts layer does not prefix it.
-        assert_selects(&layers, "/users/{id}", &["/", "/users"]);
+        assert_selects(&layers, "/users/{id}", &[Some("/"), Some("/users")]);
+    }
+
+    #[test]
+    fn for_path_puts_pathless_layers_outermost() {
+        let layers = [layer_at("/"), layer_always()];
+        // A layer without a path wraps every route, outside the layers whose
+        // paths match it.
+        assert_selects(&layers, "/users", &[None, Some("/")]);
     }
 
     #[test]
@@ -331,7 +358,7 @@ mod tests {
         let layers = [layer_at("/(auth)"), layer_at("/dashboard")];
         // Groups are part of the logical path: the layer inside `(auth)` wraps
         // the endpoint, while the URL-lookalike `/dashboard` layer does not.
-        assert_selects(&layers, "/(auth)/dashboard", &["/(auth)"]);
+        assert_selects(&layers, "/(auth)/dashboard", &[Some("/(auth)")]);
     }
 
     #[test]
@@ -339,7 +366,7 @@ mod tests {
         let layers = [layer_at("/users/{id}"), layer_at("/users/{user_id}")];
         // Prefix matching compares segments, so `{id}` only wraps endpoints
         // spelled with the same parameter name.
-        assert_selects(&layers, "/users/{id}/posts", &["/users/{id}"]);
+        assert_selects(&layers, "/users/{id}/posts", &[Some("/users/{id}")]);
     }
 
     // -- Next --
@@ -383,8 +410,8 @@ mod tests {
     #[test]
     fn run_walks_layers_in_order_before_the_terminal() {
         let layers: [Arc<dyn Layer>; 2] = [
-            Arc::new(LayerFn::new(path("/"), record_a)),
-            Arc::new(LayerFn::new(path("/"), record_b)),
+            Arc::new(LayerFn::new(Some(path("/")), record_a)),
+            Arc::new(LayerFn::new(Some(path("/")), record_b)),
         ];
         let route = RouteFn::new(Method::GET, path("/x"), record_route);
 
@@ -400,7 +427,7 @@ mod tests {
 
     #[test]
     fn run_lets_a_layer_short_circuit_without_calling_next() {
-        let layers: [Arc<dyn Layer>; 1] = [Arc::new(LayerFn::new(path("/"), short_circuit))];
+        let layers: [Arc<dyn Layer>; 1] = [Arc::new(LayerFn::new(Some(path("/")), short_circuit))];
         // The route would answer "route", but the layer never calls `next.run`.
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
         let cx = Cx::default();

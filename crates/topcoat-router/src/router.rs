@@ -86,8 +86,8 @@ impl Router {
 
         // The chain's terminal and the layer stack wrapping it: a matched
         // route carries its own precomputed stack, while a request that
-        // matched no route resolves to a 404 or 405 through the root layers,
-        // which wrap every request.
+        // matched no route resolves to a 404 or 405 through the layers
+        // without a path, which wrap every request.
         let cx = Cx::new(Arc::clone(&inner.app_context)).with(Arc::clone(&self.inner));
         let (terminal, layer_stack, cx) = match inner.endpoints.at(parts.uri.path()) {
             Some((endpoint_index, endpoint, params)) => {
@@ -101,7 +101,7 @@ impl Router {
                         let registered = &inner.routes[index];
                         (Terminal::Route(&*registered.route), &*registered.layers)
                     }
-                    None => (Terminal::MethodNotAllowed(endpoint), &*inner.root_layers),
+                    None => (Terminal::MethodNotAllowed(endpoint), &*inner.always_layers),
                 };
                 let matched = Matched {
                     endpoint: endpoint_index,
@@ -113,7 +113,7 @@ impl Router {
                     cx.with_many((matched, path_params, parts)),
                 )
             }
-            None => (Terminal::NotFound, &*inner.root_layers, cx.with(parts)),
+            None => (Terminal::NotFound, &*inner.always_layers, cx.with(parts)),
         };
 
         // The origin layer wraps the whole chain, denying untrusted
@@ -146,10 +146,10 @@ pub(crate) struct RouterInner {
     /// The registered endpoints and the matcher resolving a request URL to
     /// one of them.
     pub(crate) endpoints: Endpoints,
-    /// The layers registered at the root path, wrapping every request. A
+    /// The layers registered without a path, wrapping every request. A
     /// request matched to a route runs them as part of the route's own stack;
     /// this stack wraps requests that matched no route.
-    pub(crate) root_layers: Box<[Arc<dyn Layer>]>,
+    pub(crate) always_layers: Box<[Arc<dyn Layer>]>,
     /// The values shared by every request, read back via
     /// [`app_context`](topcoat_core::context::app_context).
     pub(crate) app_context: Arc<AppContext>,
@@ -265,7 +265,7 @@ pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
     let inner = RouterInner {
         routes: Routes::default(),
         endpoints,
-        root_layers: Box::new([]),
+        always_layers: Box::new([]),
         app_context: Arc::new(AppContext::new()),
         origin: OriginLayer::new(OriginPolicy::new()),
         #[cfg(feature = "compression")]
@@ -393,6 +393,13 @@ mod tests {
     // Layers that record their label in a shared trace before continuing, so a
     // test can observe the order layers run in.
     type Trace = Mutex<Vec<&'static str>>;
+
+    fn trace_always<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        Box::pin(async move {
+            app_context::<Arc<Trace>>(cx).lock().unwrap().push("always");
+            next.run(cx, body).await
+        })
+    }
 
     fn trace_root<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
@@ -849,15 +856,17 @@ mod tests {
         let (router, trace) = trace_router(
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
-                .layer(LayerFn::new(path("/admin"), trace_admin))
-                .layer(LayerFn::new(path("/"), trace_root)),
+                .layer(LayerFn::new(Some(path("/admin")), trace_admin))
+                .layer(LayerFn::new(Some(path("/")), trace_root))
+                .layer(LayerFn::new(None::<&Path>, trace_always)),
         );
 
         let (status, _, body) = send(&router, Method::GET, "/admin/x");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"route");
-        // The root layer (least specific) wraps the admin layer.
-        assert_eq!(*trace.lock().unwrap(), vec!["root", "admin"]);
+        // The pathless layer (least specific of all) wraps the root layer,
+        // which wraps the admin layer.
+        assert_eq!(*trace.lock().unwrap(), vec!["always", "root", "admin"]);
     }
 
     #[test]
@@ -866,7 +875,7 @@ mod tests {
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
                 .route(RouteFn::new(Method::GET, path("/public"), say_route))
-                .layer(LayerFn::new(path("/admin"), trace_admin)),
+                .layer(LayerFn::new(Some(path("/admin")), trace_admin)),
         );
 
         send(&router, Method::GET, "/public");
@@ -877,16 +886,16 @@ mod tests {
     }
 
     #[test]
-    fn root_layers_wrap_not_found_responses() {
+    fn pathless_layers_wrap_not_found_responses() {
         let (router, trace) = trace_router(
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
-                .layer(LayerFn::new(path("/"), trace_root)),
+                .layer(LayerFn::new(None::<&Path>, trace_always)),
         );
 
         let (status, _, _) = send(&router, Method::GET, "/missing");
         assert_eq!(status, StatusCode::NOT_FOUND);
-        assert_eq!(*trace.lock().unwrap(), vec!["root"]);
+        assert_eq!(*trace.lock().unwrap(), vec!["always"]);
     }
 
     #[test]
@@ -894,18 +903,19 @@ mod tests {
         let (router, trace) = trace_router(
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
-                .layer(LayerFn::new(path("/admin"), trace_admin)),
+                .layer(LayerFn::new(Some(path("/")), trace_root))
+                .layer(LayerFn::new(Some(path("/admin")), trace_admin)),
         );
 
         // A trailing slash is a different URL: the route does not match, and
-        // no route means no path layers, wherever the URL points.
+        // no route means no path layers, the root path included.
         let (status, _, _) = send(&router, Method::GET, "/admin/x/");
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert!(trace.lock().unwrap().is_empty());
     }
 
-    /// A root layer that replaces any error coming back up the chain, standing
-    /// in for a site-wide custom error page.
+    /// A pathless layer that replaces any error coming back up the chain,
+    /// standing in for a site-wide custom error page.
     fn replace_errors<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
             match next.run(cx, body).await {
@@ -916,10 +926,10 @@ mod tests {
     }
 
     #[test]
-    fn a_root_layer_can_replace_a_not_found_response() {
+    fn a_pathless_layer_can_replace_a_not_found_response() {
         let router = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/x"), say_route))
-            .layer(LayerFn::new(path("/"), replace_errors))
+            .layer(LayerFn::new(None::<&Path>, replace_errors))
             .build();
 
         let (status, _, body) = send(&router, Method::GET, "/missing");
@@ -928,15 +938,15 @@ mod tests {
     }
 
     #[test]
-    fn layers_wrap_method_not_allowed_responses() {
+    fn pathless_layers_wrap_method_not_allowed_responses() {
         let (router, trace) = trace_router(
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/x"), say_route))
-                .layer(LayerFn::new(path("/"), trace_root)),
+                .layer(LayerFn::new(None::<&Path>, trace_always)),
         );
         let (status, _, _) = send(&router, Method::POST, "/x");
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
-        assert_eq!(*trace.lock().unwrap(), vec!["root"]);
+        assert_eq!(*trace.lock().unwrap(), vec!["always"]);
     }
 
     #[test]
@@ -944,7 +954,7 @@ mod tests {
         let (router, trace) = trace_router(
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
-                .layer(LayerFn::new(path("/admin"), trace_admin)),
+                .layer(LayerFn::new(Some(path("/admin")), trace_admin)),
         );
 
         let (status, _, _) = send(&router, Method::GET, "/admin/x?tab=users");
@@ -957,7 +967,7 @@ mod tests {
         let (router, trace) = trace_router(
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/admin/{id}"), say_route))
-                .layer(LayerFn::new(path("/admin"), trace_admin)),
+                .layer(LayerFn::new(Some(path("/admin")), trace_admin)),
         );
         let (status, _, _) = send(&router, Method::GET, "/admin/a%20b");
         assert_eq!(status, StatusCode::OK);
@@ -969,7 +979,7 @@ mod tests {
         let (router, trace) = trace_router(
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/admin/{*rest}"), say_route))
-                .layer(LayerFn::new(path("/admin"), trace_admin)),
+                .layer(LayerFn::new(Some(path("/admin")), trace_admin)),
         );
         let (status, _, _) = send(&router, Method::GET, "/admin/a/b/c");
         assert_eq!(status, StatusCode::OK);
@@ -985,7 +995,7 @@ mod tests {
                     path("/(auth)/dashboard"),
                     say_route,
                 ))
-                .layer(LayerFn::new(path("/(auth)"), trace_auth)),
+                .layer(LayerFn::new(Some(path("/(auth)")), trace_auth)),
         );
 
         // The route serves `/dashboard` (the group is stripped from the URL),
@@ -1003,7 +1013,7 @@ mod tests {
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/(a)/x"), say_route))
                 .route(RouteFn::new(Method::POST, path("/(b)/x"), say_posted))
-                .layer(LayerFn::new(path("/"), trace_root)),
+                .layer(LayerFn::new(Some(path("/")), trace_root)),
         );
         let (status, _, body) = send(&router, Method::POST, "/x");
         assert_eq!(status, StatusCode::OK);
@@ -1019,7 +1029,7 @@ mod tests {
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/(auth)/x"), say_route))
                 .route(RouteFn::new(Method::POST, path("/(open)/x"), say_posted))
-                .layer(LayerFn::new(path("/(auth)"), trace_auth)),
+                .layer(LayerFn::new(Some(path("/(auth)")), trace_auth)),
         );
 
         let (status, _, body) = send(&router, Method::GET, "/x");
@@ -1035,18 +1045,19 @@ mod tests {
     }
 
     #[test]
-    fn method_not_allowed_runs_only_the_root_layers() {
-        // A 405 belongs to no route, so only the root layers wrap it; the
-        // layer inside the group does not run.
+    fn method_not_allowed_runs_only_the_pathless_layers() {
+        // A 405 belongs to no route, so only the layers without a path wrap
+        // it; neither the group layer nor the root-path layer runs.
         let (router, trace) = trace_router(
             RouterBuilder::new()
                 .route(RouteFn::new(Method::GET, path("/(auth)/x"), say_route))
-                .layer(LayerFn::new(path("/(auth)"), trace_auth))
-                .layer(LayerFn::new(path("/"), trace_root)),
+                .layer(LayerFn::new(Some(path("/(auth)")), trace_auth))
+                .layer(LayerFn::new(Some(path("/")), trace_root))
+                .layer(LayerFn::new(None::<&Path>, trace_always)),
         );
         let (status, _, _) = send(&router, Method::POST, "/x");
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
-        assert_eq!(*trace.lock().unwrap(), vec!["root"]);
+        assert_eq!(*trace.lock().unwrap(), vec!["always"]);
     }
 
     // -- Router::handle: pages and layouts --
@@ -1151,7 +1162,7 @@ mod tests {
     fn a_cloned_handle_serves_a_stream_after_the_request_returned() {
         let router = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/events"), stream_greeting))
-            .layer(LayerFn::new(path("/"), insert_greeting))
+            .layer(LayerFn::new(Some(path("/")), insert_greeting))
             .build();
 
         let response = block_on(router.handle(request(Method::GET, "/events")));

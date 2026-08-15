@@ -73,7 +73,7 @@ The [`StatusCode`](crate::StatusCode) in the view keeps the response a 403; with
 
 # Not-found pages
 
-A [`NotFoundError`] returned by a handler is caught the same way. The 404 for a URL matching no route reaches only layers at the root path, which wrap every request; no other layer or layout runs for a request nothing was registered for. To render those URLs through the layouts with the same branded treatment, declare a catch-all page with [`not_found!`](../macro.not_found.html):
+A [`NotFoundError`] returned by a handler is caught the same way. The 404 for a URL matching no route reaches only layers whose path is `None`, since they wrap every request; no other layer or layout runs for a request nothing was registered for. To render those URLs through the layouts with the same branded treatment, declare a catch-all page with [`not_found!`](../macro.not_found.html):
 
 ```rust
 # use topcoat::router::not_found;

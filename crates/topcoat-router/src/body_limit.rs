@@ -78,8 +78,8 @@ impl BodyLimit {
 }
 
 impl Layer for BodyLimit {
-    fn path(&self) -> &Path {
-        &self.path
+    fn path(&self) -> Option<&Path> {
+        Some(&self.path)
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -176,13 +176,16 @@ mod tests {
 
     #[test]
     fn layer_defaults_to_the_root_path() {
-        assert_eq!(BodyLimit::max(1).path(), Path::new("/"));
-        assert_eq!(BodyLimit::disable().path(), Path::new("/"));
+        assert_eq!(BodyLimit::max(1).path(), Some(Path::new("/")));
+        assert_eq!(BodyLimit::disable().path(), Some(Path::new("/")));
     }
 
     #[test]
     fn at_scopes_the_layer_path() {
-        assert_eq!(BodyLimit::max(1).at("/upload").path(), Path::new("/upload"));
+        assert_eq!(
+            BodyLimit::max(1).at("/upload").path(),
+            Some(Path::new("/upload"))
+        );
     }
 
     // -- Test helpers --

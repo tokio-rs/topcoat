@@ -105,9 +105,9 @@ impl ToTokens for Layer {
         let (layer, submit_as) = if let Some(path) = attr.path.as_ref() {
             let layer = quote! {
                 impl #topcoat_router::Layer for #ident {
-                    fn path(&self) -> &#topcoat_router::Path {
+                    fn path(&self) -> ::core::option::Option<&#topcoat_router::Path> {
                         const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
-                        PATH
+                        ::core::option::Option::Some(PATH)
                     }
 
                     #handle

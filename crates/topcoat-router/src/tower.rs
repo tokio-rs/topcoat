@@ -215,8 +215,8 @@ where
     ResBody: http_body::Body<Data = Bytes> + Send + 'static,
     ResBody::Error: Into<BoxError>,
 {
-    fn path(&self) -> &Path {
-        &self.path
+    fn path(&self) -> Option<&Path> {
+        Some(&self.path)
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -825,7 +825,7 @@ mod tests {
     #[test]
     fn tower_layer_exposes_its_path() {
         let layer = TowerLayer::new(tower::layer::util::Identity::new()).at("/admin");
-        assert_eq!(layer.path(), Path::new("/admin"));
+        assert_eq!(layer.path(), Some(Path::new("/admin")));
     }
 
     #[test]
