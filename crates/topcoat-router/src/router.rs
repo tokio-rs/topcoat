@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     future::{Future, poll_fn},
     panic::{AssertUnwindSafe, catch_unwind},
     pin::pin,
@@ -7,13 +6,11 @@ use std::{
     task::Poll,
 };
 
-#[cfg(feature = "compression")]
-use topcoat_core::context::try_request_context;
-use topcoat_core::context::{AppContext, Cx};
+use topcoat_core::context::{AppContext, Cx, try_request_context};
 
 use crate::{
-    Endpoint, EndpointPath, Layer, Layers, Next, OriginLayer, RawPathParams, Route, RouteId,
-    RouterBuilder, Terminal,
+    Endpoint, EndpointIndex, Endpoints, Layer, Layers, Next, OriginLayer, RawPathParams, Route,
+    RouteId, RouteIndex, RouterBuilder, Routes, Terminal,
     error::{internal_server_response, not_found, respond},
     request::Request,
     response::Response,
@@ -39,24 +36,9 @@ use crate::{
 /// # }
 /// ```
 pub struct Router {
-    /// The registered routes, indexed by the values stored in `endpoints`.
-    pub(crate) routes: Vec<Box<dyn Route>>,
-    /// The index of each route in `routes`, keyed by its [`RouteId`].
-    pub(crate) route_ids: HashMap<RouteId, usize>,
-    /// The endpoint handling each path, matched against the request URL and
-    /// indexing into `routes` by HTTP method.
-    pub(crate) endpoints: matchit::Router<Endpoint>,
-    /// The layers registered on this router, wrapping matched routes by path
-    /// prefix.
-    pub(crate) layers: Layers,
-    /// The values shared by every request, read back via
-    /// [`app_context`](topcoat_core::context::app_context).
-    pub(crate) app_context: Arc<AppContext>,
-    /// The origin policy wrapping every request as the outermost layer.
-    pub(crate) origin: OriginLayer,
-    /// The compression applied to responses on their way out.
-    #[cfg(feature = "compression")]
-    pub(crate) compression: crate::Compression,
+    /// The routing tables, shared with every request context this router
+    /// creates.
+    inner: Arc<RouterInner>,
 }
 
 impl Router {
@@ -66,10 +48,11 @@ impl Router {
         RouterBuilder::new()
     }
 
-    /// Returns the route registered under `id`, or `None` if this router
-    /// holds no route with that identity.
-    pub(crate) fn route_by_id(&self, id: RouteId) -> Option<&dyn Route> {
-        self.route_ids.get(&id).map(|&index| &*self.routes[index])
+    /// Wraps finalized routing tables into a router.
+    pub(crate) fn new(inner: RouterInner) -> Self {
+        Self {
+            inner: Arc::new(inner),
+        }
     }
 
     /// Dispatches a request to the route registered for its path and method,
@@ -98,35 +81,39 @@ impl Router {
 
     /// Handles one request inside the panic isolation boundary.
     async fn handle_inner(&self, request: Request) -> Response {
+        let inner = &*self.inner;
         let (parts, body) = request.into_parts();
 
-        let Ok(matched) = self.endpoints.at(parts.uri.path()) else {
+        let Some((endpoint_index, endpoint, params)) = inner.endpoints.at(parts.uri.path()) else {
             return respond(&Cx::default(), not_found());
         };
+
+        let path_params =
+            RawPathParams::from_match(endpoint.path(), params.iter().map(|(_, value)| value));
 
         // The chain's terminal, reached through the endpoint's precomputed
         // layer stack whether the method matches (a route) or not (405), so
         // both flow through the same layers.
-        let endpoint = matched.value;
-        let path_params = RawPathParams::from_match(
-            endpoint.path(),
-            matched.params.iter().map(|(_, value)| value),
-        );
-        let terminal = match endpoint.get(&parts.method).or_else(|| endpoint.any()) {
-            Some(index) => Terminal::Route(&*self.routes[index]),
+        let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
+        let terminal = match route_index {
+            Some(index) => Terminal::Route(&*inner.routes[index].route),
             None => Terminal::MethodNotAllowed(endpoint),
         };
 
-        let cx = Cx::new(Arc::clone(&self.app_context)).with_many((
-            EndpointPath(endpoint.shared_path().clone()),
+        let cx = Cx::new(Arc::clone(&inner.app_context)).with_many((
+            Arc::clone(&self.inner),
+            Matched {
+                endpoint: endpoint_index,
+                route: route_index,
+            },
             path_params,
             parts,
         ));
 
         // The origin layer wraps the whole chain, denying untrusted
         // cross-origin requests before anything else runs.
-        let next = Next::new(&self.layers, endpoint.layers(), terminal);
-        let response = self.origin.handle(&cx, body, next).await;
+        let next = Next::new(&inner.layers, endpoint.layers(), terminal);
+        let response = inner.origin.handle(&cx, body, next).await;
         let response = respond(&cx, response);
 
         // Compression runs outside every layer, so layers see uncompressed
@@ -134,12 +121,139 @@ impl Router {
         // left them.
         #[cfg(feature = "compression")]
         let response = match try_request_context::<http::request::Parts>(&cx) {
-            Some(parts) => self.compression.compress(&parts.headers, response).await,
+            Some(parts) => inner.compression.compress(&parts.headers, response).await,
             None => response,
         };
 
         response
     }
+}
+
+/// The routing tables behind a [`Router`].
+///
+/// Every matched request carries a shared handle to these tables on its
+/// context, so request-time accessors like [`endpoint_path`] resolve through
+/// the router that dispatched the request.
+pub(crate) struct RouterInner {
+    /// The registered routes, indexed by the endpoints' method tables.
+    pub(crate) routes: Routes,
+    /// The registered endpoints and the matcher resolving a request URL to
+    /// one of them.
+    pub(crate) endpoints: Endpoints,
+    /// The layers registered on this router, wrapping matched routes by path
+    /// prefix.
+    pub(crate) layers: Layers,
+    /// The values shared by every request, read back via
+    /// [`app_context`](topcoat_core::context::app_context).
+    pub(crate) app_context: Arc<AppContext>,
+    /// The origin policy wrapping every request as the outermost layer.
+    pub(crate) origin: OriginLayer,
+    /// The compression applied to responses on their way out.
+    #[cfg(feature = "compression")]
+    pub(crate) compression: crate::Compression,
+}
+
+/// What a request was dispatched to, stored on its context.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Matched {
+    /// The endpoint the request's path matched.
+    endpoint: EndpointIndex,
+    /// The route serving the request, or `None` when the path matched but no
+    /// route accepts the method (a 405).
+    route: Option<RouteIndex>,
+}
+
+/// Reads the router and dispatch record off a matched request's context.
+fn try_matched(cx: &Cx) -> Option<(&RouterInner, Matched)> {
+    let router = try_request_context::<Arc<RouterInner>>(cx)?;
+    let matched = try_request_context::<Matched>(cx)?;
+    Some((router, *matched))
+}
+
+/// Returns the endpoint the current request matched.
+///
+/// The endpoint's [`path`](Endpoint::path) is the pattern the request URL was
+/// matched against rather than the URL itself, so parameters keep their
+/// `{name}` form. Read the requested URL with [`uri`](crate::request::uri)
+/// instead.
+///
+/// # Panics
+///
+/// Panics if the request matched no endpoint.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::endpoint};
+///
+/// fn log_line(cx: &Cx) -> String {
+///     // The pattern, not the URL: `/users/{id}` for a request to `/users/42`.
+///     format!("handled {}", endpoint(cx).path())
+/// }
+/// ```
+#[must_use]
+#[track_caller]
+pub fn endpoint(cx: &Cx) -> &Endpoint {
+    match try_matched(cx) {
+        Some((router, matched)) => &router.endpoints[matched.endpoint],
+        None => panic!("this request matched no endpoint"),
+    }
+}
+
+/// Returns the route handling the current request.
+///
+/// # Panics
+///
+/// Panics if the request matched no route: either its path matched no
+/// endpoint, or the endpoint holds no route for the request's method.
+#[must_use]
+#[track_caller]
+pub fn route(cx: &Cx) -> &dyn Route {
+    try_matched(cx)
+        .and_then(|(router, matched)| Some(&*router.routes[matched.route?].route))
+        .unwrap_or_else(|| panic!("this request matched no route"))
+}
+
+/// Returns the endpoint serving the route registered under `id` on the router
+/// the current request was dispatched through, or `None` if the context
+/// carries no router or the router holds no route with that identity.
+#[doc(hidden)]
+#[must_use]
+pub fn route_endpoint(cx: &Cx, id: RouteId) -> Option<&Endpoint> {
+    let router = try_request_context::<Arc<RouterInner>>(cx)?;
+    let index = router.routes.index_of(id)?;
+    Some(&router.endpoints[router.routes[index].endpoint])
+}
+
+/// Builds the request context of a request matched to an endpoint at `path`,
+/// as the router assembles one, for tests elsewhere in this crate.
+#[cfg(test)]
+pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
+    use std::borrow::Cow;
+
+    use crate::OriginPolicy;
+
+    let mut endpoints = Endpoints::default();
+    let endpoint = endpoints.push(
+        Cow::Owned(path.as_str().to_owned()),
+        Endpoint::new(path, Box::new([])),
+    );
+    let inner = RouterInner {
+        routes: Routes::default(),
+        endpoints,
+        layers: Layers::default(),
+        app_context: Arc::new(AppContext::new()),
+        origin: OriginLayer::new(OriginPolicy::new()),
+        #[cfg(feature = "compression")]
+        compression: crate::Compression::new(),
+    };
+    Cx::new(Arc::clone(&inner.app_context)).with_many((
+        Arc::new(inner),
+        Matched {
+            endpoint,
+            route: None,
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -148,7 +262,7 @@ mod tests {
         borrow::Cow,
         future::Future,
         pin::Pin,
-        sync::{Arc, Mutex},
+        sync::{Arc, Mutex, OnceLock},
     };
 
     use http::{HeaderMap, StatusCode};
@@ -160,9 +274,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn, Path, RouteFn,
-        RouteFuture, endpoint_path, raw_path_params, request::Bytes, response::IntoResponse,
-        to_bytes,
+        Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn,
+        Path, Route, RouteFn, RouteFuture, raw_path_params, request::Bytes,
+        response::IntoResponse, to_bytes,
     };
 
     // -- Test helpers --
@@ -227,7 +341,12 @@ mod tests {
 
     /// Echoes the path of the endpoint the request matched.
     fn echo_endpoint_path(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { endpoint_path(cx).to_string().into_response(cx) })
+        Box::pin(async move { endpoint(cx).path().to_string().into_response(cx) })
+    }
+
+    /// Echoes the identity of the route handling the request.
+    fn echo_route_id(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { format!("{:?}", route(cx).id()).into_response(cx) })
     }
 
     /// Reads a registered app-context greeting and returns it as the body.
@@ -482,6 +601,65 @@ mod tests {
         let (status, _, body) = send(&router, Method::GET, "/x");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"route");
+    }
+
+    // -- endpoint / route accessors --
+
+    #[test]
+    fn reads_the_matched_endpoint() {
+        let cx = test_matched_cx(Path::new("/users/{id}"));
+        assert_eq!(endpoint(&cx).path(), Path::new("/users/{id}"));
+    }
+
+    #[test]
+    #[should_panic(expected = "matched no endpoint")]
+    fn endpoint_panics_without_a_match() {
+        let _ = endpoint(&Cx::default());
+    }
+
+    #[test]
+    fn exposes_the_matched_route() {
+        let route = RouteFn::new(Method::GET, path("/x"), echo_route_id);
+        let expected = format!("{:?}", route.id());
+        let router = RouterBuilder::new().route(route).build();
+
+        let (status, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], expected.as_bytes());
+    }
+
+    #[test]
+    #[should_panic(expected = "matched no route")]
+    fn route_panics_without_a_matched_route() {
+        // The context of a 405: an endpoint matched, but no route did.
+        let cx = test_matched_cx(Path::new("/x"));
+        let _ = route(&cx);
+    }
+
+    /// The route the href test resolves, shared with its handler through a
+    /// static since handlers are plain `fn` pointers.
+    static HREF_ROUTE: OnceLock<RouteFn> = OnceLock::new();
+
+    fn href_route() -> RouteFn {
+        HREF_ROUTE
+            .get_or_init(|| RouteFn::new(Method::GET, path("/(auth)/users/{id}"), echo_href_path))
+            .clone()
+    }
+
+    fn echo_href_path(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            HrefTarget::path(&href_route(), cx)
+                .to_string()
+                .into_response(cx)
+        })
+    }
+
+    #[test]
+    fn href_target_resolves_the_served_url_path() {
+        let router = RouterBuilder::new().route(href_route()).build();
+        let (_, _, body) = send(&router, Method::GET, "/users/7");
+        // The endpoint's URL path: groups stripped, params in `{name}` form.
+        assert_eq!(&body[..], b"/users/{id}");
     }
 
     // -- Router::handle: origin policy --

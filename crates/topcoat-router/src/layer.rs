@@ -113,41 +113,41 @@ impl Layer for LayerFn {
     }
 }
 
-/// The identifier of a [`Layer`] registered on a router.
+/// The position of a [`Layer`] in a router's [`Layers`] table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct LayerId(pub(crate) usize);
+pub(crate) struct LayerIndex(pub(crate) usize);
 
 /// The layers registered on a router, in registration order, indexed by
-/// [`LayerId`].
+/// [`LayerIndex`].
 ///
 /// Layers are [`push`](Self::push)ed as the router is built, then only queried:
 /// [`for_endpoint`](Self::for_endpoint) selects the layers wrapping an
-/// endpoint's path, and indexing by [`LayerId`] resolves a selected id back to
-/// its layer.
+/// endpoint's path, and indexing by [`LayerIndex`] resolves a selected index
+/// back to its layer.
 #[derive(Default)]
 pub(crate) struct Layers {
     layers: Vec<Box<dyn Layer>>,
 }
 
 impl Layers {
-    /// Registers `layer`, returning the [`LayerId`] that now identifies it.
-    pub(crate) fn push(&mut self, layer: Box<dyn Layer>) -> LayerId {
-        let id = LayerId(self.layers.len());
+    /// Registers `layer`, returning the [`LayerIndex`] that now identifies it.
+    pub(crate) fn push(&mut self, layer: Box<dyn Layer>) -> LayerIndex {
+        let index = LayerIndex(self.layers.len());
         self.layers.push(layer);
-        id
+        index
     }
 
     /// Selects the layers whose path is a prefix of the endpoint `path`, ordered
     /// least- to most-specific so the outermost layer runs first. Among layers
     /// that share a path, the most recently registered runs first.
-    pub(crate) fn for_endpoint(&self, path: &Path) -> Vec<LayerId> {
-        let mut ids: Vec<LayerId> = (0..self.layers.len())
-            .map(LayerId)
-            .filter(|id| path.starts_with(self[*id].path()))
+    pub(crate) fn for_endpoint(&self, path: &Path) -> Vec<LayerIndex> {
+        let mut indices: Vec<LayerIndex> = (0..self.layers.len())
+            .map(LayerIndex)
+            .filter(|index| path.starts_with(self[*index].path()))
             .rev()
             .collect();
-        ids.sort_by_key(|id| self[*id].path().len());
-        ids
+        indices.sort_by_key(|index| self[*index].path().len());
+        indices
     }
 
     /// Returns the number of registered layers.
@@ -156,10 +156,10 @@ impl Layers {
     }
 }
 
-impl Index<LayerId> for Layers {
+impl Index<LayerIndex> for Layers {
     type Output = dyn Layer;
 
-    fn index(&self, LayerId(index): LayerId) -> &Self::Output {
+    fn index(&self, LayerIndex(index): LayerIndex) -> &Self::Output {
         &*self.layers[index]
     }
 }
@@ -185,11 +185,11 @@ pub(crate) enum Terminal<'a> {
 /// Passed as the `next` argument to [`Layer::handle`]. Call [`run`](Self::run)
 /// to invoke the next layer, or the terminal once the layers are exhausted.
 pub struct Next<'a> {
-    /// The router's full layer table, indexed by the ids in `indices`.
+    /// The router's full layer table, indexed by `indices`.
     layers: &'a Layers,
-    /// The layers wrapping this request, as ids into `layers`, ordered from
-    /// least- to most-specific so the outermost layer runs first.
-    indices: &'a [LayerId],
+    /// The layers wrapping this request, as indices into `layers`, ordered
+    /// from least- to most-specific so the outermost layer runs first.
+    indices: &'a [LayerIndex],
     /// What runs once the layers are exhausted.
     terminal: Terminal<'a>,
 }
@@ -200,7 +200,7 @@ impl<'a> Next<'a> {
     ///
     /// `indices` must be ordered from least- to most-specific (ascending path
     /// length), so the outermost layer runs first.
-    pub(crate) fn new(layers: &'a Layers, indices: &'a [LayerId], terminal: Terminal<'a>) -> Self {
+    pub(crate) fn new(layers: &'a Layers, indices: &'a [LayerIndex], terminal: Terminal<'a>) -> Self {
         Self {
             layers,
             indices,
@@ -244,8 +244,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Method, RouteFn, RouteFuture, error::respond, request::Bytes, response::IntoResponse,
-        to_bytes,
+        Method, RouteFn, RouteFuture, RouteIndex, error::respond, request::Bytes,
+        response::IntoResponse, to_bytes,
     };
 
     // -- Test helpers --
@@ -330,9 +330,9 @@ mod tests {
     #[test]
     fn push_assigns_sequential_ids() {
         let mut layers = Layers::default();
-        assert_eq!(layers.push(layer_at("/")), LayerId(0));
-        assert_eq!(layers.push(layer_at("/admin")), LayerId(1));
-        assert_eq!(layers.push(layer_at("/admin/x")), LayerId(2));
+        assert_eq!(layers.push(layer_at("/")), LayerIndex(0));
+        assert_eq!(layers.push(layer_at("/admin")), LayerIndex(1));
+        assert_eq!(layers.push(layer_at("/admin/x")), LayerIndex(2));
     }
 
     #[test]
@@ -410,7 +410,7 @@ mod tests {
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
         let cx = Cx::default();
 
-        let indices: &[LayerId] = &[];
+        let indices: &[LayerIndex] = &[];
         let next = Next::new(&layers, indices, Terminal::Route(&route));
         let result = block_on(next.run(&cx, Body::empty()));
         let response = respond(&cx, result);
@@ -422,13 +422,13 @@ mod tests {
     #[test]
     fn run_resolves_the_method_not_allowed_terminal() {
         let layers = Layers::default();
-        let no_layers: Box<[LayerId]> = Box::new([]);
+        let no_layers: Box<[LayerIndex]> = Box::new([]);
         let mut endpoint = Endpoint::new(&path("/x"), no_layers);
-        endpoint.insert(Method::GET, 0);
-        endpoint.insert(Method::POST, 1);
+        endpoint.insert(Method::GET, RouteIndex::new(0));
+        endpoint.insert(Method::POST, RouteIndex::new(1));
         let cx = Cx::default();
 
-        let indices: &[LayerId] = &[];
+        let indices: &[LayerIndex] = &[];
         let next = Next::new(&layers, indices, Terminal::MethodNotAllowed(&endpoint));
         let result = block_on(next.run(&cx, Body::empty()));
         let response = respond(&cx, result);

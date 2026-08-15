@@ -1,16 +1,16 @@
 use std::{
     any::{Any, type_name},
     borrow::Cow,
-    collections::HashMap,
-    fmt, iter,
+    collections::{HashMap, hash_map::Entry},
+    fmt,
     sync::Arc,
 };
 
 use topcoat_core::{base_url::BaseUrl, context::AppContext};
 
 use crate::{
-    Endpoint, Layer, LayerId, Layers, Layout, Methods, OriginLayer, OriginPolicy, Page,
-    PageWithLayouts, Path, Route, Router,
+    Endpoint, EndpointIndex, Endpoints, Layer, LayerIndex, Layers, Layout, Methods, OriginLayer,
+    OriginPolicy, Page, PageWithLayouts, Path, Route, Router, RouterInner, Routes,
 };
 
 /// Builds a [`Router`] for a Topcoat application.
@@ -371,51 +371,59 @@ impl RouterBuilder {
     #[must_use]
     #[track_caller]
     pub fn build(self) -> Router {
-        let RouterBuilder {
-            mut routes,
-            pages,
-            layouts,
-            layers,
-            context,
-            origin_policy,
-            #[cfg(feature = "compression")]
-            compression,
-        } = self;
-
         // Wire each page to the layouts whose path is a prefix of the page's,
         // ordered from least- to most-specific so the page nests innermost.
-        for page in pages {
-            let mut matching: Vec<Arc<dyn Layout>> = layouts
+        let mut registrations = self.routes;
+        for page in self.pages {
+            let mut matching: Vec<Arc<dyn Layout>> = self
+                .layouts
                 .iter()
                 .filter(|layout| page.path().starts_with(layout.path()))
                 .cloned()
                 .collect();
             matching.sort_by_key(|layout| layout.path().len());
-            routes.push(Box::new(PageWithLayouts::new(page, matching)));
+            registrations.push(Box::new(PageWithLayouts::new(page, matching)));
         }
 
-        // Group routes that share a path into a single endpoint first, since
-        // matchit rejects inserting the same path twice. Two routes that resolve
-        // to the same path *and* method are ambiguous, so reject them here.
-        // Remember each group's first route index to name it in the layer
-        // divergence panic below.
-        let mut grouped: HashMap<Cow<'static, str>, Endpoint> = HashMap::new();
-        let mut layers_used = iter::repeat_n(false, layers.len()).collect::<Vec<_>>();
-        for (index, route) in routes.iter().enumerate() {
-            let layer_stack = layers.for_endpoint(route.path());
+        // Group routes that share a path onto a single endpoint. Two routes
+        // that resolve to the same path *and* method are ambiguous, so reject
+        // them here. The grouping map keys endpoints by their matchit path so
+        // that routes differing only in their group segments agree on the one
+        // their endpoint serves.
+        let mut routes = Routes::default();
+        let mut endpoints = Endpoints::default();
+        let mut grouped: HashMap<Cow<'static, str>, EndpointIndex> = HashMap::new();
+        let mut layers_used = vec![false; self.layers.len()];
+        for route in registrations {
+            let layer_stack = self.layers.for_endpoint(route.path());
             // Mark layers as used.
-            for layer_id in &layer_stack {
-                layers_used[layer_id.0] = true;
+            for layer_index in &layer_stack {
+                layers_used[layer_index.0] = true;
             }
 
-            let endpoint = grouped
-                .entry(route.path().to_matchit_path())
-                .or_insert_with_key(|matchit_path| {
-                    // The path is taken from the key rather than the route so
-                    // that routes differing only in their group segments agree
-                    // on the one this endpoint serves.
-                    Endpoint::new(Path::new(matchit_path), layer_stack.into_boxed_slice())
-                });
+            let endpoint_index = match grouped.entry(route.path().to_matchit_path()) {
+                Entry::Vacant(entry) => {
+                    let endpoint =
+                        Endpoint::new(Path::new(entry.key()), layer_stack.into_boxed_slice());
+                    let endpoint_index = endpoints.push(entry.key().clone(), endpoint);
+                    *entry.insert(endpoint_index)
+                }
+                Entry::Occupied(entry) => {
+                    // Every route at a path shares one layer stack, so reject
+                    // a divergence (possible when group segments differ)
+                    // rather than resolve it by registration order.
+                    assert!(
+                        endpoints[*entry.get()].layers() == &layer_stack[..],
+                        "routes registered for `{}` are wrapped by different layers",
+                        entry.key()
+                    );
+                    *entry.get()
+                }
+            };
+
+            let route_index = routes.push(route, endpoint_index);
+            let route = &routes[route_index].route;
+            let endpoint = &mut endpoints[endpoint_index];
 
             // An any-method route shares its path with specific-method routes
             // (which win at dispatch), so the two kinds are checked for
@@ -427,7 +435,7 @@ impl RouterBuilder {
                         "duplicate any-method route registered for `{}`",
                         route.path().to_matchit_path()
                     );
-                    endpoint.insert_any(index);
+                    endpoint.insert_any(route_index);
                 }
                 Methods::Only(methods) => {
                     assert!(
@@ -441,47 +449,35 @@ impl RouterBuilder {
                             "duplicate route registered for `{method} {}`",
                             route.path().to_matchit_path()
                         );
-                        endpoint.insert(method.clone(), index);
+                        endpoint.insert(method.clone(), route_index);
                     }
                 }
             }
         }
 
         // Sanity check for unused layers.
-        for (layer_id, used) in layers_used.into_iter().enumerate() {
-            let layer = &layers[LayerId(layer_id)];
+        for (layer_index, used) in layers_used.into_iter().enumerate() {
+            let layer = &self.layers[LayerIndex(layer_index)];
             assert!(
                 used || layer.path() == Path::ROOT,
                 "layer with path `{}` did not match any route, this is likely a mistake",
-                layers[LayerId(layer_id)].path()
+                layer.path()
             );
         }
 
-        // Insert batched endpoints into matchit router.
-        let mut endpoints = matchit::Router::new();
-        for (path, mut endpoint) in grouped {
-            endpoint.alias_head_to_get();
-            endpoints
-                .insert(path.clone(), endpoint)
-                .unwrap_or_else(|error| panic!("failed to register route {path:?}: {error}"));
+        for &endpoint_index in grouped.values() {
+            endpoints[endpoint_index].alias_head_to_get();
         }
 
-        let route_ids = routes
-            .iter()
-            .enumerate()
-            .map(|(index, route)| (route.id(), index))
-            .collect();
-
-        Router {
+        Router::new(RouterInner {
             routes,
-            route_ids,
             endpoints,
-            layers,
-            app_context: Arc::new(context),
-            origin: OriginLayer::new(origin_policy),
+            layers: self.layers,
+            app_context: Arc::new(self.context),
+            origin: OriginLayer::new(self.origin_policy),
             #[cfg(feature = "compression")]
-            compression,
-        }
+            compression: self.compression,
+        })
     }
 }
 
@@ -623,6 +619,18 @@ mod tests {
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/administrator"), handler))
             .layer(LayerFn::new(path("/admin"), noop_layer))
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "routes registered for `/x` are wrapped by different layers")]
+    fn routes_sharing_a_url_with_diverging_layers_panic_on_build() {
+        // Both routes serve `/x`, but the layer inside `(a)` wraps only one of
+        // them, so the shared endpoint has no single layer stack.
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/(a)/x"), handler))
+            .route(RouteFn::new(Method::POST, path("/(b)/x"), handler))
+            .layer(LayerFn::new(path("/(a)"), noop_layer))
             .build();
     }
 

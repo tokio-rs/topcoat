@@ -1,5 +1,7 @@
-use crate::RouteId;
+use topcoat_core::context::Cx;
+
+use crate::Path;
 
 pub trait HrefTarget {
-    fn route_id(&self) -> RouteId;
+    fn path<'cx>(&self, cx: &'cx Cx) -> &'cx Path;
 }

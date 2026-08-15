@@ -200,11 +200,19 @@ impl ToTokens for Route {
             (route, quote! { #topcoat_router::ModuleRoute })
         };
 
-        // href! resolves the marker to a URL through its route id.
+        // href! resolves the marker to the URL path it is served at, through
+        // the router that dispatched the current request.
         let href_target = quote! {
             impl #topcoat_router::HrefTarget for #ident {
-                fn route_id(&self) -> #topcoat_router::RouteId {
-                    *ID
+                fn path<'cx>(&self, cx: &'cx #topcoat_context::Cx) -> &'cx #topcoat_router::Path {
+                    match #topcoat_router::route_endpoint(cx, *ID) {
+                        ::core::option::Option::Some(endpoint) => endpoint.path(),
+                        ::core::option::Option::None => ::core::panic!(::core::concat!(
+                            "route `",
+                            ::core::stringify!(#ident),
+                            "` is not registered on the router serving this request",
+                        )),
+                    }
                 }
             }
         };
