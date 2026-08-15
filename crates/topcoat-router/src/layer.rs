@@ -135,7 +135,9 @@ pub(crate) fn layers_for_path(layers: &[Arc<dyn Layer>], path: &Path) -> Box<[Ar
         .filter(|layer| layer.path().is_none_or(|prefix| path.starts_with(prefix)))
         .rev()
         .collect();
-    matching.sort_by_key(|layer| layer.path().map_or(0, Path::len));
+    // The root path's backing string is empty, so its length is offset to
+    // keep a pathless layer strictly less specific than a layer at `/`.
+    matching.sort_by_key(|layer| layer.path().map_or(0, |path| path.len() + 1));
     matching.into_iter().cloned().collect()
 }
 
@@ -333,6 +335,11 @@ mod tests {
         let layers = [layer_at("/"), layer_always()];
         // A layer without a path wraps every route, outside the layers whose
         // paths match it.
+        assert_selects(&layers, "/users", &[None, Some("/")]);
+
+        // The same holds with the registration order reversed: a pathless
+        // layer stays outside a root-path layer regardless of order.
+        let layers = [layer_always(), layer_at("/")];
         assert_selects(&layers, "/users", &[None, Some("/")]);
     }
 
