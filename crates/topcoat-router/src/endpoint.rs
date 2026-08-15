@@ -328,10 +328,7 @@ mod tests {
 
     fn endpoint_at(path: &'static str) -> (Cow<'static, str>, Endpoint) {
         let path = Path::new(path);
-        (
-            path.to_matchit_path(),
-            Endpoint::new(path, Box::new([])),
-        )
+        (path.to_matchit_path(), Endpoint::new(path, Box::new([])))
     }
 
     #[test]

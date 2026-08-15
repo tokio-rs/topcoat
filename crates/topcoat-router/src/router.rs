@@ -275,8 +275,8 @@ mod tests {
     use super::*;
     use crate::{
         Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn,
-        Path, Route, RouteFn, RouteFuture, raw_path_params, request::Bytes,
-        response::IntoResponse, to_bytes,
+        Path, Route, RouteFn, RouteFuture, raw_path_params, request::Bytes, response::IntoResponse,
+        to_bytes,
     };
 
     // -- Test helpers --

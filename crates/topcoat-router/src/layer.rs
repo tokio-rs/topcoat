@@ -200,7 +200,11 @@ impl<'a> Next<'a> {
     ///
     /// `indices` must be ordered from least- to most-specific (ascending path
     /// length), so the outermost layer runs first.
-    pub(crate) fn new(layers: &'a Layers, indices: &'a [LayerIndex], terminal: Terminal<'a>) -> Self {
+    pub(crate) fn new(
+        layers: &'a Layers,
+        indices: &'a [LayerIndex],
+        terminal: Terminal<'a>,
+    ) -> Self {
         Self {
             layers,
             indices,
