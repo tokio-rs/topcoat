@@ -10,7 +10,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::{net::TcpListener, sync::broadcast};
 use topcoat_core::context::{Cx, app_context};
 use topcoat_router::{
-    Body, HeaderValue, Method, Path, RouteFn, RouteFuture, Router, RouterService,
+    Body, HeaderValue, Method, OriginPolicy, Path, RouteFn, RouteFuture, Router, RouterService,
     content::websocket::{Message, WebSocket, WebSocketUpgrade},
     header, internal_serve,
     request::FromRequest,
@@ -113,6 +113,7 @@ pub async fn bind() -> TcpListener {
 pub async fn run(listener: TcpListener, events: EventBus) {
     let router = Router::builder()
         .app_context(events)
+        .origin_policy(OriginPolicy::new().exempt_paths(["/ws"]))
         .route(RouteFn::new(
             Method::GET,
             Cow::Borrowed(Path::new("/dev.js")),
