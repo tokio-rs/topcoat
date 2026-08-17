@@ -38,13 +38,13 @@ async fn root_layout(slot: Result) -> Result {
                 <nav>
                     // A page as an href target resolves to the path it is
                     // registered at, so a moved page updates every link to it.
-                    <a href=(href(home, ()))>"home"</a>
+                    <a href=(href!(home))>"home"</a>
                     " | "
-                    <a href=(href(about, ()))>"about"</a>
+                    <a href=(href!(about))>"about"</a>
                     " | "
-                    <a href=(href(docs, ()))>"docs"</a>
+                    <a href=(href!(docs))>"docs"</a>
                     " | "
-                    <a href=(href(install, ()))>"install"</a>
+                    <a href=(href!(install))>"install"</a>
                 </nav>
 
                 <hr>

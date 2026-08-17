@@ -57,7 +57,7 @@ pub async fn page(cx: &Cx) -> Result {
                 "Five hundred products, zero filler. Everything in the catalog is tested daily by the people who build it."
             </p>
             <a
-                href=(href(products::page, ()))
+                href=(href!(products::page))
                 class="mt-8 inline-block rounded-lg bg-white px-6 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
             >
                 "Browse all products"
@@ -67,7 +67,7 @@ pub async fn page(cx: &Cx) -> Result {
             <div class="flex items-baseline justify-between">
                 <h2 class="text-2xl font-bold tracking-tight">"Featured products"</h2>
                 <a
-                    href=(href(products::page, ()))
+                    href=(href!(products::page))
                     class="text-sm font-medium text-indigo-600 hover:text-indigo-500"
                 >
                     "View all"

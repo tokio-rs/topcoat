@@ -83,7 +83,7 @@ async fn drink_grid(cx: &Cx, query: String) -> Result {
 #[component]
 async fn drink_card(drink: &Drink) -> Result {
     view! {
-        <a href=(href(drink::page, (drink::Slug(&drink.slug),)))>
+        <a href=(href!(drink::page, drink::Slug(&drink.slug)))>
             card(
                 // The grid stretches every cell to the row height; the card
                 // fills it and pins the price to the bottom.

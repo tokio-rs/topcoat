@@ -36,7 +36,7 @@ pub async fn page(cx: &Cx) -> Result {
         signal confirmation = String::new();
 
         <a
-            href=(href(super::page, ()))
+            href=(href!(super::page))
             class="text-sm text-muted-foreground hover:text-foreground"
         >
             "Back to the menu"

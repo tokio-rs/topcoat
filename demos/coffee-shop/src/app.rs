@@ -64,11 +64,9 @@ async fn shell(cx: &Cx, slot: Result) -> Result {
                     <nav
                         class="mx-auto flex w-full max-w-3xl items-center gap-6 px-6 py-4"
                     >
-                        <a href=(href(page, ())) class="font-semibold">
-                            "Little Crema"
-                        </a>
+                        <a href=(href!(page)) class="font-semibold">"Little Crema"</a>
                         <a
-                            href=(href(menu::page, ()))
+                            href=(href!(menu::page))
                             class="text-sm text-muted-foreground hover:text-foreground"
                         >
                             "Menu"
@@ -117,7 +115,7 @@ pub async fn page(cx: &Cx) -> Result {
             </p>
 
             <a
-                href=(href(menu::page, ()))
+                href=(href!(menu::page))
                 class=(button_variants(ButtonVariant::Primary, ButtonSize::Lg))
             >
                 "Browse the menu"
@@ -137,7 +135,7 @@ pub async fn page(cx: &Cx) -> Result {
                         )
                         card_footer(
                             // Submitting an empty name clears the cookie.
-                            <form method="post" action=(href(sign_in, ()))>
+                            <form method="post" action=(href!(sign_in))>
                                 button(
                                     variant: ButtonVariant::Outline,
                                     size: ButtonSize::Sm,
@@ -161,7 +159,7 @@ pub async fn page(cx: &Cx) -> Result {
                         card_content(
                             <form
                                 method="post"
-                                action=(href(sign_in, ()))
+                                action=(href!(sign_in))
                                 class="flex flex-col gap-3"
                             >
                                 <div class="flex flex-col gap-2">
@@ -194,5 +192,5 @@ async fn sign_in(cx: &Cx, Form(form): Form<SignIn>) -> Result<SeeOther> {
     }
 
     // Post/Redirect/Get, so a reload does not submit the form again.
-    Ok(see_other(&href(page, ()).resolve(cx)))
+    Ok(see_other(&href!(page).resolve(cx)))
 }

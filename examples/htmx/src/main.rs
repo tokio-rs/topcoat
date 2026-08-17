@@ -53,7 +53,7 @@ async fn home() -> Result {
         </h1>
 
         // Swaps the returned fragment into #count.
-        <button hx-post=(href(increment, ())) hx-target="#count" hx-swap="innerHTML">
+        <button hx-post=(href!(increment)) hx-target="#count" hx-swap="innerHTML">
             "Increment"
         </button>
     }

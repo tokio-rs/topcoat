@@ -23,7 +23,7 @@ async fn main() {
 
 #[page]
 async fn page(cx: &Cx) -> Result {
-    Err(redirect(&href(counter::page, ()).resolve(cx)).into())
+    Err(redirect(&href!(counter::page).resolve(cx)).into())
 }
 
 #[layout]
@@ -39,9 +39,9 @@ async fn layout(slot: Result) -> Result {
             </head>
             <body>
                 <nav>
-                    <a href=(href(counter::page, ()))>"counter"</a>
+                    <a href=(href!(counter::page))>"counter"</a>
                     " | "
-                    <a href=(href(show::page, ()))>"show"</a>
+                    <a href=(href!(show::page))>"show"</a>
                 </nav>
 
                 <hr>

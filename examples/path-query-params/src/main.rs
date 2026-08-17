@@ -35,15 +35,13 @@ async fn home() -> Result {
             // `href` builds the URL from the page it points at: `query` adds
             // query items, and the tuple fills the path's parameters.
             <li>
-                <a href=(href(posts, ()).query([("page", "2"), ("q", "rust")]))>
+                <a href=(href!(posts).query([("page", "2"), ("q", "rust")]))>
                     "query params: /posts?page=2&q=rust"
                 </a>
             </li>
+            <li><a href=(href!(post, PostId(42)))>"path param: /posts/42"</a></li>
             <li>
-                <a href=(href(post, (PostId(42),)))>"path param: /posts/42"</a>
-            </li>
-            <li>
-                <a href=(href(document, (DocPath(["guides", "getting-started"]),)))>
+                <a href=(href!(document, DocPath(["guides", "getting-started"])))>
                     "catch-all param: /docs/guides/getting-started"
                 </a>
             </li>
@@ -74,7 +72,7 @@ async fn posts(cx: &Cx) -> Result {
             "search: "
             (query.q.as_deref().unwrap_or("all"))
         </p>
-        <p><a href=(href(home, ()))>"back home"</a></p>
+        <p><a href=(href!(home))>"back home"</a></p>
     }
 }
 
@@ -96,7 +94,7 @@ async fn post(cx: &Cx) -> Result {
             (post_id)
         </h1>
         <p>"parsed from the {post_id} path segment"</p>
-        <p><a href=(href(posts, ()).query([("page", 1)]))>"all posts"</a></p>
+        <p><a href=(href!(posts).query([("page", 1)]))>"all posts"</a></p>
     }
 }
 
@@ -115,6 +113,6 @@ async fn document(cx: &Cx) -> Result {
                 <li>(segment)</li>
             }
         </ul>
-        <p><a href=(href(home, ()))>"back home"</a></p>
+        <p><a href=(href!(home))>"back home"</a></p>
     }
 }

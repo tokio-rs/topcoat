@@ -58,11 +58,11 @@ async fn page(cx: &Cx) -> Result {
                 (&user.name)
             </div>
 
-            <form method="POST" action=(href(logout, ()))><button>"log out"</button></form>
+            <form method="POST" action=(href!(logout))><button>"log out"</button></form>
         } else {
             <div>"currently not logged in"</div>
 
-            <form method="POST" action=(href(login, ()))>
+            <form method="POST" action=(href!(login))>
                 <input name="name" placeholder="Username" required="true">
                 <button>"log in"</button>
             </form>
@@ -84,7 +84,7 @@ async fn login(cx: &Cx, Form(form): Form<LoginForm>) -> Result<SeeOther> {
 
     db(cx).create(session, User { name: form.name });
 
-    Ok(see_other(&href(page, ()).resolve(cx)))
+    Ok(see_other(&href!(page).resolve(cx)))
 }
 
 #[route(POST "/logout")]
@@ -93,7 +93,7 @@ async fn logout(cx: &Cx) -> Result<SeeOther> {
         db(cx).delete(&token_hash);
     }
 
-    Ok(see_other(&href(page, ()).resolve(cx)))
+    Ok(see_other(&href!(page).resolve(cx)))
 }
 
 // --- In-memory demo database ------------------------------------------------

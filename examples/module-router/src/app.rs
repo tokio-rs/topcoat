@@ -24,15 +24,15 @@ async fn root_layout(slot: Result) -> Result {
                 // A page as an href target resolves to the path the module
                 // tree derives for it, so a moved module updates its links.
                 <nav>
-                    <a href=(href(page, ()))>"home"</a>
+                    <a href=(href!(page))>"home"</a>
                     " | "
-                    <a href=(href(about::page, ()))>"about"</a>
+                    <a href=(href!(about::page))>"about"</a>
                     " | "
-                    <a href=(href(docs::page, ()))>"docs"</a>
+                    <a href=(href!(docs::page))>"docs"</a>
                     " | "
-                    <a href=(href(docs::install::page, ()))>"install"</a>
+                    <a href=(href!(docs::install::page))>"install"</a>
                     " | "
-                    <a href=(href(_marketing::pricing::page, ()))>"pricing"</a>
+                    <a href=(href!(_marketing::pricing::page))>"pricing"</a>
                 </nav>
                 <hr>
                 (slot?)

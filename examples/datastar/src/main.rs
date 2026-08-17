@@ -45,7 +45,7 @@ async fn home() -> Result {
                 </h1>
 
                 // The route's URL is interpolated into the Datastar action.
-                <button data-on:click=(("@post('", href(increment, ()), "')"))>
+                <button data-on:click=(("@post('", href!(increment), "')"))>
                     "Increment"
                 </button>
 

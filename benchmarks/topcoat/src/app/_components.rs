@@ -67,12 +67,12 @@ pub async fn site_nav() -> Result {
             <nav
                 class="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4"
             >
-                <a href=(href(app::page, ())) class="text-lg font-bold tracking-tight">
+                <a href=(href!(app::page)) class="text-lg font-bold tracking-tight">
                     "Meridian Supply"
                 </a>
                 <div class="flex items-center gap-6 text-sm font-medium text-slate-600">
-                    <a href=(href(app::page, ())) class="hover:text-slate-900">"Home"</a>
-                    <a href=(href(products::page, ())) class="hover:text-slate-900">
+                    <a href=(href!(app::page)) class="hover:text-slate-900">"Home"</a>
+                    <a href=(href!(products::page)) class="hover:text-slate-900">
                         "Products"
                     </a>
                     <span
@@ -157,7 +157,7 @@ pub async fn rating_stars(tenths: u32, size: &str) -> Result {
 pub async fn product_card(product: &Product) -> Result {
     view! {
         <a
-            href=(href(products::id::page, (ProductId(product.id),)))
+            href=(href!(products::id::page, ProductId(product.id)))
             class="group flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md"
         >
             <div
@@ -232,11 +232,11 @@ pub async fn breadcrumbs(category: &str, category_slug: &str, name: &str) -> Res
         <nav aria-label="Breadcrumb" class="text-sm text-slate-500">
             <ol class="flex flex-wrap items-center gap-2">
                 <li>
-                    <a href=(href(app::page, ())) class="hover:text-slate-900">"Home"</a>
+                    <a href=(href!(app::page)) class="hover:text-slate-900">"Home"</a>
                 </li>
                 <li>"/"</li>
                 <li>
-                    <a href=(href(products::page, ())) class="hover:text-slate-900">
+                    <a href=(href!(products::page)) class="hover:text-slate-900">
                         "Products"
                     </a>
                 </li>

@@ -67,7 +67,7 @@ async fn home(cx: &Cx) -> Result {
 
         // Alpine AJAX intercepts this form and replaces the element whose
         // id matches `x-target`.
-        <form method="post" action=(href(increment, ())) x-target="count">
+        <form method="post" action=(href!(increment)) x-target="count">
             <button type="submit">"Increment"</button>
         </form>
     }
@@ -85,5 +85,5 @@ async fn increment(cx: &Cx) -> Result<Response> {
     }
 
     // Without JavaScript, use Post/Redirect/Get and render the complete page.
-    see_other(&href(home, ()).resolve(cx)).into_response(cx)
+    see_other(&href!(home).resolve(cx)).into_response(cx)
 }

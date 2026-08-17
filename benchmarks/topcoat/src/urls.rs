@@ -25,7 +25,7 @@ pub fn products_url<'a>(
     sort: Option<&'a str>,
     category: Option<&'a str>,
 ) -> ProductsUrl<'a> {
-    href(products::page, ()).query(ProductsQuery {
+    href!(products::page).query(ProductsQuery {
         page: (page > 1).then_some(page),
         sort,
         category,
