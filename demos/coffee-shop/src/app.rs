@@ -12,7 +12,7 @@ use topcoat::{
         Router, RouterBuilderDiscoverExt,
         content::Form,
         error::{SeeOther, see_other},
-        href, layout, module_router, page,
+        href, layout, module_router, page, route,
     },
     tailwind,
     view::{attributes, view},
@@ -137,7 +137,7 @@ pub async fn page(cx: &Cx) -> Result {
                         )
                         card_footer(
                             // Submitting an empty name clears the cookie.
-                            <form method="post" action=(href(route, ()))>
+                            <form method="post" action=(href(sign_in, ()))>
                                 button(
                                     variant: ButtonVariant::Outline,
                                     size: ButtonSize::Sm,
@@ -161,7 +161,7 @@ pub async fn page(cx: &Cx) -> Result {
                         card_content(
                             <form
                                 method="post"
-                                action=(href(route, ()))
+                                action=(href(sign_in, ()))
                                 class="flex flex-col gap-3"
                             >
                                 <div class="flex flex-col gap-2">
@@ -185,11 +185,9 @@ struct SignIn {
     name: String,
 }
 
-// A route in the root module serves POST / for the forms above. The attribute
-// is written out in full because importing `route` would collide with the
-// handler named after it.
-#[topcoat::router::route(POST)]
-async fn route(cx: &Cx, Form(form): Form<SignIn>) -> Result<SeeOther> {
+// A route in the root module serves POST / for the forms above.
+#[route(POST)]
+async fn sign_in(cx: &Cx, Form(form): Form<SignIn>) -> Result<SeeOther> {
     match form.name.trim() {
         "" => forget_customer(cx),
         name => remember_customer(cx, name),
