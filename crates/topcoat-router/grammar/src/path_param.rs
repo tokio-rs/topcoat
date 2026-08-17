@@ -274,27 +274,8 @@ impl PathParam {
         }
 
         let ident = self.type_ident();
-        Some(match self.param_type() {
-            Some(param_type) => quote! {
-                impl ::core::fmt::Display for #ident
-                where
-                    #param_type: ::core::fmt::Display,
-                {
-                    fn fmt(
-                        &self,
-                        f: &mut ::core::fmt::Formatter<'_>,
-                    ) -> ::core::fmt::Result {
-                        for (index, value) in self.0.iter().enumerate() {
-                            if index > 0 {
-                                f.write_str("/")?;
-                            }
-                            ::core::fmt::Display::fmt(value, f)?;
-                        }
-                        ::core::result::Result::Ok(())
-                    }
-                }
-            },
-            None => quote! {
+        let Some(param_type) = self.param_type() else {
+            return Some(quote! {
                 impl<T: ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>>
                     ::core::fmt::Display for #ident<T>
                 where
@@ -314,7 +295,27 @@ impl PathParam {
                         ::core::result::Result::Ok(())
                     }
                 }
-            },
+            });
+        };
+
+        Some(quote! {
+            impl ::core::fmt::Display for #ident
+            where
+                #param_type: ::core::fmt::Display,
+            {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    for (index, value) in self.0.iter().enumerate() {
+                        if index > 0 {
+                            f.write_str("/")?;
+                        }
+                        ::core::fmt::Display::fmt(value, f)?;
+                    }
+                    ::core::result::Result::Ok(())
+                }
+            }
         })
     }
 

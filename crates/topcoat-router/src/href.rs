@@ -547,14 +547,14 @@ mod tests {
     }
 
     /// Assigns `params` to `path` and returns the URL it produces.
-    fn assign(path: &str, params: impl HrefParams) -> String {
+    fn assign(path: &str, params: &impl HrefParams) -> String {
         let mut out = String::new();
         params.assign(Path::new(path), &mut out);
         out
     }
 
     /// Appends `queries` to an empty URL and returns the result.
-    fn assign_queries(queries: impl HrefQueries) -> String {
+    fn assign_queries(queries: &impl HrefQueries) -> String {
         let mut out = String::new();
         queries.assign(&mut out);
         out
@@ -562,12 +562,12 @@ mod tests {
 
     #[test]
     fn writes_a_static_path_verbatim() {
-        assert_eq!(assign("/users/all", ()), "/users/all");
+        assert_eq!(assign("/users/all", &()), "/users/all");
     }
 
     #[test]
     fn writes_the_root_path_as_a_slash() {
-        assert_eq!(assign("/", ()), "/");
+        assert_eq!(assign("/", &()), "/");
     }
 
     #[test]
@@ -575,7 +575,7 @@ mod tests {
         assert_eq!(
             assign(
                 "/users/{id}/posts/{post_id}",
-                (Param("id", "42"), Param("post_id", "7")),
+                &(Param("id", "42"), Param("post_id", "7")),
             ),
             "/users/42/posts/7"
         );
@@ -584,20 +584,20 @@ mod tests {
     #[test]
     fn skips_group_segments() {
         assert_eq!(
-            assign("/(auth)/users/{id}", (Param("id", "42"),)),
+            assign("/(auth)/users/{id}", &(Param("id", "42"),)),
             "/users/42"
         );
     }
 
     #[test]
     fn a_group_only_path_addresses_the_root() {
-        assert_eq!(assign("/(marketing)", ()), "/");
+        assert_eq!(assign("/(marketing)", &()), "/");
     }
 
     #[test]
     fn fills_a_catch_all_with_its_joined_segments() {
         assert_eq!(
-            assign("/docs/{*rest}", (Param("rest", "guides/start"),)),
+            assign("/docs/{*rest}", &(Param("rest", "guides/start"),)),
             "/docs/guides/start"
         );
     }
@@ -605,30 +605,30 @@ mod tests {
     #[test]
     #[should_panic(expected = "provided parameter \"user_id\" does not fill path parameter \"id\"")]
     fn rejects_a_parameter_name_mismatch() {
-        let _ = assign("/users/{id}", (Param("user_id", "42"),));
+        let _ = assign("/users/{id}", &(Param("user_id", "42"),));
     }
 
     #[test]
     #[should_panic(expected = "declares fewer parameters than the href provides")]
     fn rejects_more_parameters_than_the_path_declares() {
-        let _ = assign("/users/{id}", (Param("id", "42"), Param("extra", "1")));
+        let _ = assign("/users/{id}", &(Param("id", "42"), Param("extra", "1")));
     }
 
     #[test]
     #[should_panic(expected = "no value provided for path parameter \"id\"")]
     fn rejects_an_unfilled_path_parameter() {
-        let _ = assign("/users/{id}", ());
+        let _ = assign("/users/{id}", &());
     }
 
     #[test]
     fn writes_no_query_without_items() {
-        assert_eq!(assign_queries(()), "");
+        assert_eq!(assign_queries(&()), "");
     }
 
     #[test]
     fn concatenates_query_items() {
         assert_eq!(
-            assign_queries(([("tag", "rust")], [("page", "2"), ("sort", "asc")])),
+            assign_queries(&([("tag", "rust")], [("page", "2"), ("sort", "asc")])),
             "?tag=rust&page=2&sort=asc"
         );
     }
@@ -639,14 +639,14 @@ mod tests {
         struct Empty {}
 
         assert_eq!(
-            assign_queries((Empty {}, [("page", "2")], Empty {})),
+            assign_queries(&(Empty {}, [("page", "2")], Empty {})),
             "?page=2"
         );
     }
 
     #[test]
     fn percent_encodes_query_values() {
-        assert_eq!(assign_queries(([("tag", "a b&c")],)), "?tag=a+b%26c");
+        assert_eq!(assign_queries(&([("tag", "a b&c")],)), "?tag=a+b%26c");
     }
 
     #[test]
@@ -692,7 +692,7 @@ mod tests {
             .query([("b", "2")])
             .fragment("two");
 
-        assert_eq!(assign_queries(href.queries), "?a=1&b=2");
+        assert_eq!(assign_queries(&href.queries), "?a=1&b=2");
         assert_eq!(href.fragment, Some("two"));
     }
 }
