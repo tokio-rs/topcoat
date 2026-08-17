@@ -434,6 +434,7 @@ impl<T, P, Q, F> Href<T, P, Q, F> {
     ///
     /// This is a shorthand for [`form`](Self::form) with
     /// [`UrlForm::Relative`].
+    #[must_use]
     pub fn relative(self) -> Self {
         self.form(UrlForm::Relative)
     }
@@ -443,6 +444,7 @@ impl<T, P, Q, F> Href<T, P, Q, F> {
     ///
     /// This is a shorthand for [`form`](Self::form) with
     /// [`UrlForm::Absolute`].
+    #[must_use]
     pub fn absolute(self) -> Self {
         self.form(UrlForm::Absolute)
     }
@@ -453,6 +455,7 @@ impl<T, P, Q, F> Href<T, P, Q, F> {
     /// Without a form set, the URL renders in the form [registered on the
     /// context](url_form) it resolves against: relative unless an enclosing
     /// scope, like a mail renderer, registered the absolute form.
+    #[must_use]
     pub fn form(mut self, url_form: UrlForm) -> Self {
         self.url_form = Some(url_form);
         self
