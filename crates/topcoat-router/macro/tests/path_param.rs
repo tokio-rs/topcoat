@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{CatchAllSegments, Router, error::RouterErrorExt, page, path_param},
+    router::{CatchAllSegments, HrefParam, Router, error::RouterErrorExt, page, path_param},
     view::view,
 };
 
@@ -261,4 +261,32 @@ fn constructs_public_parameter_values() {
     assert_eq!(borrowed.0, ["guides", "start"]);
     let owned: PublicParts = PublicParts(vec!["guides".to_owned(), "start".to_owned()]);
     assert_eq!(owned.0, ["guides", "start"]);
+}
+
+#[test]
+fn exposes_typed_param_as_href_param() {
+    let id = PublicId(42);
+    assert_eq!(id.name(), "public_id");
+    assert_eq!(id.value().to_string(), "42");
+}
+
+#[test]
+fn exposes_unparsed_param_as_href_param() {
+    let slug = PublicSlug("getting started");
+    assert_eq!(slug.name(), "public_slug");
+    assert_eq!(slug.value(), "getting started");
+}
+
+#[test]
+fn joins_typed_catch_all_href_param_segments() {
+    let number_path = NumberPath(vec![1, 2, 3]);
+    assert_eq!(number_path.name(), "number_path");
+    assert_eq!(number_path.value().to_string(), "1/2/3");
+}
+
+#[test]
+fn joins_unparsed_catch_all_href_param_segments() {
+    let parts = PublicParts(["guides", "start"]);
+    assert_eq!(parts.name(), "public_parts");
+    assert_eq!(parts.value().to_string(), "guides/start");
 }

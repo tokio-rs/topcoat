@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use topcoat_core::context::Cx;
 
 use crate::Path;
@@ -16,4 +18,11 @@ impl HrefTarget for &'static str {
     fn path<'cx>(&self, cx: &'cx Cx) -> &'cx Path {
         HrefTarget::path(&Path::new(self), cx)
     }
+}
+
+pub trait HrefParam {
+    type Value: Display + ?Sized;
+
+    fn name(&self) -> &str;
+    fn value(&self) -> &Self::Value;
 }
