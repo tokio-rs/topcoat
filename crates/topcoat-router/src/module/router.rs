@@ -2,9 +2,14 @@ use std::borrow::Cow;
 
 use heck::ToKebabCase;
 
+use super::{
+    layer::ResolvedLayer,
+    page::{ResolvedLayout, ResolvedPage},
+    route::ResolvedRoute,
+};
 use crate::{
-    ModuleLayerFn, ModuleLayoutFn, ModulePageFn, ModuleRouteFn, PathBuf, PathSegment,
-    RouterBuilder, Segment, SegmentKind, Segments,
+    ModuleLayer, ModuleLayout, ModulePage, ModuleRoute, PathBuf, PathSegment, RouterBuilder,
+    Segment, SegmentKind, Segments,
 };
 
 /// The module-based router builder, created by the `module_router!` macro.
@@ -135,53 +140,47 @@ impl ModuleRouterBuilder {
         path_buf
     }
 
-    /// Registers a [`ModulePageFn`], computing its route path from the module path.
+    /// Registers a [`ModulePage`], computing its route path from the module path.
     ///
     /// # Panics
     ///
     /// Panics if a page has already been registered for the same path.
     #[must_use]
-    pub fn page(mut self, page: impl Into<ModulePageFn>) -> Self {
-        let page = page.into();
-        let module_path = page.module_path();
-        let page = page.into_page(Cow::Owned(self.module_path_to_path(module_path)));
-        self.inner = self.inner.page(page);
+    pub fn page(mut self, page: impl ModulePage) -> Self {
+        let path = self.module_path_to_path(page.module_path());
+        self.inner = self.inner.page(ResolvedPage::new(page, path));
         self
     }
 
-    /// Registers a [`ModuleLayoutFn`], computing its route path from the module path.
+    /// Registers a [`ModuleLayout`], computing its route path from the module path.
     ///
     /// # Panics
     ///
     /// Panics if a layout has already been registered for the same path.
     #[must_use]
-    pub fn layout(mut self, layout: impl Into<ModuleLayoutFn>) -> Self {
-        let layout = layout.into();
-        let module_path = layout.module_path();
-        let layout = layout.into_layout(Cow::Owned(self.module_path_to_path(module_path)));
-        self.inner = self.inner.layout(layout);
+    pub fn layout(mut self, layout: impl ModuleLayout) -> Self {
+        let path = self.module_path_to_path(layout.module_path());
+        self.inner = self.inner.layout(ResolvedLayout::new(layout, path));
         self
     }
 
-    /// Registers a [`ModuleRouteFn`], computing its route path from the module path.
+    /// Registers a [`ModuleRoute`], computing its route path from the module path.
     ///
     /// # Panics
     ///
     /// Panics if a route has already been registered for the same path.
     #[must_use]
-    pub fn route(mut self, route: ModuleRouteFn) -> Self {
-        let module_path = route.module_path();
-        let route = route.into_route(Cow::Owned(self.module_path_to_path(module_path)));
-        self.inner = self.inner.route(route);
+    pub fn route(mut self, route: impl ModuleRoute) -> Self {
+        let path = self.module_path_to_path(route.module_path());
+        self.inner = self.inner.route(ResolvedRoute::new(route, path));
         self
     }
 
-    /// Registers a [`ModuleLayerFn`], computing its path prefix from the module path.
+    /// Registers a [`ModuleLayer`], computing its path prefix from the module path.
     #[must_use]
-    pub fn layer(mut self, layer: ModuleLayerFn) -> Self {
-        let module_path = layer.module_path();
-        let layer = layer.into_layer(Cow::Owned(self.module_path_to_path(module_path)));
-        self.inner = self.inner.layer(layer);
+    pub fn layer(mut self, layer: impl ModuleLayer) -> Self {
+        let path = self.module_path_to_path(layer.module_path());
+        self.inner = self.inner.layer(ResolvedLayer::new(layer, path));
         self
     }
 
@@ -199,18 +198,18 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers every [`ModulePageFn`] annotated with `#[page]` and collected
+    /// Registers every [`ModulePage`] annotated with `#[page]` and collected
     /// at link time, deriving each path from the module tree.
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_pages(mut self) -> Self {
-        for page in inventory::iter::<ModulePageFn>().cloned() {
+        for &page in inventory::iter::<&'static dyn ModulePage>() {
             self = self.page(page);
         }
         self
     }
 
-    /// Registers every [`ModuleLayoutFn`] annotated with `#[layout]` and
+    /// Registers every [`ModuleLayout`] annotated with `#[layout]` and
     /// collected at link time, deriving each path from the module tree.
     ///
     /// At most one discovered layout is allowed per path: a page's layouts nest
@@ -226,7 +225,7 @@ impl ModuleRouterBuilder {
     #[track_caller]
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
-        for layout in inventory::iter::<ModuleLayoutFn>().cloned() {
+        for &layout in inventory::iter::<&'static dyn ModuleLayout>() {
             assert!(
                 seen.insert(self.module_path_to_path(layout.module_path())),
                 "multiple discovered layouts registered for the same path \"{}\"",
@@ -237,18 +236,18 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers every [`ModuleRouteFn`] annotated with `#[route]` and collected
+    /// Registers every [`ModuleRoute`] annotated with `#[route]` and collected
     /// at link time, deriving each path from the module tree.
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_routes(mut self) -> Self {
-        for route in inventory::iter::<ModuleRouteFn>().cloned() {
+        for &route in inventory::iter::<&'static dyn ModuleRoute>() {
             self = self.route(route);
         }
         self
     }
 
-    /// Registers every [`ModuleLayerFn`] annotated with `#[layer]` and collected
+    /// Registers every [`ModuleLayer`] annotated with `#[layer]` and collected
     /// at link time, deriving each path from the module tree.
     ///
     /// At most one discovered layer is allowed per path. Link-time collection
@@ -266,7 +265,7 @@ impl ModuleRouterBuilder {
     #[track_caller]
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
-        for layer in inventory::iter::<ModuleLayerFn>().cloned() {
+        for &layer in inventory::iter::<&'static dyn ModuleLayer>() {
             assert!(
                 seen.insert(self.module_path_to_path(layer.module_path())),
                 "multiple discovered layers registered for the same path \"{}\"",
@@ -306,24 +305,41 @@ impl From<ModuleRouterBuilder> for RouterBuilder {
 
 #[cfg(test)]
 mod tests {
-    use std::pin::Pin;
-
-    use topcoat_core::{context::Cx, error::Result};
-    use topcoat_view::View;
+    use topcoat_core::context::Cx;
 
     use super::*;
-    use crate::{Body, Method, ModulePageFn, OwnedMethods};
+    use crate::{Body, Method, Methods, RouteId, ViewFuture};
 
-    /// A `ModulePageFn` whose render function is never invoked; used to exercise
-    /// registration and path computation without running a page.
-    fn page_at(module_path: &'static str) -> ModulePageFn {
-        fn render<'cx>(
-            _cx: &'cx Cx,
-            _body: Body,
-        ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>> {
+    /// A [`ModulePage`] whose render function is never invoked; used to
+    /// exercise registration and path computation without running a page.
+    struct PageAt {
+        id: RouteId,
+        module_path: &'static str,
+    }
+
+    impl ModulePage for PageAt {
+        fn id(&self) -> RouteId {
+            self.id
+        }
+
+        fn methods(&self) -> Methods<'_> {
+            Methods::Only(&[Method::GET])
+        }
+
+        fn module_path(&self) -> &'static str {
+            self.module_path
+        }
+
+        fn render<'cx>(&'cx self, _cx: &'cx Cx, _body: Body) -> ViewFuture<'cx> {
             Box::pin(async { unreachable!("test render function is never called") })
         }
-        ModulePageFn::new(OwnedMethods::One(Method::GET), module_path, render)
+    }
+
+    fn page_at(module_path: &'static str) -> PageAt {
+        PageAt {
+            id: RouteId::new(),
+            module_path,
+        }
     }
 
     fn builder() -> ModuleRouterBuilder {

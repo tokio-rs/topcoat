@@ -3,7 +3,7 @@ use std::{iter::FusedIterator, slice};
 use percent_encoding::percent_decode_str;
 use topcoat_core::context::{Cx, request_context};
 
-use crate::{Path, PathSegment, PathSegments, endpoint_path};
+use crate::{Path, PathSegment, PathSegments, endpoint};
 
 /// A typed view of a path parameter declared by the `path_param!` macro.
 ///
@@ -55,7 +55,7 @@ pub fn path_param<T: PathParam + ?Sized>(cx: &Cx) -> T::Output<'_> {
 pub fn raw_path_params(cx: &Cx) -> RawPathParamsIter<'_> {
     let params = request_context::<RawPathParams>(cx);
     RawPathParamsIter {
-        segments: ParamSegments::new(endpoint_path(cx)),
+        segments: ParamSegments::new(endpoint(cx).path()),
         values: params.values.iter(),
         catch_all: &params.catch_all,
     }
@@ -319,22 +319,15 @@ impl PathParamSealed {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use topcoat_core::context::CxTestBuilder;
-
     use super::*;
-    use crate::EndpointPath;
+    use crate::router::test_matched_cx;
 
     /// Builds the request context of a match of `values` against `path`, as the
     /// router assembles one.
     fn matched<'values>(path: &str, values: impl IntoIterator<Item = &'values str>) -> Cx {
         let path = Path::new(path);
         let params = RawPathParams::from_match(path, values);
-        CxTestBuilder::new()
-            .request_context(EndpointPath(Arc::from(path.as_str())))
-            .request_context(params)
-            .build()
+        test_matched_cx(path).with(params)
     }
 
     /// Collects the pairs an iteration yields, with each value as one string.

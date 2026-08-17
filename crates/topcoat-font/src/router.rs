@@ -2,7 +2,7 @@ use std::sync::OnceLock;
 
 use topcoat_core::context::Cx;
 use topcoat_router::{
-    Body, HeaderValue, Method, Methods, Path, PathBuf, Route, RouteFuture, RouterBuilder,
+    Body, HeaderValue, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId, RouterBuilder,
     header::{CACHE_CONTROL, CONTENT_TYPE},
     response::Response,
 };
@@ -32,6 +32,7 @@ fn font_route_path(font: Font, write: &mut dyn std::fmt::Write) -> std::fmt::Res
 }
 
 pub struct FontRoute {
+    id: RouteId,
     path: PathBuf,
     font: Font,
     cache: OnceLock<String>,
@@ -43,6 +44,7 @@ impl FontRoute {
         let mut path = String::new();
         let _ = font_route_path(font, &mut path);
         Self {
+            id: RouteId::new(),
             path: Path::new(&path).to_owned(),
             font,
             cache: OnceLock::new(),
@@ -51,6 +53,10 @@ impl FontRoute {
 }
 
 impl Route for FontRoute {
+    fn id(&self) -> RouteId {
+        self.id
+    }
+
     fn methods(&self) -> Methods<'_> {
         Methods::Only(&[Method::GET])
     }

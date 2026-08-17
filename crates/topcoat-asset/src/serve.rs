@@ -5,7 +5,9 @@ use http::{
     header::{CACHE_CONTROL, CONTENT_TYPE},
 };
 use topcoat_core::context::Cx;
-use topcoat_router::{Body, Methods, Path, PathBuf, Route, RouteFuture, response::Response};
+use topcoat_router::{
+    Body, Methods, Path, PathBuf, Route, RouteFuture, RouteId, response::Response,
+};
 
 use crate::BundledAsset;
 
@@ -25,6 +27,8 @@ const CACHE_CONTROL_VALUE: HeaderValue =
 /// `Content-Type` and an immutable `Cache-Control`.
 #[derive(Debug, Clone)]
 pub struct AssetRoute {
+    /// The identity of this route's handler.
+    id: RouteId,
     /// URL path the asset is served at, e.g. `/_topcoat/assets/logo-1a2b3c4d5e6f7a8b.png`.
     path: PathBuf,
     /// Absolute path to the bundled file on disk.
@@ -52,6 +56,7 @@ impl AssetRoute {
             )
         });
         Self {
+            id: RouteId::new(),
             path: Path::new(&format!("{ASSET_ROUTE_PREFIX}/{name}")).to_owned(),
             file: dir.join(name),
             content_type,
@@ -60,6 +65,10 @@ impl AssetRoute {
 }
 
 impl Route for AssetRoute {
+    fn id(&self) -> RouteId {
+        self.id
+    }
+
     fn methods(&self) -> Methods<'_> {
         Methods::Only(&[Method::GET])
     }

@@ -3,7 +3,7 @@
 pub use bytes::{Bytes, BytesMut};
 use http::request::Parts;
 use topcoat_core::{
-    context::{Cx, request_context},
+    context::{Cx, request_context, try_request_context},
     error::Result,
 };
 
@@ -209,6 +209,39 @@ pub fn method(cx: &Cx) -> &http::Method {
 #[track_caller]
 pub fn uri(cx: &Cx) -> &http::Uri {
     &parts(cx).uri
+}
+
+/// The URI a rewritten request originally arrived with, stored on the request
+/// context of every dispatch reached through a rewrite.
+#[derive(Debug, Clone)]
+pub(crate) struct OriginalUri(pub(crate) http::Uri);
+
+/// Returns the [`Uri`] the client actually requested, before any rewrite.
+///
+/// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
+/// rewritten URI in [`uri`]; this accessor returns the URI the request
+/// arrived with, for example to render a form that posts back to the visible
+/// URL. For a request that was never rewritten the two are the same.
+///
+/// [`Uri`]: http::Uri
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::original_uri};
+///
+/// async fn form_action(cx: &Cx) -> String {
+///     original_uri(cx).path().to_owned()
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn original_uri(cx: &Cx) -> &http::Uri {
+    match try_request_context::<OriginalUri>(cx) {
+        Some(original) => &original.0,
+        None => uri(cx),
+    }
 }
 
 /// Returns the HTTP [`Version`] of the current request.

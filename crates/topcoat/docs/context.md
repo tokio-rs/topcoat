@@ -122,9 +122,32 @@ fn current_customer(cx: &Cx) -> Option<&Customer> {
 }
 ```
 
+# Registering request context
+
+Request context is registered by scoping: [`Cx::with`] returns a child `Cx` whose request context also holds the given value, and [`Cx::with_many`] registers a tuple of values in one step. The child inherits every other value and shares the rest of the request state, such as the app context and the memoize cache, with its parent.
+
+```rust
+use topcoat::context::{Cx, request_context};
+
+struct Customer {
+    name: String,
+}
+
+fn greet(cx: &Cx) -> String {
+    let cx = cx.with(Customer {
+        name: "Ada".to_owned(),
+    });
+
+    let customer: &Customer = request_context(&cx);
+    format!("Hello, {}", customer.name)
+}
+```
+
+Registering a type that is already present shadows it for the child scope: lookups through the child see the new value, while lookups through the parent still see the original. This is how router layers make values like the cookie jar available to everything below them; they derive a child context and pass it to the rest of the chain.
+
 # Work that outlives the handler
 
-A [`Cx`] is a handle to state shared by everything serving one request. The router drops its own handle once the response is sent, so a streaming response body or a spawned task cannot borrow the `cx` the handler was called with. Take an owned handle with [`Cx::detach`] and move it into the work instead; it reads the same app and request context.
+A [`Cx`] is a handle to state shared by everything serving one request. The router drops its own handle once the response is sent, so a streaming response body or a spawned task cannot borrow the `cx` the handler was called with. Clone the `Cx` and move the owned handle into the work instead; it reads the same app and request context.
 
 ```rust
 # async fn record(name: &str) {}
@@ -140,7 +163,7 @@ struct Customer {
 
 #[route(POST "/orders")]
 async fn place_order(cx: &Cx) -> Result<&'static str> {
-    let cx = cx.detach();
+    let cx = cx.clone();
     tokio::spawn(async move {
         let customer: &Customer = request_context(&cx);
         record(&customer.name).await;
@@ -149,13 +172,11 @@ async fn place_order(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-Detaching seals the request context: registering another value on it panics from then on, through any handle and even after the detached handle was dropped. Layers register their values before calling `next.run`, so this only concerns a layer that writes to the context after the inner chain returned.
-
-A detached handle keeps reading the context after the response was sent, but it can no longer change what the client receives. Cookie changes and other response-directed writes made from work that outlives the handler are dropped.
+A cloned handle keeps reading the context after the response was sent, but it can no longer change what the client receives. Cookie changes and other response-directed writes made from work that outlives the handler are dropped.
 
 # Memoization
 
-[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. See its documentation for the details.
+[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. A memoized body that reads request context keeps a result per set of values it observed, so a cached value never leaks out of the scope it was computed in. See its documentation for the details.
 
 # Composing helpers
 

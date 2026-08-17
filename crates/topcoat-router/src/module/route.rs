@@ -1,49 +1,74 @@
-use std::borrow::Cow;
+use topcoat_core::context::Cx;
 
-use crate::{OwnedMethods, Path, RouteFn, RouteHandlerFn};
+use crate::{Body, Methods, Path, PathBuf, Route, RouteFuture, RouteId};
 
-/// A route discovered by the module router, produced by the `#[route]` macro.
+/// A route discovered by the module router, declared without an explicit path.
 ///
-/// Holds the module path (for deriving the URL path from the module tree)
-/// and the render function. The module router converts each `ModuleRouteFn`
-/// into a [`RouteFn`] once the URL path has been computed.
+/// Holds the module path the route was declared in; the module router derives
+/// the URL path from the module tree and registers the route under it.
 #[doc(hidden)]
-#[derive(Debug, Clone)]
-pub struct ModuleRouteFn {
-    /// The HTTP methods triggering this route.
-    methods: OwnedMethods,
-    /// Module path where `#[route]` was declared, used to derive the URL path.
-    module_path: &'static str,
-    /// The route's async handler function, returning a [`Result`].
-    pub(super) render: RouteHandlerFn,
+pub trait ModuleRoute: Send + Sync + 'static {
+    /// The identity of this route's handler.
+    fn id(&self) -> RouteId;
+
+    /// The HTTP methods this route responds to.
+    fn methods(&self) -> Methods<'_>;
+
+    /// The module path where the route was declared, used to derive the URL.
+    fn module_path(&self) -> &'static str;
+
+    /// Handles a request, producing a response.
+    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx>;
 }
 
-impl ModuleRouteFn {
-    /// Creates a new module route. Called by the expanded `#[route]` macro.
-    pub const fn new(
-        methods: OwnedMethods,
-        module_path: &'static str,
-        render: RouteHandlerFn,
-    ) -> Self {
-        Self {
-            methods,
-            module_path,
-            render,
-        }
+impl<R: ModuleRoute + ?Sized> ModuleRoute for &'static R {
+    fn id(&self) -> RouteId {
+        (**self).id()
     }
 
-    /// Converts into a [`RouteFn`] with the given resolved URL path.
-    #[must_use]
-    pub fn into_route(self, path: Cow<'static, Path>) -> RouteFn {
-        RouteFn::new(self.methods, path, self.render)
+    fn methods(&self) -> Methods<'_> {
+        (**self).methods()
     }
 
-    /// Returns the module path used to derive the URL.
-    #[must_use]
-    pub fn module_path(&self) -> &'static str {
-        self.module_path
+    fn module_path(&self) -> &'static str {
+        (**self).module_path()
+    }
+
+    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
+        (**self).handle(cx, body)
     }
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModuleRouteFn);
+inventory::collect!(&'static dyn ModuleRoute);
+
+/// A [`ModuleRoute`] bound to the URL path derived from its module tree,
+/// registered into the inner builder as a [`Route`].
+pub(super) struct ResolvedRoute<R> {
+    route: R,
+    path: PathBuf,
+}
+
+impl<R: ModuleRoute> ResolvedRoute<R> {
+    pub(super) fn new(route: R, path: PathBuf) -> Self {
+        Self { route, path }
+    }
+}
+
+impl<R: ModuleRoute> Route for ResolvedRoute<R> {
+    fn id(&self) -> RouteId {
+        self.route.id()
+    }
+
+    fn methods(&self) -> Methods<'_> {
+        self.route.methods()
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
+        self.route.handle(cx, body)
+    }
+}

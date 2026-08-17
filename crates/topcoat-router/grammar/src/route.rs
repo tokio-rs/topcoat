@@ -9,7 +9,7 @@ use syn::{
 use topcoat_core_grammar::paths::{topcoat_context, topcoat_inventory, topcoat_router};
 
 use super::{
-    common::{HandlerArgs, request_ident},
+    common::{HandlerArg, HandlerArgs, request_ident},
     method::Methods,
 };
 
@@ -75,66 +75,170 @@ impl Route {
 impl ToTokens for Route {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let attr = &self.0;
-        let vis = &self.1.item.vis;
-        let docs = self
-            .1
-            .item
-            .attrs
-            .iter()
-            .filter(|attr| attr.path().is_ident("doc"));
-        let mut item = self.1.item.clone();
-        item.vis = Visibility::Inherited;
-        item.sig.generics.params.insert(0, parse_quote! { '__cx });
-        item.sig
+        let item = &self.1.item;
+        let args = &self.1.args;
+        let vis = &item.vis;
+        let ident = &item.sig.ident;
+        let output = &item.sig.output;
+        let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
+
+        // Marker: the value users register and reference. A unit struct, so
+        // `#ident` stays a value usable directly in `router.route(...)`.
+        let marker = quote! {
+            #(#docs)*
+            #[allow(non_camel_case_types)]
+            #vis struct #ident;
+        };
+
+        // The user's function, re-emitted under its original name inside the
+        // bridge below to keep the module namespace clean. Its own name shadows
+        // the marker within its body, so bindings named after the route keep
+        // working. The injected `__cx` parameter carries the ambient context
+        // that `view!` bodies read.
+        let mut inner = item.clone();
+        inner.vis = Visibility::Inherited;
+        inner.sig.generics.params.insert(0, parse_quote! { '__cx });
+        inner
+            .sig
             .inputs
             .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
-        let ident = &item.sig.ident;
-        let args = self.1.args.call_args();
-        let parse_request = self.1.args.request().map(|request_ty| {
+        inner
+            .attrs
+            .push(parse_quote! { #[allow(clippy::unused_async)] });
+
+        // The bridge every caller goes through: associated items are reached
+        // through the type rather than lexical scope, so `#ident::handler` is
+        // callable from the trait implementation below. It forwards to the
+        // user's function positionally, in declared parameter order.
+        let body_param = args.request().map(|ty| quote! { , body: #ty });
+        let forward_args = args.iter().map(|arg| match arg {
+            HandlerArg::Cx => quote! { cx },
+            HandlerArg::Request(_) => quote! { body },
+        });
+        let handler = quote! {
+            impl #ident {
+                async fn handler(cx: &#topcoat_context::Cx #body_param) #output {
+                    #inner
+
+                    #ident(cx #(, #forward_args)*).await
+                }
+            }
+        };
+
+        // The trait implementation dispatching requests to the bridge: it
+        // parses the request body (when the route takes one), calls the bridge,
+        // and converts the returned value into a response. A route with an
+        // explicit path is a `Route`; one without derives its path from the
+        // module tree through the module router as a `ModuleRoute`.
+        let parse_request = args.request().map(|request_ty| {
             let request_ident = request_ident();
             quote_spanned! {request_ty.span()=>
                 let #request_ident = <#request_ty as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
             }
         });
-
-        let render = quote! {
-            |cx, body| {
-                #[allow(clippy::unused_async)]
-                #item
-                Box::pin(async move {
+        let request_arg = args.request().map(|_| {
+            let request_ident = request_ident();
+            quote! { , #request_ident }
+        });
+        let methods = &attr.methods;
+        let id = quote! {
+            fn id(&self) -> #topcoat_router::RouteId {
+                *ID
+            }
+        };
+        let methods = quote! {
+            fn methods(&self) -> #topcoat_router::Methods<'_> {
+                const METHODS: #topcoat_router::Methods<'static> = #methods;
+                METHODS
+            }
+        };
+        let handle = quote! {
+            fn handle<'cx>(
+                &'cx self,
+                cx: &'cx #topcoat_context::Cx,
+                body: #topcoat_router::Body,
+            ) -> #topcoat_router::RouteFuture<'cx> {
+                ::std::boxed::Box::pin(async move {
                     #parse_request
-                    #topcoat_router::response::IntoResponse::into_response(#ident(cx, #(#args),*).await?, cx)
+                    #topcoat_router::response::IntoResponse::into_response(
+                        #ident::handler(cx #request_arg).await?,
+                        cx,
+                    )
                 })
             }
         };
+        let (route, submit_as) = if let Some(path) = attr.path.as_ref() {
+            let route = quote! {
+                impl #topcoat_router::Route for #ident {
+                    #id
 
-        let methods = &attr.methods;
-        if let Some(path) = attr.path.as_ref() {
-            quote! {
-                #(#docs)*
-                #[allow(non_upper_case_globals)]
-                #vis const #ident: #topcoat_router::RouteFn = #topcoat_router::RouteFn::const_new(
-                    #methods,
-                    ::std::borrow::Cow::Borrowed(#topcoat_router::Path::new(#path)),
-                    #render,
-                );
-            }
+                    #methods
+
+                    fn path(&self) -> &#topcoat_router::Path {
+                        const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
+                        PATH
+                    }
+
+                    #handle
+                }
+            };
+            (route, quote! { #topcoat_router::Route })
         } else {
-            quote! {
-                #(#docs)*
-                #[allow(non_upper_case_globals)]
-                #vis const #ident: #topcoat_router::ModuleRouteFn = #topcoat_router::ModuleRouteFn::new(
-                    #methods,
-                    module_path!(),
-                    #render,
-                );
+            let route = quote! {
+                impl #topcoat_router::ModuleRoute for #ident {
+                    #id
+
+                    #methods
+
+                    fn module_path(&self) -> &'static str {
+                        ::core::module_path!()
+                    }
+
+                    #handle
+                }
+            };
+            (route, quote! { #topcoat_router::ModuleRoute })
+        };
+
+        // href! resolves the marker to the URL path it is served at, through
+        // the router that dispatched the current request.
+        let href_target = quote! {
+            impl #topcoat_router::HrefTarget for #ident {
+                fn path<'cx>(&self, cx: &'cx #topcoat_context::Cx) -> &'cx #topcoat_router::Path {
+                    match #topcoat_router::route_endpoint(cx, *ID) {
+                        ::core::option::Option::Some(endpoint) => endpoint.path(),
+                        ::core::option::Option::None => ::core::panic!(::core::concat!(
+                            "route `",
+                            ::core::stringify!(#ident),
+                            "` is not registered on the router serving this request",
+                        )),
+                    }
+                }
             }
+        };
+
+        // Discovery collects the marker erased behind its trait.
+        let submit = cfg!(feature = "discover").then(|| {
+            quote! { #topcoat_inventory::submit! { &#ident as &'static dyn #submit_as } }
+        });
+
+        quote! {
+            #marker
+
+            const _: () = {
+                static ID: ::std::sync::LazyLock<#topcoat_router::RouteId> =
+                    ::std::sync::LazyLock::new(#topcoat_router::RouteId::new);
+
+                #handler
+
+                #route
+
+                #href_target
+
+                #submit
+            };
         }
         .to_tokens(tokens);
-
-        if cfg!(feature = "discover") {
-            quote! { #topcoat_inventory::submit! { #ident } }.to_tokens(tokens);
-        }
     }
 }
 

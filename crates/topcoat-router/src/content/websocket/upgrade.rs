@@ -63,8 +63,8 @@ use crate::{
 /// ```
 ///
 /// The callback outlives the handler, so it cannot borrow the request context.
-/// Take an owned handle with [`Cx::detach`] and move it in to read the context
-/// from the socket task:
+/// Clone the [`Cx`] and move the owned handle in to read the context from the
+/// socket task:
 ///
 /// ```rust
 /// use topcoat::{
@@ -83,7 +83,7 @@ use crate::{
 ///
 /// #[route(GET "/greet")]
 /// async fn greet(cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
-///     let cx = cx.detach();
+///     let cx = cx.clone();
 ///     upgrade.on_upgrade(move |mut socket| async move {
 ///         let customer: &Customer = request_context(&cx);
 ///         let _ = socket.send(Message::text(customer.name.as_str())).await;

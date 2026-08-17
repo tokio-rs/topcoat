@@ -1,89 +1,126 @@
-use std::borrow::Cow;
+use topcoat_core::{context::Cx, error::Result};
+use topcoat_view::View;
 
-use crate::{LayoutFn, LayoutRenderFn, OwnedMethods, PageFn, PageRenderFn, Path};
+use crate::{Body, Layout, Methods, Page, Path, PathBuf, RouteId, ViewFuture};
 
-/// A page discovered by the module router, produced by the `#[page]` macro.
+/// A page discovered by the module router, declared without an explicit path.
 ///
-/// Holds the module path (for deriving the URL path from the module tree)
-/// and the render function. The module router converts each `ModulePageFn`
-/// into a [`PageFn`] once the URL path has been computed.
+/// Holds the module path the page was declared in; the module router derives
+/// the URL path from the module tree and registers the page under it.
 #[doc(hidden)]
-#[derive(Debug, Clone)]
-pub struct ModulePageFn {
+pub trait ModulePage: Send + Sync + 'static {
+    /// The identity of this page's handler.
+    fn id(&self) -> RouteId;
+
     /// The HTTP methods this page responds to.
-    methods: OwnedMethods,
-    /// Module path where `#[page]` was declared, used to derive the URL path.
-    module_path: &'static str,
-    /// The page's async render function, returning a [`Result`].
-    pub(super) render: PageRenderFn,
+    fn methods(&self) -> Methods<'_>;
+
+    /// The module path where the page was declared, used to derive the URL.
+    fn module_path(&self) -> &'static str;
+
+    /// Renders the page [`View`].
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ViewFuture<'cx>;
 }
 
-impl ModulePageFn {
-    /// Creates a new module page. Called by the expanded `#[page]` macro.
-    pub const fn new(
-        methods: OwnedMethods,
-        module_path: &'static str,
-        render: PageRenderFn,
-    ) -> Self {
-        Self {
-            methods,
-            module_path,
-            render,
-        }
+impl<P: ModulePage + ?Sized> ModulePage for &'static P {
+    fn id(&self) -> RouteId {
+        (**self).id()
     }
 
-    /// Converts into a [`PageFn`] with the given resolved URL path.
-    #[must_use]
-    pub fn into_page(self, path: Cow<'static, Path>) -> PageFn {
-        PageFn::new(self.methods, path, self.render)
+    fn methods(&self) -> Methods<'_> {
+        (**self).methods()
     }
 
-    /// Returns the module path used to derive the URL.
-    #[must_use]
-    pub fn module_path(&self) -> &'static str {
-        self.module_path
+    fn module_path(&self) -> &'static str {
+        (**self).module_path()
+    }
+
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ViewFuture<'cx> {
+        (**self).render(cx, body)
     }
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModulePageFn);
+inventory::collect!(&'static dyn ModulePage);
 
-/// A layout discovered by the module router, produced by the `#[layout]` macro.
+/// A [`ModulePage`] bound to the URL path derived from its module tree,
+/// registered into the inner builder as a [`Page`].
+pub(super) struct ResolvedPage<P> {
+    page: P,
+    path: PathBuf,
+}
+
+impl<P: ModulePage> ResolvedPage<P> {
+    pub(super) fn new(page: P, path: PathBuf) -> Self {
+        Self { page, path }
+    }
+}
+
+impl<P: ModulePage> Page for ResolvedPage<P> {
+    fn id(&self) -> RouteId {
+        self.page.id()
+    }
+
+    fn methods(&self) -> Methods<'_> {
+        self.page.methods()
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ViewFuture<'cx> {
+        self.page.render(cx, body)
+    }
+}
+
+/// A layout discovered by the module router, declared without an explicit
+/// path.
 ///
-/// Holds the module path (for deriving the URL prefix from the module tree)
-/// and the render function. The module router converts each `ModuleLayoutFn`
-/// into a [`LayoutFn`] once the URL path has been computed.
+/// Holds the module path the layout was declared in; the module router derives
+/// the URL prefix from the module tree and registers the layout under it.
 #[doc(hidden)]
-#[derive(Debug, Clone)]
-pub struct ModuleLayoutFn {
-    /// Module path where `#[layout]` was declared, used to derive the URL path.
-    module_path: &'static str,
-    /// The layout's async render function, receiving the child content as a [`Result`] and
-    /// returning a new [`Result`].
-    render: LayoutRenderFn,
+pub trait ModuleLayout: Send + Sync + 'static {
+    /// The module path where the layout was declared, used to derive the URL.
+    fn module_path(&self) -> &'static str;
+
+    /// Renders the layout, embedding the given child content
+    /// [`Result`]`<`[`View`]`>` as its slot.
+    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Result<View>) -> ViewFuture<'cx>;
 }
 
-impl ModuleLayoutFn {
-    /// Creates a new module layout. Called by the expanded `#[layout]` macro.
-    pub const fn new(module_path: &'static str, render: LayoutRenderFn) -> Self {
-        Self {
-            module_path,
-            render,
-        }
+impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
+    fn module_path(&self) -> &'static str {
+        (**self).module_path()
     }
 
-    /// Converts into a [`LayoutFn`] with the given resolved URL path.
-    #[must_use]
-    pub fn into_layout(self, path: Cow<'static, Path>) -> LayoutFn {
-        LayoutFn::new(path, self.render)
-    }
-
-    /// Returns the module path used to derive the URL.
-    #[must_use]
-    pub fn module_path(&self) -> &'static str {
-        self.module_path
+    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Result<View>) -> ViewFuture<'cx> {
+        (**self).render(cx, slot)
     }
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ModuleLayoutFn);
+inventory::collect!(&'static dyn ModuleLayout);
+
+/// A [`ModuleLayout`] bound to the URL prefix derived from its module tree,
+/// registered into the inner builder as a [`Layout`].
+pub(super) struct ResolvedLayout<L> {
+    layout: L,
+    path: PathBuf,
+}
+
+impl<L: ModuleLayout> ResolvedLayout<L> {
+    pub(super) fn new(layout: L, path: PathBuf) -> Self {
+        Self { layout, path }
+    }
+}
+
+impl<L: ModuleLayout> Layout for ResolvedLayout<L> {
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Result<View>) -> ViewFuture<'cx> {
+        self.layout.render(cx, slot)
+    }
+}

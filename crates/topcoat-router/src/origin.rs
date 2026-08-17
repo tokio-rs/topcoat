@@ -236,11 +236,11 @@ impl OriginLayer {
 }
 
 impl Layer for OriginLayer {
-    fn path(&self) -> &Path {
-        Path::ROOT
+    fn path(&self) -> Option<&Path> {
+        None
     }
 
-    fn handle<'a>(&'a self, cx: &'a mut Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         match self.policy.check(cx) {
             OriginVerdict::Allow => next.run(cx, body),
             OriginVerdict::Deny => Box::pin(async { Err(forbidden().into()) }),

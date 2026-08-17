@@ -31,7 +31,7 @@ async fn user_profile() -> Result {
 }
 ```
 
-A page serves `GET` by default; naming methods before the path (e.g., `#[page(POST "/signup")]`) overrides that, with the same method forms as [`#[route]`](route).
+A page serves `GET` by default; naming methods before the path (e.g., `#[page(POST "/signup")]`) overrides that, with the same method forms as [`#[route]`](macro@route).
 
 See [`#[page]`](page) for the handler signature, module-derived paths, and using pages as components.
 
@@ -67,7 +67,7 @@ A layout applies to every page whose path starts with the layout's path: a layou
 
 # Layers
 
-A layer wraps request handling under its path prefix. It receives a mutable request context, the request body, and [`Next`], which represents the remaining layers and the handler:
+A layer wraps request handling under its path prefix. It receives the request context, the request body, and [`Next`], which represents the remaining layers and the handler. A layer that registers request-scoped values derives a child context with [`Cx::with`](crate::context::Cx::with) and passes that to `next.run`:
 
 ```rust
 use topcoat::{
@@ -77,7 +77,7 @@ use topcoat::{
 };
 
 #[layer("/")]
-async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let start = std::time::Instant::now();
     let response = next.run(cx, body).await?;
     println!("handled in {:?}", start.elapsed());
@@ -85,11 +85,11 @@ async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 ```
 
-Layers follow the same prefix rule as layouts and nest from least specific (outermost) to most specific (innermost). See [`#[layer]`](layer) for the exact matching and ordering rules.
+Layers follow the same prefix rule as layouts and nest from least specific (outermost) to most specific (innermost). A layer whose [`path`](Layer::path) is `None` wraps every request, including one that matches no route: the 404 or 405 error comes back through it as the `Err` returned by `next.run`. See [`#[layer]`](layer) for the exact matching and ordering rules.
 
 # API routes
 
-An API route is an async function annotated with [`#[route]`](route) and an explicit HTTP method:
+An API route is an async function annotated with [`#[route]`](macro@route) and an explicit HTTP method:
 
 ```rust
 use topcoat::{Result, router::route};
@@ -102,7 +102,7 @@ async fn health() -> Result<&'static str> {
 
 The method can also be a bracketed list (`#[route([GET, POST] "/form")]`) registering the handler for each listed method, or `*` (`#[route(* "/webhook")]`) registering it for every method. A route declaring a specific method takes precedence over a `*` route at the same path.
 
-See [`#[route]`](route) for the handler signature and how return values convert into responses.
+See [`#[route]`](macro@route) for the handler signature and how return values convert into responses.
 
 # Request and response bodies
 
@@ -266,7 +266,7 @@ Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, t
 # use topcoat::{Result, context::Cx, router::{Body, Next, layer, layout, page, response::Response, route}, view::view};
 # #[layout("/")] async fn root_layout(slot: Result) -> Result { view! { (slot?) } }
 # #[layout("/settings")] async fn settings_layout(slot: Result) -> Result { view! { (slot?) } }
-# #[layer("/")] async fn timing(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
+# #[layer("/")] async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
 # #[page("/")] async fn home() -> Result { view! { <h1>"Home"</h1> } }
 # #[page("/about")] async fn about() -> Result { view! { <h1>"About"</h1> } }
 # #[page("/settings/profile")] async fn profile() -> Result { view! { <h1>"Profile"</h1> } }
@@ -290,7 +290,7 @@ Layout and layer matching is based on path prefixes, not registration order; see
 
 # Auto-discovery with `discover()`
 
-With the `discover` feature enabled, every [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](route) is collected at link time. Instead of listing each item by hand, call [`discover`](RouterBuilderDiscoverExt::discover) on the builder:
+With the `discover` feature enabled, every [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](macro@route) is collected at link time. Instead of listing each item by hand, call [`discover`](RouterBuilderDiscoverExt::discover) on the builder:
 
 ```rust
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
@@ -374,7 +374,7 @@ async fn root_layout(slot: Result) -> Result {
 }
 
 #[layer("/api")]
-async fn api_log(cx: &mut Cx, body: Body, next: Next<'_>) -> Result<Response> {
+async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;
     println!("API response: {}", response.status());
     Ok(response)
@@ -431,4 +431,4 @@ pub fn router() -> Router {
 }
 ```
 
-All [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](route) items from the example above are picked up automatically.
+All [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](macro@route) items from the example above are picked up automatically.

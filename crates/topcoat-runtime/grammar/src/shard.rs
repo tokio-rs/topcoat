@@ -95,10 +95,13 @@ impl ToTokens for Shard {
 
         let id = Uuid::new_v4().to_string();
 
-        quote! {
-            // Component face: renders the shard inline, splitting each `Expr<T>`
-            // into its evaluated value (for the initial server render) and its
-            // JavaScript source (tracked by the browser).
+        // Marker: the value users register and reference, expanded from the
+        // component face. It renders the shard inline, splitting each
+        // `Expr<T>` into its evaluated value (for the initial server render)
+        // and its JavaScript source (tracked by the browser). The marker
+        // struct the face expands to is a unit struct, so `#ident` stays a
+        // value usable directly in `router.shard(...)`.
+        let marker = quote! {
             #[#topcoat_view_macro::component]
             #vis async fn #ident(#component_params) -> #topcoat_error::Result<#topcoat_view::View> {
                 #(
@@ -112,52 +115,61 @@ impl ToTokens for Shard {
                 );
                 #topcoat_view_macro::view! { (__scope) }
             }
-        }
-        .to_tokens(tokens);
+        };
 
-        // The erased shard is built once in a `const` so it can be used from
-        // both the `From` impl (for manual `router.shard(#ident)` registration)
-        // and the discovery submission (which expands to a `static`, requiring a
-        // const initializer). The marker the component face expands to is a unit
-        // struct, so `#ident` is a value usable just like `router.page(...)`.
-        // The const is named after the shard so the render closure carries that
-        // name in backtraces and profiles.
-        let submit =
-            cfg!(feature = "discover").then(|| quote! { #topcoat_inventory::submit! { #ident } });
+        // The user's function body, re-emitted as the marker's `handler`
+        // associated function. Associated items are reached through the type
+        // rather than lexical scope, so `#ident::handler` is callable from
+        // the component face and the trait implementation below. The leading
+        // `__cx` parameter carries the ambient context that `view!` bodies
+        // read.
+        let handler = quote! {
+            impl #ident {
+                async fn handler(__cx: &#topcoat_context::Cx, #inputs) #output #block
+            }
+        };
+
+        // The trait implementation dispatching re-render requests to the
+        // handler: it deserializes the surrogate argument tuple from the
+        // request body and forwards to the handler positionally.
+        let shard = quote! {
+            impl #topcoat_runtime::Shard for #ident {
+                fn id(&self) -> #topcoat_runtime::ShardId {
+                    #topcoat_runtime::ShardId::new(#id)
+                }
+
+                fn render<'cx>(
+                    &'cx self,
+                    cx: &'cx #topcoat_context::Cx,
+                    body: #topcoat_router::Body,
+                ) -> #topcoat_runtime::ShardFuture<'cx> {
+                    ::std::boxed::Box::pin(async move {
+                        type __Surrogate =
+                            <(#(#value_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
+                        let #topcoat_router::content::Json(__args) =
+                            <#topcoat_router::content::Json<__Surrogate> as #topcoat_router::request::FromRequest>
+                                ::from_request(cx, body).await?;
+                        let (#(#value_idents,)*) =
+                            #topcoat_runtime::Surrogate::into_real(__args);
+                        let __view = #ident::handler(cx, #(#call_args),*).await?;
+                        #topcoat_error::Result::Ok(__view)
+                    })
+                }
+            }
+        };
+
+        // Discovery collects the marker erased behind its trait.
+        let submit = cfg!(feature = "discover").then(|| {
+            quote! { #topcoat_inventory::submit! { &#ident as &'static dyn #topcoat_runtime::Shard } }
+        });
+
         quote! {
+            #marker
+
             const _: () = {
-                // The user's real body, hung off the marker so both the
-                // component's initial render and the server endpoint that
-                // re-renders the shard reach it as `#ident::handler`. The
-                // leading `__cx` parameter makes the request context implicitly
-                // available to macros in the body (like `view!`), just as
-                // inside a `#[component]`.
-                impl #ident {
-                    async fn handler(__cx: &#topcoat_context::Cx, #inputs) #output #block
-                }
+                #handler
 
-                #[allow(non_upper_case_globals)]
-                const #ident: #topcoat_runtime::ErasedShard =
-                    #topcoat_runtime::ErasedShard::new(
-                        #topcoat_runtime::ShardId::new(#id),
-                        |cx, body| ::std::boxed::Box::pin(async move {
-                            type __Surrogate =
-                                <(#(#value_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
-                            let #topcoat_router::content::Json(__args) =
-                                <#topcoat_router::content::Json<__Surrogate> as #topcoat_router::request::FromRequest>
-                                    ::from_request(cx, body).await?;
-                            let (#(#value_idents,)*) =
-                                #topcoat_runtime::Surrogate::into_real(__args);
-                            let __view = #ident::handler(cx, #(#call_args),*).await?;
-                            #topcoat_error::Result::Ok(__view)
-                        }),
-                    );
-
-                impl ::core::convert::From<#ident> for #topcoat_runtime::ErasedShard {
-                    fn from(_: #ident) -> Self {
-                        #ident
-                    }
-                }
+                #shard
 
                 #submit
             };

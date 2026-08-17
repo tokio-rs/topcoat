@@ -73,7 +73,7 @@ The [`StatusCode`](crate::StatusCode) in the view keeps the response a 403; with
 
 # Not-found pages
 
-A [`NotFoundError`] returned by a handler is caught the same way. The 404 for a URL matching no route is not: the router answers it directly, and no layer or layout runs for a request nothing was registered for. To give those URLs the same branded treatment, declare a catch-all page with [`not_found!`](../macro.not_found.html):
+A [`NotFoundError`] returned by a handler is caught the same way. The 404 for a URL matching no route reaches only layers whose path is `None`, since they wrap every request; no other layer or layout runs for a request nothing was registered for. To render those URLs through the layouts with the same branded treatment, declare a catch-all page with [`not_found!`](../macro.not_found.html):
 
 ```rust
 # use topcoat::router::not_found;
@@ -81,6 +81,28 @@ not_found!("/");
 ```
 
 This registers a page resolving every otherwise unmatched URL under its path to a [`NotFoundError`], which then bubbles through the layouts like any other handler error. See the [`not_found!` reference](../macro.not_found.html) for the module-derived form and how the catch-all segment is appended.
+
+# Rewrites
+
+A rewrite dispatches the request again at a different path, running the whole route stack as if that path had been requested in the first place. Unlike a redirect it is invisible to the client: the browser URL stays what was requested, and no extra round trip happens. Build one with [`rewrite(path, body)`](rewrite) and return it like any other router error:
+
+```rust
+use topcoat::{Result, context::Cx, router::{Body, error::rewrite, page}, view::view};
+# async fn beta_tester(_cx: &Cx) -> bool { false }
+#[page("/dashboard")]
+async fn dashboard(cx: &Cx) -> Result {
+    if beta_tester(cx).await {
+        return Err(rewrite("/dashboard-beta", Body::empty()).into());
+    }
+    view! { <h1>"Dashboard"</h1> }
+}
+```
+
+The rewritten dispatch keeps the request's method and headers and reads `body` as its request body; the path may carry a query string. Everything else starts over: the response built so far is discarded along with the request context, so per-request state like memoized values or response cookies staged by the abandoned dispatch does not leak into the new one. Layers run again too, including pathless ones.
+
+A handler reached through a rewrite sees the rewritten URI in [`uri`](crate::request::uri). To read the URL the client actually requested, for example as a form's post-back target, use [`original_uri`](crate::request::original_uri).
+
+The router refuses a rewrite to a path the request was already dispatched under and stops any chain after 8 rewrites; both respond 500 without leaking the chain to the client.
 
 # Unexpected errors
 

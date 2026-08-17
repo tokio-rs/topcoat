@@ -1,16 +1,18 @@
-use std::{hash::Hash, marker::PhantomData, pin::Pin};
+use std::{hash::Hash, pin::Pin};
 
-use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
-    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouterBuilder, response::Response,
+    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId, RouterBuilder,
+    response::Response,
 };
 
-use crate::Surrogated;
+use crate::{Surrogate, Surrogated};
 
 const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/procedures";
 
+/// The identity of a procedure, stable across the server and the client
+/// runtime.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ProcedureId(&'static str);
@@ -27,107 +29,73 @@ impl ProcedureId {
     }
 }
 
-pub type ProcedureHandlerFn =
-    for<'cx> fn(
-        cx: &'cx Cx,
-        body: Body,
-    ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>>;
+/// The future returned by [`Procedure::handle`]: a boxed, `Send` future
+/// borrowing the procedure and its request context.
+pub type ProcedureFuture<'cx> = Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>>;
 
-#[derive(Debug, Clone)]
-pub struct Procedure<A, R> {
-    id: ProcedureId,
-    handle: ProcedureHandlerFn,
-    _phantom: PhantomData<fn(A) -> R>,
+/// An async server function callable from the client runtime.
+///
+/// Registered into a [`RouterBuilder`] with
+/// [`procedure`](RouterBuilderProcedureExt::procedure), which serves it as a
+/// route dispatched by [`ProcedureId`].
+pub trait Procedure: Send + Sync + 'static {
+    /// The identity of this procedure.
+    fn id(&self) -> ProcedureId;
+
+    /// Handles a procedure call, deserializing its arguments from `body`.
+    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ProcedureFuture<'cx>;
 }
 
-impl<A, R> Procedure<A, R> {
-    #[inline]
-    pub const fn new(id: ProcedureId, handle: ProcedureHandlerFn) -> Self {
-        Self {
-            id,
-            handle,
-            _phantom: PhantomData,
-        }
+impl<P: Procedure + ?Sized> Procedure for &'static P {
+    fn id(&self) -> ProcedureId {
+        (**self).id()
     }
 
-    #[must_use]
-    pub fn id(&self) -> ProcedureId {
-        self.id
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ErasedProcedure {
-    id: ProcedureId,
-    handle: ProcedureHandlerFn,
-}
-
-impl ErasedProcedure {
-    #[must_use]
-    pub const fn new<A, R>(procedure: &Procedure<A, R>) -> Self {
-        Self {
-            id: procedure.id,
-            handle: procedure.handle,
-        }
-    }
-
-    #[must_use]
-    pub fn id(&self) -> ProcedureId {
-        self.id
-    }
-
-    /// Dispatches the procedure call, awaiting its handler future.
-    ///
-    /// # Errors
-    ///
-    /// Propagates any error returned by the underlying procedure handler.
-    #[inline]
-    pub async fn handle(&self, cx: &Cx, body: Body) -> Result<Response> {
-        (self.handle)(cx, body).await
-    }
-}
-
-impl<A, R> From<Procedure<A, R>> for ErasedProcedure {
-    fn from(value: Procedure<A, R>) -> Self {
-        Self {
-            id: value.id,
-            handle: value.handle,
-        }
-    }
-}
-
-impl<A, R> From<&Procedure<A, R>> for ErasedProcedure {
-    fn from(value: &Procedure<A, R>) -> Self {
-        Self::new(value)
+    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ProcedureFuture<'cx> {
+        (**self).handle(cx, body)
     }
 }
 
 #[cfg(feature = "discover")]
-inventory::collect!(ErasedProcedure);
+inventory::collect!(&'static dyn Procedure);
+
+/// The argument and return types of a [`Procedure`], as seen by runtime
+/// expressions calling it.
+pub trait TypedProcedure: Procedure {
+    /// The arguments, as a tuple in declaration order.
+    type Args: Surrogated;
+
+    /// The value a successful call resolves to.
+    type Output: Surrogated;
+}
 
 /// A [`Route`] that handles calls to one server procedure.
-#[derive(Debug, Clone)]
 pub struct ProcedureRoute {
+    id: RouteId,
     path: PathBuf,
-    procedure: ErasedProcedure,
+    procedure: Box<dyn Procedure>,
 }
 
 impl ProcedureRoute {
     /// Builds the route that serves `procedure`.
-    pub fn new(procedure: impl Into<ErasedProcedure>) -> Self {
-        let procedure = procedure.into();
+    pub fn new(procedure: impl Procedure) -> Self {
         Self {
+            id: RouteId::new(),
             path: Path::new(&format!(
                 "{PROCEDURE_ROUTE_PREFIX}/{}",
                 procedure.id().as_str()
             ))
             .to_owned(),
-            procedure,
+            procedure: Box::new(procedure),
         }
     }
 }
 
 impl Route for ProcedureRoute {
+    fn id(&self) -> RouteId {
+        self.id
+    }
+
     fn methods(&self) -> Methods<'_> {
         Methods::Only(&[Method::POST])
     }
@@ -137,7 +105,7 @@ impl Route for ProcedureRoute {
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
-        Box::pin(async move { self.procedure.handle(cx, body).await })
+        self.procedure.handle(cx, body)
     }
 }
 
@@ -145,7 +113,7 @@ impl Route for ProcedureRoute {
 pub trait RouterBuilderProcedureExt {
     /// Mounts a procedure route.
     #[must_use]
-    fn procedure(self, procedure: impl Into<ErasedProcedure>) -> Self;
+    fn procedure(self, procedure: impl Procedure) -> Self;
 
     /// Registers every procedure linked into the binary.
     #[cfg(feature = "discover")]
@@ -154,50 +122,60 @@ pub trait RouterBuilderProcedureExt {
 }
 
 impl RouterBuilderProcedureExt for RouterBuilder {
-    fn procedure(self, procedure: impl Into<ErasedProcedure>) -> Self {
+    fn procedure(self, procedure: impl Procedure) -> Self {
         self.route(ProcedureRoute::new(procedure))
     }
 
     #[cfg(feature = "discover")]
     fn discover_procedures(mut self) -> Self {
-        for procedure in inventory::iter::<ErasedProcedure>().cloned() {
+        for &procedure in inventory::iter::<&'static dyn Procedure>() {
             self = self.procedure(procedure);
         }
         self
     }
 }
 
-#[derive(Debug, RefCast)]
-#[repr(transparent)]
-pub struct ProcedureSurrogate<A, R>(Procedure<A, R>);
+/// The surrogate a [`Procedure`] value turns into inside a runtime
+/// expression.
+///
+/// Captured as a `&'static` reference, so closures inside the expression can
+/// hold it without borrowing a local. Serializes as the procedure's id, so
+/// the browser can call it back, and exposes the typed [`call`](Self::call)
+/// that runtime expressions invoke.
+pub struct ProcedureSurrogate<P>(P);
 
-impl<A, R> ProcedureSurrogate<A, R> {
-    pub(crate) const fn new(v: Procedure<A, R>) -> Self {
-        Self(v)
+impl<P: TypedProcedure> ProcedureSurrogate<P> {
+    #[must_use]
+    pub const fn new(procedure: P) -> Self {
+        Self(procedure)
     }
-}
 
-impl<A, R> ProcedureSurrogate<A, R>
-where
-    A: Surrogated,
-    R: Surrogated,
-{
     /// Invokes the procedure from the client side.
     ///
     /// # Panics
     ///
     /// Always panics; procedures can only be invoked from the client runtime.
     #[allow(clippy::unused_async)]
-    pub async fn call(&self, _args: A::Surrogate) -> R::Surrogate {
+    pub async fn call(
+        &self,
+        _args: <P::Args as Surrogated>::Surrogate,
+    ) -> <P::Output as Surrogated>::Surrogate {
         panic!("procedures cannot be executed on the server");
     }
 }
 
-crate::impl_surrogate!({A, R} Procedure<A, R>, ProcedureSurrogate<A, R>);
-crate::impl_surrogate_ref!({A, R} Procedure<A, R>, ProcedureSurrogate<A, R>);
-crate::impl_surrogate_mut!({A, R} Procedure<A, R>, ProcedureSurrogate<A, R>);
+impl<P> Surrogate for &'static ProcedureSurrogate<P>
+where
+    P: TypedProcedure + Copy + Surrogated<Surrogate = Self>,
+{
+    type Real = P;
 
-impl<A, R> Serialize for ProcedureSurrogate<A, R> {
+    fn into_real(self) -> Self::Real {
+        self.0
+    }
+}
+
+impl<P: TypedProcedure> Serialize for ProcedureSurrogate<P> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

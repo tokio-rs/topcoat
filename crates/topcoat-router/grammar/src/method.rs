@@ -53,23 +53,19 @@ impl ParseOption for Methods {
 }
 
 impl ToTokens for Methods {
-    /// Emits the `OwnedMethods` expression registering this method set.
+    /// Emits the `Methods` expression declaring this method set.
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::One(method) => quote! {
-                #topcoat_router::OwnedMethods::One(#topcoat_router::Method::#method)
+                #topcoat_router::Methods::Only(&[#topcoat_router::Method::#method])
             },
             Self::Set { items, .. } => {
                 let items = items
                     .iter()
                     .map(|method| quote! { #topcoat_router::Method::#method });
-                quote! {
-                    #topcoat_router::OwnedMethods::Set(::std::borrow::Cow::Borrowed(
-                        &[#(#items),*],
-                    ))
-                }
+                quote! { #topcoat_router::Methods::Only(&[#(#items),*]) }
             }
-            Self::Any(_) => quote! { #topcoat_router::OwnedMethods::Any },
+            Self::Any(_) => quote! { #topcoat_router::Methods::Any },
         }
         .to_tokens(tokens);
     }
