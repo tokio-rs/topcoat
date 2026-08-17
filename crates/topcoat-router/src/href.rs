@@ -235,19 +235,22 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
     true
 }
 
-/// Builds the URL for a route.
+/// Turns a page or route into an URL string.
 ///
-/// `target` is what the URL points at: a route handler, or a path given as a
-/// [`Path`] or a string. A handler resolves to the path it is mounted at on
-/// the router serving the request.
+/// The first parameter, `target`, is the route handler the URL should be
+/// pointing to. The URL is built from the path the handler is mounted at, so
+/// it stays in sync when the route moves. A [`Path`] or a plain path string
+/// works as well.
 ///
-/// `params` fills the path's parameters with `path_param!` values named after
-/// them, one per parameter in the path's order; a path without parameters
-/// takes `()`.
+/// `params` fills in the path's parameters: one `path_param!` value per
+/// parameter, in the order the path declares them, passed as a tuple. A path
+/// without parameters takes `()`.
 ///
-/// The returned [`Href`] optionally takes on query items and a fragment, and
-/// resolves into the URL string when used in a view, or explicitly with
-/// [`resolve`](Href::resolve):
+/// The result can be extended with a [`query`](Href::query) string, a
+/// [`fragment`](Href::fragment), and an [`absolute`](Href::absolute) or
+/// [`relative`](Href::relative) form. Use it directly in a view to render
+/// the URL, or call [`resolve`](Href::resolve) to get the string, e.g. for
+/// a redirect.
 ///
 /// ```
 /// use serde::Serialize;
@@ -275,6 +278,9 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 ///     }
 /// }
 /// ```
+///
+/// The [`href!`] macro builds the same URL with the parameters listed as
+/// plain arguments instead of a tuple.
 pub fn href<T, P>(target: T, params: P) -> Href<T, P, (), &'static str>
 where
     T: HrefTarget,
@@ -287,6 +293,79 @@ where
         url_form: None,
         fragment: None,
     }
+}
+
+/// Turns a page or route into an URL string.
+///
+/// The first argument is the route handler the URL should be pointing to.
+/// The URL is built from the path the handler is mounted at, so it stays in
+/// sync when the route moves. A [`Path`] or a plain path string works as
+/// well.
+///
+/// Every further argument fills in one of the path's parameters, with one
+/// `path_param!` value per parameter in the order the path declares them, so
+/// a link to a post reads as `href!(post, PostId(post.id))`.
+///
+/// The result can be extended with a [`query`](Href::query) string, a
+/// [`fragment`](Href::fragment), and an [`absolute`](Href::absolute) or
+/// [`relative`](Href::relative) form. Use it directly in a view to render
+/// the URL, or call [`resolve`](Href::resolve) to get the string, e.g. for
+/// a redirect.
+///
+/// ```
+/// use serde::Serialize;
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{
+///         error::{SeeOther, see_other},
+///         href, page, path_param, route,
+///     },
+///     view::view,
+/// };
+///
+/// path_param!(post_id: u64);
+///
+/// #[derive(Serialize)]
+/// struct Pagination {
+///     page: u32,
+/// }
+///
+/// #[page("/posts")]
+/// async fn posts(cx: &Cx) -> Result {
+///     view! {
+///         <a href=(href!(post, PostId(1)))>"The first post"</a>
+///         <a href=(href!(post, PostId(1)).fragment("comments"))>"Its comments"</a>
+///         <a href=(href!(posts).query(Pagination { page: 2 }))>"Next page"</a>
+///     }
+/// }
+///
+/// #[page("/posts/{post_id}")]
+/// async fn post(cx: &Cx) -> Result {
+///     let post_id = path_param::<PostId>(cx)?;
+///
+///     view! {
+///         <form method="post" action=(href!(publish, PostId(post_id)))>
+///             <button>"Publish"</button>
+///         </form>
+///     }
+/// }
+///
+/// #[route(POST "/posts/{post_id}/publish")]
+/// async fn publish(cx: &Cx) -> Result<SeeOther> {
+///     let post_id = path_param::<PostId>(cx)?;
+///
+///     Ok(see_other(&href!(post, PostId(post_id)).resolve(cx)))
+/// }
+/// ```
+///
+/// The macro is a thin wrapper around the [`href`] function, which takes the
+/// parameters as a tuple instead.
+#[macro_export]
+macro_rules! href {
+    ( $target:expr $(, $param:expr)* $(,)? ) => {
+        $crate::href($target, ($($param,)*))
+    };
 }
 
 /// A URL being built by [`href`].
@@ -575,6 +654,23 @@ mod tests {
             .resolve(&Cx::default());
 
         assert_eq!(url, "/users/42?page=2#bio");
+    }
+
+    #[test]
+    fn the_macro_takes_the_parameters_as_a_list() {
+        let url = href!(
+            "/users/{id}/posts/{post_id}",
+            Param("id", "42"),
+            Param("post_id", "7")
+        )
+        .resolve(&Cx::default());
+
+        assert_eq!(url, "/users/42/posts/7");
+    }
+
+    #[test]
+    fn the_macro_without_parameters_resolves_a_static_path() {
+        assert_eq!(href!("/users").resolve(&Cx::default()), "/users");
     }
 
     #[test]
