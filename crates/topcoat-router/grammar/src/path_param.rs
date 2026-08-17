@@ -213,55 +213,70 @@ impl PathParam {
     // for a regular parameter, one per element for a catch-all, which spans as
     // many segments as it holds elements. `HrefSegments` writes the separators
     // and the escaping, so nothing here spells out a `/`.
+    //
+    // Pushing a segment does not render it, so a declared type that cannot be
+    // rendered still gets this implementation. `HrefParams` asks the segment
+    // type for `Display` where the URL is built.
     fn href_param_impl(&self) -> TokenStream {
         let ident = self.type_ident();
         let name = self.name_string();
-        let (impl_generics, where_clause, body) = match (self.is_catch_all(), self.param_type()) {
-            (false, Some(_)) => (quote! {}, quote! {}, quote! { segments.push(&self.0); }),
-            (true, Some(_)) => (
-                quote! {},
-                quote! {},
-                quote! {
-                    for value in &self.0 {
-                        segments.push(value);
-                    }
-                },
-            ),
-            (false, None) => (
-                quote! { <T: ::core::convert::AsRef<str>> },
-                quote! {},
-                quote! {
-                    segments.push(::core::convert::AsRef::<str>::as_ref(&self.0));
-                },
-            ),
-            (true, None) => (
-                quote! {
-                    <T: ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>>
-                },
-                quote! {
-                    where for<'__iter> &'__iter T:
-                        ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>
-                },
-                quote! {
-                    for segment in &self.0 {
-                        segments.push(::core::convert::AsRef::<str>::as_ref(&segment));
-                    }
-                },
-            ),
-        };
+        let (impl_generics, where_clause, segment, body) =
+            match (self.is_catch_all(), self.param_type()) {
+                (false, Some(param_type)) => (
+                    quote! {},
+                    quote! {},
+                    quote! { #param_type },
+                    quote! { segments.push(&self.0); },
+                ),
+                (true, Some(param_type)) => (
+                    quote! {},
+                    quote! {},
+                    quote! { #param_type },
+                    quote! {
+                        for value in &self.0 {
+                            segments.push(value);
+                        }
+                    },
+                ),
+                (false, None) => (
+                    quote! { <T: ::core::convert::AsRef<str>> },
+                    quote! {},
+                    quote! { str },
+                    quote! {
+                        segments.push(::core::convert::AsRef::<str>::as_ref(&self.0));
+                    },
+                ),
+                (true, None) => (
+                    quote! {
+                        <T: ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>>
+                    },
+                    quote! {
+                        where for<'__iter> &'__iter T:
+                            ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>
+                    },
+                    quote! { str },
+                    quote! {
+                        for segment in &self.0 {
+                            segments.push(::core::convert::AsRef::<str>::as_ref(&segment));
+                        }
+                    },
+                ),
+            };
         let type_generics = self.param_type().is_none().then(|| quote! { <T> });
 
         quote! {
             impl #impl_generics #topcoat_router::HrefParam
                 for #ident #type_generics #where_clause
             {
+                type Segment = #segment;
+
                 fn name(&self) -> &str {
                     #name
                 }
 
                 fn segments(
                     &self,
-                    segments: &mut #topcoat_router::HrefSegments<'_>,
+                    segments: &mut #topcoat_router::HrefSegments<'_, Self::Segment>,
                 ) {
                     #body
                 }

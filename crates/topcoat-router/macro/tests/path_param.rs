@@ -124,6 +124,16 @@ path_param!(pub public_id: u32);
 path_param!(pub public_slug);
 path_param!(pub *public_parts);
 
+// A page linking to pages that take a parameter: the marker resolves to the
+// path the router serves it at, and the values fill that path's parameters.
+#[page("/links")]
+async fn links() -> Result {
+    view! {
+        <a href=(href!(post, PostId(42)))>"post"</a>
+        <a href=(href!(document, DocPath(["guides", "getting started"])))>"guides"</a>
+    }
+}
+
 #[tokio::test]
 async fn parses_typed_path_param() {
     let router = Router::builder().page(post).build();
@@ -288,4 +298,20 @@ fn fills_one_href_segment_per_unparsed_catch_all_element() {
     let url =
         href("/docs/{*public_parts}", (PublicParts(["guides", "a/b"]),)).resolve(&Cx::default());
     assert_eq!(url, "/docs/guides/a%2Fb");
+}
+
+#[tokio::test]
+async fn fills_the_parameters_of_a_linked_page() {
+    let router = Router::builder()
+        .page(links)
+        .page(post)
+        .page(document)
+        .build();
+    let (status, body) = send(&router, "/links").await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        body,
+        "<a href=\"/posts/42\">post</a>\
+         <a href=\"/docs/guides/getting%20started\">guides</a>"
+    );
 }

@@ -187,7 +187,9 @@ async fn home() -> Result {
 
 Values are matched to the path by name, not by position alone, so filling `{post_id}` with anything but a `PostId` panics rather than building a wrong URL.
 
-Each segment is written with [`Display`](core::fmt::Display) and percent-encoded, so a value never reshapes the URL around it: `Slug("a/b")` fills its one segment as `a%2Fb`. A catch-all contributes one segment per element, so the separators between them are the only `/` it adds.
+Each segment is written with [`Display`](core::fmt::Display) and percent-encoded, so a value stays inside the segment it fills: `Slug("a/b")` fills its one segment as `a%2Fb`. A catch-all contributes one segment per element, so the separators between them are the only `/` it adds.
+
+Filling a segment with nothing, `.`, or `..` panics. A browser resolves those against the path around them instead of reading them as one segment, and encoding them does not take that meaning away.
 
 [`href`](fn.href.html) takes the same values as a tuple, for a URL built outside a macro.
 

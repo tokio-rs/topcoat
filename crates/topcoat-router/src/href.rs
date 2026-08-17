@@ -42,23 +42,33 @@ impl HrefTarget for &'static str {
 /// parameter carrying the same name, and the value pushes what it fills that
 /// parameter with: one segment for a regular parameter, one per element for a
 /// catch-all.
+///
+/// Pushing a segment does not render it. A URL renders its segments with
+/// [`Display`], so that is what [`HrefParams`] requires of the
+/// [`Segment`](Self::Segment) type. A parameter whose type cannot be rendered
+/// still declares; only building a URL from it is rejected.
 pub trait HrefParam {
+    /// The type of one segment this value fills its parameter with.
+    type Segment: ?Sized;
+
     /// The name of the path parameter this value fills.
     fn name(&self) -> &str;
 
     /// Pushes the segments this value fills its parameter with.
-    fn segments(&self, segments: &mut HrefSegments<'_>);
+    fn segments(&self, segments: &mut HrefSegments<'_, Self::Segment>);
 }
 
 impl<T> HrefParam for &T
 where
     T: HrefParam,
 {
+    type Segment = T::Segment;
+
     fn name(&self) -> &str {
         (*self).name()
     }
 
-    fn segments(&self, segments: &mut HrefSegments<'_>) {
+    fn segments(&self, segments: &mut HrefSegments<'_, Self::Segment>) {
         (*self).segments(segments);
     }
 }
@@ -68,12 +78,12 @@ where
 /// [`push`](Self::push) appends one segment; a catch-all pushes one per
 /// element it spans. The separating `/` and the escaping are written here, so
 /// a value never spells out either itself.
-pub struct HrefSegments<'out> {
-    out: &'out mut String,
+pub struct HrefSegments<'out, S: ?Sized> {
+    write: &'out mut dyn FnMut(&S),
     count: usize,
 }
 
-impl HrefSegments<'_> {
+impl<S: ?Sized> HrefSegments<'_, S> {
     /// Appends one path segment, percent-encoded.
     ///
     /// The segment is written with [`Display`] and lands in the URL escaped,
@@ -82,11 +92,13 @@ impl HrefSegments<'_> {
     ///
     /// # Panics
     ///
-    /// Panics if the segment's [`Display`] implementation fails.
-    pub fn push(&mut self, segment: impl Display) {
+    /// Panics if the segment's [`Display`] implementation fails, or if it
+    /// renders to nothing, `.`, or `..`. A browser resolves those against the
+    /// rest of the path instead of reading them as one segment, and encoding
+    /// them does not take that meaning away, so they are rejected.
+    pub fn push(&mut self, segment: &S) {
         self.count += 1;
-        self.out.push('/');
-        write!(PercentEncoded(&mut *self.out), "{segment}").unwrap();
+        (self.write)(segment);
     }
 }
 
@@ -121,6 +133,9 @@ impl Write for PercentEncoded<'_> {
 
 /// The path parameters of an [`href`]: a tuple of up to eight [`HrefParam`]
 /// values, in the order the path declares its parameters.
+///
+/// Every value renders the segments it pushes, so each one's
+/// [`Segment`](HrefParam::Segment) type must implement [`Display`].
 pub trait HrefParams {
     /// Writes `path` into `out` with every parameter filled in, each segment
     /// percent-encoded.
@@ -130,7 +145,8 @@ pub trait HrefParams {
     /// Panics if the values do not line up with the path's parameters: a name
     /// mismatch, a value the path declares no parameter for, a parameter no
     /// value fills, or a value that fills its parameter with the wrong number
-    /// of segments.
+    /// of segments. Panics as well if a segment renders to nothing, `.`, or
+    /// `..`, which address another path instead of filling a segment.
     fn assign(&self, path: &Path, out: &mut String);
 }
 
@@ -145,7 +161,10 @@ macro_rules! impl_href_params_tuples {
         #[allow(non_snake_case, unused_mut, unused_variables)]
         impl<$($ty,)*> HrefParams for ($($ty,)*)
         where
-            $($ty: HrefParam,)*
+            $(
+                $ty: HrefParam,
+                <$ty as HrefParam>::Segment: Display,
+            )*
         {
             fn assign(&self, path: &Path, out: &mut String) {
                 let start = out.len();
@@ -209,22 +228,44 @@ fn next_param<'path>(
     }
 }
 
-/// Lets `param` push the segments it fills `name` with, checking that it
-/// filled as much of the path as the parameter stands for.
+/// Lets `param` push the segments it fills `name` with, rendering each one
+/// percent-encoded into `out` and checking that the parameter filled as much
+/// of the path as it stands for.
 ///
 /// # Panics
 ///
-/// Panics if a regular parameter does not push exactly one segment, or a
-/// catch-all pushes none: a catch-all matches at least one segment, so an
-/// empty one addresses a path its route does not serve.
-fn push_segments(
-    param: &impl HrefParam,
-    name: &str,
-    catch_all: bool,
-    path: &Path,
-    out: &mut String,
-) {
-    let mut segments = HrefSegments { out, count: 0 };
+/// Panics if a segment renders to nothing, `.`, or `..`, none of which fill a
+/// segment of their own. Panics if a regular parameter does not push exactly
+/// one segment, or a catch-all pushes none: a catch-all matches at least one
+/// segment, so an empty one addresses a path its route does not serve.
+fn push_segments<P>(param: &P, name: &str, catch_all: bool, path: &Path, out: &mut String)
+where
+    P: HrefParam,
+    P::Segment: Display,
+{
+    let mut write = |segment: &P::Segment| {
+        let start = out.len();
+        out.push('/');
+        write!(PercentEncoded(&mut *out), "{segment}").unwrap();
+
+        // The URL is read back segment by segment, and a browser resolves an
+        // empty, current, or parent segment against the path around it. No
+        // encoding takes that meaning away, so the value is rejected instead.
+        let rendered = &out[start + 1..];
+        assert!(
+            !rendered.is_empty(),
+            "parameter \"{name}\" in `{path}` was given an empty segment"
+        );
+        assert!(
+            !matches!(rendered, "." | ".."),
+            "parameter \"{name}\" in `{path}` was given \"{rendered}\", which \
+             addresses another path instead of filling a segment"
+        );
+    };
+    let mut segments = HrefSegments {
+        write: &mut write,
+        count: 0,
+    };
     param.segments(&mut segments);
     let count = segments.count;
 
@@ -377,6 +418,7 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 ///
 /// The [`href!`](macro@crate::href) macro builds the same URL with the
 /// parameters listed as plain arguments instead of a tuple.
+#[must_use]
 pub fn href<T, P>(target: T, params: P) -> Href<T, P, (), &'static str>
 where
     T: HrefTarget,
@@ -500,6 +542,7 @@ macro_rules! impl_href_query_methods {
         #[allow(non_snake_case)]
         impl<T, P, $($ty,)* F> Href<T, P, ($($ty,)*), F> {
             /// Adds one item to the URL's query string.
+            #[must_use]
             pub fn query<Q>(self, query: Q) -> Href<T, P, ($($ty,)* Q,), F>
             where
                 Q: Serialize,
@@ -528,6 +571,7 @@ impl_href_query_methods!(Q1, Q2, Q3, Q4, Q5, Q6, Q7);
 
 impl<T, P, Q, F> Href<T, P, Q, F> {
     /// Sets the URL's fragment, replacing any fragment set before.
+    #[must_use]
     pub fn fragment<G>(self, fragment: G) -> Href<T, P, Q, G>
     where
         G: Display,
@@ -589,6 +633,7 @@ where
     ///
     /// Panics if the parameters do not line up with the target's path, or a
     /// query item does not serialize to a URL query string.
+    #[must_use]
     pub fn resolve(self, cx: &Cx) -> String {
         let mut buf = String::new();
         match self.url_form.unwrap_or_else(|| url_form(cx)) {
@@ -640,17 +685,21 @@ where
 
 #[cfg(test)]
 mod tests {
+    use topcoat_core::{base_url::BaseUrl, context::CxTestBuilder};
+
     use super::*;
 
     /// An href parameter with a fixed name, filling one segment.
     struct Param(&'static str, &'static str);
 
     impl HrefParam for Param {
+        type Segment = str;
+
         fn name(&self) -> &str {
             self.0
         }
 
-        fn segments(&self, segments: &mut HrefSegments<'_>) {
+        fn segments(&self, segments: &mut HrefSegments<'_, str>) {
             segments.push(self.1);
         }
     }
@@ -659,15 +708,24 @@ mod tests {
     struct Tail(&'static str, &'static [&'static str]);
 
     impl HrefParam for Tail {
+        type Segment = str;
+
         fn name(&self) -> &str {
             self.0
         }
 
-        fn segments(&self, segments: &mut HrefSegments<'_>) {
+        fn segments(&self, segments: &mut HrefSegments<'_, str>) {
             for segment in self.1 {
                 segments.push(segment);
             }
         }
+    }
+
+    /// Builds a context carrying `https://example.com` as its base URL.
+    fn cx_with_base_url() -> Cx {
+        CxTestBuilder::new()
+            .app_context(BaseUrl::new("https://example.com").expect("a valid base URL"))
+            .build()
     }
 
     /// Assigns `params` to `path` and returns the URL it produces.
@@ -773,6 +831,32 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "parameter \"id\" in `/users/{id}` was given an empty segment")]
+    fn rejects_an_empty_segment() {
+        let _ = assign("/users/{id}", &(Param("id", ""),));
+    }
+
+    #[test]
+    #[should_panic(expected = "parameter \"id\" in `/users/{id}` was given \"..\"")]
+    fn rejects_a_parent_segment() {
+        let _ = assign("/users/{id}", &(Param("id", ".."),));
+    }
+
+    #[test]
+    #[should_panic(expected = "parameter \"rest\" in `/docs/{*rest}` was given \".\"")]
+    fn rejects_a_current_segment_inside_a_catch_all() {
+        let _ = assign("/docs/{*rest}", &(Tail("rest", &["guides", "."]),));
+    }
+
+    #[test]
+    fn keeps_a_segment_that_only_starts_with_a_dot() {
+        assert_eq!(
+            assign("/files/{name}", &(Param("name", ".gitignore"),)),
+            "/files/.gitignore"
+        );
+    }
+
+    #[test]
     #[should_panic(expected = "declares fewer parameters than the href provides")]
     fn rejects_more_parameters_than_the_path_declares() {
         let _ = assign("/users/{id}", &(Param("id", "42"), Param("extra", "1")));
@@ -846,6 +930,32 @@ mod tests {
         let url = href("/users", ()).relative().resolve(&cx);
 
         assert_eq!(url, "/users");
+    }
+
+    #[test]
+    fn resolves_an_absolute_url_behind_the_base_url() {
+        let url = href("/users/{id}", (Param("id", "42"),))
+            .query([("page", "2")])
+            .fragment("bio")
+            .absolute()
+            .resolve(&cx_with_base_url());
+
+        assert_eq!(url, "https://example.com/users/42?page=2#bio");
+    }
+
+    #[test]
+    fn an_absolute_root_url_keeps_its_slash() {
+        assert_eq!(
+            href("/", ()).absolute().resolve(&cx_with_base_url()),
+            "https://example.com/"
+        );
+    }
+
+    #[test]
+    fn the_context_form_turns_a_url_absolute() {
+        let cx = cx_with_base_url().with(UrlForm::Absolute);
+
+        assert_eq!(href("/users", ()).resolve(&cx), "https://example.com/users");
     }
 
     #[test]

@@ -1,11 +1,9 @@
 use topcoat::{
     Result,
-    router::href,
     view::{PromotedStr, StaticClass, class, component, view},
 };
 
 use crate::{
-    app::{self, products, products::id::ProductId},
     catalog::{Product, Review, Spec, filled_stars, format_rating},
     urls::products_url,
 };
@@ -21,16 +19,16 @@ const PAGE_DISABLED: StaticClass = class!("rounded-md px-3 py-2 font-medium text
 const PAGE_CURRENT: StaticClass =
     class!("rounded-md bg-indigo-600 px-3 py-2 font-semibold text-white");
 
-/// The shop column, whose links point at the products page and are built with
-/// `href`; the columns below only hold placeholders.
-const SHOP_LINKS: [(&str, Option<&str>); 4] = [
-    ("All products", None),
-    ("Audio", Some("audio")),
-    ("Displays", Some("displays")),
-    ("Wearables", Some("wearables")),
-];
-
-const FOOTER_COLUMNS: [(&str, [(&str, &str); 4]); 3] = [
+const FOOTER_COLUMNS: [(&str, [(&str, &str); 4]); 4] = [
+    (
+        "Shop",
+        [
+            ("All products", "/products"),
+            ("Audio", "/products?category=audio"),
+            ("Displays", "/products?category=displays"),
+            ("Wearables", "/products?category=wearables"),
+        ],
+    ),
     (
         "Support",
         [
@@ -67,14 +65,12 @@ pub async fn site_nav() -> Result {
             <nav
                 class="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4"
             >
-                <a href=(href!(app::page)) class="text-lg font-bold tracking-tight">
+                <a href="/" class="text-lg font-bold tracking-tight">
                     "Meridian Supply"
                 </a>
                 <div class="flex items-center gap-6 text-sm font-medium text-slate-600">
-                    <a href=(href!(app::page)) class="hover:text-slate-900">"Home"</a>
-                    <a href=(href!(products::page)) class="hover:text-slate-900">
-                        "Products"
-                    </a>
+                    <a href="/" class="hover:text-slate-900">"Home"</a>
+                    <a href="/products" class="hover:text-slate-900">"Products"</a>
                     <span
                         class="rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white"
                     >
@@ -93,28 +89,13 @@ pub async fn site_footer() -> Result {
             <div
                 class="mx-auto grid w-full max-w-6xl grid-cols-2 gap-8 px-4 py-10 text-sm md:grid-cols-4"
             >
-                <div>
-                    <h3 class="mb-3 font-semibold text-slate-900">"Shop"</h3>
-                    <ul class="space-y-2 text-slate-500">
-                        for (label, category) in SHOP_LINKS {
-                            <li>
-                                <a
-                                    href=(products_url(1, None, category))
-                                    class="hover:text-slate-900"
-                                >
-                                    (label)
-                                </a>
-                            </li>
-                        }
-                    </ul>
-                </div>
                 for (title, links) in FOOTER_COLUMNS {
                     <div>
                         <h3 class="mb-3 font-semibold text-slate-900">(title)</h3>
                         <ul class="space-y-2 text-slate-500">
-                            for (label, url) in links {
+                            for (label, href) in links {
                                 <li>
-                                    <a href=(url) class="hover:text-slate-900">(label)</a>
+                                    <a href=(href) class="hover:text-slate-900">(label)</a>
                                 </li>
                             }
                         </ul>
@@ -157,7 +138,7 @@ pub async fn rating_stars(tenths: u32, size: &str) -> Result {
 pub async fn product_card(product: &Product) -> Result {
     view! {
         <a
-            href=(href!(products::id::page, ProductId(product.id)))
+            href=(("/products/", product.id))
             class="group flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md"
         >
             <div
@@ -231,19 +212,13 @@ pub async fn breadcrumbs(category: &str, category_slug: &str, name: &str) -> Res
     view! {
         <nav aria-label="Breadcrumb" class="text-sm text-slate-500">
             <ol class="flex flex-wrap items-center gap-2">
-                <li>
-                    <a href=(href!(app::page)) class="hover:text-slate-900">"Home"</a>
-                </li>
+                <li><a href="/" class="hover:text-slate-900">"Home"</a></li>
                 <li>"/"</li>
-                <li>
-                    <a href=(href!(products::page)) class="hover:text-slate-900">
-                        "Products"
-                    </a>
-                </li>
+                <li><a href="/products" class="hover:text-slate-900">"Products"</a></li>
                 <li>"/"</li>
                 <li>
                     <a
-                        href=(products_url(1, None, Some(category_slug)))
+                        href=(("/products?category=", category_slug))
                         class="hover:text-slate-900"
                     >
                         (category)
