@@ -285,6 +285,7 @@ fn fills_one_href_segment_per_typed_catch_all_element() {
 fn fills_one_href_segment_per_unparsed_catch_all_element() {
     // A `/` inside an element is escaped, so it stays within its own segment
     // instead of adding one.
-    let url = href("/docs/{*public_parts}", (PublicParts(["guides", "a/b"]),)).resolve(&Cx::default());
+    let url =
+        href("/docs/{*public_parts}", (PublicParts(["guides", "a/b"]),)).resolve(&Cx::default());
     assert_eq!(url, "/docs/guides/a%2Fb");
 }

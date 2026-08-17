@@ -334,7 +334,7 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 ///
 /// Inside a handler's own body its name refers to the handler function, so a
 /// handler linking to itself names its marker as a type, e.g. `posts {}`, or
-/// uses the [`href!`] macro, which does that on its own.
+/// uses the [`href!`](macro@crate::href) macro, which does that on its own.
 ///
 /// `params` fills in the path's parameters: one `path_param!` value per
 /// parameter, in the order the path declares them, passed as a tuple. A path
@@ -375,7 +375,7 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 /// }
 /// ```
 ///
-/// The [`href!`] macro builds the same URL with the parameters listed as
+/// The [`href!`](macro@crate::href) macro builds the same URL with the parameters listed as
 /// plain arguments instead of a tuple.
 pub fn href<T, P>(target: T, params: P) -> Href<T, P, (), &'static str>
 where
@@ -757,13 +757,17 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "parameter \"id\" fills one segment of `/users/{id}`, but was given 2")]
+    #[should_panic(
+        expected = "parameter \"id\" fills one segment of `/users/{id}`, but was given 2"
+    )]
     fn rejects_a_parameter_spanning_several_segments() {
         let _ = assign("/users/{id}", &(Tail("id", &["a", "b"]),));
     }
 
     #[test]
-    #[should_panic(expected = "catch-all parameter \"rest\" in `/docs/{*rest}` was given no segment")]
+    #[should_panic(
+        expected = "catch-all parameter \"rest\" in `/docs/{*rest}` was given no segment"
+    )]
     fn rejects_an_empty_catch_all() {
         let _ = assign("/docs/{*rest}", &(Tail("rest", &[]),));
     }

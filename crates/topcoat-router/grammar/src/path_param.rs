@@ -217,11 +217,7 @@ impl PathParam {
         let ident = self.type_ident();
         let name = self.name_string();
         let (impl_generics, where_clause, body) = match (self.is_catch_all(), self.param_type()) {
-            (false, Some(_)) => (
-                quote! {},
-                quote! {},
-                quote! { segments.push(&self.0); },
-            ),
+            (false, Some(_)) => (quote! {}, quote! {}, quote! { segments.push(&self.0); }),
             (true, Some(_)) => (
                 quote! {},
                 quote! {},
