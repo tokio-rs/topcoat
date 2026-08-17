@@ -251,6 +251,21 @@ impl_href_query_methods!(Q1, Q2, Q3, Q4, Q5);
 impl_href_query_methods!(Q1, Q2, Q3, Q4, Q5, Q6);
 impl_href_query_methods!(Q1, Q2, Q3, Q4, Q5, Q6, Q7);
 
+impl<T, P, Q, F> Href<T, P, Q, F> {
+    /// Sets the URL's fragment, replacing any fragment set before.
+    pub fn fragment<G>(self, fragment: G) -> Href<T, P, Q, G>
+    where
+        G: Display,
+    {
+        Href {
+            target: self.target,
+            params: self.params,
+            queries: self.queries,
+            fragment: Some(fragment),
+        }
+    }
+}
+
 impl<T, P, Q, F> Href<T, P, Q, F>
 where
     T: HrefTarget,
@@ -395,9 +410,18 @@ mod tests {
 
     #[test]
     fn percent_encodes_query_values() {
-        assert_eq!(
-            assign_queries(([("tag", "a b&c")],)),
-            "?tag=a+b%26c"
-        );
+        assert_eq!(assign_queries(([("tag", "a b&c")],)), "?tag=a+b%26c");
+    }
+
+    #[test]
+    fn builder_appends_queries_and_replaces_the_fragment() {
+        let href = href("/users", ())
+            .query([("a", "1")])
+            .fragment("one")
+            .query([("b", "2")])
+            .fragment("two");
+
+        assert_eq!(assign_queries(href.queries), "?a=1&b=2");
+        assert_eq!(href.fragment, Some("two"));
     }
 }
