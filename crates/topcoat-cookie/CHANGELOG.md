@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cookie-v0.5.0...topcoat-cookie-v0.6.0) - 2026-08-17
+
+### Added
+
+- *(core)* [**breaking**] add scoped context using `cx.with(...)` ([#338](https://github.com/tokio-rs/topcoat/pull/338))
+- *(cookie)* protect cookie jar from being written to after response… ([#324](https://github.com/tokio-rs/topcoat/pull/324))
+- *(core)* [**breaking**] make Cx detachable, remove CxBuilder ([#322](https://github.com/tokio-rs/topcoat/pull/322))
+- use #[track_caller] where appropriate ([#262](https://github.com/tokio-rs/topcoat/pull/262))
+
+### Other
+
+- *(router)* [**breaking**] replace handler structs with traits in preparation for href ([#346](https://github.com/tokio-rs/topcoat/pull/346))
+- sort imports
+- make request and response dedicated modules
+
 ## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cookie-v0.4.0...topcoat-cookie-v0.5.0) - 2026-07-27
 
 ### Added

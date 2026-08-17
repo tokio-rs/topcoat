@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-grammar-v0.5.0...topcoat-core-grammar-v0.6.0) - 2026-08-17
+
+### Added
+
+- *(core)* use 128-bit hash instead of Clone and Eq for memoization ([#337](https://github.com/tokio-rs/topcoat/pull/337))
+- *(core)* [**breaking**] specify as_ref manually on memoized functions ([#310](https://github.com/tokio-rs/topcoat/pull/310))
+
+### Fixed
+
+- *(core)* keep macro bodies intact when formatting rust snippets ([#273](https://github.com/tokio-rs/topcoat/pull/273))
+
+### Other
+
+- *(view)* add promoted str optimization to avoid allocations ([#330](https://github.com/tokio-rs/topcoat/pull/330))
+- sort imports
+
 ## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-grammar-v0.4.0...topcoat-core-grammar-v0.5.0) - 2026-07-27
 
 ### Added

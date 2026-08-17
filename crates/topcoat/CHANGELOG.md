@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/v0.5.0...v0.6.0) - 2026-08-17
+
+### Added
+
+- *(core)* [**breaking**] add scoped context using `cx.with(...)` ([#338](https://github.com/tokio-rs/topcoat/pull/338))
+- *(router)* sitemaps ([#336](https://github.com/tokio-rs/topcoat/pull/336))
+- *(core)* seal Cx on detach
+- *(core)* [**breaking**] make Cx detachable, remove CxBuilder ([#322](https://github.com/tokio-rs/topcoat/pull/322))
+- *(core)* [**breaking**] specify as_ref manually on memoized functions ([#310](https://github.com/tokio-rs/topcoat/pull/310))
+- *(router)* [**breaking**] global origin policy ([#276](https://github.com/tokio-rs/topcoat/pull/276))
+- *(router)* [**breaking**] replace path parameter attribute macro ([#242](https://github.com/tokio-rs/topcoat/pull/242))
+- use #[track_caller] where appropriate ([#262](https://github.com/tokio-rs/topcoat/pull/262))
+- *(view)* concurrent rendering ([#317](https://github.com/tokio-rs/topcoat/pull/317))
+- *(cli)* warn on version mismatch between topcoat and cli ([#305](https://github.com/tokio-rs/topcoat/pull/305))
+- *(cookie)* protect cookie jar from being written to after response… ([#324](https://github.com/tokio-rs/topcoat/pull/324))
+- *(core)* use 128-bit hash instead of Clone and Eq for memoization ([#337](https://github.com/tokio-rs/topcoat/pull/337))
+- *(view)* improve new arena rendering system ([#319](https://github.com/tokio-rs/topcoat/pull/319))
+- *(router)* [**breaking**] add unused layer sanity check ([#300](https://github.com/tokio-rs/topcoat/pull/300))
+- *(router)* use `impl AsRef<str>` for route error urls ([#351](https://github.com/tokio-rs/topcoat/pull/351))
+- *(router)* `href!` macro ([#350](https://github.com/tokio-rs/topcoat/pull/350))
+- *(router)* request rewriting ([#347](https://github.com/tokio-rs/topcoat/pull/347))
+- *(router)* add matched endpoint path to request context ([#318](https://github.com/tokio-rs/topcoat/pull/318))
+- *(router)* [**breaking**] add not_found macro and no longer run layers and layouts by default on unmatched requests ([#298](https://github.com/tokio-rs/topcoat/pull/298))
+- *(router)* add a too-many-requests error with a Retry-After hint ([#267](https://github.com/tokio-rs/topcoat/pull/267))
+- *(router)* add Js and Wasm response wrappers ([#268](https://github.com/tokio-rs/topcoat/pull/268))
+- *(router)* add a service-unavailable error with a Retry-After hint ([#266](https://github.com/tokio-rs/topcoat/pull/266))
+- *(router)* [**breaking**] request body limits ([#233](https://github.com/tokio-rs/topcoat/pull/233))
+- *(ui)* add 17 new topcoat-ui components ([#341](https://github.com/tokio-rs/topcoat/pull/341))
+- *(core)* stable component identity system ([#328](https://github.com/tokio-rs/topcoat/pull/328))
+- implement NodeViewParts and AttributeValueViewParts for Cow<'static, str> ([#306](https://github.com/tokio-rs/topcoat/pull/306))
+
+### Fixed
+
+- fix docs issues
+- fix doc tests with default features
+- *(asset)* [**breaking**] write the bundle next to the executable it was scanned from ([#243](https://github.com/tokio-rs/topcoat/pull/243))
+- *(asset)* ignore false-positive asset scans with empty paths ([#280](https://github.com/tokio-rs/topcoat/pull/280))
+- *(asset)* register one route per bundled file ([#249](https://github.com/tokio-rs/topcoat/pull/249))
+- *(cli)* add '/ws' to exempt OriginPolicy on dev ([#348](https://github.com/tokio-rs/topcoat/pull/348))
+- *(cli)* exclude build script outputs from final output detection ([#301](https://github.com/tokio-rs/topcoat/pull/301))
+- *(core)* detect recursive memoized calls ([#278](https://github.com/tokio-rs/topcoat/pull/278))
+- *(core)* keep macro bodies intact when formatting rust snippets ([#273](https://github.com/tokio-rs/topcoat/pull/273))
+- *(datastar)* reject multiline selectors ([#256](https://github.com/tokio-rs/topcoat/pull/256))
+- *(font)* support unicode ranges ending in E ([#307](https://github.com/tokio-rs/topcoat/pull/307))
+- *(router)* isolate request panics ([#257](https://github.com/tokio-rs/topcoat/pull/257))
+- *(router)* reject invalid route signatures at parse time ([#241](https://github.com/tokio-rs/topcoat/pull/241))
+- include docs and visibility in routes, procedures, layers ([#232](https://github.com/tokio-rs/topcoat/pull/232))
+- *(runtime)* support signals outside the body ([#334](https://github.com/tokio-rs/topcoat/pull/334))
+- *(runtime)* let push_str accept an owned string surrogate ([#269](https://github.com/tokio-rs/topcoat/pull/269))
+- *(runtime)* reject non-2xx shard responses instead of rendering them ([#247](https://github.com/tokio-rs/topcoat/pull/247))
+- *(runtime)* render f64 text the way Rust's Display does ([#245](https://github.com/tokio-rs/topcoat/pull/245))
+- *(runtime)* match Rust semantics for string comparison and trim ([#244](https://github.com/tokio-rs/topcoat/pull/244))
+- *(runtime)* reject invalid procedure signatures at parse time ([#230](https://github.com/tokio-rs/topcoat/pull/230))
+- *(view)* allow keyword element names ([#274](https://github.com/tokio-rs/topcoat/pull/274))
+
+### Other
+
+- *(router)* [**breaking**] replace handler structs with traits in preparation for href ([#346](https://github.com/tokio-rs/topcoat/pull/346))
+- sort imports
+- make request and response dedicated modules
+- decrease logo size
+- add readme logo
+- *(core)* [**breaking**] turn fnv1a hash into a struct and add 128-bit variant ([#327](https://github.com/tokio-rs/topcoat/pull/327))
+- *(view)* add promoted str optimization to avoid allocations ([#330](https://github.com/tokio-rs/topcoat/pull/330))
+- fix memoize docs stale example
+- *(view)* consume view when rendering to improve performance ([#312](https://github.com/tokio-rs/topcoat/pull/312))
+- *(router)* rename erased constant for more readable profiler and debugger traces ([#329](https://github.com/tokio-rs/topcoat/pull/329))
+- *(router)* remove PathBuf Arc pointer indirection ([#323](https://github.com/tokio-rs/topcoat/pull/323))
+- merge router service and serve into single file
+- [**breaking**] return ContentTooLargeError instead of LengthLimitError from to_bytes ([#263](https://github.com/tokio-rs/topcoat/pull/263))
+- *(runtime)* note that page guards do not cover shard endpoints ([#251](https://github.com/tokio-rs/topcoat/pull/251))
+- *(view)* refactor new rendering system part 2 ([#320](https://github.com/tokio-rs/topcoat/pull/320))
+- *(view)* add docs about concurrent rendering
+- *(view)* add lowering step to high-level intermediate representation ([#316](https://github.com/tokio-rs/topcoat/pull/316))
+
 ## [0.5.0](https://github.com/tokio-rs/topcoat/compare/v0.4.0...v0.5.0) - 2026-07-27
 
 ### Added

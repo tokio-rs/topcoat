@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-v0.5.0...topcoat-view-v0.6.0) - 2026-08-17
+
+### Added
+
+- *(core)* stable component identity system ([#328](https://github.com/tokio-rs/topcoat/pull/328))
+- *(core)* [**breaking**] make Cx detachable, remove CxBuilder ([#322](https://github.com/tokio-rs/topcoat/pull/322))
+- *(view)* improve new arena rendering system ([#319](https://github.com/tokio-rs/topcoat/pull/319))
+- *(view)* concurrent rendering ([#317](https://github.com/tokio-rs/topcoat/pull/317))
+- implement NodeViewParts and AttributeValueViewParts for Cow<'static, str> ([#306](https://github.com/tokio-rs/topcoat/pull/306))
+- use #[track_caller] where appropriate ([#262](https://github.com/tokio-rs/topcoat/pull/262))
+
+### Fixed
+
+- *(core)* keep macro bodies intact when formatting rust snippets ([#273](https://github.com/tokio-rs/topcoat/pull/273))
+- *(view)* allow keyword element names ([#274](https://github.com/tokio-rs/topcoat/pull/274))
+
+### Other
+
+- *(view)* add promoted str optimization to avoid allocations ([#330](https://github.com/tokio-rs/topcoat/pull/330))
+- *(view)* refactor new rendering system part 2 ([#320](https://github.com/tokio-rs/topcoat/pull/320))
+- *(view)* add docs about concurrent rendering
+- *(view)* add lowering step to high-level intermediate representation ([#316](https://github.com/tokio-rs/topcoat/pull/316))
+- *(view)* consume view when rendering to improve performance ([#312](https://github.com/tokio-rs/topcoat/pull/312))
+- sort imports
+- make request and response dedicated modules
+
 ## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-v0.4.0...topcoat-view-v0.5.0) - 2026-07-27
 
 ### Added

@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.5.0...topcoat-router-v0.6.0) - 2026-08-17
+
+### Added
+
+- *(router)* use `impl AsRef<str>` for route error urls ([#351](https://github.com/tokio-rs/topcoat/pull/351))
+- *(router)* `href!` macro ([#350](https://github.com/tokio-rs/topcoat/pull/350))
+- *(router)* request rewriting ([#347](https://github.com/tokio-rs/topcoat/pull/347))
+- *(core)* [**breaking**] add scoped context using `cx.with(...)` ([#338](https://github.com/tokio-rs/topcoat/pull/338))
+- *(router)* sitemaps ([#336](https://github.com/tokio-rs/topcoat/pull/336))
+- *(core)* [**breaking**] make Cx detachable, remove CxBuilder ([#322](https://github.com/tokio-rs/topcoat/pull/322))
+- *(view)* improve new arena rendering system ([#319](https://github.com/tokio-rs/topcoat/pull/319))
+- *(router)* add matched endpoint path to request context ([#318](https://github.com/tokio-rs/topcoat/pull/318))
+- *(view)* concurrent rendering ([#317](https://github.com/tokio-rs/topcoat/pull/317))
+- *(core)* [**breaking**] specify as_ref manually on memoized functions ([#310](https://github.com/tokio-rs/topcoat/pull/310))
+- *(router)* [**breaking**] add unused layer sanity check ([#300](https://github.com/tokio-rs/topcoat/pull/300))
+- *(router)* [**breaking**] add not_found macro and no longer run layers and layouts by default on unmatched requests ([#298](https://github.com/tokio-rs/topcoat/pull/298))
+- *(router)* [**breaking**] global origin policy ([#276](https://github.com/tokio-rs/topcoat/pull/276))
+- *(router)* add a too-many-requests error with a Retry-After hint ([#267](https://github.com/tokio-rs/topcoat/pull/267))
+- *(router)* add Js and Wasm response wrappers ([#268](https://github.com/tokio-rs/topcoat/pull/268))
+- *(router)* add a service-unavailable error with a Retry-After hint ([#266](https://github.com/tokio-rs/topcoat/pull/266))
+- use #[track_caller] where appropriate ([#262](https://github.com/tokio-rs/topcoat/pull/262))
+- *(router)* [**breaking**] replace path parameter attribute macro ([#242](https://github.com/tokio-rs/topcoat/pull/242))
+- *(router)* [**breaking**] request body limits ([#233](https://github.com/tokio-rs/topcoat/pull/233))
+
+### Fixed
+
+- fix docs issues
+- *(router)* isolate request panics ([#257](https://github.com/tokio-rs/topcoat/pull/257))
+- *(router)* reject invalid route signatures at parse time ([#241](https://github.com/tokio-rs/topcoat/pull/241))
+
+### Other
+
+- *(router)* [**breaking**] replace handler structs with traits in preparation for href ([#346](https://github.com/tokio-rs/topcoat/pull/346))
+- *(router)* rename erased constant for more readable profiler and debugger traces ([#329](https://github.com/tokio-rs/topcoat/pull/329))
+- *(router)* remove PathBuf Arc pointer indirection ([#323](https://github.com/tokio-rs/topcoat/pull/323))
+- sort imports
+- make request and response dedicated modules
+- merge router service and serve into single file
+- [**breaking**] return ContentTooLargeError instead of LengthLimitError from to_bytes ([#263](https://github.com/tokio-rs/topcoat/pull/263))
+
 ## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.4.0...topcoat-router-v0.5.0) - 2026-07-27
 
 ### Added

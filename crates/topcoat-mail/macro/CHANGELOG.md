@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-mail-macro-v0.5.0...topcoat-mail-macro-v0.6.0) - 2026-08-17
+
+### Added
+
+- *(view)* improve new arena rendering system ([#319](https://github.com/tokio-rs/topcoat/pull/319))
+- *(view)* concurrent rendering ([#317](https://github.com/tokio-rs/topcoat/pull/317))
+
+### Other
+
+- *(view)* consume view when rendering to improve performance ([#312](https://github.com/tokio-rs/topcoat/pull/312))
+- sort imports
+
 ## [0.5.0](https://github.com/tokio-rs/topcoat/compare/topcoat-mail-macro-v0.4.0...topcoat-mail-macro-v0.5.0) - 2026-07-27
 
 ### Added

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-font-macro-v0.5.0...topcoat-font-macro-v0.6.0) - 2026-08-17
+
+### Fixed
+
+- *(font)* support unicode ranges ending in E ([#307](https://github.com/tokio-rs/topcoat/pull/307))
+
+### Other
+
+- sort imports
+
 ## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-font-macro-v0.1.3...topcoat-font-macro-v0.2.0) - 2026-07-19
 
 ### Other

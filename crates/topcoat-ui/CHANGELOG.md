@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-v0.5.0...topcoat-ui-v0.6.0) - 2026-08-17
+
+### Added
+
+- *(ui)* add 17 new topcoat-ui components ([#341](https://github.com/tokio-rs/topcoat/pull/341))
+- use #[track_caller] where appropriate ([#262](https://github.com/tokio-rs/topcoat/pull/262))
+
+### Other
+
+- *(view)* add promoted str optimization to avoid allocations ([#330](https://github.com/tokio-rs/topcoat/pull/330))
+- sort imports
+
 ## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-v0.1.3...topcoat-ui-v0.2.0) - 2026-07-19
 
 ### Other
