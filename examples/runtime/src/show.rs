@@ -1,7 +1,7 @@
 use topcoat::{Result, router::page, view::view};
 
 #[page]
-async fn show() -> Result {
+pub async fn page() -> Result {
     view! {
         signal show = false;
 

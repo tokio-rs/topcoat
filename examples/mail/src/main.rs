@@ -7,7 +7,7 @@ use topcoat::{
         Router, RouterBuilderDiscoverExt,
         content::Form,
         error::{SeeOther, see_other},
-        layout, page, route,
+        href, layout, page, route,
     },
     view::view,
 };
@@ -47,14 +47,14 @@ async fn home() -> Result {
     view! {
         <h1>"Send a welcome mail"</h1>
 
-        <form method="POST" action="/send">
+        <form method="POST" action=(href(send_welcome, ()))>
             <input name="name" placeholder="Name" required="true">
             <input type="email" name="address" placeholder="Address" required="true">
             <button>"send"</button>
         </form>
 
         <p>"Nothing leaves the machine: the mail is written to a file."</p>
-        <a href="/sent">"Outbox"</a>
+        <a href=(href(sent, ()))>"Outbox"</a>
     }
 }
 
@@ -113,7 +113,7 @@ async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> Result<SeeOt
 
     send(cx, mail).await?;
 
-    Ok(see_other("/sent"))
+    Ok(see_other(&href(sent, ()).resolve(cx)))
 }
 
 #[page("/sent")]
@@ -136,7 +136,7 @@ async fn sent() -> Result {
             }
         </ul>
 
-        <a href="/">"Send another"</a>
+        <a href=(href(home, ()))>"Send another"</a>
     }
 }
 

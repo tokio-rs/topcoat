@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Router, RouterBuilderDiscoverExt, layout, page, path_param, query_params},
+    router::{Router, RouterBuilderDiscoverExt, href, layout, page, path_param, query_params},
     view::view,
 };
 
@@ -32,12 +32,18 @@ async fn home() -> Result {
     view! {
         <h1>"Path and query params"</h1>
         <ul>
+            // `href` builds the URL from the page it points at: `query` adds
+            // query items, and the tuple fills the path's parameters.
             <li>
-                <a href="/posts?page=2&q=rust">"query params: /posts?page=2&q=rust"</a>
+                <a href=(href(posts, ()).query([("page", "2"), ("q", "rust")]))>
+                    "query params: /posts?page=2&q=rust"
+                </a>
             </li>
-            <li><a href="/posts/42">"path param: /posts/42"</a></li>
             <li>
-                <a href="/docs/guides/getting-started">
+                <a href=(href(post, (PostId(42),)))>"path param: /posts/42"</a>
+            </li>
+            <li>
+                <a href=(href(document, (DocPath(["guides", "getting-started"]),)))>
                     "catch-all param: /docs/guides/getting-started"
                 </a>
             </li>
@@ -68,7 +74,7 @@ async fn posts(cx: &Cx) -> Result {
             "search: "
             (query.q.as_deref().unwrap_or("all"))
         </p>
-        <p><a href="/">"back home"</a></p>
+        <p><a href=(href(home, ()))>"back home"</a></p>
     }
 }
 
@@ -90,7 +96,7 @@ async fn post(cx: &Cx) -> Result {
             (post_id)
         </h1>
         <p>"parsed from the {post_id} path segment"</p>
-        <p><a href="/posts?page=1">"all posts"</a></p>
+        <p><a href=(href(posts, ()).query([("page", 1)]))>"all posts"</a></p>
     }
 }
 
@@ -109,6 +115,6 @@ async fn document(cx: &Cx) -> Result {
                 <li>(segment)</li>
             }
         </ul>
-        <p><a href="/">"back home"</a></p>
+        <p><a href=(href(home, ()))>"back home"</a></p>
     }
 }

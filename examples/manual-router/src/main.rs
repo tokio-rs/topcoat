@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    router::{Router, layout, page, route},
+    router::{Router, href, layout, page, route},
     view::view,
 };
 
@@ -36,13 +36,15 @@ async fn root_layout(slot: Result) -> Result {
             <head>topcoat::dev::script()</head>
             <body>
                 <nav>
-                    <a href="/">"home"</a>
+                    // A page as an href target resolves to the path it is
+                    // registered at, so a moved page updates every link to it.
+                    <a href=(href(home, ()))>"home"</a>
                     " | "
-                    <a href="/about">"about"</a>
+                    <a href=(href(about, ()))>"about"</a>
                     " | "
-                    <a href="/docs">"docs"</a>
+                    <a href=(href(docs, ()))>"docs"</a>
                     " | "
-                    <a href="/docs/install">"install"</a>
+                    <a href=(href(install, ()))>"install"</a>
                 </nav>
 
                 <hr>

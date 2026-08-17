@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     htmx::{HxResponseTrigger, hx_request},
-    router::{Router, RouterBuilderDiscoverExt, layout, page, route},
+    router::{Router, RouterBuilderDiscoverExt, href, layout, page, route},
     view::{View, view},
 };
 
@@ -53,7 +53,7 @@ async fn home() -> Result {
         </h1>
 
         // Swaps the returned fragment into #count.
-        <button hx-post="/increment" hx-target="#count" hx-swap="innerHTML">
+        <button hx-post=(href(increment, ())) hx-target="#count" hx-swap="innerHTML">
             "Increment"
         </button>
     }

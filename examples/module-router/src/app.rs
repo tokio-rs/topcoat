@@ -4,7 +4,7 @@ mod docs;
 
 use topcoat::{
     Result,
-    router::{layout, page},
+    router::{href, layout, page},
     view::view,
 };
 
@@ -21,16 +21,18 @@ async fn root_layout(slot: Result) -> Result {
         <html>
             <head>topcoat::dev::script()</head>
             <body>
+                // A page as an href target resolves to the path the module
+                // tree derives for it, so a moved module updates its links.
                 <nav>
-                    <a href="/">"home"</a>
+                    <a href=(href(page, ()))>"home"</a>
                     " | "
-                    <a href="/about">"about"</a>
+                    <a href=(href(about::page, ()))>"about"</a>
                     " | "
-                    <a href="/docs">"docs"</a>
+                    <a href=(href(docs::page, ()))>"docs"</a>
                     " | "
-                    <a href="/docs/install">"install"</a>
+                    <a href=(href(docs::install::page, ()))>"install"</a>
                     " | "
-                    <a href="/pricing">"pricing"</a>
+                    <a href=(href(_marketing::pricing::page, ()))>"pricing"</a>
                 </nav>
                 <hr>
                 (slot?)
@@ -41,7 +43,7 @@ async fn root_layout(slot: Result) -> Result {
 
 // A page in app.rs renders at /.
 #[page]
-async fn home() -> Result {
+pub async fn page() -> Result {
     view! {
         <h1>"home"</h1>
         <p>"src/app.rs -> /"</p>
@@ -53,7 +55,7 @@ mod about {
     use topcoat::{Result, router::page, view::view};
 
     #[page]
-    async fn about() -> Result {
+    pub async fn page() -> Result {
         view! {
             <h1>"about"</h1>
             <p>"src/app.rs (mod about) -> /about"</p>

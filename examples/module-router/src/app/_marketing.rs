@@ -1,4 +1,4 @@
-mod pricing;
+pub mod pricing;
 
 use topcoat::{Result, router::layout, view::view};
 

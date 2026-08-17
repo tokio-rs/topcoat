@@ -1,7 +1,7 @@
 use topcoat::{Result, router::page, view::view};
 
 #[page]
-async fn counter() -> Result {
+pub async fn page() -> Result {
     view! {
         // The signal lives in the browser; the handlers below update it.
         signal count = 0.0;

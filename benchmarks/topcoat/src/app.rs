@@ -1,11 +1,11 @@
 mod _components;
-mod products;
+pub mod products;
 
 use topcoat::{
     Result,
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset},
     context::{Cx, app_context},
-    router::{Compression, Router, layout, page},
+    router::{Compression, Router, href, layout, page},
     view::view,
 };
 
@@ -47,7 +47,7 @@ async fn root_layout(slot: Result) -> Result {
 }
 
 #[page]
-async fn home(cx: &Cx) -> Result {
+pub async fn page(cx: &Cx) -> Result {
     view! {
         <section class="rounded-2xl bg-indigo-600 px-8 py-16 text-white">
             <h1 class="max-w-2xl text-4xl font-bold tracking-tight">
@@ -57,7 +57,7 @@ async fn home(cx: &Cx) -> Result {
                 "Five hundred products, zero filler. Everything in the catalog is tested daily by the people who build it."
             </p>
             <a
-                href="/products"
+                href=(href(products::page, ()))
                 class="mt-8 inline-block rounded-lg bg-white px-6 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
             >
                 "Browse all products"
@@ -67,7 +67,7 @@ async fn home(cx: &Cx) -> Result {
             <div class="flex items-baseline justify-between">
                 <h2 class="text-2xl font-bold tracking-tight">"Featured products"</h2>
                 <a
-                    href="/products"
+                    href=(href(products::page, ()))
                     class="text-sm font-medium text-indigo-600 hover:text-indigo-500"
                 >
                     "View all"

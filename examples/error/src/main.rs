@@ -4,7 +4,7 @@ use topcoat::{
     router::{
         Router, RouterBuilderDiscoverExt, StatusCode,
         error::{ForbiddenError, NotFoundError, RouterErrorExt, forbidden},
-        layout, not_found, page, path_param,
+        href, layout, not_found, page, path_param,
     },
     view::view,
 };
@@ -21,9 +21,10 @@ async fn home() -> Result {
     view! {
         <h1>"Error handling"</h1>
         <ul>
-            <li><a href="/posts/1">"An existing post"</a></li>
-            <li><a href="/posts/7">"A missing post (404)"</a></li>
-            <li><a href="/admin">"The admin area (403)"</a></li>
+            <li><a href=(href(post, (PostId(1),)))>"An existing post"</a></li>
+            <li><a href=(href(post, (PostId(7),)))>"A missing post (404)"</a></li>
+            <li><a href=(href(admin, ()))>"The admin area (403)"</a></li>
+            // No route serves this URL, so there is no target to point at.
             <li><a href="/no/such/page">"An unrouted URL (404)"</a></li>
         </ul>
     }
@@ -49,7 +50,7 @@ async fn root_layout(slot: Result) -> Result {
         <html>
             <body>
                 (content)
-                <p><a href="/">"Home"</a></p>
+                <p><a href=(href(home, ()))>"Home"</a></p>
             </body>
         </html>
     }

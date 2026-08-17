@@ -1,4 +1,4 @@
-mod id;
+pub mod id;
 
 use topcoat::{
     Result,
@@ -35,7 +35,7 @@ struct ProductsQuery {
 }
 
 #[page]
-async fn products(cx: &Cx) -> Result {
+pub async fn page(cx: &Cx) -> Result {
     let query = query_params::<ProductsQuery>(cx)?;
     let catalog = app_context::<Catalog>(cx);
     let sort = normalize_sort(query.sort.as_deref());

@@ -7,7 +7,7 @@ use topcoat::{
         Router, RouterBuilderDiscoverExt,
         content::Form,
         error::{SeeOther, see_other},
-        layout, page, path_param, route,
+        href, layout, page, path_param, route,
     },
     view::{component, view},
 };
@@ -65,7 +65,7 @@ async fn home(cx: &Cx) -> Result {
     view! {
         <h1>"Toasty Todos"</h1>
 
-        <form method="post" action="/todos">
+        <form method="post" action=(href(create, ()))>
             <input type="text" name="title" placeholder="What needs doing?" required="">
             <button type="submit">"Add"</button>
         </form>
@@ -106,7 +106,7 @@ async fn home(cx: &Cx) -> Result {
 #[component]
 async fn toggle_checkbox(todo: &Todo) -> Result {
     view! {
-        <form method="post" action=(("/todos/", todo.id, "/toggle"))>
+        <form method="post" action=(href(toggle, (TodoId(todo.id),)))>
             <input type="checkbox" checked=(todo.done) onchange="this.form.submit()">
         </form>
     }
@@ -115,7 +115,7 @@ async fn toggle_checkbox(todo: &Todo) -> Result {
 #[component]
 async fn delete_button(todo: &Todo) -> Result {
     view! {
-        <form method="post" action=(("/todos/", todo.id, "/delete"))>
+        <form method="post" action=(href(delete, (TodoId(todo.id),)))>
             <button type="submit">"delete"</button>
         </form>
     }
@@ -139,7 +139,7 @@ async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<SeeOther> {
     }
 
     // Post/Redirect/Get, so a reload does not submit the form again.
-    Ok(see_other("/"))
+    Ok(see_other(&href(home, ()).resolve(cx)))
 }
 
 path_param!(todo_id: u64, error = bad_request);
@@ -153,12 +153,12 @@ async fn toggle(cx: &Cx) -> Result<SeeOther> {
 
     toasty::update!(todo { done }).exec(&mut db).await?;
 
-    Ok(see_other("/"))
+    Ok(see_other(&href(home, ()).resolve(cx)))
 }
 
 #[route(POST "/todos/{todo_id}/delete")]
 async fn delete(cx: &Cx) -> Result<SeeOther> {
     Todo::delete_by_id(&mut db(cx), *path_param::<TodoId>(cx)?).await?;
 
-    Ok(see_other("/"))
+    Ok(see_other(&href(home, ()).resolve(cx)))
 }

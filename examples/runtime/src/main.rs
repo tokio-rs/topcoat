@@ -4,7 +4,8 @@ mod show;
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{RouterBuilderDiscoverExt, error::redirect, layout, module_router, page},
+    context::Cx,
+    router::{RouterBuilderDiscoverExt, error::redirect, href, layout, module_router, page},
     view::view,
 };
 
@@ -21,8 +22,8 @@ async fn main() {
 }
 
 #[page]
-async fn home() -> Result {
-    Err(redirect("/counter").into())
+async fn page(cx: &Cx) -> Result {
+    Err(redirect(&href(counter::page, ()).resolve(cx)).into())
 }
 
 #[layout]
@@ -38,9 +39,9 @@ async fn layout(slot: Result) -> Result {
             </head>
             <body>
                 <nav>
-                    <a href="/counter">"counter"</a>
+                    <a href=(href(counter::page, ()))>"counter"</a>
                     " | "
-                    <a href="/show">"show"</a>
+                    <a href=(href(show::page, ()))>"show"</a>
                 </nav>
 
                 <hr>

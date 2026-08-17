@@ -10,10 +10,10 @@ use crate::{
     catalog::{Catalog, Product, format_rating},
 };
 
-path_param!(product_id: u32, error = not_found);
+path_param!(pub product_id: u32, error = not_found);
 
 #[page]
-async fn product_detail(cx: &Cx) -> Result {
+pub async fn page(cx: &Cx) -> Result {
     let catalog = app_context::<Catalog>(cx);
     let product = catalog
         .get(*path_param::<ProductId>(cx)?)

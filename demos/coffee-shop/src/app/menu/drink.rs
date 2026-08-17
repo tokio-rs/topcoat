@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{error::RouterErrorExt, page, path_param},
+    router::{error::RouterErrorExt, href, page, path_param},
     runtime::{Event, procedure},
     view::{attributes, view},
 };
@@ -15,10 +15,10 @@ use crate::{
 
 // The declaration turns this module's segment into a parameter, so the page
 // below renders at /menu/{slug}.
-path_param!(slug);
+path_param!(pub slug);
 
 #[page]
-async fn drink_page(cx: &Cx) -> Result {
+pub async fn page(cx: &Cx) -> Result {
     let slug = path_param::<Slug>(cx);
 
     let drink = Drink::filter_by_slug(slug)
@@ -35,7 +35,10 @@ async fn drink_page(cx: &Cx) -> Result {
         signal quantity = 1.0;
         signal confirmation = String::new();
 
-        <a href="/menu" class="text-sm text-muted-foreground hover:text-foreground">
+        <a
+            href=(href(super::page, ()))
+            class="text-sm text-muted-foreground hover:text-foreground"
+        >
             "Back to the menu"
         </a>
 

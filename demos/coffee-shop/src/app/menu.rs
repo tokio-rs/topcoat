@@ -1,9 +1,9 @@
-mod drink;
+pub mod drink;
 
 use topcoat::{
     Result,
     context::Cx,
-    router::page,
+    router::{href, page},
     runtime::{Event, shard},
     view::{attributes, component, view},
 };
@@ -20,7 +20,7 @@ use crate::{
 
 // The `menu` module adds a URL segment: this page renders at /menu.
 #[page]
-async fn menu_page() -> Result {
+pub async fn page() -> Result {
     view! {
         // The signal lives in the browser; typing filters without a reload.
         signal query = String::new();
@@ -83,7 +83,7 @@ async fn drink_grid(cx: &Cx, query: String) -> Result {
 #[component]
 async fn drink_card(drink: &Drink) -> Result {
     view! {
-        <a href=(("/menu/", &drink.slug))>
+        <a href=(href(drink::page, (drink::Slug(&drink.slug),)))>
             card(
                 // The grid stretches every cell to the row height; the card
                 // fills it and pins the price to the bottom.

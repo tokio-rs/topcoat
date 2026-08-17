@@ -8,7 +8,7 @@ use topcoat::{
     router::{
         Router, RouterBuilderDiscoverExt,
         content::sse::{Event, Sse},
-        page, route,
+        href, page, route,
     },
     view::view,
 };
@@ -44,7 +44,10 @@ async fn home() -> Result {
                     <span data-text="$count"></span>
                 </h1>
 
-                <button data-on:click="@post('/increment')">"Increment"</button>
+                // The route's URL is interpolated into the Datastar action.
+                <button data-on:click=(("@post('", href(increment, ()), "')"))>
+                    "Increment"
+                </button>
 
                 <ol id="log"></ol>
             </body>

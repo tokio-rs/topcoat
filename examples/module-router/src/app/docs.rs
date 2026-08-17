@@ -1,4 +1,4 @@
-mod install;
+pub mod install;
 
 use topcoat::{
     Result,
@@ -19,7 +19,7 @@ async fn docs_layout(slot: Result) -> Result {
 
 // A page in app::docs renders at /docs.
 #[page]
-async fn docs_index() -> Result {
+pub async fn page() -> Result {
     view! {
         <h1>"docs"</h1>
         <p>"src/app/docs.rs -> /docs"</p>
