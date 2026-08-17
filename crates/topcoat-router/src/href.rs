@@ -10,7 +10,10 @@ use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
 use crate::{Path, PathSegment, PathSegments};
 
+/// The destination an [`href`] points at, resolved to the route [`Path`] the
+/// URL is built from.
 pub trait HrefTarget {
+    /// Returns the route path the URL is built from.
     fn path<'cx>(&self, cx: &'cx Cx) -> &'cx Path;
 }
 
@@ -20,16 +23,31 @@ impl HrefTarget for &'static Path {
     }
 }
 
+/// A path literal, parsed with [`Path::new`].
+///
+/// # Panics
+///
+/// Resolving panics if the string is not a well-formed path.
 impl HrefTarget for &'static str {
     fn path<'cx>(&self, cx: &'cx Cx) -> &'cx Path {
         HrefTarget::path(&Path::new(self), cx)
     }
 }
 
+/// A value for one path parameter, named after the parameter it fills.
+///
+/// The `path_param!` macro implements this trait for the types it declares.
+/// An [`href`] writes each provided value into the path segment whose
+/// parameter carries the same name.
 pub trait HrefParam {
+    /// What the parameter renders as in the URL: one segment for a regular
+    /// parameter, the `/`-joined segments for a catch-all.
     type Value: Display + ?Sized;
 
+    /// The name of the path parameter this value fills.
     fn name(&self) -> &str;
+
+    /// The value written into the URL in the parameter's place.
     fn value(&self) -> &Self::Value;
 }
 
@@ -48,7 +66,16 @@ where
     }
 }
 
+/// The path parameters of an [`href`]: a tuple of up to eight [`HrefParam`]
+/// values, in the order the path declares its parameters.
 pub trait HrefParams {
+    /// Writes `path` into `out` with every parameter filled in.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the values do not line up with the path's parameters: a name
+    /// mismatch, a value the path declares no parameter for, or a parameter
+    /// no value fills.
     fn assign(&self, path: &Path, out: &mut String);
 }
 
@@ -145,7 +172,15 @@ fn write_remaining(segments: PathSegments<'_>, path: &Path, out: &mut String) {
     }
 }
 
+/// The query of an [`href`]: a tuple of up to eight [`Serialize`] items,
+/// collected by [`Href::query`].
 pub trait HrefQueries {
+    /// Appends the items, serialized and concatenated into one query string,
+    /// to the URL in `out`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an item does not serialize to a URL query string.
     fn assign(&self, out: &mut String);
 }
 
@@ -200,6 +235,46 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
     true
 }
 
+/// Builds the URL for a route.
+///
+/// `target` is what the URL points at: a route handler, or a path given as a
+/// [`Path`] or a string. A handler resolves to the path it is mounted at on
+/// the router serving the request.
+///
+/// `params` fills the path's parameters with `path_param!` values named after
+/// them, one per parameter in the path's order; a path without parameters
+/// takes `()`.
+///
+/// The returned [`Href`] optionally takes on query items and a fragment, and
+/// resolves into the URL string when used in a view, or explicitly with
+/// [`resolve`](Href::resolve):
+///
+/// ```
+/// use serde::Serialize;
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{href, page, path_param},
+///     view::view,
+/// };
+///
+/// path_param!(post_id: u64);
+///
+/// #[derive(Serialize)]
+/// struct Pagination {
+///     page: u32,
+/// }
+///
+/// #[page("/posts")]
+/// async fn posts(cx: &Cx) -> Result {
+///     let comments = href("/posts/{post_id}", (PostId(5),))
+///         .query(Pagination { page: 2 })
+///         .fragment("comments");
+///     view! {
+///         <a href=(comments)>"Comments of the fifth post"</a>
+///     }
+/// }
+/// ```
 pub fn href<T, P>(target: T, params: P) -> Href<T, P, (), &'static str>
 where
     T: HrefTarget,
@@ -214,6 +289,12 @@ where
     }
 }
 
+/// A URL being built by [`href`].
+///
+/// [`query`](Self::query) adds query items, [`fragment`](Self::fragment) sets
+/// the fragment, and [`relative`](Self::relative), [`absolute`](Self::absolute),
+/// and [`form`](Self::form) choose the URL's form. The URL renders by using
+/// the value in a view, or by calling [`resolve`](Self::resolve).
 pub struct Href<T, P, Q, F> {
     target: T,
     params: P,
@@ -306,6 +387,15 @@ where
     Q: HrefQueries,
     F: Display,
 {
+    /// Resolves the URL into its final string.
+    ///
+    /// The URL renders in the [`UrlForm`] set on this href, or the form
+    /// registered on `cx` when none is set.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parameters do not line up with the target's path, or a
+    /// query item does not serialize to a URL query string.
     pub fn resolve(self, cx: &Cx) -> String {
         let mut buf = String::new();
         match self.url_form.unwrap_or_else(|| url_form(cx)) {
