@@ -363,6 +363,7 @@ where
 ///
 ///     Ok(see_other(&href!(post, PostId(*post_id)).resolve(cx)))
 /// }
+/// # fn main() {}
 /// ```
 ///
 /// The macro is a thin wrapper around the [`href`] function, which takes the
