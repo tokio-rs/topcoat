@@ -375,8 +375,8 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 /// }
 /// ```
 ///
-/// The [`href!`](macro@crate::href) macro builds the same URL with the parameters listed as
-/// plain arguments instead of a tuple.
+/// The [`href!`](macro@crate::href) macro builds the same URL with the
+/// parameters listed as plain arguments instead of a tuple.
 pub fn href<T, P>(target: T, params: P) -> Href<T, P, (), &'static str>
 where
     T: HrefTarget,
