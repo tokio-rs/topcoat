@@ -1,6 +1,7 @@
 use topcoat::{
     Result,
-    router::{Body, Router, route, to_bytes},
+    context::Cx,
+    router::{Body, Router, href, route, to_bytes},
 };
 
 /// Dispatches a request with the given method through the router and returns
@@ -43,6 +44,14 @@ async fn mixed_rest() -> Result<&'static str> {
     Ok("rest")
 }
 
+// A route linking to itself: the marker stays reachable from the route's own
+// body, next to a binding of the same name shadowing it.
+#[route(GET "/self-linked")]
+async fn self_linked(cx: &Cx) -> Result<String> {
+    let self_linked = "self-linked";
+    Ok(format!("{self_linked}: {}", href!(self_linked).resolve(cx)))
+}
+
 #[tokio::test]
 async fn a_single_method_serves_only_that_method() {
     let router = Router::builder().route(one).build();
@@ -64,6 +73,15 @@ async fn a_star_serves_every_method() {
     for method in ["GET", "POST", "PUT", "DELETE", "PATCH", "PURGE"] {
         assert_eq!(send(&router, method, "/any").await, (200, "any".into()));
     }
+}
+
+#[tokio::test]
+async fn a_route_links_to_itself() {
+    let router = Router::builder().route(self_linked).build();
+    assert_eq!(
+        send(&router, "GET", "/self-linked").await,
+        (200, "self-linked: /self-linked".into())
+    );
 }
 
 #[tokio::test]

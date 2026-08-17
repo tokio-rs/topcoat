@@ -201,8 +201,16 @@ impl ToTokens for Route {
         };
 
         // href! resolves the marker to the URL path it is served at, through
-        // the router that dispatched the current request.
+        // the router that dispatched the current request. It names the marker
+        // as a type, so the marker is constructed through `Default`.
         let href_target = quote! {
+            impl ::core::default::Default for #ident {
+                #[inline]
+                fn default() -> Self {
+                    Self
+                }
+            }
+
             impl #topcoat_router::HrefTarget for #ident {
                 fn path<'cx>(&self, cx: &'cx #topcoat_context::Cx) -> &'cx #topcoat_router::Path {
                     match #topcoat_router::route_endpoint(cx, *ID) {

@@ -242,6 +242,10 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 /// it stays in sync when the route moves. A [`Path`] or a plain path string
 /// works as well.
 ///
+/// Inside a handler's own body its name refers to the handler function, so a
+/// handler linking to itself names its marker as a type, e.g. `posts {}`, or
+/// uses the [`href!`] macro, which does that on its own.
+///
 /// `params` fills in the path's parameters: one `path_param!` value per
 /// parameter, in the order the path declares them, passed as a tuple. A path
 /// without parameters takes `()`.
@@ -299,8 +303,10 @@ where
 ///
 /// The first argument is the route handler the URL should be pointing to.
 /// The URL is built from the path the handler is mounted at, so it stays in
-/// sync when the route moves. A [`Path`] or a plain path string works as
-/// well.
+/// sync when the route moves. A handler links to itself as well, so a page
+/// can point at its own path. A [`Path`] or a plain path string works too,
+/// but a bare path always names a handler, so a [`Path`] held in a constant
+/// goes through the [`href`] function instead.
 ///
 /// Every further argument fills in one of the path's parameters, with one
 /// `path_param!` value per parameter in the order the path declares them, so
@@ -345,7 +351,7 @@ where
 ///     let post_id = path_param::<PostId>(cx)?;
 ///
 ///     view! {
-///         <form method="post" action=(href!(publish, PostId(post_id)))>
+///         <form method="post" action=(href!(publish, PostId(*post_id)))>
 ///             <button>"Publish"</button>
 ///         </form>
 ///     }
@@ -363,6 +369,16 @@ where
 /// parameters as a tuple instead.
 #[macro_export]
 macro_rules! href {
+    // A bare path names the marker a `#[page]` or `#[route]` expands to, and is
+    // resolved as a type: inside a handler's own body the re-emitted function
+    // shadows the marker in the value namespace, so only the type namespace
+    // reaches it. Every other target is an expression.
+    ( $( $target:ident )::+ $(, $param:expr)* $(,)? ) => {
+        $crate::href(
+            <$($target)::+ as ::core::default::Default>::default(),
+            ($($param,)*),
+        )
+    };
     ( $target:expr $(, $param:expr)* $(,)? ) => {
         $crate::href($target, ($($param,)*))
     };

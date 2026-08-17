@@ -2,7 +2,7 @@ use serde::Deserialize;
 use topcoat::{
     Result,
     context::Cx,
-    router::{Body, Router, content::Form, page, request::uri, to_bytes},
+    router::{Body, Router, content::Form, href, page, request::uri, to_bytes},
     view::view,
 };
 
@@ -54,6 +54,14 @@ async fn whoami(cx: &Cx) -> Result {
 async fn shadowed() -> Result {
     let shadowed = "shadowed";
     view! { <p>(shadowed)</p> }
+}
+
+// A page linking to itself: the marker stays reachable from the page's own
+// body, next to a binding of the same name shadowing it.
+#[page("/self-linked")]
+async fn self_linked() -> Result {
+    let self_linked = "self-linked";
+    view! { <a href=(href!(self_linked))>(self_linked)</a> }
 }
 
 // Pages used as components: called like any component inside `view!`, with a
@@ -146,6 +154,14 @@ async fn a_binding_shadows_the_page_marker() {
     let (status, body) = send(&router, "/shadowed").await;
     assert_eq!(status, 200);
     assert_eq!(body, "<p>shadowed</p>");
+}
+
+#[tokio::test]
+async fn a_page_links_to_itself() {
+    let router = Router::builder().page(self_linked).build();
+    let (status, body) = send(&router, "/self-linked").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "<a href=\"/self-linked\">self-linked</a>");
 }
 
 #[tokio::test]
