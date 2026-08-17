@@ -6,6 +6,7 @@ use topcoat_core::{
     context::Cx,
     url_form::{UrlForm, url_form},
 };
+use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
 use crate::{Path, PathSegment, PathSegments};
 
@@ -208,6 +209,7 @@ where
         target,
         params,
         queries: (),
+        url_form: None,
         fragment: None,
     }
 }
@@ -216,6 +218,7 @@ pub struct Href<T, P, Q, F> {
     target: T,
     params: P,
     queries: Q,
+    url_form: Option<UrlForm>,
     fragment: Option<F>,
 }
 
@@ -235,6 +238,7 @@ macro_rules! impl_href_query_methods {
                     target: self.target,
                     params: self.params,
                     queries: ($($ty,)* query,),
+                    url_form: self.url_form,
                     fragment: self.fragment,
                 }
             }
@@ -261,8 +265,37 @@ impl<T, P, Q, F> Href<T, P, Q, F> {
             target: self.target,
             params: self.params,
             queries: self.queries,
+            url_form: self.url_form,
             fragment: Some(fragment),
         }
+    }
+
+    /// Renders the URL relative to the site root, like `/posts/42`.
+    ///
+    /// This is a shorthand for [`form`](Self::form) with
+    /// [`UrlForm::Relative`].
+    pub fn relative(self) -> Self {
+        self.form(UrlForm::Relative)
+    }
+
+    /// Renders the URL with its scheme and host, like
+    /// `https://example.com/posts/42`.
+    ///
+    /// This is a shorthand for [`form`](Self::form) with
+    /// [`UrlForm::Absolute`].
+    pub fn absolute(self) -> Self {
+        self.form(UrlForm::Absolute)
+    }
+
+    /// Sets the [`UrlForm`] the URL renders in, replacing any form set
+    /// before.
+    ///
+    /// Without a form set, the URL renders in the form [registered on the
+    /// context](url_form) it resolves against: relative unless an enclosing
+    /// scope, like a mail renderer, registered the absolute form.
+    pub fn form(mut self, url_form: UrlForm) -> Self {
+        self.url_form = Some(url_form);
+        self
     }
 }
 
@@ -275,7 +308,7 @@ where
 {
     pub fn resolve(self, cx: &Cx) -> String {
         let mut buf = String::new();
-        match url_form(cx) {
+        match self.url_form.unwrap_or_else(|| url_form(cx)) {
             UrlForm::Absolute => buf += base_url(cx).as_str(),
             UrlForm::Relative => {}
         }
@@ -288,6 +321,37 @@ where
         }
 
         buf
+    }
+}
+
+/// An href used in node position renders as the URL it resolves to.
+impl<T, P, Q, F> NodeViewParts for Href<T, P, Q, F>
+where
+    T: HrefTarget,
+    P: HrefParams,
+    Q: HrefQueries,
+    F: Display,
+{
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_string(self.resolve(cx));
+    }
+}
+
+/// An href used in attribute value position renders as the URL it resolves
+/// to, e.g. `href=(href(...))`.
+impl<T, P, Q, F> AttributeValueViewParts for Href<T, P, Q, F>
+where
+    T: HrefTarget,
+    P: HrefParams,
+    Q: HrefQueries,
+    F: Display,
+{
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_string(self.resolve(cx));
     }
 }
 
@@ -411,6 +475,24 @@ mod tests {
     #[test]
     fn percent_encodes_query_values() {
         assert_eq!(assign_queries(([("tag", "a b&c")],)), "?tag=a+b%26c");
+    }
+
+    #[test]
+    fn resolves_a_relative_url_with_query_and_fragment() {
+        let url = href("/users/{id}", (Param("id", "42"),))
+            .query([("page", "2")])
+            .fragment("bio")
+            .resolve(&Cx::default());
+
+        assert_eq!(url, "/users/42?page=2#bio");
+    }
+
+    #[test]
+    fn a_set_form_overrides_the_context_form() {
+        let cx = Cx::default().with(UrlForm::Absolute);
+        let url = href("/users", ()).relative().resolve(&cx);
+
+        assert_eq!(url, "/users");
     }
 
     #[test]
