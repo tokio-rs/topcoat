@@ -155,9 +155,46 @@ A bare `error = bad_request` includes the zero-based failing segment index. For 
 
 An unparsed catch-all accepts any `IntoIterator` whose items implement `AsRef<str>`. For example, `path_param!(pub *doc_path)` accepts `DocPath(["guide", "start"])` and defaults to `DocPath<Vec<String>>` in type positions.
 
+# Building URLs
+
+The declared type can also be used in combination with the [`href!`](macro.href.html) macro. It fills the parameter slot of the handler's path to construct a URL string:
+
+```rust
+# use topcoat::{Result, router::{href, page, path_param}, view::view};
+path_param!(post_id: u64);
+path_param!(*doc_path);
+
+#[page("/posts/{post_id}")]
+async fn post() -> Result {
+    view! { "post" }
+}
+
+#[page("/docs/{*doc_path}")]
+async fn document() -> Result {
+    view! { "doc" }
+}
+
+#[page("/")]
+async fn home() -> Result {
+    view! {
+        // /posts/1
+        <a href=(href!(post, PostId(1)))>"The first post"</a>
+        // /docs/guides/getting%20started
+        <a href=(href!(document, DocPath(["guides", "getting started"])))>"Guides"</a>
+    }
+}
+```
+
+Values are matched to the path by name, not by position alone, so filling `{post_id}` with anything but a `PostId` panics rather than building a wrong URL.
+
+Each segment is written with [`Display`](core::fmt::Display) and percent-encoded, so a value never reshapes the URL around it: `Slug("a/b")` fills its one segment as `a%2Fb`. A catch-all contributes one segment per element, so the separators between them are the only `/` it adds.
+
+[`href`](fn.href.html) takes the same values as a tuple, for a URL built outside a macro.
+
 # Requirements
 
 - Parsed segment types must implement [`FromStr`](core::str::FromStr).
+- Parsed segment types must implement [`Display`](core::fmt::Display) to be filled into an [`href`](fn.href.html).
 - The parsed segment type and its `<T as FromStr>::Err` must be `Send + Sync + 'static` so the result can be [memoized](../topcoat_core_macro/attr.memoize.html).
 - The parameter name in an explicit route must match the declaration.
 - A module can contain either one `path_param!` declaration or one manual `segment!` override.

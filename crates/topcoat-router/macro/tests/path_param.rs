@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{CatchAllSegments, HrefParam, Router, error::RouterErrorExt, page, path_param},
+    router::{CatchAllSegments, Router, error::RouterErrorExt, href, page, path_param},
     view::view,
 };
 
@@ -264,29 +264,27 @@ fn constructs_public_parameter_values() {
 }
 
 #[test]
-fn exposes_typed_param_as_href_param() {
-    let id = PublicId(42);
-    assert_eq!(id.name(), "public_id");
-    assert_eq!(id.value().to_string(), "42");
+fn fills_a_typed_param_into_an_href() {
+    let url = href("/posts/{public_id}", (PublicId(42),)).resolve(&Cx::default());
+    assert_eq!(url, "/posts/42");
 }
 
 #[test]
-fn exposes_unparsed_param_as_href_param() {
-    let slug = PublicSlug("getting started");
-    assert_eq!(slug.name(), "public_slug");
-    assert_eq!(slug.value(), "getting started");
+fn escapes_an_unparsed_param_filled_into_an_href() {
+    let url = href("/tags/{public_slug}", (PublicSlug("getting started"),)).resolve(&Cx::default());
+    assert_eq!(url, "/tags/getting%20started");
 }
 
 #[test]
-fn joins_typed_catch_all_href_param_segments() {
-    let number_path = NumberPath(vec![1, 2, 3]);
-    assert_eq!(number_path.name(), "number_path");
-    assert_eq!(number_path.value().to_string(), "1/2/3");
+fn fills_one_href_segment_per_typed_catch_all_element() {
+    let url = href("/archive/{*number_path}", (NumberPath(vec![1, 2, 3]),)).resolve(&Cx::default());
+    assert_eq!(url, "/archive/1/2/3");
 }
 
 #[test]
-fn joins_unparsed_catch_all_href_param_segments() {
-    let parts = PublicParts(["guides", "start"]);
-    assert_eq!(parts.name(), "public_parts");
-    assert_eq!(parts.value().to_string(), "guides/start");
+fn fills_one_href_segment_per_unparsed_catch_all_element() {
+    // A `/` inside an element is escaped, so it stays within its own segment
+    // instead of adding one.
+    let url = href("/docs/{*public_parts}", (PublicParts(["guides", "a/b"]),)).resolve(&Cx::default());
+    assert_eq!(url, "/docs/guides/a%2Fb");
 }

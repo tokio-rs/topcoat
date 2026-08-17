@@ -72,7 +72,7 @@ impl PathParam {
                 #visibility struct #ident<
                     T: ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>
                         = ::std::vec::Vec<::std::string::String>,
-                >(#[allow(dead_code)] #visibility T);
+                >(#visibility T);
             },
         }
     }
@@ -209,114 +209,68 @@ impl PathParam {
         }
     }
 
+    // The parameter pushes what it fills its path parameter with: one segment
+    // for a regular parameter, one per element for a catch-all, which spans as
+    // many segments as it holds elements. `HrefSegments` writes the separators
+    // and the escaping, so nothing here spells out a `/`.
     fn href_param_impl(&self) -> TokenStream {
         let ident = self.type_ident();
         let name = self.name_string();
-        let (impl_generics, where_clause, value_type, value_expr) =
-            match (self.is_catch_all(), self.param_type()) {
-                (false, Some(param_type)) => (
-                    quote! {},
-                    quote! { where #param_type: ::core::fmt::Display },
-                    quote! { #param_type },
-                    quote! { &self.0 },
-                ),
-                (true, Some(param_type)) => (
-                    quote! {},
-                    quote! { where #param_type: ::core::fmt::Display },
-                    quote! { Self },
-                    quote! { self },
-                ),
-                (false, None) => (
-                    quote! { <T: ::core::convert::AsRef<str>> },
-                    quote! {},
-                    quote! { str },
-                    quote! { ::core::convert::AsRef::<str>::as_ref(&self.0) },
-                ),
-                (true, None) => (
-                    quote! {
-                        <T: ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>>
-                    },
-                    quote! {
-                        where for<'__iter> &'__iter T:
-                            ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>
-                    },
-                    quote! { Self },
-                    quote! { self },
-                ),
-            };
+        let (impl_generics, where_clause, body) = match (self.is_catch_all(), self.param_type()) {
+            (false, Some(_)) => (
+                quote! {},
+                quote! {},
+                quote! { segments.push(&self.0); },
+            ),
+            (true, Some(_)) => (
+                quote! {},
+                quote! {},
+                quote! {
+                    for value in &self.0 {
+                        segments.push(value);
+                    }
+                },
+            ),
+            (false, None) => (
+                quote! { <T: ::core::convert::AsRef<str>> },
+                quote! {},
+                quote! {
+                    segments.push(::core::convert::AsRef::<str>::as_ref(&self.0));
+                },
+            ),
+            (true, None) => (
+                quote! {
+                    <T: ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>>
+                },
+                quote! {
+                    where for<'__iter> &'__iter T:
+                        ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>
+                },
+                quote! {
+                    for segment in &self.0 {
+                        segments.push(::core::convert::AsRef::<str>::as_ref(&segment));
+                    }
+                },
+            ),
+        };
         let type_generics = self.param_type().is_none().then(|| quote! { <T> });
-        let display_impl = self.href_display_impl();
 
         quote! {
-            #display_impl
-
             impl #impl_generics #topcoat_router::HrefParam
                 for #ident #type_generics #where_clause
             {
-                type Value = #value_type;
-
                 fn name(&self) -> &str {
                     #name
                 }
 
-                fn value(&self) -> &Self::Value {
-                    #value_expr
-                }
-            }
-        }
-    }
-
-    // A catch-all fills several segments at once, so the parameter itself is
-    // the href value and displays as its segments joined by `/`.
-    fn href_display_impl(&self) -> Option<TokenStream> {
-        if !self.is_catch_all() {
-            return None;
-        }
-
-        let ident = self.type_ident();
-        let Some(param_type) = self.param_type() else {
-            return Some(quote! {
-                impl<T: ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>>
-                    ::core::fmt::Display for #ident<T>
-                where
-                    for<'__iter> &'__iter T:
-                        ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>,
-                {
-                    fn fmt(
-                        &self,
-                        f: &mut ::core::fmt::Formatter<'_>,
-                    ) -> ::core::fmt::Result {
-                        for (index, segment) in (&self.0).into_iter().enumerate() {
-                            if index > 0 {
-                                f.write_str("/")?;
-                            }
-                            f.write_str(::core::convert::AsRef::<str>::as_ref(&segment))?;
-                        }
-                        ::core::result::Result::Ok(())
-                    }
-                }
-            });
-        };
-
-        Some(quote! {
-            impl ::core::fmt::Display for #ident
-            where
-                #param_type: ::core::fmt::Display,
-            {
-                fn fmt(
+                fn segments(
                     &self,
-                    f: &mut ::core::fmt::Formatter<'_>,
-                ) -> ::core::fmt::Result {
-                    for (index, value) in self.0.iter().enumerate() {
-                        if index > 0 {
-                            f.write_str("/")?;
-                        }
-                        ::core::fmt::Display::fmt(value, f)?;
-                    }
-                    ::core::result::Result::Ok(())
+                    segments: &mut #topcoat_router::HrefSegments<'_>,
+                ) {
+                    #body
                 }
             }
-        })
+        }
     }
 
     fn segment(&self) -> TokenStream {
