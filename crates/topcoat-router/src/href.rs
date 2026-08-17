@@ -1,5 +1,6 @@
-use std::fmt::{Display, Write};
+use std::fmt::{self, Display, Write};
 
+use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 use serde::Serialize;
 use topcoat_core::{
     base_url::base_url,
@@ -324,13 +325,13 @@ where
 ///     Result,
 ///     context::Cx,
 ///     router::{
-///         error::{SeeOther, see_other},
+///         error::{SeeOther, bad_request, see_other},
 ///         href, page, path_param, route,
 ///     },
 ///     view::view,
 /// };
 ///
-/// path_param!(post_id: u64);
+/// path_param!(post_id: u64, error = bad_request);
 ///
 /// #[derive(Serialize)]
 /// struct Pagination {
@@ -363,7 +364,6 @@ where
 ///
 ///     Ok(see_other(&href!(post, PostId(*post_id)).resolve(cx)))
 /// }
-/// # fn main() {}
 /// ```
 ///
 /// The macro is a thin wrapper around the [`href`] function, which takes the
