@@ -355,7 +355,7 @@ where
 /// async fn publish(cx: &Cx) -> Result<SeeOther> {
 ///     let post_id = path_param::<PostId>(cx)?;
 ///
-///     Ok(see_other(&href!(post, PostId(post_id)).resolve(cx)))
+///     Ok(see_other(&href!(post, PostId(*post_id)).resolve(cx)))
 /// }
 /// ```
 ///
