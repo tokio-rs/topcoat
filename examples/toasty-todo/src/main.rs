@@ -139,7 +139,7 @@ async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<SeeOther> {
     }
 
     // Post/Redirect/Get, so a reload does not submit the form again.
-    Ok(see_other(&href!(home).resolve(cx)))
+    Ok(see_other(href!(home).resolve(cx)))
 }
 
 path_param!(todo_id: u64, error = bad_request);
@@ -153,12 +153,12 @@ async fn toggle(cx: &Cx) -> Result<SeeOther> {
 
     toasty::update!(todo { done }).exec(&mut db).await?;
 
-    Ok(see_other(&href!(home).resolve(cx)))
+    Ok(see_other(href!(home).resolve(cx)))
 }
 
 #[route(POST "/todos/{todo_id}/delete")]
 async fn delete(cx: &Cx) -> Result<SeeOther> {
     Todo::delete_by_id(&mut db(cx), *path_param::<TodoId>(cx)?).await?;
 
-    Ok(see_other(&href!(home).resolve(cx)))
+    Ok(see_other(href!(home).resolve(cx)))
 }

@@ -25,8 +25,8 @@ use crate::response::{IntoResponse, Response};
 /// ```
 #[must_use]
 #[track_caller]
-pub fn redirect(uri: &str) -> RedirectError {
-    RedirectError::new(StatusCode::TEMPORARY_REDIRECT, uri)
+pub fn redirect(uri: impl AsRef<str>) -> RedirectError {
+    RedirectError::new(StatusCode::TEMPORARY_REDIRECT, uri.as_ref())
 }
 
 /// Builds a permanent (HTTP 308) redirect to `uri`.
@@ -54,8 +54,8 @@ pub fn redirect(uri: &str) -> RedirectError {
 /// ```
 #[must_use]
 #[track_caller]
-pub fn redirect_permanent(uri: &str) -> RedirectError {
-    RedirectError::new(StatusCode::PERMANENT_REDIRECT, uri)
+pub fn redirect_permanent(uri: impl AsRef<str>) -> RedirectError {
+    RedirectError::new(StatusCode::PERMANENT_REDIRECT, uri.as_ref())
 }
 
 /// A redirect response carried as the `Err` variant of a handler `Result`.
@@ -131,8 +131,8 @@ impl IntoResponse for RedirectError {
 /// ```
 #[must_use]
 #[track_caller]
-pub fn see_other(uri: &str) -> SeeOther {
-    SeeOther::new(uri)
+pub fn see_other(uri: impl AsRef<str>) -> SeeOther {
+    SeeOther::new(uri.as_ref())
 }
 
 /// A "see other" (HTTP 303) redirect response.

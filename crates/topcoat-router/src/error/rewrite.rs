@@ -46,9 +46,9 @@ pub(crate) const REWRITE_LIMIT: usize = 8;
 /// ```
 #[must_use]
 #[track_caller]
-pub fn rewrite(path: &str, body: impl Into<Body>) -> RewriteError {
+pub fn rewrite(path: impl AsRef<str>, body: impl Into<Body>) -> RewriteError {
     RewriteError {
-        path_and_query: PathAndQuery::try_from(path)
+        path_and_query: PathAndQuery::try_from(path.as_ref())
             .expect("rewrite path is not a valid uri path and query"),
         body: Mutex::new(body.into()),
     }

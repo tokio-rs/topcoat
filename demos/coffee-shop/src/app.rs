@@ -192,5 +192,5 @@ async fn sign_in(cx: &Cx, Form(form): Form<SignIn>) -> Result<SeeOther> {
     }
 
     // Post/Redirect/Get, so a reload does not submit the form again.
-    Ok(see_other(&href!(page).resolve(cx)))
+    Ok(see_other(href!(page).resolve(cx)))
 }

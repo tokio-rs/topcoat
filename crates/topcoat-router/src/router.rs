@@ -737,7 +737,7 @@ mod tests {
                 .as_str()
                 .parse()
                 .unwrap();
-            Err(rewrite(&format!("/step/{}", step + 1), Body::empty()).into())
+            Err(rewrite(format!("/step/{}", step + 1), Body::empty()).into())
         })
     }
 

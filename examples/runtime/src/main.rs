@@ -23,7 +23,7 @@ async fn main() {
 
 #[page]
 async fn page(cx: &Cx) -> Result {
-    Err(redirect(&href!(counter::page).resolve(cx)).into())
+    Err(redirect(href!(counter::page).resolve(cx)).into())
 }
 
 #[layout]

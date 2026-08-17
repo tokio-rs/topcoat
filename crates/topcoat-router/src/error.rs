@@ -138,7 +138,7 @@ pub trait RouterErrorExt {
     ///
     /// Panics if `uri` is not a valid `Location` header value.
     #[track_caller]
-    fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError>;
+    fn ok_or_redirect(self, uri: impl AsRef<str>) -> Result<Self::T, RedirectError>;
 
     /// Returns `Ok(value)` if present, otherwise a permanent redirect to `uri`.
     ///
@@ -151,7 +151,7 @@ pub trait RouterErrorExt {
     ///
     /// Panics if `uri` is not a valid `Location` header value.
     #[track_caller]
-    fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError>;
+    fn ok_or_redirect_permanent(self, uri: impl AsRef<str>) -> Result<Self::T, RedirectError>;
 
     /// Returns `Ok(value)` if present, otherwise a not-found response.
     ///
@@ -187,7 +187,7 @@ impl<T> RouterErrorExt for Option<T> {
     type T = T;
 
     #[track_caller]
-    fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError> {
+    fn ok_or_redirect(self, uri: impl AsRef<str>) -> Result<Self::T, RedirectError> {
         match self {
             Some(value) => Ok(value),
             None => Err(redirect(uri)),
@@ -195,7 +195,7 @@ impl<T> RouterErrorExt for Option<T> {
     }
 
     #[track_caller]
-    fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError> {
+    fn ok_or_redirect_permanent(self, uri: impl AsRef<str>) -> Result<Self::T, RedirectError> {
         match self {
             Some(value) => Ok(value),
             None => Err(redirect_permanent(uri)),
@@ -235,7 +235,7 @@ impl<T, E> RouterErrorExt for Result<T, E> {
     type T = T;
 
     #[track_caller]
-    fn ok_or_redirect(self, uri: &str) -> Result<Self::T, RedirectError> {
+    fn ok_or_redirect(self, uri: impl AsRef<str>) -> Result<Self::T, RedirectError> {
         match self {
             Ok(value) => Ok(value),
             Err(_) => Err(redirect(uri)),
@@ -243,7 +243,7 @@ impl<T, E> RouterErrorExt for Result<T, E> {
     }
 
     #[track_caller]
-    fn ok_or_redirect_permanent(self, uri: &str) -> Result<Self::T, RedirectError> {
+    fn ok_or_redirect_permanent(self, uri: impl AsRef<str>) -> Result<Self::T, RedirectError> {
         match self {
             Ok(value) => Ok(value),
             Err(_) => Err(redirect_permanent(uri)),

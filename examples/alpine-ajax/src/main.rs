@@ -85,5 +85,5 @@ async fn increment(cx: &Cx) -> Result<Response> {
     }
 
     // Without JavaScript, use Post/Redirect/Get and render the complete page.
-    see_other(&href!(home).resolve(cx)).into_response(cx)
+    see_other(href!(home).resolve(cx)).into_response(cx)
 }

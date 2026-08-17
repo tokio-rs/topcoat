@@ -113,7 +113,7 @@ async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> Result<SeeOt
 
     send(cx, mail).await?;
 
-    Ok(see_other(&href!(sent).resolve(cx)))
+    Ok(see_other(href!(sent).resolve(cx)))
 }
 
 #[page("/sent")]
