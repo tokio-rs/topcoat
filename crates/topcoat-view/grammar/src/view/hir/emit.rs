@@ -1,6 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{TokenStreamExt, format_ident, quote, quote_spanned};
-use syn::Ident;
+use syn::{Expr, Ident, Pat, Token};
 use topcoat_core_grammar::paths::topcoat_view;
 
 /// HIR nodes that emit themselves into the two phases of an [`Emitter`].
@@ -104,5 +104,171 @@ impl Emitter {
                 #burst
             })
         }}
+    }
+
+    /// Hoists `Option` cells for `bindings` so a joined `if`/`match` arm can
+    /// move them into its future.
+    ///
+    /// Pattern bindings die when the arm returns the future that captures
+    /// them. The cells live in the enclosing hoist, the arm stashes each
+    /// binding into one, and the future's prelude takes them back out, so the
+    /// coroutine owns them for as long as it runs.
+    ///
+    /// Returns the arm-body stash assignments and the prelude that rebinds
+    /// them inside the future.
+    pub(super) fn stash_bindings(&mut self, bindings: &[Binding]) -> (TokenStream, TokenStream) {
+        let mut stash = TokenStream::new();
+        let mut prelude = TokenStream::new();
+        for binding in bindings {
+            let temp = self.fresh_ident();
+            self.hoist(quote! {
+                let mut #temp = ::core::option::Option::None;
+            });
+            let ident = &binding.ident;
+            let mutability = &binding.mutability;
+            stash.append_all(quote! {
+                #temp = ::core::option::Option::Some(#ident);
+            });
+            prelude.append_all(quote! {
+                let #mutability #ident = #temp.take().unwrap();
+            });
+        }
+        (stash, prelude)
+    }
+}
+
+/// A named binding introduced by an `if let` condition or `match` arm pattern.
+pub(crate) struct Binding {
+    ident: Ident,
+    mutability: Option<Token![mut]>,
+}
+
+/// Bindings introduced by `if let` / let-chain conditions.
+pub(crate) fn condition_bindings(expr: &Expr) -> Vec<Binding> {
+    let mut bindings = Vec::new();
+    collect_condition_bindings(expr, &mut bindings);
+    bindings
+}
+
+/// Bindings introduced by a `match` arm pattern.
+pub(crate) fn pattern_bindings(pat: &Pat) -> Vec<Binding> {
+    let mut bindings = Vec::new();
+    collect_pat_bindings(pat, &mut bindings);
+    bindings
+}
+
+fn collect_condition_bindings(expr: &Expr, bindings: &mut Vec<Binding>) {
+    match expr {
+        Expr::Let(expr) => collect_pat_bindings(&expr.pat, bindings),
+        Expr::Binary(expr) => {
+            collect_condition_bindings(&expr.left, bindings);
+            collect_condition_bindings(&expr.right, bindings);
+        }
+        Expr::Paren(expr) => collect_condition_bindings(&expr.expr, bindings),
+        Expr::Group(expr) => collect_condition_bindings(&expr.expr, bindings),
+        _ => {}
+    }
+}
+
+fn collect_pat_bindings(pat: &Pat, bindings: &mut Vec<Binding>) {
+    match pat {
+        Pat::Ident(pat) => {
+            if is_binding_ident(pat) && bindings.iter().all(|binding| binding.ident != pat.ident) {
+                bindings.push(Binding {
+                    ident: pat.ident.clone(),
+                    mutability: pat.mutability,
+                });
+            }
+            if let Some((_, subpat)) = &pat.subpat {
+                collect_pat_bindings(subpat, bindings);
+            }
+        }
+        Pat::Or(pat) => {
+            for case in &pat.cases {
+                collect_pat_bindings(case, bindings);
+            }
+        }
+        Pat::Tuple(pat) => {
+            for elem in &pat.elems {
+                collect_pat_bindings(elem, bindings);
+            }
+        }
+        Pat::TupleStruct(pat) => {
+            for elem in &pat.elems {
+                collect_pat_bindings(elem, bindings);
+            }
+        }
+        Pat::Struct(pat) => {
+            for field in &pat.fields {
+                collect_pat_bindings(&field.pat, bindings);
+            }
+        }
+        Pat::Slice(pat) => {
+            for elem in &pat.elems {
+                collect_pat_bindings(elem, bindings);
+            }
+        }
+        Pat::Reference(pat) => collect_pat_bindings(&pat.pat, bindings),
+        Pat::Paren(pat) => collect_pat_bindings(&pat.pat, bindings),
+        Pat::Type(pat) => collect_pat_bindings(&pat.pat, bindings),
+        _ => {}
+    }
+}
+
+/// Whether this ident introduces a variable rather than naming a unit
+/// variant or constant.
+///
+/// A single uppercase ident in pattern position is almost always a path
+/// like `None` or `Status::First`'s `First`, not a binding. `ref`, `mut`,
+/// and `@` make the ident a binding regardless of case.
+fn is_binding_ident(pat: &syn::PatIdent) -> bool {
+    if pat.ident == "_" {
+        return false;
+    }
+    if pat.by_ref.is_some() || pat.mutability.is_some() || pat.subpat.is_some() {
+        return true;
+    }
+    !pat.ident.to_string().starts_with(char::is_uppercase)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn names(pat: &str) -> Vec<String> {
+        pattern_bindings(&syn::parse::Parser::parse_str(Pat::parse_single, pat).unwrap())
+            .into_iter()
+            .map(|binding| binding.ident.to_string())
+            .collect()
+    }
+
+    #[test]
+    fn pattern_bindings_collect_lowercase_idents() {
+        assert_eq!(names("Some(status)"), vec!["status"]);
+        assert_eq!(names("(a, mut b)"), vec!["a", "b"]);
+        assert_eq!(names("s @ Some(inner)"), vec!["s", "inner"]);
+    }
+
+    #[test]
+    fn pattern_bindings_skip_unit_variants() {
+        assert!(names("None").is_empty());
+        assert!(names("Status::First").is_empty());
+    }
+
+    #[test]
+    fn condition_bindings_collect_if_let_and_let_chains() {
+        let expr: Expr = syn::parse_quote!(let Some(status) = opt);
+        let names: Vec<_> = condition_bindings(&expr)
+            .into_iter()
+            .map(|binding| binding.ident.to_string())
+            .collect();
+        assert_eq!(names, vec!["status"]);
+
+        let expr: Expr = syn::parse_quote!(let Some(a) = x && let Some(b) = y);
+        let names: Vec<_> = condition_bindings(&expr)
+            .into_iter()
+            .map(|binding| binding.ident.to_string())
+            .collect();
+        assert_eq!(names, vec!["a", "b"]);
     }
 }

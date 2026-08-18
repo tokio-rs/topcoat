@@ -5,7 +5,7 @@ use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
     Scope,
-    emit::{Emit, Emitter},
+    emit::{Emit, Emitter, pattern_bindings},
 };
 
 /// A `match` whose arm bodies are lowered into nested scopes.
@@ -38,12 +38,29 @@ impl Emit for MatchExpr {
             // views, so the taken arm joins with the scope's other
             // components. Nested `Either`s unify the arms' future types.
             let arm_count = self.arms.len();
-            let arms = self.arms.iter().enumerate().map(|(index, arm)| {
-                let pat = &arm.pat;
-                let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
-                let body = nest_either(arm.body.emit_future(), index, arm_count);
-                quote! { #pat #guard => #body }
-            });
+            let arms: Vec<_> = self
+                .arms
+                .iter()
+                .enumerate()
+                .map(|(index, arm)| {
+                    let pat = &arm.pat;
+                    let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
+                    // Arm pattern bindings die when the arm returns; stash
+                    // them into the enclosing hoist and rebind them inside
+                    // the future.
+                    let (stash, prelude) = if arm.body.is_async() {
+                        emitter.stash_bindings(&pattern_bindings(pat))
+                    } else {
+                        (TokenStream::new(), TokenStream::new())
+                    };
+                    let body = nest_either(
+                        arm.body.emit_future_with_prelude(&prelude),
+                        index,
+                        arm_count,
+                    );
+                    quote! { #pat #guard => { #stash #body } }
+                })
+                .collect();
 
             emitter.hoist_future(
                 Span::call_site(),

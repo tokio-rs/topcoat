@@ -1,11 +1,11 @@
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Expr;
 use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
     Scope,
-    emit::{Emit, Emitter},
+    emit::{Emit, Emitter, condition_bindings},
 };
 
 /// An `if`/`else` whose branches are lowered into nested scopes.
@@ -38,7 +38,15 @@ impl Emit for IfElse {
             // In a joined position the branches yield futures instead of
             // views, so the taken branch joins with the scope's other
             // components. `Either` unifies the two future types.
-            let then_branch = then_branch.emit_future();
+            //
+            // `if let` pattern bindings die when the arm returns; stash them
+            // into the enclosing hoist and rebind them inside the future.
+            let (stash, prelude) = if then_branch.is_async() {
+                emitter.stash_bindings(&condition_bindings(expr))
+            } else {
+                (TokenStream::new(), TokenStream::new())
+            };
+            let then_branch = then_branch.emit_future_with_prelude(&prelude);
             let else_branch = else_branch.emit_future();
 
             emitter.hoist_future(
@@ -46,6 +54,7 @@ impl Emit for IfElse {
                 &ident,
                 &quote! {
                     if #expr {
+                        #stash
                         #topcoat_view::internal::Either::Left(#then_branch)
                     } else {
                         #topcoat_view::internal::Either::Right(#else_branch)

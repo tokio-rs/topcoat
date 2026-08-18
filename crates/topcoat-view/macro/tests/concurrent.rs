@@ -239,3 +239,125 @@ async fn concurrent_loop_interleaves_static_markup_in_order() {
     })
     .await;
 }
+
+#[derive(Clone, Copy)]
+enum Status {
+    First,
+    Second,
+}
+
+struct Obj {
+    name: String,
+    user_status: Option<Status>,
+    post_status: Option<Status>,
+}
+
+#[component]
+async fn badge(status: Status) -> Result {
+    let text = match status {
+        Status::First => "First",
+        Status::Second => "Second",
+    };
+    view! { <span>(text)</span> }
+}
+
+#[tokio::test]
+async fn joined_if_lets_can_pass_pattern_bindings_to_components() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let items = [Obj {
+        name: "a".into(),
+        user_status: Some(Status::First),
+        post_status: Some(Status::Second),
+    }];
+    let items: Vec<&Obj> = items.iter().collect();
+    let result: Result = view! {
+        <div>
+            for item in items {
+                <div>
+                    <span>(&item.name)</span>
+                    <div>
+                        if let Some(status) = item.user_status {
+                            badge(status: status)
+                        }
+                        if let Some(status) = item.post_status {
+                            badge(status: status)
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    };
+
+    assert_eq!(
+        result.unwrap().render(__cx),
+        "<div><div><span>a</span><div><span>First</span><span>Second</span></div></div></div>",
+    );
+}
+
+#[tokio::test]
+async fn joined_if_lets_can_borrow_non_copy_pattern_bindings() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let user = Some(String::from("Ada"));
+    let post = Some(String::from("Hi"));
+    let result: Result = view! {
+        if let Some(name) = user {
+            echo(text: &name)
+        }
+        if let Some(title) = post {
+            echo(text: &title)
+        }
+    };
+
+    assert_eq!(result.unwrap().render(__cx), "<b>Ada</b><b>Hi</b>");
+}
+
+#[tokio::test]
+async fn joined_match_can_pass_pattern_bindings_to_components() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let user = Some(Status::First);
+    let post = Some(Status::Second);
+    let result: Result = view! {
+        match user {
+            Some(status) => badge(status: status),
+            None => {
+
+            }
+        }
+        match post {
+            Some(status) => badge(status: status),
+            None => {
+
+            }
+        }
+    };
+
+    assert_eq!(
+        result.unwrap().render(__cx),
+        "<span>First</span><span>Second</span>",
+    );
+}
+
+#[tokio::test]
+async fn taken_if_let_branch_renders_concurrently_with_siblings() {
+    assert_concurrent(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let barrier = Barrier::new(2);
+        let label = Some("sometimes");
+        let result: Result = view! {
+            meet(barrier: &barrier, label: "always")
+            if let Some(label) = label {
+                meet(barrier: &barrier, label: label)
+            }
+        };
+
+        assert_eq!(
+            result.unwrap().render(__cx),
+            "<i>always</i><i>sometimes</i>"
+        );
+    })
+    .await;
+}

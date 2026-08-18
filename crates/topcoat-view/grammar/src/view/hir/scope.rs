@@ -83,9 +83,19 @@ impl Scope {
     ///
     /// The future borrows from its environment, so it must not outlive the
     /// enclosing block; for one that does, use
-    /// [`emit_owned_future`](Self::emit_owned_future).
+    /// [`emit_owned_future`](Self::emit_owned_future). Pattern bindings from
+    /// a joined `if let` or `match` arm are rebound through
+    /// [`emit_future_with_prelude`](Self::emit_future_with_prelude) so the
+    /// future owns them instead of borrowing values that die with the arm.
     pub(crate) fn emit_future(&self) -> TokenStream {
-        self.future(&quote! { async })
+        self.emit_future_with_prelude(&TokenStream::new())
+    }
+
+    /// Like [`emit_future`](Self::emit_future), with `prelude` statements run
+    /// inside the future before the view, so an arm can rebind stashed
+    /// pattern bindings as owned locals.
+    pub(crate) fn emit_future_with_prelude(&self, prelude: &TokenStream) -> TokenStream {
+        self.future(&quote! { async }, prelude)
     }
 
     /// Emits this scope as an expression yielding a future of the view that
@@ -93,14 +103,15 @@ impl Scope {
     /// expression is evaluated in, like one iteration's future outliving the
     /// iteration in a joined `for` loop.
     pub(crate) fn emit_owned_future(&self) -> TokenStream {
-        self.future(&quote! { async move })
+        self.future(&quote! { async move }, &TokenStream::new())
     }
 
-    fn future(&self, header: &TokenStream) -> TokenStream {
+    fn future(&self, header: &TokenStream, prelude: &TokenStream) -> TokenStream {
         let view = self.emit_view();
         if self.is_async() {
             quote! {
                 #header {
+                    #prelude
                     ::core::result::Result::<_, #topcoat_error::Error>::Ok(#view)
                 }
             }
@@ -426,6 +437,41 @@ mod tests {
         assert!(out.contains("Either :: Left"));
         assert!(out.contains("Either :: Right"));
         assert!(out.contains("try_join ! (__expr0 , __expr1)"));
+    }
+
+    #[test]
+    fn joined_if_let_stashes_pattern_bindings_into_the_future() {
+        let mut builder = ViewBuilder::new();
+        add_component(&mut builder, "sibling");
+        builder.if_else(
+            &syn::parse_quote!(let Some(status) = opt),
+            |then_branch, _| {
+                add_component(then_branch, "conditional");
+            },
+        );
+        let out = rendered(builder);
+        assert!(out.contains("let mut __expr2 = :: core :: option :: Option :: None"));
+        assert!(out.contains("Option :: Some (status)"));
+        assert!(out.contains("let status = __expr2 . take () . unwrap ()"));
+        assert!(out.contains("try_join ! (__expr0 , __expr1)"));
+    }
+
+    #[test]
+    fn joined_match_stashes_arm_pattern_bindings_into_the_future() {
+        let mut builder = ViewBuilder::new();
+        add_component(&mut builder, "sibling");
+        builder.match_expr(&syn::parse_quote!(opt), |arms| {
+            arms.arm(&syn::parse_quote!(Some(status)), None, |body| {
+                add_component(body, "a");
+            });
+            arms.arm(&syn::parse_quote!(None), None, |body| {
+                add_component(body, "b");
+            });
+        });
+        let out = rendered(builder);
+        assert!(out.contains("Option :: Some (status)"));
+        assert!(out.contains("let status = __expr2 . take () . unwrap ()"));
+        assert!(!out.contains("Option :: Some (None)"));
     }
 
     #[test]
