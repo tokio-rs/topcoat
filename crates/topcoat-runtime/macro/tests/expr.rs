@@ -5,8 +5,7 @@
 //! interface to the browser runtime: nothing maps it on the way out, so a
 //! rename on one side alone would fail only in the browser, at click time.
 
-use topcoat::runtime::procedure;
-use topcoat::{context::Cx, view::view};
+use topcoat::{context::Cx, runtime::procedure, view::view};
 
 #[tokio::test]
 async fn toggle_reaches_the_generated_javascript() {

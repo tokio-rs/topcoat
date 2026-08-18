@@ -1,5 +1,7 @@
-use syn::visit::{self, Visit};
-use syn::{ExprBlock, ExprIf};
+use syn::{
+    ExprBlock, ExprIf,
+    visit::{self, Visit},
+};
 
 #[derive(Default)]
 pub(super) struct ContainsAwait {
