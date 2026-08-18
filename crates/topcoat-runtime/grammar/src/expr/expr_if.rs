@@ -3,7 +3,7 @@ use quote::{ToTokens, quote};
 use syn::{Expr as SynExpr, ExprIf};
 use topcoat_core_grammar::paths::topcoat_runtime;
 
-use crate::expr::{Expr, contains_async::ContainsAwait, name_resolver::NameResolver};
+use crate::expr::{Expr, contains_await::ContainsAwait, name_resolver::NameResolver};
 
 impl Expr {
     /// Lowers `if cond { ... } else { ... }`. The JavaScript side is wrapped

@@ -1,6 +1,6 @@
 mod block;
 mod builtin_macro;
-mod contains_async;
+mod contains_await;
 mod expr_await;
 mod expr_binary;
 mod expr_block;

@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use syn::ExprBlock;
 
-use crate::expr::{Expr, contains_async::ContainsAwait, name_resolver::NameResolver};
+use crate::expr::{Expr, contains_await::ContainsAwait, name_resolver::NameResolver};
 
 impl Expr {
     pub(super) fn expr_block(
