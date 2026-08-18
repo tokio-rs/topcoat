@@ -145,8 +145,8 @@ mod tests {
 
     use super::*;
 
-    fn pattern_idents(pat: Pat) -> Vec<String> {
-        let bindings = Bindings::of_pattern(&pat);
+    fn pattern_idents(pat: &Pat) -> Vec<String> {
+        let bindings = Bindings::of_pattern(pat);
         bindings.idents().map(Ident::to_string).collect()
     }
 
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn collects_bindings_from_nested_patterns() {
         let pat = parse_pattern("Some((a, Obj { name, .. }, [b, ..], &mut c))");
-        assert_eq!(pattern_idents(pat), ["a", "name", "b", "c"]);
+        assert_eq!(pattern_idents(&pat), ["a", "name", "b", "c"]);
     }
 
     #[test]
@@ -176,19 +176,19 @@ mod tests {
     #[test]
     fn skips_uppercase_idents() {
         let pat = parse_pattern("(status, None, Ordering)");
-        assert_eq!(pattern_idents(pat), ["status"]);
+        assert_eq!(pattern_idents(&pat), ["status"]);
     }
 
     #[test]
     fn collects_an_at_binding_and_its_subpattern() {
         let pat = parse_pattern("whole @ Some(part)");
-        assert_eq!(pattern_idents(pat), ["whole", "part"]);
+        assert_eq!(pattern_idents(&pat), ["whole", "part"]);
     }
 
     #[test]
     fn deduplicates_across_or_alternatives() {
         let pat = parse_pattern("Ok(value) | Err(value)");
-        assert_eq!(pattern_idents(pat), ["value"]);
+        assert_eq!(pattern_idents(&pat), ["value"]);
     }
 
     #[test]
