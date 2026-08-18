@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.6.0...topcoat-router-v0.6.1) - 2026-08-18
+
+### Fixed
+
+- *(router)* rewrite through 'discover' routing ([#354](https://github.com/tokio-rs/topcoat/pull/354))
+
 ## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.5.0...topcoat-router-v0.6.0) - 2026-08-17
 
 ### Added
