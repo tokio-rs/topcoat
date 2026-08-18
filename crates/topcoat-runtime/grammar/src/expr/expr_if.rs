@@ -3,21 +3,27 @@ use quote::{ToTokens, quote};
 use syn::{Expr as SynExpr, ExprIf};
 use topcoat_core_grammar::paths::topcoat_runtime;
 
-use crate::expr::{Expr, name_resolver::NameResolver};
+use crate::expr::{Expr, contains_async::ContainsAwait, name_resolver::NameResolver};
 
 impl Expr {
     /// Lowers `if cond { ... } else { ... }`. The JavaScript side is wrapped
     /// in an IIFE so the same shape works in both expression and statement
-    /// position.
+    /// position. This expression can also hold async expressions.
     pub(super) fn expr_if(
         if_expr: &ExprIf,
         rust: &mut TokenStream,
         js: &mut String,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
-        js.push_str("(() => ");
+        let is_async = ContainsAwait::in_if(if_expr);
+        let predicate = if is_async {
+            "(await (async () => "
+        } else {
+            "(() => "
+        };
+        js.push_str(predicate);
         let rust_if = Self::expr_if_inner(if_expr, js, names)?;
-        js.push_str(")()");
+        js.push_str(if is_async { ")())" } else { ")()" });
         rust_if.to_tokens(rust);
         Ok(())
     }

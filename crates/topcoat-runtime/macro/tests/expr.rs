@@ -5,6 +5,7 @@
 //! interface to the browser runtime: nothing maps it on the way out, so a
 //! rename on one side alone would fail only in the browser, at click time.
 
+use topcoat::runtime::procedure;
 use topcoat::{context::Cx, view::view};
 
 #[tokio::test]
@@ -52,6 +53,59 @@ async fn push_str_reaches_the_generated_javascript_with_its_argument() {
     .render(cx);
 
     assert!(html.contains(".push_str("), "{html}");
+}
+
+#[procedure]
+async fn test_procedure(v: String) -> Result<String, std::convert::Infallible> {
+    Ok(v)
+}
+
+#[tokio::test]
+async fn procedure_call_inside_if_is_an_async_func() {
+    let cx = &Cx::default();
+    let html = view! {
+        cx =>
+        <button
+            @click=$(async |_e| {
+                if true {
+                    let _v = test_procedure("hello test".to_owned()).await;
+                }
+            })
+        >
+            "Test"
+        </button>
+    }
+    .unwrap()
+    .render(cx);
+
+    assert!(
+        html.contains("(await (async ()"),
+        "if block containing an await must be an async anonymous function: {html}"
+    );
+}
+
+#[tokio::test]
+async fn procedure_call_inside_block_is_an_async_func() {
+    let cx = &Cx::default();
+    let html = view! {
+        cx =>
+        <button
+            @click=$(async |_e| {
+                {
+                    let _v = test_procedure("hello test".to_owned()).await;
+                }
+            })
+        >
+            "Test"
+        </button>
+    }
+    .unwrap()
+    .render(cx);
+
+    assert!(
+        html.contains("(await (async ()"),
+        "block containing an await must be an async anonymous function: {html}"
+    );
 }
 
 /// `push_str` takes anything that dereferences to a string, so it accepts the
