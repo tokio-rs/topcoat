@@ -706,6 +706,14 @@ mod tests {
         Box::pin(async move { Err(rewrite("/x", Body::empty()).into()) })
     }
 
+    fn render_rewriting_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
+        Box::pin(async move { Err(rewrite("/x", Body::empty()).into()) })
+    }
+
+    fn layout_rewrites(_cx: &Cx, _slot: Result<View>) -> ViewFuture<'_> {
+        Box::pin(async move { Err(rewrite("/x", Body::empty()).into()) })
+    }
+
     fn rewrite_to_missing(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { Err(rewrite("/missing", Body::empty()).into()) })
     }
@@ -760,6 +768,52 @@ mod tests {
     fn a_rewrite_serves_the_new_path() {
         let router = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/old"), rewrite_to_x))
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/old");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"route");
+    }
+
+    #[test]
+    fn a_page_without_a_layout_can_rewrite() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(
+                Method::GET,
+                path("/old"),
+                render_rewriting_page,
+            ))
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/old");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"route");
+    }
+
+    #[test]
+    fn a_page_wrapped_by_a_layout_can_rewrite() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(
+                Method::GET,
+                path("/old"),
+                render_rewriting_page,
+            ))
+            .layout(LayoutFn::new(path("/"), layout_root))
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/old");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"route");
+    }
+
+    #[test]
+    fn a_layout_can_rewrite() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::GET, path("/old"), render_page))
+            .layout(LayoutFn::new(path("/"), layout_rewrites))
             .route(RouteFn::new(Method::GET, path("/x"), say_route))
             .build();
 
