@@ -4,7 +4,7 @@ use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::View;
 
 use crate::{
-    Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId, error::RewriteError,
+    Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId,
     response::IntoResponse,
 };
 
@@ -225,11 +225,7 @@ impl Route for PageWithLayouts {
             for layout in self.layouts.iter().rev() {
                 slot = layout.render(cx, slot).await;
             }
-
-            match slot {
-                Err(error) if error.downcast_ref::<RewriteError>().is_some() => Err(error),
-                slot => slot.into_response(cx),
-            }
+            slot?.into_response(cx)
         })
     }
 }
