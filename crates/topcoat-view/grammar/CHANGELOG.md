@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2](https://github.com/tokio-rs/topcoat/compare/topcoat-view-grammar-v0.6.1...topcoat-view-grammar-v0.6.2) - 2026-08-18
+
+### Fixed
+
+- *(view)* make control-flow futures own their pattern bindings ([#360](https://github.com/tokio-rs/topcoat/pull/360))
+
 ## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-grammar-v0.5.0...topcoat-view-grammar-v0.6.0) - 2026-08-17
 
 ### Added

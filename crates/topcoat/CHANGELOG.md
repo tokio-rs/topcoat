@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2](https://github.com/tokio-rs/topcoat/compare/v0.6.1...v0.6.2) - 2026-08-18
+
+### Added
+
+- *(router)* add support for mounting a topcoat router as an axum service
+
+### Fixed
+
+- *(view)* make control-flow futures own their pattern bindings ([#360](https://github.com/tokio-rs/topcoat/pull/360))
+
 ## [0.6.1](https://github.com/tokio-rs/topcoat/compare/v0.6.0...v0.6.1) - 2026-08-18
 
 ### Fixed
