@@ -3,7 +3,7 @@ use quote::quote;
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 use super::{
-    Node, StaticSegment,
+    Bindings, Node, StaticSegment,
     emit::{Emit, Emitter},
 };
 
@@ -78,37 +78,36 @@ impl Scope {
     }
 
     /// Emits this scope as an expression yielding a future of the view, for a
-    /// position joined with sibling futures in the block the expression is
-    /// evaluated in, like the branches of an `if`.
+    /// position joined with sibling futures, like the branches of an `if` or
+    /// the iterations of a `for` loop.
     ///
-    /// The future borrows from its environment, so it must not outlive the
-    /// enclosing block; for one that does, use
-    /// [`emit_owned_future`](Self::emit_owned_future).
-    pub(crate) fn emit_future(&self) -> TokenStream {
-        self.future(&quote! { async })
-    }
-
-    /// Emits this scope as an expression yielding a future of the view that
-    /// owns everything it captures, so it can outlive the block the
-    /// expression is evaluated in, like one iteration's future outliving the
-    /// iteration in a joined `for` loop.
-    pub(crate) fn emit_owned_future(&self) -> TokenStream {
-        self.future(&quote! { async move })
-    }
-
-    fn future(&self, header: &TokenStream) -> TokenStream {
+    /// The future borrows its environment, except for the values bound by
+    /// the enclosing pattern: those die with the branch or iteration that
+    /// produced them, so the future carries them in a `Capture` packed where
+    /// they are still alive and taken back apart inside the future.
+    pub(crate) fn emit_future(&self, bindings: &Bindings) -> TokenStream {
         let view = self.emit_view();
-        if self.is_async() {
-            quote! {
-                #header {
-                    ::core::result::Result::<_, #topcoat_error::Error>::Ok(#view)
-                }
-            }
-        } else {
+        if !self.is_async() {
             // Without components the view builds synchronously where the
             // expression is evaluated and only needs wrapping into a ready
             // future.
             quote! { #topcoat_view::internal::ready(#view) }
+        } else if bindings.is_empty() {
+            quote! {
+                async {
+                    ::core::result::Result::<_, #topcoat_error::Error>::Ok(#view)
+                }
+            }
+        } else {
+            let idents = bindings.idents();
+            let rebinds = bindings.rebinds();
+            quote! {{
+                let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
+                async {
+                    let (#(#rebinds,)*) = __captured.take();
+                    ::core::result::Result::<_, #topcoat_error::Error>::Ok(#view)
+                }
+            }}
         }
     }
 }
@@ -409,10 +408,65 @@ mod tests {
         });
         let out = rendered(builder);
         assert!(out.contains("try_join_all"));
-        // The iteration future owns its bindings, so it outlives the
+        // The iteration future carries the loop binding, so it outlives the
         // iteration; the single loop node then awaits inline.
-        assert!(out.contains("async move"));
+        assert!(out.contains("Capture ((x ,))"));
+        assert!(out.contains("let (x ,) = __captured . take ()"));
         assert!(out.contains(". await ?"));
+    }
+
+    #[test]
+    fn a_for_loop_body_borrows_everything_but_its_bindings() {
+        let mut builder = ViewBuilder::new();
+        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
+            add_component(body, "item");
+        });
+        let out = rendered(builder);
+        assert!(!out.contains("async move"));
+    }
+
+    #[test]
+    fn an_if_let_branch_in_a_joined_position_captures_its_bindings() {
+        let mut builder = ViewBuilder::new();
+        add_component(&mut builder, "sibling");
+        builder.if_else(
+            &syn::parse_quote!(let Some(status) = value),
+            |then_branch, _| {
+                add_component(then_branch, "conditional");
+            },
+        );
+        let out = rendered(builder);
+        assert!(out.contains("Capture ((status ,))"));
+        assert!(out.contains("let (status ,) = __captured . take ()"));
+    }
+
+    #[test]
+    fn a_branch_without_bindings_emits_no_capture() {
+        let mut builder = ViewBuilder::new();
+        add_component(&mut builder, "sibling");
+        builder.if_else(&syn::parse_quote!(cond), |then_branch, _| {
+            add_component(then_branch, "conditional");
+        });
+        let out = rendered(builder);
+        assert!(!out.contains("Capture"));
+    }
+
+    #[test]
+    fn match_arms_in_a_joined_position_capture_their_own_bindings() {
+        let mut builder = ViewBuilder::new();
+        add_component(&mut builder, "sibling");
+        builder.match_expr(&syn::parse_quote!(v), |arms| {
+            arms.arm(&syn::parse_quote!(Some(status)), None, |body| {
+                add_component(body, "a");
+            });
+            arms.arm(&syn::parse_quote!(None), None, |body| {
+                add_component(body, "b");
+            });
+        });
+        let out = rendered(builder);
+        assert!(out.contains("Capture ((status ,))"));
+        // The binding-free arm needs no capture.
+        assert_eq!(out.matches("Capture (").count(), 1);
     }
 
     #[test]

@@ -4,7 +4,7 @@ use syn::{Expr, Pat};
 use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
-    Scope,
+    Bindings, Scope,
     emit::{Emit, Emitter},
 };
 
@@ -37,11 +37,14 @@ impl Emit for MatchExpr {
             // In a joined position the arm bodies yield futures instead of
             // views, so the taken arm joins with the scope's other
             // components. Nested `Either`s unify the arms' future types.
+            // Each arm's future carries its pattern's bindings, which die
+            // with the arm it is created in.
             let arm_count = self.arms.len();
             let arms = self.arms.iter().enumerate().map(|(index, arm)| {
                 let pat = &arm.pat;
                 let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
-                let body = nest_either(arm.body.emit_future(), index, arm_count);
+                let body = arm.body.emit_future(&Bindings::of_pattern(pat));
+                let body = nest_either(body, index, arm_count);
                 quote! { #pat #guard => #body }
             });
 

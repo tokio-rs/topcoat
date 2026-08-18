@@ -4,7 +4,7 @@ use syn::{Expr, Pat};
 use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
-    Scope,
+    Bindings, Scope,
     emit::{Emit, Emitter},
 };
 
@@ -23,9 +23,10 @@ impl Emit for ForLoop {
         if body.is_async() {
             // A body that renders components yields one future per
             // iteration; joining them renders all iterations concurrently.
-            // The future owns its iteration's bindings, so it outlives the
-            // iteration that produced it.
-            let body = body.emit_owned_future();
+            // Each future carries its iteration's pattern bindings, which
+            // die with the iteration, and borrows the rest of its
+            // environment, so iterations share outer values.
+            let body = body.emit_future(&Bindings::of_pattern(pat));
             emitter.hoist_future(
                 Span::call_site(),
                 &ident,

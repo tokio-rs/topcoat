@@ -4,7 +4,7 @@ use syn::Expr;
 use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
-    Scope,
+    Bindings, Scope,
     emit::{Emit, Emitter},
 };
 
@@ -37,9 +37,11 @@ impl Emit for IfElse {
         } else {
             // In a joined position the branches yield futures instead of
             // views, so the taken branch joins with the scope's other
-            // components. `Either` unifies the two future types.
-            let then_branch = then_branch.emit_future();
-            let else_branch = else_branch.emit_future();
+            // components. `Either` unifies the two future types. The then
+            // future carries the bindings of the condition's `let` patterns,
+            // which die with the branch it is created in.
+            let then_branch = then_branch.emit_future(&Bindings::of_condition(expr));
+            let else_branch = else_branch.emit_future(&Bindings::empty());
 
             emitter.hoist_future(
                 Span::call_site(),

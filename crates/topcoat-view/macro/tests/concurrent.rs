@@ -58,13 +58,10 @@ async fn loop_iterations_render_concurrently_in_iteration_order() {
         let cx = empty_cx();
         let __cx = &cx;
         let barrier = Barrier::new(3);
-        // An iteration's future takes ownership of what it captures, so
-        // values shared by all iterations are borrowed up front.
-        let barrier = &barrier;
         let result: Result = view! {
             <ul>
                 for label in ["a", "b", "c"] {
-                    <li>meet(barrier: barrier, label: label)</li>
+                    <li>meet(barrier: &barrier, label: label)</li>
                 }
             </ul>
         };
@@ -220,12 +217,11 @@ async fn concurrent_loop_interleaves_static_markup_in_order() {
         let cx = empty_cx();
         let __cx = &cx;
         let barrier = Barrier::new(2);
-        let barrier = &barrier;
         let result: Result = view! {
             <ol>
                 for (index, label) in ["a", "b"].into_iter().enumerate() {
                     <li value=(index + 1)>
-                        meet(barrier: barrier, label: label)
+                        meet(barrier: &barrier, label: label)
                         (label.to_uppercase())
                     </li>
                 }
@@ -238,4 +234,61 @@ async fn concurrent_loop_interleaves_static_markup_in_order() {
         );
     })
     .await;
+}
+
+#[tokio::test]
+async fn taken_branches_carry_their_pattern_bindings_to_the_join() {
+    assert_concurrent(async {
+        let cx = empty_cx();
+        let __cx = &cx;
+        let barrier = Barrier::new(2);
+        let first = Some("one");
+        let second = Some("two");
+        let result: Result = view! {
+            if let Some(label) = first {
+                meet(barrier: &barrier, label: label)
+            }
+            if let Some(label) = second {
+                meet(barrier: &barrier, label: label)
+            }
+        };
+
+        assert_eq!(result.unwrap().render(__cx), "<i>one</i><i>two</i>");
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn taken_match_arms_carry_their_pattern_bindings_to_the_join() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let choice = Some(String::from("picked"));
+    let result: Result = view! {
+        echo(text: "always")
+        match choice {
+            Some(text) => {
+                echo(text: &text)
+            }
+            None => {
+                echo(text: "none")
+            }
+        }
+    };
+
+    assert_eq!(result.unwrap().render(__cx), "<b>always</b><b>picked</b>");
+}
+
+#[tokio::test]
+async fn a_binding_borrowed_from_an_outer_value_lives_until_the_join() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let name = Some(String::from("borrowed"));
+    let result: Result = view! {
+        echo(text: "always")
+        if let Some(name) = &name {
+            echo(text: name)
+        }
+    };
+
+    assert_eq!(result.unwrap().render(__cx), "<b>always</b><b>borrowed</b>");
 }

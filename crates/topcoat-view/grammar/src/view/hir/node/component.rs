@@ -6,7 +6,7 @@ use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 use crate::view::{
     NamedArg,
     hir::{
-        Scope,
+        Bindings, Scope,
         emit::{Emit, Emitter},
     },
 };
@@ -159,7 +159,7 @@ impl Component {
             let value = &arg.value;
             quote! { .#ident(#value) }
         });
-        let child = children.emit_future();
+        let child = children.emit_future(&Bindings::empty());
 
         quote_spanned! {path.span()=> {
             async {

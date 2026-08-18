@@ -108,6 +108,29 @@ pub fn ready(view: View) -> futures_util::future::Ready<Result<View>> {
     futures_util::future::ready(Ok(view))
 }
 
+/// Moves a control-flow body's pattern bindings into its render future.
+///
+/// A joined branch or iteration body expands to a future that borrows its
+/// environment, while the values its pattern binds die with the branch or
+/// iteration that produced them. The expansion packs those values into this
+/// wrapper where they are still alive and takes them back inside the future,
+/// which then owns them for as long as it lives.
+///
+/// The wrapper is deliberately not `Copy`, and [`take`](Self::take) consumes
+/// it whole: a by-value use of a whole non-`Copy` place is captured by value
+/// even in a non-`move` async block. Reading the contents through the field
+/// instead would let capture analysis narrow to the possibly `Copy` values
+/// inside and downgrade the capture to a borrow, which would not live long
+/// enough.
+pub struct Capture<T>(pub T);
+
+impl<T> Capture<T> {
+    /// Returns the packed bindings, consuming the wrapper.
+    pub fn take(self) -> T {
+        self.0
+    }
+}
+
 /// Runs `f` with the writer sealing for a different context, then restores
 /// the current context.
 ///
