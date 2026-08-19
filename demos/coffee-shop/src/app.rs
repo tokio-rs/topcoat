@@ -15,7 +15,7 @@ use topcoat::{
         href, layout, module_router, page, route,
     },
     tailwind,
-    view::{attributes, view},
+    view::{attributes, class, view},
 };
 
 use crate::{
@@ -66,8 +66,15 @@ async fn shell(cx: &Cx, slot: Result) -> Result {
                     >
                         <a href=(href!(page)) class="font-semibold">"Little Crema"</a>
                         <a
-                            href=(href!(menu::page))
-                            class="text-sm text-muted-foreground hover:text-foreground"
+                            let href = href!(menu::page);
+                            let current = href.is_current(cx);
+                            href=(href)
+                            aria-current=(current.then_some("page"))
+                            class=(class!(
+                                "text-sm hover:text-foreground",
+                                "text-foreground" if current,
+                                "text-muted-foreground" if !current,
+                            ))
                         >
                             "Menu"
                         </a>

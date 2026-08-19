@@ -403,7 +403,9 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 /// [`fragment`](Href::fragment), and an [`absolute`](Href::absolute) or
 /// [`relative`](Href::relative) form. Use it directly in a view to render
 /// the URL, or call [`resolve`](Href::resolve) to get the string, e.g. for
-/// a redirect.
+/// a redirect. [`is_current`](Href::is_current) tells whether the URL points
+/// at the page the current request is serving, e.g. to mark the link to it in
+/// a nav.
 ///
 /// ```
 /// use serde::Serialize;
@@ -469,7 +471,9 @@ where
 /// [`fragment`](Href::fragment), and an [`absolute`](Href::absolute) or
 /// [`relative`](Href::relative) form. Use it directly in a view to render
 /// the URL, or call [`resolve`](Href::resolve) to get the string, e.g. for
-/// a redirect.
+/// a redirect. [`is_current`](Href::is_current) tells whether the URL points
+/// at the page the current request is serving, e.g. to mark the link to it in
+/// a nav.
 ///
 /// ```
 /// use serde::Serialize;
