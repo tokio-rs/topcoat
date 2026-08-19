@@ -382,6 +382,14 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
     true
 }
 
+/// Parses a query string into its decoded key-value pairs, sorted so that two
+/// queries compare equal regardless of parameter order and encoding.
+fn query_pairs(query: &str) -> Vec<(Cow<'_, str>, Cow<'_, str>)> {
+    let mut pairs: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
+    pairs.sort_unstable();
+    pairs
+}
+
 /// Turns a page or route into an URL string.
 ///
 /// The first parameter, `target`, is the route handler the URL should be
@@ -716,6 +724,15 @@ where
     /// query item does not serialize to a URL query string.
     #[must_use]
     pub fn is_current(&self, cx: &Cx) -> bool {
+        /// Parses a query string into its decoded key-value pairs, sorted so
+        /// that two queries compare equal regardless of parameter order and
+        /// encoding.
+        fn query_pairs(query: &str) -> Vec<(Cow<'_, str>, Cow<'_, str>)> {
+            let mut pairs: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
+            pairs.sort_unstable();
+            pairs
+        }
+
         let uri = uri(cx);
 
         let mut path = String::new();
@@ -725,15 +742,6 @@ where
         }
         if !Q::SPECIFIED {
             return true;
-        }
-
-        /// Parses a query string into its decoded key-value pairs, sorted so
-        /// that two queries compare equal regardless of parameter order and
-        /// encoding.
-        fn query_pairs(query: &str) -> Vec<(Cow<'_, str>, Cow<'_, str>)> {
-            let mut pairs: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
-            pairs.sort_unstable();
-            pairs
         }
 
         let mut query = String::new();
