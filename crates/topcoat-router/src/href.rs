@@ -382,14 +382,6 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
     true
 }
 
-/// Parses a query string into its decoded key-value pairs, sorted so that two
-/// queries compare equal regardless of parameter order and encoding.
-fn query_pairs(query: &str) -> Vec<(Cow<'_, str>, Cow<'_, str>)> {
-    let mut pairs: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
-    pairs.sort_unstable();
-    pairs
-}
-
 /// Turns a page or route into an URL string.
 ///
 /// The first parameter, `target`, is the route handler the URL should be

@@ -1,7 +1,7 @@
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::View;
 
-use crate::{Body, Layout, Methods, Page, Path, PathBuf, RouteId, ViewFuture};
+use crate::{Body, Layout, Methods, Page, Path, PathBuf, RouteId, ViewFuture, route};
 
 /// A page discovered by the module router, declared without an explicit path.
 ///
@@ -20,6 +20,19 @@ pub trait ModulePage: Send + Sync + 'static {
 
     /// Renders the page [`View`].
     fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ViewFuture<'cx>;
+
+    /// Returns whether this page handles the current request.
+    ///
+    /// Only the handler is compared, so a page is current for every value its
+    /// path parameters take, whatever the request's query or fragment.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the request matched no route: either its path matched no
+    /// endpoint, or the endpoint holds no route for the request's method.
+    fn is_current(&self, cx: &Cx) -> bool {
+        route(cx).id() == self.id()
+    }
 }
 
 impl<P: ModulePage + ?Sized> ModulePage for &'static P {

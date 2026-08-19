@@ -9,7 +9,7 @@ use topcoat::{
     cookie::RouterBuilderCookieExt,
     font::{Font, fontsource::fontsource_font},
     router::{
-        Router, RouterBuilderDiscoverExt,
+        ModulePage, Router, RouterBuilderDiscoverExt,
         content::Form,
         error::{SeeOther, see_other},
         href, layout, module_router, page, route,
