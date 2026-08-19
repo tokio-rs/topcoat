@@ -15,6 +15,17 @@ pub struct TopcoatCli {
     command: Command,
 }
 
+impl TopcoatCli {
+    pub async fn run(self) {
+        match self.command {
+            Command::Ui(cmd) => cmd.run(),
+            Command::Fmt(cmd) => cmd.run().await,
+            Command::Dev(cmd) => cmd.run().await,
+            Command::Asset(cmd) => cmd.run().await,
+        }
+    }
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// Start a development server
@@ -28,12 +39,6 @@ enum Command {
 }
 
 pub async fn run() {
-    let cli = TopcoatCli::parse();
     common::version::warn_on_mismatch();
-    match cli.command {
-        Command::Ui(cmd) => cmd.run(),
-        Command::Fmt(cmd) => cmd.run().await,
-        Command::Dev(cmd) => cmd.run().await,
-        Command::Asset(cmd) => cmd.run().await,
-    }
+    TopcoatCli::parse().run().await;
 }
