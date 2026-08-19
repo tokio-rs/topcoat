@@ -14,7 +14,7 @@ use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
     Body, EndpointIndex, HrefTarget, IntoPath, Layer, Methods, OwnedMethods, Path,
-    response::Response, route_endpoint,
+    response::Response, route, route_endpoint,
 };
 
 /// The future returned by [`Route::handle`]: a boxed, `Send` future borrowing
@@ -57,6 +57,19 @@ pub trait Route: Send + Sync + 'static {
 
     /// Handles a request, producing a response.
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx>;
+
+    /// Returns whether this route handles the current request.
+    ///
+    /// Only the handler is compared, so a route is current for every value its
+    /// path parameters take, whatever the request's query or fragment.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the request matched no route: either its path matched no
+    /// endpoint, or the endpoint holds no route for the request's method.
+    fn is_current(&self, cx: &Cx) -> bool {
+        route(cx).id() == self.id()
+    }
 }
 
 impl<R: Route + ?Sized> Route for &'static R {

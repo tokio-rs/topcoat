@@ -5,7 +5,7 @@ use topcoat_view::View;
 
 use crate::{
     Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId,
-    response::IntoResponse,
+    response::IntoResponse, route,
 };
 
 /// The future returned by [`Page::render`] and [`Layout::render`]: a boxed,
@@ -31,6 +31,19 @@ pub trait Page: Send + Sync + 'static {
 
     /// Renders the page [`View`].
     fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ViewFuture<'cx>;
+
+    /// Returns whether this page handles the current request.
+    ///
+    /// Only the handler is compared, so a page is current for every value its
+    /// path parameters take, whatever the request's query or fragment.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the request matched no route: either its path matched no
+    /// endpoint, or the endpoint holds no route for the request's method.
+    fn is_current(&self, cx: &Cx) -> bool {
+        route(cx).id() == self.id()
+    }
 }
 
 impl<P: Page + ?Sized> Page for &'static P {

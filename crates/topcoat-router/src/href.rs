@@ -1,4 +1,7 @@
-use std::fmt::{self, Display, Write};
+use std::{
+    borrow::Cow,
+    fmt::{self, Display, Write},
+};
 
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 use serde::Serialize;
@@ -9,7 +12,7 @@ use topcoat_core::{
 };
 use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
-use crate::{Path, PathSegment, PathSegments};
+use crate::{Path, PathSegment, PathSegments, request::uri};
 
 /// The destination an [`href`] points at, resolved to the route [`Path`] the
 /// URL is built from.
@@ -306,6 +309,10 @@ fn write_remaining(segments: PathSegments<'_>, path: &Path, out: &mut String) {
 /// The query of an [`href`]: a tuple of up to eight [`Serialize`] items,
 /// collected by [`Href::query`].
 pub trait HrefQueries {
+    /// Whether a query was specified: `true` when the tuple holds at least
+    /// one item, even one that serializes to nothing.
+    const SPECIFIED: bool;
+
     /// Appends the items, serialized and concatenated into one query string,
     /// to the URL in `out`.
     ///
@@ -315,31 +322,40 @@ pub trait HrefQueries {
     fn assign(&self, out: &mut String);
 }
 
-/// Generates the `HrefQueries` impl for a tuple of query items `Q1..Qn`.
+/// The empty tuple: no query was specified, and nothing is appended.
+impl HrefQueries for () {
+    const SPECIFIED: bool = false;
+
+    fn assign(&self, _out: &mut String) {}
+}
+
+/// Generates the `HrefQueries` impl for a non-empty tuple of query items
+/// `Q1..Qn`.
 ///
 /// Each item serializes to a query string on its own; the non-empty results
 /// are concatenated, the first behind `?` and the rest behind `&`.
 macro_rules! impl_href_queries_tuples {
-    ( $($ty:ident),* ) => {
-        #[allow(non_snake_case, unused_assignments, unused_mut, unused_variables)]
-        impl<$($ty,)*> HrefQueries for ($($ty,)*)
+    ( $($ty:ident),+ ) => {
+        #[allow(non_snake_case, unused_assignments)]
+        impl<$($ty,)+> HrefQueries for ($($ty,)+)
         where
-            $($ty: Serialize,)*
+            $($ty: Serialize,)+
         {
+            const SPECIFIED: bool = true;
+
             fn assign(&self, out: &mut String) {
-                let ($($ty,)*) = self;
+                let ($($ty,)+) = self;
                 let mut separator = '?';
                 $(
                     if write_query($ty, separator, out) {
                         separator = '&';
                     }
-                )*
+                )+
             }
         }
     };
 }
 
-impl_href_queries_tuples!();
 impl_href_queries_tuples!(Q1);
 impl_href_queries_tuples!(Q1, Q2);
 impl_href_queries_tuples!(Q1, Q2, Q3);
@@ -527,6 +543,8 @@ macro_rules! href {
 /// the fragment, and [`relative`](Self::relative), [`absolute`](Self::absolute),
 /// and [`form`](Self::form) choose the URL's form. The URL renders by using
 /// the value in a view, or by calling [`resolve`](Self::resolve).
+/// [`is_current`](Self::is_current) tells whether the URL points at the page
+/// the current request is serving.
 pub struct Href<T, P, Q, F> {
     target: T,
     params: P,
@@ -634,7 +652,7 @@ where
     /// Panics if the parameters do not line up with the target's path, or a
     /// query item does not serialize to a URL query string.
     #[must_use]
-    pub fn resolve(self, cx: &Cx) -> String {
+    pub fn resolve(&self, cx: &Cx) -> String {
         let mut buf = String::new();
         match self.url_form.unwrap_or_else(|| url_form(cx)) {
             UrlForm::Absolute => buf += base_url(cx).as_str(),
@@ -644,11 +662,79 @@ where
         self.params.assign(self.target.path(cx), &mut buf);
         self.queries.assign(&mut buf);
 
-        if let Some(fragment) = self.fragment {
+        if let Some(fragment) = &self.fragment {
             write!(buf, "#{fragment}").unwrap();
         }
 
         buf
+    }
+
+    /// Returns whether this href points at the page the current request is
+    /// serving.
+    ///
+    /// The href is current when its path, with every parameter filled in,
+    /// equals the request's path, and its query matches the request's query.
+    ///
+    /// An href built without [`query`](Self::query) leaves the request's
+    /// query out of the comparison, so a bare link to a page stays current
+    /// while that page is filtered or paginated. Once a query is specified,
+    /// the request's query must hold exactly the same key-value pairs,
+    /// compared decoded and in any order. A specified query whose items
+    /// serialize to nothing demands a request without any query.
+    ///
+    /// The fragment never takes part in the comparison, because a browser
+    /// does not send it with a request. The [`UrlForm`] plays no role
+    /// either, as only the path and the query are compared.
+    ///
+    /// Use it to mark the link pointing at the page being rendered:
+    ///
+    /// ```
+    /// use topcoat::{
+    ///     Result,
+    ///     context::Cx,
+    ///     router::{href, page},
+    ///     view::view,
+    /// };
+    ///
+    /// #[page("/posts")]
+    /// async fn posts(cx: &Cx) -> Result {
+    ///     let link = href!(posts);
+    ///     let current = link.is_current(cx);
+    ///     view! {
+    ///         <a href=(link) aria-current=(current.then_some("page"))>"Posts"</a>
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parameters do not line up with the target's path, or a
+    /// query item does not serialize to a URL query string.
+    #[must_use]
+    pub fn is_current(&self, cx: &Cx) -> bool {
+        let uri = uri(cx);
+
+        let mut path = String::new();
+        self.params.assign(self.target.path(cx), &mut path);
+        if uri.path() != path {
+            return false;
+        }
+        if !Q::SPECIFIED {
+            return true;
+        }
+
+        /// Parses a query string into its decoded key-value pairs, sorted so
+        /// that two queries compare equal regardless of parameter order and
+        /// encoding.
+        fn query_pairs(query: &str) -> Vec<(Cow<'_, str>, Cow<'_, str>)> {
+            let mut pairs: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
+            pairs.sort_unstable();
+            pairs
+        }
+
+        let mut query = String::new();
+        self.queries.assign(&mut query);
+        query_pairs(query.strip_prefix('?').unwrap_or("")) == query_pairs(uri.query().unwrap_or(""))
     }
 }
 
@@ -726,6 +812,17 @@ mod tests {
         CxTestBuilder::new()
             .app_context(BaseUrl::new("https://example.com").expect("a valid base URL"))
             .build()
+    }
+
+    /// Builds a context whose request URI is `uri`.
+    fn cx_with_uri(uri: &str) -> Cx {
+        let (parts, ()) = http::Request::builder()
+            .uri(uri)
+            .body(())
+            .expect("a valid request URI")
+            .into_parts();
+
+        CxTestBuilder::new().request_context(parts).build()
     }
 
     /// Assigns `params` to `path` and returns the URL it produces.
@@ -956,6 +1053,73 @@ mod tests {
         let cx = cx_with_base_url().with(UrlForm::Absolute);
 
         assert_eq!(href("/users", ()).resolve(&cx), "https://example.com/users");
+    }
+
+    #[test]
+    fn is_current_on_the_request_path() {
+        assert!(href("/users", ()).is_current(&cx_with_uri("/users")));
+        assert!(!href("/users", ()).is_current(&cx_with_uri("/users/42")));
+    }
+
+    #[test]
+    fn is_current_fills_in_the_parameters() {
+        let href = href("/users/{id}", (Param("id", "42"),));
+
+        assert!(href.is_current(&cx_with_uri("/users/42")));
+        assert!(!href.is_current(&cx_with_uri("/users/7")));
+    }
+
+    #[test]
+    fn is_current_compares_the_encoded_path() {
+        let href = href("/users/{id}", (Param("id", "a/b"),));
+
+        assert!(href.is_current(&cx_with_uri("/users/a%2Fb")));
+        assert!(!href.is_current(&cx_with_uri("/users/a/b")));
+    }
+
+    #[test]
+    fn the_root_href_is_current_on_the_root() {
+        assert!(href("/", ()).is_current(&cx_with_uri("/")));
+    }
+
+    #[test]
+    fn an_unspecified_query_is_left_out_of_the_comparison() {
+        assert!(href("/users", ()).is_current(&cx_with_uri("/users?page=2")));
+    }
+
+    #[test]
+    fn a_specified_query_must_match_the_request_query() {
+        let href = href("/users", ()).query([("page", "2")]);
+
+        assert!(href.is_current(&cx_with_uri("/users?page=2")));
+        assert!(!href.is_current(&cx_with_uri("/users")));
+        assert!(!href.is_current(&cx_with_uri("/users?page=3")));
+        assert!(!href.is_current(&cx_with_uri("/users?page=2&sort=asc")));
+    }
+
+    #[test]
+    fn the_query_comparison_ignores_order_and_encoding() {
+        let href = href("/users", ()).query([("page", "2"), ("sort", "a b")]);
+
+        assert!(href.is_current(&cx_with_uri("/users?sort=a%20b&page=2")));
+    }
+
+    #[test]
+    fn a_query_that_serializes_to_nothing_demands_a_bare_request() {
+        #[derive(serde::Serialize)]
+        struct Empty {}
+
+        let href = href("/users", ()).query(Empty {});
+
+        assert!(href.is_current(&cx_with_uri("/users")));
+        assert!(!href.is_current(&cx_with_uri("/users?page=2")));
+    }
+
+    #[test]
+    fn the_fragment_is_left_out_of_the_comparison() {
+        let href = href("/users", ()).fragment("bio");
+
+        assert!(href.is_current(&cx_with_uri("/users")));
     }
 
     #[test]
