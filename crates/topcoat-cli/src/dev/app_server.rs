@@ -6,6 +6,8 @@ use std::{
 
 use tokio::process::{Child, Command};
 
+use super::port::Address;
+
 /// A running instance of the application under development.
 ///
 /// The process inherits the terminal's stdio and receives the broadcast
@@ -22,10 +24,12 @@ impl AppServer {
     /// run instead: a running process locks its image file, so launching the
     /// original would make every subsequent rebuild fail at the link step
     /// ("Access is denied") while the server keeps serving.
-    pub fn spawn(exe: &Path, dev_url: &str) -> io::Result<Self> {
+    pub fn spawn(exe: &Path, dev_url: &str, address: &Address) -> io::Result<Self> {
         let exe = shadow_copy_for_windows(exe)?;
         let child = Command::new(exe)
             .env("TOPCOAT_DEV_URL", dev_url)
+            .env("HOST", &address.host)
+            .env("PORT", address.port.to_string())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .stdin(Stdio::inherit())
