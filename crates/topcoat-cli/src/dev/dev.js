@@ -203,10 +203,25 @@
     ws.onclose = reconnect;
   }
 
+  // The browser also closes the WebSocket when the page navigates away - at
+  // navigation start in Firefox, at commit in Chrome. Reloading then would
+  // cancel the in-flight navigation, so probing is deferred while one is
+  // pending; navigateerror resumes it when a navigation fails and the page
+  // lives on.
+  let navigating = false;
+  window.navigation?.addEventListener("navigate", () => (navigating = true));
+  window.navigation?.addEventListener(
+    "navigateerror",
+    () => (navigating = false)
+  );
+  // A page restored from the back/forward cache is no longer navigating.
+  window.addEventListener("pageshow", () => (navigating = false));
+
   // Probe until the dev server is back, then reload to pick up whatever it
   // now serves.
   function reconnect() {
     setTimeout(() => {
+      if (navigating) return reconnect();
       const probe = new WebSocket(wsUrl);
       probe.onopen = () => {
         probe.close();
