@@ -2,8 +2,6 @@ use std::{env, io, net::TcpListener};
 
 use console::style;
 
-use super::keyboard::Keyboard;
-
 /// Mirrors the defaults `topcoat::serve::start` applies when `HOST`/`PORT`
 /// are unset.
 const DEFAULT_HOST: &str = "127.0.0.1";
@@ -28,8 +26,12 @@ impl Address {
 }
 
 /// Find a host and port for the application to bind, starting from
-/// `HOST`/`PORT`.
-pub async fn resolve(keyboard: &mut Keyboard) -> Option<Address> {
+/// `HOST`/`PORT` and walking up from an occupied port to the first free one.
+/// Picking a different port than the configured one is reported on the
+/// terminal.
+///
+/// Returns `None` when every port from the configured one upward is occupied.
+pub fn resolve() -> Option<Address> {
     let mut address = Address::from_env();
     let original_port = address.port;
 
@@ -39,28 +41,22 @@ pub async fn resolve(keyboard: &mut Keyboard) -> Option<Address> {
             Err(err) if err.kind() == io::ErrorKind::AddrInUse => {
                 address.port = address.port.checked_add(1)?;
             }
+            // Any other error (an unresolvable host, a privileged port) is
+            // left for the application to run into and report itself.
             Err(_) => break,
         }
     }
 
-    if address.port == original_port {
-        return Some(address);
-    }
-
-    let question = style(format!(
-        "  Port {original_port} is already in use. Use port {} instead? [",
-        address.port
-    ))
-    .for_stderr()
-    .dim();
-    let yes = style("Y").for_stderr().green().bold();
-    let slash = style("/").for_stderr().dim();
-    let no = style("n").for_stderr().red().bold();
-    let suffix = style("] ").for_stderr().dim();
-    let message = format!("{question}{yes}{slash}{no}{suffix}");
-
-    if !keyboard.confirm(&message).await {
-        return None;
+    if address.port != original_port {
+        eprintln!(
+            "  {}",
+            style(format!(
+                "port {original_port} is in use; starting on port {} instead",
+                address.port
+            ))
+            .yellow()
+        );
+        eprintln!();
     }
 
     Some(address)

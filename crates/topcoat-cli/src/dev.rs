@@ -1,14 +1,13 @@
 //! The `topcoat dev` command: an auto-rebuilding development server.
 //!
-//! Five pieces cooperate, tied together by the event loop in
+//! Six pieces cooperate, tied together by the event loop in
 //! [`DevCommand::run`]:
 //!
 //! - [`broadcast_server`]: a long-lived local WebSocket server that browsers connect to; it
 //!   broadcasts a reload message whenever a freshly started application reports ready.
 //! - [`watch`]: watches every local package -- workspace members and path dependencies alike -- and
 //!   coalesces bursts of filesystem events into single change notifications.
-//! - [`keyboard`]: reports the `r` keypress that triggers a manual rebuild, and owns the terminal
-//!   for [`port`]'s prompt.
+//! - [`keyboard`]: reports the `r` keypress that triggers a manual rebuild.
 //! - [`build`]: compiles the application and bundles its assets in a cancellable background task.
 //! - [`app_server`]: the application process itself.
 //! - [`port`]: resolves the host and port the application will bind before each start.
@@ -134,7 +133,7 @@ impl DevCommand {
                             if let Some(old) = server.take() {
                                 old.shutdown().await;
                             }
-                            server = start_app(&exe, &dev_url, &events, &mut keyboard).await;
+                            server = start_app(&exe, &dev_url, &events);
                         }
                     } else {
                         // The failure is already on the terminal; keep the
@@ -191,13 +190,8 @@ async fn rebuild(build: &mut Option<BuildTask>, opts: &BuildOpts, events: &Event
 
 /// Start the built executable, reporting a failure to the terminal and to
 /// connected browsers.
-async fn start_app(
-    exe: &Path,
-    dev_url: &str,
-    events: &EventBus,
-    keyboard: &mut Keyboard,
-) -> Option<AppServer> {
-    let Some(address) = port::resolve(keyboard).await else {
+fn start_app(exe: &Path, dev_url: &str, events: &EventBus) -> Option<AppServer> {
+    let Some(address) = port::resolve() else {
         events.publish(Event::AppExited);
         eprintln!(
             "  {}",
