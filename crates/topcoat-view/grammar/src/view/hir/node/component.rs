@@ -102,7 +102,7 @@ impl Component {
                 }
             }
             (None, false) => quote_spanned! {span=>
-                #topcoat_view::identity::IdentityFuture::new(#site, #future)
+                #topcoat_view::identity::IdentityFuture::child(#site, #future)
             },
         }
     }

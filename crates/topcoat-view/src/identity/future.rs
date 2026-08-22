@@ -25,9 +25,9 @@ pin_project! {
     }
 }
 
-impl<F> IdentityFuture<F> {
+impl<F: Future + Send> IdentityFuture<F> {
     /// Wraps `fut` as a child invocation at `site`.
-    pub fn new(site: SiteKey, fut: F) -> Self {
+    pub fn child(site: SiteKey, fut: F) -> impl Future<Output = F::Output> + Send {
         Self {
             fut,
             identity: Identity::current_raw().child(site),
@@ -35,7 +35,11 @@ impl<F> IdentityFuture<F> {
     }
 
     /// Wraps `fut` as a keyed child invocation at `site`.
-    pub fn keyed(site: SiteKey, key: impl IdentityKey, fut: F) -> Self {
+    pub fn keyed(
+        site: SiteKey,
+        key: impl IdentityKey,
+        fut: F,
+    ) -> impl Future<Output = F::Output> + Send {
         Self {
             fut,
             identity: Identity::current_raw().keyed_child(site, key),
@@ -44,7 +48,11 @@ impl<F> IdentityFuture<F> {
 
     /// Wraps `fut` as a child invocation at `site` whose repetitions cannot
     /// be told apart, recording `label` as the ambiguity.
-    pub fn ambiguous(site: SiteKey, label: &'static str, fut: F) -> Self {
+    pub fn ambiguous(
+        site: SiteKey,
+        label: &'static str,
+        fut: F,
+    ) -> impl Future<Output = F::Output> + Send {
         Self {
             fut,
             identity: Identity::current_raw().ambiguous_child(site, label),
@@ -107,7 +115,7 @@ mod tests {
 
     #[test]
     fn the_future_installs_its_identity_only_while_polling() {
-        let fut = IdentityFuture::new(SITE_A, async {
+        let fut = IdentityFuture::child(SITE_A, async {
             assert_eq!(Identity::current(), Identity::ROOT.child(SITE_A));
         });
         assert_eq!(Identity::current(), Identity::ROOT);
@@ -119,7 +127,7 @@ mod tests {
     fn the_identity_is_derived_at_construction() {
         let fut = {
             let _parent = IdentityGuard::enter(SITE_A);
-            IdentityFuture::new(SITE_B, async { Identity::current() })
+            IdentityFuture::child(SITE_B, async { Identity::current() })
         };
         // The parent guard is gone, but the future captured its identity.
         assert_eq!(block_on(fut), Identity::ROOT.child(SITE_A).child(SITE_B));
@@ -155,7 +163,7 @@ mod tests {
 
     #[test]
     fn the_future_restores_the_identity_when_a_poll_panics() {
-        let mut fut = pin!(IdentityFuture::new(SITE_A, async { panic!("boom") }));
+        let mut fut = pin!(IdentityFuture::child(SITE_A, async { panic!("boom") }));
         let result = catch_unwind(AssertUnwindSafe(|| {
             let mut task = Context::from_waker(Waker::noop());
             let _ = fut.as_mut().poll(&mut task);

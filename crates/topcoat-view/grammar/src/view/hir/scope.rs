@@ -324,7 +324,7 @@ mod tests {
         let mut builder = ViewBuilder::new();
         add_component(&mut builder, "solo");
         let out = rendered(builder);
-        assert!(out.contains("IdentityFuture :: new"));
+        assert!(out.contains("IdentityFuture :: child"));
         assert!(out.contains("SiteKey :: new"));
         assert!(out.contains("file ! ()"));
     }
@@ -397,7 +397,7 @@ mod tests {
         // relative to it; the wrapper's ambiguity poisons the child at
         // runtime instead.
         assert_eq!(out.matches("IdentityFuture :: ambiguous").count(), 1);
-        assert_eq!(out.matches("IdentityFuture :: new").count(), 1);
+        assert_eq!(out.matches("IdentityFuture :: child").count(), 1);
     }
 
     #[test]
