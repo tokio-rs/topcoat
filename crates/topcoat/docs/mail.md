@@ -5,7 +5,7 @@ Everything below is re-exported from `topcoat::mail` and gated behind the `mail`
 ```toml
 # Cargo.toml
 [dependencies]
-topcoat = { version = "0.6.2", features = ["mail", "mail-smtp"] }
+topcoat = { version = "0.6.3", features = ["mail", "mail-smtp"] }
 ```
 
 # Setup
