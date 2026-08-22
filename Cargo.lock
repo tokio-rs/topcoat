@@ -3227,7 +3227,6 @@ dependencies = [
  "futures-core",
  "futures-util",
  "http",
- "itoa",
  "memchr",
  "pin-project-lite",
  "smallvec",

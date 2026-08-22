@@ -1,3 +1,5 @@
+use core::fmt::NumBuffer;
+
 use topcoat_core::context::Cx;
 
 use crate::{
@@ -37,7 +39,6 @@ impl<'a> Renderer<'a> {
         use std::fmt::Write;
 
         let consts = self.buffer.consts();
-        let mut int_buffer = itoa::Buffer::new();
         loop {
             let instruction = self.buffer.instruction(self.ptr);
             self.ptr.increment();
@@ -61,16 +62,16 @@ impl<'a> Renderer<'a> {
                 }
 
                 Instruction::Bool(inner) => f.write_str(if *inner { "true" } else { "false" }),
-                Instruction::I8(inner) => f.write_str(int_buffer.format(*inner)),
-                Instruction::I16(inner) => f.write_str(int_buffer.format(*inner)),
-                Instruction::I32(inner) => f.write_str(int_buffer.format(*inner)),
-                Instruction::I64(inner) => f.write_str(int_buffer.format(*inner)),
-                Instruction::Isize(inner) => f.write_str(int_buffer.format(*inner)),
-                Instruction::U8(inner) => f.write_str(int_buffer.format(*inner)),
-                Instruction::U16(inner) => f.write_str(int_buffer.format(*inner)),
-                Instruction::U32(inner) => f.write_str(int_buffer.format(*inner)),
-                Instruction::U64(inner) => f.write_str(int_buffer.format(*inner)),
-                Instruction::Usize(inner) => f.write_str(int_buffer.format(*inner)),
+                Instruction::I8(inner) => f.write_str(inner.format_into(&mut NumBuffer::new())),
+                Instruction::I16(inner) => f.write_str(inner.format_into(&mut NumBuffer::new())),
+                Instruction::I32(inner) => f.write_str(inner.format_into(&mut NumBuffer::new())),
+                Instruction::I64(inner) => f.write_str(inner.format_into(&mut NumBuffer::new())),
+                Instruction::Isize(inner) => f.write_str(inner.format_into(&mut NumBuffer::new())),
+                Instruction::U8(inner) => f.write_str(inner.format_into(&mut NumBuffer::new())),
+                Instruction::U16(inner) => f.write_str(inner.format_into(&mut NumBuffer::new())),
+                Instruction::U32(inner) => f.write_str(inner.format_into(&mut NumBuffer::new())),
+                Instruction::U64(inner) => f.write_str(inner.format_into(&mut NumBuffer::new())),
+                Instruction::Usize(inner) => f.write_str(inner.format_into(&mut NumBuffer::new())),
                 Instruction::F32(inner) => write!(f, "{inner}").unwrap(),
                 Instruction::F64(inner) => write!(f, "{inner}").unwrap(),
                 Instruction::Char { value, context } => context.writer(f).write_char(*value),
