@@ -64,30 +64,31 @@ pub struct Multipart {
 }
 
 impl FromRequest for Multipart {
-    async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
-        let boundary = content_type(cx)
-            .and_then(|content_type| multer::parse_boundary(content_type).ok())
-            .ok_or_else(invalid_boundary)?;
-
-        Ok(Self {
-            inner: multer::Multipart::new(limited(cx, body).into_data_stream(), boundary),
-        })
+    fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> {
+        core::future::ready(
+            content_type(cx)
+                .and_then(|content_type| multer::parse_boundary(content_type).ok())
+                .map(|boundary| Self {
+                    inner: multer::Multipart::new(limited(cx, body).into_data_stream(), boundary),
+                })
+                .ok_or_else(invalid_boundary),
+        )
     }
 }
 
 impl OptionalFromRequest for Multipart {
-    async fn from_request(cx: &Cx, body: Body) -> Result<Option<Self>> {
+    fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Option<Self>>> {
         let Some(content_type) = content_type(cx) else {
-            return Ok(None);
+            return std::future::ready(Ok(None));
         };
 
-        match multer::parse_boundary(content_type) {
+        std::future::ready(match multer::parse_boundary(content_type) {
             Ok(boundary) => Ok(Some(Self {
                 inner: multer::Multipart::new(limited(cx, body).into_data_stream(), boundary),
             })),
             Err(multer::Error::NoMultipart) => Ok(None),
             Err(_) => Err(invalid_boundary()),
-        }
+        })
     }
 }
 

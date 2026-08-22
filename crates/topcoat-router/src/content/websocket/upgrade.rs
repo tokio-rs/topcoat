@@ -235,6 +235,7 @@ impl fmt::Debug for WebSocketUpgrade {
 /// request that is not a conforming WebSocket upgrade with a `400 Bad Request`
 /// (or `405 Method Not Allowed` for a non-`GET` method).
 impl FromRequest for WebSocketUpgrade {
+    #[allow(clippy::unused_async_trait_impl)]
     async fn from_request(cx: &Cx, _body: Body) -> Result<Self> {
         if method(cx) != Method::GET {
             return Err(method_not_allowed([Method::GET]).into());

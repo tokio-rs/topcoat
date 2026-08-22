@@ -90,8 +90,8 @@ pub trait FromRequest: Sized {
 /// Yields the request body unchanged, leaving it unbuffered for the handler to
 /// read or forward itself.
 impl FromRequest for Body {
-    async fn from_request(_cx: &Cx, body: Body) -> Result<Self> {
-        Ok(body)
+    fn from_request(_cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> {
+        core::future::ready(Ok(body))
     }
 }
 
