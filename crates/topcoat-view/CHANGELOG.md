@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3](https://github.com/tokio-rs/topcoat/compare/topcoat-view-v0.6.2...topcoat-view-v0.6.3) - 2026-08-22
+
+### Other
+
+- *(view)* remove `itoa` dependency in favor of `format_into` ([#366](https://github.com/tokio-rs/topcoat/pull/366))
+- upgrade to rust 1.98 ([#367](https://github.com/tokio-rs/topcoat/pull/367))
+
 ## [0.6.2](https://github.com/tokio-rs/topcoat/compare/topcoat-view-v0.6.1...topcoat-view-v0.6.2) - 2026-08-18
 
 ### Fixed

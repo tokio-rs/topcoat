@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3](https://github.com/tokio-rs/topcoat/compare/v0.6.2...v0.6.3) - 2026-08-22
+
+### Added
+
+- *(cli)* port retry on dev server init ([#364](https://github.com/tokio-rs/topcoat/pull/364))
+- *(cli)* expose run method on `TopcoatCli` ([#363](https://github.com/tokio-rs/topcoat/pull/363))
+- *(router)* is_current methods for Href, routes, and pages ([#362](https://github.com/tokio-rs/topcoat/pull/362))
+
+### Fixed
+
+- *(cli)* don't reload over in-flight navigations on reconnect ([#365](https://github.com/tokio-rs/topcoat/pull/365))
+
+### Other
+
+- upgrade to rust 1.98 ([#367](https://github.com/tokio-rs/topcoat/pull/367))
+- *(view)* remove `itoa` dependency in favor of `format_into` ([#366](https://github.com/tokio-rs/topcoat/pull/366))
+
 ## [0.6.2](https://github.com/tokio-rs/topcoat/compare/v0.6.1...v0.6.2) - 2026-08-18
 
 ### Added
