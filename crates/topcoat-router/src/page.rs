@@ -206,7 +206,13 @@ impl Layout for LayoutFn {
 
 /// A [`Page`] paired with the [`Layout`]s that wrap it.
 pub struct PageWithLayouts {
-    page: Arc<dyn Page>,
+    inner: Arc<PageWithLayoutsInner>,
+}
+
+/// The pair behind one shared handle, so the response body stream can own it
+/// past the handler.
+struct PageWithLayoutsInner {
+    page: Box<dyn Page>,
     /// The matching layouts, ordered by ascending path length (outermost first).
     layouts: Vec<Arc<dyn Layout>>,
 }
@@ -217,34 +223,34 @@ impl PageWithLayouts {
     /// `layouts` must be ordered from least- to most-specific (ascending path
     /// length); they are applied from the innermost (most specific) outward.
     #[must_use]
-    pub fn new(page: Arc<dyn Page>, layouts: Vec<Arc<dyn Layout>>) -> Self {
-        Self { page, layouts }
+    pub fn new(page: Box<dyn Page>, layouts: Vec<Arc<dyn Layout>>) -> Self {
+        Self {
+            inner: Arc::new(PageWithLayoutsInner { page, layouts }),
+        }
     }
 }
 
 impl Route for PageWithLayouts {
     fn id(&self) -> RouteId {
-        self.page.id()
+        self.inner.page.id()
     }
 
     fn methods(&self) -> Methods<'_> {
-        self.page.methods()
+        self.inner.page.methods()
     }
 
     fn path(&self) -> &Path {
-        self.page.path()
+        self.inner.page.path()
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
         Box::pin(async move {
             let stream = {
-                let page = self.page.clone();
-                let layouts = self.layouts.clone();
+                let inner = self.inner.clone();
                 let cx = cx.clone();
-                // TODO: prevent inefficient cloning
                 ViewStream::new(async move {
-                    let mut slot = page.render(&cx, body);
-                    for layout in layouts.iter().rev() {
+                    let mut slot = inner.page.render(&cx, body);
+                    for layout in inner.layouts.iter().rev() {
                         slot = layout.render(&cx, slot);
                     }
 
