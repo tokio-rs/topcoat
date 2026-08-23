@@ -1,7 +1,6 @@
 use std::{borrow::Cow, pin::Pin, sync::Arc};
 
 use futures_core::Stream;
-use futures_util::StreamExt;
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::{ViewChunk, ViewStream};
 
@@ -249,9 +248,7 @@ impl Route for PageWithLayouts {
                         slot = layout.render(&cx, slot);
                     }
 
-                    while let Some(item) = slot.next().await {
-                        topcoat_view::internal::yield_(item).await;
-                    }
+                    topcoat_view::internal::forward(slot).await;
                 })
             };
 
