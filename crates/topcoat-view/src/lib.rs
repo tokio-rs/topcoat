@@ -3,7 +3,6 @@
 mod buffer;
 mod component;
 mod css;
-mod emit;
 mod format;
 mod html;
 pub mod identity;
@@ -13,6 +12,7 @@ mod stream;
 mod string;
 pub mod svg;
 mod view;
+mod yielder;
 
 pub use component::*;
 pub use css::*;

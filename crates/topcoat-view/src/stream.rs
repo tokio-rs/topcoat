@@ -1,14 +1,17 @@
+use futures_util::StreamExt;
 use pin_project_lite::pin_project;
 use std::{
-    cell::Cell,
-    pin::Pin,
+    pin::{Pin, pin},
     task::{Context, Poll},
 };
 
 use futures_core::{FusedStream, Stream};
 use topcoat_core::error::Result;
 
-use crate::{View, emit::collect};
+use crate::{
+    View,
+    yielder::{collect, yield_},
+};
 
 pub struct ViewChunk {
     id: u64,
@@ -20,6 +23,18 @@ pin_project! {
         #[pin]
         f: F,
         done: bool,
+    }
+}
+
+impl<F> ViewStream<F>
+where
+    F: Future<Output = ()>,
+{
+    pub async fn yield_all(self) {
+        let mut this = pin!(self);
+        while let Some(value) = this.next().await {
+            yield_(value).await;
+        }
     }
 }
 

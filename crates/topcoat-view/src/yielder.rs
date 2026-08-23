@@ -8,20 +8,14 @@ use crate::stream::ViewChunk;
 use topcoat_core::error::Result;
 
 thread_local! {
-    static EMIT: Cell<Option<Result<ViewChunk>>> = const { Cell::new(None) };
+    static YIELD: Cell<Option<Result<ViewChunk>>> = const { Cell::new(None) };
 }
 
-pub struct Emit {
+pub struct Yield {
     value: Option<Result<ViewChunk>>,
 }
 
-impl Emit {
-    fn new(value: Option<Result<ViewChunk>>) -> Self {
-        Self { value }
-    }
-}
-
-impl Future for Emit {
+impl Future for Yield {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
@@ -29,20 +23,20 @@ impl Future for Emit {
             return Poll::Ready(());
         }
 
-        let current = EMIT.take();
+        let current = YIELD.take();
         if current.is_some() {
-            EMIT.set(current);
+            YIELD.set(current);
             return Poll::Pending;
         }
 
-        EMIT.set(self.value.take());
+        YIELD.set(self.value.take());
         Poll::Pending
     }
 }
 
 #[must_use]
-pub fn emit(value: Result<ViewChunk>) -> Emit {
-    Emit { value: Some(value) }
+pub fn yield_(value: Result<ViewChunk>) -> Yield {
+    Yield { value: Some(value) }
 }
 
 struct Collect {
@@ -51,7 +45,7 @@ struct Collect {
 
 impl Drop for Collect {
     fn drop(&mut self) {
-        EMIT.set(self.previous.take());
+        YIELD.set(self.previous.take());
     }
 }
 
@@ -63,9 +57,9 @@ where
     F: Future,
 {
     let _guard = Collect {
-        previous: EMIT.take(),
+        previous: YIELD.take(),
     };
     let poll = f.poll(cx);
-    let emit = EMIT.take();
+    let emit = YIELD.take();
     (poll, emit)
 }
