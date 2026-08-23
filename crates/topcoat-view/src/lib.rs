@@ -3,11 +3,13 @@
 mod buffer;
 mod component;
 mod css;
+mod emit;
 mod format;
 mod html;
 pub mod identity;
 mod part;
 mod props;
+mod stream;
 mod string;
 pub mod svg;
 mod view;
