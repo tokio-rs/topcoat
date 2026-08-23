@@ -1,6 +1,8 @@
 use std::{borrow::Cow, convert::Infallible};
 
 use bytes::{Bytes, BytesMut};
+use futures_core::Stream;
+use futures_util::StreamExt;
 use http::{
     Extensions, HeaderMap, StatusCode,
     header::{CONTENT_TYPE, HeaderName, HeaderValue},
@@ -10,7 +12,7 @@ use topcoat_core::{
     context::Cx,
     error::{Error, Result},
 };
-use topcoat_view::View;
+use topcoat_view::{View, ViewChunk};
 
 use crate::{Body, BoxError, content::Html};
 
@@ -228,20 +230,6 @@ impl IntoResponse for Extensions {
 impl IntoResponse for Parts {
     fn into_response(self, cx: &Cx) -> Result<Response> {
         (self, ()).into_response(cx)
-    }
-}
-
-/// Renders the view to HTML and applies the status code and headers it
-/// declares; a declared `Content-Type` replaces the default `text/html`.
-impl IntoResponse for View {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        let rendered = self.render_response(cx);
-        let mut response = Html(rendered.html).into_response(cx)?;
-        if let Some(status_code) = rendered.status_code {
-            *response.status_mut() = status_code;
-        }
-        response.headers_mut().extend(rendered.headers);
-        Ok(response)
     }
 }
 
@@ -538,64 +526,6 @@ mod tests {
         assert_eq!(parts.status, StatusCode::ACCEPTED);
         assert_eq!(header(&parts, "x-test"), "1");
         assert_eq!(&body[..], b"yo");
-    }
-
-    // -- views --
-
-    /// Builds a view with `build`, renders it into a response, and reads the
-    /// body fully into memory.
-    fn run_view(build: impl AsyncFnOnce(&Cx) -> Result<View>) -> (Parts, Bytes) {
-        block_on(async {
-            let cx = Cx::default();
-            let view = build(&cx).await.unwrap();
-            let (parts, body) = view.into_response(&cx).unwrap().into_parts();
-            let bytes = to_bytes(body, usize::MAX).await.unwrap();
-            (parts, bytes)
-        })
-    }
-
-    #[test]
-    fn view_is_an_html_response() {
-        let (parts, body) = run_view(async |cx| view! { cx => "hi" });
-        assert_eq!(parts.status, StatusCode::OK);
-        assert_eq!(header(&parts, "content-type"), "text/html; charset=utf-8");
-        assert_eq!(&body[..], b"hi");
-    }
-
-    #[test]
-    fn view_applies_declared_status_and_headers() {
-        let (parts, body) = run_view(async |cx| {
-            let header = (
-                HeaderName::from_static("x-test"),
-                HeaderValue::from_static("1"),
-            );
-            view! {
-                cx =>
-                (StatusCode::IM_A_TEAPOT)
-                (header)
-                "hi"
-            }
-        });
-        assert_eq!(parts.status, StatusCode::IM_A_TEAPOT);
-        assert_eq!(header(&parts, "content-type"), "text/html; charset=utf-8");
-        assert_eq!(header(&parts, "x-test"), "1");
-        assert_eq!(&body[..], b"hi");
-    }
-
-    #[test]
-    fn view_declared_content_type_replaces_the_html_default() {
-        let (parts, _) = run_view(async |cx| {
-            let header = (
-                CONTENT_TYPE,
-                HeaderValue::from_static("application/xhtml+xml"),
-            );
-            view! {
-                cx =>
-                (header)
-                "hi"
-            }
-        });
-        assert_eq!(header(&parts, "content-type"), "application/xhtml+xml");
     }
 
     // -- header arrays --

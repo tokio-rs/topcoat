@@ -61,12 +61,10 @@ impl ToTokens for View {
         // component/page/layout this binding is already in scope, so we emit
         // the view untouched.
         match &self.cx {
-            Some(cx) => quote! {
-                {
-                    #cx
-                    #view
-                }
-            }
+            Some(cx) => quote! {{
+                #cx
+                #view
+            }}
             .to_tokens(tokens),
             None => view.to_tokens(tokens),
         }

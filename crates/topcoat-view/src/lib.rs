@@ -20,6 +20,7 @@ pub use format::*;
 pub use html::*;
 pub use part::*;
 pub use props::*;
+pub use stream::*;
 pub use string::*;
 pub use view::*;
 

@@ -18,10 +18,8 @@ async fn home() -> Result {
         <!DOCTYPE html>
         <html>
             <head>
-                <title>"Hello world"</title>
-
-                // Reloads the browser when the dev server rebuilds the app.
-                topcoat::dev::script()
+                <title>"Hello world"</title> // Reloads the browser when the dev server rebuilds the app.
+                // topcoat::dev::script() // TODO
             </head>
             <body>hello(name: "World")</body>
         </html>

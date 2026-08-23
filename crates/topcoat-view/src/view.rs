@@ -9,6 +9,11 @@ use crate::{
     buffer::{InstructionPtr, Renderer, ViewBuffer, ViewBufferId, ViewBufferScope},
 };
 
+pub struct ViewChunk {
+    id: u64,
+    pub view: View, // TODO: not pub
+}
+
 /// A self-contained piece of HTML content.
 ///
 /// A view may contain multiple sibling nodes, but opened tags must be closed

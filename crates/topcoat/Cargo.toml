@@ -16,10 +16,10 @@ default = [
 	"asset",
 	"compression",
 	"cookie",
-	"font",
-	"icon",
+	# "font",
+	# "icon",
 	"router",
-	"runtime",
+	# "runtime", // TODO!
 	"serve",
 	"session",
 	"view",

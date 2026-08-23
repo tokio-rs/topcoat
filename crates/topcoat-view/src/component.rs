@@ -1,6 +1,7 @@
+use futures_core::Stream;
 use topcoat_core::{context::Cx, error::Error};
 
-use crate::{Props, View};
+use crate::{Props, ViewChunk};
 
 pub trait Component {
     type Props: Props;
@@ -15,7 +16,7 @@ pub trait Component {
         self,
         cx: &'cx Cx,
         props: Self::Props,
-    ) -> impl Future<Output = Result<View, Error>> + Send
+    ) -> impl Stream<Item = Result<ViewChunk, Error>> + Send
     where
         Self: 'cx,
         Self::Props: 'cx;

@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-pub type Result<T, E = Error> = ::core::result::Result<T, E>;
+pub type Result<T = (), E = Error> = ::core::result::Result<T, E>;
 
 /// Error type used by Topcoat APIs.
 ///

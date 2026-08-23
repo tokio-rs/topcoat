@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{ToTokens, quote};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
 use super::{
@@ -20,15 +20,10 @@ impl Scope {
 
     pub fn emit_root(&self) -> TokenStream {
         let view = self.emit_view();
-        let body = quote! {
-            async {
-                ::core::result::Result::<#topcoat_view::View, #topcoat_error::Error>::Ok(#view)
-            }
-        };
-        if self.is_static() {
-            quote! { #body.await }
-        } else {
-            quote! { #topcoat_view::internal::build(#body).await }
+        quote! {
+            #topcoat_view::internal::ViewStream::new(async {
+                #view
+            })
         }
     }
 
@@ -68,12 +63,13 @@ impl Scope {
             // no instruction block.
             quote! { #topcoat_view::View::unescaped_unchecked(#string) }
         } else {
-            let concurrent = self.nodes.iter().filter(|node| node.is_async()).count() >= 2;
-            let mut emitter = Emitter::new(!concurrent);
-            for node in &self.nodes {
-                node.emit(&mut emitter);
-            }
-            emitter.finish()
+            // let concurrent = self.nodes.iter().filter(|node| node.is_async()).count() >= 2;
+            // let mut emitter = Emitter::new(!concurrent);
+            // for node in &self.nodes {
+            //     node.emit(&mut emitter);
+            // }
+            // emitter.finish()
+            quote! {}
         }
     }
 

@@ -13,7 +13,9 @@ use syn::{
     spanned::Spanned,
     visit_mut::{self, VisitMut},
 };
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
+use topcoat_core_grammar::paths::{
+    topcoat_context, topcoat_error, topcoat_view, topcoat_view_macro,
+};
 
 use crate::component::{ComponentAttr, ComponentItem};
 
@@ -59,8 +61,8 @@ impl Component {
 
 impl ToTokens for Component {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let mut item = self.item.item().clone();
-        let mut generics = item.sig.generics.clone();
+        let item = self.item.item();
+        let attrs = &item.attrs;
         let vis = &item.vis;
         let ident = &item.sig.ident;
         let props_ident = format_ident!(
@@ -69,26 +71,20 @@ impl ToTokens for Component {
             span = ident.span()
         );
 
-        let attrs = item.attrs;
-        item.attrs = vec![];
-        item.sig.generics.params.insert(0, parse_quote! { '__cx });
-        item.sig
-            .inputs
-            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
+        let mut generics = item.sig.generics.clone();
+        let mut inputs = item.sig.inputs.clone();
+        inputs.insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
+        let block = &item.block;
 
         // The `#[default]` and `#[into]` helper attributes are only meaningful to
         // the `Props` derive, which sees them on the generated struct's fields.
         // They are not valid on the re-emitted function's parameters, so strip
         // them here to avoid a "cannot find attribute" error.
-        for arg in &mut item.sig.inputs {
+        for arg in &mut inputs {
             if let FnArg::Typed(pat_type) = arg {
                 pat_type.attrs.clear();
             }
         }
-
-        let ReturnType::Type(_, return_ty) = &item.sig.output else {
-            unreachable!("validated in Parse");
-        };
 
         let mut fields = Vec::new();
         let mut args = Vec::new();
@@ -149,6 +145,16 @@ impl ToTokens for Component {
             })
             .collect::<Vec<_>>();
 
+        let return_trait = quote! {
+            #topcoat_view::internal::Stream<Item = #topcoat_error::Result<#topcoat_view::ViewChunk>>
+                + ::core::marker::Send
+                + '__cx
+        };
+
+        let item = quote! {
+            fn #ident (#inputs) -> impl #return_trait #block
+        };
+
         // A lifetime or type parameter must appear in the body, so generic
         // markers carry a `PhantomData` field. Markers with no such parameters
         // are emitted as unit structs, which makes the marker's bare name a
@@ -187,19 +193,13 @@ impl ToTokens for Component {
                     self,
                     cx: &'__cx #topcoat_context::Cx,
                     props: Self::Props,
-                ) -> ::core::pin::Pin<::std::boxed::Box<
-                    dyn ::core::future::Future<Output = #return_ty>
-                        + ::core::marker::Send
-                        + '__cx,
-                >>
+                ) -> ::core::pin::Pin<::std::boxed::Box<dyn #return_trait>>
                 where
                     Self: '__cx,
                     Self::Props: '__cx,
                 {
-                    ::std::boxed::Box::pin(async move {
-                        #item
-                        #ident(cx, #(#args),*).await
-                    })
+                    #item
+                    ::std::boxed::Box::pin(#ident(cx, #(#args),*))
                 }
             }
         } else {
@@ -208,13 +208,13 @@ impl ToTokens for Component {
                     self,
                     cx: &'__cx #topcoat_context::Cx,
                     props: Self::Props,
-                ) -> #return_ty
+                ) -> impl #return_trait
                 where
                     Self: '__cx,
                     Self::Props: '__cx,
                 {
                     #item
-                    #ident(cx, #(#args),*).await
+                    #ident(cx, #(#args),*)
                 }
             }
         };

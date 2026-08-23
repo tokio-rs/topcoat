@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::stream::ViewChunk;
+use crate::ViewChunk;
 use topcoat_core::error::Result;
 
 thread_local! {

@@ -9,14 +9,11 @@ use futures_core::{FusedStream, Stream};
 use topcoat_core::error::Result;
 
 use crate::{
-    View,
+    View, ViewChunk,
     yielder::{collect, yield_},
 };
 
-pub struct ViewChunk {
-    id: u64,
-    view: View,
-}
+pub type BoxViewStream = Box<dyn Stream<Item = Result<ViewChunk>>>;
 
 pin_project! {
     pub struct ViewStream<F> {
@@ -30,12 +27,26 @@ impl<F> ViewStream<F>
 where
     F: Future<Output = ()>,
 {
-    pub async fn yield_all(self) {
+    #[doc(hidden)]
+    pub fn new(f: F) -> Self {
+        Self { f, done: false }
+    }
+
+    #[doc(hidden)]
+    pub async fn yield_all(self) -> Result<()> {
         let mut this = pin!(self);
         while let Some(value) = this.next().await {
-            yield_(value).await;
+            yield_(Ok(value?)).await;
         }
+        Ok(())
     }
+}
+
+#[macro_export]
+macro_rules! emit {
+    ($($tt:tt)*) => {
+        $crate::ViewStream::yield_all($crate::view! { $($tt)* }).await
+    };
 }
 
 impl<F> Stream for ViewStream<F>
