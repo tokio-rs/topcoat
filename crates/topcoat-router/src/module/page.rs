@@ -18,7 +18,7 @@ pub trait ModulePage: Send + Sync + 'static {
     fn module_path(&self) -> &'static str;
 
     /// Renders the page [`View`].
-    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream;
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx>;
 
     /// Returns whether this page handles the current request.
     ///
@@ -47,7 +47,7 @@ impl<P: ModulePage + ?Sized> ModulePage for &'static P {
         (**self).module_path()
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream {
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx> {
         (**self).render(cx, body)
     }
 }
@@ -81,7 +81,7 @@ impl<P: ModulePage> Page for ResolvedPage<P> {
         &self.path
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream {
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx> {
         self.page.render(cx, body)
     }
 }
@@ -98,7 +98,7 @@ pub trait ModuleLayout: Send + Sync + 'static {
 
     /// Renders the layout, embedding the given child content
     /// [`Result`]`<`[`View`]`>` as its slot.
-    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot) -> PageViewStream;
+    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx>;
 }
 
 impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
@@ -106,7 +106,7 @@ impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
         (**self).module_path()
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot) -> PageViewStream {
+    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx> {
         (**self).render(cx, slot)
     }
 }
@@ -132,7 +132,7 @@ impl<L: ModuleLayout> Layout for ResolvedLayout<L> {
         &self.path
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot) -> PageViewStream {
+    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx> {
         self.layout.render(cx, slot)
     }
 }

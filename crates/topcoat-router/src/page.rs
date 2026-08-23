@@ -12,7 +12,7 @@ use crate::{
 
 /// The stream returned by [`Page::render`] and [`Layout::render`]: a boxed,
 /// `Send` stream borrowing the handler and its request context.
-pub type PageViewStream = Pin<Box<dyn Stream<Item = Result<ViewChunk>> + Send>>;
+pub type PageViewStream<'cx> = Pin<Box<dyn Stream<Item = Result<ViewChunk>> + Send + 'cx>>;
 
 /// A page handler that renders a [`View`] for a specific URL path.
 ///
@@ -32,7 +32,7 @@ pub trait Page: Send + Sync + 'static {
     fn path(&self) -> &Path;
 
     /// Renders the page [`View`].
-    fn render<'cx>(&self, cx: &'cx Cx, body: Body) -> PageViewStream;
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx>;
 
     /// Returns whether this page handles the current request.
     ///
@@ -61,7 +61,7 @@ impl<P: Page + ?Sized> Page for &'static P {
         (**self).path()
     }
 
-    fn render<'cx>(&self, cx: &'cx Cx, body: Body) -> PageViewStream {
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx> {
         (**self).render(cx, body)
     }
 }
@@ -70,7 +70,7 @@ impl<P: Page + ?Sized> Page for &'static P {
 inventory::collect!(&'static dyn Page);
 
 /// The async render function backing a [`PageFn`].
-pub type PageRenderFn = for<'cx> fn(cx: &'cx Cx, body: Body) -> PageViewStream;
+pub type PageRenderFn = for<'cx> fn(cx: &'cx Cx, body: Body) -> PageViewStream<'cx>;
 
 /// A [`Page`] backed by a plain render function.
 ///
@@ -126,12 +126,12 @@ impl Page for PageFn {
         &self.path
     }
 
-    fn render<'cx>(&self, cx: &'cx Cx, body: Body) -> PageViewStream {
+    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx> {
         (self.render)(cx, body)
     }
 }
 
-pub type Slot = PageViewStream;
+pub type Slot<'cx> = PageViewStream<'cx>;
 
 /// A layout handler that wraps pages whose path starts with the layout's path
 /// prefix.
@@ -148,7 +148,7 @@ pub trait Layout: Send + Sync + 'static {
 
     /// Renders the layout, embedding the given child content
     /// [`Result`]`<`[`View`]`>` as its slot.
-    fn render<'cx>(&self, cx: &'cx Cx, slot: Slot) -> PageViewStream;
+    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx>;
 }
 
 impl<L: Layout + ?Sized> Layout for &'static L {
@@ -156,7 +156,7 @@ impl<L: Layout + ?Sized> Layout for &'static L {
         (**self).path()
     }
 
-    fn render<'cx>(&self, cx: &'cx Cx, slot: Slot) -> PageViewStream {
+    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx> {
         (**self).render(cx, slot)
     }
 }
@@ -166,7 +166,7 @@ inventory::collect!(&'static dyn Layout);
 
 /// The async render function backing a [`LayoutFn`], receiving the rendered
 /// child content as a [`Result`]`<`[`View`]`>`.
-pub type LayoutRenderFn = for<'cx> fn(cx: &'cx Cx, slot: Slot) -> PageViewStream;
+pub type LayoutRenderFn = for<'cx> fn(cx: &'cx Cx, slot: Slot) -> PageViewStream<'cx>;
 
 /// A [`Layout`] backed by a plain render function.
 ///
@@ -200,14 +200,14 @@ impl Layout for LayoutFn {
         &self.path
     }
 
-    fn render<'cx>(&self, cx: &'cx Cx, slot: Slot) -> PageViewStream {
+    fn render<'cx>(&self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx> {
         (self.render)(cx, slot)
     }
 }
 
 /// A [`Page`] paired with the [`Layout`]s that wrap it.
 pub struct PageWithLayouts {
-    page: Box<dyn Page>,
+    page: Arc<dyn Page>,
     /// The matching layouts, ordered by ascending path length (outermost first).
     layouts: Vec<Arc<dyn Layout>>,
 }
@@ -218,7 +218,7 @@ impl PageWithLayouts {
     /// `layouts` must be ordered from least- to most-specific (ascending path
     /// length); they are applied from the innermost (most specific) outward.
     #[must_use]
-    pub fn new(page: Box<dyn Page>, layouts: Vec<Arc<dyn Layout>>) -> Self {
+    pub fn new(page: Arc<dyn Page>, layouts: Vec<Arc<dyn Layout>>) -> Self {
         Self { page, layouts }
     }
 }
@@ -239,12 +239,16 @@ impl Route for PageWithLayouts {
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
         Box::pin(async move {
             let stream = {
-                let mut slot = self.page.render(cx, body);
-                for layout in self.layouts.iter().rev() {
-                    slot = layout.render(cx, slot);
-                }
-
+                let page = self.page.clone();
+                let layouts = self.layouts.clone();
+                let cx = cx.clone();
+                // TODO: prevent inefficient cloning
                 ViewStream::new(async move {
+                    let mut slot = page.render(&cx, body);
+                    for layout in layouts.iter().rev() {
+                        slot = layout.render(&cx, slot);
+                    }
+
                     while let Some(item) = slot.next().await {
                         topcoat_view::internal::yield_(item).await;
                     }

@@ -46,7 +46,7 @@ use crate::{
 /// ```
 pub struct RouterBuilder {
     routes: Vec<Box<dyn Route>>,
-    pages: Vec<Box<dyn Page>>,
+    pages: Vec<Arc<dyn Page>>,
     layouts: Vec<Arc<dyn Layout>>,
     layers: Vec<Arc<dyn Layer>>,
     context: AppContext,
@@ -112,7 +112,7 @@ impl RouterBuilder {
     /// the page opts into others).
     #[must_use]
     pub fn page(mut self, page: impl Page) -> Self {
-        self.pages.push(Box::new(page));
+        self.pages.push(Arc::new(page));
         self
     }
 
