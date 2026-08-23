@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    future::Future,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use topcoat::context::{Cx, memoize};
 
@@ -66,6 +69,38 @@ async fn async_memoized_function_runs_body_once_per_key_per_request() {
     assert_eq!(b, "post:hello");
     assert_eq!(c, "post:world");
     assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+}
+
+/// A memoized function with a borrowed argument must be callable from a
+/// future that is required to be `Send`, as router handler futures are.
+/// This is a compile-time regression test: a higher-ranked bound on the
+/// memoize cache's closure once made this fail the `Send` check with
+/// "implementation of `AsyncFnOnce` is not general enough".
+#[tokio::test]
+async fn async_memoized_function_with_borrowed_argument_works_in_send_future() {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[memoize]
+    async fn lookup(cx: &Cx, slug: &str) -> String {
+        let _ = cx;
+        CALLS.fetch_add(1, Ordering::SeqCst);
+        slug.to_owned()
+    }
+
+    fn require_send<F: Future + Send>(future: F) -> F {
+        future
+    }
+
+    let cx = Cx::default();
+
+    let value = require_send(async {
+        let slug = String::from("hello");
+        lookup(&cx, slug.as_str()).await.clone()
+    })
+    .await;
+
+    assert_eq!(value, "hello");
+    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]

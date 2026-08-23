@@ -1,6 +1,7 @@
 use std::{
     any::{Any, TypeId},
     collections::hash_map::RandomState,
+    future::Future,
     hash::{BuildHasher, Hash},
     sync::OnceLock,
 };
@@ -87,7 +88,7 @@ impl MemoizeCache {
     where
         K: Hash,
         V: Send + Sync + 'static,
-        F: (for<'cx> FnOnce(&'cx Cx, P) -> V) + 'static,
+        F: (FnOnce(Cx, P) -> V) + 'static,
     {
         self.get_or_insert_cell::<F, _, SyncMemoizeCell<V>>(&key)
             .get_or_init::<F, _>(cx, |cx| f(cx, params))
@@ -126,7 +127,7 @@ impl MemoizeCache {
 
     /// Async counterpart to [`memoize`](Self::memoize). Concurrent callers with the same key
     /// and scope share a single in-flight computation via the cell's gate.
-    pub async fn memoize_async<'a, K, P, V, F>(
+    pub async fn memoize_async<'a, K, P, V, F, Fut>(
         &'a self,
         cx: &'a Cx,
         key: K,
@@ -136,10 +137,11 @@ impl MemoizeCache {
     where
         K: Hash,
         V: Send + Sync + 'static,
-        F: AsyncFnOnce(&Cx, P) -> V + 'static,
+        F: (FnOnce(Cx, P) -> Fut) + 'static,
+        Fut: Future<Output = V>,
     {
         self.get_or_insert_cell::<F, _, AsyncMemoizeCell<V>>(&key)
-            .get_or_init::<F, _>(cx, async |cx| f(cx, params).await)
+            .get_or_init::<F, _, _>(cx, |cx| f(cx, params))
             .await
     }
 }
@@ -186,7 +188,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
         let n = counter();
-        let f = move |_: &Cx, (x, y): (i32, i32)| {
+        let f = move |_: Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
             x + y
         };
@@ -204,7 +206,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
         let n = counter();
-        let f = move |_: &Cx, (x, y): (i32, i32)| {
+        let f = move |_: Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
             x + y
         };
@@ -222,11 +224,11 @@ mod tests {
         let cx = Cx::default();
         let n1 = counter();
         let n2 = counter();
-        let f1 = move |_: &Cx, (x,): (i32,)| {
+        let f1 = move |_: Cx, (x,): (i32,)| {
             n1.fetch_add(1, Ordering::SeqCst);
             x
         };
-        let f2 = move |_: &Cx, (x,): (i32,)| {
+        let f2 = move |_: Cx, (x,): (i32,)| {
             n2.fetch_add(1, Ordering::SeqCst);
             x * 10
         };
@@ -245,7 +247,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
         let n = counter();
-        let f = move |_: &Cx, (s,): (&str,)| {
+        let f = move |_: Cx, (s,): (&str,)| {
             n.fetch_add(1, Ordering::SeqCst);
             s.to_owned()
         };
@@ -270,7 +272,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
         let n = counter();
-        let f = move |_: &Cx, (t,): (&Token,)| {
+        let f = move |_: Cx, (t,): (&Token,)| {
             n.fetch_add(1, Ordering::SeqCst);
             t.0
         };
@@ -288,7 +290,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
         let n = counter();
-        let f = move |_: &Cx, (): ()| {
+        let f = move |_: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
             42
         };
@@ -306,7 +308,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
         let n = counter();
-        let f = move |_: &Cx, (): ()| {
+        let f = move |_: Cx, (): ()| {
             assert_ne!(n.fetch_add(1, Ordering::SeqCst), 0, "first attempt");
             42
         };
@@ -323,7 +325,7 @@ mod tests {
     fn get_observes_memoized_value() {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
-        let f = move |cx: &Cx, (x,): (i32,)| x * request_context::<Setting>(cx).0;
+        let f = move |cx: Cx, (x,): (i32,)| x * request_context::<Setting>(&cx).0;
 
         let cx = cx.with(Setting(2));
         assert_eq!(cache.get::<_, i32, _>(&cx, f, (&3i32,)), None);
@@ -342,9 +344,9 @@ mod tests {
         let cx = Cx::default().with(Setting(1));
         let shadowed = cx.with(Setting(2));
         let n = counter();
-        let f = move |cx: &Cx, (): ()| {
+        let f = move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
-            request_context::<Setting>(cx).0
+            request_context::<Setting>(&cx).0
         };
 
         let original = cache.memoize(&cx, (), (), f);
@@ -362,9 +364,9 @@ mod tests {
         let cx = Cx::default();
         let extended = cx.with(Setting(5));
         let n = counter();
-        let f = move |cx: &Cx, (): ()| {
+        let f = move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
-            try_request_context::<Setting>(cx).map_or(-1, |setting| setting.0)
+            try_request_context::<Setting>(&cx).map_or(-1, |setting| setting.0)
         };
 
         assert_eq!(*cache.memoize(&cx, (), (), f), -1);
@@ -378,9 +380,9 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default().with(Setting(1));
         let n = counter();
-        let f = move |cx: &Cx, (): ()| {
+        let f = move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
-            request_context::<Setting>(cx).0
+            request_context::<Setting>(&cx).0
         };
 
         assert_eq!(*cache.memoize(&cx, (), (), f), 1);
@@ -393,7 +395,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default().with(Setting(1));
         let n = counter();
-        let f = move |_: &Cx, (): ()| {
+        let f = move |_: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
             42
         };
@@ -408,13 +410,13 @@ mod tests {
         let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
         let n_outer = counter();
         let n_inner = counter();
-        let inner = move |cx: &Cx, (): ()| {
+        let inner = move |cx: Cx, (): ()| {
             n_inner.fetch_add(1, Ordering::SeqCst);
-            request_context::<Setting>(cx).0
+            request_context::<Setting>(&cx).0
         };
-        let outer = move |cx: &Cx, (): ()| {
+        let outer = move |cx: Cx, (): ()| {
             n_outer.fetch_add(1, Ordering::SeqCst);
-            *cache.memoize(cx, (), (), inner) * 10
+            *cache.memoize(&cx, (), (), inner) * 10
         };
 
         let cx = Cx::default().with(Setting(1));
@@ -430,10 +432,10 @@ mod tests {
     fn sync_nested_hit_propagates_reads() {
         let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
         let n_outer = counter();
-        let inner = move |cx: &Cx, (): ()| request_context::<Setting>(cx).0;
-        let outer = move |cx: &Cx, (): ()| {
+        let inner = move |cx: Cx, (): ()| request_context::<Setting>(&cx).0;
+        let outer = move |cx: Cx, (): ()| {
             n_outer.fetch_add(1, Ordering::SeqCst);
-            *cache.memoize(cx, (), (), inner) * 10
+            *cache.memoize(&cx, (), (), inner) * 10
         };
 
         let cx = Cx::default().with(Setting(1));
@@ -449,8 +451,8 @@ mod tests {
     fn sync_nested_internal_scope_is_not_a_dependency() {
         let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
         let n_outer = counter();
-        let inner = move |cx: &Cx, (): ()| request_context::<Setting>(cx).0;
-        let outer = move |cx: &Cx, (): ()| {
+        let inner = move |cx: Cx, (): ()| request_context::<Setting>(&cx).0;
+        let outer = move |cx: Cx, (): ()| {
             n_outer.fetch_add(1, Ordering::SeqCst);
             let scoped = cx.with(Setting(7));
             *cache.memoize(&scoped, (), (), inner)
@@ -470,7 +472,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
         let n = counter();
-        let f = move |cx: &Cx, (): ()| {
+        let f = move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
             let scoped = cx.with(Setting(7));
             request_context::<Setting>(&scoped).0
@@ -488,7 +490,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
         let n = counter();
-        let f = async move |_: &Cx, (x, y): (i32, i32)| {
+        let f = async move |_: Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
             tokio::task::yield_now().await;
             x + y
@@ -509,7 +511,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
         let n = counter();
-        let f = async move |_: &Cx, (x, y): (i32, i32)| {
+        let f = async move |_: Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
             x + y
         };
@@ -526,10 +528,10 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default().with(Setting(1));
         let n = counter();
-        let f = async move |cx: &Cx, (): ()| {
+        let f = async move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
             tokio::task::yield_now().await;
-            request_context::<Setting>(cx).0
+            request_context::<Setting>(&cx).0
         };
 
         let shadowed = cx.with(Setting(2));
@@ -543,10 +545,10 @@ mod tests {
     async fn async_nested_hit_propagates_reads() {
         let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
         let n_outer = counter();
-        let inner = async move |cx: &Cx, (): ()| request_context::<Setting>(cx).0;
-        let outer = async move |cx: &Cx, (): ()| {
+        let inner = async move |cx: Cx, (): ()| request_context::<Setting>(&cx).0;
+        let outer = async move |cx: Cx, (): ()| {
             n_outer.fetch_add(1, Ordering::SeqCst);
-            *cache.memoize_async(cx, (), (), inner).await * 10
+            *cache.memoize_async(&cx, (), (), inner).await * 10
         };
 
         let cx = Cx::default().with(Setting(1));
@@ -568,7 +570,7 @@ mod tests {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
         let n = counter();
-        let f = async move |_: &Cx, (): ()| {
+        let f = async move |_: Cx, (): ()| {
             if n.fetch_add(1, Ordering::SeqCst) == 0 {
                 std::future::pending::<()>().await;
             }

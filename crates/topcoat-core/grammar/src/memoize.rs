@@ -170,6 +170,7 @@ impl ToTokens for Memoize {
                     (#(#borrowed_keys,)*),
                     (#(#key_idents,)*),
                     async |cx, (#(#closure_pats,)*)| {
+                        let cx = &cx;
                         #(#destructures)*
                         #(#body_stmts)*
                     },
@@ -182,6 +183,7 @@ impl ToTokens for Memoize {
                     (#(#borrowed_keys,)*),
                     (#(#key_idents,)*),
                     |cx, (#(#closure_pats,)*)| {
+                        let cx = &cx;
                         #(#destructures)*
                         #(#body_stmts)*
                     },

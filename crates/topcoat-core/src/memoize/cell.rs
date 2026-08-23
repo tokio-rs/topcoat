@@ -110,7 +110,7 @@ impl<V> SyncMemoizeCell<V> {
     /// recursion panic.
     pub(super) fn get_or_init<Marker, I>(&self, cx: &Cx, initialize: I) -> &V
     where
-        I: FnOnce(&Cx) -> V,
+        I: FnOnce(Cx) -> V,
     {
         if let Some(value) = self.variants.reuse(cx) {
             return value;
@@ -122,7 +122,7 @@ impl<V> SyncMemoizeCell<V> {
             return value;
         }
         let (child, tracker) = cx.track();
-        let value = self.recursion.scope(|| initialize(&child));
+        let value = self.recursion.scope(|| initialize(child));
         self.variants.insert(cx, value, tracker.take_reads())
     }
 }
@@ -155,9 +155,10 @@ impl<V> AsyncMemoizeCell<V> {
     /// Concurrent callers with the same scope share a single in-flight
     /// computation. `Marker` is the memoized function's type and only names
     /// it in the recursion panic.
-    pub(super) async fn get_or_init<Marker, I>(&self, cx: &Cx, initialize: I) -> &V
+    pub(super) async fn get_or_init<Marker, I, Fut>(&self, cx: &Cx, initialize: I) -> &V
     where
-        I: AsyncFnOnce(&Cx) -> V,
+        I: FnOnce(Cx) -> Fut,
+        Fut: Future<Output = V>,
     {
         if let Some(value) = self.variants.reuse(cx) {
             return value;
@@ -169,7 +170,7 @@ impl<V> AsyncMemoizeCell<V> {
             return value;
         }
         let (child, tracker) = cx.track();
-        let mut future = pin!(self.recursion.scope(|| initialize(&child)));
+        let mut future = pin!(self.recursion.scope(|| initialize(child)));
         // Clear ownership after every poll so sibling futures can wait on this cell and
         // the initializer can move between executor threads.
         let value = poll_fn(|task| self.recursion.scope(|| future.as_mut().poll(task))).await;
