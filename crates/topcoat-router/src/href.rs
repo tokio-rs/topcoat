@@ -38,6 +38,15 @@ impl HrefTarget for &'static str {
     }
 }
 
+impl<T> HrefTarget for &T
+where
+    T: HrefTarget + ?Sized,
+{
+    fn path<'cx>(&self, cx: &'cx Cx) -> &'cx Path {
+        (*self).path(cx)
+    }
+}
+
 /// A value for one path parameter, named after the parameter it fills.
 ///
 /// The `path_param!` macro implements this trait for the types it declares.
