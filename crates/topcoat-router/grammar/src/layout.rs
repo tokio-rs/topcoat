@@ -1,14 +1,13 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{ToTokens, quote};
 use syn::{
-    FnArg, ItemFn, LitStr, Pat, ReturnType, Visibility,
+    FnArg, ItemFn, LitStr, Pat, ReturnType,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
 };
 use topcoat_core_grammar::paths::{
-    topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_view,
-    topcoat_view_macro,
+    topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro,
 };
 
 pub struct LayoutAttr {
@@ -119,66 +118,31 @@ impl ToTokens for Layout {
         let attr = &self.0;
         let item = &self.1.item;
         let args = &self.1.args;
-        let vis = &item.vis;
         let ident = &item.sig.ident;
-        let output = &item.sig.output;
 
-        // Marker: the value users register and reference, expanded from the
-        // component face. It wraps a child view inline from `view!`, always
-        // takes `cx` (feeding the handler's injected context parameter), and
-        // the child is already rendered, so it is passed as the `slot` prop
-        // and handed to the handler as an `Ok` result. The marker struct the
-        // face expands to is a unit struct, so `#ident` stays a value usable
-        // directly in `router.layout(...)`.
-        let component_args = args.iter().map(|arg| match arg {
-            LayoutArg::Cx => quote! { cx },
-            LayoutArg::Slot => quote! { slot },
-        });
+        let mut face = item.clone();
+        for (arg, input) in args.iter().zip(&mut face.sig.inputs) {
+            if let (LayoutArg::Slot, FnArg::Typed(pat_type)) = (arg, input) {
+                pat_type.ty = Box::new(parse_quote! { #topcoat_router::Slot<'_> });
+            }
+        }
         let marker = quote! {
             #[#topcoat_view_macro::component]
-            #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_router::Slot) #output {
-                #ident::handler(cx #(, #component_args)*).await
-            }
+            #face
         };
 
-        // The user's function, re-emitted as the marker's `handler` associated
-        // function. Associated items are reached through the type rather than
-        // lexical scope, so `#ident::handler` is callable from the component
-        // face and the trait implementation below. The injected `__cx`
-        // parameter carries the ambient context that `view!` bodies read.
-        let mut inner = item.clone();
-        inner.sig.ident = format_ident!("handler", span = ident.span());
-        inner.vis = Visibility::Inherited;
-        inner.sig.generics.params.insert(0, parse_quote! { '__cx });
-        inner
-            .sig
-            .inputs
-            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
-        inner
-            .attrs
-            .push(parse_quote! { #[allow(clippy::unused_async)] });
-        let handler = quote! {
-            impl #ident {
-                #inner
-            }
-        };
-
-        // The trait implementation dispatching requests to the handler: it
-        // passes the already-rendered slot result through untouched, so the
-        // layout body wraps the inner page's output. A layout with an explicit
-        // path is a `Layout`; one without derives its path from the module
-        // tree through the module router as a `ModuleLayout`.
-        let render_args = args.iter().map(|arg| match arg {
-            LayoutArg::Cx => quote! { cx },
-            LayoutArg::Slot => quote! { slot },
-        });
         let render = quote! {
             fn render<'cx>(
                 &'cx self,
                 cx: &'cx #topcoat_context::Cx,
                 slot: #topcoat_router::Slot<'cx>,
             ) -> #topcoat_router::PageViewStream<'cx> {
-                ::std::boxed::Box::pin(#ident::handler(cx #(, #render_args)*))
+                let props = <#ident as #topcoat_view::Component>::props_builder()
+                    .slot(slot)
+                    .build();
+                ::std::boxed::Box::pin(
+                    <#ident as #topcoat_view::Component>::render(#ident, cx, props),
+                )
             }
         };
         let (layout, submit_as) = if let Some(path) = attr.path.as_ref() {
@@ -215,8 +179,6 @@ impl ToTokens for Layout {
             #marker
 
             const _: () = {
-                #handler
-
                 #layout
 
                 #submit
