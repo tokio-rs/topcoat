@@ -1,8 +1,17 @@
-use std::sync::Arc;
+use std::{
+    cell::Cell,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
+use futures_core::Stream;
+use futures_util::future::poll_fn;
 #[cfg(feature = "http")]
 use http::{HeaderMap, StatusCode};
+use pin_project_lite::pin_project;
 use topcoat_core::context::Cx;
+use topcoat_core::error::Result;
 
 use crate::{
     Formatter,
