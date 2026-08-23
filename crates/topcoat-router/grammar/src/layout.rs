@@ -136,7 +136,7 @@ impl ToTokens for Layout {
         });
         let marker = quote! {
             #[#topcoat_view_macro::component]
-            #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_error::Result<#topcoat_view::View>) #output {
+            #vis async fn #ident(cx: &#topcoat_context::Cx, slot: #topcoat_router::Slot) #output {
                 #ident::handler(cx #(, #component_args)*).await
             }
         };
@@ -176,8 +176,8 @@ impl ToTokens for Layout {
             fn render<'cx>(
                 &'cx self,
                 cx: &'cx #topcoat_context::Cx,
-                slot: #topcoat_error::Result<#topcoat_view::View>,
-            ) -> #topcoat_router::ViewFuture<'cx> {
+                slot: #topcoat_router::Slot<'cx>,
+            ) -> #topcoat_router::PageViewStream<'cx> {
                 ::std::boxed::Box::pin(#ident::handler(cx #(, #render_args)*))
             }
         };

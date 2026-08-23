@@ -1,18 +1,18 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    ItemFn, LitStr, ReturnType, Visibility,
+    FnArg, ItemFn, LitStr, Pat, ReturnType,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
 };
 use topcoat_core_grammar::{
     ParseOption,
-    paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view_macro},
+    paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro},
 };
 
 use super::{
-    common::{HandlerArg, HandlerArgs, request_ident},
+    common::{HandlerArg, HandlerArgs},
     method::Methods,
 };
 
@@ -52,6 +52,16 @@ impl Parse for PageItem {
             ));
         }
         let args = HandlerArgs::parse(&item, "page")?;
+        for (arg, input) in args.iter().zip(&item.sig.inputs) {
+            if let (HandlerArg::Cx, FnArg::Typed(pat_type)) = (arg, input)
+                && !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "cx")
+            {
+                return Err(syn::Error::new_spanned(
+                    pat_type,
+                    "the request context parameter must be named `cx`",
+                ));
+            }
+        }
         Ok(Self { item, args })
     }
 }
@@ -81,76 +91,65 @@ impl ToTokens for Page {
         let attr = &self.0;
         let item = &self.1.item;
         let args = &self.1.args;
-        let vis = &item.vis;
         let ident = &item.sig.ident;
-        let output = &item.sig.output;
 
-        // Marker: the value users register and reference, expanded from the
-        // component face. It renders the page inline from `view!`, always
-        // takes `cx` (feeding the function's injected context parameter), and
-        // a page that reads a request body takes the already-parsed value as a
-        // `body` prop instead. The marker struct the face expands to is a unit
-        // struct, so `#ident` stays a value usable directly in
-        // `router.page(...)`.
-        let body_param = args.request().map(|ty| quote! { , body: #ty });
-        let body_arg = args.request().map(|_| quote! { , body });
+        let mut face = item.clone();
+        for (arg, input) in args.iter().zip(&mut face.sig.inputs) {
+            if let (HandlerArg::Request(_), FnArg::Typed(pat_type)) = (arg, input)
+                && !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "body")
+            {
+                let pat = std::mem::replace(&mut *pat_type.pat, parse_quote! { body });
+                face.block
+                    .stmts
+                    .insert(0, parse_quote! { let #pat = body; });
+            }
+        }
         let marker = quote! {
             #[#topcoat_view_macro::component]
-            #vis async fn #ident(cx: &#topcoat_context::Cx #body_param) #output {
-                #ident::handler(cx #body_arg).await
-            }
+            #face
         };
 
-        // The user's function, re-emitted under its original name inside the
-        // bridge below to keep the module namespace clean. Its own name shadows
-        // the marker within its body, so bindings named after the page keep
-        // working. The injected `__cx` parameter carries the ambient context
-        // that `view!` bodies read.
-        let mut inner = item.clone();
-        inner.vis = Visibility::Inherited;
-        inner.sig.generics.params.insert(0, parse_quote! { '__cx });
-        inner
-            .sig
-            .inputs
-            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
-        inner
-            .attrs
-            .push(parse_quote! { #[allow(clippy::unused_async)] });
-
-        // The bridge every caller goes through: associated items are reached
-        // through the type rather than lexical scope, so `#ident::handler` is
-        // callable from the component face and the trait implementation below.
-        // It forwards to the user's function positionally, in declared
-        // parameter order.
-        let forward_args = args.iter().map(|arg| match arg {
-            HandlerArg::Cx => quote! { cx },
-            HandlerArg::Request(_) => quote! { body },
-        });
-        let handler = quote! {
-            impl #ident {
-                async fn handler(cx: &#topcoat_context::Cx #body_param) #output {
-                    #inner
-
-                    #ident(cx #(, #forward_args)*).await
+        let render = if let Some(request_ty) = args.request() {
+            let parse_request = quote_spanned! {request_ty.span()=>
+                let body = match <#request_ty as #topcoat_router::request::FromRequest>::from_request(cx, body).await {
+                    ::core::result::Result::Ok(body) => body,
+                    ::core::result::Result::Err(error) => {
+                        return #topcoat_view::internal::yield_(::core::result::Result::Err(error)).await;
+                    }
+                };
+            };
+            quote! {
+                fn render<'cx>(
+                    &'cx self,
+                    cx: &'cx #topcoat_context::Cx,
+                    body: #topcoat_router::Body,
+                ) -> #topcoat_router::PageViewStream<'cx> {
+                    ::std::boxed::Box::pin(#topcoat_view::internal::ViewStream::new(async move {
+                        #parse_request
+                        let props = <#ident as #topcoat_view::Component>::props_builder()
+                            .body(body)
+                            .build();
+                        #topcoat_view::internal::forward(
+                            <#ident as #topcoat_view::Component>::render(#ident, cx, props),
+                        )
+                        .await;
+                    }))
+                }
+            }
+        } else {
+            quote! {
+                fn render<'cx>(
+                    &'cx self,
+                    cx: &'cx #topcoat_context::Cx,
+                    _body: #topcoat_router::Body,
+                ) -> #topcoat_router::PageViewStream<'cx> {
+                    let props = <#ident as #topcoat_view::Component>::props_builder().build();
+                    ::std::boxed::Box::pin(
+                        <#ident as #topcoat_view::Component>::render(#ident, cx, props),
+                    )
                 }
             }
         };
-
-        // The trait implementation dispatching requests to the bridge: it
-        // parses the request body (when the page takes one) and hands it to
-        // the bridge. A page with an explicit path is a `Page`; one without
-        // derives its path from the module tree through the module router as
-        // a `ModulePage`.
-        let parse_request = args.request().map(|request_ty| {
-            let request_ident = request_ident();
-            quote_spanned! {request_ty.span()=>
-                let #request_ident = <#request_ty as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
-            }
-        });
-        let request_arg = args.request().map(|_| {
-            let request_ident = request_ident();
-            quote! { , #request_ident }
-        });
         let methods = attr.methods.as_ref().map_or_else(
             || quote! { #topcoat_router::Methods::Only(&[#topcoat_router::Method::GET]) },
             ToTokens::to_token_stream,
@@ -164,18 +163,6 @@ impl ToTokens for Page {
             fn methods(&self) -> #topcoat_router::Methods<'_> {
                 const METHODS: #topcoat_router::Methods<'static> = #methods;
                 METHODS
-            }
-        };
-        let render = quote! {
-            fn render<'cx>(
-                &'cx self,
-                cx: &'cx #topcoat_context::Cx,
-                body: #topcoat_router::Body,
-            ) -> #topcoat_router::ViewFuture<'cx> {
-                ::std::boxed::Box::pin(async move {
-                    #parse_request
-                    #ident::handler(cx #request_arg).await
-                })
             }
         };
         let (page, submit_as) = if let Some(path) = attr.path.as_ref() {
@@ -239,8 +226,6 @@ impl ToTokens for Page {
             const _: () = {
                 static ID: ::std::sync::LazyLock<#topcoat_router::RouteId> =
                     ::std::sync::LazyLock::new(#topcoat_router::RouteId::new);
-
-                #handler
 
                 #page
 

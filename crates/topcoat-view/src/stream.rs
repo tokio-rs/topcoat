@@ -1,17 +1,13 @@
-use futures_util::StreamExt;
 use pin_project_lite::pin_project;
 use std::{
-    pin::{Pin, pin},
+    pin::Pin,
     task::{Context, Poll},
 };
 
 use futures_core::{FusedStream, Stream};
 use topcoat_core::error::Result;
 
-use crate::{
-    View, ViewChunk,
-    yielder::{collect, yield_},
-};
+use crate::{ViewChunk, yielder::collect};
 
 pub type BoxViewStream = Box<dyn Stream<Item = Result<ViewChunk>>>;
 
@@ -31,21 +27,12 @@ where
     pub fn new(f: F) -> Self {
         Self { f, done: false }
     }
-
-    #[doc(hidden)]
-    pub async fn yield_all(self) -> Result<()> {
-        let mut this = pin!(self);
-        while let Some(value) = this.next().await {
-            yield_(Ok(value?)).await;
-        }
-        Ok(())
-    }
 }
 
 #[macro_export]
 macro_rules! emit {
     ($($tt:tt)*) => {
-        $crate::ViewStream::yield_all($crate::view! { $($tt)* }).await
+        $crate::internal::forward($crate::view! { $($tt)* }).await
     };
 }
 

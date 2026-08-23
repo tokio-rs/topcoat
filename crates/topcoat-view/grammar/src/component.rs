@@ -70,10 +70,12 @@ impl ToTokens for Component {
             ident.unraw().to_string().to_pascal_case(),
             span = ident.span()
         );
+        let mut struct_generics = item.sig.generics.clone();
+        let mut item_generics = item.sig.generics.clone();
 
-        let mut generics = item.sig.generics.clone();
         let mut inputs = item.sig.inputs.clone();
         inputs.insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
+        item_generics.params.insert(0, parse_quote! { '__cx });
         let block = &item.block;
 
         // The `#[default]` and `#[into]` helper attributes are only meaningful to
@@ -119,17 +121,19 @@ impl ToTokens for Component {
         }
 
         if implicit_lifetime_visitor.used {
-            generics.params.insert(0, parse_quote! { '__implicit });
+            struct_generics
+                .params
+                .insert(0, parse_quote! { '__implicit });
         }
-        generics.params.extend(
+        struct_generics.params.extend(
             impl_traits_visitor
                 .params
                 .into_iter()
                 .map(GenericParam::Type),
         );
-        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+        let (impl_generics, ty_generics, where_clause) = struct_generics.split_for_impl();
 
-        let phantom_args = generics
+        let phantom_args = struct_generics
             .params
             .iter()
             .filter_map(|param| match param {
@@ -152,7 +156,7 @@ impl ToTokens for Component {
         };
 
         let item = quote! {
-            fn #ident (#inputs) -> impl #return_trait #block
+            fn #ident #item_generics (#inputs) -> impl #return_trait #block
         };
 
         // A lifetime or type parameter must appear in the body, so generic
@@ -204,7 +208,8 @@ impl ToTokens for Component {
             }
         } else {
             quote! {
-                async fn render<'__cx>(
+                #[allow(refining_impl_trait)]
+                fn render<'__cx>(
                     self,
                     cx: &'__cx #topcoat_context::Cx,
                     props: Self::Props,

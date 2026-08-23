@@ -257,7 +257,7 @@ impl Route for PageWithLayouts {
 
             ViewResponse::try_from(Box::pin(stream))
                 .await?
-                .into_response(&cx)
+                .into_response(cx)
         })
     }
 }

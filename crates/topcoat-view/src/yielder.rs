@@ -1,8 +1,11 @@
 use std::{
     cell::Cell,
-    pin::Pin,
+    pin::{Pin, pin},
     task::{Context, Poll},
 };
+
+use futures_core::Stream;
+use futures_util::StreamExt;
 
 use crate::ViewChunk;
 use topcoat_core::error::Result;
@@ -37,6 +40,15 @@ impl Future for Yield {
 #[must_use]
 pub fn yield_(value: Result<ViewChunk>) -> Yield {
     Yield { value: Some(value) }
+}
+
+/// Forwards every item of `stream` through the enclosing
+/// [`ViewStream`](crate::ViewStream), errors included.
+pub async fn forward(stream: impl Stream<Item = Result<ViewChunk>>) {
+    let mut stream = pin!(stream);
+    while let Some(item) = stream.next().await {
+        yield_(item).await;
+    }
 }
 
 struct Collect {
