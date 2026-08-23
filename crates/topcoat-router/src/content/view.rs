@@ -20,9 +20,8 @@ pub struct ViewResponse {
 
 impl ViewResponse {
     pub async fn try_from(
-        stream: impl Stream<Item = Result<ViewChunk>> + Send + 'static,
+        mut stream: Pin<Box<dyn Stream<Item = Result<ViewChunk>> + Send>>,
     ) -> Result<Self> {
-        let mut stream = stream.boxed();
         Ok(Self {
             first: stream
                 .next()
