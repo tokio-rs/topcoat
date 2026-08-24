@@ -81,11 +81,16 @@ where
     {
         let mut stream = pin!(self);
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk?;
-            writer.emit(|parts| {
-                parts.push_view_chunk(chunk);
-            })
-            .await;
+            match chunk? {
+                ViewChunk::Content(view) => {
+                    writer.emit(|parts| {
+                        parts.push_view(view);
+                    })
+                    .await;
+                }
+                // A swap targets its own position; it passes through as is.
+                chunk @ ViewChunk::Swap { .. } => yield_(Ok(chunk)).await,
+            }
         }
         Ok(())
     }
@@ -99,11 +104,16 @@ impl NodeViewPartsStream for BoxView<'_> {
         Self: 'cx,
     {
         while let Some(chunk) = self.next().await {
-            let chunk = chunk?;
-            writer.emit(|parts| {
-                parts.push_view_chunk(chunk);
-            })
-            .await;
+            match chunk? {
+                ViewChunk::Content(view) => {
+                    writer.emit(|parts| {
+                        parts.push_view(view);
+                    })
+                    .await;
+                }
+                // A swap targets its own position; it passes through as is.
+                chunk @ ViewChunk::Swap { .. } => yield_(Ok(chunk)).await,
+            }
         }
         Ok(())
     }
@@ -144,7 +154,7 @@ impl NodeWriter {
     /// Panics if no view is building on the current task.
     pub async fn emit(&mut self, f: impl FnOnce(&mut PartsWriter<'_>)) {
         let view = ViewBufferScope::with(|buffer| PartsWriter::block(buffer, f));
-        yield_(Ok(ViewChunk::new(view))).await;
+        yield_(Ok(ViewChunk::Content(view))).await;
     }
 }
 

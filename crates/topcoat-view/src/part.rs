@@ -4,7 +4,7 @@ use core::fmt;
 use http::{HeaderMap, StatusCode};
 use topcoat_core::context::Cx;
 
-use crate::{HtmlContext, HtmlWriter, ViewChunk, ViewHandle, buffer::ViewBuffer};
+use crate::{HtmlContext, HtmlWriter, ViewHandle, buffer::ViewBuffer};
 
 /// A boxed view part that writes its output at render time.
 ///
@@ -302,17 +302,6 @@ impl<'a> PartsWriter<'a> {
         self.size_hint += view.size_hint();
         self.buffer.push_view(view);
         self
-    }
-
-    /// Appends the view a [`ViewChunk`] carries.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the chunk's view was built in a different, still building
-    /// buffer.
-    #[inline]
-    pub fn push_view_chunk(&mut self, chunk: ViewChunk) -> &mut Self {
-        self.push_view(chunk.view)
     }
 
     /// Records a response status code; renders no content.

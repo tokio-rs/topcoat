@@ -18,19 +18,20 @@ use crate::{
     buffer::{InstructionPtr, Renderer, ViewBuffer, ViewBufferId, ViewBufferScope},
 };
 
-pub struct ViewChunk {
-    id: u64,
-    pub view: ViewHandle, // TODO: not pub
-}
-
-impl ViewChunk {
-    /// Wraps a view in a content chunk.
-    ///
-    /// The id targets the position a later chunk swaps into; content chunks
-    /// carry `0` until the live swap protocol assigns real ids.
-    pub(crate) fn new(view: ViewHandle) -> Self {
-        Self { id: 0, view }
-    }
+/// One rendered piece of a view stream.
+///
+/// A view's first chunk is always its content; only a stream emitting more
+/// than one chunk swaps later content into an identified position.
+pub enum ViewChunk {
+    /// The content rendered at the position that emitted the chunk.
+    Content(ViewHandle),
+    /// A live update replacing the content at an identified position.
+    Swap {
+        /// The position the update swaps into.
+        id: u64,
+        /// The replacement content.
+        view: ViewHandle,
+    },
 }
 
 /// A self-contained piece of HTML content.

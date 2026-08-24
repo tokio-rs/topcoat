@@ -22,12 +22,16 @@ impl ViewResponse {
     pub async fn try_from(
         mut stream: Pin<Box<dyn Stream<Item = Result<ViewChunk>> + Send>>,
     ) -> Result<Self> {
+        let first = match stream
+            .next()
+            .await
+            .unwrap_or_else(|| panic!("view did not emit anything"))?
+        {
+            ViewChunk::Content(view) => view,
+            ViewChunk::Swap { .. } => panic!("view did not emit its content first"),
+        };
         Ok(Self {
-            first: stream
-                .next()
-                .await
-                .ok_or_else(|| panic!("view did not emit anything"))??
-                .view,
+            first,
             rest: stream,
         })
     }
@@ -65,9 +69,11 @@ impl http_body::Body for ViewBody {
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Result<http_body::Frame<Self::Data>, Self::Error>>> {
         match self.rest.as_mut().poll_next(cx) {
-            Poll::Ready(Some(Ok(chunk))) => {
-                Poll::Ready(Some(Ok(Frame::data(chunk.view.render(&self.cx).into()))))
-            }
+            // TODO: envelope a swap for the client to apply, instead of
+            // writing it out like content.
+            Poll::Ready(Some(Ok(
+                ViewChunk::Content(view) | ViewChunk::Swap { view, .. },
+            ))) => Poll::Ready(Some(Ok(Frame::data(view.render(&self.cx).into())))),
             Poll::Ready(Some(Err(error))) => Poll::Ready(Some(Err(error.into()))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
