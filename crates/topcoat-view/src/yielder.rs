@@ -66,7 +66,7 @@ pub fn collect<F>(
     cx: &mut Context<'_>,
 ) -> (Poll<F::Output>, Option<Result<ViewChunk>>)
 where
-    F: Future,
+    F: Future + ?Sized,
 {
     let _guard = Collect {
         previous: YIELD.take(),

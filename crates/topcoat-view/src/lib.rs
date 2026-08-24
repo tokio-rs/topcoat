@@ -7,6 +7,7 @@ mod css;
 mod format;
 mod html;
 pub mod identity;
+mod join;
 mod part;
 mod props;
 mod stream;
