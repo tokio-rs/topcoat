@@ -82,7 +82,9 @@ impl PrettyPrint for syn::LifetimeParam {
         if let Some(colon_token) = &self.colon_token {
             colon_token.pretty_print(printer);
             " ".pretty_print(printer);
+            printer.scan_begin(BreakMode::Inconsistent);
             common::space_separated(printer, &self.bounds);
+            printer.scan_end();
         }
     }
 }
@@ -130,7 +132,9 @@ impl PrettyPrint for syn::WherePredicate {
                 predicate.lifetime.pretty_print(printer);
                 predicate.colon_token.pretty_print(printer);
                 " ".pretty_print(printer);
+                printer.scan_begin(BreakMode::Inconsistent);
                 common::space_separated(printer, &predicate.bounds);
+                printer.scan_end();
             }
             Self::Type(predicate) => {
                 predicate.lifetimes.pretty_print(printer);

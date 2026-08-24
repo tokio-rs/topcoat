@@ -4,6 +4,10 @@ use crate::pretty::{PrettyPrint, Printer};
 
 impl PrettyPrint for syn::Attribute {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
+        // Comments still pending before the attribute must come out now: the
+        // attribute's source text is copied verbatim and the trivia it covers
+        // is dropped afterwards, which would silently swallow them.
+        printer.scan_trivia(true, true);
         if self.meta.path().is_ident("doc") {
             // Doc comments are captured by the trivia lexer and reproduced like
             // regular comments, so the parsed attribute prints nothing.

@@ -1,0 +1,30 @@
+fn report(count: usize, name: &str) -> String {
+    assert!(count > 0, "count must be positive, got {count}");
+    let mut out = format!("{name}: {count} item(s)");
+    if count > WARN_LIMIT {
+        write!(
+            out,
+            " (which is over the {WARN_LIMIT} limit for a single {} report)",
+            name,
+        ).unwrap();
+    }
+    let statuses = vec![Status::Ready, Status::Blocked, Status::Done];
+    let ready = statuses
+        .iter()
+        .filter(|status| matches!(status, Status::Ready | Status::Done))
+        .count();
+    println!("{out} with {ready} ready");
+    out
+}
+
+macro_rules! ok_or_log {
+    ($result:expr) => {
+        match $result {
+            Ok(value) => Some(value),
+            Err(error) => {
+                log::warn!("{error}");
+                None
+            }
+        }
+    };
+}

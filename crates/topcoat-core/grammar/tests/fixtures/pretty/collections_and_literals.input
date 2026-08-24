@@ -1,0 +1,9 @@
+const WEEKDAYS:[&str;5]=["monday","tuesday","wednesday","thursday","friday"];
+let matrix=[[1,0,0],[0,1,0],[0,0,1]];
+let pair=(width,height);
+let single=(elem,);
+let config=Config{retries:3,timeout:Duration::from_secs(30),verbose:false,..Config::default()};
+let window=&samples[start..start+len];
+let scaled=samples.iter().map(|sample|sample*factor).collect::<Vec<f32>>();
+let lookup=HashMap::<String,Vec<(u32,u32)>>::new();
+let palette=[Color{red:255,green:87,blue:51,alpha:opacity_for(Layer::Accent)},Color{red:46,green:139,blue:87,alpha:opacity_for(Layer::Background)}];

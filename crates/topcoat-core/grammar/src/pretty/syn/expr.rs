@@ -79,6 +79,14 @@ enum Link<'a> {
     Try(&'a syn::ExprTry),
 }
 
+/// Prints the break point before a chain link, keeping a trailing comment on
+/// the previous link's line and giving standalone comments their own lines.
+fn link_break(printer: &mut Printer<'_>) {
+    printer.scan_same_line_trivia();
+    printer.scan_break();
+    printer.scan_trivia(true, true);
+}
+
 /// Prints a `.`-chain. A chain with at least two method calls breaks before
 /// every `.` when it exceeds the margin; anything shorter stays attached to its
 /// receiver.
@@ -123,7 +131,7 @@ fn chain(printer: &mut Printer<'_>, expr: &syn::Expr) {
         match link {
             Link::Method(inner) => {
                 if breakable {
-                    printer.scan_break();
+                    link_break(printer);
                 }
                 inner.dot_token.pretty_print(printer);
                 inner.method.pretty_print(printer);
@@ -136,14 +144,14 @@ fn chain(printer: &mut Printer<'_>, expr: &syn::Expr) {
             }
             Link::Field(inner) => {
                 if breakable {
-                    printer.scan_break();
+                    link_break(printer);
                 }
                 inner.dot_token.pretty_print(printer);
                 inner.member.pretty_print(printer);
             }
             Link::Await(inner) => {
                 if breakable {
-                    printer.scan_break();
+                    link_break(printer);
                 }
                 inner.dot_token.pretty_print(printer);
                 inner.await_token.pretty_print(printer);

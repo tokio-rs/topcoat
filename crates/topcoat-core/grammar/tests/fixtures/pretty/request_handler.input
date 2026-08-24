@@ -1,0 +1,10 @@
+/// Renders the dashboard for the signed-in user.
+async fn dashboard(cx:&Cx)->Result{
+let Some(user)=current_user(cx).await? else{return redirect("/login");};
+let projects=load_projects(cx,user.id).await?;
+let greeting=if projects.is_empty(){"welcome!"}else{"welcome back!"};
+// Track the visit before rendering anything.
+track_visit(cx,&user,Visit{page:Page::Dashboard,timestamp:now(),..Visit::default()}).await?;
+let summary=Summary{name:user.name.clone(),project_count:projects.len(),greeting};
+render(cx,summary)
+}

@@ -23,6 +23,10 @@ proc-macro2.workspace = true
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
+[[test]]
+name = "pretty"
+required-features = ["pretty"]
+
 [lints]
 workspace = true
 

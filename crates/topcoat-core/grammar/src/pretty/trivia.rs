@@ -219,6 +219,22 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Whether the `'` at the cursor starts a lifetime rather than a char
+    /// literal: `'` followed by an identifier that no closing `'` terminates.
+    fn at_lifetime(&self) -> bool {
+        let mut chars = self.rest().chars();
+        chars.next();
+        let Some(first) = chars.next() else {
+            return false;
+        };
+        if !(first.is_alphabetic() || first == '_') {
+            return false;
+        }
+        // A single identifier character closed by a quote (`'a'`) is a char
+        // literal; anything longer (`'static`, `'a>`) is a lifetime.
+        chars.next() != Some('\'')
+    }
+
     /// Skips a char literal '...' handling escapes \'
     fn skip_char(&mut self) {
         self.bump(); // Consume opening '
@@ -320,7 +336,15 @@ impl<'a> Iterator for Lexer<'a> {
             // inside them.
             match c {
                 '"' => self.skip_string(),
-                '\'' => self.skip_char(),
+                '\'' => {
+                    if self.at_lifetime() {
+                        // Only the quote is consumed; the identifier after it
+                        // is skipped as ordinary code.
+                        self.bump();
+                    } else {
+                        self.skip_char();
+                    }
+                }
                 'b' => {
                     // Could be b"" or br"" or b'' or just identifier 'bytes'
                     match self.peek_second() {
@@ -425,6 +449,25 @@ mod tests {
         let tokens = collect_tokens(src);
         assert_eq!(tokens[0].kind, TriviaKind::BlockComment);
         assert_eq!(tokens[0].content, "/* outer /* inner */ outer */");
+    }
+
+    #[test]
+    fn test_lifetimes_are_not_char_literals() {
+        // The lifetime must not open a char literal that swallows the
+        // comment and the blank line after it.
+        let src = "fn f() -> &'static str {}\n\n// note\nx('a', '\\n')";
+        let tokens = collect_tokens(src);
+        let comments: Vec<_> = tokens
+            .iter()
+            .filter(|t| t.kind == TriviaKind::LineComment)
+            .collect();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].content, "// note");
+        assert!(
+            tokens
+                .iter()
+                .any(|t| t.kind == TriviaKind::Whitespace && t.newlines() == 2),
+        );
     }
 
     #[test]

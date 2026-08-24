@@ -1,0 +1,7 @@
+fn summarize(orders:&[Order])->Report{
+let total:u64=orders.iter().map(|order|order.amount).sum();
+let names=orders.iter().filter(|order|order.amount>FREE_LIMIT).map(|order|order.customer.name.clone()).collect::<Vec<_>>();
+let first=orders.first().map(|order|order.id).unwrap_or_default();
+let by_customer=orders.iter().fold(HashMap::new(),|mut acc,order|{*acc.entry(order.customer.id).or_insert(0)+=order.amount;acc});
+Report{total,names,first,by_customer}
+}
