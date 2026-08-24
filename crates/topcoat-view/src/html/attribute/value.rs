@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use topcoat_core::context::Cx;
 
-use crate::{ClassViewParts, PartsWriter, PromotedStr, StaticStr, Unescaped, View};
+use crate::{ClassViewParts, PartsWriter, PromotedStr, StaticStr, Unescaped, ViewHandle};
 
 /// Converts a value used as an attribute value into view parts.
 ///
@@ -229,7 +229,7 @@ impl AttributeValueViewParts for &bool {
 /// ensure that sealing is valid inside a double-quoted attribute value;
 /// content sealed for the text position keeps its double quotes and can
 /// break out of the attribute.
-impl AttributeValueViewParts for Unescaped<View> {
+impl AttributeValueViewParts for Unescaped<ViewHandle> {
     #[inline]
     fn attribute_present(&self) -> bool {
         true
@@ -319,7 +319,7 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 /// verbatim; its content was already escaped when it was captured.
 #[derive(Debug, Default, Clone)]
 pub struct AttributeValue {
-    view: Option<View>,
+    view: Option<ViewHandle>,
 }
 
 impl AttributeValue {
@@ -336,7 +336,7 @@ impl AttributeValue {
 
     /// Wraps the view holding a captured instruction block.
     #[inline]
-    pub(crate) fn captured(view: View) -> Self {
+    pub(crate) fn captured(view: ViewHandle) -> Self {
         Self { view: Some(view) }
     }
 

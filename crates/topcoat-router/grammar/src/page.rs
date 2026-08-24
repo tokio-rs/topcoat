@@ -109,45 +109,36 @@ impl ToTokens for Page {
             #face
         };
 
-        let render = if let Some(request_ty) = args.request() {
-            let parse_request = quote_spanned! {request_ty.span()=>
-                let body = match <#request_ty as #topcoat_router::request::FromRequest>::from_request(cx, body).await {
-                    ::core::result::Result::Ok(body) => body,
-                    ::core::result::Result::Err(error) => {
-                        return #topcoat_view::internal::yield_(::core::result::Result::Err(error)).await;
-                    }
-                };
-            };
-            quote! {
-                fn render<'cx>(
-                    &'cx self,
-                    cx: &'cx #topcoat_context::Cx,
-                    body: #topcoat_router::Body,
-                ) -> #topcoat_router::PageViewStream<'cx> {
-                    ::std::boxed::Box::pin(#topcoat_view::internal::ViewStream::new(async move {
-                        #parse_request
-                        let props = <#ident as #topcoat_view::Component>::props_builder()
-                            .body(body)
-                            .build();
-                        #topcoat_view::internal::forward(
-                            <#ident as #topcoat_view::Component>::render(#ident, cx, props),
-                        )
-                        .await;
-                    }))
-                }
-            }
-        } else {
-            quote! {
-                fn render<'cx>(
-                    &'cx self,
-                    cx: &'cx #topcoat_context::Cx,
-                    _body: #topcoat_router::Body,
-                ) -> #topcoat_router::PageViewStream<'cx> {
-                    let props = <#ident as #topcoat_view::Component>::props_builder().build();
-                    ::std::boxed::Box::pin(
-                        <#ident as #topcoat_view::Component>::render(#ident, cx, props),
+        // A request that fails to parse becomes the error the view's stream
+        // yields, exactly like an error from the page body.
+        let (parse_request, body_prop) = match args.request() {
+            Some(request_ty) => (
+                quote_spanned! {request_ty.span()=>
+                    let body = <#request_ty as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
+                },
+                Some(quote! { .body(body) }),
+            ),
+            None => (quote! { ::core::mem::drop(body); }, None),
+        };
+        let render = quote! {
+            fn render<'s>(
+                &'s self,
+                cx: &#topcoat_context::Cx,
+                body: #topcoat_router::Body,
+            ) -> #topcoat_view::BoxView<'s> {
+                let cx = ::core::clone::Clone::clone(cx);
+                ::std::boxed::Box::pin(#topcoat_view::internal::ViewStream::new(async move {
+                    let cx = &cx;
+                    #parse_request
+                    let props = <#ident as #topcoat_view::Component>::props_builder()
+                        #body_prop
+                        .build();
+                    #topcoat_view::internal::forward(
+                        <#ident as #topcoat_view::Component>::render(#ident, cx, props).await?,
                     )
-                }
+                    .await;
+                    ::core::result::Result::Ok(())
+                }))
             }
         };
         let methods = attr.methods.as_ref().map_or_else(

@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use topcoat_core::context::Cx;
 
-use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped, View};
+use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped, ViewHandle};
 
 /// Converts a value used in node position into view parts.
 ///
@@ -26,7 +26,7 @@ pub trait NodeViewParts {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
 }
 
-impl NodeViewParts for View {
+impl NodeViewParts for ViewHandle {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         parts.push_view(self);

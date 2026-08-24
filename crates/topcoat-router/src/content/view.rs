@@ -5,7 +5,7 @@ use futures_core::Stream;
 use futures_util::StreamExt;
 use http_body::Frame;
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::{View, ViewChunk};
+use topcoat_view::{ViewChunk, ViewHandle};
 
 use crate::{
     Body, BoxError,
@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub struct ViewResponse {
-    first: View,
+    first: ViewHandle,
     rest: Pin<Box<dyn Stream<Item = Result<ViewChunk>> + Send>>,
 }
 

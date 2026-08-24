@@ -1,6 +1,8 @@
 use topcoat_core::context::Cx;
 
-use crate::{Body, Layout, Methods, Page, PageViewStream, Path, PathBuf, RouteId, Slot, route};
+use topcoat_view::BoxView;
+
+use crate::{Body, Layout, Methods, Page, Path, PathBuf, RouteId, Slot, route};
 
 /// A page discovered by the module router, declared without an explicit path.
 ///
@@ -18,7 +20,7 @@ pub trait ModulePage: Send + Sync + 'static {
     fn module_path(&self) -> &'static str;
 
     /// Renders the page [`View`].
-    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx>;
+    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s>;
 
     /// Returns whether this page handles the current request.
     ///
@@ -47,7 +49,7 @@ impl<P: ModulePage + ?Sized> ModulePage for &'static P {
         (**self).module_path()
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx> {
+    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s> {
         (**self).render(cx, body)
     }
 }
@@ -81,7 +83,7 @@ impl<P: ModulePage> Page for ResolvedPage<P> {
         &self.path
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx> {
+    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s> {
         self.page.render(cx, body)
     }
 }
@@ -98,7 +100,7 @@ pub trait ModuleLayout: Send + Sync + 'static {
 
     /// Renders the layout, embedding the given child content
     /// [`Result`]`<`[`View`]`>` as its slot.
-    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx>;
+    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s>;
 }
 
 impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
@@ -106,7 +108,7 @@ impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
         (**self).module_path()
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx> {
+    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s> {
         (**self).render(cx, slot)
     }
 }
@@ -132,7 +134,7 @@ impl<L: ModuleLayout> Layout for ResolvedLayout<L> {
         &self.path
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx> {
+    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s> {
         self.layout.render(cx, slot)
     }
 }

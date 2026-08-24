@@ -1,5 +1,5 @@
 use crate::{
-    View,
+    ViewHandle,
     buffer::{InstructionPtr, ViewBufferId, ViewBufferScope},
 };
 
@@ -35,7 +35,7 @@ impl ViewSlot {
     ///
     /// Panics if no view is building on the current task, if the slot or the
     /// view belongs to a different buffer, or if the slot was already filled.
-    pub fn fill(self, view: View) {
+    pub fn fill(self, view: ViewHandle) {
         ViewBufferScope::with(|buffer| buffer.fill_view(self, view));
     }
 }

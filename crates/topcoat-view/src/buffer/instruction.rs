@@ -16,7 +16,7 @@ pub enum Instruction {
     /// Holds a reserved slot until it is filled; executing it panics.
     Placeholder,
     /// Execute a spliced owned view's block in the buffer it carries.
-    View { ptr: ViewPtr },
+    ViewHandle { ptr: ViewPtr },
 
     /// A boolean rendered as text.
     #[non_exhaustive]

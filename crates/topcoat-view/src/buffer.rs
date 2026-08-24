@@ -16,13 +16,13 @@ pub use renderer::*;
 pub use scope::*;
 pub use view_slot::*;
 
-use crate::{DynViewPart, HtmlContext, View, view::ViewRepr};
+use crate::{DynViewPart, HtmlContext, ViewHandle, view::ViewRepr};
 
 /// The instruction buffer of a build.
 ///
 /// The outermost `view!` invocation creates a buffer, every `view!`
 /// invocation nested inside it appends its instructions here, and rendering
-/// a [`View`] executes them.
+/// a [`ViewHandle`] executes them.
 ///
 /// # Contiguity
 ///
@@ -78,7 +78,7 @@ impl ViewBuffer {
     /// # Panics
     ///
     /// Panics if the view was built in a different, still building buffer.
-    pub fn push_view(&mut self, view: View) {
+    pub fn push_view(&mut self, view: ViewHandle) {
         match view.repr() {
             ViewRepr::Static(body) => {
                 self.push_static_str(body, HtmlContext::Unescaped);
@@ -92,7 +92,7 @@ impl ViewBuffer {
             }
             ViewRepr::Owned { buffer, entry, .. } => {
                 let ptr = self.consts.push_view(buffer, entry);
-                self.push_instruction(Instruction::View { ptr });
+                self.push_instruction(Instruction::ViewHandle { ptr });
             }
         }
     }
@@ -111,11 +111,11 @@ impl ViewBuffer {
     /// placeholder renders the filled view's content; rendering it before
     /// that panics. The placeholder carries no size hint, since the filled
     /// view's is not known yet.
-    pub fn reserve_view(&mut self) -> (View, ViewSlot) {
+    pub fn reserve_view(&mut self) -> (ViewHandle, ViewSlot) {
         let ptr = self.next_ptr();
         self.push_instruction(Instruction::Placeholder);
         let slot = ViewSlot::new(self.id, ptr);
-        (View::from_scope(self.id, ptr, 0), slot)
+        (ViewHandle::from_scope(self.id, ptr, 0), slot)
     }
 
     /// Redirects a reserved slot to `view`, resolving its placeholder.
@@ -125,7 +125,7 @@ impl ViewBuffer {
     /// Panics if the slot was reserved in a different buffer, if the view
     /// was built in a different, still building buffer, or if the slot was
     /// already filled.
-    pub fn fill_view(&mut self, slot: ViewSlot, view: View) {
+    pub fn fill_view(&mut self, slot: ViewSlot, view: ViewHandle) {
         assert!(
             slot.buffer() == self.id,
             "tried to fill a view slot outside the `view!` invocation it was reserved in",
@@ -151,7 +151,7 @@ impl ViewBuffer {
             ViewRepr::Owned { buffer, entry, .. } => {
                 let block_entry = self.next_ptr();
                 let ptr = self.consts.push_view(buffer, entry);
-                self.push_instruction(Instruction::View { ptr });
+                self.push_instruction(Instruction::ViewHandle { ptr });
                 self.push_ret();
                 block_entry
             }

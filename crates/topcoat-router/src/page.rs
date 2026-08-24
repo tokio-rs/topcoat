@@ -1,19 +1,15 @@
-use std::{borrow::Cow, pin::Pin, sync::Arc};
+use std::{borrow::Cow, sync::Arc};
 
-use futures_core::Stream;
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::{ViewChunk, ViewStream};
+use topcoat_view::{BoxView, ViewStream};
 
 use crate::{
     Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId,
     content::ViewResponse, response::IntoResponse, route,
 };
 
-/// The stream returned by [`Page::render`] and [`Layout::render`]: a boxed,
-/// `Send` stream borrowing the handler and its request context.
-pub type PageViewStream<'cx> = Pin<Box<dyn Stream<Item = Result<ViewChunk>> + Send + 'cx>>;
-
-/// A page handler that renders a [`View`] for a specific URL path.
+/// A page handler that renders a [`View`](topcoat_view::View) for a specific
+/// URL path.
 ///
 /// Registered into a [`RouterBuilder`](crate::RouterBuilder) with
 /// [`page`](crate::RouterBuilder::page), alongside [`Layout`]s, which wrap it
@@ -30,8 +26,12 @@ pub trait Page: Send + Sync + 'static {
     /// The URL path this page handles.
     fn path(&self) -> &Path;
 
-    /// Renders the page [`View`].
-    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx>;
+    /// Renders the page to a [`View`](topcoat_view::View).
+    ///
+    /// The returned view owns its request context: it may borrow `self`, but
+    /// not `cx`. An error in the page body is yielded through the view's
+    /// stream rather than returned here.
+    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s>;
 
     /// Returns whether this page handles the current request.
     ///
@@ -60,7 +60,7 @@ impl<P: Page + ?Sized> Page for &'static P {
         (**self).path()
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx> {
+    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s> {
         (**self).render(cx, body)
     }
 }
@@ -68,8 +68,8 @@ impl<P: Page + ?Sized> Page for &'static P {
 #[cfg(feature = "discover")]
 inventory::collect!(&'static dyn Page);
 
-/// The async render function backing a [`PageFn`].
-pub type PageRenderFn = for<'cx> fn(cx: &'cx Cx, body: Body) -> PageViewStream<'cx>;
+/// The render function backing a [`PageFn`].
+pub type PageRenderFn = fn(cx: &Cx, body: Body) -> BoxView<'static>;
 
 /// A [`Page`] backed by a plain render function.
 ///
@@ -83,7 +83,7 @@ pub struct PageFn {
     methods: OwnedMethods,
     /// The URL path this page handles.
     path: Cow<'static, Path>,
-    /// The async render function that produces the page [`View`].
+    /// The render function that produces the page [`View`](topcoat_view::View).
     render: PageRenderFn,
 }
 
@@ -125,12 +125,41 @@ impl Page for PageFn {
         &self.path
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> PageViewStream<'cx> {
+    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s> {
         (self.render)(cx, body)
     }
 }
 
-pub type Slot<'cx> = PageViewStream<'cx>;
+/// The content a [`Layout`] wraps: the page, already composed with any inner
+/// layouts, waiting to be rendered against a request context.
+///
+/// Interpolating the slot into a `view!` template renders it against the
+/// template's context, so a layout can provide request context values to
+/// everything beneath it by deriving a context with
+/// [`Cx::with`](topcoat_core::context::Cx::with) and rebinding the template's
+/// context (`view! { cx => ... }`).
+pub struct Slot<'a> {
+    render: Box<dyn FnOnce(&Cx) -> BoxView<'a> + Send + 'a>,
+}
+
+impl<'a> Slot<'a> {
+    /// Wraps the function that renders the slot's content.
+    #[must_use]
+    pub fn new(render: impl FnOnce(&Cx) -> BoxView<'a> + Send + 'a) -> Self {
+        Self {
+            render: Box::new(render),
+        }
+    }
+
+    /// Renders the slot's content against `cx`.
+    ///
+    /// The returned view owns `cx`'s request context, so it outlives the
+    /// borrow.
+    #[must_use]
+    pub fn render(self, cx: &Cx) -> BoxView<'a> {
+        (self.render)(cx)
+    }
+}
 
 /// A layout handler that wraps pages whose path starts with the layout's path
 /// prefix.
@@ -145,9 +174,11 @@ pub trait Layout: Send + Sync + 'static {
     /// The path prefix this layout applies to.
     fn path(&self) -> &Path;
 
-    /// Renders the layout, embedding the given child content
-    /// [`Result`]`<`[`View`]`>` as its slot.
-    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx>;
+    /// Renders the layout, embedding the given child content [`Slot`].
+    ///
+    /// The returned view owns its request context: it may borrow `self` and
+    /// the slot, but not `cx`.
+    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s>;
 }
 
 impl<L: Layout + ?Sized> Layout for &'static L {
@@ -155,7 +186,7 @@ impl<L: Layout + ?Sized> Layout for &'static L {
         (**self).path()
     }
 
-    fn render<'cx>(&'cx self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx> {
+    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s> {
         (**self).render(cx, slot)
     }
 }
@@ -163,9 +194,9 @@ impl<L: Layout + ?Sized> Layout for &'static L {
 #[cfg(feature = "discover")]
 inventory::collect!(&'static dyn Layout);
 
-/// The async render function backing a [`LayoutFn`], receiving the rendered
-/// child content as a [`Result`]`<`[`View`]`>`.
-pub type LayoutRenderFn = for<'cx> fn(cx: &'cx Cx, slot: Slot) -> PageViewStream<'cx>;
+/// The render function backing a [`LayoutFn`], receiving the child content as
+/// a [`Slot`].
+pub type LayoutRenderFn = for<'a> fn(cx: &Cx, slot: Slot<'a>) -> BoxView<'a>;
 
 /// A [`Layout`] backed by a plain render function.
 ///
@@ -175,7 +206,7 @@ pub type LayoutRenderFn = for<'cx> fn(cx: &'cx Cx, slot: Slot) -> PageViewStream
 pub struct LayoutFn {
     /// The path prefix this layout applies to.
     path: Cow<'static, Path>,
-    /// The async render function that wraps the child content [`Result`]`<`[`View`]`>`.
+    /// The render function that wraps the child content [`Slot`].
     render: LayoutRenderFn,
 }
 
@@ -199,7 +230,7 @@ impl Layout for LayoutFn {
         &self.path
     }
 
-    fn render<'cx>(&self, cx: &'cx Cx, slot: Slot<'cx>) -> PageViewStream<'cx> {
+    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s> {
         (self.render)(cx, slot)
     }
 }
@@ -249,12 +280,24 @@ impl Route for PageWithLayouts {
                 let inner = self.inner.clone();
                 let cx = cx.clone();
                 ViewStream::new(async move {
-                    let mut slot = inner.page.render(&cx, body);
-                    for layout in inner.layouts.iter().rev() {
-                        slot = layout.render(&cx, slot);
+                    // The page is the innermost slot, each layout wraps the
+                    // slot beneath it, and only the outermost layer renders
+                    // directly against the request context. Nothing runs
+                    // until the view is driven: each layout decides when its
+                    // slot renders and which context it sees.
+                    let page = &inner.page;
+                    let mut slot = Slot::new(move |cx| page.render(cx, body));
+                    let mut layouts = inner.layouts.iter();
+                    let outermost = layouts.next();
+                    for layout in layouts.rev() {
+                        slot = Slot::new(move |cx| layout.render(cx, slot));
                     }
-
-                    topcoat_view::internal::forward(slot).await;
+                    let view = match outermost {
+                        Some(layout) => layout.render(&cx, slot),
+                        None => slot.render(&cx),
+                    };
+                    topcoat_view::internal::forward(view).await;
+                    Ok(())
                 })
             };
 

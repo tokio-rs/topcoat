@@ -20,7 +20,7 @@ use crate::{
 
 pub struct ViewChunk {
     id: u64,
-    pub view: View, // TODO: not pub
+    pub view: ViewHandle, // TODO: not pub
 }
 
 /// A self-contained piece of HTML content.
@@ -45,7 +45,7 @@ pub struct ViewChunk {
 /// only lives while its enclosing invocation builds; one that escapes it
 /// panics when used.
 #[derive(Debug, Default, Clone)]
-pub struct View {
+pub struct ViewHandle {
     repr: ViewRepr,
 }
 
@@ -83,7 +83,7 @@ impl Default for ViewRepr {
     }
 }
 
-impl View {
+impl ViewHandle {
     /// Creates the handle for an instruction block built in the buffer
     /// identified by `buffer`, estimated to write `size_hint` bytes.
     #[inline]
@@ -153,7 +153,7 @@ impl View {
         }
     }
 
-    /// Returns a `View` that renders to an empty string.
+    /// Returns a `ViewHandle` that renders to an empty string.
     #[inline]
     #[must_use]
     pub fn empty() -> Self {
@@ -295,9 +295,9 @@ impl View {
     }
 }
 
-/// The output of rendering a [`View`] for an HTTP response.
+/// The output of rendering a [`ViewHandle`] for an HTTP response.
 ///
-/// Returned by [`View::render_response`]: the rendered HTML alongside the
+/// Returned by [`ViewHandle::render_response`]: the rendered HTML alongside the
 /// status code and headers the view declared.
 #[cfg(feature = "http")]
 #[derive(Debug)]
@@ -337,7 +337,7 @@ mod tests {
     ///
     /// Appends to the enclosing buffer inside a root build and owns a buffer
     /// of its own outside one.
-    fn sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> View {
+    fn sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
         build_sync(|| write_block(f))
     }
 
@@ -357,8 +357,8 @@ mod tests {
 
     #[test]
     fn static_views_render_without_a_scope() {
-        assert_eq!(View::empty().render(&Cx::default()), "");
-        let view = View::unescaped_unchecked("<b>raw</b>");
+        assert_eq!(ViewHandle::empty().render(&Cx::default()), "");
+        let view = ViewHandle::unescaped_unchecked("<b>raw</b>");
         assert_eq!(view.render(&Cx::default()), "<b>raw</b>");
     }
 
@@ -481,8 +481,8 @@ mod tests {
     fn static_views_are_spliced_verbatim() {
         in_scope(async |cx| {
             let outer = sync(|parts| {
-                parts.push_view(View::unescaped_unchecked("<hr>"));
-                parts.push_view(View::empty());
+                parts.push_view(ViewHandle::unescaped_unchecked("<hr>"));
+                parts.push_view(ViewHandle::empty());
             });
             assert_eq!(outer.render(cx), "<hr>");
         });
@@ -513,11 +513,11 @@ mod tests {
     fn static_views_fill_a_slot_like_scoped_ones() {
         in_scope(async |cx| {
             let (placeholder, slot) = reserve();
-            slot.fill(View::unescaped_unchecked("<hr>"));
+            slot.fill(ViewHandle::unescaped_unchecked("<hr>"));
             assert_eq!(placeholder.render(cx), "<hr>");
 
             let (placeholder, slot) = reserve();
-            slot.fill(View::empty());
+            slot.fill(ViewHandle::empty());
             assert_eq!(placeholder.render(cx), "");
         });
     }
@@ -536,8 +536,8 @@ mod tests {
     fn filling_a_slot_twice_panics() {
         in_scope(async |_cx| {
             let (_placeholder, slot) = reserve();
-            slot.fill(View::empty());
-            slot.fill(View::empty());
+            slot.fill(ViewHandle::empty());
+            slot.fill(ViewHandle::empty());
         });
     }
 
@@ -545,7 +545,7 @@ mod tests {
     #[should_panic(expected = "outside the `view!` invocation it was reserved in")]
     fn filling_a_slot_in_a_different_root_build_panics() {
         let slot = in_scope(async |_cx| reserve().1);
-        in_scope(async |_cx| slot.fill(View::empty()));
+        in_scope(async |_cx| slot.fill(ViewHandle::empty()));
     }
 
     #[test]
@@ -558,7 +558,7 @@ mod tests {
             let outer = sync(|parts| {
                 parts.push_view(inner.clone());
                 parts.push_view(inner);
-                parts.push_view(View::unescaped_unchecked("<hr>"));
+                parts.push_view(ViewHandle::unescaped_unchecked("<hr>"));
             });
             let ViewRepr::Scoped { size_hint, .. } = outer.repr() else {
                 panic!("expected a scoped view");

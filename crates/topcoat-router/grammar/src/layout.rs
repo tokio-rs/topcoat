@@ -132,17 +132,22 @@ impl ToTokens for Layout {
         };
 
         let render = quote! {
-            fn render<'cx>(
-                &'cx self,
-                cx: &'cx #topcoat_context::Cx,
-                slot: #topcoat_router::Slot<'cx>,
-            ) -> #topcoat_router::PageViewStream<'cx> {
-                let props = <#ident as #topcoat_view::Component>::props_builder()
-                    .slot(slot)
-                    .build();
-                ::std::boxed::Box::pin(
-                    <#ident as #topcoat_view::Component>::render(#ident, cx, props),
-                )
+            fn render<'s>(
+                &'s self,
+                cx: &#topcoat_context::Cx,
+                slot: #topcoat_router::Slot<'s>,
+            ) -> #topcoat_view::BoxView<'s> {
+                let cx = ::core::clone::Clone::clone(cx);
+                ::std::boxed::Box::pin(#topcoat_view::internal::ViewStream::new(async move {
+                    let props = <#ident as #topcoat_view::Component>::props_builder()
+                        .slot(slot)
+                        .build();
+                    #topcoat_view::internal::forward(
+                        <#ident as #topcoat_view::Component>::render(#ident, &cx, props).await?,
+                    )
+                    .await;
+                    ::core::result::Result::Ok(())
+                }))
             }
         };
         let (layout, submit_as) = if let Some(path) = attr.path.as_ref() {
