@@ -35,6 +35,8 @@ impl FmtCommand {
                 "view",
                 "attributes",
                 "class",
+                "live",
+                "emit",
                 "font_face",
                 "font",
                 "fontsource_font_face",
@@ -72,6 +74,12 @@ impl FmtCommand {
             }
             if selected.contains("class") {
                 registry.register_macro::<topcoat_view_grammar::class::Class>("class");
+            }
+            if selected.contains("live") {
+                registry.register_macro::<topcoat_view_grammar::live::Live>("live");
+            }
+            if selected.contains("emit") {
+                registry.register_macro::<topcoat_view_grammar::live::Emit>("emit");
             }
             if selected.contains("font_face") {
                 registry.register_macro::<topcoat_font_grammar::font_face::FontFace>("font_face");

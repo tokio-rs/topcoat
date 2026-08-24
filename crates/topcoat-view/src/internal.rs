@@ -19,6 +19,7 @@ pub use futures_core::Stream;
 use topcoat_core::{context::Cx, error::Result};
 
 pub use crate::join::{Join, JoinUnits, Unit};
+pub use crate::live::{Live, LiveSink};
 pub use crate::stream::ViewStream;
 pub use crate::yielder::{forward, yield_};
 use crate::{

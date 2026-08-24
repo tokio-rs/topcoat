@@ -128,6 +128,36 @@ impl PrettyPrint for syn::Local {
     }
 }
 
+impl PrettyPrint for syn::Stmt {
+    fn pretty_print(&self, printer: &mut Printer<'_>) {
+        match self {
+            syn::Stmt::Local(local) => local.pretty_print(printer),
+            syn::Stmt::Expr(expr, semi) => {
+                expr.pretty_print(printer);
+                semi.pretty_print(printer);
+            }
+            // A macro statement prints through the expression pass, which
+            // formats the body of a registered macro through its grammar.
+            syn::Stmt::Macro(stmt_macro) => {
+                syn::Expr::Macro(syn::ExprMacro {
+                    attrs: stmt_macro.attrs.clone(),
+                    mac: stmt_macro.mac.clone(),
+                })
+                .pretty_print(printer);
+                stmt_macro.semi_token.pretty_print(printer);
+            }
+            // An item, such as a helper `fn`, keeps its source text instead
+            // of being reformatted.
+            syn::Stmt::Item(item) => {
+                item.span()
+                    .source_text()
+                    .expect("cannot pretty print rust item without source text")
+                    .pretty_print(printer);
+            }
+        }
+    }
+}
+
 impl PrettyPrint for syn::Attribute {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         if self.meta.path().is_ident("doc") {

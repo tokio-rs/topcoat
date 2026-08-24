@@ -10,6 +10,18 @@ pub fn view(tokens: TokenStream) -> TokenStream {
     quote! { #parsed }.into()
 }
 
+#[proc_macro]
+pub fn live(tokens: TokenStream) -> TokenStream {
+    let parsed = syn::parse_macro_input!(tokens as topcoat_view_grammar::live::Live);
+    quote! { #parsed }.into()
+}
+
+#[proc_macro]
+pub fn emit(tokens: TokenStream) -> TokenStream {
+    let parsed = syn::parse_macro_input!(tokens as topcoat_view_grammar::live::Emit);
+    quote! { #parsed }.into()
+}
+
 #[doc = include_str!("../docs/attributes.md")]
 #[proc_macro]
 pub fn attributes(tokens: TokenStream) -> TokenStream {
