@@ -224,7 +224,7 @@ fn attachment_part(attachment: &Attachment) -> Result<SinglePart, SendError> {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_view::View;
+    use topcoat_view::ViewHandle;
 
     use super::*;
     use crate::Mailbox;
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn html_derives_its_text_alternative_by_default() {
         let mail = base()
-            .html(View::unescaped_unchecked("<h1>Hi</h1><p>Bye now</p>"))
+            .html(ViewHandle::unescaped_unchecked("<h1>Hi</h1><p>Bye now</p>"))
             .build();
         let wire = formatted(mail);
 
@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn opted_out_text_leaves_a_single_html_part() {
         let mail = base()
-            .html(View::unescaped_unchecked("<h1>Hi</h1>"))
+            .html(ViewHandle::unescaped_unchecked("<h1>Hi</h1>"))
             .text(TextBody::None)
             .build();
         let wire = formatted(mail);
@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn empty_derived_text_is_not_sent() {
         let mail = base()
-            .html(View::unescaped_unchecked("<img src=\"x.png\">"))
+            .html(ViewHandle::unescaped_unchecked("<img src=\"x.png\">"))
             .build();
         let wire = formatted(mail);
 
@@ -292,7 +292,7 @@ mod tests {
     fn both_bodies_are_alternatives_with_html_preferred() {
         let mail = base()
             .text("Hi Bob")
-            .html(View::unescaped_unchecked("<h1>Hi</h1>"))
+            .html(ViewHandle::unescaped_unchecked("<h1>Hi</h1>"))
             .build();
         let wire = formatted(mail);
 
@@ -307,7 +307,7 @@ mod tests {
     fn inline_attachments_relate_to_the_html_body() {
         let mail = base()
             .text("Hi Bob")
-            .html(View::unescaped_unchecked("<img src=\"cid:logo\">"))
+            .html(ViewHandle::unescaped_unchecked("<img src=\"cid:logo\">"))
             .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
             .build();
         let wire = formatted(mail);

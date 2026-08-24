@@ -2,7 +2,7 @@
 
 use std::time::SystemTime;
 
-use topcoat_view::View;
+use topcoat_view::ViewHandle;
 
 use crate::{Attachment, Mailbox};
 
@@ -30,7 +30,7 @@ pub struct Mail {
     bcc: Vec<Mailbox>,
     reply_to: Vec<Mailbox>,
     subject: String,
-    pub(crate) html: Option<View>,
+    pub(crate) html: Option<ViewHandle>,
     text: TextBody,
     attachments: Vec<Attachment>,
     in_reply_to: Option<String>,
@@ -85,7 +85,7 @@ impl Mail {
 
     /// The HTML body, if any.
     #[must_use]
-    pub fn html(&self) -> Option<&View> {
+    pub fn html(&self) -> Option<&ViewHandle> {
         self.html.as_ref()
     }
 
@@ -196,7 +196,7 @@ impl MailBuilder {
 
     /// Sets the HTML body.
     #[must_use]
-    pub fn html(mut self, html: View) -> Self {
+    pub fn html(mut self, html: ViewHandle) -> Self {
         self.mail.html = Some(html);
         self
     }
@@ -379,7 +379,7 @@ mod tests {
             .bcc([Mailbox::new("dan@example.com")?])
             .reply_to([Mailbox::new("replies@example.com")?])
             .subject("Hello")
-            .html(View::empty())
+            .html(ViewHandle::empty())
             .text("Hello there")
             .attachments([Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")])
             .headers([(
