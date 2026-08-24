@@ -23,6 +23,16 @@ pub struct ViewChunk {
     pub view: ViewHandle, // TODO: not pub
 }
 
+impl ViewChunk {
+    /// Wraps a view in a content chunk.
+    ///
+    /// The id targets the position a later chunk swaps into; content chunks
+    /// carry `0` until the live swap protocol assigns real ids.
+    pub(crate) fn new(view: ViewHandle) -> Self {
+        Self { id: 0, view }
+    }
+}
+
 /// A self-contained piece of HTML content.
 ///
 /// A view may contain multiple sibling nodes, but opened tags must be closed
