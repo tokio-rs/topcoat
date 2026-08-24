@@ -748,10 +748,7 @@ async fn settings_card(state: &State) -> Result {
                     <p class="truncate font-mono text-sm">"topcoat-ui"</p>
                     <a
                         href=(state.href("overlay", Some("rename")))
-                        class=(button_variants(
-                            ButtonVariant::Outline,
-                            ButtonSize::Sm,
-                        ))
+                        class=(button_variants(ButtonVariant::Outline, ButtonSize::Sm))
                     >
                         "Rename"
                     </a>
@@ -831,10 +828,7 @@ async fn deployments_card(state: &State) -> Result {
                     // in from the edge instead.
                     <a
                         href=(state.href("overlay", Some("filters")))
-                        class=(button_variants(
-                            ButtonVariant::Outline,
-                            ButtonSize::Sm,
-                        ))
+                        class=(button_variants(ButtonVariant::Outline, ButtonSize::Sm))
                     >
                         icon(data: iconify_icon!("feather:filter"))
                         "Filters"
@@ -1379,10 +1373,7 @@ async fn rename_dialog(state: &State) -> Result {
                 <a
                     href=(state.closed())
                     class=(class!(
-                        button_variants(
-                            ButtonVariant::Ghost,
-                            ButtonSize::Icon,
-                        ),
+                        button_variants(ButtonVariant::Ghost, ButtonSize::Icon),
                         "absolute top-3 right-3",
                     ))
                 >
@@ -1406,10 +1397,7 @@ async fn rename_dialog(state: &State) -> Result {
                     dialog_footer(
                         <a
                             href=(state.closed())
-                            class=(button_variants(
-                                ButtonVariant::Ghost,
-                                ButtonSize::Md,
-                            ))
+                            class=(button_variants(ButtonVariant::Ghost, ButtonSize::Md))
                         >
                             "Cancel"
                         </a>
@@ -1451,10 +1439,7 @@ async fn delete_dialog(state: &State) -> Result {
                 dialog_footer(
                     <a
                         href=(state.closed())
-                        class=(button_variants(
-                            ButtonVariant::Ghost,
-                            ButtonSize::Md,
-                        ))
+                        class=(button_variants(ButtonVariant::Ghost, ButtonSize::Md))
                     >
                         "Keep the workspace"
                     </a>
@@ -1552,10 +1537,7 @@ async fn filters_sheet(state: &State) -> Result {
                         attrs: attributes! { class="mt-auto" },
                         <a
                             href=(state.closed())
-                            class=(button_variants(
-                                ButtonVariant::Ghost,
-                                ButtonSize::Md,
-                            ))
+                            class=(button_variants(ButtonVariant::Ghost, ButtonSize::Md))
                         >
                             "Cancel"
                         </a>

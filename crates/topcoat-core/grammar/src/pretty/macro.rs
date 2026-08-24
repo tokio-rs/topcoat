@@ -1,10 +1,9 @@
-use proc_macro2::extra::DelimSpan;
 use syn::{
     braced, bracketed, parenthesized,
     parse::{Parse, ParseStream},
 };
 
-use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer};
+use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer, Unspaced};
 
 /// A wrapper type that parses and pretty-prints content with any of the three delimiter types.
 ///
@@ -63,32 +62,6 @@ where
         } else {
             Err(lookahead.error())
         }
-    }
-}
-
-/// Wraps a [`Delim`] to suppress the spacing it would otherwise add around its
-/// body, so an empty braced macro prints as `{}` rather than `{  }` while still
-/// reusing the delimiter's cursor and trivia handling.
-struct Unspaced<'a, D>(&'a D);
-
-impl<D> Delim for Unspaced<'_, D>
-where
-    D: Delim,
-{
-    fn space(&self) -> bool {
-        false
-    }
-
-    fn open_text(&self) -> &'static str {
-        self.0.open_text()
-    }
-
-    fn close_text(&self) -> &'static str {
-        self.0.close_text()
-    }
-
-    fn span(&self) -> DelimSpan {
-        self.0.span()
     }
 }
 
@@ -210,21 +183,6 @@ mod tests {
         let result = crate::pretty::pretty_print_str(&registry(), source);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), source);
-    }
-
-    #[test]
-    fn parenthesized_rust_body_is_formatted_inside_a_macro_body() {
-        // `rustfmt` never reaches inside a macro body, so the same invocation is
-        // formatted when it is part of one.
-        let source = "test!(this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed);";
-        let result = crate::pretty::pretty_print_fragment_str(&registry(), source);
-        assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap(),
-            r"test!(
-    this_is_a_very_long_identifier_name_that_should_definitely_break_across_multiple_lines_when_pretty_printed
-);"
-        );
     }
 
     #[test]

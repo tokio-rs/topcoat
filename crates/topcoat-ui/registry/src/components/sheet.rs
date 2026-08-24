@@ -176,12 +176,7 @@ pub async fn sheet_content(
 ) -> Result {
     view! {
         <div
-            class=(class!(
-                CONTENT,
-                side.classes(),
-                side.motion(),
-                attrs.remove("class"),
-            ))
+            class=(class!(CONTENT, side.classes(), side.motion(), attrs.remove("class")))
             (attrs)
         >
             (child)

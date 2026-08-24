@@ -61,6 +61,32 @@ pub trait Delim {
     fn span(&self) -> DelimSpan;
 }
 
+/// Wraps a [`Delim`] to suppress the spacing it would otherwise add around its
+/// body, so a brace pair can print as `{}` or `{a, b}` while still reusing the
+/// delimiter's cursor and trivia handling.
+pub(crate) struct Unspaced<'a, D>(pub(crate) &'a D);
+
+impl<D> Delim for Unspaced<'_, D>
+where
+    D: Delim,
+{
+    fn space(&self) -> bool {
+        false
+    }
+
+    fn open_text(&self) -> &'static str {
+        self.0.open_text()
+    }
+
+    fn close_text(&self) -> &'static str {
+        self.0.close_text()
+    }
+
+    fn span(&self) -> DelimSpan {
+        self.0.span()
+    }
+}
+
 impl Delim for syn::token::Paren {
     fn space(&self) -> bool {
         false

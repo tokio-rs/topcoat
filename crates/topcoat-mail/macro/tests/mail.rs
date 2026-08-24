@@ -23,10 +23,7 @@ async fn empty_body_builds_a_default_mail() -> Result<()> {
 async fn collects_every_field() -> Result<()> {
     let mail = mail! {
         from: Mailbox::named("Ada", "ada@example.com")?,
-        to: [
-            Mailbox::new("bob@example.com")?,
-            Mailbox::new("grace@example.com")?,
-        ],
+        to: [Mailbox::new("bob@example.com")?, Mailbox::new("grace@example.com")?],
         cc: Mailbox::new("carol@example.com")?,
         bcc: [Mailbox::new("dan@example.com")?],
         reply_to: Mailbox::new("replies@example.com")?,
@@ -77,10 +74,7 @@ async fn collects_every_field() -> Result<()> {
 #[tokio::test]
 async fn additive_fields_append_in_written_order() -> Result<()> {
     let mail = mail! {
-        to: [
-            Mailbox::new("bob@example.com")?,
-            Mailbox::new("grace@example.com")?,
-        ],
+        to: [Mailbox::new("bob@example.com")?, Mailbox::new("grace@example.com")?],
     }?;
 
     assert_eq!(
@@ -122,10 +116,7 @@ async fn html_renders_dynamic_parts_against_the_named_context() -> Result<()> {
 async fn mailboxes_accept_strings_and_pairs() -> Result<()> {
     let mail = mail! {
         from: "Ada Lovelace <ada@example.com>",
-        to: [
-            ("Bob", "bob@example.com"),
-            ("Grace Hopper", "grace@example.com"),
-        ],
+        to: [("Bob", "bob@example.com"), ("Grace Hopper", "grace@example.com")],
         cc: ("Carol", "carol@example.com"),
         bcc: "dan@example.com",
     }?;

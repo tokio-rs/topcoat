@@ -12,7 +12,6 @@ rust-version.workspace = true
 
 [features]
 pretty = [
-	"dep:prettyplease",
 	"syn/extra-traits",
 	"syn/visit",
 	"proc-macro2/span-locations",
@@ -24,7 +23,9 @@ proc-macro2.workspace = true
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
-prettyplease = { workspace = true, optional = true }
+[[test]]
+name = "pretty"
+required-features = ["pretty"]
 
 [lints]
 workspace = true

@@ -1,0 +1,24 @@
+// Set up the environment first.
+let env=Environment::detect(); // cached per process
+
+/* The retry budget is deliberately small:
+   the caller retries the whole batch anyway. */
+let budget=RetryBudget::new(3);
+
+let client=Client::builder()
+// The proxy is only used in staging.
+.proxy(env.proxy_url())
+.timeout(budget.timeout())
+.build()?;
+
+match client.fetch(/* page */ 1){
+// The empty page means we are done.
+Ok(page) if page.is_empty()=>return Ok(()),
+Ok(page)=>process(page), // happy path
+Err(error)=>{
+// Give the caller the full context.
+return Err(error.into());
+}
+}
+
+// Nothing left to do.

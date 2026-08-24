@@ -1,0 +1,40 @@
+pub trait Repository: Send + Sync {
+    type Item;
+
+    fn get(&self, id: u64) -> Option<Self::Item>;
+    fn insert(&mut self, item: Self::Item) -> u64;
+
+    /// Returns every stored item.
+    fn all(&self) -> Vec<Self::Item> {
+        Vec::new()
+    }
+}
+
+pub struct Cached<R>
+where
+    R: Repository,
+{
+    inner: R,
+    hits: u64,
+}
+
+impl<R> Repository for Cached<R>
+where
+    R: Repository,
+    R::Item: Clone,
+{
+    type Item = R::Item;
+
+    fn get(&self, id: u64) -> Option<Self::Item> {
+        self.inner.get(id)
+    }
+    fn insert(&mut self, item: Self::Item) -> u64 {
+        self.inner.insert(item)
+    }
+}
+
+fn largest<T: PartialOrd + Copy>(items: &[T]) -> Option<T> {
+    items.iter().copied().reduce(|a, b| if a > b { a } else { b })
+}
+
+type Handler = fn(&Request) -> Result<Response, Error>;

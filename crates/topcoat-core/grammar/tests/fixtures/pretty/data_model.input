@@ -1,0 +1,18 @@
+/// A user account.
+#[derive(Debug, Clone)]
+pub struct Account{pub id:u64,pub name:String,
+/// The primary email address.
+pub email:String,roles:Vec<Role>}
+
+/// What an account is allowed to do.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Role{Admin,Editor,
+/// Read-only access.
+Viewer}
+
+impl Account{
+pub fn new(id:u64,name:impl Into<String>)->Self{Self{id,name:name.into(),email:String::new(),roles:vec![Role::Viewer]}}
+
+/// Whether the account may edit content.
+pub fn can_edit(&self)->bool{self.roles.iter().any(|role|matches!(role,Role::Admin|Role::Editor))}
+}
