@@ -70,7 +70,7 @@ impl ToTokens for Component {
         );
 
         let attrs = item.attrs;
-        item.attrs = vec![];
+        item.attrs = vec![parse_quote!(#[allow(clippy::unused_async)])];
         item.sig.generics.params.insert(0, parse_quote! { '__cx });
         item.sig
             .inputs
@@ -204,17 +204,17 @@ impl ToTokens for Component {
             }
         } else {
             quote! {
-                async fn render<'__cx>(
+                fn render<'__cx>(
                     self,
                     cx: &'__cx #topcoat_context::Cx,
                     props: Self::Props,
-                ) -> #return_ty
+                ) -> impl Future<Output = #return_ty> + ::core::marker::Send + '__cx
                 where
                     Self: '__cx,
                     Self::Props: '__cx,
                 {
                     #item
-                    #ident(cx, #(#args),*).await
+                    #ident(cx, #(#args),*)
                 }
             }
         };

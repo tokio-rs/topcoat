@@ -3,7 +3,7 @@ use std::time::Duration;
 use topcoat::{
     Result,
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::{View, ViewHandle, component, emit, live, view},
+    view::{View, ViewHandle, emit, live, view},
 };
 
 #[tokio::main]
@@ -17,7 +17,7 @@ async fn main() {
 /// Applies streamed swaps: replaces the content between a live position's
 /// marker comments with the template the swap arrived in.
 // TODO: serve this from the framework instead of pasting it into the page.
-const SWAP_SCRIPT: &str = r#"<script>
+const SWAP_SCRIPT: &str = r"<script>
 window.topcoat = {
     swap(id) {
         const script = document.currentScript;
@@ -38,7 +38,7 @@ window.topcoat = {
         script.remove();
     },
 };
-</script>"#;
+</script>";
 
 #[page("/")]
 async fn home() -> Result<impl View> {
@@ -54,7 +54,11 @@ async fn home() -> Result<impl View> {
             <body>
                 (live! {
                     for count in 0..100 {
-                        emit! { "Loading... " (count) "%" }?;
+                        emit! {
+                            "Loading... "
+                            (count)
+                            "%"
+                        }?;
                         tokio::time::sleep(Duration::from_millis(20)).await;
                     }
                     emit! { "Hello world!" }
