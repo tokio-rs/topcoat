@@ -73,11 +73,19 @@ impl http_body::Body for ViewBody {
             return Poll::Ready(Some(Ok(Frame::data(first.into()))));
         }
         match self.rest.as_mut().poll_next(cx) {
-            // TODO: envelope a swap for the client to apply, instead of
-            // writing it out like content.
-            Poll::Ready(Some(Ok(
-                ViewChunk::Content(view) | ViewChunk::Swap { view, .. },
-            ))) => Poll::Ready(Some(Ok(Frame::data(view.render(&self.cx).into())))),
+            Poll::Ready(Some(Ok(ViewChunk::Content(view)))) => {
+                Poll::Ready(Some(Ok(Frame::data(view.render(&self.cx).into()))))
+            }
+            // A swap streams down the still-open response as an inert
+            // template plus a script applying it to the swap's position.
+            Poll::Ready(Some(Ok(ViewChunk::Swap { id, view }))) => {
+                let html = view.render(&self.cx);
+                let envelope = format!(
+                    "<template data-tc-swap=\"{id}\">{html}</template>\
+                     <script>topcoat.swap({id})</script>",
+                );
+                Poll::Ready(Some(Ok(Frame::data(envelope.into()))))
+            }
             Poll::Ready(Some(Err(error))) => Poll::Ready(Some(Err(error.into()))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
