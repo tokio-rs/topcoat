@@ -6,7 +6,7 @@ use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    BoxView, Child, PartsWriter, PromotedStr, StaticStr, Unescaped, ViewChunk, ViewHandle,
+    BoxView, Child, PartsWriter, PromotedStr, StaticStr, Unescaped, View, ViewChunk, ViewHandle,
     ViewStream,
     buffer::ViewBufferScope,
     yielder::yield_,
@@ -67,8 +67,28 @@ impl<T: NodeViewParts + Send> NodeViewPartsStream for T {
     }
 }
 
-/// A view interpolated into a node position re-emits each of its chunks at
-/// the position; an error its stream yields fails the position.
+/// Re-emits a view's chunks at the node position `writer` drives.
+///
+/// The view's content chunks become content of the position; a swap targets
+/// its own position and passes through as is. An error the view's stream
+/// yields fails the position.
+pub(crate) async fn forward_view(view: impl View, writer: &mut NodeWriter) -> Result<()> {
+    let mut view = pin!(view);
+    while let Some(chunk) = view.next().await {
+        match chunk? {
+            ViewChunk::Content(content) => {
+                writer
+                    .emit(|parts| {
+                        parts.push_view(content);
+                    })
+                    .await;
+            }
+            chunk @ ViewChunk::Swap { .. } => yield_(Ok(chunk)).await,
+        }
+    }
+    Ok(())
+}
+
 impl<F> NodeViewPartsStream for ViewStream<F>
 where
     F: Future<Output = Result<()>> + Send,
@@ -79,43 +99,18 @@ where
     where
         Self: 'cx,
     {
-        let mut stream = pin!(self);
-        while let Some(chunk) = stream.next().await {
-            match chunk? {
-                ViewChunk::Content(view) => {
-                    writer.emit(|parts| {
-                        parts.push_view(view);
-                    })
-                    .await;
-                }
-                // A swap targets its own position; it passes through as is.
-                chunk @ ViewChunk::Swap { .. } => yield_(Ok(chunk)).await,
-            }
-        }
-        Ok(())
+        forward_view(self, &mut writer).await
     }
 }
 
 impl NodeViewPartsStream for BoxView<'_> {
     const MULTI: bool = false;
 
-    async fn into_view_parts_stream<'cx>(mut self, _cx: &'cx Cx, mut writer: NodeWriter) -> Result<()>
+    async fn into_view_parts_stream<'cx>(self, _cx: &'cx Cx, mut writer: NodeWriter) -> Result<()>
     where
         Self: 'cx,
     {
-        while let Some(chunk) = self.next().await {
-            match chunk? {
-                ViewChunk::Content(view) => {
-                    writer.emit(|parts| {
-                        parts.push_view(view);
-                    })
-                    .await;
-                }
-                // A swap targets its own position; it passes through as is.
-                chunk @ ViewChunk::Swap { .. } => yield_(Ok(chunk)).await,
-            }
-        }
-        Ok(())
+        forward_view(self, &mut writer).await
     }
 }
 

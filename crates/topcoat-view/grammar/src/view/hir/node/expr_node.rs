@@ -4,7 +4,8 @@ use syn::Ident;
 
 use crate::view::hir::emit::{Emit, Emitter};
 
-/// A dynamic expression, emitted through its [`ExprKind`]'s builder method.
+/// A dynamic expression: a node position is driven as a joined unit, any
+/// other position is pushed through its [`ExprKind`]'s builder method.
 pub(crate) struct ExprNode {
     pub kind: ExprKind,
     pub tokens: TokenStream,
@@ -14,16 +15,22 @@ impl Emit for ExprNode {
     fn emit(&self, emitter: &mut Emitter) {
         let ident = emitter.fresh_ident();
         let tokens = &self.tokens;
-        let method = self.kind.builder_method();
 
         emitter.hoist(quote! { let #ident = #tokens; });
-        emitter.burst(quote! { __b.#method(#ident); });
+        match self.kind {
+            ExprKind::Node => emitter.unit(Span::call_site(), &ident),
+            kind => {
+                let method = kind.builder_method();
+                emitter.burst(quote! { __b.#method(#ident); });
+            }
+        }
     }
 }
 
-/// Identifies which builder method an [`ExprNode`] is pushed through when
-/// emitted, so the generated code seals the expression with the right
-/// position and dispatches the corresponding `*ViewParts` trait.
+/// Identifies how an [`ExprNode`] is emitted: a node position joins the
+/// template's units, every other position maps to the builder method that
+/// seals the expression with the right position and dispatches the
+/// corresponding `*ViewParts` trait.
 #[derive(Copy, Clone)]
 pub(crate) enum ExprKind {
     Node,

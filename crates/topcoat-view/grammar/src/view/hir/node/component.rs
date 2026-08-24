@@ -1,12 +1,12 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{Path, spanned::Spanned};
-use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
+use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::{
     NamedArg,
     hir::{
-        Bindings, Scope,
+        Scope,
         emit::{Emit, Emitter},
     },
 };
@@ -108,6 +108,10 @@ impl Component {
     }
     /// Returns the expression yielding this component's render future, with
     /// the props evaluated eagerly.
+    ///
+    /// The invocation's child nodes pass as a lazy [`Child`]: the component
+    /// decides where they render by interpolating the value into its own
+    /// template, which drives them concurrently with the rest of it.
     fn render_future(&self) -> TokenStream {
         let Self {
             path,
@@ -123,7 +127,7 @@ impl Component {
         });
         let child = children.as_ref().map(|scope| {
             let child = scope.emit_view();
-            quote! { .child(#child) }
+            quote! { .child(#topcoat_view::Child::new(#child)) }
         });
 
         quote_spanned! {path.span()=> {
@@ -139,49 +143,6 @@ impl Component {
             )
         }}
     }
-
-    /// Returns the expression yielding this component's render future when
-    /// the children render components of their own.
-    ///
-    /// The children cannot resolve before the props build, so the props take
-    /// a placeholder view holding a reserved slot in the scope's instruction
-    /// memory instead. The future joins the component's render with the
-    /// children and redirects the slot to their view once both resolve, so a
-    /// component renders concurrently with its own children at any nesting
-    /// depth.
-    fn render_future_with_async_children(&self, children: &Scope) -> TokenStream {
-        let Self {
-            path, named_args, ..
-        } = self;
-
-        let setters = named_args.iter().map(|arg| {
-            let ident = &arg.ident;
-            let value = &arg.value;
-            quote! { .#ident(#value) }
-        });
-        let child = children.emit_future(&Bindings::empty());
-
-        quote_spanned! {path.span()=> {
-            async {
-                use #topcoat_view::Component;
-                let (__placeholder, __slot) = #topcoat_view::internal::reserve();
-                let props = #path::props_builder()#(#setters)*.child(__placeholder).build();
-                // The marker is built via `Default` so the same construction
-                // works for both unit-struct and generic (`PhantomData`) markers.
-                #[allow(clippy::default_constructed_unit_structs)]
-                let __render = Component::render(
-                    #path::default(),
-                    __cx,
-                    props,
-                );
-                let __child = #child;
-                let (__rendered, __child) =
-                    #topcoat_view::internal::try_join!(__render, __child)?;
-                __slot.fill(__child);
-                ::core::result::Result::<_, #topcoat_error::Error>::Ok(__rendered)
-            }
-        }}
-    }
 }
 
 impl Emit for Component {
@@ -189,18 +150,11 @@ impl Emit for Component {
         let ident = emitter.fresh_ident();
         let span = self.span;
 
-        // Children that render components of their own resolve through a
-        // reserved slot, so the component overlaps with them instead of
-        // awaiting them while the props build.
-        let future = match &self.children {
-            Some(children) if children.is_async() => {
-                self.render_future_with_async_children(children)
-            }
-            _ => self.render_future(),
-        };
-        let future = self.identity_future(&future);
+        let future = self.identity_future(&self.render_future());
 
-        emitter.hoist_future(span, &ident, &future);
-        emitter.burst(quote_spanned! {span=> __b.view(#ident); });
+        emitter.hoist(quote_spanned! {span=>
+            let #ident = #topcoat_view::internal::Render::new(#future);
+        });
+        emitter.unit(span, &ident);
     }
 }

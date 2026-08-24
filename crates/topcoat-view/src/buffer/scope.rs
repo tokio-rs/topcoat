@@ -39,7 +39,7 @@ pub struct ViewBufferScope<'a> {
 }
 
 impl<'a> ViewBufferScope<'a> {
-    fn swap(slot: &'a mut Option<Box<ViewBuffer>>) -> Self {
+    pub(crate) fn swap(slot: &'a mut Option<Box<ViewBuffer>>) -> Self {
         *slot = CURRENT.replace(slot.take());
         Self { slot }
     }
@@ -51,7 +51,7 @@ impl<'a> ViewBufferScope<'a> {
 
     /// Returns whether a scope is active on the current thread, meaning an
     /// enclosing invocation has its buffer installed.
-    fn is_active() -> bool {
+    pub(crate) fn is_active() -> bool {
         let buffer = CURRENT.take();
         let active = buffer.is_some();
         CURRENT.set(buffer);

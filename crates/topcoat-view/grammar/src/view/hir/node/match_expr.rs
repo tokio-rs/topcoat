@@ -19,52 +19,31 @@ impl Emit for MatchExpr {
         let ident = emitter.fresh_ident();
         let expr = &self.expr;
 
-        let renders_components = self.arms.iter().any(|arm| arm.body.is_async());
-        if emitter.inline_await() || !renders_components {
-            let arms = self.arms.iter().map(|arm| {
-                let pat = &arm.pat;
-                let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
-                let body = arm.body.emit_view();
-                quote! { #pat #guard => #body }
-            });
+        // The arm bodies build streams of different types; nested `Either`s
+        // unify them, and only the taken arm is driven as this position's
+        // unit. Each arm's stream carries its pattern's bindings, which die
+        // with the arm it is created in.
+        let arm_count = self.arms.len();
+        let arms = self.arms.iter().enumerate().map(|(index, arm)| {
+            let pat = &arm.pat;
+            let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
+            let body = arm.body.emit_view_captured(&Bindings::of_pattern(pat));
+            let body = nest_either(body, index, arm_count);
+            quote! { #pat #guard => #body }
+        });
 
-            emitter.hoist(quote! {
-                let #ident = match #expr {
-                    #(#arms,)*
-                };
-            });
-        } else {
-            // In a joined position the arm bodies yield futures instead of
-            // views, so the taken arm joins with the scope's other
-            // components. Nested `Either`s unify the arms' future types.
-            // Each arm's future carries its pattern's bindings, which die
-            // with the arm it is created in.
-            let arm_count = self.arms.len();
-            let arms = self.arms.iter().enumerate().map(|(index, arm)| {
-                let pat = &arm.pat;
-                let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
-                let body = arm.body.emit_future(&Bindings::of_pattern(pat));
-                let body = nest_either(body, index, arm_count);
-                quote! { #pat #guard => #body }
-            });
-
-            emitter.hoist_future(
-                Span::call_site(),
-                &ident,
-                &quote! {
-                    match #expr {
-                        #(#arms,)*
-                    }
-                },
-            );
-        }
-        emitter.burst(quote! { __b.view(#ident); });
+        emitter.hoist(quote! {
+            let #ident = match #expr {
+                #(#arms,)*
+            };
+        });
+        emitter.unit(Span::call_site(), &ident);
     }
 }
 
-/// Wraps one arm's future so all arms unify to the same nested `Either` type:
-/// arm `i` of `n` becomes `i` `Right`s around a `Left`, and the last arm `n -
-/// 1` `Right`s around the bare future.
+/// Wraps one arm's stream so all arms unify to the same nested `Either`
+/// type: arm `i` of `n` becomes `i` `Right`s around a `Left`, and the last
+/// arm `n - 1` `Right`s around the bare stream.
 fn nest_either(future: TokenStream, index: usize, arm_count: usize) -> TokenStream {
     let last = index + 1 == arm_count;
     let mut tokens = if last {

@@ -20,42 +20,26 @@ impl Emit for ForLoop {
         let ident = emitter.fresh_ident();
         let Self { pat, expr, body } = self;
 
-        if body.is_async() {
-            // A body that renders components yields one future per
-            // iteration; joining them renders all iterations concurrently.
-            // Each future carries its iteration's pattern bindings, which
-            // die with the iteration, and borrows the rest of its
-            // environment, so iterations share outer values.
-            let body = body.emit_future(&Bindings::of_pattern(pat));
-            emitter.hoist_future(
-                Span::call_site(),
-                &ident,
-                &quote! {{
-                    let mut __futures = ::std::vec::Vec::new();
-                    for #pat in #expr {
-                        __futures.push(#body);
-                    }
-                    #topcoat_view::internal::try_join_all(__futures)
-                }},
-            );
-        } else {
-            // The hoist phase builds one view per iteration; the burst phase
-            // splices them into the enclosing block in iteration order.
-            let body = body.emit_view();
-            emitter.hoist(quote! {
-                let #ident = {
-                    let mut __views = ::std::vec::Vec::new();
-                    for #pat in #expr {
-                        __views.push(#body);
-                    }
-                    __views
-                };
-            });
-        }
-        emitter.burst(quote! {
-            for __loop_view in #ident {
-                __b.view(__loop_view);
-            }
+        // The iterations become the units of a nested join, driven together
+        // as one unit of the enclosing template, so all iterations render
+        // concurrently and splice in iteration order. Each iteration's
+        // stream carries its pattern bindings, which die with the iteration,
+        // and borrows the rest of its environment, so iterations share outer
+        // values.
+        let body = body.emit_view_captured(&Bindings::of_pattern(pat));
+        emitter.hoist(quote! {
+            let #ident = {
+                let mut __iterations = ::std::vec::Vec::new();
+                for #pat in #expr {
+                    __iterations.push(#topcoat_view::internal::Unit::new(
+                        ::std::boxed::Box::pin(
+                            #topcoat_view::internal::unit_future(#body, __cx),
+                        ),
+                    ));
+                }
+                #topcoat_view::internal::LoopView::new(__iterations)
+            };
         });
+        emitter.unit(Span::call_site(), &ident);
     }
 }

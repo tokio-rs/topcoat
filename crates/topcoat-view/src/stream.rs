@@ -7,7 +7,11 @@ use std::{
 use futures_core::{FusedStream, Stream};
 use topcoat_core::error::{Error, Result};
 
-use crate::{ViewChunk, yielder::collect};
+use crate::{
+    ViewChunk,
+    buffer::{ViewBuffer, ViewBufferScope},
+    yielder::collect,
+};
 
 /// A lazy view: a stream of rendered [`ViewChunk`]s.
 ///
@@ -45,7 +49,27 @@ pin_project! {
         f: F,
         done: bool,
         error: Option<Error>,
+        role: Role,
+        // A root stream's buffer between polls; installed on the task for
+        // the duration of each poll, and moved into the content chunk when
+        // it is yielded.
+        buffer: Option<Box<ViewBuffer>>,
     }
+}
+
+/// Who owns the buffer a stream's views are built in, decided at the first
+/// poll.
+///
+/// A stream polled with a buffer already installed is nested: it appends to
+/// the enclosing stream's buffer, and its chunks stay cheap handles into it.
+/// Otherwise the stream is the root: it installs a buffer of its own for
+/// exactly the duration of each poll, and seals it into the content chunk it
+/// yields.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Role {
+    Undecided,
+    Root,
+    Nested,
 }
 
 impl<F> ViewStream<F>
@@ -58,6 +82,8 @@ where
             f,
             done: false,
             error: None,
+            role: Role::Undecided,
+            buffer: None,
         }
     }
 }
@@ -81,7 +107,28 @@ where
             *this.done = true;
             return Poll::Ready(Some(Err(error)));
         }
-        let (poll, value) = collect(this.f, cx);
+        if *this.role == Role::Undecided {
+            *this.role = if ViewBufferScope::is_active() {
+                Role::Nested
+            } else {
+                *this.buffer = Some(Box::new(ViewBuffer::new()));
+                Role::Root
+            };
+        }
+        let (poll, value) = if *this.role == Role::Root {
+            let _scope = ViewBufferScope::swap(this.buffer);
+            collect(this.f, cx)
+        } else {
+            collect(this.f, cx)
+        };
+        // A root stream's content chunk takes the buffer it was built in
+        // with it, so it is self-contained once it leaves the stream.
+        let value = match value {
+            Some(Ok(ViewChunk::Content(view))) if *this.role == Role::Root => Some(Ok(
+                ViewChunk::Content(view.seal(this.buffer.take().map(|buffer| *buffer))),
+            )),
+            other => other,
+        };
         match poll {
             Poll::Pending => match value {
                 Some(value) => Poll::Ready(Some(value)),
