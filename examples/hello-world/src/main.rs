@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::{component, view},
+    view::{View, component, view},
 };
 
 #[tokio::main]
@@ -13,8 +13,8 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -23,16 +23,16 @@ async fn home() -> Result {
             </head>
             <body>hello(name: "World")</body>
         </html>
-    }
+    })
 }
 
 #[component]
-async fn hello(name: &str) -> Result {
-    view! {
+async fn hello(name: &str) -> Result<impl View> {
+    Ok(view! {
         <h1>
             "Hello, "
             (name)
             "!"
         </h1>
-    }
+    })
 }

@@ -42,7 +42,7 @@ impl IntoResponse for ViewResponse {
         let rendered = self.first.render_response(cx);
         let mut response = Html(Body::new(ViewBody {
             cx: cx.clone(),
-            first: rendered.html,
+            first: Some(rendered.html),
             rest: self.rest,
         }))
         .into_response(cx)?;
@@ -56,7 +56,8 @@ impl IntoResponse for ViewResponse {
 
 struct ViewBody {
     cx: Cx,
-    first: String,
+    /// The content chunk's HTML, emitted as the body's first frame.
+    first: Option<String>,
     rest: Pin<Box<dyn Stream<Item = Result<ViewChunk>> + Send>>,
 }
 
@@ -68,6 +69,9 @@ impl http_body::Body for ViewBody {
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Result<http_body::Frame<Self::Data>, Self::Error>>> {
+        if let Some(first) = self.first.take() {
+            return Poll::Ready(Some(Ok(Frame::data(first.into()))));
+        }
         match self.rest.as_mut().poll_next(cx) {
             // TODO: envelope a swap for the client to apply, instead of
             // writing it out like content.
