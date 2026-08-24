@@ -5,9 +5,9 @@ mod pretty_print;
 mod printer;
 mod registry;
 mod ring_buffer;
-mod rust;
 mod snippet;
 mod span;
+mod syn;
 mod text;
 mod token;
 mod trivia;
@@ -45,43 +45,18 @@ struct Replace {
 /// Returns `Err` with the accumulated [`FormatError`]s if parsing `input` or any
 /// macro body fails, or if a registered pretty-printer returns an error.
 pub fn pretty_print_str(registry: &Registry, input: &str) -> Result<String, Vec<FormatError>> {
-    pretty_print(registry, input, true)
-}
-
-/// Pretty-prints the Topcoat macro invocations in a fragment lifted out of a
-/// macro body.
-///
-/// `rustfmt` never reaches inside a macro body, so every invocation in the
-/// fragment is formatted here, including the ones that would be left to
-/// `rustfmt` at file level.
-///
-/// # Errors
-///
-/// Same as [`pretty_print_str`].
-pub(crate) fn pretty_print_fragment_str(
-    registry: &Registry,
-    input: &str,
-) -> Result<String, Vec<FormatError>> {
-    pretty_print(registry, input, false)
-}
-
-fn pretty_print(
-    registry: &Registry,
-    input: &str,
-    skip_rustfmt_layout: bool,
-) -> Result<String, Vec<FormatError>> {
     let mut output = String::new();
 
     // The whole file is parsed as a unit, so this error's span already refers to
     // positions in `input`; its body starts at the very first line and column.
-    let file = syn::parse_file(input)
+    let file = ::syn::parse_file(input)
         .map_err(|error| vec![FormatError::new(&error, LineColumn { line: 1, column: 0 })])?;
     let snippets = MacroSnippet::collect_from_file(&file);
     let mut errors = Vec::new();
     let mut replacements = Vec::new();
 
     for snippet in snippets {
-        if skip_rustfmt_layout && snippet.laid_out_by_rustfmt() {
+        if snippet.laid_out_by_rustfmt() {
             continue;
         }
         let Some(replacement) = registry.pretty_print_macro(&snippet) else {

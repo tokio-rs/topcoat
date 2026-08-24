@@ -119,9 +119,7 @@ async fn push_str_accepts_the_owned_string_from_an_event() {
         signal message = String::new();
 
         <input
-            @input=$(|e: topcoat::runtime::Event| {
-                message.push_str(e.target.value)
-            })
+            @input=$(|e: topcoat::runtime::Event| { message.push_str(e.target.value) })
         >
     }
     .unwrap()

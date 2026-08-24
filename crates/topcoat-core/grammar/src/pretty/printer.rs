@@ -91,7 +91,11 @@ impl<'a> Printer<'a> {
     ///
     /// Panics if `string.len()` does not fit in an `isize`.
     pub fn scan_text(&mut self, string: Cow<'static, str>, mode: TextMode) {
-        self.tokens.push_len(string.len().try_into().unwrap());
+        // Break-mode text (a trailing comma) renders only once its group has
+        // broken, so it takes no space in the flat layout being measured.
+        if mode != TextMode::Break {
+            self.tokens.push_len(string.len().try_into().unwrap());
+        }
         let token = Token::Text(TextToken::new(string, mode));
         self.tokens.push_back(token);
     }
@@ -232,9 +236,17 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Drops the trivia that began before the cursor without emitting it, for
+    /// callers that have copied a stretch of source text through verbatim.
+    /// Trivia starting exactly at the cursor lies outside the copied text and
+    /// is kept.
     pub fn skip_trivia(&mut self) {
-        while self.ready_trivia().is_some() {
-            self.trivia = &self.trivia[1..];
+        while let Some(trivia) = self.trivia.first() {
+            if trivia.span.start() < self.cursor {
+                self.trivia = &self.trivia[1..];
+            } else {
+                break;
+            }
         }
     }
 

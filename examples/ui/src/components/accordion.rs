@@ -117,10 +117,7 @@ pub async fn accordion_trigger(#[default] mut attrs: Attributes, #[default] chil
 pub async fn accordion_content(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
     view! {
         <div
-            class=(class!(
-                "pb-4 text-sm text-muted-foreground",
-                attrs.remove("class"),
-            ))
+            class=(class!("pb-4 text-sm text-muted-foreground", attrs.remove("class")))
             (attrs)
         >
             (child)

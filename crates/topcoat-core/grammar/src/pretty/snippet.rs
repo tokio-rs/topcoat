@@ -32,6 +32,27 @@ impl MacroSnippet {
         visitor.snippets
     }
 
+    /// Builds a snippet for a single invocation encountered while printing the
+    /// Rust code around it, laid out at the printer's current indentation.
+    /// Returns `None` when the invocation has no source text to reprint from.
+    pub(crate) fn from_macro(mac: &syn::Macro, initial_indent: isize) -> Option<Self> {
+        let name = &mac.path.segments.last()?.ident;
+        let span = mac.delimiter.span().span();
+        let source_text = span.source_text()?;
+        Some(Self {
+            name: name.to_string(),
+            source_text,
+            span,
+            // The output column is not known while tokens are being scanned;
+            // the source column is the best estimate and makes reformatting
+            // already-formatted code stable. One column is held back for the
+            // closing delimiter or comma that usually follows the invocation.
+            initial_space: MARGIN - isize::try_from(span.start().column).unwrap_or(0) - 1,
+            initial_indent,
+            laid_out_by_rustfmt: false,
+        })
+    }
+
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name

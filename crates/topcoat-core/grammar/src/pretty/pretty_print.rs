@@ -1,4 +1,4 @@
-use crate::pretty::{Printer, TextMode};
+use crate::pretty::Printer;
 
 /// Implemented by anything that knows how to emit itself as formatted text
 /// through a [`Printer`]. The printer takes care of line breaking and
@@ -29,26 +29,11 @@ where
     }
 }
 
-impl<T> PrettyPrint for syn::punctuated::Punctuated<T, syn::Token![,]>
+impl<T> PrettyPrint for Box<T>
 where
     T: PrettyPrint,
 {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
-        for (index, item) in self.pairs().enumerate() {
-            item.value().pretty_print(printer);
-            if item.punct().is_some() {
-                printer.scan_no_break_trivia();
-            }
-            if index == self.len() - 1 {
-                printer.scan_text(",".into(), TextMode::Break);
-                printer.advance_cursor(",");
-            } else {
-                item.punct().unwrap().pretty_print(printer);
-                printer.scan_same_line_trivia();
-                printer.scan_break();
-                " ".pretty_print(printer);
-                printer.scan_trivia(true, true);
-            }
-        }
+        self.as_ref().pretty_print(printer);
     }
 }

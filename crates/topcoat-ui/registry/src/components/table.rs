@@ -130,10 +130,7 @@ pub async fn table_head(#[default] mut attrs: Attributes, #[default] child: View
 pub async fn table_cell(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
     view! {
         <td
-            class=(class!(
-                "p-3 align-middle whitespace-nowrap",
-                attrs.remove("class"),
-            ))
+            class=(class!("p-3 align-middle whitespace-nowrap", attrs.remove("class")))
             (attrs)
         >
             (child)
@@ -146,10 +143,7 @@ pub async fn table_cell(#[default] mut attrs: Attributes, #[default] child: View
 pub async fn table_caption(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
     view! {
         <caption
-            class=(class!(
-                "mt-4 text-sm text-muted-foreground",
-                attrs.remove("class"),
-            ))
+            class=(class!("mt-4 text-sm text-muted-foreground", attrs.remove("class")))
             (attrs)
         >
             (child)
