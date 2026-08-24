@@ -1,6 +1,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod buffer;
+mod child;
 mod component;
 mod css;
 mod format;
@@ -14,6 +15,7 @@ pub mod svg;
 mod view;
 mod yielder;
 
+pub use child::*;
 pub use component::*;
 pub use css::*;
 pub use format::*;

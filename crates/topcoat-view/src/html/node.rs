@@ -1,12 +1,15 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, pin::pin};
 
+use futures_util::StreamExt;
 #[cfg(feature = "http")]
 use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    PartsWriter, PromotedStr, StaticStr, Unescaped, ViewChunk, ViewHandle,
-    buffer::ViewBufferScope, yielder::yield_,
+    BoxView, Child, PartsWriter, PromotedStr, StaticStr, Unescaped, ViewChunk, ViewHandle,
+    ViewStream,
+    buffer::ViewBufferScope,
+    yielder::yield_,
 };
 
 /// Converts a value used in node position into view parts.
@@ -61,6 +64,59 @@ impl<T: NodeViewParts + Send> NodeViewPartsStream for T {
     {
         writer.emit(|parts| self.into_view_parts(cx, parts)).await;
         Ok(())
+    }
+}
+
+/// A view interpolated into a node position re-emits each of its chunks at
+/// the position; an error its stream yields fails the position.
+impl<F> NodeViewPartsStream for ViewStream<F>
+where
+    F: Future<Output = Result<()>> + Send,
+{
+    const MULTI: bool = false;
+
+    async fn into_view_parts_stream<'cx>(self, _cx: &'cx Cx, mut writer: NodeWriter) -> Result<()>
+    where
+        Self: 'cx,
+    {
+        let mut stream = pin!(self);
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            writer.emit(|parts| {
+                parts.push_view_chunk(chunk);
+            })
+            .await;
+        }
+        Ok(())
+    }
+}
+
+impl NodeViewPartsStream for BoxView<'_> {
+    const MULTI: bool = false;
+
+    async fn into_view_parts_stream<'cx>(mut self, _cx: &'cx Cx, mut writer: NodeWriter) -> Result<()>
+    where
+        Self: 'cx,
+    {
+        while let Some(chunk) = self.next().await {
+            let chunk = chunk?;
+            writer.emit(|parts| {
+                parts.push_view_chunk(chunk);
+            })
+            .await;
+        }
+        Ok(())
+    }
+}
+
+impl NodeViewPartsStream for Child<'_> {
+    const MULTI: bool = false;
+
+    async fn into_view_parts_stream<'cx>(self, cx: &'cx Cx, writer: NodeWriter) -> Result<()>
+    where
+        Self: 'cx,
+    {
+        self.view.into_view_parts_stream(cx, writer).await
     }
 }
 

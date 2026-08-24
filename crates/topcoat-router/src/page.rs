@@ -1,7 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::{BoxView, ViewStream};
+use topcoat_view::{BoxView, NodeViewPartsStream, NodeWriter, ViewStream};
 
 use crate::{
     Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId,
@@ -158,6 +158,19 @@ impl<'a> Slot<'a> {
     #[must_use]
     pub fn render(self, cx: &Cx) -> BoxView<'a> {
         (self.render)(cx)
+    }
+}
+
+/// Interpolating the slot into a template renders it against the template's
+/// context.
+impl NodeViewPartsStream for Slot<'_> {
+    const MULTI: bool = false;
+
+    async fn into_view_parts_stream<'cx>(self, cx: &'cx Cx, writer: NodeWriter) -> Result<()>
+    where
+        Self: 'cx,
+    {
+        self.render(cx).into_view_parts_stream(cx, writer).await
     }
 }
 
