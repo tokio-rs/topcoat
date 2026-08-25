@@ -4,7 +4,7 @@ use syn::Expr;
 use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
-    Bindings, Scope,
+    Scope,
     emit::{Emit, Emitter},
 };
 
@@ -24,18 +24,18 @@ impl Emit for IfElse {
             else_branch,
         } = self;
 
-        // The branches build streams of different types; `Either` unifies
+        // The branches build views of different types; `EitherView` unifies
         // them, and only the taken branch is driven as this position's unit.
-        // The then stream carries the bindings of the condition's `let`
-        // patterns, which die with the branch it is created in.
-        let then_branch = then_branch.emit_view_captured(&Bindings::of_condition(expr));
+        // The branch's view is built eagerly inside the branch, so the
+        // bindings of the condition's `let` patterns move into it.
+        let then_branch = then_branch.emit_view();
         let else_branch = else_branch.emit_view();
 
         emitter.hoist(quote! {
             let #ident = if #expr {
-                #topcoat_view::internal::Either::Left(#then_branch)
+                #topcoat_view::internal::EitherView::left(#then_branch)
             } else {
-                #topcoat_view::internal::Either::Right(#else_branch)
+                #topcoat_view::internal::EitherView::right(#else_branch)
             };
         });
         emitter.unit(Span::call_site(), &ident);

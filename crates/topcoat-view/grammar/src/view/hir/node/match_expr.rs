@@ -4,7 +4,7 @@ use syn::{Expr, Pat};
 use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
-    Bindings, Scope,
+    Scope,
     emit::{Emit, Emitter},
 };
 
@@ -19,15 +19,15 @@ impl Emit for MatchExpr {
         let ident = emitter.fresh_ident();
         let expr = &self.expr;
 
-        // The arm bodies build streams of different types; nested `Either`s
-        // unify them, and only the taken arm is driven as this position's
-        // unit. Each arm's stream carries its pattern's bindings, which die
-        // with the arm it is created in.
+        // The arm bodies build views of different types; nested
+        // `EitherView`s unify them, and only the taken arm is driven as this
+        // position's unit. The arm's view is built eagerly inside the arm,
+        // so its pattern's bindings move into it.
         let arm_count = self.arms.len();
         let arms = self.arms.iter().enumerate().map(|(index, arm)| {
             let pat = &arm.pat;
             let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
-            let body = arm.body.emit_view_captured(&Bindings::of_pattern(pat));
+            let body = arm.body.emit_view();
             let body = nest_either(body, index, arm_count);
             quote! { #pat #guard => #body }
         });
@@ -41,18 +41,18 @@ impl Emit for MatchExpr {
     }
 }
 
-/// Wraps one arm's stream so all arms unify to the same nested `Either`
-/// type: arm `i` of `n` becomes `i` `Right`s around a `Left`, and the last
-/// arm `n - 1` `Right`s around the bare stream.
-fn nest_either(future: TokenStream, index: usize, arm_count: usize) -> TokenStream {
+/// Wraps one arm's view so all arms unify to the same nested `EitherView`
+/// type: arm `i` of `n` becomes `i` `right`s around a `left`, and the last
+/// arm `n - 1` `right`s around the bare view.
+fn nest_either(view: TokenStream, index: usize, arm_count: usize) -> TokenStream {
     let last = index + 1 == arm_count;
     let mut tokens = if last {
-        future
+        view
     } else {
-        quote! { #topcoat_view::internal::Either::Left(#future) }
+        quote! { #topcoat_view::internal::EitherView::left(#view) }
     };
     for _ in 0..if last { arm_count - 1 } else { index } {
-        tokens = quote! { #topcoat_view::internal::Either::Right(#tokens) };
+        tokens = quote! { #topcoat_view::internal::EitherView::right(#tokens) };
     }
     tokens
 }

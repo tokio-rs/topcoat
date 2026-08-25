@@ -1,6 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Ident;
+use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::emit::{Emit, Emitter};
 
@@ -16,11 +17,16 @@ impl Emit for ExprNode {
         let ident = emitter.fresh_ident();
         let tokens = &self.tokens;
 
-        emitter.hoist(quote! { let #ident = #tokens; });
         match self.kind {
-            ExprKind::Node => emitter.unit(Span::call_site(), &ident),
+            ExprKind::Node => {
+                emitter.hoist(quote! {
+                    let #ident = #topcoat_view::internal::NodeView::new(#tokens);
+                });
+                emitter.unit(Span::call_site(), &ident);
+            }
             kind => {
                 let method = kind.builder_method();
+                emitter.hoist(quote! { let #ident = #tokens; });
                 emitter.burst(quote! { __b.#method(#ident); });
             }
         }

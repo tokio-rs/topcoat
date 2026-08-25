@@ -1,9 +1,7 @@
 use proc_macro2::TokenStream;
-use quote::quote;
-use topcoat_core_grammar::paths::topcoat_view;
 
 use super::{
-    Bindings, Node,
+    Node,
     emit::{Emit, Emitter},
 };
 
@@ -18,58 +16,20 @@ impl Scope {
         Self { nodes }
     }
 
-    /// Emits a top-level `view!` invocation: a `ViewStream` owning its
-    /// captures, so the view outlives the invocation's scope.
+    /// Emits a top-level `view!` invocation.
     pub fn emit_root(&self) -> TokenStream {
-        let body = self.emit_body();
-        quote! {
-            #topcoat_view::internal::ViewStream::new(async move {
-                #body
-            })
-        }
+        self.emit_view()
     }
 
-    /// Emits this scope as a nested view value, for a node position of the
-    /// enclosing scope: a component's children, or a control-flow body
-    /// without pattern bindings.
+    /// Emits this scope as an inert view value: a block expression that
+    /// evaluates the scope's expressions in source order and builds its
+    /// `JoinView`.
     ///
-    /// The stream's body borrows its environment; it is driven inside the
-    /// enclosing template's join, where everything it borrows is still
-    /// alive.
+    /// The view owns the evaluated values; whatever the expressions borrow
+    /// from the environment, it borrows. A nested scope built inside a
+    /// branch or iteration takes its pattern bindings with it, since the
+    /// expressions move them into the view.
     pub(crate) fn emit_view(&self) -> TokenStream {
-        let body = self.emit_body();
-        quote! {
-            #topcoat_view::internal::ViewStream::new(async {
-                #body
-            })
-        }
-    }
-
-    /// Emits this scope like [`emit_view`](Self::emit_view), moving the
-    /// enclosing pattern's bindings into the stream.
-    ///
-    /// The stream borrows its environment, except for the values bound by
-    /// the enclosing pattern: those die with the branch or iteration that
-    /// produced them, so the stream carries them in a `Capture` packed where
-    /// they are still alive and taken back apart inside the body.
-    pub(crate) fn emit_view_captured(&self, bindings: &Bindings) -> TokenStream {
-        if bindings.is_empty() {
-            return self.emit_view();
-        }
-        let idents = bindings.idents();
-        let rebinds = bindings.rebinds();
-        let body = self.emit_body();
-        quote! {{
-            let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
-            #topcoat_view::internal::ViewStream::new(async {
-                let (#(#rebinds,)*) = __captured.take();
-                #body
-            })
-        }}
-    }
-
-    /// Emits the body of this scope's `ViewStream`.
-    fn emit_body(&self) -> TokenStream {
         let mut emitter = Emitter::new();
         for node in &self.nodes {
             node.emit(&mut emitter);

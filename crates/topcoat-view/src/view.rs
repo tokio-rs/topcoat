@@ -56,7 +56,13 @@ pub trait View: Send {
         task: &mut Context<'_>,
         buf: &mut ViewBuffer,
     ) -> Poll<Option<Result<Swap>>>;
+}
 
+/// Combinators available on every [`View`].
+///
+/// Blanket implemented, so implementing [`View`] is enough to get them and an
+/// implementation never has to care about them.
+pub trait ViewExt: View {
     /// Erases the view's concrete type behind a boxed one.
     ///
     /// Every `view!` invocation has its own anonymous type, so a function
@@ -69,6 +75,8 @@ pub trait View: Send {
         Box::pin(self)
     }
 }
+
+impl<V: View + ?Sized> ViewExt for V {}
 
 impl View for () {
     fn poll_first(

@@ -153,7 +153,7 @@ impl Emit for Component {
         let future = self.identity_future(&self.render_future());
 
         emitter.hoist(quote_spanned! {span=>
-            let #ident = #topcoat_view::internal::Render::new(#future);
+            let #ident = #topcoat_view::internal::ThenView::new(#future);
         });
         emitter.unit(span, &ident);
     }

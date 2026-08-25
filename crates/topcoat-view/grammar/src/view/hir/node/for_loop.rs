@@ -4,7 +4,7 @@ use syn::{Expr, Pat};
 use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
-    Bindings, Scope,
+    Scope,
     emit::{Emit, Emitter},
 };
 
@@ -20,22 +20,17 @@ impl Emit for ForLoop {
         let ident = emitter.fresh_ident();
         let Self { pat, expr, body } = self;
 
-        // The iterations become the units of a nested join, driven together
-        // as one unit of the enclosing template, so all iterations render
-        // concurrently and splice in iteration order. Each iteration's
-        // stream carries its pattern bindings, which die with the iteration,
-        // and borrows the rest of its environment, so iterations share outer
-        // values.
-        let body = body.emit_view_captured(&Bindings::of_pattern(pat));
+        // The iterations become one `LoopView`, driven as one unit of the
+        // enclosing template, so all iterations render concurrently and
+        // splice in iteration order. Each iteration's view is built eagerly
+        // inside the iteration, so its pattern bindings move into it; the
+        // views share one type by boxing each body.
+        let body = body.emit_view();
         emitter.hoist(quote! {
             let #ident = {
                 let mut __iterations = ::std::vec::Vec::new();
                 for #pat in #expr {
-                    __iterations.push(#topcoat_view::internal::Unit::new(
-                        ::std::boxed::Box::pin(
-                            #topcoat_view::internal::unit_future(#body, __cx),
-                        ),
-                    ));
+                    __iterations.push(#topcoat_view::ViewExt::boxed(#body));
                 }
                 #topcoat_view::internal::LoopView::new(__iterations)
             };
