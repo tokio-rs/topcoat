@@ -38,7 +38,7 @@ pub struct ViewHandle {
 /// into a buffer someone else holds, or an owned view carrying its own
 /// buffer.
 #[derive(Debug, Clone)]
-pub(crate) enum ViewRepr {
+pub(super) enum ViewRepr {
     /// Trusted static markup rendered verbatim, independent of any buffer.
     Static(&'static str),
     /// An instruction block in the buffer identified by `buffer`, starting
@@ -72,7 +72,7 @@ impl ViewHandle {
     /// Creates the handle for an instruction block built in the buffer
     /// identified by `buffer`, estimated to write `size_hint` bytes.
     #[inline]
-    pub(crate) fn from_scope(
+    pub(super) fn from_scope(
         buffer: ViewBufferId,
         entry: InstructionPtr,
         size_hint: usize,
@@ -88,14 +88,14 @@ impl ViewHandle {
 
     /// Unwraps the view into its representation.
     #[inline]
-    pub(crate) fn repr(self) -> ViewRepr {
+    pub(super) fn repr(self) -> ViewRepr {
         self.repr
     }
 
     /// Returns an estimate of the number of bytes the view writes when
     /// rendered.
     #[inline]
-    pub(crate) fn size_hint(&self) -> usize {
+    pub(super) fn size_hint(&self) -> usize {
         match &self.repr {
             ViewRepr::Static(body) => body.len(),
             ViewRepr::Scoped { size_hint, .. } | ViewRepr::Owned { size_hint, .. } => *size_hint,

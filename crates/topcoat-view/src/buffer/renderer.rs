@@ -13,7 +13,7 @@ use crate::{
 /// [`Call`](Instruction::Call) instructions, follows the
 /// [`Jmp`](Instruction::Jmp) redirects of filled view slots, and finishes
 /// when a [`Ret`](Instruction::Ret) is reached with an empty call stack.
-pub struct Renderer<'a> {
+pub(super) struct Renderer<'a> {
     buffer: &'a ViewBuffer,
     ptr: InstructionPtr,
     stack: Vec<InstructionPtr>,
@@ -21,7 +21,7 @@ pub struct Renderer<'a> {
 
 impl<'a> Renderer<'a> {
     #[must_use]
-    pub fn new(buffer: &'a ViewBuffer, entry: InstructionPtr) -> Self {
+    pub(super) fn new(buffer: &'a ViewBuffer, entry: InstructionPtr) -> Self {
         Self {
             buffer,
             ptr: entry,
@@ -35,7 +35,7 @@ impl<'a> Renderer<'a> {
     ///
     /// Panics if execution reaches a reserved view slot that was never
     /// filled.
-    pub fn execute(&mut self, cx: &Cx, f: &mut Formatter<'_>) {
+    pub(super) fn execute(&mut self, cx: &Cx, f: &mut Formatter<'_>) {
         use std::fmt::Write;
 
         let consts = self.buffer.consts();

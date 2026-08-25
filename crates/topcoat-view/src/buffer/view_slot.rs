@@ -12,17 +12,17 @@ pub struct ViewSlot {
 }
 
 impl ViewSlot {
-    pub(crate) fn new(buffer: ViewBufferId, ptr: InstructionPtr) -> Self {
+    pub(super) fn new(buffer: ViewBufferId, ptr: InstructionPtr) -> Self {
         Self { buffer, ptr }
     }
 
     /// Returns the id of the buffer the slot was reserved in.
-    pub(crate) fn buffer(&self) -> ViewBufferId {
+    pub(super) fn buffer(&self) -> ViewBufferId {
         self.buffer
     }
 
     /// Returns the address of the slot's placeholder instruction.
-    pub(crate) fn ptr(&self) -> InstructionPtr {
+    pub(super) fn ptr(&self) -> InstructionPtr {
         self.ptr
     }
 }

@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub enum Instruction {
+pub(super) enum Instruction {
     /// Jump into a nested block, returning here at its [`Ret`](Self::Ret).
     Call { entry: InstructionPtr },
     /// Return back to the previous call instruction, if any.

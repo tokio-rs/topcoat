@@ -9,13 +9,13 @@ mod view_slot;
 
 use core::fmt::NumBuffer;
 
-pub use const_buffer::*;
+use const_buffer::*;
 pub use handle::*;
-pub use id::*;
-pub use instruction::*;
-pub use instruction_buffer::*;
+use id::*;
+use instruction::*;
+use instruction_buffer::*;
 pub use part::*;
-pub use renderer::*;
+use renderer::*;
 use topcoat_core::context::Cx;
 pub use view_slot::*;
 
@@ -53,22 +53,20 @@ impl ViewBuffer {
     }
 
     /// Returns this buffer's unique id.
-    #[must_use]
-    pub fn id(&self) -> ViewBufferId {
+    fn id(&self) -> ViewBufferId {
         self.id
     }
 
     /// Returns the address the next pushed instruction will live at.
-    #[must_use]
-    pub fn next_ptr(&self) -> InstructionPtr {
+    fn next_ptr(&self) -> InstructionPtr {
         self.instructions.next_ptr()
     }
 
-    pub(crate) fn instruction(&self, ptr: InstructionPtr) -> &Instruction {
+    fn instruction(&self, ptr: InstructionPtr) -> &Instruction {
         self.instructions.fetch(ptr)
     }
 
-    pub(crate) fn consts(&self) -> &ConstBuffer {
+    fn consts(&self) -> &ConstBuffer {
         &self.consts
     }
 
@@ -84,8 +82,11 @@ impl ViewBuffer {
     /// builder's accumulated size hint. `f` must not build other views;
     /// nested views are built first and spliced into the block with
     /// [`Builder::view`].
-    #[doc(hidden)]
-    pub fn block(&mut self, cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> ViewHandle {
+    pub(crate) fn block(
+        &mut self,
+        cx: &Cx,
+        f: impl FnOnce(&mut Builder<'_, '_, '_>),
+    ) -> ViewHandle {
         let entry = self.next_ptr();
         let mut parts = PartsWriter::new(self, HtmlContext::Text);
         f(&mut Builder::new(cx, &mut parts));
@@ -99,7 +100,7 @@ impl ViewBuffer {
     /// # Panics
     ///
     /// Panics if the view was built in a different, still building buffer.
-    pub fn push_view(&mut self, view: ViewHandle) {
+    fn push_view(&mut self, view: ViewHandle) {
         match view.repr() {
             ViewRepr::Static(body) => {
                 self.push_static_str(body, HtmlContext::Unescaped);
@@ -120,7 +121,7 @@ impl ViewBuffer {
 
     /// Appends the return instruction that terminates a view's instruction
     /// block.
-    pub fn push_ret(&mut self) {
+    fn push_ret(&mut self) {
         self.push_instruction(Instruction::Ret);
     }
 
@@ -185,47 +186,47 @@ impl ViewBuffer {
         *instruction = Instruction::Jmp { entry };
     }
 
-    pub fn push_bool(&mut self, value: bool) {
+    fn push_bool(&mut self, value: bool) {
         self.push_instruction(Instruction::Bool(value));
     }
 
-    pub fn push_i8(&mut self, value: i8) {
+    fn push_i8(&mut self, value: i8) {
         self.push_instruction(Instruction::I8(value));
     }
 
-    pub fn push_i16(&mut self, value: i16) {
+    fn push_i16(&mut self, value: i16) {
         self.push_instruction(Instruction::I16(value));
     }
 
-    pub fn push_i32(&mut self, value: i32) {
+    fn push_i32(&mut self, value: i32) {
         self.push_instruction(Instruction::I32(value));
     }
 
-    pub fn push_i64(&mut self, value: i64) {
+    fn push_i64(&mut self, value: i64) {
         self.push_instruction(Instruction::I64(value));
     }
 
-    pub fn push_isize(&mut self, value: isize) {
+    fn push_isize(&mut self, value: isize) {
         self.push_instruction(Instruction::Isize(value));
     }
 
-    pub fn push_u8(&mut self, value: u8) {
+    fn push_u8(&mut self, value: u8) {
         self.push_instruction(Instruction::U8(value));
     }
 
-    pub fn push_u16(&mut self, value: u16) {
+    fn push_u16(&mut self, value: u16) {
         self.push_instruction(Instruction::U16(value));
     }
 
-    pub fn push_u32(&mut self, value: u32) {
+    fn push_u32(&mut self, value: u32) {
         self.push_instruction(Instruction::U32(value));
     }
 
-    pub fn push_u64(&mut self, value: u64) {
+    fn push_u64(&mut self, value: u64) {
         self.push_instruction(Instruction::U64(value));
     }
 
-    pub fn push_usize(&mut self, value: usize) {
+    fn push_usize(&mut self, value: usize) {
         self.push_instruction(Instruction::Usize(value));
     }
 
@@ -234,7 +235,7 @@ impl ViewBuffer {
     /// An `i128` does not fit into a fixed-size instruction, so its rendered
     /// form is stored in the constant buffer. Its digits are not significant
     /// in any HTML context, so no escaping applies.
-    pub fn push_i128(&mut self, value: i128) {
+    fn push_i128(&mut self, value: i128) {
         self.push_str(
             value.format_into(&mut NumBuffer::new()),
             HtmlContext::Unescaped,
@@ -246,22 +247,22 @@ impl ViewBuffer {
     /// A `u128` does not fit into a fixed-size instruction, so its rendered
     /// form is stored in the constant buffer. Its digits are not significant
     /// in any HTML context, so no escaping applies.
-    pub fn push_u128(&mut self, value: u128) {
+    fn push_u128(&mut self, value: u128) {
         self.push_str(
             value.format_into(&mut NumBuffer::new()),
             HtmlContext::Unescaped,
         );
     }
 
-    pub fn push_f32(&mut self, value: f32) {
+    fn push_f32(&mut self, value: f32) {
         self.push_instruction(Instruction::F32(value));
     }
 
-    pub fn push_f64(&mut self, value: f64) {
+    fn push_f64(&mut self, value: f64) {
         self.push_instruction(Instruction::F64(value));
     }
 
-    pub fn push_char(&mut self, value: char, context: HtmlContext) {
+    fn push_char(&mut self, value: char, context: HtmlContext) {
         self.push_instruction(Instruction::Char { value, context });
     }
 
@@ -271,14 +272,14 @@ impl ViewBuffer {
     /// read-only data. The string stays out of the buffer's constants, so
     /// prefer this over [`push_static_str`](Self::push_static_str) whenever
     /// the string is written as a literal.
-    pub fn push_promoted_str(&mut self, value: &'static &'static str, context: HtmlContext) {
+    fn push_promoted_str(&mut self, value: &'static &'static str, context: HtmlContext) {
         if value.is_empty() {
             return;
         }
         self.push_instruction(Instruction::PromotedStr { value, context });
     }
 
-    pub fn push_static_str(&mut self, value: &'static str, context: HtmlContext) {
+    fn push_static_str(&mut self, value: &'static str, context: HtmlContext) {
         if value.is_empty() {
             return;
         }
@@ -286,7 +287,7 @@ impl ViewBuffer {
         self.push_instruction(Instruction::StaticStr { ptr, context });
     }
 
-    pub fn push_str(&mut self, value: &str, context: HtmlContext) {
+    fn push_str(&mut self, value: &str, context: HtmlContext) {
         if value.is_empty() {
             return;
         }
@@ -298,7 +299,7 @@ impl ViewBuffer {
         });
     }
 
-    pub fn push_string(&mut self, value: String, context: HtmlContext) {
+    fn push_string(&mut self, value: String, context: HtmlContext) {
         if value.is_empty() {
             return;
         }
@@ -306,18 +307,18 @@ impl ViewBuffer {
         self.push_instruction(Instruction::String { ptr, context });
     }
 
-    pub fn push_dyn(&mut self, value: Box<dyn DynViewPart>, context: HtmlContext) {
+    fn push_dyn(&mut self, value: Box<dyn DynViewPart>, context: HtmlContext) {
         let ptr = self.consts.push_dyn(value);
         self.push_instruction(Instruction::Dyn { ptr, context });
     }
 
     #[cfg(feature = "http")]
-    pub fn push_status_code(&mut self, value: http::StatusCode) {
+    fn push_status_code(&mut self, value: http::StatusCode) {
         self.push_instruction(Instruction::StatusCode(value));
     }
 
     #[cfg(feature = "http")]
-    pub fn push_headers(&mut self, value: http::HeaderMap) {
+    fn push_headers(&mut self, value: http::HeaderMap) {
         let ptr = self.consts.push_headers(value);
         self.push_instruction(Instruction::Headers { ptr });
     }
@@ -325,7 +326,7 @@ impl ViewBuffer {
     /// Prints the buffer's fields and how many instructions and constants of
     /// each kind it holds.
     #[allow(unused)]
-    pub(crate) fn print_stats(&self) {
+    fn print_stats(&self) {
         println!("ViewBuffer {{");
         println!("  id: {:?}", self.id);
         self.instructions.print_stats();

@@ -12,7 +12,7 @@ mod string;
 pub mod svg;
 mod view;
 
-pub use buffer::{DynViewPart, PartsWriter, ViewBuffer, ViewHandle};
+pub use buffer::*;
 pub use child::*;
 pub use component::*;
 pub use css::*;

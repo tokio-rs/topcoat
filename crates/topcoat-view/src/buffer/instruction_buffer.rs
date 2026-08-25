@@ -4,10 +4,10 @@ use crate::buffer::Instruction;
 
 /// The address of an instruction in an [`InstructionBuffer`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct InstructionPtr(usize);
+pub(super) struct InstructionPtr(usize);
 
 impl InstructionPtr {
-    pub(crate) fn increment(&mut self) {
+    pub(super) fn increment(&mut self) {
         self.0 += 1;
     }
 }
@@ -15,12 +15,12 @@ impl InstructionPtr {
 /// The instructions of a [`ViewBuffer`](crate::buffer::ViewBuffer): an
 /// append-only sequence addressed by [`InstructionPtr`].
 #[derive(Debug)]
-pub struct InstructionBuffer {
+pub(super) struct InstructionBuffer {
     instructions: Vec<Instruction>,
 }
 
 impl InstructionBuffer {
-    pub(crate) fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             instructions: Vec::new(),
         }
@@ -28,25 +28,25 @@ impl InstructionBuffer {
 
     /// Returns the address the next pushed instruction will live at.
     #[must_use]
-    pub fn next_ptr(&self) -> InstructionPtr {
+    pub(super) fn next_ptr(&self) -> InstructionPtr {
         InstructionPtr(self.instructions.len())
     }
 
-    pub(crate) fn push(&mut self, instruction: Instruction) {
+    pub(super) fn push(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
     }
 
-    pub(crate) fn fetch(&self, ptr: InstructionPtr) -> &Instruction {
+    pub(super) fn fetch(&self, ptr: InstructionPtr) -> &Instruction {
         &self.instructions[ptr.0]
     }
 
-    pub(crate) fn fetch_mut(&mut self, ptr: InstructionPtr) -> &mut Instruction {
+    pub(super) fn fetch_mut(&mut self, ptr: InstructionPtr) -> &mut Instruction {
         &mut self.instructions[ptr.0]
     }
 
     /// Prints how many instructions of each kind the buffer holds.
     #[allow(unused)]
-    pub(crate) fn print_stats(&self) {
+    pub(super) fn print_stats(&self) {
         println!(
             "  instructions: {} ({} bytes)",
             self.instructions.len(),

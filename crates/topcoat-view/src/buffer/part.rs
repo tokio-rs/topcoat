@@ -84,7 +84,7 @@ impl<'a> PartsWriter<'a> {
 
     /// Returns the accumulated size hint of everything pushed so far.
     #[inline]
-    pub(crate) fn size_hint(&self) -> usize {
+    pub(super) fn size_hint(&self) -> usize {
         self.size_hint
     }
 

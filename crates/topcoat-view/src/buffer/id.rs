@@ -7,10 +7,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// instructions live in, so using it against a different buffer fails instead
 /// of executing that buffer's instructions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ViewBufferId(u64);
+pub(super) struct ViewBufferId(u64);
 
 impl ViewBufferId {
-    pub(crate) fn next() -> Self {
+    pub(super) fn next() -> Self {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         Self(COUNTER.fetch_add(1, Ordering::Relaxed))
     }
