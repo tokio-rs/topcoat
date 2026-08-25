@@ -74,30 +74,12 @@ pub struct PartsWriter<'a> {
 impl<'a> PartsWriter<'a> {
     /// Creates a writer that seals everything pushed into it with `context`.
     #[inline]
-    fn new(buffer: &'a mut ViewBuffer, context: HtmlContext) -> Self {
+    pub(super) fn new(buffer: &'a mut ViewBuffer, context: HtmlContext) -> Self {
         Self {
             buffer,
             context,
             size_hint: 0,
         }
-    }
-
-    /// Appends one view's instruction block to `buffer`, filled by `f`
-    /// through a writer in text context.
-    ///
-    /// Records the entry address, runs `f`, and terminates the block with a
-    /// return instruction. Returns the handle to the block, carrying the
-    /// writer's accumulated size hint.
-    pub(crate) fn block(
-        buffer: &mut ViewBuffer,
-        f: impl FnOnce(&mut PartsWriter<'_>),
-    ) -> ViewHandle {
-        let entry = buffer.next_ptr();
-        let mut parts = PartsWriter::new(buffer, HtmlContext::Text);
-        f(&mut parts);
-        let size_hint = parts.size_hint();
-        buffer.push_ret();
-        ViewHandle::from_scope(buffer.id(), entry, size_hint)
     }
 
     /// Returns the accumulated size hint of everything pushed so far.
@@ -113,6 +95,8 @@ impl<'a> PartsWriter<'a> {
     /// transition between the positions they cover, such as
     /// [`Attribute`](crate::Attribute) moving from a key to a value or
     /// [`push_comment`](Self::push_comment) sealing a comment body.
+    ///
+    /// This method should remain private to avoid potential XSS footguns.
     #[inline]
     pub(crate) fn in_context<R>(
         &mut self,
@@ -301,7 +285,7 @@ impl<'a> PartsWriter<'a> {
     ///
     /// Panics if the view was built in a different, still building buffer.
     #[inline]
-    pub(crate) fn push_view_handle(&mut self, handle: ViewHandle) -> &mut Self {
+    pub fn push_view_handle(&mut self, handle: ViewHandle) -> &mut Self {
         self.size_hint += handle.size_hint();
         self.buffer.push_view(handle);
         self

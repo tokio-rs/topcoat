@@ -1,10 +1,10 @@
-use crate::buffer::{InstructionPtr, ViewBufferId, ViewBufferScope, ViewHandle};
+use crate::buffer::{InstructionPtr, ViewBufferId};
 
 /// A reserved slot in a view buffer that a view resolves into later.
 ///
 /// Reserving pushes a placeholder and returns it as a view alongside the
-/// slot; [`fill`](Self::fill) redirects the slot once the real view is
-/// built.
+/// slot; [`ViewBuffer::fill_view`](super::ViewBuffer::fill_view) redirects
+/// the slot once the real view is built.
 #[derive(Debug, Clone, Copy)]
 pub struct ViewSlot {
     buffer: ViewBufferId,
@@ -24,15 +24,5 @@ impl ViewSlot {
     /// Returns the address of the slot's placeholder instruction.
     pub(crate) fn ptr(&self) -> InstructionPtr {
         self.ptr
-    }
-
-    /// Redirects this slot to `handle`, resolving its placeholder.
-    ///
-    /// # Panics
-    ///
-    /// Panics if no view is building on the current task, if the slot or the
-    /// view belongs to a different buffer, or if the slot was already filled.
-    pub fn fill(self, handle: ViewHandle) {
-        ViewBufferScope::with(|buffer| buffer.fill_view(self, handle));
     }
 }

@@ -1,5 +1,6 @@
 use std::{
-    pin::Pin,
+    future::poll_fn,
+    pin::{Pin, pin},
     task::{Context, Poll},
 };
 
@@ -63,6 +64,23 @@ pub trait View: Send {
 /// Blanket implemented, so implementing [`View`] is enough to get them and an
 /// implementation never has to care about them.
 pub trait ViewExt: View {
+    /// Resolves the view's first content.
+    ///
+    /// The returned handle is self-contained: it can be rendered, stored,
+    /// or spliced into another view. Any updates the view would emit after
+    /// its first content are discarded.
+    fn first(self, cx: &Cx) -> impl Future<Output = Result<ViewHandle>> + Send
+    where
+        Self: Sized,
+    {
+        async move {
+            let mut buffer = ViewBuffer::new();
+            let mut view = pin!(self);
+            let content = poll_fn(|task| view.as_mut().poll_first(cx, task, &mut buffer)).await?;
+            Ok(content.seal(buffer))
+        }
+    }
+
     /// Erases the view's concrete type behind a boxed one.
     ///
     /// Every `view!` invocation has its own anonymous type, so a function
