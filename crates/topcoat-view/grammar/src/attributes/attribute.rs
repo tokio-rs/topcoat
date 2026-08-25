@@ -5,7 +5,8 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
+use topcoat_view::{Formatter, HtmlContext};
 
 use crate::{
     attributes::{
@@ -52,9 +53,27 @@ impl LowerView for Attribute {
 
 impl LowerAttribute for Attribute {
     fn lower(&self, builder: &mut AttributeBuilder) {
-        let key = &self.key;
-        let value = &self.value;
-        builder.insert(quote! { #key }, quote! { #value });
+        // A literal key is a valid identifier and a literal value is escaped
+        // here, so both are inserted as promoted trusted strings: the
+        // collection captures them without allocating or escaping again.
+        let key = match &self.key {
+            AttributeKey::Ident(ident) => {
+                let ident = ident.to_string();
+                quote! { #topcoat_view::Unescaped::new_unchecked(#topcoat_view::PromotedStr(&#ident)) }
+            }
+            key @ AttributeKey::Expr(_) => quote! { #key },
+        };
+        let value = match &self.value {
+            AttributeValue::LitStr(lit) => {
+                let mut escaped = String::new();
+                HtmlContext::AttributeValue
+                    .writer(&mut Formatter::new(&mut escaped))
+                    .write_str(&lit.value());
+                quote! { #topcoat_view::Unescaped::new_unchecked(#topcoat_view::PromotedStr(&#escaped)) }
+            }
+            value @ AttributeValue::Expr(_) => quote! { #value },
+        };
+        builder.insert(key, value);
     }
 }
 
@@ -127,5 +146,25 @@ mod tests {
     #[test]
     fn requires_equals_sign() {
         assert!(parse_err("class").contains("expected `=`"));
+    }
+
+    fn lowered(attr: &Attribute) -> String {
+        let mut builder = AttributeBuilder::new();
+        LowerAttribute::lower(attr, &mut builder);
+        builder.finish().emit().to_string()
+    }
+
+    #[test]
+    fn literal_key_and_value_are_inserted_as_promoted_strings() {
+        let out = lowered(&parse(r#"title="a \"b\" & c""#));
+        assert!(out.contains("Unescaped :: new_unchecked ("));
+        assert!(out.contains("PromotedStr (& \"title\")"));
+        assert!(out.contains("PromotedStr (& \"a &quot;b&quot; &amp; c\")"));
+    }
+
+    #[test]
+    fn expression_key_and_value_are_inserted_as_is() {
+        let out = lowered(&parse("(name)=(value)"));
+        assert!(out.contains("insert (__cx , name , value)"));
     }
 }

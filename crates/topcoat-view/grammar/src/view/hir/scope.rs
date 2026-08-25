@@ -129,7 +129,10 @@ mod tests {
     fn a_root_view_is_a_move_view_driving_its_body() {
         let out = rendered(ViewBuilder::new());
         assert!(out.contains("MoveView :: new (async move"), "{out}");
-        assert!(out.contains("MoveView > :: drive (__cx , __view) . await"), "{out}");
+        assert!(
+            out.contains("MoveView > :: drive (__cx , __view) . await"),
+            "{out}"
+        );
     }
 
     #[test]
