@@ -18,10 +18,13 @@ use std::{marker::PhantomData, ops::DerefMut};
 pub use futures_core::Stream;
 use topcoat_core::{context::Cx, error::Result};
 
+mod live_view;
+mod then_view;
+
+pub use live_view::*;
+pub use then_view::*;
+
 pub use crate::join::{Join, JoinUnits, Unit};
-pub use crate::live::{Live, LiveSink};
-pub use crate::view::ThenView;
-pub use crate::yielder::{forward, yield_};
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
     ElementNameViewParts, HtmlContext, NodeViewPartsStream, NodeWriter, PartsWriter, Unescaped,
@@ -35,12 +38,6 @@ where
     T: NodeViewPartsStream + 'cx,
 {
     value.into_view_parts_stream(cx, NodeWriter::new())
-}
-
-/// Yields a template's rendered content through the enclosing
-/// [`ViewStream`].
-pub async fn emit_content(view: ViewHandle) {
-    yield_(Ok(ViewChunk::Content(view))).await;
 }
 
 /// A component's render future as a node value, joined like any other
