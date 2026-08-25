@@ -78,9 +78,7 @@ impl std::fmt::Display for BadRequestError {
 impl std::error::Error for BadRequestError {}
 
 impl IntoResponse for BadRequestError {
-    async fn into_response(self, cx: &Cx) -> Result<Response> {
-        (StatusCode::BAD_REQUEST, self.to_string())
-            .into_response(cx)
-            .await
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        (StatusCode::BAD_REQUEST, self.to_string()).into_response(cx)
     }
 }

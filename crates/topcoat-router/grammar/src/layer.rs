@@ -95,7 +95,7 @@ impl ToTokens for Layer {
                 next: #topcoat_router::Next<'a>,
             ) -> #topcoat_router::LayerFuture<'a> {
                 ::std::boxed::Box::pin(async move {
-                    #topcoat_router::response::IntoResponse::into_response(
+                    #topcoat_router::response::AsyncIntoResponse::async_into_response(
                         #ident::handler(cx, body, next).await?,
                         cx,
                     )

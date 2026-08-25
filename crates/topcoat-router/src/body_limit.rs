@@ -195,7 +195,7 @@ mod tests {
     fn echo(cx: &Cx, body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
             let bytes = Bytes::from_request(cx, body).await?;
-            bytes.len().to_string().into_response(cx).await
+            bytes.len().to_string().into_response(cx)
         })
     }
 
@@ -282,7 +282,7 @@ mod tests {
         fn raw(cx: &Cx, body: Body) -> RouteFuture<'_> {
             Box::pin(async move {
                 let bytes = to_bytes(body, usize::MAX).await.expect("body reads fully");
-                bytes.len().to_string().into_response(cx).await
+                bytes.len().to_string().into_response(cx)
             })
         }
 

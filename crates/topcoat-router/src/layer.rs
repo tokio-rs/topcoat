@@ -295,17 +295,17 @@ mod tests {
 
     /// A layer that answers the request itself, without invoking `next`.
     fn short_circuit<'a>(cx: &'a Cx, _body: Body, _next: Next<'a>) -> LayerFuture<'a> {
-        Box::pin(async move { "short".into_response(cx).await })
+        Box::pin(async move { "short".into_response(cx) })
     }
 
     fn say_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "route".into_response(cx).await })
+        Box::pin(async move { "route".into_response(cx) })
     }
 
     fn record_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("route");
-            "route".into_response(cx).await
+            "route".into_response(cx)
         })
     }
 
@@ -385,7 +385,7 @@ mod tests {
 
         let next = Next::new(&[], Terminal::Route(&route));
         let result = block_on(next.run(&cx, Body::empty()));
-        let response = block_on(respond(&cx, result));
+        let response = respond(&cx, result);
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(&body_bytes(response)[..], b"route");
@@ -400,7 +400,7 @@ mod tests {
 
         let next = Next::new(&[], Terminal::MethodNotAllowed(&endpoint));
         let result = block_on(next.run(&cx, Body::empty()));
-        let response = block_on(respond(&cx, result));
+        let response = respond(&cx, result);
 
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
         // The `Allow` header is built from the endpoint's supported methods.
@@ -441,7 +441,7 @@ mod tests {
 
         let next = Next::new(&layers, Terminal::Route(&route));
         let result = block_on(next.run(&cx, Body::empty()));
-        let response = block_on(respond(&cx, result));
+        let response = respond(&cx, result);
 
         assert_eq!(&body_bytes(response)[..], b"short");
     }

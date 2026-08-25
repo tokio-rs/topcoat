@@ -71,18 +71,15 @@ impl std::fmt::Display for ServiceUnavailableError {
 impl std::error::Error for ServiceUnavailableError {}
 
 impl IntoResponse for ServiceUnavailableError {
-    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        let mut response =
+            (StatusCode::SERVICE_UNAVAILABLE, "service unavailable").into_response(cx)?;
         // A `u64`'s decimal form is always a valid header value, so the header
         // is only skipped if that ever stops being true.
-        let retry_after = HeaderValue::from_str(&self.retry_after_secs.to_string())
-            .ok()
-            .map(|value| [(RETRY_AFTER, value)]);
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            retry_after,
-            "service unavailable",
-        )
-            .into_response(cx)
+        if let Ok(value) = HeaderValue::from_str(&self.retry_after_secs.to_string()) {
+            response.headers_mut().insert(RETRY_AFTER, value);
+        }
+        Ok(response)
     }
 }
 
@@ -92,11 +89,10 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test]
-    async fn responds_503_with_a_retry_after_header() {
+    #[test]
+    fn responds_503_with_a_retry_after_header() {
         let response = service_unavailable(2)
             .into_response(&Cx::default())
-            .await
             .expect("the response builds");
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);

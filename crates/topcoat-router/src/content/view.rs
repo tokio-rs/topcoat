@@ -12,24 +12,24 @@ use topcoat_view::{BoxView, Swaps, View, ViewExt, internal::MoveView};
 use crate::{
     Body, BoxError,
     content::Html,
-    response::{IntoResponse, Response},
+    response::{AsyncIntoResponse, IntoResponse, Response},
 };
 
 /// Replies with the view's first content as an HTML page, then streams the
 /// updates its live regions emit down the still-open body.
-impl IntoResponse for BoxView<'static> {
-    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+impl AsyncIntoResponse for BoxView<'static> {
+    fn async_into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
         stream(self, cx)
     }
 }
 
 /// Replies with the view's first content as an HTML page, then streams the
 /// updates its live regions emit down the still-open body.
-impl<Fut> IntoResponse for MoveView<Fut>
+impl<Fut> AsyncIntoResponse for MoveView<Fut>
 where
     Fut: Future<Output = Result<()>> + Send + 'static,
 {
-    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+    fn async_into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
         stream(self, cx)
     }
 }
@@ -47,7 +47,7 @@ async fn stream<V: View + 'static>(view: V, cx: &Cx) -> Result<Response> {
         first: Some(rendered.html),
         swaps,
     };
-    let mut response = Html(Body::new(body)).into_response(cx).await?;
+    let mut response = Html(Body::new(body)).into_response(cx)?;
     if let Some(status_code) = rendered.status_code {
         *response.status_mut() = status_code;
     }

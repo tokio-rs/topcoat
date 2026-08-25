@@ -48,7 +48,7 @@ impl std::fmt::Display for NotFoundError {
 impl std::error::Error for NotFoundError {}
 
 impl IntoResponse for NotFoundError {
-    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
         (StatusCode::NOT_FOUND, "not found").into_response(cx)
     }
 }

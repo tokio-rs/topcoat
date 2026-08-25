@@ -37,11 +37,10 @@ use crate::{
 /// Renders any [`IntoResponse`] value into a [`Response`], falling back to the
 /// error's response if conversion fails. This is the terminal conversion the
 /// router applies to a handler's return value.
-pub(crate) async fn respond(cx: &Cx, value: impl IntoResponse) -> Response {
-    match value.into_response(cx).await {
-        Ok(response) => response,
-        Err(error) => error_into_response(cx, error).await,
-    }
+pub(crate) fn respond(cx: &Cx, value: impl IntoResponse) -> Response {
+    value
+        .into_response(cx)
+        .unwrap_or_else(|error| error_into_response(cx, error))
 }
 
 /// Builds a bare 500 response without consulting request or application code.
@@ -53,11 +52,11 @@ pub(crate) fn internal_server_response() -> Response {
 
 /// Maps the framework's error types onto their HTTP status codes, falling back
 /// to a 500 for anything else.
-async fn error_into_response(cx: &Cx, error: Error) -> Response {
+fn error_into_response(cx: &Cx, error: Error) -> Response {
     macro_rules! try_downcast {
         ($ident:ident as $ty:ty) => {
             match $ident.downcast::<$ty>() {
-                Ok(error) => return into_response_or_500(cx, error).await,
+                Ok(error) => return into_response_or_500(cx, error),
                 Err(error) => error,
             }
         };
@@ -73,35 +72,34 @@ async fn error_into_response(cx: &Cx, error: Error) -> Response {
     let error = try_downcast!(error as ServiceUnavailableError);
     let error = try_downcast!(error as TooManyRequestsError);
 
-    into_response_or_500(cx, internal_server_error(error)).await
+    into_response_or_500(cx, internal_server_error(error))
 }
 
 /// Renders an error response, falling back to a bare 500 (none of the error
 /// types' responses can actually fail to build).
-async fn into_response_or_500(cx: &Cx, value: impl IntoResponse) -> Response {
+fn into_response_or_500(cx: &Cx, value: impl IntoResponse) -> Response {
     value
         .into_response(cx)
-        .await
         .unwrap_or_else(|_| internal_server_response())
 }
 
 /// Renders the contained value, or the framework error response on `Err`.
 impl<T> IntoResponse for Result<T>
 where
-    T: IntoResponse + Send,
+    T: IntoResponse,
 {
-    async fn into_response(self, cx: &Cx) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
         match self {
-            Ok(value) => value.into_response(cx).await,
-            Err(error) => Ok(error_into_response(cx, error).await),
+            Ok(value) => value.into_response(cx),
+            Err(error) => Ok(error_into_response(cx, error)),
         }
     }
 }
 
 /// Renders an error by mapping it onto its HTTP status code.
 impl IntoResponse for Error {
-    async fn into_response(self, cx: &Cx) -> Result<Response> {
-        Ok(error_into_response(cx, self).await)
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        Ok(error_into_response(cx, self))
     }
 }
 
@@ -290,11 +288,11 @@ mod tests {
     /// The mapping is a closed list of downcasts, so an error type that is not
     /// on it degrades to a 500 no matter what its own `IntoResponse` says. A
     /// shed answered as "broken" rather than "busy" is the failure this guards.
-    #[tokio::test]
-    async fn a_service_unavailable_error_maps_to_503_not_500() {
+    #[test]
+    fn a_service_unavailable_error_maps_to_503_not_500() {
         let error: Error = service_unavailable(2).into();
 
-        let response = error_into_response(&Cx::default(), error).await;
+        let response = error_into_response(&Cx::default(), error);
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(
@@ -308,11 +306,11 @@ mod tests {
 
     /// The 429 mirror: a rate limit answered as "the server is broken" is the
     /// failure this guards.
-    #[tokio::test]
-    async fn a_too_many_requests_error_maps_to_429_not_500() {
+    #[test]
+    fn a_too_many_requests_error_maps_to_429_not_500() {
         let error: Error = too_many_requests(60).into();
 
-        let response = error_into_response(&Cx::default(), error).await;
+        let response = error_into_response(&Cx::default(), error);
 
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(
@@ -324,11 +322,11 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn an_error_that_is_not_on_the_list_still_maps_to_500() {
+    #[test]
+    fn an_error_that_is_not_on_the_list_still_maps_to_500() {
         let error: Error = std::io::Error::other("boom").into();
 
-        let response = error_into_response(&Cx::default(), error).await;
+        let response = error_into_response(&Cx::default(), error);
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }

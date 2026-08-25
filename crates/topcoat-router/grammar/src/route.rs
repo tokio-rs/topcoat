@@ -160,7 +160,7 @@ impl ToTokens for Route {
             ) -> #topcoat_router::RouteFuture<'cx> {
                 ::std::boxed::Box::pin(async move {
                     #parse_request
-                    #topcoat_router::response::IntoResponse::into_response(
+                    #topcoat_router::response::AsyncIntoResponse::async_into_response(
                         #ident::handler(cx #request_arg).await?,
                         cx,
                     )

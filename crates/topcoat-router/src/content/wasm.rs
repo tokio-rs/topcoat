@@ -44,15 +44,14 @@ impl<T> From<T> for Wasm<T> {
 
 impl<T> IntoResponse for Wasm<T>
 where
-    T: Into<Body> + Send,
+    T: Into<Body>,
 {
-    async fn into_response(self, cx: &Cx) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
         (
             [(CONTENT_TYPE, HeaderValue::from_static("application/wasm"))],
             self.0.into(),
         )
             .into_response(cx)
-            .await
     }
 }
 
@@ -68,7 +67,6 @@ mod tests {
         // The four-byte module preamble: `\0asm` and version 1.
         let response = Wasm(b"\0asm\x01\0\0\0".as_slice())
             .into_response(&Cx::default())
-            .await
             .expect("response builds");
 
         assert_eq!(
@@ -91,7 +89,6 @@ mod tests {
     async fn into_response_sends_the_media_type_without_parameters() {
         let response = Wasm(b"\0asm\x01\0\0\0".as_slice())
             .into_response(&Cx::default())
-            .await
             .expect("response builds");
 
         let content_type = response

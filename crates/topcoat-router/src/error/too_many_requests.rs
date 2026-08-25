@@ -70,18 +70,15 @@ impl std::fmt::Display for TooManyRequestsError {
 impl std::error::Error for TooManyRequestsError {}
 
 impl IntoResponse for TooManyRequestsError {
-    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        let mut response =
+            (StatusCode::TOO_MANY_REQUESTS, "too many requests").into_response(cx)?;
         // A `u64`'s decimal form is always a valid header value, so the header
         // is only skipped if that ever stops being true.
-        let retry_after = HeaderValue::from_str(&self.retry_after_secs.to_string())
-            .ok()
-            .map(|value| [(RETRY_AFTER, value)]);
-        (
-            StatusCode::TOO_MANY_REQUESTS,
-            retry_after,
-            "too many requests",
-        )
-            .into_response(cx)
+        if let Ok(value) = HeaderValue::from_str(&self.retry_after_secs.to_string()) {
+            response.headers_mut().insert(RETRY_AFTER, value);
+        }
+        Ok(response)
     }
 }
 
@@ -91,11 +88,10 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test]
-    async fn responds_429_with_a_retry_after_header() {
+    #[test]
+    fn responds_429_with_a_retry_after_header() {
         let response = too_many_requests(60)
             .into_response(&Cx::default())
-            .await
             .expect("the response builds");
 
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);

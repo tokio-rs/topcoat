@@ -5,7 +5,7 @@ use topcoat_view::{BoxView, Child, ViewExt, internal::MoveView};
 
 use crate::{
     Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId,
-    response::IntoResponse, route,
+    response::AsyncIntoResponse, route,
 };
 
 /// A page handler that renders a [`View`](topcoat_view::View) for a specific
@@ -283,7 +283,7 @@ impl Route for PageWithLayouts {
                 let view = inner.render(body);
                 MoveView::drive(&owned, view).await
             });
-            view.boxed().into_response(cx).await
+            view.boxed().async_into_response(cx).await
         })
     }
 }
