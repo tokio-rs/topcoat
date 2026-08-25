@@ -1,15 +1,10 @@
-use std::{
-    borrow::Cow,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::borrow::Cow;
 
-use futures_util::StreamExt;
 #[cfg(feature = "http")]
 use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
-use topcoat_core::{context::Cx, error::Result};
+use topcoat_core::context::Cx;
 
-use crate::{PartsWriter, PromotedStr, StaticStr, Swap, Unescaped, View, buffer::ViewHandle};
+use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped, buffer::ViewHandle};
 
 /// Converts a value used in node position into view parts.
 ///
@@ -29,19 +24,6 @@ use crate::{PartsWriter, PromotedStr, StaticStr, Swap, Unescaped, View, buffer::
 pub trait NodeViewParts {
     /// Appends this value to the view being built.
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
-}
-
-impl<T> View for T
-where
-    T: NodeViewParts + Send,
-{
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
-        Poll::Ready(Ok())
-    }
-
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        Poll::Ready(None)
-    }
 }
 
 impl NodeViewParts for ViewHandle {

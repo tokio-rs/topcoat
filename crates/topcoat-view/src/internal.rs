@@ -18,13 +18,19 @@ use std::{marker::PhantomData, ops::DerefMut};
 pub use futures_core::Stream;
 use topcoat_core::{context::Cx, error::Result};
 
+mod either_view;
+mod join_view;
 mod live_view;
+mod loop_view;
+mod node_view;
 mod then_view;
 
+pub use either_view::*;
+pub use join_view::*;
 pub use live_view::*;
+pub use loop_view::*;
+pub use node_view::*;
 pub use then_view::*;
-
-pub use crate::join::{Join, JoinUnits, Unit};
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
     ElementNameViewParts, HtmlContext, NodeViewPartsStream, NodeWriter, PartsWriter, Unescaped,
@@ -76,72 +82,6 @@ where
         Self: 'cx,
     {
         forward_view(self.future.await?, &mut writer).await
-    }
-}
-
-/// Unifies the branch values of an `if`/`else` or `match` in node position:
-/// the branches build different types, but only the taken one is driven.
-///
-/// `match` arms nest `Right`s to give every arm a distinct position in one
-/// type.
-pub enum Either<A, B> {
-    Left(A),
-    Right(B),
-}
-
-impl<A, B> NodeViewPartsStream for Either<A, B>
-where
-    A: NodeViewPartsStream + Send,
-    B: NodeViewPartsStream + Send,
-{
-    const MULTI: bool = A::MULTI || B::MULTI;
-
-    async fn into_view_parts_stream<'cx>(self, cx: &'cx Cx, writer: NodeWriter) -> Result<()>
-    where
-        Self: 'cx,
-    {
-        match self {
-            Self::Left(value) => value.into_view_parts_stream(cx, writer).await,
-            Self::Right(value) => value.into_view_parts_stream(cx, writer).await,
-        }
-    }
-}
-
-/// The iterations of a `for` body as one node value: a [`Join`] over the
-/// per-iteration units, spliced in iteration order.
-pub struct LoopView<P> {
-    units: Vec<Unit<P>>,
-}
-
-impl<P> LoopView<P> {
-    #[must_use]
-    pub fn new(units: Vec<Unit<P>>) -> Self {
-        Self { units }
-    }
-}
-
-impl<P> NodeViewPartsStream for LoopView<P>
-where
-    P: DerefMut + Send + Unpin,
-    P::Target: Future<Output = Result<()>> + Send,
-{
-    const MULTI: bool = false;
-
-    async fn into_view_parts_stream<'cx>(self, _cx: &'cx Cx, mut writer: NodeWriter) -> Result<()>
-    where
-        Self: 'cx,
-    {
-        let mut join = Join::new(self.units);
-        let views = join.first().await?;
-        writer
-            .emit(|parts| {
-                for view in views.into_iter().flatten() {
-                    parts.push_view(view);
-                }
-            })
-            .await;
-        forward(join).await;
-        Ok(())
     }
 }
 
