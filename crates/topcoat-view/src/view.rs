@@ -137,4 +137,3 @@ impl View for BoxView<'_> {
         self.get_mut().as_mut().poll_swap(cx, task, buf)
     }
 }
-

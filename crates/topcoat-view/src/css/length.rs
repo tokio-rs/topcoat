@@ -544,9 +544,7 @@ impl AttributeValueViewParts for Length {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        buffer::ViewBuffer,
-    };
+    use crate::buffer::ViewBuffer;
 
     /// Every unit constructor paired with its rendered form. The numeric value
     /// is the same across cases so each assertion focuses on the unit suffix.

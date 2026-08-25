@@ -276,7 +276,10 @@ where
             if *this.first {
                 let content = ready!(this.view.as_mut().poll_first(this.cx, task, buffer))?;
                 *this.first = false;
-                let buffer = this.buffer.take().expect("the content was built in the buffer");
+                let buffer = this
+                    .buffer
+                    .take()
+                    .expect("the content was built in the buffer");
                 *this.pending = Some(Emission::Content(content.seal(buffer)));
             } else {
                 match ready!(this.view.as_mut().poll_swap(this.cx, task, buffer)) {
