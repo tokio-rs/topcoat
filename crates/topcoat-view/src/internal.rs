@@ -225,7 +225,7 @@ pub fn in_context<R>(
 /// Panics if the view was built in a different, still building buffer.
 #[inline]
 pub fn view(parts: &mut PartsWriter<'_>, view: ViewHandle) {
-    parts.push_view(view);
+    parts.push_view_handle(view);
 }
 
 /// The emission handle of a [`block`]: the request context plus a writer
@@ -313,6 +313,6 @@ impl Builder<'_, '_, '_> {
     /// Panics if the view was built in a different, still building buffer.
     #[inline]
     pub fn view(&mut self, view: ViewHandle) {
-        self.parts.push_view(view);
+        self.parts.push_view_handle(view);
     }
 }

@@ -88,7 +88,10 @@ impl<'a> PartsWriter<'a> {
     /// Records the entry address, runs `f`, and terminates the block with a
     /// return instruction. Returns the handle to the block, carrying the
     /// writer's accumulated size hint.
-    pub(crate) fn block(buffer: &mut ViewBuffer, f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
+    pub(crate) fn block(
+        buffer: &mut ViewBuffer,
+        f: impl FnOnce(&mut PartsWriter<'_>),
+    ) -> ViewHandle {
         let entry = buffer.next_ptr();
         let mut parts = PartsWriter::new(buffer, HtmlContext::Text);
         f(&mut parts);
@@ -298,9 +301,9 @@ impl<'a> PartsWriter<'a> {
     ///
     /// Panics if the view was built in a different, still building buffer.
     #[inline]
-    pub(crate) fn push_view(&mut self, view: ViewHandle) -> &mut Self {
-        self.size_hint += view.size_hint();
-        self.buffer.push_view(view);
+    pub(crate) fn push_view_handle(&mut self, handle: ViewHandle) -> &mut Self {
+        self.size_hint += handle.size_hint();
+        self.buffer.push_view(handle);
         self
     }
 

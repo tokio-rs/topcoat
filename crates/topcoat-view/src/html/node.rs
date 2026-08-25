@@ -1,16 +1,15 @@
-use std::{borrow::Cow, pin::pin};
+use std::{
+    borrow::Cow,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use futures_util::StreamExt;
 #[cfg(feature = "http")]
 use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{
-    BoxView, Child, PartsWriter, PromotedStr, StaticStr, Unescaped, View, ViewChunk, ViewHandle,
-    ViewStream,
-    buffer::ViewBufferScope,
-    yielder::yield_,
-};
+use crate::{PartsWriter, PromotedStr, StaticStr, Swap, Unescaped, View, buffer::ViewHandle};
 
 /// Converts a value used in node position into view parts.
 ///
@@ -32,131 +31,23 @@ pub trait NodeViewParts {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
 }
 
-/// Streams a value used in node position as [`ViewChunk`]s.
-///
-/// The `view!` macro drives every dynamic node position through this trait.
-/// Plain values get it through the blanket impl over [`NodeViewParts`],
-/// emitting their parts as a single chunk; view streams implement it
-/// directly, forwarding a chunk at a time.
-pub trait NodeViewPartsStream {
-    /// Whether this value may emit more than one chunk at its position.
-    ///
-    /// The template surrounds a multi-chunk position with marker comments,
-    /// so a later chunk can be swapped in on the client.
-    const MULTI: bool;
-
-    /// Emits this value's chunks through `writer`.
-    fn into_view_parts_stream<'cx>(
-        self,
-        cx: &'cx Cx,
-        writer: NodeWriter,
-    ) -> impl Future<Output = Result<()>> + Send + 'cx
-    where
-        Self: 'cx;
-}
-
-impl<T: NodeViewParts + Send> NodeViewPartsStream for T {
-    const MULTI: bool = false;
-
-    async fn into_view_parts_stream<'cx>(self, cx: &'cx Cx, mut writer: NodeWriter) -> Result<()>
-    where
-        Self: 'cx,
-    {
-        writer.emit(|parts| self.into_view_parts(cx, parts)).await;
-        Ok(())
-    }
-}
-
-/// Re-emits a view's chunks at the node position `writer` drives.
-///
-/// The view's content chunks become content of the position; a swap targets
-/// its own position and passes through as is. An error the view's stream
-/// yields fails the position.
-pub(crate) async fn forward_view(view: impl View, writer: &mut NodeWriter) -> Result<()> {
-    let mut view = pin!(view);
-    while let Some(chunk) = view.next().await {
-        match chunk? {
-            ViewChunk::Content(content) => {
-                writer
-                    .emit(|parts| {
-                        parts.push_view(content);
-                    })
-                    .await;
-            }
-            chunk @ ViewChunk::Swap { .. } => yield_(Ok(chunk)).await,
-        }
-    }
-    Ok(())
-}
-
-impl<F> NodeViewPartsStream for ViewStream<F>
+impl<T> View for T
 where
-    F: Future<Output = Result<()>> + Send,
+    T: NodeViewParts + Send,
 {
-    const MULTI: bool = false;
-
-    async fn into_view_parts_stream<'cx>(self, _cx: &'cx Cx, mut writer: NodeWriter) -> Result<()>
-    where
-        Self: 'cx,
-    {
-        forward_view(self, &mut writer).await
-    }
-}
-
-impl NodeViewPartsStream for BoxView<'_> {
-    const MULTI: bool = false;
-
-    async fn into_view_parts_stream<'cx>(self, _cx: &'cx Cx, mut writer: NodeWriter) -> Result<()>
-    where
-        Self: 'cx,
-    {
-        forward_view(self, &mut writer).await
-    }
-}
-
-impl NodeViewPartsStream for Child<'_> {
-    const MULTI: bool = false;
-
-    async fn into_view_parts_stream<'cx>(self, cx: &'cx Cx, writer: NodeWriter) -> Result<()>
-    where
-        Self: 'cx,
-    {
-        self.view.into_view_parts_stream(cx, writer).await
-    }
-}
-
-/// The emission handle of a node position: each [`emit`](Self::emit) call
-/// yields one [`ViewChunk`] filled by the caller.
-///
-/// Handed to [`NodeViewPartsStream::into_view_parts_stream`] by the `view!`
-/// machinery driving the position. Most implementations emit exactly once;
-/// only a position declaring [`MULTI`](NodeViewPartsStream::MULTI) may emit
-/// again to replace its content.
-pub struct NodeWriter {
-    _private: (),
-}
-
-impl NodeWriter {
-    pub(crate) fn new() -> Self {
-        Self { _private: () }
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
+        Poll::Ready(Ok())
     }
 
-    /// Builds one chunk's view in a synchronous burst through the writer
-    /// handed to `f`, and yields it through the enclosing stream.
-    ///
-    /// # Panics
-    ///
-    /// Panics if no view is building on the current task.
-    pub async fn emit(&mut self, f: impl FnOnce(&mut PartsWriter<'_>)) {
-        let view = ViewBufferScope::with(|buffer| PartsWriter::block(buffer, f));
-        yield_(Ok(ViewChunk::Content(view))).await;
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
+        Poll::Ready(None)
     }
 }
 
 impl NodeViewParts for ViewHandle {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_view(self);
+        parts.push_view_handle(self);
     }
 }
 

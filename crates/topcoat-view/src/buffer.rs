@@ -1,4 +1,5 @@
 mod const_buffer;
+mod handle;
 mod id;
 mod instruction;
 mod instruction_buffer;
@@ -9,6 +10,7 @@ mod view_slot;
 use core::fmt::NumBuffer;
 
 pub use const_buffer::*;
+pub use handle::*;
 pub use id::*;
 pub use instruction::*;
 pub use instruction_buffer::*;
@@ -16,7 +18,7 @@ pub use renderer::*;
 pub use scope::*;
 pub use view_slot::*;
 
-use crate::{DynViewPart, HtmlContext, ViewHandle, view::ViewRepr};
+use crate::{DynViewPart, HtmlContext};
 
 /// The instruction buffer of a build.
 ///

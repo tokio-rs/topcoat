@@ -237,7 +237,7 @@ impl AttributeValueViewParts for Unescaped<ViewHandle> {
 
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_view(self.0);
+        parts.push_view_handle(self.0);
     }
 }
 
@@ -357,7 +357,7 @@ impl AttributeValueViewParts for AttributeValue {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         if let Some(view) = self.view {
-            parts.push_view(view);
+            parts.push_view_handle(view);
         }
     }
 }
@@ -386,7 +386,7 @@ impl ClassViewParts for AttributeValue {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
         if let Some(view) = self.view {
-            parts.push_view(view);
+            parts.push_view_handle(view);
         }
     }
 }
