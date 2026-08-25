@@ -19,7 +19,7 @@ use std::ops::Deref;
 /// constant into the binary's read-only data. Only a constant can be
 /// promoted, so a string that is only known at run time goes through
 /// [`StaticStr`] instead.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PromotedStr(pub &'static &'static str);
 
 impl Deref for PromotedStr {
@@ -49,7 +49,7 @@ impl Deref for PromotedStr {
 /// ```
 ///
 /// A string written as a literal can be further optimized by using [`PromotedStr`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StaticStr(pub &'static str);
 
 impl Deref for StaticStr {

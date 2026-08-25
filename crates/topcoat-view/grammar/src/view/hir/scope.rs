@@ -1,7 +1,9 @@
 use proc_macro2::TokenStream;
+use quote::quote;
+use topcoat_core_grammar::paths::topcoat_view;
 
 use super::{
-    Node,
+    Bindings, Node,
     emit::{Emit, Emitter},
 };
 
@@ -16,9 +18,53 @@ impl Scope {
         Self { nodes }
     }
 
-    /// Emits a top-level `view!` invocation.
+    /// Emits a top-level `view!` invocation: a `MoveView` whose `async move`
+    /// body builds the scope's view and drives it in place.
+    ///
+    /// The block captures every value the template uses, so the view owns
+    /// its data and the expressions inside borrow from the block. The built
+    /// view never leaves the block, which keeps those borrows valid.
     pub fn emit_root(&self) -> TokenStream {
-        self.emit_view()
+        self.emit_move_view(quote! { move }, TokenStream::new())
+    }
+
+    /// Emits this scope as the body of a branch or iteration whose pattern
+    /// binds `bindings`.
+    ///
+    /// The bound values die with the branch or iteration that produced them
+    /// while the view lives on, so the view must own them: a nested
+    /// `MoveView` carries them in a `Capture` packed where they are still
+    /// alive and taken back apart inside its body. The body is not `move`,
+    /// so everything else stays borrowed from the enclosing scope and a
+    /// value shared by all iterations is not moved into the first. Without
+    /// bindings the scope is a plain view in the enclosing scope.
+    pub(crate) fn emit_captured(&self, bindings: &Bindings) -> TokenStream {
+        if bindings.is_empty() {
+            return self.emit_view();
+        }
+        let idents = bindings.idents();
+        let rebinds = bindings.rebinds();
+        let view = self.emit_move_view(
+            TokenStream::new(),
+            quote! { let (#(#rebinds,)*) = __captured.take(); },
+        );
+        quote! {{
+            let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
+            #view
+        }}
+    }
+
+    /// Emits this scope as a `MoveView` whose async body runs `prologue`,
+    /// builds the scope's view, and drives it in place.
+    fn emit_move_view(&self, move_token: TokenStream, prologue: TokenStream) -> TokenStream {
+        let view = self.emit_view();
+        quote! {
+            #topcoat_view::internal::MoveView::new(async #move_token {
+                #prologue
+                let __view = #view;
+                <#topcoat_view::internal::MoveView>::drive(__cx, __view).await
+            })
+        }
     }
 
     /// Emits this scope as an inert view value: a block expression that
@@ -80,11 +126,10 @@ mod tests {
     }
 
     #[test]
-    fn a_root_view_is_a_stream_owning_its_captures() {
+    fn a_root_view_is_a_move_view_driving_its_body() {
         let out = rendered(ViewBuilder::new());
-        assert!(out.contains("ViewStream :: new (async move"));
-        assert!(out.contains("internal :: block"));
-        assert!(out.contains("emit_content"));
+        assert!(out.contains("MoveView :: new (async move"), "{out}");
+        assert!(out.contains("MoveView > :: drive (__cx , __view) . await"), "{out}");
     }
 
     #[test]

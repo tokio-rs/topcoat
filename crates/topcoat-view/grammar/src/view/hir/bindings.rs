@@ -4,10 +4,10 @@ use syn::{Expr, Ident, Pat, Token};
 
 /// The bindings a control-flow pattern introduces into its body's scope.
 ///
-/// A joined body's future must own these values, because they die with the
-/// branch or iteration that produced them while the future lives on until
-/// the join. [`Scope::emit_future`](super::Scope::emit_future) moves them
-/// into the future through `Capture`.
+/// A body's view must own these values, because they die with the branch or
+/// iteration that produced them while the view lives on.
+/// [`Scope::emit_captured`](super::Scope::emit_captured) moves them into the
+/// view through `Capture`.
 pub(crate) struct Bindings(Vec<Binding>);
 
 impl Bindings {
@@ -43,7 +43,7 @@ impl Bindings {
     }
 
     /// Returns the rebinding patterns, for taking the values back out of
-    /// the `Capture` inside the future.
+    /// the `Capture` inside the view's body.
     pub(crate) fn rebinds(&self) -> impl Iterator<Item = &Binding> {
         self.0.iter()
     }
@@ -124,9 +124,9 @@ impl Bindings {
 
 /// A single bound identifier with the mutability of its binding.
 ///
-/// Its tokens are the rebinding pattern inside the future: the identifier
-/// keeps its span, so lints on the binding still point at the source
-/// pattern.
+/// Its tokens are the rebinding pattern inside the view's body: the
+/// identifier keeps its span, so lints on the binding still point at the
+/// source pattern.
 pub(crate) struct Binding {
     mutability: Option<Token![mut]>,
     ident: Ident,

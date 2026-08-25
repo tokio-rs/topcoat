@@ -22,6 +22,7 @@ mod either_view;
 mod join_view;
 mod live_view;
 mod loop_view;
+mod move_view;
 mod node_view;
 mod then_view;
 
@@ -30,6 +31,7 @@ pub use either_view::*;
 pub use join_view::*;
 pub use live_view::*;
 pub use loop_view::*;
+pub use move_view::*;
 pub use node_view::*;
 pub use then_view::*;
 
@@ -38,13 +40,13 @@ use crate::{
     PartsWriter, Unescaped, ViewHandle, buffer::ViewBufferScope, html::ElementNameViewParts,
 };
 
-/// Moves a control-flow body's pattern bindings into its nested stream.
+/// Moves a control-flow body's pattern bindings into its nested view.
 ///
-/// A branch or iteration body expands to a stream that borrows its
-/// environment, while the values its pattern binds die with the branch or
-/// iteration that produced them. The expansion packs those values into this
-/// wrapper where they are still alive and takes them back inside the
-/// stream's body, which then owns them for as long as it lives.
+/// A branch or iteration body expands to a [`MoveView`] whose body borrows
+/// its environment, while the values its pattern binds die with the branch
+/// or iteration that produced them. The expansion packs those values into
+/// this wrapper where they are still alive and takes them back inside the
+/// view's body, which then owns them for as long as it lives.
 ///
 /// The wrapper is deliberately not `Copy`, and [`take`](Self::take) consumes
 /// it whole: a by-value use of a whole non-`Copy` place is captured by value
