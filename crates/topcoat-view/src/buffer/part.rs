@@ -310,43 +310,14 @@ impl<'a> PartsWriter<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        future::Future,
-        pin::pin,
-        task::{Context, Poll, Waker},
-    };
-
     use super::*;
-    use crate::{
-        buffer::ViewBufferScope,
-        internal::{build_sync, write_block},
-    };
 
-    /// Drives `fut` to completion on the current thread.
-    ///
-    /// The futures under test never wait on external events, so polling in a
-    /// tight loop is sufficient.
-    fn block_on<F: Future>(fut: F) -> F::Output {
-        let mut fut = pin!(fut);
-        let mut task = Context::from_waker(Waker::noop());
-        loop {
-            if let Poll::Ready(output) = fut.as_mut().poll(&mut task) {
-                return output;
-            }
-        }
-    }
-
-    /// Runs `f` with a request context inside a fresh view scope.
-    fn in_scope<R>(f: impl AsyncFnOnce(&Cx) -> R) -> R {
-        block_on(ViewBufferScope::scope(async { f(&Cx::default()).await })).0
-    }
-
-    /// Builds a view inside a fresh scope through a writer sealed with
-    /// `context` and renders it.
+    /// Builds a view through a writer sealed with `context` and renders it.
     fn render_with(context: HtmlContext, f: impl FnOnce(&mut PartsWriter<'_>)) -> String {
-        in_scope(async |cx| {
-            build_sync(|| write_block(|parts| parts.in_context(context, f))).render(cx)
-        })
+        let cx = Cx::default();
+        let mut buffer = ViewBuffer::new();
+        let view = buffer.block(&cx, |b| b.parts().in_context(context, f));
+        view.seal(buffer).render(&cx)
     }
 
     #[test]

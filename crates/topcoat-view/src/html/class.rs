@@ -393,18 +393,15 @@ pub type StaticClass = Class<Unescaped<PromotedStr>>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        AttributeValue,
-        buffer::ViewBufferScope,
-        internal::{block, build_sync},
-    };
+    use crate::{AttributeValue, buffer::ViewBuffer};
 
     fn render(class: Class<impl ClassEntries>) -> String {
-        let (html, _) = ViewBufferScope::scope_sync(|| {
-            let cx = Cx::default();
-            build_sync(|| block(&cx, |b| b.attribute_value(class))).render(&cx)
-        });
-        html
+        let cx = Cx::default();
+        let mut buffer = ViewBuffer::new();
+        buffer
+            .block(&cx, |b| b.attribute_value(class))
+            .seal(buffer)
+            .render(&cx)
     }
 
     #[test]
@@ -503,15 +500,13 @@ mod tests {
 
     #[test]
     fn attribute_value_entries_are_spliced_verbatim() {
-        ViewBufferScope::scope_sync(|| {
-            let cx = Cx::default();
-            let value = AttributeValue::captured(build_sync(|| {
-                block(&cx, |b| b.attribute_value("[&>*]:mt-2"))
-            }));
-            let html = build_sync(|| block(&cx, |b| b.attribute_value(Class(("btn", &value)))))
-                .render(&cx);
-            assert_eq!(html, "btn [&amp;>*]:mt-2");
-        });
+        let cx = Cx::default();
+        let mut buffer = ViewBuffer::new();
+        let captured = buffer
+            .block(&cx, |b| b.attribute_value("[&>*]:mt-2"))
+            .seal(buffer);
+        let value = AttributeValue::captured(captured);
+        assert_eq!(render(Class(("btn", &value))), "btn [&amp;>*]:mt-2");
     }
 
     #[test]

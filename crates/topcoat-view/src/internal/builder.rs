@@ -1,0 +1,108 @@
+use topcoat_core::context::Cx;
+
+use crate::{
+    Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts, HtmlContext,
+    PartsWriter, Unescaped, ViewHandle, html::ElementNameViewParts,
+};
+
+/// The handle a block is filled through: the request context plus a writer
+/// over the buffer the block is appended to.
+///
+/// Each method pushes one of the block's parts, sealing it with the
+/// [`HtmlContext`] of the position it fills by dispatching the matching
+/// `*ViewParts` trait.
+pub struct Builder<'a, 'b, 'c> {
+    cx: &'a Cx,
+    parts: &'b mut PartsWriter<'c>,
+}
+
+impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
+    pub(crate) fn new(cx: &'a Cx, parts: &'b mut PartsWriter<'c>) -> Self {
+        Self { cx, parts }
+    }
+
+    /// Returns the writer over the block, in text context.
+    ///
+    /// For compositions that push through the writer directly instead of a
+    /// position method, like the runtime's JavaScript views.
+    #[inline]
+    pub fn parts(&mut self) -> &mut PartsWriter<'c> {
+        self.parts
+    }
+
+    /// Appends a literal markup segment, verbatim.
+    ///
+    /// The segment is passed as `&"..."` so it stays out of the buffer's
+    /// constants.
+    #[inline]
+    pub fn markup(&mut self, s: &'static &'static str) {
+        self.parts.push_promoted_str_unescaped(s);
+    }
+
+    /// Appends a value in an element name position.
+    #[inline]
+    pub fn element_name(&mut self, value: impl ElementNameViewParts) {
+        let cx = self.cx;
+        self.parts.in_context(HtmlContext::ElementName, |parts| {
+            value.into_view_parts(cx, parts);
+        });
+    }
+
+    /// Appends a value in an attribute key position.
+    #[inline]
+    pub fn attribute_key(&mut self, value: impl AttributeKeyViewParts) {
+        let cx = self.cx;
+        self.parts.in_context(HtmlContext::AttributeKey, |parts| {
+            value.into_view_parts(cx, parts);
+        });
+    }
+
+    /// Appends a value in an attribute value position.
+    #[inline]
+    pub fn attribute_value(&mut self, value: impl AttributeValueViewParts) {
+        let cx = self.cx;
+        self.parts.in_context(HtmlContext::AttributeValue, |parts| {
+            value.into_view_parts(cx, parts);
+        });
+    }
+
+    /// Appends a whole attribute from a key and value pair.
+    #[inline]
+    pub fn attribute(
+        &mut self,
+        (key, value): (impl AttributeKeyViewParts, impl AttributeValueViewParts),
+    ) {
+        self.attributes(Attribute::new(key, value));
+    }
+
+    /// Appends a whole attribute from a trusted literal key and a value.
+    #[inline]
+    pub fn attribute_unescaped(
+        &mut self,
+        (key, value): (&'static str, impl AttributeValueViewParts),
+    ) {
+        self.attributes(Attribute::new(Unescaped::new_unchecked(key), value));
+    }
+
+    /// Appends a value covering whole attributes, keys and values.
+    #[inline]
+    pub fn attributes(&mut self, attributes: impl AttributeViewParts) {
+        let cx = self.cx;
+        // Whole-attribute values do their own context transitions between
+        // keys and values; the attribute-value context here is the safe
+        // default for any text pushed directly.
+        self.parts.in_context(HtmlContext::AttributeValue, |parts| {
+            attributes.into_view_parts(cx, parts);
+        });
+    }
+
+    /// Splices an already-built view.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the view was built in a different, still building buffer.
+    #[inline]
+    pub fn view(&mut self, view: ViewHandle) {
+        self.parts.push_view_handle(view);
+    }
+}

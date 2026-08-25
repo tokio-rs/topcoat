@@ -12,7 +12,7 @@ use topcoat_core::{
 };
 
 use crate::{
-    PartsWriter, RegionId, Swap, View,
+    RegionId, Swap, View,
     buffer::{ViewBuffer, ViewHandle},
 };
 
@@ -123,7 +123,7 @@ where
 {
     fn poll_first(
         self: Pin<&mut Self>,
-        _cx: &Cx,
+        cx: &Cx,
         task: &mut Context<'_>,
         buf: &mut ViewBuffer,
     ) -> Poll<Result<ViewHandle>> {
@@ -140,10 +140,12 @@ where
             }
             return match emission {
                 Emission::Content(content) => {
-                    let view = PartsWriter::block(buf, |parts| {
-                        parts.push_str_unescaped(&format!("<!--tc:{}-->", region.0));
-                        parts.push_view_handle(content);
-                        parts.push_str_unescaped(&format!("<!--/tc:{}-->", region.0));
+                    let view = buf.block(cx, |b| {
+                        b.parts()
+                            .push_str_unescaped(&format!("<!--tc:{}-->", region.0));
+                        b.view(content);
+                        b.parts()
+                            .push_str_unescaped(&format!("<!--/tc:{}-->", region.0));
                     });
                     Poll::Ready(Ok(view))
                 }

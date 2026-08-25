@@ -3,6 +3,7 @@ mod handle;
 mod id;
 mod instruction;
 mod instruction_buffer;
+mod part;
 mod renderer;
 mod view_slot;
 
@@ -13,10 +14,12 @@ pub use handle::*;
 pub use id::*;
 pub use instruction::*;
 pub use instruction_buffer::*;
+pub use part::*;
 pub use renderer::*;
+use topcoat_core::context::Cx;
 pub use view_slot::*;
 
-use crate::{DynViewPart, HtmlContext};
+use crate::{HtmlContext, internal::Builder};
 
 /// The instruction buffer of a build.
 ///
@@ -71,6 +74,24 @@ impl ViewBuffer {
 
     fn push_instruction(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
+    }
+
+    /// Appends one view's instruction block in one synchronous burst,
+    /// filled by `f` through a [`Builder`].
+    ///
+    /// Records the entry address, runs `f`, and terminates the block with a
+    /// return instruction. Returns the handle to the block, carrying the
+    /// builder's accumulated size hint. `f` must not build other views;
+    /// nested views are built first and spliced into the block with
+    /// [`Builder::view`].
+    #[doc(hidden)]
+    pub fn block(&mut self, cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> ViewHandle {
+        let entry = self.next_ptr();
+        let mut parts = PartsWriter::new(self, HtmlContext::Text);
+        f(&mut Builder::new(cx, &mut parts));
+        let size_hint = parts.size_hint();
+        self.push_ret();
+        ViewHandle::from_scope(self.id, entry, size_hint)
     }
 
     /// Appends a nested view, such as a rendered component.

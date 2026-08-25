@@ -7,7 +7,7 @@ use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    PartsWriter, Swap, View,
+    Swap, View,
     buffer::{ViewBuffer, ViewHandle},
 };
 
@@ -61,7 +61,7 @@ where
             .burst
             .take()
             .expect("`poll_first` called again after it returned `Ready`");
-        let view = PartsWriter::block(buf, |parts| burst(&mut Builder { cx, parts }, contents));
+        let view = buf.block(cx, |b| burst(b, contents));
         Poll::Ready(Ok(view))
     }
 

@@ -6,7 +6,7 @@ use std::{
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    PartsWriter, Swap, View,
+    Swap, View,
     buffer::{ViewBuffer, ViewHandle},
 };
 
@@ -77,13 +77,13 @@ where
         if !ready {
             return Poll::Pending;
         }
-        let view = PartsWriter::block(buf, |parts| {
+        let view = buf.block(cx, |b| {
             for iteration in &mut this.iterations {
                 let content = iteration
                     .content
                     .take()
                     .expect("every iteration resolved its content");
-                parts.push_view_handle(content);
+                b.view(content);
             }
         });
         Poll::Ready(Ok(view))

@@ -153,15 +153,14 @@ mod tests {
     use topcoat_core::context::Cx;
 
     use super::*;
-    use crate::{buffer::ViewBufferScope, internal::build_sync};
-
-    /// Runs `f` with a request context inside a fresh view scope.
-    fn in_scope<R>(f: impl FnOnce(&Cx) -> R) -> R {
-        ViewBufferScope::scope_sync(|| f(&Cx::default())).0
-    }
+    use crate::buffer::ViewBuffer;
 
     fn render(cx: &Cx, attrs: Attributes) -> String {
-        build_sync(|| block(cx, |b| b.attributes(attrs))).render(cx)
+        let mut buffer = ViewBuffer::new();
+        buffer
+            .block(cx, |b| b.attributes(attrs))
+            .seal(buffer)
+            .render(cx)
     }
 
     #[test]
@@ -179,159 +178,144 @@ mod tests {
 
     #[test]
     fn insert_then_contains_key() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "class", "button");
-            assert!(attrs.contains_key("class"));
-            assert!(!attrs.contains_key("id"));
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "class", "button");
+        assert!(attrs.contains_key("class"));
+        assert!(!attrs.contains_key("id"));
     }
 
     #[test]
     fn insert_returns_none_for_new_key() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            assert!(attrs.insert(cx, "class", "button").is_none());
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        assert!(attrs.insert(cx, "class", "button").is_none());
     }
 
     #[test]
     fn insert_replaces_existing_value() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "class", "button");
-            let previous = attrs.insert(cx, "class", "link");
-            assert!(previous.is_some());
-            assert_eq!(render(cx, attrs), " class=\"link\"");
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "class", "button");
+        let previous = attrs.insert(cx, "class", "link");
+        assert!(previous.is_some());
+        assert_eq!(render(cx, attrs), " class=\"link\"");
     }
 
     #[test]
     fn get_returns_inserted_value() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "class", "button");
-            assert!(attrs.get("class").is_some());
-            assert!(attrs.get("missing").is_none());
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "class", "button");
+        assert!(attrs.get("class").is_some());
+        assert!(attrs.get("missing").is_none());
     }
 
     #[test]
     fn remove_returns_value_and_deletes_entry() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "class", "button");
-            assert!(attrs.remove("class").is_some());
-            assert!(!attrs.contains_key("class"));
-            assert!(attrs.remove("class").is_none());
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "class", "button");
+        assert!(attrs.remove("class").is_some());
+        assert!(!attrs.contains_key("class"));
+        assert!(attrs.remove("class").is_none());
     }
 
     #[test]
     fn clear_removes_all_entries() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "class", "button");
-            attrs.insert(cx, "id", "submit");
-            attrs.clear();
-            assert_eq!(attrs.iter().count(), 0);
-            assert!(!attrs.contains_key("class"));
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "class", "button");
+        attrs.insert(cx, "id", "submit");
+        attrs.clear();
+        assert_eq!(attrs.iter().count(), 0);
+        assert!(!attrs.contains_key("class"));
     }
 
     #[test]
     fn renders_single_attribute() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "class", "button");
-            assert_eq!(render(cx, attrs), " class=\"button\"");
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "class", "button");
+        assert_eq!(render(cx, attrs), " class=\"button\"");
     }
 
     #[test]
     fn renders_multiple_attributes() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "class", "button");
-            attrs.insert(cx, "id", "submit");
-            let rendered = render(cx, attrs);
-            let parts: HashSet<&str> = rendered
-                .split_terminator(' ')
-                .filter(|s| !s.is_empty())
-                .collect();
-            let expected: HashSet<&str> =
-                ["class=\"button\"", "id=\"submit\""].into_iter().collect();
-            assert_eq!(parts, expected);
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "class", "button");
+        attrs.insert(cx, "id", "submit");
+        let rendered = render(cx, attrs);
+        let parts: HashSet<&str> = rendered
+            .split_terminator(' ')
+            .filter(|s| !s.is_empty())
+            .collect();
+        let expected: HashSet<&str> = ["class=\"button\"", "id=\"submit\""].into_iter().collect();
+        assert_eq!(parts, expected);
     }
 
     #[test]
     fn escapes_attribute_value() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "data-x", "a\"b<c");
-            assert_eq!(render(cx, attrs), " data-x=\"a&quot;b<c\"");
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "data-x", "a\"b<c");
+        assert_eq!(render(cx, attrs), " data-x=\"a&quot;b<c\"");
     }
 
     #[test]
     fn omits_false_boolean_attribute() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "disabled", false);
-            assert_eq!(render(cx, attrs), "");
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "disabled", false);
+        assert_eq!(render(cx, attrs), "");
     }
 
     #[test]
     fn renders_true_boolean_attribute() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "disabled", true);
-            assert_eq!(render(cx, attrs), " disabled=\"\"");
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "disabled", true);
+        assert_eq!(render(cx, attrs), " disabled=\"\"");
     }
 
     #[test]
     fn omits_none_option_attribute() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "title", Option::<&str>::None);
-            assert!(!attrs.get("title").unwrap().is_present());
-            assert_eq!(render(cx, attrs), "");
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "title", Option::<&str>::None);
+        assert!(!attrs.get("title").unwrap().is_present());
+        assert_eq!(render(cx, attrs), "");
     }
 
     #[test]
     fn renders_some_option_attribute() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "title", Some("hello"));
-            assert_eq!(render(cx, attrs), " title=\"hello\"");
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "title", Some("hello"));
+        assert_eq!(render(cx, attrs), " title=\"hello\"");
     }
 
     #[test]
     fn iter_yields_inserted_entries() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "class", "button");
-            attrs.insert(cx, "id", "submit");
-            let keys: HashSet<&str> = attrs.iter().map(|(k, _)| k.as_str()).collect();
-            let expected: HashSet<&str> = ["class", "id"].into_iter().collect();
-            assert_eq!(keys, expected);
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "class", "button");
+        attrs.insert(cx, "id", "submit");
+        let keys: HashSet<&str> = attrs.iter().map(|(k, _)| k.as_str()).collect();
+        let expected: HashSet<&str> = ["class", "id"].into_iter().collect();
+        assert_eq!(keys, expected);
     }
 
     #[test]
     fn into_iter_yields_inserted_entries() {
-        in_scope(|cx| {
-            let mut attrs = Attributes::new();
-            attrs.insert(cx, "class", "button");
-            attrs.insert(cx, "id", "submit");
-            let keys: HashSet<String> = attrs.into_iter().map(|(k, _)| k).collect();
-            let expected: HashSet<String> = ["class", "id"].into_iter().map(String::from).collect();
-            assert_eq!(keys, expected);
-        });
+        let cx = &Cx::default();
+        let mut attrs = Attributes::new();
+        attrs.insert(cx, "class", "button");
+        attrs.insert(cx, "id", "submit");
+        let keys: HashSet<String> = attrs.into_iter().map(|(k, _)| k).collect();
+        let expected: HashSet<String> = ["class", "id"].into_iter().map(String::from).collect();
+        assert_eq!(keys, expected);
     }
 }
+
