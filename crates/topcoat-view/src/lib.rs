@@ -11,7 +11,6 @@ mod join;
 mod live;
 mod part;
 mod props;
-mod stream;
 mod string;
 pub mod svg;
 mod view;
@@ -25,7 +24,6 @@ pub use html::*;
 pub use live::*;
 pub use part::*;
 pub use props::*;
-pub use stream::*;
 pub use string::*;
 pub use view::*;
 

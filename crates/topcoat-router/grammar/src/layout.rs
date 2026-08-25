@@ -134,19 +134,14 @@ impl ToTokens for Layout {
         let render = quote! {
             fn render<'s>(
                 &'s self,
-                cx: &#topcoat_context::Cx,
+                cx: &'s #topcoat_context::Cx,
                 slot: #topcoat_router::Slot<'s>,
             ) -> #topcoat_view::BoxView<'s> {
-                let cx = ::core::clone::Clone::clone(cx);
-                ::std::boxed::Box::pin(#topcoat_view::internal::ViewStream::new(async move {
+                ::std::boxed::Box::pin(#topcoat_view::internal::ThenView::new(async move {
                     let props = <#ident as #topcoat_view::Component>::props_builder()
                         .slot(slot)
                         .build();
-                    #topcoat_view::internal::forward(
-                        <#ident as #topcoat_view::Component>::render(#ident, &cx, props).await?,
-                    )
-                    .await;
-                    ::core::result::Result::Ok(())
+                    <#ident as #topcoat_view::Component>::render(#ident, cx, props).await
                 }))
             }
         };

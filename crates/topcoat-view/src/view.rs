@@ -1,28 +1,62 @@
-use pin_project_lite::pin_project;
 use std::{
     pin::Pin,
-    task::{Context, Poll},
+    task::{Context, Poll, ready},
 };
 
-use futures_core::{FusedStream, Stream};
-use topcoat_core::error::{Error, Result};
+use pin_project_lite::pin_project;
+use topcoat_core::{context::Cx, error::Result};
 
-use crate::{
-    buffer::{ViewBuffer, ViewBufferScope, ViewHandle},
-    yielder::collect,
-};
+use crate::buffer::{ViewBuffer, ViewHandle};
 
-pub struct RegionId(usize);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RegionId(pub(crate) u64);
 
+/// A replacement for the content of a live region, emitted after a view's
+/// first content resolved.
+#[derive(Debug)]
 pub struct Swap {
-    region: RegionId,
-    replacement: ViewHandle,
+    /// The region whose content is replaced.
+    pub region: RegionId,
+    /// The region's new content, self-contained: it renders without the
+    /// buffer the view's first content was built in.
+    pub replacement: ViewHandle,
 }
 
+/// A lazy view: an inert value that builds its content when polled.
+///
+/// A `view!` invocation evaluates to a value implementing this trait, and a
+/// component returns one as `Result<impl View>`. Constructing a view does no
+/// work; everything it writes happens inside the poll methods, into the
+/// buffer the caller passes in.
+///
+/// [`poll_first`](View::poll_first) drives the view to its first content: a
+/// [`ViewHandle`] pointing at the instruction block the view appended to
+/// `buf`. After that, [`poll_swap`](View::poll_swap) streams the updates its
+/// live regions emit, until it returns `None`.
 pub trait View: Send {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>>;
+    /// Polls toward the view's first content.
+    ///
+    /// On `Ready`, the view has appended its instruction block to `buf` and
+    /// the returned handle points at it. Must not be polled again after it
+    /// returned `Ready`.
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &Cx,
+        task: &mut Context<'_>,
+        buf: &mut ViewBuffer,
+    ) -> Poll<Result<ViewHandle>>;
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>>;
+    /// Polls for the next live update, once the first content resolved.
+    ///
+    /// Returns `Ready(None)` when the view emits no further updates. Must
+    /// only be polled after [`poll_first`](View::poll_first) returned
+    /// `Ready`.
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &Cx,
+        task: &mut Context<'_>,
+        buf: &mut ViewBuffer,
+    ) -> Poll<Option<Result<Swap>>>;
 
     /// Erases the view's concrete type behind a boxed one.
     ///
@@ -37,134 +71,99 @@ pub trait View: Send {
     }
 }
 
-/// A [`View`] erased behind a boxed, pinned trait object.
+impl View for () {
+    fn poll_first(
+        self: Pin<&mut Self>,
+        _cx: &Cx,
+        _task: &mut Context<'_>,
+        _buf: &mut ViewBuffer,
+    ) -> Poll<Result<ViewHandle>> {
+        Poll::Ready(Ok(ViewHandle::empty()))
+    }
+
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        _cx: &Cx,
+        _task: &mut Context<'_>,
+        _buf: &mut ViewBuffer,
+    ) -> Poll<Option<Result<Swap>>> {
+        Poll::Ready(None)
+    }
+}
+
 pub type BoxView<'a> = Pin<Box<dyn View + 'a>>;
 
 impl View for BoxView<'_> {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
-        self.as_deref_mut().poll_first(cx)
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &Cx,
+        task: &mut Context<'_>,
+        buf: &mut ViewBuffer,
+    ) -> Poll<Result<ViewHandle>> {
+        self.get_mut().as_mut().poll_first(cx, task, buf)
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        self.as_deref_mut().poll_swap(cx)
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &Cx,
+        task: &mut Context<'_>,
+        buf: &mut ViewBuffer,
+    ) -> Poll<Option<Result<Swap>>> {
+        self.get_mut().as_mut().poll_swap(cx, task, buf)
     }
 }
 
 pin_project! {
-    /// The [`View`] a `view!` invocation produces: a stream of
-    /// [`ViewChunk`]s driven by the future the template compiled to.
-    pub struct ViewStream<F> {
-        #[pin]
-        f: F,
-        done: bool,
-        error: Option<Error>,
-        role: Role,
-        // A root stream's buffer between polls; installed on the task for
-        // the duration of each poll, and moved into the content chunk when
-        // it is yielded.
-        buffer: Option<Box<ViewBuffer>>,
+    #[project = ThenViewProj]
+    pub(crate) enum ThenView<F, V> {
+        Future { #[pin] future: F },
+        View { #[pin] view: V },
     }
 }
 
-/// Who owns the buffer a stream's views are built in, decided at the first
-/// poll.
-///
-/// A stream polled with a buffer already installed is nested: it appends to
-/// the enclosing stream's buffer, and its chunks stay cheap handles into it.
-/// Otherwise the stream is the root: it installs a buffer of its own for
-/// exactly the duration of each poll, and seals it into the content chunk it
-/// yields.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Role {
-    Undecided,
-    Root,
-    Nested,
-}
-
-impl<F> ViewStream<F>
+impl<F, V> ThenView<F, V>
 where
-    F: Future<Output = Result<()>>,
+    F: Future<Output = Result<V>>,
 {
-    #[doc(hidden)]
-    pub fn new(f: F) -> Self {
-        Self {
-            f,
-            done: false,
-            error: None,
-            role: Role::Undecided,
-            buffer: None,
-        }
+    #[must_use]
+    pub fn new(future: F) -> Self {
+        Self::Future { future }
     }
 }
 
-impl<F> View for ViewStream<F> where F: Future<Output = Result<()>> + Send {}
-
-impl<F> Stream for ViewStream<F>
+impl<F, V> View for ThenView<F, V>
 where
-    F: Future<Output = Result<()>>,
+    F: Future<Output = Result<V>> + Send,
+    V: View,
 {
-    type Item = Result<ViewChunk>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.done {
-            return Poll::Ready(None);
-        }
-        let this = self.project();
-        // An error the future completed with while a chunk was still in
-        // flight; it becomes the stream's final item.
-        if let Some(error) = this.error.take() {
-            *this.done = true;
-            return Poll::Ready(Some(Err(error)));
-        }
-        if *this.role == Role::Undecided {
-            *this.role = if ViewBufferScope::is_active() {
-                Role::Nested
-            } else {
-                *this.buffer = Some(Box::new(ViewBuffer::new()));
-                Role::Root
-            };
-        }
-        let (poll, value) = if *this.role == Role::Root {
-            let _scope = ViewBufferScope::swap(this.buffer);
-            collect(this.f, cx)
-        } else {
-            collect(this.f, cx)
-        };
-        // A root stream's content chunk takes the buffer it was built in
-        // with it, so it is self-contained once it leaves the stream.
-        let value = match value {
-            Some(Ok(ViewChunk::Content(view))) if *this.role == Role::Root => Some(Ok(
-                ViewChunk::Content(view.seal(this.buffer.take().map(|buffer| *buffer))),
-            )),
-            other => other,
-        };
-        match poll {
-            Poll::Pending => match value {
-                Some(value) => Poll::Ready(Some(value)),
-                None => Poll::Pending,
-            },
-            Poll::Ready(Ok(())) => {
-                *this.done = true;
-                Poll::Ready(value)
-            }
-            Poll::Ready(Err(error)) => {
-                if let Some(value) = value {
-                    *this.error = Some(error);
-                    Poll::Ready(Some(value))
-                } else {
-                    *this.done = true;
-                    Poll::Ready(Some(Err(error)))
+    fn poll_first(
+        mut self: Pin<&mut Self>,
+        cx: &Cx,
+        task: &mut Context<'_>,
+        buf: &mut ViewBuffer,
+    ) -> Poll<Result<ViewHandle>> {
+        loop {
+            match self.as_mut().project() {
+                ThenViewProj::Future { future } => {
+                    let view = ready!(future.poll(task))?;
+                    self.as_mut().set(Self::View { view });
                 }
+                ThenViewProj::View { view } => return view.poll_first(cx, task, buf),
             }
         }
     }
-}
 
-impl<F> FusedStream for ViewStream<F>
-where
-    F: Future<Output = Result<()>>,
-{
-    fn is_terminated(&self) -> bool {
-        self.done
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &Cx,
+        task: &mut Context<'_>,
+        buf: &mut ViewBuffer,
+    ) -> Poll<Option<Result<Swap>>> {
+        match self.project() {
+            ThenViewProj::Future { .. } => {
+                panic!("`poll_swap` called before `poll_first` returned `Ready`")
+            }
+            ThenViewProj::View { view } => view.poll_swap(cx, task, buf),
+        }
     }
 }

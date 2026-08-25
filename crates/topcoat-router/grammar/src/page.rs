@@ -123,21 +123,15 @@ impl ToTokens for Page {
         let render = quote! {
             fn render<'s>(
                 &'s self,
-                cx: &#topcoat_context::Cx,
+                cx: &'s #topcoat_context::Cx,
                 body: #topcoat_router::Body,
             ) -> #topcoat_view::BoxView<'s> {
-                let cx = ::core::clone::Clone::clone(cx);
-                ::std::boxed::Box::pin(#topcoat_view::internal::ViewStream::new(async move {
-                    let cx = &cx;
+                ::std::boxed::Box::pin(#topcoat_view::internal::ThenView::new(async move {
                     #parse_request
                     let props = <#ident as #topcoat_view::Component>::props_builder()
                         #body_prop
                         .build();
-                    #topcoat_view::internal::forward(
-                        <#ident as #topcoat_view::Component>::render(#ident, cx, props).await?,
-                    )
-                    .await;
-                    ::core::result::Result::Ok(())
+                    <#ident as #topcoat_view::Component>::render(#ident, cx, props).await
                 }))
             }
         };

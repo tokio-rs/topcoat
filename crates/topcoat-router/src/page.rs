@@ -1,7 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::{BoxView, NodeViewPartsStream, NodeWriter, ViewStream};
+use topcoat_view::{BoxView, NodeViewPartsStream, NodeWriter, ThenView};
 
 use crate::{
     Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId,
@@ -28,10 +28,9 @@ pub trait Page: Send + Sync + 'static {
 
     /// Renders the page to a [`View`](topcoat_view::View).
     ///
-    /// The returned view owns its request context: it may borrow `self`, but
-    /// not `cx`. An error in the page body is yielded through the view's
-    /// stream rather than returned here.
-    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s>;
+    /// The returned view may borrow `self` and `cx`. An error in the page
+    /// body surfaces when the view is polled rather than returned here.
+    fn render<'s>(&'s self, cx: &'s Cx, body: Body) -> BoxView<'s>;
 
     /// Returns whether this page handles the current request.
     ///
@@ -60,7 +59,7 @@ impl<P: Page + ?Sized> Page for &'static P {
         (**self).path()
     }
 
-    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s> {
+    fn render<'s>(&'s self, cx: &'s Cx, body: Body) -> BoxView<'s> {
         (**self).render(cx, body)
     }
 }
@@ -125,7 +124,7 @@ impl Page for PageFn {
         &self.path
     }
 
-    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s> {
+    fn render<'s>(&'s self, cx: &'s Cx, body: Body) -> BoxView<'s> {
         (self.render)(cx, body)
     }
 }
@@ -189,9 +188,8 @@ pub trait Layout: Send + Sync + 'static {
 
     /// Renders the layout, embedding the given child content [`Slot`].
     ///
-    /// The returned view owns its request context: it may borrow `self` and
-    /// the slot, but not `cx`.
-    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s>;
+    /// The returned view may borrow `self`, `cx`, and the slot.
+    fn render<'s>(&'s self, cx: &'s Cx, slot: Slot<'s>) -> BoxView<'s>;
 }
 
 impl<L: Layout + ?Sized> Layout for &'static L {
@@ -199,7 +197,7 @@ impl<L: Layout + ?Sized> Layout for &'static L {
         (**self).path()
     }
 
-    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s> {
+    fn render<'s>(&'s self, cx: &'s Cx, slot: Slot<'s>) -> BoxView<'s> {
         (**self).render(cx, slot)
     }
 }
@@ -243,7 +241,7 @@ impl Layout for LayoutFn {
         &self.path
     }
 
-    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s> {
+    fn render<'s>(&'s self, cx: &'s Cx, slot: Slot<'s>) -> BoxView<'s> {
         (self.render)(cx, slot)
     }
 }
@@ -289,34 +287,26 @@ impl Route for PageWithLayouts {
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
         Box::pin(async move {
-            let stream = {
-                let inner = self.inner.clone();
-                let cx = cx.clone();
-                ViewStream::new(async move {
-                    // The page is the innermost slot, each layout wraps the
-                    // slot beneath it, and only the outermost layer renders
-                    // directly against the request context. Nothing runs
-                    // until the view is driven: each layout decides when its
-                    // slot renders and which context it sees.
-                    let page = &inner.page;
-                    let mut slot = Slot::new(move |cx| page.render(cx, body));
-                    let mut layouts = inner.layouts.iter();
-                    let outermost = layouts.next();
-                    for layout in layouts.rev() {
-                        slot = Slot::new(move |cx| layout.render(cx, slot));
-                    }
-                    let view = match outermost {
-                        Some(layout) => layout.render(&cx, slot),
-                        None => slot.render(&cx),
-                    };
-                    topcoat_view::internal::forward(view).await;
-                    Ok(())
+            let view = ThenView::new(async move {
+                // The page is the innermost slot, each layout wraps the
+                // slot beneath it, and only the outermost layer renders
+                // directly against the request context. Nothing runs
+                // until the view is driven: each layout decides when its
+                // slot renders and which context it sees.
+                let page = &self.inner.page;
+                let mut slot = Slot::new(move |cx| page.render(cx, body));
+                let mut layouts = self.inner.layouts.iter();
+                let outermost = layouts.next();
+                for layout in layouts.rev() {
+                    slot = Slot::new(move |cx| layout.render(cx, slot));
+                }
+                Ok(match outermost {
+                    Some(layout) => layout.render(cx, slot),
+                    None => slot.render(cx),
                 })
-            };
+            });
 
-            ViewResponse::try_from(Box::pin(stream))
-                .await?
-                .into_response(cx)
+            ViewResponse::try_from(Box::pin(view)).await?.into_response(cx)
         })
     }
 }
