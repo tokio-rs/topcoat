@@ -213,8 +213,12 @@ impl ViewHandle {
     }
 
     /// Writes the view's output through `f`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the view is a nested handle.
     #[track_caller]
-    fn render_into(self, cx: &Cx, f: &mut Formatter<'_>) {
+    pub(crate) fn render_into(self, cx: &Cx, f: &mut Formatter<'_>) {
         match self.repr {
             ViewRepr::Static(body) => f.write_str(body),
             ViewRepr::Scoped { .. } => {

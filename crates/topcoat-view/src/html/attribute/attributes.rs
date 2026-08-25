@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use topcoat_core::context::Cx;
 
-use crate::{Attribute, AttributeValue, AttributeValueViewParts, AttributeViewParts, PartsWriter};
+use crate::{
+    Attribute, AttributeCollector, AttributeKey, AttributeKeyViewParts, AttributeValue,
+    AttributeValueViewParts, AttributeViewParts, HtmlContext, PartsWriter,
+};
 
 /// A runtime collection of HTML attributes with unique keys.
 ///
@@ -11,13 +14,12 @@ use crate::{Attribute, AttributeValue, AttributeValueViewParts, AttributeViewPar
 /// Prefer constructing `Attributes` with the [`attributes!`](macro.attributes.html)
 /// macro.
 ///
-/// Each value is captured as an [`AttributeValue`]: inside a `view!`
-/// invocation it lands in the enclosing instruction buffer, and elsewhere it
-/// carries a buffer of its own, so a collection can be built and rendered
-/// anywhere.
+/// Each key and value is captured as an [`AttributeKey`] and an
+/// [`AttributeValue`] when it is inserted, so a collection can be built and
+/// rendered anywhere.
 #[derive(Debug, Default, Clone)]
 pub struct Attributes {
-    map: HashMap<String, AttributeValue>,
+    map: HashMap<AttributeKey, AttributeValue>,
 }
 
 impl Attributes {
@@ -63,31 +65,38 @@ impl Attributes {
 
     /// Inserts or replaces an attribute.
     ///
-    /// The value is captured as an [`AttributeValue`] with
+    /// The key is captured as an [`AttributeKey`] with
+    /// [`AttributeKeyViewParts`] and the value as an [`AttributeValue`] with
     /// [`AttributeValueViewParts`]. If the key was already present, the
     /// previous captured value is returned. If the implementation of
     /// [`AttributeValueViewParts`] for `v` signals that the attribute should
-    /// not be present, an [absent](AttributeValue::absent) value is stored
+    /// not be present, an [absent](AttributeValue::Absent) value is stored
     /// instead, which causes the previous value to be replaced and the
     /// attribute not to be rendered in a `view!`.
     #[inline]
     pub fn insert(
         &mut self,
         cx: &Cx,
-        k: impl Into<String>,
+        k: impl AttributeKeyViewParts,
         v: impl AttributeValueViewParts,
     ) -> Option<AttributeValue> {
+        let mut collector = AttributeCollector::new();
+        k.into_view_parts(
+            cx,
+            &mut PartsWriter::collecting(&mut collector, HtmlContext::AttributeKey),
+        );
+        let key = collector.finish(cx);
         let value = if v.attribute_present() {
-            // A present value is always captured as an instruction block,
-            // even when it writes nothing (a `true` boolean), so it is
-            // never mistaken for an absent attribute.
-            // AttributeValue::captured(build_sync(|| block(cx, |b| b.attribute_value(v))))
-            // TODO
-            AttributeValue::absent()
+            let mut collector = AttributeCollector::new();
+            v.into_view_parts(
+                cx,
+                &mut PartsWriter::collecting(&mut collector, HtmlContext::AttributeValue),
+            );
+            collector.finish(cx)
         } else {
-            AttributeValue::absent()
+            AttributeValue::Absent
         };
-        self.map.insert(k.into(), value)
+        self.map.insert(key, value)
     }
 
     /// Removes an attribute, returning its captured value if the key was
@@ -106,7 +115,7 @@ impl Attributes {
     /// Inserts every `(key, value)` entry from `iter`, replacing any keys
     /// already present.
     #[inline]
-    pub fn extend(&mut self, iter: impl IntoIterator<Item = (String, AttributeValue)>) {
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = (AttributeKey, AttributeValue)>) {
         self.map.extend(iter);
     }
 
@@ -127,8 +136,8 @@ impl AttributeViewParts for Attributes {
 }
 
 impl IntoIterator for Attributes {
-    type Item = (String, AttributeValue);
-    type IntoIter = std::collections::hash_map::IntoIter<String, AttributeValue>;
+    type Item = (AttributeKey, AttributeValue);
+    type IntoIter = std::collections::hash_map::IntoIter<AttributeKey, AttributeValue>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -137,8 +146,8 @@ impl IntoIterator for Attributes {
 }
 
 impl<'a> IntoIterator for &'a Attributes {
-    type Item = (&'a String, &'a AttributeValue);
-    type IntoIter = std::collections::hash_map::Iter<'a, String, AttributeValue>;
+    type Item = (&'a AttributeKey, &'a AttributeValue);
+    type IntoIter = std::collections::hash_map::Iter<'a, AttributeKey, AttributeValue>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -313,7 +322,10 @@ mod tests {
         let mut attrs = Attributes::new();
         attrs.insert(cx, "class", "button");
         attrs.insert(cx, "id", "submit");
-        let keys: HashSet<String> = attrs.into_iter().map(|(k, _)| k).collect();
+        let keys: HashSet<String> = attrs
+            .into_iter()
+            .map(|(k, _)| k.as_str().to_owned())
+            .collect();
         let expected: HashSet<String> = ["class", "id"].into_iter().map(String::from).collect();
         assert_eq!(keys, expected);
     }

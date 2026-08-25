@@ -393,7 +393,7 @@ pub type StaticClass = Class<Unescaped<PromotedStr>>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AttributeValue, buffer::ViewBuffer};
+    use crate::{AttributeValue, Attributes, buffer::ViewBuffer};
 
     fn render(class: Class<impl ClassEntries>) -> String {
         let cx = Cx::default();
@@ -499,13 +499,11 @@ mod tests {
     }
 
     #[test]
-    fn attribute_value_entries_are_spliced_verbatim() {
+    fn attribute_value_entries_are_spliced_as_captured() {
         let cx = Cx::default();
-        let mut buffer = ViewBuffer::new();
-        let captured = buffer
-            .block(&cx, |b| b.attribute_value("[&>*]:mt-2"))
-            .seal(buffer);
-        let value = AttributeValue::captured(captured);
+        let mut attrs = Attributes::new();
+        attrs.insert(&cx, "class", "[&>*]:mt-2");
+        let value = attrs.remove("class").unwrap();
         assert_eq!(render(Class(("btn", &value))), "btn [&amp;>*]:mt-2");
     }
 

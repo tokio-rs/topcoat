@@ -1,8 +1,10 @@
 mod attributes;
+mod collector;
 mod key;
 mod value;
 
 pub use attributes::*;
+pub(crate) use collector::*;
 pub use key::*;
 use topcoat_core::context::Cx;
 pub use value::*;

@@ -4,7 +4,9 @@ use core::fmt;
 use http::{HeaderMap, StatusCode};
 use topcoat_core::context::Cx;
 
-use crate::{HtmlContext, HtmlWriter, ViewHandle, buffer::ViewBuffer};
+use crate::{
+    AttributeCollector, CollectedPart, HtmlContext, HtmlWriter, ViewHandle, buffer::ViewBuffer,
+};
 
 /// A boxed view part that writes its output at render time.
 ///
@@ -37,7 +39,7 @@ macro_rules! impl_push_primitive {
         #[inline]
         pub fn $method(&mut self, value: $ty) -> &mut Self {
             self.size_hint += $size_hint;
-            self.buffer.$method(value);
+            self.sink.$method(value);
             self
         }
     };
@@ -66,7 +68,7 @@ macro_rules! impl_push_primitive {
 /// becomes the built view's size hint, which pre-allocates the output buffer
 /// at render time.
 pub struct PartsWriter<'a> {
-    buffer: &'a mut ViewBuffer,
+    sink: Sink<'a>,
     context: HtmlContext,
     size_hint: usize,
 }
@@ -76,7 +78,18 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub(super) fn new(buffer: &'a mut ViewBuffer, context: HtmlContext) -> Self {
         Self {
-            buffer,
+            sink: Sink::Buffer(buffer),
+            context,
+            size_hint: 0,
+        }
+    }
+
+    /// Creates a writer sealing for `context` whose pushes are collected
+    /// into `collector` instead of a buffer.
+    #[inline]
+    pub(crate) fn collecting(collector: &'a mut AttributeCollector, context: HtmlContext) -> Self {
+        Self {
+            sink: Sink::Collector(collector),
             context,
             size_hint: 0,
         }
@@ -122,7 +135,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_str(&mut self, value: &str) -> &mut Self {
         self.size_hint += Self::str_size_hint(value, self.context);
-        self.buffer.push_str(value, self.context);
+        self.sink.push_str(value, self.context);
         self
     }
 
@@ -130,7 +143,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_static_str(&mut self, value: &'static str) -> &mut Self {
         self.size_hint += Self::str_size_hint(value, self.context);
-        self.buffer.push_static_str(value, self.context);
+        self.sink.push_static_str(value, self.context);
         self
     }
 
@@ -144,7 +157,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_promoted_str(&mut self, value: &'static &'static str) -> &mut Self {
         self.size_hint += Self::str_size_hint(value, self.context);
-        self.buffer.push_promoted_str(value, self.context);
+        self.sink.push_promoted_str(value, self.context);
         self
     }
 
@@ -152,7 +165,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_string(&mut self, value: String) -> &mut Self {
         self.size_hint += Self::str_size_hint(&value, self.context);
-        self.buffer.push_string(value, self.context);
+        self.sink.push_string(value, self.context);
         self
     }
 
@@ -164,7 +177,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_str_unescaped(&mut self, value: &str) -> &mut Self {
         self.size_hint += value.len();
-        self.buffer.push_str(value, HtmlContext::Unescaped);
+        self.sink.push_str(value, HtmlContext::Unescaped);
         self
     }
 
@@ -176,7 +189,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_static_str_unescaped(&mut self, value: &'static str) -> &mut Self {
         self.size_hint += value.len();
-        self.buffer.push_static_str(value, HtmlContext::Unescaped);
+        self.sink.push_static_str(value, HtmlContext::Unescaped);
         self
     }
 
@@ -194,7 +207,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_promoted_str_unescaped(&mut self, value: &'static &'static str) -> &mut Self {
         self.size_hint += value.len();
-        self.buffer.push_promoted_str(value, HtmlContext::Unescaped);
+        self.sink.push_promoted_str(value, HtmlContext::Unescaped);
         self
     }
 
@@ -206,7 +219,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_string_unescaped(&mut self, value: String) -> &mut Self {
         self.size_hint += value.len();
-        self.buffer.push_string(value, HtmlContext::Unescaped);
+        self.sink.push_string(value, HtmlContext::Unescaped);
         self
     }
 
@@ -240,7 +253,7 @@ impl<'a> PartsWriter<'a> {
     pub fn push_char(&mut self, value: char) -> &mut Self {
         // One to four UTF-8 bytes, or an escape sequence.
         self.size_hint += 3;
-        self.buffer.push_char(value, self.context);
+        self.sink.push_char(value, self.context);
         self
     }
 
@@ -271,7 +284,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_dyn(&mut self, part: Box<dyn DynViewPart>) -> &mut Self {
         self.size_hint += part.size_hint();
-        self.buffer.push_dyn(part, self.context);
+        self.sink.push_dyn(part, self.context);
         self
     }
 
@@ -287,7 +300,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_view_handle(&mut self, handle: ViewHandle) -> &mut Self {
         self.size_hint += handle.size_hint();
-        self.buffer.push_view(handle);
+        self.sink.push_view(handle);
         self
     }
 
@@ -295,7 +308,7 @@ impl<'a> PartsWriter<'a> {
     #[cfg(feature = "http")]
     #[inline]
     pub fn push_status_code(&mut self, status_code: StatusCode) -> &mut Self {
-        self.buffer.push_status_code(status_code);
+        self.sink.push_status_code(status_code);
         self
     }
 
@@ -303,8 +316,141 @@ impl<'a> PartsWriter<'a> {
     #[cfg(feature = "http")]
     #[inline]
     pub fn push_headers(&mut self, headers: HeaderMap) -> &mut Self {
-        self.buffer.push_headers(headers);
+        self.sink.push_headers(headers);
         self
+    }
+}
+
+macro_rules! impl_sink_primitive {
+    ($method:ident, $ty:ty, $part:expr) => {
+        #[inline]
+        fn $method(&mut self, value: $ty) {
+            match self {
+                Self::Buffer(buffer) => buffer.$method(value),
+                Self::Collector(collector) => collector.push($part(value)),
+            }
+        }
+    };
+}
+
+/// Where a writer's pushes go.
+enum Sink<'a> {
+    /// The instruction buffer of a view under construction.
+    Buffer(&'a mut ViewBuffer),
+    /// The collector capturing one attribute key or value.
+    Collector(&'a mut AttributeCollector),
+}
+
+impl Sink<'_> {
+    #[inline]
+    fn push_str(&mut self, value: &str, context: HtmlContext) {
+        match self {
+            Self::Buffer(buffer) => buffer.push_str(value, context),
+            Self::Collector(collector) => collector.push(CollectedPart::String {
+                value: value.to_owned(),
+                context,
+            }),
+        }
+    }
+
+    #[inline]
+    fn push_static_str(&mut self, value: &'static str, context: HtmlContext) {
+        match self {
+            Self::Buffer(buffer) => buffer.push_static_str(value, context),
+            Self::Collector(collector) => {
+                collector.push(CollectedPart::StaticStr { value, context });
+            }
+        }
+    }
+
+    #[inline]
+    fn push_promoted_str(&mut self, value: &'static &'static str, context: HtmlContext) {
+        match self {
+            Self::Buffer(buffer) => buffer.push_promoted_str(value, context),
+            Self::Collector(collector) => {
+                collector.push(CollectedPart::PromotedStr { value, context });
+            }
+        }
+    }
+
+    #[inline]
+    fn push_string(&mut self, value: String, context: HtmlContext) {
+        match self {
+            Self::Buffer(buffer) => buffer.push_string(value, context),
+            Self::Collector(collector) => {
+                collector.push(CollectedPart::String { value, context });
+            }
+        }
+    }
+
+    #[inline]
+    fn push_char(&mut self, value: char, context: HtmlContext) {
+        match self {
+            Self::Buffer(buffer) => buffer.push_char(value, context),
+            Self::Collector(collector) => {
+                collector.push(CollectedPart::Char { value, context });
+            }
+        }
+    }
+
+    impl_sink_primitive!(push_bool, bool, CollectedPart::Bool);
+    impl_sink_primitive!(push_i8, i8, |value| CollectedPart::Int(i128::from(value)));
+    impl_sink_primitive!(push_i16, i16, |value| CollectedPart::Int(i128::from(value)));
+    impl_sink_primitive!(push_i32, i32, |value| CollectedPart::Int(i128::from(value)));
+    impl_sink_primitive!(push_i64, i64, |value| CollectedPart::Int(i128::from(value)));
+    impl_sink_primitive!(push_i128, i128, CollectedPart::Int);
+    impl_sink_primitive!(push_isize, isize, |value| CollectedPart::Int(value as i128));
+    impl_sink_primitive!(push_u8, u8, |value| CollectedPart::Uint(u128::from(value)));
+    impl_sink_primitive!(push_u16, u16, |value| CollectedPart::Uint(u128::from(
+        value
+    )));
+    impl_sink_primitive!(push_u32, u32, |value| CollectedPart::Uint(u128::from(
+        value
+    )));
+    impl_sink_primitive!(push_u64, u64, |value| CollectedPart::Uint(u128::from(
+        value
+    )));
+    impl_sink_primitive!(push_u128, u128, CollectedPart::Uint);
+    impl_sink_primitive!(push_usize, usize, |value| CollectedPart::Uint(
+        value as u128
+    ));
+    impl_sink_primitive!(push_f32, f32, CollectedPart::F32);
+    impl_sink_primitive!(push_f64, f64, CollectedPart::F64);
+
+    #[inline]
+    fn push_dyn(&mut self, part: Box<dyn DynViewPart>, context: HtmlContext) {
+        match self {
+            Self::Buffer(buffer) => buffer.push_dyn(part, context),
+            Self::Collector(collector) => {
+                collector.push(CollectedPart::Dyn { part, context });
+            }
+        }
+    }
+
+    #[inline]
+    fn push_view(&mut self, handle: ViewHandle) {
+        match self {
+            Self::Buffer(buffer) => buffer.push_view(handle),
+            Self::Collector(collector) => collector.push(CollectedPart::View(handle)),
+        }
+    }
+
+    /// Records a status code; a collected attribute has nowhere to keep one.
+    #[cfg(feature = "http")]
+    #[inline]
+    fn push_status_code(&mut self, status_code: StatusCode) {
+        if let Self::Buffer(buffer) = self {
+            buffer.push_status_code(status_code);
+        }
+    }
+
+    /// Records headers; a collected attribute has nowhere to keep them.
+    #[cfg(feature = "http")]
+    #[inline]
+    fn push_headers(&mut self, headers: HeaderMap) {
+        if let Self::Buffer(buffer) = self {
+            buffer.push_headers(headers);
+        }
     }
 }
 
