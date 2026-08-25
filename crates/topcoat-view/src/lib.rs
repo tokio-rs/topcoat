@@ -13,6 +13,7 @@ mod string;
 pub mod svg;
 mod view;
 
+pub use buffer::{ViewBuffer, ViewHandle};
 pub use child::*;
 pub use component::*;
 pub use css::*;

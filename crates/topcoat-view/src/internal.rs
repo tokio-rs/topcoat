@@ -5,19 +5,19 @@
 //! reach it through fully qualified paths, so nothing is imported into the
 //! user's scope.
 //!
-//! A template expands to a [`ViewStream`] whose body drives its dynamic
-//! node positions concurrently: each position becomes a unit future
-//! ([`unit_future`]) in a [`Join`], the joined content lands in the body's
-//! own instruction block ([`block`]), and the block is yielded as the
-//! template's content chunk ([`emit_content`]). The [`Builder`] is the
-//! emission handle a `block` hands out: its methods push the block's parts,
-//! sealed with the HTML context of the position they fill.
+//! A template expands to a composition of the [`View`](crate::View)
+//! combinators defined here: a [`JoinView`] drives the template's dynamic
+//! node positions concurrently and builds its instruction block from their
+//! contents, [`NodeView`] wraps a position's value, [`ThenView`] adapts a
+//! future resolving to a view, [`EitherView`] unifies branch types, a
+//! [`LoopView`] joins a `for` body's iterations, and [`LiveView`] backs a
+//! `live!` region. The [`Builder`] is the emission handle a burst hands
+//! out: its methods push the block's parts, sealed with the HTML context of
+//! the position they fill.
 
-use std::{marker::PhantomData, ops::DerefMut};
+use topcoat_core::context::Cx;
 
-pub use futures_core::Stream;
-use topcoat_core::{context::Cx, error::Result};
-
+mod cx_view;
 mod either_view;
 mod join_view;
 mod live_view;
@@ -25,65 +25,18 @@ mod loop_view;
 mod node_view;
 mod then_view;
 
+pub use cx_view::*;
 pub use either_view::*;
 pub use join_view::*;
 pub use live_view::*;
 pub use loop_view::*;
 pub use node_view::*;
 pub use then_view::*;
+
 use crate::{
-    Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts,
-    ElementNameViewParts, HtmlContext, NodeViewPartsStream, NodeWriter, PartsWriter, Unescaped,
-    View, ViewChunk, ViewHandle, buffer::ViewBufferScope, html::forward_view,
+    Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts, HtmlContext,
+    PartsWriter, Unescaped, ViewHandle, buffer::ViewBufferScope, html::ElementNameViewParts,
 };
-
-/// Returns the future driving `value` at a node position: a unit of the
-/// template's [`Join`].
-pub fn unit_future<'cx, T>(value: T, cx: &'cx Cx) -> impl Future<Output = Result<()>> + Send + 'cx
-where
-    T: NodeViewPartsStream + 'cx,
-{
-    value.into_view_parts_stream(cx, NodeWriter::new())
-}
-
-/// A component's render future as a node value, joined like any other
-/// dynamic position.
-///
-/// The future resolves to the component's view, whose chunks then stream
-/// through the position.
-pub struct Render<F, V> {
-    future: F,
-    // Names the view type, so it participates in the lifetime bounds of the
-    // trait method's returned future.
-    view: PhantomData<fn() -> V>,
-}
-
-impl<F, V> Render<F, V>
-where
-    F: Future<Output = Result<V>>,
-{
-    pub fn new(future: F) -> Self {
-        Self {
-            future,
-            view: PhantomData,
-        }
-    }
-}
-
-impl<F, V> NodeViewPartsStream for Render<F, V>
-where
-    F: Future<Output = Result<V>> + Send,
-    V: View,
-{
-    const MULTI: bool = false;
-
-    async fn into_view_parts_stream<'cx>(self, _cx: &'cx Cx, mut writer: NodeWriter) -> Result<()>
-    where
-        Self: 'cx,
-    {
-        forward_view(self.future.await?, &mut writer).await
-    }
-}
 
 /// Moves a control-flow body's pattern bindings into its nested stream.
 ///
