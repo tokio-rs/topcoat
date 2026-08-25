@@ -43,9 +43,9 @@ impl<T> From<T> for Js<T> {
 
 impl<T> IntoResponse for Js<T>
 where
-    T: Into<Body>,
+    T: Into<Body> + Send,
 {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
         (
             [(
                 CONTENT_TYPE,
@@ -53,7 +53,7 @@ where
             )],
             self.0.into(),
         )
-            .into_response(cx)
+            .into_response(cx).await
     }
 }
 
@@ -67,7 +67,7 @@ mod tests {
     #[tokio::test]
     async fn into_response_sets_javascript_content_type() {
         let response = Js("export const a = 1;")
-            .into_response(&Cx::default())
+            .into_response(&Cx::default()).await
             .expect("response builds");
 
         assert_eq!(

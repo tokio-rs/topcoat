@@ -400,11 +400,11 @@ mod tests {
     // `fn` pointers and cannot capture state.
 
     fn say_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "route".into_response(cx) })
+        Box::pin(async move { "route".into_response(cx).await })
     }
 
     fn say_posted(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "posted".into_response(cx) })
+        Box::pin(async move { "posted".into_response(cx).await })
     }
 
     fn panic_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
@@ -422,25 +422,25 @@ mod tests {
                 .map(|(key, value)| format!("{key}={}", value.as_str()))
                 .collect::<Vec<_>>()
                 .join("&")
-                .into_response(cx)
+                .into_response(cx).await
         })
     }
 
     /// Echoes the path of the endpoint the request matched.
     fn echo_endpoint_path(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { endpoint(cx).path().to_string().into_response(cx) })
+        Box::pin(async move { endpoint(cx).path().to_string().into_response(cx).await })
     }
 
     /// Echoes the identity of the route handling the request.
     fn echo_route_id(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { format!("{:?}", route(cx).id()).into_response(cx) })
+        Box::pin(async move { format!("{:?}", route(cx).id()).into_response(cx).await })
     }
 
     /// Reads a registered app-context greeting and returns it as the body.
     struct Greeting(&'static str);
 
     fn say_greeting(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { app_context::<Greeting>(cx).0.into_response(cx) })
+        Box::pin(async move { app_context::<Greeting>(cx).0.into_response(cx).await })
     }
 
     /// Reads the registered base URL and returns it as the body.
@@ -449,7 +449,7 @@ mod tests {
             topcoat_core::base_url::base_url(cx)
                 .as_str()
                 .to_owned()
-                .into_response(cx)
+                .into_response(cx).await
         })
     }
 
@@ -755,13 +755,13 @@ mod tests {
             let bytes = to_bytes(body, usize::MAX).await?;
             String::from_utf8_lossy(&bytes)
                 .into_owned()
-                .into_response(cx)
+                .into_response(cx).await
         })
     }
 
     /// Echoes the dispatched and original URIs, separated by a space.
     fn echo_uris(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { format!("{} {}", uri(cx), original_uri(cx)).into_response(cx) })
+        Box::pin(async move { format!("{} {}", uri(cx), original_uri(cx)).into_response(cx).await })
     }
 
     #[test]
@@ -994,7 +994,7 @@ mod tests {
         Box::pin(async move {
             HrefTarget::path(&href_route(), cx)
                 .to_string()
-                .into_response(cx)
+                .into_response(cx).await
         })
     }
 
@@ -1059,7 +1059,7 @@ mod tests {
     // -- Router::handle: method sets --
 
     fn say_any(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "any".into_response(cx) })
+        Box::pin(async move { "any".into_response(cx).await })
     }
 
     #[test]
@@ -1218,7 +1218,7 @@ mod tests {
         Box::pin(async move {
             match next.run(cx, body).await {
                 Ok(response) => Ok(response),
-                Err(_) => "replaced".into_response(cx),
+                Err(_) => "replaced".into_response(cx).await,
             }
         })
     }
@@ -1451,7 +1451,7 @@ mod tests {
             let events = futures_util::stream::once(async move {
                 Result::<Event>::Ok(Event::new().data(request_context::<Greeting>(&handle).0))
             });
-            Sse::new(events).into_response(cx)
+            Sse::new(events).into_response(cx).await
         })
     }
 

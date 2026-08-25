@@ -38,14 +38,14 @@ impl ViewResponse {
 }
 
 impl IntoResponse for ViewResponse {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
         let rendered = self.first.render_response(cx);
         let mut response = Html(Body::new(ViewBody {
             cx: cx.clone(),
             first: Some(rendered.html),
             rest: self.rest,
         }))
-        .into_response(cx)?;
+        .into_response(cx).await?;
         if let Some(status_code) = rendered.status_code {
             *response.status_mut() = status_code;
         }

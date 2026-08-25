@@ -50,7 +50,7 @@ impl std::fmt::Display for UnauthorizedError {
 impl std::error::Error for UnauthorizedError {}
 
 impl IntoResponse for UnauthorizedError {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
         (StatusCode::UNAUTHORIZED, "unauthorized").into_response(cx)
     }
 }

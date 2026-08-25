@@ -99,6 +99,7 @@ impl ToTokens for Layer {
                         #ident::handler(cx, body, next).await?,
                         cx,
                     )
+                    .await
                 })
             }
         };

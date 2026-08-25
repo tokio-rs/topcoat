@@ -508,7 +508,7 @@ mod tests {
 
     /// A stand-in handler; builder tests register routes without running them.
     fn handler(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "handled".into_response(cx) })
+        Box::pin(async move { "handled".into_response(cx).await })
     }
 
     /// A stand-in page; builder tests register pages without rendering them.

@@ -164,6 +164,7 @@ impl ToTokens for Route {
                         #ident::handler(cx #request_arg).await?,
                         cx,
                     )
+                    .await
                 })
             }
         };

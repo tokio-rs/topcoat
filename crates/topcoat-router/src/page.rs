@@ -306,7 +306,7 @@ impl Route for PageWithLayouts {
                 })
             });
 
-            ViewResponse::try_from(Box::pin(view)).await?.into_response(cx)
+            ViewResponse::try_from(Box::pin(view)).await?.into_response(cx).await
         })
     }
 }

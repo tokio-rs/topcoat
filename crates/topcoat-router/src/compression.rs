@@ -261,18 +261,18 @@ mod tests {
     }
 
     fn long_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { long_body().into_response(cx) })
+        Box::pin(async move { long_body().into_response(cx).await })
     }
 
     /// A route whose body stays below the default size threshold.
     fn short_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "route".into_response(cx) })
+        Box::pin(async move { "route".into_response(cx).await })
     }
 
     /// A route that marks its (uncompressed) response as already encoded.
     fn encoded_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
-            let mut response = long_body().into_response(cx)?;
+            let mut response = long_body().into_response(cx).await?;
             response
                 .headers_mut()
                 .insert(CONTENT_ENCODING, HeaderValue::from_static("br"));

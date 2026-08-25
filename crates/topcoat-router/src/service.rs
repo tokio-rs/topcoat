@@ -222,7 +222,7 @@ mod tests {
     }
 
     fn say_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "served".into_response(cx) })
+        Box::pin(async move { "served".into_response(cx).await })
     }
 
     fn panic_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
@@ -251,7 +251,7 @@ mod tests {
     fn slow_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
             tokio::time::sleep(Duration::from_millis(200)).await;
-            "slow".into_response(cx)
+            "slow".into_response(cx).await
         })
     }
 

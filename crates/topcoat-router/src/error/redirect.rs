@@ -94,8 +94,8 @@ impl std::fmt::Display for RedirectError {
 impl std::error::Error for RedirectError {}
 
 impl IntoResponse for RedirectError {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        (self.status, ([(LOCATION, self.location)], ())).into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self.status, ([(LOCATION, self.location)], ())).into_response(cx).await
     }
 }
 
@@ -161,7 +161,7 @@ impl SeeOther {
 }
 
 impl IntoResponse for SeeOther {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        (StatusCode::SEE_OTHER, ([(LOCATION, self.location)], ())).into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        (StatusCode::SEE_OTHER, ([(LOCATION, self.location)], ())).into_response(cx).await
     }
 }

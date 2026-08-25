@@ -71,15 +71,13 @@ impl std::fmt::Display for ServiceUnavailableError {
 impl std::error::Error for ServiceUnavailableError {}
 
 impl IntoResponse for ServiceUnavailableError {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        let mut response =
-            (StatusCode::SERVICE_UNAVAILABLE, "service unavailable").into_response(cx)?;
+    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
         // A `u64`'s decimal form is always a valid header value, so the header
         // is only skipped if that ever stops being true.
-        if let Ok(value) = HeaderValue::from_str(&self.retry_after_secs.to_string()) {
-            response.headers_mut().insert(RETRY_AFTER, value);
-        }
-        Ok(response)
+        let retry_after = HeaderValue::from_str(&self.retry_after_secs.to_string())
+            .ok()
+            .map(|value| [(RETRY_AFTER, value)]);
+        (StatusCode::SERVICE_UNAVAILABLE, retry_after, "service unavailable").into_response(cx)
     }
 }
 

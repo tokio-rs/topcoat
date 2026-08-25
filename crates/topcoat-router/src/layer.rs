@@ -295,17 +295,17 @@ mod tests {
 
     /// A layer that answers the request itself, without invoking `next`.
     fn short_circuit<'a>(cx: &'a Cx, _body: Body, _next: Next<'a>) -> LayerFuture<'a> {
-        Box::pin(async move { "short".into_response(cx) })
+        Box::pin(async move { "short".into_response(cx).await })
     }
 
     fn say_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "route".into_response(cx) })
+        Box::pin(async move { "route".into_response(cx).await })
     }
 
     fn record_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
             app_context::<Arc<Trace>>(cx).lock().unwrap().push("route");
-            "route".into_response(cx)
+            "route".into_response(cx).await
         })
     }
 

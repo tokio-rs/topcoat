@@ -608,7 +608,7 @@ mod tests {
     }
 
     fn say_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "route".into_response(cx) })
+        Box::pin(async move { "route".into_response(cx).await })
     }
 
     /// Echoes the `x-tower` request header, so a test can observe request
@@ -620,7 +620,7 @@ mod tests {
                 .and_then(|value| value.to_str().ok())
                 .unwrap_or("missing")
                 .to_owned();
-            value.into_response(cx)
+            value.into_response(cx).await
         })
     }
 
@@ -638,7 +638,7 @@ mod tests {
     /// A route whose body is long enough to clear tower-http's compression
     /// size threshold.
     fn long_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { "route ".repeat(64).into_response(cx) })
+        Box::pin(async move { "route ".repeat(64).into_response(cx).await })
     }
 
     /// A mountable service echoing the request's method, URI, and body, to
@@ -1327,7 +1327,7 @@ mod tests {
             let bytes = to_bytes(body, usize::MAX).await.unwrap();
             String::from_utf8_lossy(&bytes)
                 .into_owned()
-                .into_response(cx)
+                .into_response(cx).await
         })
     }
 

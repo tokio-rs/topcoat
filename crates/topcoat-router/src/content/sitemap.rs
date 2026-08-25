@@ -132,12 +132,12 @@ impl Sitemap {
 }
 
 impl IntoResponse for Sitemap {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
         (
             [(CONTENT_TYPE, HeaderValue::from_static("application/xml"))],
             Body::from(self.serialize(cx)?),
         )
-            .into_response(cx)
+            .into_response(cx).await
     }
 }
 
@@ -396,7 +396,7 @@ mod tests {
     async fn into_response_sets_the_xml_content_type() {
         let response = Sitemap::new()
             .url("/")
-            .into_response(&cx())
+            .into_response(&cx()).await
             .expect("response builds");
 
         assert_eq!(

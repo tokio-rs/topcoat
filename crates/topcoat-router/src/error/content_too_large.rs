@@ -53,7 +53,7 @@ impl std::fmt::Display for ContentTooLargeError {
 impl std::error::Error for ContentTooLargeError {}
 
 impl IntoResponse for ContentTooLargeError {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
         (StatusCode::PAYLOAD_TOO_LARGE, "content too large").into_response(cx)
     }
 }

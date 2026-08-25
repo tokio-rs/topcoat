@@ -70,15 +70,13 @@ impl std::fmt::Display for TooManyRequestsError {
 impl std::error::Error for TooManyRequestsError {}
 
 impl IntoResponse for TooManyRequestsError {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        let mut response =
-            (StatusCode::TOO_MANY_REQUESTS, "too many requests").into_response(cx)?;
+    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
         // A `u64`'s decimal form is always a valid header value, so the header
         // is only skipped if that ever stops being true.
-        if let Ok(value) = HeaderValue::from_str(&self.retry_after_secs.to_string()) {
-            response.headers_mut().insert(RETRY_AFTER, value);
-        }
-        Ok(response)
+        let retry_after = HeaderValue::from_str(&self.retry_after_secs.to_string())
+            .ok()
+            .map(|value| [(RETRY_AFTER, value)]);
+        (StatusCode::TOO_MANY_REQUESTS, retry_after, "too many requests").into_response(cx)
     }
 }
 

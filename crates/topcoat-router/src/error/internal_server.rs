@@ -58,7 +58,7 @@ impl std::fmt::Display for InternalServerError {
 impl std::error::Error for InternalServerError {}
 
 impl IntoResponse for InternalServerError {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
+    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
         (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response(cx)
     }
 }

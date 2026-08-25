@@ -1,8 +1,6 @@
 use std::{borrow::Cow, convert::Infallible};
 
 use bytes::{Bytes, BytesMut};
-use futures_core::Stream;
-use futures_util::StreamExt;
 use http::{
     Extensions, HeaderMap, StatusCode,
     header::{CONTENT_TYPE, HeaderName, HeaderValue},
@@ -12,9 +10,8 @@ use topcoat_core::{
     context::Cx,
     error::{Error, Result},
 };
-use topcoat_view::{View, ViewChunk};
 
-use crate::{Body, BoxError, content::Html};
+use crate::{Body, BoxError};
 
 pub type Response<T = Body> = http::Response<T>;
 
@@ -53,7 +50,7 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// struct Csv(String);
 ///
 /// impl IntoResponse for Csv {
-///     fn into_response(self, _cx: &Cx) -> Result<Response> {
+///     async fn into_response(self, _cx: &Cx) -> Result<Response> {
 ///         Ok(Response::builder()
 ///             .header("Content-Type", "text/csv; charset=utf-8")
 ///             .body(Body::from(self.0))?)
@@ -73,7 +70,7 @@ pub trait IntoResponse {
     ///
     /// Returns an error if the response cannot be assembled (for example, a
     /// header value is invalid).
-    fn into_response(self, cx: &Cx) -> Result<Response>;
+    fn into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send;
 }
 
 /// Modifies a [`Response`]'s [`Parts`] without supplying a body.
@@ -91,7 +88,11 @@ pub trait IntoResponseParts {
     ///
     /// Returns an error if a part cannot be applied (for example, a header
     /// value is invalid).
-    fn into_response_parts(self, cx: &Cx, parts: &mut Parts) -> Result<()>;
+    fn into_response_parts(
+        self,
+        cx: &Cx,
+        parts: &mut Parts,
+    ) -> impl Future<Output = Result<()>> + Send;
 }
 
 /// Builds a response carrying `body` with the given `Content-Type`.
@@ -113,136 +114,136 @@ fn merge_parts(parts: &mut Parts, from: Parts) {
 // -- Leaf IntoResponse impls --
 
 impl IntoResponse for Infallible {
-    fn into_response(self, _cx: &Cx) -> Result<Response> {
+    async fn into_response(self, _cx: &Cx) -> Result<Response> {
         match self {}
     }
 }
 
 impl IntoResponse for () {
-    fn into_response(self, _cx: &Cx) -> Result<Response> {
+    async fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(Response::new(Body::empty()))
     }
 }
 
 impl IntoResponse for StatusCode {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        (self, ()).into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self, ()).into_response(cx).await
     }
 }
 
 impl IntoResponse for &'static str {
-    fn into_response(self, _cx: &Cx) -> Result<Response> {
+    async fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(content_response(TEXT_PLAIN, Body::from(self)))
     }
 }
 
 impl IntoResponse for String {
-    fn into_response(self, _cx: &Cx) -> Result<Response> {
+    async fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(content_response(TEXT_PLAIN, Body::from(self)))
     }
 }
 
 impl IntoResponse for Box<str> {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        String::from(self).into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        String::from(self).into_response(cx).await
     }
 }
 
 impl IntoResponse for Cow<'static, str> {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
         match self {
-            Cow::Borrowed(value) => value.into_response(cx),
-            Cow::Owned(value) => value.into_response(cx),
+            Cow::Borrowed(value) => value.into_response(cx).await,
+            Cow::Owned(value) => value.into_response(cx).await,
         }
     }
 }
 
 impl IntoResponse for &'static [u8] {
-    fn into_response(self, _cx: &Cx) -> Result<Response> {
+    async fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(content_response(APPLICATION_OCTET_STREAM, Body::from(self)))
     }
 }
 
 impl<const N: usize> IntoResponse for &'static [u8; N] {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
         let bytes: &'static [u8] = self;
-        bytes.into_response(cx)
+        bytes.into_response(cx).await
     }
 }
 
 impl<const N: usize> IntoResponse for [u8; N] {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        self.to_vec().into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        self.to_vec().into_response(cx).await
     }
 }
 
 impl IntoResponse for Vec<u8> {
-    fn into_response(self, _cx: &Cx) -> Result<Response> {
+    async fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(content_response(APPLICATION_OCTET_STREAM, Body::from(self)))
     }
 }
 
 impl IntoResponse for Box<[u8]> {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        Vec::from(self).into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        Vec::from(self).into_response(cx).await
     }
 }
 
 impl IntoResponse for Cow<'static, [u8]> {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
         match self {
-            Cow::Borrowed(value) => value.into_response(cx),
-            Cow::Owned(value) => value.into_response(cx),
+            Cow::Borrowed(value) => value.into_response(cx).await,
+            Cow::Owned(value) => value.into_response(cx).await,
         }
     }
 }
 
 impl IntoResponse for Bytes {
-    fn into_response(self, _cx: &Cx) -> Result<Response> {
+    async fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(content_response(APPLICATION_OCTET_STREAM, Body::from(self)))
     }
 }
 
 impl IntoResponse for BytesMut {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        self.freeze().into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        self.freeze().into_response(cx).await
     }
 }
 
 impl IntoResponse for Body {
-    fn into_response(self, _cx: &Cx) -> Result<Response> {
+    async fn into_response(self, _cx: &Cx) -> Result<Response> {
         Ok(Response::new(self))
     }
 }
 
 impl IntoResponse for HeaderMap {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        (self, ()).into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self, ()).into_response(cx).await
     }
 }
 
 impl IntoResponse for Extensions {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        (self, ()).into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self, ()).into_response(cx).await
     }
 }
 
 impl IntoResponse for Parts {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        (self, ()).into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self, ()).into_response(cx).await
     }
 }
 
 /// Replies with an empty body carrying each `(name, value)` pair as a header.
 impl<K, V, const N: usize> IntoResponse for [(K, V); N]
 where
-    K: TryInto<HeaderName>,
+    K: TryInto<HeaderName> + Send,
     K::Error: std::error::Error + Send + Sync + 'static,
-    V: TryInto<HeaderValue>,
+    V: TryInto<HeaderValue> + Send,
     V::Error: std::error::Error + Send + Sync + 'static,
 {
-    fn into_response(self, cx: &Cx) -> Result<Response> {
-        (self, ()).into_response(cx)
+    async fn into_response(self, cx: &Cx) -> Result<Response> {
+        (self, ()).into_response(cx).await
     }
 }
 
@@ -253,7 +254,7 @@ where
     B: http_body::Body<Data = Bytes> + Send + 'static,
     B::Error: Into<BoxError>,
 {
-    fn into_response(self, _cx: &Cx) -> Result<Response> {
+    async fn into_response(self, _cx: &Cx) -> Result<Response> {
         let (parts, body) = self.into_parts();
         Ok(Response::from_parts(parts, Body::new(body)))
     }
@@ -262,32 +263,32 @@ where
 // -- IntoResponseParts impls --
 
 impl IntoResponseParts for () {
-    fn into_response_parts(self, _cx: &Cx, _parts: &mut Parts) -> Result<()> {
+    async fn into_response_parts(self, _cx: &Cx, _parts: &mut Parts) -> Result<()> {
         Ok(())
     }
 }
 
 impl<T> IntoResponseParts for Option<T>
 where
-    T: IntoResponseParts,
+    T: IntoResponseParts + Send,
 {
-    fn into_response_parts(self, cx: &Cx, parts: &mut Parts) -> Result<()> {
+    async fn into_response_parts(self, cx: &Cx, parts: &mut Parts) -> Result<()> {
         if let Some(value) = self {
-            value.into_response_parts(cx, parts)?;
+            value.into_response_parts(cx, parts).await?;
         }
         Ok(())
     }
 }
 
 impl IntoResponseParts for HeaderMap {
-    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
+    async fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts.headers.extend(self);
         Ok(())
     }
 }
 
 impl IntoResponseParts for Extensions {
-    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
+    async fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         parts.extensions.extend(self);
         Ok(())
     }
@@ -297,12 +298,12 @@ impl IntoResponseParts for Extensions {
 /// value is not a valid header.
 impl<K, V, const N: usize> IntoResponseParts for [(K, V); N]
 where
-    K: TryInto<HeaderName>,
+    K: TryInto<HeaderName> + Send,
     K::Error: std::error::Error + Send + Sync + 'static,
-    V: TryInto<HeaderValue>,
+    V: TryInto<HeaderValue> + Send,
     V::Error: std::error::Error + Send + Sync + 'static,
 {
-    fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
+    async fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
         for (name, value) in self {
             let name = name.try_into().map_err(Error::from)?;
             let value = value.try_into().map_err(Error::from)?;
@@ -325,13 +326,13 @@ macro_rules! impl_into_response_tuples {
         #[allow(non_snake_case, unused_mut, unused_variables)]
         impl<R, $($ty,)*> IntoResponse for ($($ty,)* R,)
         where
-            R: IntoResponse,
-            $($ty: IntoResponseParts,)*
+            R: IntoResponse + Send,
+            $($ty: IntoResponseParts + Send,)*
         {
-            fn into_response(self, cx: &Cx) -> Result<Response> {
+            async fn into_response(self, cx: &Cx) -> Result<Response> {
                 let ($($ty,)* r,) = self;
-                let (mut parts, body) = r.into_response(cx)?.into_parts();
-                $( $ty.into_response_parts(cx, &mut parts)?; )*
+                let (mut parts, body) = r.into_response(cx).await?.into_parts();
+                $( $ty.into_response_parts(cx, &mut parts).await?; )*
                 Ok(Response::from_parts(parts, body))
             }
         }
@@ -339,14 +340,14 @@ macro_rules! impl_into_response_tuples {
         #[allow(non_snake_case, unused_mut, unused_variables)]
         impl<R, $($ty,)*> IntoResponse for (StatusCode, $($ty,)* R,)
         where
-            R: IntoResponse,
-            $($ty: IntoResponseParts,)*
+            R: IntoResponse + Send,
+            $($ty: IntoResponseParts + Send,)*
         {
-            fn into_response(self, cx: &Cx) -> Result<Response> {
+            async fn into_response(self, cx: &Cx) -> Result<Response> {
                 let (status, $($ty,)* r,) = self;
-                let (mut parts, body) = r.into_response(cx)?.into_parts();
+                let (mut parts, body) = r.into_response(cx).await?.into_parts();
                 parts.status = status;
-                $( $ty.into_response_parts(cx, &mut parts)?; )*
+                $( $ty.into_response_parts(cx, &mut parts).await?; )*
                 Ok(Response::from_parts(parts, body))
             }
         }
@@ -354,14 +355,14 @@ macro_rules! impl_into_response_tuples {
         #[allow(non_snake_case, unused_mut, unused_variables)]
         impl<R, $($ty,)*> IntoResponse for (Parts, $($ty,)* R,)
         where
-            R: IntoResponse,
-            $($ty: IntoResponseParts,)*
+            R: IntoResponse + Send,
+            $($ty: IntoResponseParts + Send,)*
         {
-            fn into_response(self, cx: &Cx) -> Result<Response> {
+            async fn into_response(self, cx: &Cx) -> Result<Response> {
                 let (template, $($ty,)* r,) = self;
-                let (mut parts, body) = r.into_response(cx)?.into_parts();
+                let (mut parts, body) = r.into_response(cx).await?.into_parts();
                 merge_parts(&mut parts, template);
-                $( $ty.into_response_parts(cx, &mut parts)?; )*
+                $( $ty.into_response_parts(cx, &mut parts).await?; )*
                 Ok(Response::from_parts(parts, body))
             }
         }
@@ -369,15 +370,15 @@ macro_rules! impl_into_response_tuples {
         #[allow(non_snake_case, unused_mut, unused_variables)]
         impl<R, $($ty,)*> IntoResponse for (Response<()>, $($ty,)* R,)
         where
-            R: IntoResponse,
-            $($ty: IntoResponseParts,)*
+            R: IntoResponse + Send,
+            $($ty: IntoResponseParts + Send,)*
         {
-            fn into_response(self, cx: &Cx) -> Result<Response> {
+            async fn into_response(self, cx: &Cx) -> Result<Response> {
                 let (template, $($ty,)* r,) = self;
                 let (template, ()) = template.into_parts();
-                let (mut parts, body) = r.into_response(cx)?.into_parts();
+                let (mut parts, body) = r.into_response(cx).await?.into_parts();
                 merge_parts(&mut parts, template);
-                $( $ty.into_response_parts(cx, &mut parts)?; )*
+                $( $ty.into_response_parts(cx, &mut parts).await?; )*
                 Ok(Response::from_parts(parts, body))
             }
         }
@@ -409,23 +410,15 @@ impl_into_response_tuples!(
 #[cfg(test)]
 mod tests {
     use http_body_util::Full;
-    use topcoat::view::{View, view};
 
     use super::*;
     use crate::to_bytes;
 
-    fn block_on<F: Future>(future: F) -> F::Output {
-        tokio::runtime::Builder::new_current_thread()
-            .build()
-            .unwrap()
-            .block_on(future)
-    }
-
     /// Renders a value into a response and reads the body fully into memory.
-    fn run(value: impl IntoResponse) -> (Parts, Bytes) {
-        let cx = Cx::default();
-        let (parts, body) = value.into_response(&cx).unwrap().into_parts();
-        let bytes = block_on(to_bytes(body, usize::MAX)).unwrap();
+    async fn run(value: impl IntoResponse) -> (Parts, Bytes) {
+        let cx = Cx::default().await;
+        let (parts, body) = value.into_response(&cx).await.unwrap().into_parts();
+        let bytes = to_bytes(body, usize::MAX).await.unwrap();
         (parts, bytes)
     }
 
@@ -441,88 +434,88 @@ mod tests {
 
     // -- leaf bodies --
 
-    #[test]
-    fn str_is_text_plain() {
-        let (parts, body) = run("hi");
+    #[tokio::test]
+    async fn str_is_text_plain() {
+        let (parts, body) = run("hi").await;
         assert_eq!(parts.status, StatusCode::OK);
         assert_eq!(header(&parts, "content-type"), "text/plain; charset=utf-8");
         assert_eq!(&body[..], b"hi");
     }
 
-    #[test]
-    fn owned_and_borrowed_text_match() {
+    #[tokio::test]
+    async fn owned_and_borrowed_text_match() {
         for (parts, body) in [
-            run(String::from("hi")),
-            run(Box::<str>::from("hi")),
-            run(Cow::Borrowed("hi")),
-            run(Cow::<str>::Owned("hi".to_owned())),
+            run(String::from("hi")).await,
+            run(Box::<str>::from("hi")).await,
+            run(Cow::Borrowed("hi")).await,
+            run(Cow::<str>::Owned("hi".to_owned())).await,
         ] {
             assert_eq!(header(&parts, "content-type"), "text/plain; charset=utf-8");
             assert_eq!(&body[..], b"hi");
         }
     }
 
-    #[test]
-    fn byte_bodies_are_octet_stream() {
+    #[tokio::test]
+    async fn byte_bodies_are_octet_stream() {
         for (parts, body) in [
-            run(b"hi".to_vec()),
-            run(Bytes::from_static(b"hi")),
-            run(BytesMut::from(&b"hi"[..])),
-            run(*b"hi"),
-            run(b"hi"),
-            run(Box::<[u8]>::from(&b"hi"[..])),
+            run(b"hi".to_vec()).await,
+            run(Bytes::from_static(b"hi")).await,
+            run(BytesMut::from(&b"hi"[..])).await,
+            run(*b"hi").await,
+            run(b"hi").await,
+            run(Box::<[u8]>::from(&b"hi"[..])).await,
         ] {
             assert_eq!(header(&parts, "content-type"), "application/octet-stream");
             assert_eq!(&body[..], b"hi");
         }
     }
 
-    #[test]
-    fn unit_is_empty_ok() {
-        let (parts, body) = run(());
+    #[tokio::test]
+    async fn unit_is_empty_ok() {
+        let (parts, body) = run(()).await;
         assert_eq!(parts.status, StatusCode::OK);
         assert!(body.is_empty());
         assert!(parts.headers.is_empty());
     }
 
-    #[test]
-    fn status_code_sets_status_with_empty_body() {
-        let (parts, body) = run(StatusCode::NO_CONTENT);
+    #[tokio::test]
+    async fn status_code_sets_status_with_empty_body() {
+        let (parts, body) = run(StatusCode::NO_CONTENT).await;
         assert_eq!(parts.status, StatusCode::NO_CONTENT);
         assert!(body.is_empty());
     }
 
-    #[test]
-    fn header_map_applies_headers() {
+    #[tokio::test]
+    async fn header_map_applies_headers() {
         let mut headers = HeaderMap::new();
         headers.insert(
             HeaderName::from_static("x-test"),
             HeaderValue::from_static("1"),
         );
-        let (parts, body) = run(headers);
+        let (parts, body) = run(headers).await;
         assert_eq!(header(&parts, "x-test"), "1");
         assert!(body.is_empty());
     }
 
-    #[test]
-    fn extensions_are_applied() {
+    #[tokio::test]
+    async fn extensions_are_applied() {
         #[derive(Clone, Debug, PartialEq)]
         struct Marker(u32);
 
         let mut extensions = Extensions::new();
         extensions.insert(Marker(7));
-        let (parts, _) = run(extensions);
+        let (parts, _) = run(extensions).await;
         assert_eq!(parts.extensions.get::<Marker>(), Some(&Marker(7)));
     }
 
-    #[test]
-    fn response_passes_through_with_rebodied_stream() {
+    #[tokio::test]
+    async fn response_passes_through_with_rebodied_stream() {
         let response = http::Response::builder()
             .status(StatusCode::ACCEPTED)
             .header("x-test", "1")
             .body(Full::new(Bytes::from_static(b"yo")))
             .unwrap();
-        let (parts, body) = run(response);
+        let (parts, body) = run(response).await;
         assert_eq!(parts.status, StatusCode::ACCEPTED);
         assert_eq!(header(&parts, "x-test"), "1");
         assert_eq!(&body[..], b"yo");
@@ -530,79 +523,79 @@ mod tests {
 
     // -- header arrays --
 
-    #[test]
-    fn header_array_is_into_response() {
-        let (parts, body) = run([("x-test", "1"), ("x-other", "2")]);
+    #[tokio::test]
+    async fn header_array_is_into_response() {
+        let (parts, body) = run([("x-test", "1"), ("x-other", "2")]).await;
         assert_eq!(header(&parts, "x-test"), "1");
         assert_eq!(header(&parts, "x-other"), "2");
         assert!(body.is_empty());
     }
 
-    #[test]
-    fn invalid_header_name_is_an_error() {
+    #[tokio::test]
+    async fn invalid_header_name_is_an_error() {
         // A space is not allowed in a header name.
         let cx = Cx::default();
-        assert!([("inva lid", "1")].into_response(&cx).is_err());
+        assert!([("inva lid", "1")].into_response(&cx).await.is_err());
     }
 
     // -- tuples --
 
-    #[test]
-    fn one_tuple_is_just_the_body() {
-        let (parts, body) = run(("hi",));
+    #[tokio::test]
+    async fn one_tuple_is_just_the_body() {
+        let (parts, body) = run(("hi",)).await;
         assert_eq!(parts.status, StatusCode::OK);
         assert_eq!(&body[..], b"hi");
     }
 
-    #[test]
-    fn status_then_body() {
-        let (parts, body) = run((StatusCode::CREATED, "hi"));
+    #[tokio::test]
+    async fn status_then_body() {
+        let (parts, body) = run((StatusCode::CREATED, "hi")).await;
         assert_eq!(parts.status, StatusCode::CREATED);
         assert_eq!(header(&parts, "content-type"), "text/plain; charset=utf-8");
         assert_eq!(&body[..], b"hi");
     }
 
-    #[test]
-    fn headers_then_body() {
-        let (parts, body) = run(([("x-test", "1")], "hi"));
+    #[tokio::test]
+    async fn headers_then_body() {
+        let (parts, body) = run(([("x-test", "1")], "hi")).await;
         assert_eq!(header(&parts, "x-test"), "1");
         assert_eq!(&body[..], b"hi");
     }
 
-    #[test]
-    fn status_headers_and_body() {
-        let (parts, body) = run((StatusCode::CREATED, [("x-test", "1")], "hi"));
+    #[tokio::test]
+    async fn status_headers_and_body() {
+        let (parts, body) = run((StatusCode::CREATED, [("x-test", "1")], "hi")).await;
         assert_eq!(parts.status, StatusCode::CREATED);
         assert_eq!(header(&parts, "x-test"), "1");
         assert_eq!(&body[..], b"hi");
     }
 
-    #[test]
-    fn multiple_response_parts_are_all_applied() {
+    #[tokio::test]
+    async fn multiple_response_parts_are_all_applied() {
         let (parts, body) = run((
             StatusCode::CREATED,
             [("x-one", "1")],
             [("x-two", "2")],
             "hi",
-        ));
+        )).await;
         assert_eq!(parts.status, StatusCode::CREATED);
         assert_eq!(header(&parts, "x-one"), "1");
         assert_eq!(header(&parts, "x-two"), "2");
         assert_eq!(&body[..], b"hi");
     }
 
-    #[test]
-    fn optional_parts_are_applied_when_present() {
-        let (present, _) = run((Some([("x-test", "1")]), "hi"));
+    #[tokio::test]
+    async fn optional_parts_are_applied_when_present() {
+        let (present, _) = run((Some([("x-test", "1")]), "hi")).await;
         assert_eq!(header(&present, "x-test"), "1");
 
-        let (absent, body) = run((Option::<[(&str, &str); 1]>::None, "hi"));
+        let (absent, body) = run((Option::<[(&str, &str); 1]>::None, "hi")).await;
         assert!(absent.headers.get("x-test").is_none());
         assert_eq!(&body[..], b"hi");
     }
 
-    #[test]
-    fn parts_template_seeds_status_and_headers() {
+    #[tokio::test]
+    async fn parts_template_seeds_status_and_headers() {
         let (mut template, _) = Response::new(Body::empty()).into_parts();
         template.status = StatusCode::IM_A_TEAPOT;
         template.headers.insert(
@@ -610,21 +603,21 @@ mod tests {
             HeaderValue::from_static("1"),
         );
 
-        let (parts, body) = run((template, "hi"));
+        let (parts, body) = run((template, "hi")).await;
         assert_eq!(parts.status, StatusCode::IM_A_TEAPOT);
         assert_eq!(header(&parts, "x-test"), "1");
         assert_eq!(&body[..], b"hi");
     }
 
-    #[test]
-    fn response_unit_template_seeds_status_and_headers() {
+    #[tokio::test]
+    async fn response_unit_template_seeds_status_and_headers() {
         let template = http::Response::builder()
             .status(StatusCode::IM_A_TEAPOT)
             .header("x-test", "1")
             .body(())
             .unwrap();
 
-        let (parts, body) = run((template, "hi"));
+        let (parts, body) = run((template, "hi")).await;
         assert_eq!(parts.status, StatusCode::IM_A_TEAPOT);
         assert_eq!(header(&parts, "x-test"), "1");
         assert_eq!(&body[..], b"hi");
