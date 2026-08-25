@@ -24,8 +24,17 @@ impl Scope {
     /// The block captures every value the template uses, so the view owns
     /// its data and the expressions inside borrow from the block. The built
     /// view never leaves the block, which keeps those borrows valid.
-    pub fn emit_root(&self) -> TokenStream {
-        self.emit_move_view(quote! { move }, TokenStream::new())
+    ///
+    /// With `owns_cx`, the block expects an owned `__cx` context in scope
+    /// and captures it, rebinding `__cx` to a borrow of it inside; the view
+    /// then does not borrow the caller's context.
+    pub fn emit_root(&self, owns_cx: bool) -> TokenStream {
+        let prologue = if owns_cx {
+            quote! { let __cx = &__cx; }
+        } else {
+            TokenStream::new()
+        };
+        self.emit_move_view(quote! { move }, prologue)
     }
 
     /// Emits this scope as the body of a branch or iteration whose pattern
@@ -97,7 +106,7 @@ mod tests {
     };
 
     fn rendered(builder: ViewBuilder) -> String {
-        builder.finish().emit_root().to_string()
+        builder.finish().emit_root(false).to_string()
     }
 
     fn add_component(builder: &mut ViewBuilder, name: &str) {

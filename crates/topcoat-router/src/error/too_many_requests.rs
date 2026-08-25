@@ -76,7 +76,12 @@ impl IntoResponse for TooManyRequestsError {
         let retry_after = HeaderValue::from_str(&self.retry_after_secs.to_string())
             .ok()
             .map(|value| [(RETRY_AFTER, value)]);
-        (StatusCode::TOO_MANY_REQUESTS, retry_after, "too many requests").into_response(cx)
+        (
+            StatusCode::TOO_MANY_REQUESTS,
+            retry_after,
+            "too many requests",
+        )
+            .into_response(cx)
     }
 }
 
@@ -86,10 +91,11 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn responds_429_with_a_retry_after_header() {
+    #[tokio::test]
+    async fn responds_429_with_a_retry_after_header() {
         let response = too_many_requests(60)
             .into_response(&Cx::default())
+            .await
             .expect("the response builds");
 
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);

@@ -59,7 +59,8 @@ where
             )],
             self.0.into(),
         )
-            .into_response(cx).await
+            .into_response(cx)
+            .await
     }
 }
 
@@ -153,7 +154,8 @@ mod tests {
     #[tokio::test]
     async fn into_response_sets_html_content_type() {
         let response = Html("<h1>hi</h1>")
-            .into_response(&Cx::default()).await
+            .into_response(&Cx::default())
+            .await
             .expect("response builds");
 
         assert_eq!(

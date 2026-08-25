@@ -20,7 +20,7 @@ pub trait ModulePage: Send + Sync + 'static {
     fn module_path(&self) -> &'static str;
 
     /// Renders the page [`View`].
-    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s>;
+    fn render(&self, body: Body) -> BoxView<'_>;
 
     /// Returns whether this page handles the current request.
     ///
@@ -49,8 +49,8 @@ impl<P: ModulePage + ?Sized> ModulePage for &'static P {
         (**self).module_path()
     }
 
-    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s> {
-        (**self).render(cx, body)
+    fn render(&self, body: Body) -> BoxView<'_> {
+        (**self).render(body)
     }
 }
 
@@ -83,8 +83,8 @@ impl<P: ModulePage> Page for ResolvedPage<P> {
         &self.path
     }
 
-    fn render<'s>(&'s self, cx: &Cx, body: Body) -> BoxView<'s> {
-        self.page.render(cx, body)
+    fn render(&self, body: Body) -> BoxView<'_> {
+        self.page.render(body)
     }
 }
 
@@ -98,9 +98,8 @@ pub trait ModuleLayout: Send + Sync + 'static {
     /// The module path where the layout was declared, used to derive the URL.
     fn module_path(&self) -> &'static str;
 
-    /// Renders the layout, embedding the given child content
-    /// [`Result`]`<`[`View`]`>` as its slot.
-    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s>;
+    /// Renders the layout, embedding the given child content [`Slot`].
+    fn render<'s>(&'s self, slot: Slot<'s>) -> BoxView<'s>;
 }
 
 impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
@@ -108,8 +107,8 @@ impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
         (**self).module_path()
     }
 
-    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s> {
-        (**self).render(cx, slot)
+    fn render<'s>(&'s self, slot: Slot<'s>) -> BoxView<'s> {
+        (**self).render(slot)
     }
 }
 
@@ -134,7 +133,7 @@ impl<L: ModuleLayout> Layout for ResolvedLayout<L> {
         &self.path
     }
 
-    fn render<'s>(&'s self, cx: &Cx, slot: Slot<'s>) -> BoxView<'s> {
-        self.layout.render(cx, slot)
+    fn render<'s>(&'s self, slot: Slot<'s>) -> BoxView<'s> {
+        self.layout.render(slot)
     }
 }

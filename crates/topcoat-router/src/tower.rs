@@ -1327,7 +1327,8 @@ mod tests {
             let bytes = to_bytes(body, usize::MAX).await.unwrap();
             String::from_utf8_lossy(&bytes)
                 .into_owned()
-                .into_response(cx).await
+                .into_response(cx)
+                .await
         })
     }
 

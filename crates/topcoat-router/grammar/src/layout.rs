@@ -123,7 +123,7 @@ impl ToTokens for Layout {
         let mut face = item.clone();
         for (arg, input) in args.iter().zip(&mut face.sig.inputs) {
             if let (LayoutArg::Slot, FnArg::Typed(pat_type)) = (arg, input) {
-                pat_type.ty = Box::new(parse_quote! { #topcoat_router::Slot<'_> });
+                pat_type.ty = parse_quote! { #topcoat_router::Slot<'_> };
             }
         }
         let marker = quote! {
@@ -131,18 +131,29 @@ impl ToTokens for Layout {
             #face
         };
 
+        // The view picks up the request context it is first polled with, so
+        // an outer layout's derived context reaches this one. It owns that
+        // context and drives the component's view in place, which lets the
+        // view borrow it.
         let render = quote! {
             fn render<'s>(
                 &'s self,
-                cx: &'s #topcoat_context::Cx,
                 slot: #topcoat_router::Slot<'s>,
             ) -> #topcoat_view::BoxView<'s> {
-                ::std::boxed::Box::pin(#topcoat_view::internal::ThenView::new(async move {
-                    let props = <#ident as #topcoat_view::Component>::props_builder()
-                        .slot(slot)
-                        .build();
-                    <#ident as #topcoat_view::Component>::render(#ident, cx, props).await
-                }))
+                ::std::boxed::Box::pin(#topcoat_view::internal::LazyView::new(
+                    move |cx: #topcoat_context::Cx| {
+                        #topcoat_view::internal::MoveView::new(async move {
+                            let props = <#ident as #topcoat_view::Component>::props_builder()
+                                .slot(slot)
+                                .build();
+                            let view = <#ident as #topcoat_view::Component>::render(
+                                #ident, &cx, props,
+                            )
+                            .await?;
+                            <#topcoat_view::internal::MoveView>::drive(&cx, view).await
+                        })
+                    },
+                ))
             }
         };
         let (layout, submit_as) = if let Some(path) = attr.path.as_ref() {

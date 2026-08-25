@@ -171,7 +171,7 @@ impl Router {
             parts = next_parts;
             body = rewrite_body;
         };
-        let response = respond(&cx, result);
+        let response = respond(&cx, result).await;
 
         // Compression runs outside every layer, so layers see uncompressed
         // bodies. The negotiation reads the request headers as the layers
@@ -344,21 +344,24 @@ mod tests {
     use std::{
         borrow::Cow,
         future::Future,
-        pin::Pin,
         sync::{Arc, Mutex, OnceLock},
     };
 
     use http::{HeaderMap, StatusCode};
-    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, View, view};
+    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, view};
     use topcoat_core::{
         context::{Cx, app_context, request_context},
         error::Result,
+    };
+    use topcoat_view::{
+        BoxView,
+        internal::{LazyView, MoveView},
     };
 
     use super::*;
     use crate::{
         Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn,
-        Path, Route, RouteFn, RouteFuture,
+        Path, Route, RouteFn, RouteFuture, Slot,
         error::rewrite,
         raw_path_params,
         request::{Bytes, original_uri, uri},
@@ -422,7 +425,8 @@ mod tests {
                 .map(|(key, value)| format!("{key}={}", value.as_str()))
                 .collect::<Vec<_>>()
                 .join("&")
-                .into_response(cx).await
+                .into_response(cx)
+                .await
         })
     }
 
@@ -449,7 +453,8 @@ mod tests {
             topcoat_core::base_url::base_url(cx)
                 .as_str()
                 .to_owned()
-                .into_response(cx).await
+                .into_response(cx)
+                .await
         })
     }
 
@@ -486,12 +491,8 @@ mod tests {
     }
 
     // Page and layout render functions for the rendering tests.
-    type ViewFuture<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
-
-    fn render_page(cx: &Cx, _body: Body) -> ViewFuture<'_> {
-        Box::pin(async move {
-            view! { cx => "page" }
-        })
+    fn render_page(_body: Body) -> BoxView<'static> {
+        Box::pin(LazyView::new(|cx: Cx| view! { cx => "page" }))
     }
 
     /// A view part that panics when it renders, so the router's panic
@@ -511,36 +512,32 @@ mod tests {
         }
     }
 
-    fn render_panicking_page(cx: &Cx, _body: Body) -> ViewFuture<'_> {
-        Box::pin(async move {
-            view! { cx => (Panicking) }
-        })
+    fn render_panicking_page(_body: Body) -> BoxView<'static> {
+        Box::pin(LazyView::new(|cx: Cx| view! { cx => (Panicking) }))
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
-    fn layout_root(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
-        Box::pin(async move {
-            let inner = slot?;
+    fn layout_root(slot: Slot<'_>) -> BoxView<'_> {
+        Box::pin(LazyView::new(move |cx: Cx| {
             view! {
                 cx =>
                 "R["
-                (inner)
+                (slot)
                 "]"
             }
-        })
+        }))
     }
 
     /// Wraps the child content in `A[ ... ]`.
-    fn layout_admin(cx: &Cx, slot: Result<View>) -> ViewFuture<'_> {
-        Box::pin(async move {
-            let inner = slot?;
+    fn layout_admin(slot: Slot<'_>) -> BoxView<'_> {
+        Box::pin(LazyView::new(move |cx: Cx| {
             view! {
                 cx =>
                 "A["
-                (inner)
+                (slot)
                 "]"
             }
-        })
+        }))
     }
 
     // -- Router::handle: dispatch --
@@ -706,12 +703,16 @@ mod tests {
         Box::pin(async move { Err(rewrite("/x", Body::empty()).into()) })
     }
 
-    fn render_rewriting_page(_cx: &Cx, _body: Body) -> ViewFuture<'_> {
-        Box::pin(async move { Err(rewrite("/x", Body::empty()).into()) })
+    fn render_rewriting_page(_body: Body) -> BoxView<'static> {
+        Box::pin(MoveView::new(async move {
+            Err(rewrite("/x", Body::empty()).into())
+        }))
     }
 
-    fn layout_rewrites(_cx: &Cx, _slot: Result<View>) -> ViewFuture<'_> {
-        Box::pin(async move { Err(rewrite("/x", Body::empty()).into()) })
+    fn layout_rewrites(_slot: Slot<'_>) -> BoxView<'_> {
+        Box::pin(MoveView::new(async move {
+            Err(rewrite("/x", Body::empty()).into())
+        }))
     }
 
     fn rewrite_to_missing(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
@@ -755,13 +756,18 @@ mod tests {
             let bytes = to_bytes(body, usize::MAX).await?;
             String::from_utf8_lossy(&bytes)
                 .into_owned()
-                .into_response(cx).await
+                .into_response(cx)
+                .await
         })
     }
 
     /// Echoes the dispatched and original URIs, separated by a space.
     fn echo_uris(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { format!("{} {}", uri(cx), original_uri(cx)).into_response(cx).await })
+        Box::pin(async move {
+            format!("{} {}", uri(cx), original_uri(cx))
+                .into_response(cx)
+                .await
+        })
     }
 
     #[test]
@@ -994,7 +1000,8 @@ mod tests {
         Box::pin(async move {
             HrefTarget::path(&href_route(), cx)
                 .to_string()
-                .into_response(cx).await
+                .into_response(cx)
+                .await
         })
     }
 

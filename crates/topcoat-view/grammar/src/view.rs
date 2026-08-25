@@ -21,7 +21,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 pub use signal_declaration::*;
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_context};
 
 use crate::{
     leading_cx::LeadingCx,
@@ -54,18 +54,21 @@ impl ToTokens for View {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut builder = ViewBuilder::new();
         self.nodes.lower(&mut builder);
-        let view = builder.finish().emit_root();
+        let view = builder.finish().emit_root(self.cx.is_some());
 
-        // When an explicit context is named, bind it to the `__cx` identifier
-        // the generated code (component invocations) reads from. Inside a
-        // component/page/layout this binding is already in scope, so we emit
-        // the view untouched.
+        // When an explicit context is named, the view owns a copy of it
+        // rather than borrowing it, so the view can outlive the binding it
+        // was named from. Inside a component/page/layout the `__cx` binding
+        // is already in scope, so we emit the view untouched.
         match &self.cx {
-            Some(cx) => quote! {{
-                #cx
-                #view
-            }}
-            .to_tokens(tokens),
+            Some(cx) => {
+                let cx = &cx.cx;
+                quote! {{
+                    let __cx: #topcoat_context::Cx = (#cx).clone();
+                    #view
+                }}
+                .to_tokens(tokens);
+            }
             None => view.to_tokens(tokens),
         }
     }

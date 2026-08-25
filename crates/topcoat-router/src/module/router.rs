@@ -305,10 +305,10 @@ impl From<ModuleRouterBuilder> for RouterBuilder {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_core::context::Cx;
+    use topcoat_view::BoxView;
 
     use super::*;
-    use crate::{Body, Method, Methods, RouteId, ViewFuture};
+    use crate::{Body, Method, Methods, RouteId};
 
     /// A [`ModulePage`] whose render function is never invoked; used to
     /// exercise registration and path computation without running a page.
@@ -330,8 +330,8 @@ mod tests {
             self.module_path
         }
 
-        fn render<'cx>(&'cx self, _cx: &'cx Cx, _body: Body) -> ViewFuture<'cx> {
-            Box::pin(async { unreachable!("test render function is never called") })
+        fn render(&self, _body: Body) -> BoxView<'_> {
+            unreachable!("test render function is never called")
         }
     }
 

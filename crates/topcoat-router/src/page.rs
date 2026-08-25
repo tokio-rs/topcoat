@@ -1,11 +1,11 @@
 use std::{borrow::Cow, sync::Arc};
 
-use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::{BoxView, NodeViewPartsStream, NodeWriter, ThenView};
+use topcoat_core::context::Cx;
+use topcoat_view::{BoxView, Child, ViewExt, internal::MoveView};
 
 use crate::{
     Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId,
-    content::ViewResponse, response::IntoResponse, route,
+    response::IntoResponse, route,
 };
 
 /// A page handler that renders a [`View`](topcoat_view::View) for a specific
@@ -28,9 +28,10 @@ pub trait Page: Send + Sync + 'static {
 
     /// Renders the page to a [`View`](topcoat_view::View).
     ///
-    /// The returned view may borrow `self` and `cx`. An error in the page
-    /// body surfaces when the view is polled rather than returned here.
-    fn render<'s>(&'s self, cx: &'s Cx, body: Body) -> BoxView<'s>;
+    /// The returned view may borrow `self`. It sees the request context it
+    /// is polled with, and an error in the page body surfaces when it is
+    /// polled rather than returned here.
+    fn render(&self, body: Body) -> BoxView<'_>;
 
     /// Returns whether this page handles the current request.
     ///
@@ -59,8 +60,8 @@ impl<P: Page + ?Sized> Page for &'static P {
         (**self).path()
     }
 
-    fn render<'s>(&'s self, cx: &'s Cx, body: Body) -> BoxView<'s> {
-        (**self).render(cx, body)
+    fn render(&self, body: Body) -> BoxView<'_> {
+        (**self).render(body)
     }
 }
 
@@ -68,7 +69,7 @@ impl<P: Page + ?Sized> Page for &'static P {
 inventory::collect!(&'static dyn Page);
 
 /// The render function backing a [`PageFn`].
-pub type PageRenderFn = fn(cx: &Cx, body: Body) -> BoxView<'static>;
+pub type PageRenderFn = fn(body: Body) -> BoxView<'static>;
 
 /// A [`Page`] backed by a plain render function.
 ///
@@ -124,54 +125,20 @@ impl Page for PageFn {
         &self.path
     }
 
-    fn render<'s>(&'s self, cx: &'s Cx, body: Body) -> BoxView<'s> {
-        (self.render)(cx, body)
+    fn render(&self, body: Body) -> BoxView<'_> {
+        (self.render)(body)
     }
 }
 
 /// The content a [`Layout`] wraps: the page, already composed with any inner
-/// layouts, waiting to be rendered against a request context.
+/// layouts.
 ///
-/// Interpolating the slot into a `view!` template renders it against the
-/// template's context, so a layout can provide request context values to
-/// everything beneath it by deriving a context with
-/// [`Cx::with`](topcoat_core::context::Cx::with) and rebinding the template's
-/// context (`view! { cx => ... }`).
-pub struct Slot<'a> {
-    render: Box<dyn FnOnce(&Cx) -> BoxView<'a> + Send + 'a>,
-}
-
-impl<'a> Slot<'a> {
-    /// Wraps the function that renders the slot's content.
-    #[must_use]
-    pub fn new(render: impl FnOnce(&Cx) -> BoxView<'a> + Send + 'a) -> Self {
-        Self {
-            render: Box::new(render),
-        }
-    }
-
-    /// Renders the slot's content against `cx`.
-    ///
-    /// The returned view owns `cx`'s request context, so it outlives the
-    /// borrow.
-    #[must_use]
-    pub fn render(self, cx: &Cx) -> BoxView<'a> {
-        (self.render)(cx)
-    }
-}
-
-/// Interpolating the slot into a template renders it against the template's
-/// context.
-impl NodeViewPartsStream for Slot<'_> {
-    const MULTI: bool = false;
-
-    async fn into_view_parts_stream<'cx>(self, cx: &'cx Cx, writer: NodeWriter) -> Result<()>
-    where
-        Self: 'cx,
-    {
-        self.render(cx).into_view_parts_stream(cx, writer).await
-    }
-}
+/// Interpolating the slot into the layout's template renders it there,
+/// under the template's request context. A layout provides request context
+/// values to everything beneath it by deriving a context with
+/// [`Cx::with`](topcoat_core::context::Cx::with) and rendering its template
+/// under it (`view! { cx => ... }`).
+pub type Slot<'a> = Child<'a>;
 
 /// A layout handler that wraps pages whose path starts with the layout's path
 /// prefix.
@@ -188,8 +155,9 @@ pub trait Layout: Send + Sync + 'static {
 
     /// Renders the layout, embedding the given child content [`Slot`].
     ///
-    /// The returned view may borrow `self`, `cx`, and the slot.
-    fn render<'s>(&'s self, cx: &'s Cx, slot: Slot<'s>) -> BoxView<'s>;
+    /// The returned view may borrow `self` and the slot. It sees the request
+    /// context it is polled with.
+    fn render<'s>(&'s self, slot: Slot<'s>) -> BoxView<'s>;
 }
 
 impl<L: Layout + ?Sized> Layout for &'static L {
@@ -197,8 +165,8 @@ impl<L: Layout + ?Sized> Layout for &'static L {
         (**self).path()
     }
 
-    fn render<'s>(&'s self, cx: &'s Cx, slot: Slot<'s>) -> BoxView<'s> {
-        (**self).render(cx, slot)
+    fn render<'s>(&'s self, slot: Slot<'s>) -> BoxView<'s> {
+        (**self).render(slot)
     }
 }
 
@@ -207,7 +175,7 @@ inventory::collect!(&'static dyn Layout);
 
 /// The render function backing a [`LayoutFn`], receiving the child content as
 /// a [`Slot`].
-pub type LayoutRenderFn = for<'a> fn(cx: &Cx, slot: Slot<'a>) -> BoxView<'a>;
+pub type LayoutRenderFn = for<'a> fn(slot: Slot<'a>) -> BoxView<'a>;
 
 /// A [`Layout`] backed by a plain render function.
 ///
@@ -241,8 +209,8 @@ impl Layout for LayoutFn {
         &self.path
     }
 
-    fn render<'s>(&'s self, cx: &'s Cx, slot: Slot<'s>) -> BoxView<'s> {
-        (self.render)(cx, slot)
+    fn render<'s>(&'s self, slot: Slot<'s>) -> BoxView<'s> {
+        (self.render)(slot)
     }
 }
 
@@ -251,12 +219,32 @@ pub struct PageWithLayouts {
     inner: Arc<PageWithLayoutsInner>,
 }
 
-/// The pair behind one shared handle, so the response body stream can own it
-/// past the handler.
+/// The pair behind one shared handle, so the response can own it past the
+/// handler.
 struct PageWithLayoutsInner {
     page: Box<dyn Page>,
     /// The matching layouts, ordered by ascending path length (outermost first).
     layouts: Vec<Arc<dyn Layout>>,
+}
+
+impl PageWithLayoutsInner {
+    /// Composes the page with its layouts: the page is the innermost slot,
+    /// each layout wraps the slot beneath it, and the outermost layout is
+    /// the view.
+    ///
+    /// Nothing runs until the view is polled: each layout decides when its
+    /// slot renders and which context it sees.
+    fn render(&self, body: Body) -> BoxView<'_> {
+        let page = self.page.render(body);
+        let Some((outermost, inner)) = self.layouts.split_first() else {
+            return page;
+        };
+        let mut slot = Slot::new(page);
+        for layout in inner.iter().rev() {
+            slot = Slot::new(layout.render(slot));
+        }
+        outermost.render(slot)
+    }
 }
 
 impl PageWithLayouts {
@@ -286,27 +274,16 @@ impl Route for PageWithLayouts {
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
+        // The response body outlives the handler, so the view owns the pair
+        // and a copy of the request context and drives itself in place.
+        let inner = Arc::clone(&self.inner);
+        let owned = cx.clone();
         Box::pin(async move {
-            let view = ThenView::new(async move {
-                // The page is the innermost slot, each layout wraps the
-                // slot beneath it, and only the outermost layer renders
-                // directly against the request context. Nothing runs
-                // until the view is driven: each layout decides when its
-                // slot renders and which context it sees.
-                let page = &self.inner.page;
-                let mut slot = Slot::new(move |cx| page.render(cx, body));
-                let mut layouts = self.inner.layouts.iter();
-                let outermost = layouts.next();
-                for layout in layouts.rev() {
-                    slot = Slot::new(move |cx| layout.render(cx, slot));
-                }
-                Ok(match outermost {
-                    Some(layout) => layout.render(cx, slot),
-                    None => slot.render(cx),
-                })
+            let view = MoveView::new(async move {
+                let view = inner.render(body);
+                MoveView::drive(&owned, view).await
             });
-
-            ViewResponse::try_from(Box::pin(view)).await?.into_response(cx).await
+            view.boxed().into_response(cx).await
         })
     }
 }

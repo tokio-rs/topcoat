@@ -491,10 +491,8 @@ impl Default for RouterBuilder {
 
 #[cfg(test)]
 mod tests {
-    use std::{future::Future, pin::Pin};
-
-    use topcoat_core::{context::Cx, error::Result};
-    use topcoat_view::View;
+    use topcoat_core::context::Cx;
+    use topcoat_view::BoxView;
 
     use super::*;
     use crate::{
@@ -512,11 +510,8 @@ mod tests {
     }
 
     /// A stand-in page; builder tests register pages without rendering them.
-    fn render_page(
-        _cx: &Cx,
-        _body: Body,
-    ) -> Pin<Box<dyn Future<Output = Result<View>> + Send + '_>> {
-        Box::pin(async move { Ok(View::empty()) })
+    fn render_page(_body: Body) -> BoxView<'static> {
+        Box::pin(())
     }
 
     /// A stand-in layer that continues the chain unchanged.

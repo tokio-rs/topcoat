@@ -133,7 +133,8 @@ where
             ],
             body,
         )
-            .into_response(cx).await
+            .into_response(cx)
+            .await
     }
 }
 
@@ -199,7 +200,10 @@ mod tests {
             Ok::<_, Error>(Event::new().data("one")),
             Ok(Event::new().data("two")),
         ]);
-        let response = Sse::new(events).into_response(&Cx::default()).await.unwrap();
+        let response = Sse::new(events)
+            .into_response(&Cx::default())
+            .await
+            .unwrap();
 
         assert_eq!(
             response.headers().get(CONTENT_TYPE).unwrap(),
@@ -217,7 +221,10 @@ mod tests {
             Ok(Event::new().data("one")),
             Err(Error::from(std::io::Error::other("source failed"))),
         ]);
-        let response = Sse::new(events).into_response(&Cx::default()).await.unwrap();
+        let response = Sse::new(events)
+            .into_response(&Cx::default())
+            .await
+            .unwrap();
 
         let mut frames = response.into_body().into_data_stream();
         let frame = frames.next().await.unwrap().unwrap();
@@ -235,7 +242,8 @@ mod tests {
                     .interval(Duration::from_secs(10))
                     .text("ping"),
             )
-            .into_response(&Cx::default()).await
+            .into_response(&Cx::default())
+            .await
             .unwrap();
 
         let started = Instant::now();
@@ -256,7 +264,8 @@ mod tests {
         .chain(stream::pending());
         let response = Sse::new(events)
             .keep_alive(KeepAlive::new().interval(Duration::from_secs(10)))
-            .into_response(&Cx::default()).await
+            .into_response(&Cx::default())
+            .await
             .unwrap();
 
         let started = Instant::now();

@@ -142,7 +142,8 @@ where
             )],
             serde_urlencoded::to_string(&self.0)?,
         )
-            .into_response(cx).await
+            .into_response(cx)
+            .await
     }
 }
 
@@ -341,7 +342,8 @@ mod tests {
             ("a".to_owned(), "1".to_owned()),
             ("b".to_owned(), "two".to_owned()),
         ])
-        .into_response(&Cx::default()).await
+        .into_response(&Cx::default())
+        .await
         .expect("serialization succeeds");
 
         assert_eq!(

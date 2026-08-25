@@ -11,7 +11,8 @@
 //! contents, [`NodeView`] wraps a position's value, [`ThenView`] adapts a
 //! future resolving to a view, [`EitherView`] unifies branch types, a
 //! [`LoopView`] joins a `for` body's iterations, [`LiveView`] backs a
-//! `live!` region, and [`MoveView`] owns a template's captured environment.
+//! `live!` region, [`MoveView`] owns a template's captured environment, and
+//! [`LazyView`] builds a view from the context it is first polled with.
 //! The [`Builder`] is the handle a burst pushes its block's parts through,
 //! sealed with the HTML context of the position they fill.
 
@@ -20,6 +21,7 @@ mod capture;
 mod cx_view;
 mod either_view;
 mod join_view;
+mod lazy_view;
 mod live_view;
 mod loop_view;
 mod move_view;
@@ -31,6 +33,7 @@ pub use capture::*;
 pub use cx_view::*;
 pub use either_view::*;
 pub use join_view::*;
+pub use lazy_view::*;
 pub use live_view::*;
 pub use loop_view::*;
 pub use move_view::*;

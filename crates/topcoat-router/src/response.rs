@@ -1,4 +1,4 @@
-use std::{borrow::Cow, convert::Infallible};
+use std::{borrow::Cow, convert::Infallible, future::ready};
 
 use bytes::{Bytes, BytesMut};
 use http::{
@@ -114,14 +114,15 @@ fn merge_parts(parts: &mut Parts, from: Parts) {
 // -- Leaf IntoResponse impls --
 
 impl IntoResponse for Infallible {
+    #[allow(clippy::unused_async)]
     async fn into_response(self, _cx: &Cx) -> Result<Response> {
         match self {}
     }
 }
 
 impl IntoResponse for () {
-    async fn into_response(self, _cx: &Cx) -> Result<Response> {
-        Ok(Response::new(Body::empty()))
+    fn into_response(self, _cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+        ready(Ok(Response::new(Body::empty())))
     }
 }
 
@@ -132,14 +133,14 @@ impl IntoResponse for StatusCode {
 }
 
 impl IntoResponse for &'static str {
-    async fn into_response(self, _cx: &Cx) -> Result<Response> {
-        Ok(content_response(TEXT_PLAIN, Body::from(self)))
+    fn into_response(self, _cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+        ready(Ok(content_response(TEXT_PLAIN, Body::from(self))))
     }
 }
 
 impl IntoResponse for String {
-    async fn into_response(self, _cx: &Cx) -> Result<Response> {
-        Ok(content_response(TEXT_PLAIN, Body::from(self)))
+    fn into_response(self, _cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+        ready(Ok(content_response(TEXT_PLAIN, Body::from(self))))
     }
 }
 
@@ -159,8 +160,11 @@ impl IntoResponse for Cow<'static, str> {
 }
 
 impl IntoResponse for &'static [u8] {
-    async fn into_response(self, _cx: &Cx) -> Result<Response> {
-        Ok(content_response(APPLICATION_OCTET_STREAM, Body::from(self)))
+    fn into_response(self, _cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+        ready(Ok(content_response(
+            APPLICATION_OCTET_STREAM,
+            Body::from(self),
+        )))
     }
 }
 
@@ -178,8 +182,11 @@ impl<const N: usize> IntoResponse for [u8; N] {
 }
 
 impl IntoResponse for Vec<u8> {
-    async fn into_response(self, _cx: &Cx) -> Result<Response> {
-        Ok(content_response(APPLICATION_OCTET_STREAM, Body::from(self)))
+    fn into_response(self, _cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+        ready(Ok(content_response(
+            APPLICATION_OCTET_STREAM,
+            Body::from(self),
+        )))
     }
 }
 
@@ -199,8 +206,11 @@ impl IntoResponse for Cow<'static, [u8]> {
 }
 
 impl IntoResponse for Bytes {
-    async fn into_response(self, _cx: &Cx) -> Result<Response> {
-        Ok(content_response(APPLICATION_OCTET_STREAM, Body::from(self)))
+    fn into_response(self, _cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+        ready(Ok(content_response(
+            APPLICATION_OCTET_STREAM,
+            Body::from(self),
+        )))
     }
 }
 
@@ -211,8 +221,8 @@ impl IntoResponse for BytesMut {
 }
 
 impl IntoResponse for Body {
-    async fn into_response(self, _cx: &Cx) -> Result<Response> {
-        Ok(Response::new(self))
+    fn into_response(self, _cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
+        ready(Ok(Response::new(self)))
     }
 }
 
@@ -254,17 +264,21 @@ where
     B: http_body::Body<Data = Bytes> + Send + 'static,
     B::Error: Into<BoxError>,
 {
-    async fn into_response(self, _cx: &Cx) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
         let (parts, body) = self.into_parts();
-        Ok(Response::from_parts(parts, Body::new(body)))
+        ready(Ok(Response::from_parts(parts, Body::new(body))))
     }
 }
 
 // -- IntoResponseParts impls --
 
 impl IntoResponseParts for () {
-    async fn into_response_parts(self, _cx: &Cx, _parts: &mut Parts) -> Result<()> {
-        Ok(())
+    fn into_response_parts(
+        self,
+        _cx: &Cx,
+        _parts: &mut Parts,
+    ) -> impl Future<Output = Result<()>> + Send {
+        ready(Ok(()))
     }
 }
 
@@ -281,16 +295,24 @@ where
 }
 
 impl IntoResponseParts for HeaderMap {
-    async fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(
+        self,
+        _cx: &Cx,
+        parts: &mut Parts,
+    ) -> impl Future<Output = Result<()>> + Send {
         parts.headers.extend(self);
-        Ok(())
+        ready(Ok(()))
     }
 }
 
 impl IntoResponseParts for Extensions {
-    async fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
+    fn into_response_parts(
+        self,
+        _cx: &Cx,
+        parts: &mut Parts,
+    ) -> impl Future<Output = Result<()>> + Send {
         parts.extensions.extend(self);
-        Ok(())
+        ready(Ok(()))
     }
 }
 
@@ -303,13 +325,18 @@ where
     V: TryInto<HeaderValue> + Send,
     V::Error: std::error::Error + Send + Sync + 'static,
 {
-    async fn into_response_parts(self, _cx: &Cx, parts: &mut Parts) -> Result<()> {
-        for (name, value) in self {
+    fn into_response_parts(
+        self,
+        _cx: &Cx,
+        parts: &mut Parts,
+    ) -> impl Future<Output = Result<()>> + Send {
+        let result = self.into_iter().try_for_each(|(name, value)| {
             let name = name.try_into().map_err(Error::from)?;
             let value = value.try_into().map_err(Error::from)?;
             parts.headers.insert(name, value);
-        }
-        Ok(())
+            Ok(())
+        });
+        ready(result)
     }
 }
 
@@ -416,7 +443,7 @@ mod tests {
 
     /// Renders a value into a response and reads the body fully into memory.
     async fn run(value: impl IntoResponse) -> (Parts, Bytes) {
-        let cx = Cx::default().await;
+        let cx = Cx::default();
         let (parts, body) = value.into_response(&cx).await.unwrap().into_parts();
         let bytes = to_bytes(body, usize::MAX).await.unwrap();
         (parts, bytes)
@@ -577,7 +604,8 @@ mod tests {
             [("x-one", "1")],
             [("x-two", "2")],
             "hi",
-        )).await;
+        ))
+        .await;
         assert_eq!(parts.status, StatusCode::CREATED);
         assert_eq!(header(&parts, "x-one"), "1");
         assert_eq!(header(&parts, "x-two"), "2");

@@ -77,7 +77,12 @@ impl IntoResponse for ServiceUnavailableError {
         let retry_after = HeaderValue::from_str(&self.retry_after_secs.to_string())
             .ok()
             .map(|value| [(RETRY_AFTER, value)]);
-        (StatusCode::SERVICE_UNAVAILABLE, retry_after, "service unavailable").into_response(cx)
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            retry_after,
+            "service unavailable",
+        )
+            .into_response(cx)
     }
 }
 
@@ -87,10 +92,11 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn responds_503_with_a_retry_after_header() {
+    #[tokio::test]
+    async fn responds_503_with_a_retry_after_header() {
         let response = service_unavailable(2)
             .into_response(&Cx::default())
+            .await
             .expect("the response builds");
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);

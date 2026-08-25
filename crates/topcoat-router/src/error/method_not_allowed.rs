@@ -1,3 +1,5 @@
+use std::future::ready;
+
 use http::{HeaderValue, Method, StatusCode};
 use topcoat_core::{context::Cx, error::Result};
 
@@ -53,12 +55,12 @@ impl std::fmt::Display for MethodNotAllowedError {
 impl std::error::Error for MethodNotAllowedError {}
 
 impl IntoResponse for MethodNotAllowedError {
-    async fn into_response(self, _cx: &Cx) -> Result<Response> {
+    fn into_response(self, _cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
         let mut response = Response::new(Body::empty());
         *response.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
         if let Ok(allow) = HeaderValue::from_str(&self.allow) {
             response.headers_mut().insert(http::header::ALLOW, allow);
         }
-        Ok(response)
+        ready(Ok(response))
     }
 }

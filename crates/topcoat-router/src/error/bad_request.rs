@@ -79,6 +79,8 @@ impl std::error::Error for BadRequestError {}
 
 impl IntoResponse for BadRequestError {
     async fn into_response(self, cx: &Cx) -> Result<Response> {
-        (StatusCode::BAD_REQUEST, self.to_string()).into_response(cx).await
+        (StatusCode::BAD_REQUEST, self.to_string())
+            .into_response(cx)
+            .await
     }
 }

@@ -1,15 +1,26 @@
 use std::{
+    fmt,
     future::poll_fn,
     pin::{Pin, pin},
     task::{Context, Poll},
 };
 
+use futures_core::Stream;
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::buffer::{ViewBuffer, ViewHandle};
 
+/// The identity of a live region within a rendered view.
+///
+/// Displays as the number that marks the region's boundaries in the HTML.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RegionId(pub(crate) u64);
+
+impl fmt::Display for RegionId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
 
 /// A replacement for the content of a live region, emitted after a view's
 /// first content resolved.
@@ -81,6 +92,29 @@ pub trait ViewExt: View {
         }
     }
 
+    /// Resolves the view's first content and keeps the updates that follow.
+    ///
+    /// The returned handle is self-contained, like the one
+    /// [`first`](ViewExt::first) returns. The stream beside it yields a
+    /// [`Swap`] for every live region that re-renders and ends once the view
+    /// has no further updates.
+    fn live(self, cx: &Cx) -> impl Future<Output = Result<(ViewHandle, Swaps<Self>)>> + Send
+    where
+        Self: Sized,
+    {
+        async move {
+            let mut buffer = ViewBuffer::new();
+            let mut view = Box::pin(self);
+            let content = poll_fn(|task| view.as_mut().poll_first(cx, task, &mut buffer)).await?;
+            let swaps = Swaps {
+                cx: cx.clone(),
+                view,
+                buffer: ViewBuffer::new(),
+            };
+            Ok((content.seal(buffer), swaps))
+        }
+    }
+
     /// Erases the view's concrete type behind a boxed one.
     ///
     /// Every `view!` invocation has its own anonymous type, so a function
@@ -95,6 +129,28 @@ pub trait ViewExt: View {
 }
 
 impl<V: View + ?Sized> ViewExt for V {}
+
+/// The updates a view emits after its first content, returned by
+/// [`ViewExt::live`].
+///
+/// Yields a [`Swap`] for every live region that re-renders and ends once the
+/// view has no further updates.
+pub struct Swaps<V> {
+    cx: Cx,
+    view: Pin<Box<V>>,
+    buffer: ViewBuffer,
+}
+
+impl<V: View> Stream for Swaps<V> {
+    type Item = Result<Swap>;
+
+    fn poll_next(self: Pin<&mut Self>, task: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        this.view
+            .as_mut()
+            .poll_swap(&this.cx, task, &mut this.buffer)
+    }
+}
 
 impl View for () {
     fn poll_first(

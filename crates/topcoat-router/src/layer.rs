@@ -385,7 +385,7 @@ mod tests {
 
         let next = Next::new(&[], Terminal::Route(&route));
         let result = block_on(next.run(&cx, Body::empty()));
-        let response = respond(&cx, result);
+        let response = block_on(respond(&cx, result));
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(&body_bytes(response)[..], b"route");
@@ -400,7 +400,7 @@ mod tests {
 
         let next = Next::new(&[], Terminal::MethodNotAllowed(&endpoint));
         let result = block_on(next.run(&cx, Body::empty()));
-        let response = respond(&cx, result);
+        let response = block_on(respond(&cx, result));
 
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
         // The `Allow` header is built from the endpoint's supported methods.
@@ -441,7 +441,7 @@ mod tests {
 
         let next = Next::new(&layers, Terminal::Route(&route));
         let result = block_on(next.run(&cx, Body::empty()));
-        let response = respond(&cx, result);
+        let response = block_on(respond(&cx, result));
 
         assert_eq!(&body_bytes(response)[..], b"short");
     }

@@ -95,7 +95,9 @@ impl std::error::Error for RedirectError {}
 
 impl IntoResponse for RedirectError {
     async fn into_response(self, cx: &Cx) -> Result<Response> {
-        (self.status, ([(LOCATION, self.location)], ())).into_response(cx).await
+        (self.status, ([(LOCATION, self.location)], ()))
+            .into_response(cx)
+            .await
     }
 }
 
@@ -162,6 +164,8 @@ impl SeeOther {
 
 impl IntoResponse for SeeOther {
     async fn into_response(self, cx: &Cx) -> Result<Response> {
-        (StatusCode::SEE_OTHER, ([(LOCATION, self.location)], ())).into_response(cx).await
+        (StatusCode::SEE_OTHER, ([(LOCATION, self.location)], ()))
+            .into_response(cx)
+            .await
     }
 }
