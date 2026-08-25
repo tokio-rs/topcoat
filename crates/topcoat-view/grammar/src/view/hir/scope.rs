@@ -136,10 +136,9 @@ mod tests {
     }
 
     #[test]
-    fn a_view_without_units_skips_the_join() {
+    fn a_view_without_units_joins_over_unit() {
         let out = rendered(ViewBuilder::new());
-        assert!(!out.contains("Join :: new"));
-        assert!(!out.contains("forward"));
+        assert!(out.contains("JoinView :: new (() , move | __b , () |"));
     }
 
     #[test]
@@ -184,20 +183,19 @@ mod tests {
         builder.expr(ExprKind::Node, quote! { value });
         builder.str_unescaped("</p>");
         let out = rendered(builder);
-        assert!(out.contains("let __expr0 = value"));
-        assert!(out.contains("unit_future (__expr0 , __cx)"));
-        assert!(out.contains("Join :: new"));
-        assert!(out.contains("__join . first () . await ?"));
-        assert!(out.contains("internal :: block"));
+        assert!(
+            out.contains("let __expr0 = :: topcoat_view :: internal :: NodeView :: new (value)")
+        );
+        assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
+        assert!(out.contains("JoinView :: new"));
+        assert!(out.contains("move | __b , (__view0 , ()) |"));
         assert!(out.contains("__b . markup (& \"<p>\")"));
-        assert!(out.contains("Some (__unit_view) = __view0"));
-        assert!(out.contains("__b . view (__unit_view)"));
+        assert!(out.contains("__b . view (__view0)"));
         assert!(out.contains("__b . markup (& \"</p>\")"));
-        assert!(out.contains("forward (__join)"));
     }
 
     #[test]
-    fn if_else_wraps_the_branch_streams_in_either() {
+    fn if_else_wraps_the_branch_views_in_either() {
         let mut builder = ViewBuilder::new();
         builder.if_else(&syn::parse_quote!(cond), |then_branch, else_branch| {
             then_branch.str_unescaped("yes");
@@ -205,22 +203,22 @@ mod tests {
         });
         let out = rendered(builder);
         assert!(out.contains("let __expr0 = if cond"));
-        assert!(out.contains("Either :: Left"));
-        assert!(out.contains("Either :: Right"));
+        assert!(out.contains("EitherView :: left"));
+        assert!(out.contains("EitherView :: right"));
         assert!(out.contains("\"yes\""));
         assert!(out.contains("\"no\""));
-        assert!(out.contains("unit_future (__expr0 , __cx)"));
+        assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
     }
 
     #[test]
-    fn if_without_else_still_emits_an_else_stream() {
+    fn if_without_else_still_emits_an_else_view() {
         let mut builder = ViewBuilder::new();
         builder.if_else(&syn::parse_quote!(cond), |then_branch, _| {
             then_branch.str_unescaped("yes");
         });
         let out = rendered(builder);
         assert!(out.contains("if cond"));
-        assert!(out.contains("Either :: Right"));
+        assert!(out.contains("EitherView :: right"));
     }
 
     #[test]
@@ -231,10 +229,9 @@ mod tests {
         });
         let out = rendered(builder);
         assert!(out.contains("for x in xs"));
-        assert!(out.contains("__iterations . push"));
-        assert!(out.contains("Box :: pin"));
+        assert!(out.contains("__iterations . push (:: topcoat_view :: ViewExt :: boxed"));
         assert!(out.contains("LoopView :: new (__iterations)"));
-        assert!(out.contains("unit_future (__expr0 , __cx)"));
+        assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
     }
 
     #[test]
@@ -256,7 +253,7 @@ mod tests {
         assert!(out.contains("let __expr0 = match v"));
         assert!(out.contains("A =>"));
         assert!(out.contains("B if flag =>"));
-        assert!(out.contains("unit_future (__expr0 , __cx)"));
+        assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
     }
 
     #[test]
@@ -274,8 +271,9 @@ mod tests {
         add_component(&mut builder, "solo");
         builder.str_unescaped("<hr>");
         let out = rendered(builder);
-        assert!(out.contains("Render :: new"));
-        assert!(out.contains("unit_future (__expr0 , __cx)"));
+        assert!(out.contains("let __expr0 = :: topcoat_view :: internal :: ThenView :: new"));
+        assert!(out.contains("Component :: render"));
+        assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
     }
 
     #[test]
@@ -297,11 +295,10 @@ mod tests {
         add_component(&mut builder, "first");
         add_component(&mut builder, "second");
         let out = rendered(builder);
-        assert!(out.contains("unit_future (__expr0 , __cx)"));
-        assert!(out.contains("unit_future (__expr1 , __cx)"));
-        assert!(out.contains("Unit :: new (__unit0)"));
-        assert!(out.contains("Unit :: new (__unit1)"));
-        assert!(out.contains("(__view0 , __view1 ,) = __join . first () . await ?"));
+        assert!(out.contains("JoinUnit :: new (__expr0 , :: topcoat_view :: internal :: JoinUnit :: new (__expr1 , ()))"));
+        assert!(out.contains("move | __b , (__view0 , (__view1 , ())) |"));
+        assert!(out.contains("__b . view (__view0)"));
+        assert!(out.contains("__b . view (__view1)"));
     }
 
     #[test]
@@ -392,9 +389,9 @@ mod tests {
             add_component(body, "item");
         });
         let out = rendered(builder);
-        assert!(out.contains("Box :: pin"));
+        assert!(out.contains("ViewExt :: boxed"));
         assert!(out.contains("LoopView :: new"));
-        assert!(out.contains("Render :: new"));
+        assert!(out.contains("ThenView :: new"));
     }
 
     #[test]
@@ -471,10 +468,10 @@ mod tests {
             });
         });
         let out = rendered(builder);
-        let either = quote! { #topcoat_view::internal::Either }.to_string();
-        assert!(out.contains(&format!("{either} :: Left")));
-        assert!(out.contains(&format!("{either} :: Right ({either} :: Left")));
-        assert!(out.contains(&format!("{either} :: Right ({either} :: Right")));
+        let either = quote! { #topcoat_view::internal::EitherView }.to_string();
+        assert!(out.contains(&format!("{either} :: left")));
+        assert!(out.contains(&format!("{either} :: right ({either} :: left")));
+        assert!(out.contains(&format!("{either} :: right ({either} :: right")));
     }
 
     #[test]
