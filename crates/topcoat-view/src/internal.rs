@@ -39,31 +39,3 @@ pub use loop_view::*;
 pub use move_view::*;
 pub use node_view::*;
 pub use then_view::*;
-
-use crate::{HtmlContext, PartsWriter, ViewBuffer, ViewHandle};
-
-/// Builds a self-contained view handle in one synchronous burst, pushing its
-/// parts through the writer handed to `f`.
-///
-/// Out-of-crate macro expansions use this for values built outside any
-/// template, like the runtime's JavaScript views. The handle owns its
-/// buffer, so it can be spliced into any view later.
-pub fn build_sync(f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
-    let mut buffer = ViewBuffer::new();
-    let handle = buffer.write_block(f);
-    handle.seal(buffer)
-}
-
-/// Runs `f` with the writer switched to `context`, restoring the previous
-/// context afterwards.
-///
-/// Out-of-crate macro expansions use this for compositions that span more
-/// than one position, like the runtime's JavaScript views.
-#[inline]
-pub fn in_context<R>(
-    parts: &mut PartsWriter<'_>,
-    context: HtmlContext,
-    f: impl FnOnce(&mut PartsWriter<'_>) -> R,
-) -> R {
-    parts.in_context(context, f)
-}

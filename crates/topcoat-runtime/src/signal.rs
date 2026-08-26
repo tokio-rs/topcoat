@@ -219,9 +219,25 @@ impl EncodedSignals {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_view::internal::build_sync;
+    use std::{
+        pin::pin,
+        task::{Context, Poll, Waker},
+    };
+
+    use topcoat_view::{ViewExt, internal::NodeView};
 
     use super::*;
+
+    /// Drives a future that never yields to completion.
+    fn block_on<F: Future>(future: F) -> F::Output {
+        let mut future = pin!(future);
+        let mut task = Context::from_waker(Waker::noop());
+        loop {
+            if let Poll::Ready(output) = future.as_mut().poll(&mut task) {
+                return output;
+            }
+        }
+    }
 
     #[test]
     fn payload_cannot_terminate_the_comment() {
@@ -230,8 +246,8 @@ mod tests {
         let signal = Signal::new(String::from("a-->b\"c&d"));
 
         let cx = Cx::default();
-        let view = build_sync(|parts| SignalDeclaration::new(&signal).into_view_parts(&cx, parts));
-        let html = view.render(&cx);
+        let view = NodeView::new(SignalDeclaration::new(&signal));
+        let html = block_on(view.first(&cx)).unwrap().render(&cx);
 
         // The comment context escaped `>`, so the only `-->` left is the
         // marker's own terminator; the payload cannot end the comment early.

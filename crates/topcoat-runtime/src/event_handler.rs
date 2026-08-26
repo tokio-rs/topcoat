@@ -31,11 +31,9 @@ where
 {
     #[inline]
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
-        // The JS view was sealed with an escaping that is valid inside a
-        // double-quoted attribute value.
         Attribute::new(
             (Unescaped::new_unchecked("data-topcoat-on:"), self.key),
-            Unescaped::new_unchecked(self.value.js),
+            self.value.js,
         )
         .into_view_parts(cx, parts);
     }

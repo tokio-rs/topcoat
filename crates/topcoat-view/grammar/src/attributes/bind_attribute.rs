@@ -53,7 +53,7 @@ impl LowerAttribute for BindAttribute {
                     __attrs.insert(
                         __cx,
                         ::std::format!("data-topcoat-bind:{}", __key),
-                        #topcoat_view::Unescaped::new_unchecked(__js),
+                        __js,
                     );
                 }
             },

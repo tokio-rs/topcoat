@@ -26,7 +26,7 @@ mod stmt;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::paths::{topcoat_runtime, topcoat_view};
+use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::expr::name_resolver::NameResolver;
 
@@ -68,14 +68,9 @@ impl Expr {
         let externals = names.externals();
 
         if externals.is_empty() {
-            Ok(quote! {{
-                use #topcoat_runtime::internal::*;
-
-                let __js_view = #topcoat_view::internal::build_sync(|__parts| {
-                    __js(__parts, #js);
-                });
-                #topcoat_runtime::Expr::new(#rust, __js_view)
-            }})
+            Ok(quote! {
+                #topcoat_runtime::Expr::new(#rust, #topcoat_runtime::Js::source(#js))
+            })
         } else {
             let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
             let rust_external_values = externals.iter().map(|binding| {
@@ -95,26 +90,24 @@ impl Expr {
             let mut js_externals = TokenStream::new();
             for (index, binding) in externals.iter().enumerate() {
                 let rust_ident = &binding.rust_ident;
-                quote! { __surrogate(__parts, &#rust_ident); }.to_tokens(&mut js_externals);
+                quote! { .surrogate(&#rust_ident) }.to_tokens(&mut js_externals);
                 if index < externals.len() - 1 {
-                    quote! { __js_unescaped(__parts, ", "); }.to_tokens(&mut js_externals);
+                    quote! { .raw(", ") }.to_tokens(&mut js_externals);
                 }
             }
 
             let js_tail = "]; return ".to_owned() + &js + "; })()";
 
             Ok(quote! {{
-                use #topcoat_runtime::internal::*;
-
                 let (#(#rust_external_idents,)*) = (#(#rust_external_values,)*);
-                // The JS view serializes the surrogates by reference, so it
+                // The source serializes the surrogates by reference, so it
                 // is built before the Rust expression consumes them.
-                let __js_view = #topcoat_view::internal::build_sync(|__parts| {
-                    __js_unescaped(__parts, #js_head);
+                let __js = #topcoat_runtime::Js::builder()
+                    .raw(#js_head)
                     #js_externals
-                    __js(__parts, #js_tail);
-                });
-                #topcoat_runtime::Expr::new(#rust, __js_view)
+                    .source(#js_tail)
+                    .build();
+                #topcoat_runtime::Expr::new(#rust, __js)
             }})
         }
     }

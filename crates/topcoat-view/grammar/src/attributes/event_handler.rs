@@ -118,7 +118,7 @@ impl LowerAttribute for EventHandler {
                             __attrs.insert(
                                 __cx,
                                 ::std::format!("data-topcoat-on:{}", __key),
-                                #topcoat_view::Unescaped::new_unchecked(__js),
+                                __js,
                             );
                         }
                     },
