@@ -1,3 +1,5 @@
+use std::mem;
+
 use topcoat_core::context::Cx;
 
 use crate::{DynViewPart, Formatter, HtmlContext, ViewHandle};
@@ -5,12 +7,24 @@ use crate::{DynViewPart, Formatter, HtmlContext, ViewHandle};
 /// Collects the parts an attribute key or value pushes and turns them into
 /// a [`Captured`] type.
 ///
-/// A single string part is handed over as is; any other combination is
-/// rendered into a `String` when the collector finishes.
+/// The first part is held as pushed, so a key or value made of a single
+/// string is handed over as is. A second part renders both into a `String`
+/// that every part after it appends to, so collecting never allocates more
+/// than that one `String`.
 #[derive(Default)]
 pub(crate) struct AttributeCollector {
-    first: Option<CollectedPart>,
-    rest: Vec<CollectedPart>,
+    state: State,
+}
+
+#[derive(Default)]
+enum State {
+    /// Nothing pushed yet.
+    #[default]
+    Empty,
+    /// The only part pushed so far, held as pushed.
+    Single(CollectedPart),
+    /// Everything pushed so far, rendered.
+    Rendered(String),
 }
 
 impl AttributeCollector {
@@ -20,39 +34,62 @@ impl AttributeCollector {
     }
 
     #[inline]
-    pub(crate) fn push(&mut self, part: CollectedPart) {
-        if self.first.is_none() {
-            self.first = Some(part);
+    pub(crate) fn push(&mut self, cx: &Cx, part: CollectedPart) {
+        if matches!(self.state, State::Empty) {
+            self.state = State::Single(part);
         } else {
-            self.rest.push(part);
+            self.render(cx, |f| part.render(cx, f));
         }
+    }
+
+    /// Pushes borrowed text, copying it only while it is the sole part.
+    #[inline]
+    pub(crate) fn push_str(&mut self, cx: &Cx, value: &str, context: HtmlContext) {
+        if matches!(self.state, State::Empty) {
+            self.state = State::Single(CollectedPart::String {
+                value: value.to_owned(),
+                context,
+            });
+        } else {
+            self.render(cx, |f| context.writer(f).write_str(value));
+        }
+    }
+
+    /// Appends what `write` writes to the rendered form of everything
+    /// pushed so far, rendering a held single part first.
+    fn render(&mut self, cx: &Cx, write: impl FnOnce(&mut Formatter<'_>)) {
+        let mut value = match mem::take(&mut self.state) {
+            State::Empty => String::new(),
+            State::Single(first) => {
+                let mut value = String::new();
+                first.render(cx, &mut Formatter::new(&mut value));
+                value
+            }
+            State::Rendered(value) => value,
+        };
+        write(&mut Formatter::new(&mut value));
+        self.state = State::Rendered(value);
     }
 
     /// Turns the collected parts into a `C`, rendering them with `cx` where
     /// a single string cannot represent them.
     pub(crate) fn finish<C: Captured>(self, cx: &Cx) -> C {
-        let Some(first) = self.first else {
-            return C::empty();
-        };
-        let first = match (first, self.rest.is_empty()) {
-            (CollectedPart::PromotedStr { value, context }, true) => {
-                return C::promoted_str(value, context);
+        match self.state {
+            State::Empty => C::empty(),
+            State::Single(CollectedPart::PromotedStr { value, context }) => {
+                C::promoted_str(value, context)
             }
-            (CollectedPart::StaticStr { value, context }, true) => {
-                return C::static_str(value, context);
+            State::Single(CollectedPart::StaticStr { value, context }) => {
+                C::static_str(value, context)
             }
-            (CollectedPart::String { value, context }, true) => {
-                return C::string(value, context);
+            State::Single(CollectedPart::String { value, context }) => C::string(value, context),
+            State::Single(part) => {
+                let mut value = String::new();
+                part.render(cx, &mut Formatter::new(&mut value));
+                C::string(value, HtmlContext::Unescaped)
             }
-            (first, _) => first,
-        };
-        let mut value = String::new();
-        let mut f = Formatter::new(&mut value);
-        first.render(cx, &mut f);
-        for part in self.rest {
-            part.render(cx, &mut f);
+            State::Rendered(value) => C::string(value, HtmlContext::Unescaped),
         }
-        C::string(value, HtmlContext::Unescaped)
     }
 }
 

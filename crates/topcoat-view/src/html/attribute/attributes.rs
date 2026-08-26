@@ -83,14 +83,14 @@ impl Attributes {
         let mut collector = AttributeCollector::new();
         k.into_view_parts(
             cx,
-            &mut PartsWriter::collecting(&mut collector, HtmlContext::AttributeKey),
+            &mut PartsWriter::collecting(&mut collector, cx, HtmlContext::AttributeKey),
         );
         let key = collector.finish(cx);
         let value = if v.attribute_present() {
             let mut collector = AttributeCollector::new();
             v.into_view_parts(
                 cx,
-                &mut PartsWriter::collecting(&mut collector, HtmlContext::AttributeValue),
+                &mut PartsWriter::collecting(&mut collector, cx, HtmlContext::AttributeValue),
             );
             collector.finish(cx)
         } else {

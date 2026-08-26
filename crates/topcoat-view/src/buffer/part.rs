@@ -87,9 +87,13 @@ impl<'a> PartsWriter<'a> {
     /// Creates a writer sealing for `context` whose pushes are collected
     /// into `collector` instead of a buffer.
     #[inline]
-    pub(crate) fn collecting(collector: &'a mut AttributeCollector, context: HtmlContext) -> Self {
+    pub(crate) fn collecting(
+        collector: &'a mut AttributeCollector,
+        cx: &'a Cx,
+        context: HtmlContext,
+    ) -> Self {
         Self {
-            sink: Sink::Collector(collector),
+            sink: Sink::Collector { collector, cx },
             context,
             size_hint: 0,
         }
@@ -327,7 +331,7 @@ macro_rules! impl_sink_primitive {
         fn $method(&mut self, value: $ty) {
             match self {
                 Self::Buffer(buffer) => buffer.$method(value),
-                Self::Collector(collector) => collector.push($part(value)),
+                Self::Collector { collector, cx } => collector.push(cx, $part(value)),
             }
         }
     };
@@ -337,8 +341,12 @@ macro_rules! impl_sink_primitive {
 enum Sink<'a> {
     /// The instruction buffer of a view under construction.
     Buffer(&'a mut ViewBuffer),
-    /// The collector capturing one attribute key or value.
-    Collector(&'a mut AttributeCollector),
+    /// The collector capturing one attribute key or value, with the
+    /// context it renders parts under.
+    Collector {
+        collector: &'a mut AttributeCollector,
+        cx: &'a Cx,
+    },
 }
 
 impl Sink<'_> {
@@ -346,10 +354,7 @@ impl Sink<'_> {
     fn push_str(&mut self, value: &str, context: HtmlContext) {
         match self {
             Self::Buffer(buffer) => buffer.push_str(value, context),
-            Self::Collector(collector) => collector.push(CollectedPart::String {
-                value: value.to_owned(),
-                context,
-            }),
+            Self::Collector { collector, cx } => collector.push_str(cx, value, context),
         }
     }
 
@@ -357,8 +362,8 @@ impl Sink<'_> {
     fn push_static_str(&mut self, value: &'static str, context: HtmlContext) {
         match self {
             Self::Buffer(buffer) => buffer.push_static_str(value, context),
-            Self::Collector(collector) => {
-                collector.push(CollectedPart::StaticStr { value, context });
+            Self::Collector { collector, cx } => {
+                collector.push(cx, CollectedPart::StaticStr { value, context });
             }
         }
     }
@@ -367,8 +372,8 @@ impl Sink<'_> {
     fn push_promoted_str(&mut self, value: &'static &'static str, context: HtmlContext) {
         match self {
             Self::Buffer(buffer) => buffer.push_promoted_str(value, context),
-            Self::Collector(collector) => {
-                collector.push(CollectedPart::PromotedStr { value, context });
+            Self::Collector { collector, cx } => {
+                collector.push(cx, CollectedPart::PromotedStr { value, context });
             }
         }
     }
@@ -377,8 +382,8 @@ impl Sink<'_> {
     fn push_string(&mut self, value: String, context: HtmlContext) {
         match self {
             Self::Buffer(buffer) => buffer.push_string(value, context),
-            Self::Collector(collector) => {
-                collector.push(CollectedPart::String { value, context });
+            Self::Collector { collector, cx } => {
+                collector.push(cx, CollectedPart::String { value, context });
             }
         }
     }
@@ -387,8 +392,8 @@ impl Sink<'_> {
     fn push_char(&mut self, value: char, context: HtmlContext) {
         match self {
             Self::Buffer(buffer) => buffer.push_char(value, context),
-            Self::Collector(collector) => {
-                collector.push(CollectedPart::Char { value, context });
+            Self::Collector { collector, cx } => {
+                collector.push(cx, CollectedPart::Char { value, context });
             }
         }
     }
@@ -421,8 +426,8 @@ impl Sink<'_> {
     fn push_dyn(&mut self, part: Box<dyn DynViewPart>, context: HtmlContext) {
         match self {
             Self::Buffer(buffer) => buffer.push_dyn(part, context),
-            Self::Collector(collector) => {
-                collector.push(CollectedPart::Dyn { part, context });
+            Self::Collector { collector, cx } => {
+                collector.push(cx, CollectedPart::Dyn { part, context });
             }
         }
     }
@@ -431,7 +436,7 @@ impl Sink<'_> {
     fn push_view(&mut self, handle: ViewHandle) {
         match self {
             Self::Buffer(buffer) => buffer.push_view(handle),
-            Self::Collector(collector) => collector.push(CollectedPart::View(handle)),
+            Self::Collector { collector, cx } => collector.push(cx, CollectedPart::View(handle)),
         }
     }
 
