@@ -5,15 +5,28 @@ use std::{
 
 use bytes::Bytes;
 use futures_core::Stream;
+use http::{HeaderMap, StatusCode};
 use http_body::Frame;
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::{BoxView, Swaps, View, ViewExt, internal::MoveView};
+use topcoat_view::{BoxView, Swaps, View, ViewExt, ViewHandle, internal::MoveView};
 
 use crate::{
     Body, BoxError,
     content::Html,
     response::{AsyncIntoResponse, IntoResponse, Response},
 };
+
+/// Replies with the rendered content as an HTML page, carrying the status
+/// code and headers declared in it.
+///
+/// A handle holds a view's first content only, so nothing streams after the
+/// page.
+impl IntoResponse for ViewHandle {
+    fn into_response(self, cx: &Cx) -> Result<Response> {
+        let rendered = self.render_response(cx);
+        html_response(cx, rendered.html, rendered.status_code, rendered.headers)
+    }
+}
 
 /// Replies with the view's first content as an HTML page, then streams the
 /// updates its live regions emit down the still-open body.
@@ -47,11 +60,22 @@ async fn stream<V: View + 'static>(view: V, cx: &Cx) -> Result<Response> {
         first: Some(rendered.html),
         swaps,
     };
-    let mut response = Html(Body::new(body)).into_response(cx)?;
-    if let Some(status_code) = rendered.status_code {
+    html_response(cx, Body::new(body), rendered.status_code, rendered.headers)
+}
+
+/// Builds an HTML response around `body`, applying the status code and
+/// headers a view declared.
+fn html_response(
+    cx: &Cx,
+    body: impl Into<Body>,
+    status_code: Option<StatusCode>,
+    headers: HeaderMap,
+) -> Result<Response> {
+    let mut response = Html(body.into()).into_response(cx)?;
+    if let Some(status_code) = status_code {
         *response.status_mut() = status_code;
     }
-    response.headers_mut().extend(rendered.headers);
+    response.headers_mut().extend(headers);
     Ok(response)
 }
 
@@ -92,5 +116,67 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::header::{CONTENT_TYPE, HeaderName, HeaderValue};
+    use topcoat::view::view;
+    use topcoat_core::context::CxTestBuilder;
+
+    use super::*;
+    use crate::to_bytes;
+
+    #[tokio::test]
+    async fn view_handle_responds_with_its_html() {
+        let cx = CxTestBuilder::new().build();
+        let handle = view! { cx => <p>"hello"</p> }.first(&cx).await.unwrap();
+
+        let response = handle.into_response(&cx).unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(body, "<p>hello</p>");
+    }
+
+    #[tokio::test]
+    async fn view_handle_applies_declared_status_and_headers() {
+        let cx = CxTestBuilder::new().build();
+        let handle = view! { cx =>
+            (StatusCode::NOT_FOUND)
+            ((HeaderName::from_static("x-custom"), HeaderValue::from_static("yes")))
+            <p>"missing"</p>
+        }
+        .first(&cx)
+        .await
+        .unwrap();
+
+        let response = handle.into_response(&cx).unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(response.headers().get("x-custom").unwrap(), "yes");
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(body, "<p>missing</p>");
+    }
+
+    #[tokio::test]
+    async fn boxed_view_streams_its_first_content() {
+        let cx = CxTestBuilder::new().build();
+        let view = view! { cx =>
+            (StatusCode::CREATED)
+            <p>"streamed"</p>
+        }
+        .boxed();
+
+        let response = view.async_into_response(&cx).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(body, "<p>streamed</p>");
     }
 }

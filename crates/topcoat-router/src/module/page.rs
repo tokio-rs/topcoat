@@ -1,5 +1,4 @@
 use topcoat_core::context::Cx;
-
 use topcoat_view::BoxView;
 
 use crate::{Body, Layout, Methods, Page, Path, PathBuf, RouteId, Slot, route};

@@ -6,12 +6,11 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
 
+use super::Builder;
 use crate::{
     Swap, View,
     buffer::{ViewBuffer, ViewHandle},
 };
-
-use super::Builder;
 
 pin_project! {
     /// A template as a [`View`]: its dynamic node positions driven
