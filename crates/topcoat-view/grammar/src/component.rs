@@ -131,29 +131,57 @@ impl ToTokens for Component {
                 .into_iter()
                 .map(GenericParam::Type),
         );
-        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+        let (impl_generics, _, where_clause) = generics.split_for_impl();
 
-        let phantom_args = generics
+        // Lifetimes belong to the props alone: `Component::Props` is generic
+        // over a single lifetime, and every lifetime the props borrow maps
+        // onto it. The marker only carries the type and const parameters.
+        let mut marker_generics = generics.clone();
+        marker_generics.params = generics
+            .params
+            .iter()
+            .filter(|param| !matches!(param, GenericParam::Lifetime(_)))
+            .cloned()
+            .collect();
+        let (marker_impl_generics, marker_ty_generics, _) = marker_generics.split_for_impl();
+        let props_args = generics
+            .params
+            .iter()
+            .map(|param| match param {
+                GenericParam::Lifetime(_) => quote! { '__props },
+                GenericParam::Type(param) => {
+                    let ident = &param.ident;
+                    quote! { #ident }
+                }
+                GenericParam::Const(param) => {
+                    let ident = &param.ident;
+                    quote! { #ident }
+                }
+            })
+            .collect::<Vec<_>>();
+        let props_ty = if props_args.is_empty() {
+            quote! { #props_ident }
+        } else {
+            quote! { #props_ident<#(#props_args),*> }
+        };
+
+        let phantom_args = marker_generics
             .params
             .iter()
             .filter_map(|param| match param {
-                GenericParam::Lifetime(param) => {
-                    let lifetime = &param.lifetime;
-                    Some(quote! { &#lifetime () })
-                }
                 GenericParam::Type(param) => {
                     let ident = &param.ident;
                     Some(quote! { #ident })
                 }
-                GenericParam::Const(_) => None,
+                GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
             })
             .collect::<Vec<_>>();
 
-        // A lifetime or type parameter must appear in the body, so generic
-        // markers carry a `PhantomData` field. Markers with no such parameters
-        // are emitted as unit structs, which makes the marker's bare name a
-        // value (`combobox_content`) rather than a tuple-struct constructor,
-        // letting callers pass it directly, e.g. `router.shard(combobox_content)`.
+        // A type parameter must appear in the body, so generic markers carry
+        // a `PhantomData` field. Markers with no such parameters are emitted
+        // as unit structs, which makes the marker's bare name a value
+        // (`combobox_content`) rather than a tuple-struct constructor, letting
+        // callers pass it directly, e.g. `router.shard(combobox_content)`.
         let (marker_body, default_value) = if phantom_args.is_empty() {
             (quote! { #where_clause; }, quote! { Self })
         } else {
@@ -169,7 +197,7 @@ impl ToTokens for Component {
 
         quote_spanned! {ident.span()=>
             #[allow(non_camel_case_types)]
-            #vis struct #ident #impl_generics #marker_body
+            #vis struct #ident #marker_impl_generics #marker_body
         }
         .to_tokens(tokens);
 
@@ -183,18 +211,19 @@ impl ToTokens for Component {
         let render = if self.attr.boxed() {
             quote! {
                 #[allow(refining_impl_trait)]
-                fn render<'__cx>(
+                fn render<'__cx, '__props>(
                     self,
                     cx: &'__cx #topcoat_context::Cx,
-                    props: Self::Props,
+                    props: Self::Props<'__props>,
                 ) -> ::core::pin::Pin<::std::boxed::Box<
                     dyn ::core::future::Future<Output = #return_ty>
                         + ::core::marker::Send
                         + '__cx,
                 >>
                 where
+                    '__props: '__cx,
                     Self: '__cx,
-                    Self::Props: '__cx,
+                    Self::Props<'__props>: '__cx,
                 {
                     ::std::boxed::Box::pin(async move {
                         #item
@@ -204,14 +233,15 @@ impl ToTokens for Component {
             }
         } else {
             quote! {
-                fn render<'__cx>(
+                fn render<'__cx, '__props>(
                     self,
                     cx: &'__cx #topcoat_context::Cx,
-                    props: Self::Props,
+                    props: Self::Props<'__props>,
                 ) -> impl Future<Output = #return_ty> + ::core::marker::Send + '__cx
                 where
+                    '__props: '__cx,
                     Self: '__cx,
-                    Self::Props: '__cx,
+                    Self::Props<'__props>: '__cx,
                 {
                     #item
                     #ident(cx, #(#args),*)
@@ -220,15 +250,15 @@ impl ToTokens for Component {
         };
 
         quote! {
-            impl #impl_generics ::core::default::Default for #ident #ty_generics #where_clause {
+            impl #marker_impl_generics ::core::default::Default for #ident #marker_ty_generics #where_clause {
                 #[inline]
                 fn default() -> Self {
                     #default_value
                 }
             }
 
-            impl #impl_generics #topcoat_view::Component for #ident #ty_generics #where_clause {
-                type Props = #props_ident #ty_generics;
+            impl #marker_impl_generics #topcoat_view::Component for #ident #marker_ty_generics #where_clause {
+                type Props<'__props> = #props_ty;
 
                 #render
             }

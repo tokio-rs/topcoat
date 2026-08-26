@@ -27,7 +27,7 @@ async fn inner() -> Result<impl View> {
 #[page("/composed")]
 async fn composed() -> Result<impl View> {
     let content = view! { <p>"content"</p> };
-    Ok(view! { shell(slot: Ok(content)) })
+    Ok(view! { shell(slot: Slot::new(content)) })
 }
 
 #[tokio::test]

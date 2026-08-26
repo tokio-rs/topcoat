@@ -3,10 +3,17 @@ use topcoat_core::{context::Cx, error::Result};
 use crate::{Props, View};
 
 pub trait Component {
-    type Props: Props;
+    /// The component's props, generic over the lifetime of anything they
+    /// borrow: a [`Child`](crate::Child), a `&str`, or another reference the
+    /// caller hands in.
+    ///
+    /// The lifetime lives here rather than on the implementing type so that a
+    /// component borrowing its props is still a plain unit struct, usable by
+    /// its bare name wherever a value is expected.
+    type Props<'a>: Props;
 
     #[must_use]
-    fn props_builder() -> <Self::Props as Props>::Builder {
+    fn props_builder<'a>() -> <Self::Props<'a> as Props>::Builder {
         Self::Props::builder()
     }
 
@@ -14,12 +21,13 @@ pub trait Component {
     ///
     /// The returned future is the component's body; the [`View`] it resolves
     /// to may borrow `cx` and the props.
-    fn render<'cx>(
+    fn render<'cx, 'a>(
         self,
         cx: &'cx Cx,
-        props: Self::Props,
+        props: Self::Props<'a>,
     ) -> impl Future<Output = Result<impl View + 'cx>> + Send + 'cx
     where
+        'a: 'cx,
         Self: 'cx,
-        Self::Props: 'cx;
+        Self::Props<'a>: 'cx;
 }
