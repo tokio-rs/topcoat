@@ -1,3 +1,5 @@
+use topcoat::view::ViewExt;
+
 #[tokio::test]
 async fn attributes_macro_builds_runtime_attributes() {
     let cx = &topcoat::context::Cx::default();
@@ -55,8 +57,8 @@ async fn spread_inserts_attribute_fragment_into_element() {
 
     let cx = &Cx::default();
     let attrs = topcoat::view::attributes! { cx => type="submit" };
-    let result: topcoat::Result = view! { cx => <button (attrs)>"Save"</button> };
-    let html = result.unwrap().render(cx);
+    let result = view! { cx => <button (attrs)>"Save"</button> };
+    let html = result.first(cx).await.unwrap().render(cx);
 
     assert_eq!(html, r#"<button type="submit">Save</button>"#);
 }
@@ -67,8 +69,8 @@ async fn spread_follows_other_attributes() {
 
     let cx = &Cx::default();
     let attrs = topcoat::view::attributes! { cx => type="submit" };
-    let result: topcoat::Result = view! { cx => <button class="btn" (attrs)>"Save"</button> };
-    let html = result.unwrap().render(cx);
+    let result = view! { cx => <button class="btn" (attrs)>"Save"</button> };
+    let html = result.first(cx).await.unwrap().render(cx);
 
     assert!(html.contains(r#"class="btn""#));
     assert!(html.contains(r#"type="submit""#));
@@ -95,8 +97,8 @@ async fn spread_merges_within_attributes_macro() {
     assert!(merged.contains_key("type"));
 
     // The spread's keys replace earlier ones, so `class` renders as `btn`.
-    let result: topcoat::Result = view! { cx => <div (merged)></div> };
-    let html = result.unwrap().render(cx);
+    let result = view! { cx => <div (merged)></div> };
+    let html = result.first(cx).await.unwrap().render(cx);
     assert!(html.contains(r#"class="btn""#));
     assert!(!html.contains(r#"class="card""#));
 }

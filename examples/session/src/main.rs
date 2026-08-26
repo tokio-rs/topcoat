@@ -10,13 +10,13 @@ use topcoat::{
     context::{Cx, app_context},
     cookie::RouterBuilderCookieExt,
     router::{
-        Router, RouterBuilderDiscoverExt,
+        Router, RouterBuilderDiscoverExt, Slot,
         content::Form,
         error::{SeeOther, see_other},
         href, layout, page, route,
     },
     session::{self, RouterBuilderSessionExt, SessionConfig, TokenHash},
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -36,22 +36,22 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(slot: Result) -> Result {
-    view! {
+async fn root(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
                 <title>"Sessions"</title>
                 topcoat::dev::script()
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
-    }
+    })
 }
 
 #[page("/")]
-async fn page(cx: &Cx) -> Result {
-    view! {
+async fn page(cx: &Cx) -> Result<impl View> {
+    Ok(view! {
         if let Some(user) = current_user(cx).await? {
             <div>
                 "currently logged in as: "
@@ -67,7 +67,7 @@ async fn page(cx: &Cx) -> Result {
                 <button>"log in"</button>
             </form>
         }
-    }
+    })
 }
 
 // --- API routes -------------------------------------------------------------

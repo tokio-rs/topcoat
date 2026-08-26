@@ -5,8 +5,8 @@ use topcoat::{
     Result,
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset},
     context::{Cx, app_context},
-    router::{Compression, Router, layout, page},
-    view::view,
+    router::{Compression, Router, Slot, layout, page},
+    view::{View, view},
 };
 
 use crate::{
@@ -27,8 +27,8 @@ pub fn router() -> Router {
 }
 
 #[layout]
-async fn root_layout(slot: Result) -> Result {
-    view! {
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html lang="en">
             <head>
@@ -39,16 +39,16 @@ async fn root_layout(slot: Result) -> Result {
             </head>
             <body class="flex min-h-screen flex-col bg-slate-50 text-slate-900">
                 site_nav()
-                <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-8">(slot?)</main>
+                <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-8">(slot)</main>
                 site_footer()
             </body>
         </html>
-    }
+    })
 }
 
 #[page]
-async fn home(cx: &Cx) -> Result {
-    view! {
+async fn home(cx: &Cx) -> Result<impl View> {
+    Ok(view! {
         <section class="rounded-2xl bg-indigo-600 px-8 py-16 text-white">
             <h1 class="max-w-2xl text-4xl font-bold tracking-tight">
                 "Gear that earns its place on your desk"
@@ -79,5 +79,5 @@ async fn home(cx: &Cx) -> Result {
                 }
             </div>
         </section>
-    }
+    })
 }

@@ -5,7 +5,7 @@ use syn::{
     ext::IdentExt,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::topcoat_mail;
+use topcoat_core_grammar::paths::{topcoat_mail, topcoat_view};
 
 use crate::mail::FieldValue;
 
@@ -64,9 +64,21 @@ impl MailField {
         match value {
             FieldValue::Html(html) => {
                 let view = &html.view;
+                // The view resolves to its first content here, against the
+                // named context when the body leads with `cx =>` and the
+                // ambient `__cx` otherwise.
+                let cx = view.cx.as_ref().map_or_else(
+                    || quote! { __cx },
+                    |leading| {
+                        let cx = &leading.cx;
+                        quote! { &(#cx).clone() }
+                    },
+                );
                 quote! {
                     let __html = #view;
-                    let __builder = __builder.#method(__html?);
+                    let __builder = __builder.#method(
+                        #topcoat_view::ViewExt::first(__html, #cx).await?,
+                    );
                 }
             }
             FieldValue::Expr(value) => match self.name().as_str() {

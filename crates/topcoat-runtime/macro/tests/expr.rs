@@ -5,7 +5,11 @@
 //! interface to the browser runtime: nothing maps it on the way out, so a
 //! rename on one side alone would fail only in the browser, at click time.
 
-use topcoat::{context::Cx, runtime::procedure, view::view};
+use topcoat::{
+    context::Cx,
+    runtime::procedure,
+    view::{ViewExt, view},
+};
 
 #[tokio::test]
 async fn toggle_reaches_the_generated_javascript() {
@@ -16,6 +20,8 @@ async fn toggle_reaches_the_generated_javascript() {
 
         <button @click=$(|_e| open.toggle())>"x"</button>
     }
+    .first(cx)
+    .await
     .unwrap()
     .render(cx);
 
@@ -32,6 +38,8 @@ async fn increment_and_decrement_reach_the_generated_javascript() {
         <button @click=$(|_e| count.increment())>"+"</button>
         <button @click=$(|_e| count.decrement())>"-"</button>
     }
+    .first(cx)
+    .await
     .unwrap()
     .render(cx);
 
@@ -48,6 +56,8 @@ async fn push_str_reaches_the_generated_javascript_with_its_argument() {
 
         <button @click=$(|_e| name.push_str("!"))>"x"</button>
     }
+    .first(cx)
+    .await
     .unwrap()
     .render(cx);
 
@@ -74,6 +84,8 @@ async fn procedure_call_inside_if_is_an_async_func() {
             "Test"
         </button>
     }
+    .first(cx)
+    .await
     .unwrap()
     .render(cx);
 
@@ -98,6 +110,8 @@ async fn procedure_call_inside_block_is_an_async_func() {
             "Test"
         </button>
     }
+    .first(cx)
+    .await
     .unwrap()
     .render(cx);
 
@@ -122,6 +136,8 @@ async fn push_str_accepts_the_owned_string_from_an_event() {
             @input=$(|e: topcoat::runtime::Event| { message.push_str(e.target.value) })
         >
     }
+    .first(cx)
+    .await
     .unwrap()
     .render(cx);
 

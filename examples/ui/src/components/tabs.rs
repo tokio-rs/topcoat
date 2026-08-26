@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, View, class, component, view},
+    view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
 /// A tabs component: one panel at a time out of several, picked by the row of
@@ -33,12 +33,15 @@ use topcoat::{
 /// }
 /// ```
 #[component]
-pub async fn tabs(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn tabs(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div class=(class!("flex flex-col gap-4", attrs.remove("class"))) (attrs)>
             (child)
         </div>
-    }
+    })
 }
 
 /// The row of triggers at the top of a [`tabs`].
@@ -46,8 +49,11 @@ pub async fn tabs(#[default] mut attrs: Attributes, #[default] child: View) -> R
 /// The triggers sit in a rail, the same one a toggle group uses, so a set of
 /// tabs reads as one control rather than as loose links.
 #[component]
-pub async fn tabs_list(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn tabs_list(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div
             class=(class!(
                 "inline-flex w-fit items-center gap-1 rounded-lg border border-border p-1 \
@@ -58,7 +64,7 @@ pub async fn tabs_list(#[default] mut attrs: Attributes, #[default] child: View)
         >
             (child)
         </div>
-    }
+    })
 }
 
 /// The classes for a [`tabs_trigger`].
@@ -88,15 +94,15 @@ pub async fn tabs_trigger(
     mut attrs: Attributes,
     /// The trigger's label.
     #[default]
-    child: View,
-) -> Result {
+    child: Child<'_>,
+) -> Result<impl View> {
     let state = if active {
         "bg-foreground/10 text-foreground"
     } else {
         "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
     };
 
-    view! {
+    Ok(view! {
         <a
             aria-current=(active.then_some("page"))
             class=(class!(TRIGGER, state, attrs.remove("class")))
@@ -104,7 +110,7 @@ pub async fn tabs_trigger(
         >
             (child)
         </a>
-    }
+    })
 }
 
 /// The panel of the [`tabs_trigger`] on show.
@@ -112,6 +118,9 @@ pub async fn tabs_trigger(
 /// Only the panel being shown is rendered, so there is one of these on the
 /// page at a time and it needs no state of its own.
 #[component]
-pub async fn tabs_content(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! { <div class=(attrs.remove("class")) (attrs)>(child)</div> }
+pub async fn tabs_content(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! { <div class=(attrs.remove("class")) (attrs)>(child)</div> })
 }

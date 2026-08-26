@@ -20,3 +20,11 @@ impl<'a> Child<'a> {
         }
     }
 }
+
+/// No child content: renders nothing, like a component invoked without
+/// children.
+impl Default for Child<'_> {
+    fn default() -> Self {
+        Self::new(())
+    }
+}

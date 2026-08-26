@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, View, class, component, view},
+    view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`label`] element.
@@ -32,6 +32,11 @@ const LABEL: StaticClass = class!(
 /// }
 /// ```
 #[component]
-pub async fn label(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! { <label class=(class!(LABEL, attrs.remove("class"))) (attrs)>(child)</label> }
+pub async fn label(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
+        <label class=(class!(LABEL, attrs.remove("class"))) (attrs)>(child)</label>
+    })
 }

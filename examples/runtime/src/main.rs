@@ -5,8 +5,8 @@ use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
     context::Cx,
-    router::{RouterBuilderDiscoverExt, error::redirect, href, layout, module_router, page},
-    view::view,
+    router::{RouterBuilderDiscoverExt, Slot, error::redirect, href, layout, module_router, page},
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -22,13 +22,13 @@ async fn main() {
 }
 
 #[page]
-async fn page(cx: &Cx) -> Result {
+async fn page(cx: &Cx) -> Result<()> {
     Err(redirect(href!(counter::page).resolve(cx)).into())
 }
 
 #[layout]
-async fn layout(slot: Result) -> Result {
-    view! {
+async fn layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -47,8 +47,8 @@ async fn layout(slot: Result) -> Result {
                 <hr>
                 <br>
 
-                (slot?)
+                (slot)
             </body>
         </html>
-    }
+    })
 }

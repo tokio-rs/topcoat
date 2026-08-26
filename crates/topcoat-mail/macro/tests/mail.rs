@@ -21,6 +21,7 @@ async fn empty_body_builds_a_default_mail() -> Result<()> {
 
 #[tokio::test]
 async fn collects_every_field() -> Result<()> {
+    let cx = Cx::default();
     let mail = mail! {
         from: Mailbox::named("Ada", "ada@example.com")?,
         to: [Mailbox::new("bob@example.com")?, Mailbox::new("grace@example.com")?],
@@ -28,7 +29,7 @@ async fn collects_every_field() -> Result<()> {
         bcc: [Mailbox::new("dan@example.com")?],
         reply_to: Mailbox::new("replies@example.com")?,
         subject: "Analytical engines",
-        html: { <p>"The engine weaves algebraic patterns."</p> },
+        html: { cx => <p>"The engine weaves algebraic patterns."</p> },
         text: "The engine weaves algebraic patterns.",
         attachments: [Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")],
         headers: [("List-Unsubscribe", "<mailto:stop@example.com>")],

@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, View, attributes, component, view},
+    view::{Attributes, Child, View, attributes, component, view},
 };
 
 use super::dialog::dialog;
@@ -51,9 +51,9 @@ pub async fn alert_dialog(
     attrs: Attributes,
     /// The alert dialog's content.
     #[default]
-    child: View,
-) -> Result {
-    view! {
+    child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         dialog(open: open, attrs: attributes! { role="alertdialog" (attrs) }, (child))
-    }
+    })
 }

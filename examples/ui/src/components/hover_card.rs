@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, View, class, component, view},
+    view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
 /// A hover card component: a card of detail about its trigger, shown while
@@ -28,15 +28,18 @@ use topcoat::{
 /// }
 /// ```
 #[component]
-pub async fn hover_card(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn hover_card(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <span
             class=(class!("group relative inline-flex", attrs.remove("class")))
             (attrs)
         >
             (child)
         </span>
-    }
+    })
 }
 
 /// The classes for the [`hover_card_content`] panel.
@@ -63,14 +66,14 @@ const PANEL: StaticClass = class!(
 #[component]
 pub async fn hover_card_content(
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <span
             class=(class!("flex flex-col gap-2", PANEL, attrs.remove("class")))
             (attrs)
         >
             (child)
         </span>
-    }
+    })
 }

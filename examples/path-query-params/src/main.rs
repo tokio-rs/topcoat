@@ -1,8 +1,10 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Router, RouterBuilderDiscoverExt, href, layout, page, path_param, query_params},
-    view::view,
+    router::{
+        Router, RouterBuilderDiscoverExt, Slot, href, layout, page, path_param, query_params,
+    },
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -15,21 +17,21 @@ async fn main() {
 // --- Layout -----------------------------------------------------------------
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    view! {
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>topcoat::dev::script()</head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
-    }
+    })
 }
 
 // --- Home -------------------------------------------------------------------
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <h1>"Path and query params"</h1>
         <ul>
             // `href` builds the URL from the page it points at: `query` adds
@@ -46,7 +48,7 @@ async fn home() -> Result {
                 </a>
             </li>
         </ul>
-    }
+    })
 }
 
 // --- Query params -----------------------------------------------------------
@@ -59,10 +61,10 @@ struct PostsQuery {
 }
 
 #[page("/posts")]
-async fn posts(cx: &Cx) -> Result {
+async fn posts(cx: &Cx) -> Result<impl View> {
     let query = query_params::<PostsQuery>(cx)?;
 
-    view! {
+    Ok(view! {
         <h1>"Posts"</h1>
         <p>
             "page: "
@@ -73,7 +75,7 @@ async fn posts(cx: &Cx) -> Result {
             (query.q.as_deref().unwrap_or("all"))
         </p>
         <p><a href=(href!(home))>"back home"</a></p>
-    }
+    })
 }
 
 // --- Path params ------------------------------------------------------------
@@ -85,17 +87,17 @@ path_param!(
 );
 
 #[page("/posts/{post_id}")]
-async fn post(cx: &Cx) -> Result {
+async fn post(cx: &Cx) -> Result<impl View> {
     let post_id = path_param::<PostId>(cx)?;
 
-    view! {
+    Ok(view! {
         <h1>
             "Post "
             (post_id)
         </h1>
         <p>"parsed from the {post_id} path segment"</p>
         <p><a href=(href!(posts).query([("page", 1)]))>"all posts"</a></p>
-    }
+    })
 }
 
 // --- Catch-all params -------------------------------------------------------
@@ -105,8 +107,8 @@ async fn post(cx: &Cx) -> Result {
 path_param!(*doc_path);
 
 #[page("/docs/{*doc_path}")]
-async fn document(cx: &Cx) -> Result {
-    view! {
+async fn document(cx: &Cx) -> Result<impl View> {
+    Ok(view! {
         <h1>"Documentation path"</h1>
         <ul>
             for segment in path_param::<DocPath>(cx) {
@@ -114,5 +116,5 @@ async fn document(cx: &Cx) -> Result {
             }
         </ul>
         <p><a href=(href!(home))>"back home"</a></p>
-    }
+    })
 }

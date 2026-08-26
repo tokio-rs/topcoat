@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, View, class, component, view},
+    view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`textarea`] control.
@@ -32,10 +32,13 @@ const TEXTAREA: StaticClass = class!(
 /// }
 /// ```
 #[component]
-pub async fn textarea(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn textarea(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <textarea class=(class!(TEXTAREA, attrs.remove("class"))) (attrs)>
             (child)
         </textarea>
-    }
+    })
 }

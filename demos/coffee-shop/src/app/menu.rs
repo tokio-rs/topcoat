@@ -5,7 +5,7 @@ use topcoat::{
     context::Cx,
     router::{href, page},
     runtime::{Event, shard},
-    view::{attributes, component, view},
+    view::{View, attributes, component, view},
 };
 
 use crate::{
@@ -20,8 +20,8 @@ use crate::{
 
 // The `menu` module adds a URL segment: this page renders at /menu.
 #[page]
-pub async fn page() -> Result {
-    view! {
+pub async fn page() -> Result<impl View> {
+    Ok(view! {
         // The signal lives in the browser; typing filters without a reload.
         signal query = String::new();
 
@@ -49,12 +49,12 @@ pub async fn page() -> Result {
 
         // The shard renders again on the server whenever `query` changes.
         <div class="mt-6">drink_grid(query: $(query.get()))</div>
-    }
+    })
 }
 
 /// The drinks matching the search, rendered on the server.
 #[shard]
-async fn drink_grid(cx: &Cx, query: String) -> Result {
+async fn drink_grid(cx: &Cx, query: String) -> Result<impl View> {
     // The query comes from the client, so treat it as untrusted input.
     let needle = query.trim().to_lowercase();
 
@@ -64,7 +64,7 @@ async fn drink_grid(cx: &Cx, query: String) -> Result {
         .filter(|drink| drink.name.to_lowercase().contains(&needle))
         .collect();
 
-    view! {
+    Ok(view! {
         if matches.is_empty() {
             <p class="text-muted-foreground">
                 "Nothing matches. The barista suggests an espresso."
@@ -76,13 +76,13 @@ async fn drink_grid(cx: &Cx, query: String) -> Result {
                 }
             </div>
         }
-    }
+    })
 }
 
 /// One menu entry, linking to the drink's page.
 #[component]
-async fn drink_card(drink: &Drink) -> Result {
-    view! {
+async fn drink_card(drink: &Drink) -> Result<impl View> {
+    Ok(view! {
         <a href=(href!(drink::page, drink::Slug(&drink.slug)))>
             card(
                 // The grid stretches every cell to the row height; the card
@@ -105,17 +105,17 @@ async fn drink_card(drink: &Drink) -> Result {
                 )
             )
         </a>
-    }
+    })
 }
 
 /// The roast as a badge; each profile gets its own weight.
 #[component]
-async fn roast_badge(roast: Roast) -> Result {
-    view! {
+async fn roast_badge(roast: Roast) -> Result<impl View> {
+    Ok(view! {
         match roast {
             Roast::Light => badge(variant: BadgeVariant::Outline, "Light roast"),
             Roast::Medium => badge(variant: BadgeVariant::Secondary, "Medium roast"),
             Roast::Dark => badge(variant: BadgeVariant::Primary, "Dark roast"),
         }
-    }
+    })
 }

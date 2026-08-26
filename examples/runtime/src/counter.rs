@@ -1,8 +1,12 @@
-use topcoat::{Result, router::page, view::view};
+use topcoat::{
+    Result,
+    router::page,
+    view::{View, view},
+};
 
 #[page]
-pub async fn page() -> Result {
-    view! {
+pub async fn page() -> Result<impl View> {
+    Ok(view! {
         // The signal lives in the browser; the handlers below update it.
         signal count = 0.0;
 
@@ -15,5 +19,5 @@ pub async fn page() -> Result {
 
         // Renders again whenever the signal changes.
         $(count.get())
-    }
+    })
 }

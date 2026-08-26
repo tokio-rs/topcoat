@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     icon::{IconData, icon, iconify},
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::{svg::ViewBox, view},
+    view::{View, svg::ViewBox, view},
 };
 
 // An icon is an SVG view box plus its body. `currentColor` is what makes it
@@ -24,8 +24,8 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -60,5 +60,5 @@ async fn home() -> Result {
                 </p>
             </body>
         </html>
-    }
+    })
 }

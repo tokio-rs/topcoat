@@ -87,9 +87,19 @@ impl ViewBuffer {
         cx: &Cx,
         f: impl FnOnce(&mut Builder<'_, '_, '_>),
     ) -> ViewHandle {
+        self.write_block(|parts| f(&mut Builder::new(cx, parts)))
+    }
+
+    /// Appends one view's instruction block in one synchronous burst,
+    /// filled by `f` through the writer directly.
+    ///
+    /// The writer counterpart of [`block`](Self::block), for compositions
+    /// that push through the writer instead of a [`Builder`], like the
+    /// runtime's JavaScript views.
+    pub(crate) fn write_block(&mut self, f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
         let entry = self.next_ptr();
         let mut parts = PartsWriter::new(self, HtmlContext::Text);
-        f(&mut Builder::new(cx, &mut parts));
+        f(&mut parts);
         let size_hint = parts.size_hint();
         self.push_ret();
         ViewHandle::from_scope(self.id, entry, size_hint)

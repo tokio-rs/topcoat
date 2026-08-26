@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{Router, error::RouterErrorExt, page, query_params},
-    view::view,
+    view::{View, view},
 };
 
 mod common;
@@ -16,14 +16,14 @@ struct PostsQuery {
 }
 
 #[page("/posts")]
-async fn posts(cx: &Cx) -> Result {
+async fn posts(cx: &Cx) -> Result<impl View> {
     let query = query_params::<PostsQuery>(cx).ok_or_bad_request("invalid query string")?;
-    view! {
+    Ok(view! {
         "page="
         (query.page.unwrap_or(1).to_string())
         " q="
         (query.q.as_deref().unwrap_or("all"))
-    }
+    })
 }
 
 // `error = ...` declares the response for a failed parse on the struct
@@ -34,12 +34,12 @@ struct SearchQuery {
 }
 
 #[page("/search")]
-async fn search(cx: &Cx) -> Result {
+async fn search(cx: &Cx) -> Result<impl View> {
     let query = query_params::<SearchQuery>(cx)?;
-    view! {
+    Ok(view! {
         "limit="
         (query.limit)
-    }
+    })
 }
 
 // `error = redirect("?")` reloads the page with the query string cleared.
@@ -49,12 +49,12 @@ struct FilterQuery {
 }
 
 #[page("/filter")]
-async fn filter(cx: &Cx) -> Result {
+async fn filter(cx: &Cx) -> Result<impl View> {
     let query = query_params::<FilterQuery>(cx)?;
-    view! {
+    Ok(view! {
         "min="
         (query.min.unwrap_or(0))
-    }
+    })
 }
 
 #[tokio::test]

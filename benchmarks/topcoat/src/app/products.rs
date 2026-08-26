@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{page, query_params},
-    view::{StaticClass, class, view},
+    view::{StaticClass, View, class, view},
 };
 
 use crate::{
@@ -35,14 +35,14 @@ struct ProductsQuery {
 }
 
 #[page]
-async fn products(cx: &Cx) -> Result {
+async fn products(cx: &Cx) -> Result<impl View> {
     let query = query_params::<ProductsQuery>(cx)?;
     let catalog = app_context::<Catalog>(cx);
     let sort = normalize_sort(query.sort.as_deref());
     let category = query.category.as_deref();
     let page = catalog.page(query.page.unwrap_or(1), sort, category);
 
-    view! {
+    Ok(view! {
         <div class="flex flex-wrap items-baseline justify-between gap-4">
             <h1 class="text-3xl font-bold tracking-tight">"All products"</h1>
             <p class="text-sm text-slate-500">
@@ -95,5 +95,5 @@ async fn products(cx: &Cx) -> Result {
                 category: category
             )
         }
-    }
+    })
 }

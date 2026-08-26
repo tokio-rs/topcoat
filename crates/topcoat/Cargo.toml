@@ -19,7 +19,7 @@ default = [
 	"font",
 	"icon",
 	"router",
-	# "runtime", // TODO!
+	"runtime",
 	"serve",
 	"session",
 	"view",

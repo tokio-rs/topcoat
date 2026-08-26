@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`skeleton`] placeholder.
@@ -28,6 +28,6 @@ const SKELETON: StaticClass = class!("animate-pulse rounded-md bg-foreground/10"
 /// }
 /// ```
 #[component]
-pub async fn skeleton(#[default] mut attrs: Attributes) -> Result {
-    view! { <div class=(class!(SKELETON, attrs.remove("class"))) (attrs)></div> }
+pub async fn skeleton(#[default] mut attrs: Attributes) -> Result<impl View> {
+    Ok(view! { <div class=(class!(SKELETON, attrs.remove("class"))) (attrs)></div> })
 }

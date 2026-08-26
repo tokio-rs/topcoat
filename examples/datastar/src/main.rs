@@ -10,7 +10,7 @@ use topcoat::{
         content::sse::{Event, Sse},
         href, page, route,
     },
-    view::view,
+    view::{View, ViewExt, view},
 };
 
 #[tokio::main]
@@ -21,10 +21,10 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
+async fn home() -> Result<impl View> {
     // Datastar keeps the counter in the browser and sends it along with every
     // action request.
-    view! {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -52,7 +52,7 @@ async fn home() -> Result {
                 <ol id="log"></ol>
             </body>
         </html>
-    }
+    })
 }
 
 // Matches the signals declared by the page.
@@ -73,7 +73,9 @@ async fn increment(
             "Counted to "
             (count)
         </li>
-    }?;
+    }
+    .first(cx)
+    .await?;
 
     // One event updates the counter signal, the other appends the log entry.
     let events = stream::iter([

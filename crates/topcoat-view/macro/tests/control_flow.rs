@@ -1,7 +1,11 @@
-use topcoat::{context::Cx, view::view};
+use topcoat::{
+    context::Cx,
+    view::{View, ViewExt, view},
+};
 
-fn r(v: topcoat::Result) -> String {
-    v.unwrap().render(&Cx::default())
+async fn r(v: impl View) -> String {
+    let cx = Cx::default();
+    v.first(&cx).await.unwrap().render(&cx)
 }
 
 #[tokio::test]
@@ -15,7 +19,8 @@ async fn if_true_branch_emits_its_body() {
         } else {
             <a href="/login">"Sign in"</a>
         }
-    });
+    })
+    .await;
 
     assert_eq!(html, r#"<a href="/account">Account</a>"#);
 }
@@ -31,7 +36,8 @@ async fn if_false_branch_emits_else_body() {
         } else {
             <a href="/login">"Sign in"</a>
         }
-    });
+    })
+    .await;
 
     assert_eq!(html, r#"<a href="/login">Sign in</a>"#);
 }
@@ -47,7 +53,8 @@ async fn if_without_else_emits_nothing_on_false() {
                 <p>"shown"</p>
             }
         </div>
-    });
+    })
+    .await;
 
     assert_eq!(html, "<div></div>");
 }
@@ -65,7 +72,8 @@ async fn if_else_if_else_chain_selects_first_match() {
         } else {
             <p>"many"</p>
         }
-    });
+    })
+    .await;
 
     assert_eq!(html, "<p>one</p>");
 }
@@ -85,7 +93,8 @@ async fn if_in_attribute_list_adds_branch_attributes() {
         >
             "Posts"
         </a>
-    });
+    })
+    .await;
 
     assert!(html.contains(r#"href="/posts""#));
     assert!(html.contains(r#"aria-current="page""#));
@@ -103,7 +112,8 @@ async fn for_loop_renders_body_per_item() {
                 <li>(title)</li>
             }
         </ul>
-    });
+    })
+    .await;
 
     assert_eq!(html, "<ul><li>alpha</li><li>beta</li><li>gamma</li></ul>");
 }
@@ -119,7 +129,8 @@ async fn for_loop_in_attribute_list_emits_attributes_per_item() {
                 (name)=(value)
             }
         ></div>
-    });
+    })
+    .await;
 
     assert!(html.contains(r#"data-a="1""#));
     assert!(html.contains(r#"data-b="2""#));
@@ -138,7 +149,8 @@ async fn for_loop_filtering_with_if_emits_subset() {
                 }
             }
         </ul>
-    });
+    })
+    .await;
 
     assert_eq!(html, "<ul><li>keep</li><li>keep</li></ul>");
 }
@@ -161,7 +173,8 @@ async fn match_chooses_arm_body() {
             Status::Published => <a href="/post">"open"</a>,
             Status::Archived => <span>"archived"</span>,
         }
-    });
+    })
+    .await;
 
     assert_eq!(html, r#"<a href="/post">open</a>"#);
 }
@@ -179,7 +192,8 @@ async fn match_arm_with_block_emits_multiple_siblings() {
             }
             None => <a href="/login">"sign in"</a>,
         }
-    });
+    })
+    .await;
 
     assert_eq!(html, "<h1>ada</h1><p>signed in</p>");
 }
@@ -197,7 +211,8 @@ async fn match_in_attribute_list_emits_attribute_per_arm() {
                 Status::Archived => class="archived",
             }
         ></article>
-    });
+    })
+    .await;
 
     assert_eq!(html, r#"<article class="draft"></article>"#);
 }
@@ -213,7 +228,8 @@ async fn local_binding_introduces_variable_for_following_nodes() {
             <h1>(title)</h1>
             <p>(title)</p>
         </article>
-    });
+    })
+    .await;
 
     assert_eq!(html, "<article><h1>Hello</h1><p>Hello</p></article>");
 }
@@ -236,7 +252,8 @@ async fn local_binding_initializer_accepts_low_precedence_operators() {
             <p>(ratio)</p>
             <p>(range.len())</p>
         </article>
-    });
+    })
+    .await;
 
     assert_eq!(
         html,
@@ -250,7 +267,8 @@ async fn local_binding_in_attribute_list_is_in_scope_for_later_attributes() {
     let html = r(view! {
         cx =>
         <a let href = "/posts"; href=(href) data-href=(href)>"Posts"</a>
-    });
+    })
+    .await;
 
     assert!(html.contains(r#"href="/posts""#));
     assert!(html.contains(r#"data-href="/posts""#));

@@ -147,7 +147,8 @@ mod tests {
     #[tokio::test]
     async fn view_handle_applies_declared_status_and_headers() {
         let cx = CxTestBuilder::new().build();
-        let handle = view! { cx =>
+        let handle = view! {
+            cx =>
             (StatusCode::NOT_FOUND)
             ((HeaderName::from_static("x-custom"), HeaderValue::from_static("yes")))
             <p>"missing"</p>
@@ -167,7 +168,8 @@ mod tests {
     #[tokio::test]
     async fn boxed_view_streams_its_first_content() {
         let cx = CxTestBuilder::new().build();
-        let view = view! { cx =>
+        let view = view! {
+            cx =>
             (StatusCode::CREATED)
             <p>"streamed"</p>
         }

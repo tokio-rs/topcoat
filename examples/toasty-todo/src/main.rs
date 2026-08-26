@@ -4,12 +4,12 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{
-        Router, RouterBuilderDiscoverExt,
+        Router, RouterBuilderDiscoverExt, Slot,
         content::Form,
         error::{SeeOther, see_other},
         href, layout, page, path_param, route,
     },
-    view::{component, view},
+    view::{View, component, view},
 };
 
 #[tokio::main]
@@ -47,22 +47,22 @@ struct Todo {
 }
 
 #[layout("/")]
-async fn root(slot: Result) -> Result {
-    view! {
+async fn root(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
                 <title>"Toasty Todos"</title>
                 topcoat::dev::script()
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
-    }
+    })
 }
 
 #[page("/")]
-async fn home(cx: &Cx) -> Result {
-    view! {
+async fn home(cx: &Cx) -> Result<impl View> {
+    Ok(view! {
         <h1>"Toasty Todos"</h1>
 
         <form method="post" action=(href!(create))>
@@ -98,27 +98,27 @@ async fn home(cx: &Cx) -> Result {
                 }
             </ul>
         }
-    }
+    })
 }
 
 // --- Components -------------------------------------------------------------
 
 #[component]
-async fn toggle_checkbox(todo: &Todo) -> Result {
-    view! {
+async fn toggle_checkbox(todo: &Todo) -> Result<impl View> {
+    Ok(view! {
         <form method="post" action=(href!(toggle, TodoId(todo.id)))>
             <input type="checkbox" checked=(todo.done) onchange="this.form.submit()">
         </form>
-    }
+    })
 }
 
 #[component]
-async fn delete_button(todo: &Todo) -> Result {
-    view! {
+async fn delete_button(todo: &Todo) -> Result<impl View> {
+    Ok(view! {
         <form method="post" action=(href!(delete, TodoId(todo.id)))>
             <button type="submit">"delete"</button>
         </form>
-    }
+    })
 }
 
 // --- Routes -----------------------------------------------------------------

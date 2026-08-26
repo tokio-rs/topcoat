@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, View, class, component, view},
+    view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
 /// The visual style of an [`alert`].
@@ -71,23 +71,26 @@ pub async fn alert(
     mut attrs: Attributes,
     /// The alert's icon, title, and description.
     #[default]
-    child: View,
-) -> Result {
+    child: Child<'_>,
+) -> Result<impl View> {
     // `role="alert"` is deliberately absent: it interrupts a screen reader
     // the moment the element appears, which suits a message arriving during
     // the visit, not one rendered with the page. Pass it among the `attrs`
     // where that is what you want.
-    view! {
+    Ok(view! {
         <div class=(class!(BASE, variant.classes(), attrs.remove("class"))) (attrs)>
             (child)
         </div>
-    }
+    })
 }
 
 /// The heading of an [`alert`], one line saying what happened.
 #[component]
-pub async fn alert_title(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn alert_title(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <p
             class=(class!(
                 "col-start-2 font-medium tracking-tight",
@@ -97,14 +100,17 @@ pub async fn alert_title(#[default] mut attrs: Attributes, #[default] child: Vie
         >
             (child)
         </p>
-    }
+    })
 }
 
 /// The supporting text under an [`alert_title`], with the detail and what to
 /// do about it.
 #[component]
-pub async fn alert_description(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn alert_description(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div
             class=(class!(
                 "col-start-2 text-sm text-muted-foreground",
@@ -114,5 +120,5 @@ pub async fn alert_description(#[default] mut attrs: Attributes, #[default] chil
         >
             (child)
         </div>
-    }
+    })
 }

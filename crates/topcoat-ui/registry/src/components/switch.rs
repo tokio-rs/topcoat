@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The classes for the native `<input type="checkbox">` serving as the
@@ -44,11 +44,11 @@ const THUMB: StaticClass = class!(
 /// }
 /// ```
 #[component]
-pub async fn switch(#[default] mut attrs: Attributes) -> Result {
+pub async fn switch(#[default] mut attrs: Attributes) -> Result<impl View> {
     // The thumb cannot be drawn by the `<input>` itself, which renders no
     // children or pseudo-elements: it is a sibling overlaid on the track,
     // slid to the far end by the input's `peer` state while checked.
-    view! {
+    Ok(view! {
         <span
             class=(class!(
                 "relative inline-flex shrink-0 has-[:disabled]:opacity-50",
@@ -58,5 +58,5 @@ pub async fn switch(#[default] mut attrs: Attributes) -> Result {
             <input type="checkbox" role="switch" class=(SWITCH) (attrs)>
             <span class=(THUMB)></span>
         </span>
-    }
+    })
 }

@@ -103,17 +103,21 @@ impl ToTokens for Shard {
         // value usable directly in `router.shard(...)`.
         let marker = quote! {
             #[#topcoat_view_macro::component]
-            #vis async fn #ident(#component_params) -> #topcoat_error::Result<#topcoat_view::View> {
+            #vis async fn #ident(#component_params) -> #topcoat_error::Result<impl #topcoat_view::View> {
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
-                let __placeholder = #ident::handler(__cx, #(#call_args),*).await?;
+                let __placeholder = #topcoat_view::ViewExt::first(
+                    #ident::handler(__cx, #(#call_args),*).await?,
+                    __cx,
+                )
+                .await?;
                 let __scope = #topcoat_runtime::ReactiveScope::new(
                     #topcoat_runtime::ShardId::new(#id),
                     ::std::vec![#(#js_idents),*],
                     __placeholder,
                 );
-                #topcoat_view_macro::view! { (__scope) }
+                #topcoat_error::Result::Ok(#topcoat_view_macro::view! { (__scope) })
             }
         };
 
@@ -152,7 +156,7 @@ impl ToTokens for Shard {
                         let (#(#value_idents,)*) =
                             #topcoat_runtime::Surrogate::into_real(__args);
                         let __view = #ident::handler(cx, #(#call_args),*).await?;
-                        #topcoat_error::Result::Ok(__view)
+                        #topcoat_error::Result::Ok(#topcoat_view::ViewExt::first(__view, cx).await?)
                     })
                 }
             }

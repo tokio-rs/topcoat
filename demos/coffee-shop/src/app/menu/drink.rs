@@ -3,7 +3,7 @@ use topcoat::{
     context::Cx,
     router::{error::RouterErrorExt, href, page, path_param},
     runtime::{Event, procedure},
-    view::{attributes, view},
+    view::{View, attributes, view},
 };
 
 use super::roast_badge;
@@ -18,7 +18,7 @@ use crate::{
 path_param!(pub slug);
 
 #[page]
-pub async fn page(cx: &Cx) -> Result {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     let slug = path_param::<Slug>(cx);
 
     let drink = Drink::filter_by_slug(slug)
@@ -31,7 +31,7 @@ pub async fn page(cx: &Cx) -> Result {
     let name = drink.name.clone();
     let price = drink.price;
 
-    view! {
+    Ok(view! {
         signal quantity = 1.0;
         signal confirmation = String::new();
 
@@ -99,7 +99,7 @@ pub async fn page(cx: &Cx) -> Result {
                 $(confirmation.get())
             </p>
         </div>
-    }
+    })
 }
 
 // The arguments come from the client, so a real application would validate

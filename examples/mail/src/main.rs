@@ -4,12 +4,12 @@ use topcoat::{
     context::Cx,
     mail::{Attachment, FileTransport, MailConfig, RouterBuilderMailExt, mail, send},
     router::{
-        Router, RouterBuilderDiscoverExt,
+        Router, RouterBuilderDiscoverExt, Slot,
         content::Form,
         error::{SeeOther, see_other},
         href, layout, page, route,
     },
-    view::view,
+    view::{View, view},
 };
 
 const OUTBOX: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/outbox");
@@ -29,22 +29,22 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(slot: Result) -> Result {
-    view! {
+async fn root(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
                 <title>"Mail"</title>
                 topcoat::dev::script()
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
-    }
+    })
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <h1>"Send a welcome mail"</h1>
 
         <form method="POST" action=(href!(send_welcome))>
@@ -55,7 +55,7 @@ async fn home() -> Result {
 
         <p>"Nothing leaves the machine: the mail is written to a file."</p>
         <a href=(href!(sent))>"Outbox"</a>
-    }
+    })
 }
 
 #[derive(Deserialize)]
@@ -117,10 +117,10 @@ async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> Result<SeeOt
 }
 
 #[page("/sent")]
-async fn sent() -> Result {
+async fn sent() -> Result<impl View> {
     let files = outbox()?;
 
-    view! {
+    Ok(view! {
         <h1>"Outbox"</h1>
 
         <p>
@@ -137,7 +137,7 @@ async fn sent() -> Result {
         </ul>
 
         <a href=(href!(home))>"Send another"</a>
-    }
+    })
 }
 
 fn outbox() -> Result<Vec<String>> {

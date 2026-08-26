@@ -4,7 +4,7 @@ use topcoat::{
     context::Cx,
     cookie::{CookieStore, Cookies, Key, RouterBuilderCookieExt, cookie_store, signed_cookies},
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -47,11 +47,11 @@ fn visits(cx: &Cx) -> CookieStore<Visits, impl Cookies> {
 }
 
 #[page("/")]
-async fn home(cx: &Cx) -> Result {
+async fn home(cx: &Cx) -> Result<impl View> {
     // `commit` queues the updated value as a Set-Cookie response header.
     let visits = visits(cx).update(Visits::increment).commit()?;
 
-    view! {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -66,5 +66,5 @@ async fn home(cx: &Cx) -> Result {
                 </p>
             </body>
         </html>
-    }
+    })
 }

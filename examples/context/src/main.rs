@@ -5,7 +5,7 @@ use topcoat::{
         Router, RouterBuilderDiscoverExt, page,
         request::{headers, uri},
     },
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -27,9 +27,9 @@ fn user_agent(cx: &Cx) -> &str {
 }
 
 #[page("/")]
-async fn home(cx: &Cx) -> Result {
+async fn home(cx: &Cx) -> Result<impl View> {
     // `Cx` carries the current request and can be passed to plain functions.
-    view! {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -50,5 +50,5 @@ async fn home(cx: &Cx) -> Result {
                 </p>
             </body>
         </html>
-    }
+    })
 }

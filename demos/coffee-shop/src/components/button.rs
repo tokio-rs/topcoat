@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, Class, StaticClass, View, class, component, view},
+    view::{Attributes, Child, Class, StaticClass, View, class, component, view},
 };
 
 /// The visual style of a [`button`].
@@ -148,9 +148,9 @@ pub async fn button(
     #[default] variant: ButtonVariant,
     #[default] size: ButtonSize,
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <button
             class=(class!(
                 BASE,
@@ -162,5 +162,5 @@ pub async fn button(
         >
             (child)
         </button>
-    }
+    })
 }

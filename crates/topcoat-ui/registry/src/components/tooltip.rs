@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, View, class, component, view},
+    view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
 /// A tooltip component: a hint that shows while its trigger is hovered or
@@ -29,15 +29,18 @@ use topcoat::{
 /// }
 /// ```
 #[component]
-pub async fn tooltip(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn tooltip(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <span
             class=(class!("group relative inline-flex", attrs.remove("class")))
             (attrs)
         >
             (child)
         </span>
-    }
+    })
 }
 
 /// The classes for the [`tooltip_content`] bubble.
@@ -65,10 +68,13 @@ const BUBBLE: StaticClass = class!(
 
 /// The hint a [`tooltip`] shows, in a bubble above its trigger.
 #[component]
-pub async fn tooltip_content(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn tooltip_content(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <span role="tooltip" class=(class!(BUBBLE, attrs.remove("class"))) (attrs)>
             (child)
         </span>
-    }
+    })
 }

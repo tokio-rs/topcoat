@@ -4,7 +4,7 @@ use tokio::{sync::Barrier, time::timeout};
 use topcoat::{
     Result,
     context::Cx,
-    view::{View, component, view},
+    view::{Child, View, ViewExt, component, view},
 };
 
 // `view!` lowers component calls to expressions that reference `__cx`. In real
@@ -20,9 +20,9 @@ fn empty_cx() -> Cx {
 /// when all of them render concurrently; sequential renders deadlock and trip
 /// the test's timeout.
 #[component]
-async fn meet(barrier: &Barrier, label: &str) -> Result {
+async fn meet(barrier: &Barrier, label: &str) -> Result<impl View> {
     barrier.wait().await;
-    view! { <i>(label)</i> }
+    Ok(view! { <i>(label)</i> })
 }
 
 /// Runs `fut`, failing instead of hanging when the expected concurrency
@@ -39,7 +39,7 @@ async fn sibling_components_render_concurrently_in_source_order() {
         let cx = empty_cx();
         let __cx = &cx;
         let barrier = Barrier::new(2);
-        let result: Result = view! {
+        let result = view! {
             <p>
                 meet(barrier: &barrier, label: "a")
                 "-"
@@ -47,7 +47,10 @@ async fn sibling_components_render_concurrently_in_source_order() {
             </p>
         };
 
-        assert_eq!(result.unwrap().render(__cx), "<p><i>a</i>-<i>b</i></p>");
+        assert_eq!(
+            result.first(__cx).await.unwrap().render(__cx),
+            "<p><i>a</i>-<i>b</i></p>"
+        );
     })
     .await;
 }
@@ -58,7 +61,7 @@ async fn loop_iterations_render_concurrently_in_iteration_order() {
         let cx = empty_cx();
         let __cx = &cx;
         let barrier = Barrier::new(3);
-        let result: Result = view! {
+        let result = view! {
             <ul>
                 for label in ["a", "b", "c"] {
                     <li>meet(barrier: &barrier, label: label)</li>
@@ -67,7 +70,7 @@ async fn loop_iterations_render_concurrently_in_iteration_order() {
         };
 
         assert_eq!(
-            result.unwrap().render(__cx),
+            result.first(__cx).await.unwrap().render(__cx),
             "<ul><li><i>a</i></li><li><i>b</i></li><li><i>c</i></li></ul>",
         );
     })
@@ -80,7 +83,7 @@ async fn taken_if_branch_renders_concurrently_with_siblings() {
         let cx = empty_cx();
         let __cx = &cx;
         let barrier = Barrier::new(2);
-        let result: Result = view! {
+        let result = view! {
             meet(barrier: &barrier, label: "always")
             if 1 + 1 == 2 {
                 meet(barrier: &barrier, label: "sometimes")
@@ -88,7 +91,7 @@ async fn taken_if_branch_renders_concurrently_with_siblings() {
         };
 
         assert_eq!(
-            result.unwrap().render(__cx),
+            result.first(__cx).await.unwrap().render(__cx),
             "<i>always</i><i>sometimes</i>"
         );
     })
@@ -102,7 +105,7 @@ async fn taken_match_arm_renders_concurrently_with_siblings() {
         let __cx = &cx;
         let barrier = Barrier::new(2);
         let choice = 1_u8;
-        let result: Result = view! {
+        let result = view! {
             meet(barrier: &barrier, label: "always")
             match choice {
                 0 => {
@@ -117,14 +120,17 @@ async fn taken_match_arm_renders_concurrently_with_siblings() {
             }
         };
 
-        assert_eq!(result.unwrap().render(__cx), "<i>always</i><i>one</i>");
+        assert_eq!(
+            result.first(__cx).await.unwrap().render(__cx),
+            "<i>always</i><i>one</i>"
+        );
     })
     .await;
 }
 
 #[component]
-async fn wrapper(child: View) -> Result {
-    view! { <div>(child)</div> }
+async fn wrapper(child: Child<'_>) -> Result<impl View> {
+    Ok(view! { <div>(child)</div> })
 }
 
 #[tokio::test]
@@ -133,13 +139,13 @@ async fn child_views_render_concurrently_with_their_parents_siblings() {
         let cx = empty_cx();
         let __cx = &cx;
         let barrier = Barrier::new(2);
-        let result: Result = view! {
+        let result = view! {
             meet(barrier: &barrier, label: "sibling")
             wrapper(meet(barrier: &barrier, label: "inner"))
         };
 
         assert_eq!(
-            result.unwrap().render(__cx),
+            result.first(__cx).await.unwrap().render(__cx),
             "<i>sibling</i><div><i>inner</i></div>",
         );
     })
@@ -148,9 +154,9 @@ async fn child_views_render_concurrently_with_their_parents_siblings() {
 
 /// Wraps its child once every party has arrived at the barrier.
 #[component]
-async fn meet_wrapper(barrier: &Barrier, child: View) -> Result {
+async fn meet_wrapper(barrier: &Barrier, child: Child<'_>) -> Result<impl View> {
     barrier.wait().await;
-    view! { <div>(child)</div> }
+    Ok(view! { <div>(child)</div> })
 }
 
 #[tokio::test]
@@ -159,11 +165,14 @@ async fn a_component_renders_concurrently_with_its_own_child() {
         let cx = empty_cx();
         let __cx = &cx;
         let barrier = Barrier::new(2);
-        let result: Result = view! {
+        let result = view! {
             meet_wrapper(barrier: &barrier, meet(barrier: &barrier, label: "inner"))
         };
 
-        assert_eq!(result.unwrap().render(__cx), "<div><i>inner</i></div>");
+        assert_eq!(
+            result.first(__cx).await.unwrap().render(__cx),
+            "<div><i>inner</i></div>"
+        );
     })
     .await;
 }
@@ -177,7 +186,7 @@ async fn nested_components_render_concurrently_at_every_depth() {
         let cx = empty_cx();
         let __cx = &cx;
         let barrier = Barrier::new(3);
-        let result: Result = view! {
+        let result = view! {
             meet_wrapper(
                 barrier: &barrier,
                 meet_wrapper(barrier: &barrier, meet(barrier: &barrier, label: "deep"))
@@ -185,7 +194,7 @@ async fn nested_components_render_concurrently_at_every_depth() {
         };
 
         assert_eq!(
-            result.unwrap().render(__cx),
+            result.first(__cx).await.unwrap().render(__cx),
             "<div><div><i>deep</i></div></div>",
         );
     })
@@ -193,22 +202,25 @@ async fn nested_components_render_concurrently_at_every_depth() {
 }
 
 #[component]
-async fn echo(text: &str) -> Result {
-    view! { <b>(text)</b> }
+async fn echo(text: &str) -> Result<impl View> {
+    Ok(view! { <b>(text)</b> })
 }
 
 #[tokio::test]
 async fn joined_components_still_read_earlier_local_bindings() {
     let cx = empty_cx();
     let __cx = &cx;
-    let result: Result = view! {
+    let result = view! {
         let greeting = "hello";
         echo(text: greeting)
         let farewell = "goodbye";
         echo(text: farewell)
     };
 
-    assert_eq!(result.unwrap().render(__cx), "<b>hello</b><b>goodbye</b>",);
+    assert_eq!(
+        result.first(__cx).await.unwrap().render(__cx),
+        "<b>hello</b><b>goodbye</b>",
+    );
 }
 
 #[tokio::test]
@@ -217,7 +229,7 @@ async fn concurrent_loop_interleaves_static_markup_in_order() {
         let cx = empty_cx();
         let __cx = &cx;
         let barrier = Barrier::new(2);
-        let result: Result = view! {
+        let result = view! {
             <ol>
                 for (index, label) in ["a", "b"].into_iter().enumerate() {
                     <li value=(index + 1)>
@@ -229,7 +241,7 @@ async fn concurrent_loop_interleaves_static_markup_in_order() {
         };
 
         assert_eq!(
-            result.unwrap().render(__cx),
+            result.first(__cx).await.unwrap().render(__cx),
             "<ol><li value=\"1\"><i>a</i>A</li><li value=\"2\"><i>b</i>B</li></ol>",
         );
     })
@@ -244,7 +256,7 @@ async fn taken_branches_carry_their_pattern_bindings_to_the_join() {
         let barrier = Barrier::new(2);
         let first = Some("one");
         let second = Some("two");
-        let result: Result = view! {
+        let result = view! {
             if let Some(label) = first {
                 meet(barrier: &barrier, label: label)
             }
@@ -253,7 +265,10 @@ async fn taken_branches_carry_their_pattern_bindings_to_the_join() {
             }
         };
 
-        assert_eq!(result.unwrap().render(__cx), "<i>one</i><i>two</i>");
+        assert_eq!(
+            result.first(__cx).await.unwrap().render(__cx),
+            "<i>one</i><i>two</i>"
+        );
     })
     .await;
 }
@@ -263,7 +278,7 @@ async fn taken_match_arms_carry_their_pattern_bindings_to_the_join() {
     let cx = empty_cx();
     let __cx = &cx;
     let choice = Some(String::from("picked"));
-    let result: Result = view! {
+    let result = view! {
         echo(text: "always")
         match choice {
             Some(text) => {
@@ -275,7 +290,10 @@ async fn taken_match_arms_carry_their_pattern_bindings_to_the_join() {
         }
     };
 
-    assert_eq!(result.unwrap().render(__cx), "<b>always</b><b>picked</b>");
+    assert_eq!(
+        result.first(__cx).await.unwrap().render(__cx),
+        "<b>always</b><b>picked</b>"
+    );
 }
 
 #[tokio::test]
@@ -283,12 +301,15 @@ async fn a_binding_borrowed_from_an_outer_value_lives_until_the_join() {
     let cx = empty_cx();
     let __cx = &cx;
     let name = Some(String::from("borrowed"));
-    let result: Result = view! {
+    let result = view! {
         echo(text: "always")
         if let Some(name) = &name {
             echo(text: name)
         }
     };
 
-    assert_eq!(result.unwrap().render(__cx), "<b>always</b><b>borrowed</b>");
+    assert_eq!(
+        result.first(__cx).await.unwrap().render(__cx),
+        "<b>always</b><b>borrowed</b>"
+    );
 }

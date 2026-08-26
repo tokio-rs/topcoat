@@ -26,7 +26,7 @@ use criterion::{
 use topcoat::{
     Result,
     context::Cx,
-    view::{View, component, view},
+    view::{View, ViewExt, ViewHandle, component, view},
 };
 
 /// Drives a future to completion on the current thread.
@@ -46,7 +46,12 @@ fn block_on<F: Future>(future: F) -> F::Output {
 
 /// Times `view.render(cx)` and reports throughput as the rendered byte length,
 /// so the report shows bytes per second alongside per-render latency.
-fn measure(group: &mut BenchmarkGroup<'_, WallTime>, id: impl Into<String>, cx: &Cx, view: &View) {
+fn measure(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    id: impl Into<String>,
+    cx: &Cx,
+    view: &ViewHandle,
+) {
     group.throughput(Throughput::Bytes(view.clone().render(cx).len() as u64));
     group.bench_function(id.into(), |b| {
         b.iter_batched(
@@ -64,8 +69,9 @@ fn measure(group: &mut BenchmarkGroup<'_, WallTime>, id: impl Into<String>, cx: 
 /// A page made entirely of static markup: no interpolation, no escaping, no
 /// control flow. Isolates the cost of emitting literal HTML and growing the
 /// output buffer, which is the fast path the renderer takes most often.
-async fn static_page() -> Result {
-    view! {
+fn static_page(cx: &Cx) -> Result<impl View> {
+    Ok(view! {
+        cx =>
         <!DOCTYPE html>
         <html lang="en">
             <head>
@@ -170,7 +176,7 @@ async fn static_page() -> Result {
                 </footer>
             </body>
         </html>
-    }
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -181,8 +187,8 @@ async fn static_page() -> Result {
 /// with HTML-significant characters (`<`, `>`, `&`, quotes), so this scenario
 /// exercises the escaping path in the formatter rather than the bulk copy of
 /// safe runs.
-async fn comment_feed(cx: &Cx, comments: &[String]) -> Result {
-    view! {
+fn comment_feed(cx: &Cx, comments: &[String]) -> Result<impl View> {
+    Ok(view! {
         cx =>
         <ul class="space-y-4">
             for comment in comments {
@@ -193,7 +199,7 @@ async fn comment_feed(cx: &Cx, comments: &[String]) -> Result {
                 </li>
             }
         </ul>
-    }
+    })
 }
 
 fn make_comments(count: usize) -> Vec<String> {
@@ -215,8 +221,8 @@ fn make_comments(count: usize) -> Vec<String> {
 
 /// A dense table of integers. Every cell formats a number through the
 /// `Display`-based render path, isolating numeric formatting from markup.
-async fn numeric_table(cx: &Cx, rows: &[Vec<i64>]) -> Result {
-    view! {
+fn numeric_table(cx: &Cx, rows: &[Vec<i64>]) -> Result<impl View> {
+    Ok(view! {
         cx =>
         <table class="w-full text-right font-mono text-sm">
             <tbody>
@@ -229,7 +235,7 @@ async fn numeric_table(cx: &Cx, rows: &[Vec<i64>]) -> Result {
                 }
             </tbody>
         </table>
-    }
+    })
 }
 
 fn make_number_rows(rows: usize, cols: usize) -> Vec<Vec<i64>> {
@@ -254,8 +260,8 @@ fn make_number_rows(rows: usize, cols: usize) -> Vec<Vec<i64>> {
 /// One element per item, each carrying several dynamic attributes. Isolates the
 /// attribute-writing path: name emission, value escaping, and the surrounding
 /// quoting.
-async fn tag_cloud(cx: &Cx, tags: &[Tag]) -> Result {
-    view! {
+fn tag_cloud(cx: &Cx, tags: &[Tag]) -> Result<impl View> {
+    Ok(view! {
         cx =>
         <div class="flex flex-wrap gap-2">
             for tag in tags {
@@ -272,7 +278,7 @@ async fn tag_cloud(cx: &Cx, tags: &[Tag]) -> Result {
                 </a>
             }
         </div>
-    }
+    })
 }
 
 struct Tag {
@@ -351,10 +357,10 @@ fn make_products(count: usize) -> Vec<Product> {
 /// A row of five stars, filled up to the product's rating. Nested inside every
 /// card, so it multiplies the per-card render work.
 #[component]
-async fn rating_stars(tenths: u32) -> Result {
+async fn rating_stars(tenths: u32) -> Result<impl View> {
     let filled = (tenths + 5) / 10;
 
-    view! {
+    Ok(view! {
         <div class="flex">
             for index in 0..5u32 {
                 <svg
@@ -371,14 +377,14 @@ async fn rating_stars(tenths: u32) -> Result {
                 </svg>
             }
         </div>
-    }
+    })
 }
 
 /// A single product card: static markup mixed with escaped text, a nested
 /// component, numeric interpolation, and computed attributes.
 #[component]
-async fn product_card(product: &Product) -> Result {
-    view! {
+async fn product_card(product: &Product) -> Result<impl View> {
+    Ok(view! {
         <a
             href=(format!("/products/{}", product.id))
             class="group flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md"
@@ -407,15 +413,15 @@ async fn product_card(product: &Product) -> Result {
             </div>
             <p class="mt-3 text-lg font-bold">(format_price(product.price_cents))</p>
         </a>
-    }
+    })
 }
 
 /// A responsive grid of product cards, the flagship realistic scenario.
 ///
 /// Like the leaf scenarios above, it threads the request context into `view!`
 /// with the `cx,` form; on top of that it invokes a component (`product_card`).
-async fn product_grid(cx: &Cx, products: &[Product]) -> Result {
-    view! {
+fn product_grid(cx: &Cx, products: &[Product]) -> Result<impl View> {
+    Ok(view! {
         cx =>
         <main class="mx-auto w-full max-w-6xl px-4 py-10">
             <h1 class="text-2xl font-bold tracking-tight">"All products"</h1>
@@ -425,7 +431,7 @@ async fn product_grid(cx: &Cx, products: &[Product]) -> Result {
                 }
             </div>
         </main>
-    }
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -437,23 +443,35 @@ fn bench_render(c: &mut Criterion) {
     let mut group = c.benchmark_group("view_render");
 
     block_on(async {
-        let static_view = static_page().await.expect("render static_page");
+        let static_view = static_page(&cx)
+            .expect("build static_page")
+            .first(&cx)
+            .await
+            .expect("render static_page");
         measure(&mut group, "static_page", &cx, &static_view);
 
         let comments = make_comments(200);
         let comment_view = comment_feed(&cx, &comments)
+            .expect("build comment_feed")
+            .first(&cx)
             .await
             .expect("render comment_feed");
         measure(&mut group, "text_escaping", &cx, &comment_view);
 
         let number_rows = make_number_rows(120, 10);
         let number_view = numeric_table(&cx, &number_rows)
+            .expect("build numeric_table")
+            .first(&cx)
             .await
             .expect("render numeric_table");
         measure(&mut group, "numeric_table", &cx, &number_view);
 
         let tags = make_tags(200);
-        let tag_view = tag_cloud(&cx, &tags).await.expect("render tag_cloud");
+        let tag_view = tag_cloud(&cx, &tags)
+            .expect("build tag_cloud")
+            .first(&cx)
+            .await
+            .expect("render tag_cloud");
         measure(&mut group, "attributes", &cx, &tag_view);
 
         // The realistic grid grows with the number of cards, showing how
@@ -461,6 +479,8 @@ fn bench_render(c: &mut Criterion) {
         for &count in &[12usize, 96, 768] {
             let products = make_products(count);
             let grid_view = product_grid(&cx, &products)
+                .expect("build product_grid")
+                .first(&cx)
                 .await
                 .expect("render product_grid");
             measure(&mut group, format!("product_grid/{count}"), &cx, &grid_view);

@@ -1,9 +1,9 @@
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{Router, layout, page},
+    router::{Router, Slot, layout, page},
     tailwind,
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -18,8 +18,8 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    view! {
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -32,15 +32,15 @@ async fn root_layout(slot: Result) -> Result {
             <body
                 class="flex min-h-screen items-center justify-center bg-slate-100 font-sans"
             >
-                (slot?)
+                (slot)
             </body>
         </html>
-    }
+    })
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <main
             class="mx-4 w-full max-w-md rounded-2xl bg-white p-8 shadow-lg ring-1 ring-slate-200"
         >
@@ -75,5 +75,5 @@ async fn home() -> Result {
                 "Read the Tailwind docs"
             </a>
         </main>
-    }
+    })
 }

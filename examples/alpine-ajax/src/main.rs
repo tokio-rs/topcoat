@@ -5,13 +5,13 @@ use topcoat::{
     alpine_ajax::ajax_request,
     context::{Cx, app_context},
     router::{
-        Router, RouterBuilderDiscoverExt,
+        Router, RouterBuilderDiscoverExt, Slot,
         error::see_other,
         href, layout, page,
         response::{IntoResponse, Response},
         route,
     },
-    view::view,
+    view::{View, ViewExt, view},
 };
 
 #[tokio::main]
@@ -27,13 +27,13 @@ async fn main() {
 }
 
 #[layout("/")]
-async fn root(cx: &Cx, slot: Result) -> Result {
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     // Alpine AJAX requests only need the targeted content, not the document.
     if ajax_request(cx) {
         return slot;
     }
 
-    view! {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -50,16 +50,16 @@ async fn root(cx: &Cx, slot: Result) -> Result {
 
                 topcoat::dev::script()
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
-    }
+    })
 }
 
 #[page("/")]
-async fn home(cx: &Cx) -> Result {
+async fn home(cx: &Cx) -> Result<impl View> {
     let count = app_context::<Counter>(cx).0.load(Ordering::Relaxed);
 
-    view! {
+    Ok(view! {
         <h1>
             "Count: "
             <span id="count">(count)</span>
@@ -70,7 +70,7 @@ async fn home(cx: &Cx) -> Result {
         <form method="post" action=(href!(increment)) x-target="count">
             <button type="submit">"Increment"</button>
         </form>
-    }
+    })
 }
 
 struct Counter(AtomicU64);
@@ -81,7 +81,10 @@ async fn increment(cx: &Cx) -> Result<Response> {
 
     // An Alpine AJAX request only receives the targeted element.
     if ajax_request(cx) {
-        return view! { <span id="count">(count)</span> }?.into_response(cx);
+        return view! { <span id="count">(count)</span> }
+            .first(cx)
+            .await?
+            .into_response(cx);
     }
 
     // Without JavaScript, use Post/Redirect/Get and render the complete page.

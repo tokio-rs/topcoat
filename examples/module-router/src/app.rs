@@ -4,8 +4,8 @@ mod docs;
 
 use topcoat::{
     Result,
-    router::{href, layout, page},
-    view::view,
+    router::{Slot, href, layout, page},
+    view::{View, view},
 };
 
 // The `module_router!()` macro call must be placed at the root of your route structure.
@@ -16,8 +16,8 @@ pub fn router() -> topcoat::router::Router {
 
 // A layout in the root app module wraps every page.
 #[layout]
-async fn root_layout(slot: Result) -> Result {
-    view! {
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <html>
             <head>topcoat::dev::script()</head>
             <body>
@@ -35,30 +35,34 @@ async fn root_layout(slot: Result) -> Result {
                     <a href=(href!(_marketing::pricing::page))>"pricing"</a>
                 </nav>
                 <hr>
-                (slot?)
+                (slot)
             </body>
         </html>
-    }
+    })
 }
 
 // A page in app.rs renders at /.
 #[page]
-pub async fn page() -> Result {
-    view! {
+pub async fn page() -> Result<impl View> {
+    Ok(view! {
         <h1>"home"</h1>
         <p>"src/app.rs -> /"</p>
-    }
+    })
 }
 
 // The module `about` adds a URL segment `/about`.
 mod about {
-    use topcoat::{Result, router::page, view::view};
+    use topcoat::{
+        Result,
+        router::page,
+        view::{View, view},
+    };
 
     #[page]
-    pub async fn page() -> Result {
-        view! {
+    pub async fn page() -> Result<impl View> {
+        Ok(view! {
             <h1>"about"</h1>
             <p>"src/app.rs (mod about) -> /about"</p>
-        }
+        })
     }
 }

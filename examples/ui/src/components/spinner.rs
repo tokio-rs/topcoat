@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     icon::{icon, iconify::iconify_icon},
-    view::{Attributes, Length, attributes, class, component, view},
+    view::{Attributes, Length, View, attributes, class, component, view},
 };
 
 /// A spinner component: a spinning loader icon for pending states.
@@ -33,8 +33,8 @@ pub async fn spinner(
     /// Extra attributes for the `<svg>` element.
     #[default]
     mut attrs: Attributes,
-) -> Result {
-    view! {
+) -> Result<impl View> {
+    Ok(view! {
         icon(
             data: iconify_icon!("feather:loader"),
             size: size,
@@ -44,5 +44,5 @@ pub async fn spinner(
                 (attrs)
             }
         )
-    }
+    })
 }

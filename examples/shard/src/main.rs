@@ -6,7 +6,7 @@ use topcoat::{
     context::Cx,
     router::{Router, RouterBuilderDiscoverExt, page},
     runtime::{Event, shard},
-    view::{component, view},
+    view::{View, component, view},
 };
 
 #[tokio::main]
@@ -22,8 +22,8 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -35,12 +35,12 @@ async fn home() -> Result {
 
             <body>combobox()</body>
         </html>
-    }
+    })
 }
 
 #[component]
-async fn combobox() -> Result {
-    view! {
+async fn combobox() -> Result<impl View> {
+    Ok(view! {
         signal input = String::new();
 
         <div>
@@ -49,15 +49,15 @@ async fn combobox() -> Result {
             // The shard renders again on the server whenever `input` changes.
             combobox_content(input: $(input.get()))
         </div>
-    }
+    })
 }
 
 #[shard]
-async fn combobox_content(cx: &Cx, input: String) -> Result {
+async fn combobox_content(cx: &Cx, input: String) -> Result<impl View> {
     // The input comes from the client, so a real application would validate it.
     let results = search_fruit(cx, &input).await;
 
-    view! {
+    Ok(view! {
         <div>
             <b>"results:"</b>
 
@@ -65,7 +65,7 @@ async fn combobox_content(cx: &Cx, input: String) -> Result {
                 <div>(item)</div>
             }
         </div>
-    }
+    })
 }
 
 // Simulate a server-side lookup that takes half a second.

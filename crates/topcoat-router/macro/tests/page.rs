@@ -3,7 +3,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{Body, Router, content::Form, href, page, request::uri, to_bytes},
-    view::view,
+    view::{View, view},
 };
 
 mod common;
@@ -23,8 +23,8 @@ async fn send_as(router: &Router, method: &str, path: &str) -> (u16, String) {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! { <h1>"home"</h1> }
+async fn home() -> Result<impl View> {
+    Ok(view! { <h1>"home"</h1> })
 }
 
 #[derive(Deserialize)]
@@ -34,66 +34,66 @@ struct Search {
 
 // A page that reads a request body through a destructuring pattern.
 #[page("/search")]
-async fn search(Form(input): Form<Search>) -> Result {
-    view! {
+async fn search(Form(input): Form<Search>) -> Result<impl View> {
+    Ok(view! {
         <p>
             "searching for "
             (input.q)
         </p>
-    }
+    })
 }
 
 #[page("/whoami")]
-async fn whoami(cx: &Cx) -> Result {
-    view! { <p>(uri(cx).path())</p> }
+async fn whoami(cx: &Cx) -> Result<impl View> {
+    Ok(view! { <p>(uri(cx).path())</p> })
 }
 
 // A page whose body binds its own name: the binding must shadow the
 // generated marker.
 #[page("/shadowed")]
-async fn shadowed() -> Result {
+async fn shadowed() -> Result<impl View> {
     let shadowed = "shadowed";
-    view! { <p>(shadowed)</p> }
+    Ok(view! { <p>(shadowed)</p> })
 }
 
 // A page linking to itself: the marker stays reachable from the page's own
 // body, next to a binding of the same name shadowing it.
 #[page("/self-linked")]
-async fn self_linked() -> Result {
+async fn self_linked() -> Result<impl View> {
     let self_linked = "self-linked";
-    view! { <a href=(href!(self_linked))>(self_linked)</a> }
+    Ok(view! { <a href=(href!(self_linked))>(self_linked)</a> })
 }
 
 // Pages used as components: called like any component inside `view!`, with a
 // request body passed as the already-parsed `body` prop.
 #[page("/composed")]
-async fn composed() -> Result {
+async fn composed() -> Result<impl View> {
     let query = Search {
         q: String::from("topcoat"),
     };
-    view! {
+    Ok(view! {
         home()
         search(body: Form(query))
         whoami()
-    }
+    })
 }
 
 // A page serving a method other than the default `GET`.
 #[page(POST "/submit")]
-async fn submit() -> Result {
-    view! { <p>"submitted"</p> }
+async fn submit() -> Result<impl View> {
+    Ok(view! { <p>"submitted"</p> })
 }
 
 // A page serving several methods at one path.
 #[page([GET, POST] "/either")]
-async fn either() -> Result {
-    view! { <p>"either"</p> }
+async fn either() -> Result<impl View> {
+    Ok(view! { <p>"either"</p> })
 }
 
 // A page serving every method.
 #[page(* "/anything")]
-async fn anything() -> Result {
-    view! { <p>"anything"</p> }
+async fn anything() -> Result<impl View> {
+    Ok(view! { <p>"anything"</p> })
 }
 
 #[tokio::test]

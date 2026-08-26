@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     icon::{icon, iconify::iconify_icon},
-    view::{Attributes, StaticClass, View, attributes, class, component, view},
+    view::{Attributes, Child, StaticClass, View, attributes, class, component, view},
 };
 
 use super::button::{ButtonSize, ButtonVariant, button_variants};
@@ -33,8 +33,11 @@ use super::button::{ButtonSize, ButtonVariant, button_variants};
 /// }
 /// ```
 #[component]
-pub async fn pagination(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn pagination(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <nav
             aria-label="pagination"
             class=(class!(
@@ -45,7 +48,7 @@ pub async fn pagination(#[default] mut attrs: Attributes, #[default] child: View
         >
             (child)
         </nav>
-    }
+    })
 }
 
 /// The list of steps in a [`pagination`].
@@ -55,9 +58,9 @@ pub async fn pagination(#[default] mut attrs: Attributes, #[default] child: View
 #[component]
 pub async fn pagination_content(
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <ul
             class=(class!(
                 "flex flex-row flex-wrap items-center justify-center gap-1",
@@ -67,13 +70,16 @@ pub async fn pagination_content(
         >
             (child)
         </ul>
-    }
+    })
 }
 
 /// One step of a [`pagination_content`], holding a link or an ellipsis.
 #[component]
-pub async fn pagination_item(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! { <li class=(attrs.remove("class")) (attrs)>(child)</li> }
+pub async fn pagination_item(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! { <li class=(attrs.remove("class")) (attrs)>(child)</li> })
 }
 
 /// A link to one page of the list, usually labelled with its number.
@@ -92,15 +98,15 @@ pub async fn pagination_link(
     mut attrs: Attributes,
     /// The link's label.
     #[default]
-    child: View,
-) -> Result {
+    child: Child<'_>,
+) -> Result<impl View> {
     let variant = if active {
         ButtonVariant::Outline
     } else {
         ButtonVariant::Ghost
     };
 
-    view! {
+    Ok(view! {
         <a
             aria-current=(active.then_some("page"))
             class=(class!(
@@ -111,7 +117,7 @@ pub async fn pagination_link(
         >
             (child)
         </a>
-    }
+    })
 }
 
 /// The classes for the label of [`pagination_previous`] and
@@ -134,8 +140,8 @@ pub async fn pagination_previous(
     /// Extra attributes for the `<a>` element.
     #[default]
     mut attrs: Attributes,
-) -> Result {
-    view! {
+) -> Result<impl View> {
+    Ok(view! {
         <a
             class=(class!(
                 button_variants(ButtonVariant::Ghost, ButtonSize::Md),
@@ -146,7 +152,7 @@ pub async fn pagination_previous(
             icon(data: iconify_icon!("feather:chevron-left"))
             <span class=(LABEL)>(label)</span>
         </a>
-    }
+    })
 }
 
 /// The link to the page after the one being read.
@@ -159,8 +165,8 @@ pub async fn pagination_next(
     /// Extra attributes for the `<a>` element.
     #[default]
     mut attrs: Attributes,
-) -> Result {
-    view! {
+) -> Result<impl View> {
+    Ok(view! {
         <a
             class=(class!(
                 button_variants(ButtonVariant::Ghost, ButtonSize::Md),
@@ -171,7 +177,7 @@ pub async fn pagination_next(
             <span class=(LABEL)>(label)</span>
             icon(data: iconify_icon!("feather:chevron-right"))
         </a>
-    }
+    })
 }
 
 /// A stand-in for the page links left out of a long pagination.
@@ -180,8 +186,8 @@ pub async fn pagination_next(
 /// nothing to assistive technology, so a phrase standing in for it is read out
 /// instead.
 #[component]
-pub async fn pagination_ellipsis(#[default] mut attrs: Attributes) -> Result {
-    view! {
+pub async fn pagination_ellipsis(#[default] mut attrs: Attributes) -> Result<impl View> {
+    Ok(view! {
         <span
             class=(class!(
                 "flex size-9 items-center justify-center text-muted-foreground",
@@ -195,5 +201,5 @@ pub async fn pagination_ellipsis(#[default] mut attrs: Attributes) -> Result {
             )
             <span class="sr-only">"More pages"</span>
         </span>
-    }
+    })
 }

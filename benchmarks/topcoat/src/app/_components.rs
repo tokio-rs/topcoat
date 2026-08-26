@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{PromotedStr, StaticClass, class, component, view},
+    view::{PromotedStr, StaticClass, View, class, component, view},
 };
 
 use crate::{
@@ -59,8 +59,8 @@ const FOOTER_COLUMNS: [(&str, [(&str, &str); 4]); 4] = [
 ];
 
 #[component]
-pub async fn site_nav() -> Result {
-    view! {
+pub async fn site_nav() -> Result<impl View> {
+    Ok(view! {
         <header class="border-b border-slate-200 bg-white">
             <nav
                 class="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4"
@@ -79,12 +79,12 @@ pub async fn site_nav() -> Result {
                 </div>
             </nav>
         </header>
-    }
+    })
 }
 
 #[component]
-pub async fn site_footer() -> Result {
-    view! {
+pub async fn site_footer() -> Result<impl View> {
+    Ok(view! {
         <footer class="border-t border-slate-200 bg-white">
             <div
                 class="mx-auto grid w-full max-w-6xl grid-cols-2 gap-8 px-4 py-10 text-sm md:grid-cols-4"
@@ -108,14 +108,14 @@ pub async fn site_footer() -> Result {
                 </p>
             </div>
         </footer>
-    }
+    })
 }
 
 #[component]
-pub async fn rating_stars(tenths: u32, size: &str) -> Result {
+pub async fn rating_stars(tenths: u32, size: &str) -> Result<impl View> {
     let filled = filled_stars(tenths);
 
-    view! {
+    Ok(view! {
         <div class="flex">
             for index in 0..5u32 {
                 <svg
@@ -131,12 +131,12 @@ pub async fn rating_stars(tenths: u32, size: &str) -> Result {
                 </svg>
             }
         </div>
-    }
+    })
 }
 
 #[component]
-pub async fn product_card(product: &Product) -> Result {
-    view! {
+pub async fn product_card(product: &Product) -> Result<impl View> {
+    Ok(view! {
         <a
             href=(("/products/", product.id))
             class="group flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md"
@@ -165,7 +165,7 @@ pub async fn product_card(product: &Product) -> Result {
             </div>
             <p class="mt-3 text-lg font-bold">(product.price())</p>
         </a>
-    }
+    })
 }
 
 #[component]
@@ -174,8 +174,8 @@ pub async fn pagination(
     page_count: usize,
     sort: Option<&str>,
     category: Option<&str>,
-) -> Result {
-    view! {
+) -> Result<impl View> {
+    Ok(view! {
         <nav
             aria-label="Pagination"
             class="mt-10 flex flex-wrap items-center justify-center gap-1 text-sm"
@@ -204,12 +204,12 @@ pub async fn pagination(
                 <span class=(PAGE_DISABLED)>"Next"</span>
             }
         </nav>
-    }
+    })
 }
 
 #[component]
-pub async fn breadcrumbs(category: &str, category_slug: &str, name: &str) -> Result {
-    view! {
+pub async fn breadcrumbs(category: &str, category_slug: &str, name: &str) -> Result<impl View> {
+    Ok(view! {
         <nav aria-label="Breadcrumb" class="text-sm text-slate-500">
             <ol class="flex flex-wrap items-center gap-2">
                 <li><a href="/" class="hover:text-slate-900">"Home"</a></li>
@@ -228,12 +228,12 @@ pub async fn breadcrumbs(category: &str, category_slug: &str, name: &str) -> Res
                 <li class="font-medium text-slate-900">(name)</li>
             </ol>
         </nav>
-    }
+    })
 }
 
 #[component]
-pub async fn spec_table(specs: &[Spec]) -> Result {
-    view! {
+pub async fn spec_table(specs: &[Spec]) -> Result<impl View> {
+    Ok(view! {
         <div class="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white">
             <table class="w-full text-sm">
                 <tbody>
@@ -251,12 +251,12 @@ pub async fn spec_table(specs: &[Spec]) -> Result {
                 </tbody>
             </table>
         </div>
-    }
+    })
 }
 
 #[component]
-pub async fn review_list(reviews: &[Review]) -> Result {
-    view! {
+pub async fn review_list(reviews: &[Review]) -> Result<impl View> {
+    Ok(view! {
         <div class="mt-6 space-y-6">
             for review in reviews {
                 <article class="rounded-xl border border-slate-200 bg-white p-6">
@@ -274,5 +274,5 @@ pub async fn review_list(reviews: &[Review]) -> Result {
                 </article>
             }
         </div>
-    }
+    })
 }

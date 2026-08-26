@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::Cx,
     icon::{IconData, icon, iconify::iconify_icon},
-    view::{Attributes, StaticClass, View, attributes, class, component, view},
+    view::{Attributes, Child, StaticClass, View, attributes, class, component, view},
 };
 
 /// The classes for the native `<select>` inside the [`select`] component.
@@ -99,13 +99,17 @@ fn checkmark_style(cx: &Cx) -> String {
 /// }
 /// ```
 #[component]
-pub async fn select(cx: &Cx, #[default] mut attrs: Attributes, #[default] child: View) -> Result {
+pub async fn select(
+    cx: &Cx,
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
     // `appearance: base-select` opts into the customizable picker. It is set
     // from the wrapper because the descendant selector outranks the
     // `appearance-none` fallback in specificity, making the outcome
     // independent of stylesheet order; browsers without support drop the
     // invalid declaration and keep the fallback.
-    view! {
+    Ok(view! {
         <span
             class=(class!(
                 "relative block has-[:disabled]:opacity-50 \
@@ -124,5 +128,5 @@ pub async fn select(cx: &Cx, #[default] mut attrs: Attributes, #[default] child:
                 }
             )
         </span>
-    }
+    })
 }

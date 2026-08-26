@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`progress`] bar.
@@ -47,13 +47,13 @@ pub async fn progress(
     /// Extra attributes for the `<progress>` element.
     #[default]
     mut attrs: Attributes,
-) -> Result {
-    view! {
+) -> Result<impl View> {
+    Ok(view! {
         <progress
             class=(class!(PROGRESS, attrs.remove("class")))
             value=(value)
             max=(max)
             (attrs)
         ></progress>
-    }
+    })
 }

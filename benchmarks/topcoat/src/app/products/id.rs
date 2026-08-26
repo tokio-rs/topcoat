@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{error::RouterErrorExt, page, path_param},
-    view::view,
+    view::{View, view},
 };
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
 path_param!(product_id: u32, error = not_found);
 
 #[page]
-async fn product_detail(cx: &Cx) -> Result {
+async fn product_detail(cx: &Cx) -> Result<impl View> {
     let catalog = app_context::<Catalog>(cx);
     let product = catalog
         .get(*path_param::<ProductId>(cx)?)
@@ -24,7 +24,7 @@ async fn product_detail(cx: &Cx) -> Result {
         .filter_map(|id| catalog.get(*id))
         .collect();
 
-    view! {
+    Ok(view! {
         breadcrumbs(
             category: &product.category,
             category_slug: &product.category_slug,
@@ -84,5 +84,5 @@ async fn product_detail(cx: &Cx) -> Result {
                 }
             </div>
         </section>
-    }
+    })
 }

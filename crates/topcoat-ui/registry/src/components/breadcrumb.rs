@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     icon::{icon, iconify::iconify_icon},
-    view::{Attributes, View, attributes, class, component, view},
+    view::{Attributes, Child, View, attributes, class, component, view},
 };
 
 /// A breadcrumb component: the trail from the site's root to the current
@@ -27,10 +27,13 @@ use topcoat::{
 /// }
 /// ```
 #[component]
-pub async fn breadcrumb(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn breadcrumb(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <nav aria-label="breadcrumb" class=(attrs.remove("class")) (attrs)>(child)</nav>
-    }
+    })
 }
 
 /// The ordered list of steps in a [`breadcrumb`].
@@ -38,8 +41,11 @@ pub async fn breadcrumb(#[default] mut attrs: Attributes, #[default] child: View
 /// The steps wrap onto another line rather than overflowing when the trail
 /// outgrows its container.
 #[component]
-pub async fn breadcrumb_list(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn breadcrumb_list(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <ol
             class=(class!(
                 "flex flex-wrap items-center gap-2 text-sm text-muted-foreground",
@@ -49,21 +55,24 @@ pub async fn breadcrumb_list(#[default] mut attrs: Attributes, #[default] child:
         >
             (child)
         </ol>
-    }
+    })
 }
 
 /// One step of a [`breadcrumb_list`], holding a [`breadcrumb_link`] or a
 /// [`breadcrumb_page`].
 #[component]
-pub async fn breadcrumb_item(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn breadcrumb_item(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <li
             class=(class!("inline-flex items-center gap-2", attrs.remove("class")))
             (attrs)
         >
             (child)
         </li>
-    }
+    })
 }
 
 /// A step of the trail that leads somewhere: an `<a>` to an ancestor of the
@@ -72,8 +81,11 @@ pub async fn breadcrumb_item(#[default] mut attrs: Attributes, #[default] child:
 /// It takes the list's muted color at rest and the full foreground color on
 /// hover. Pass the `href` among the `attrs`.
 #[component]
-pub async fn breadcrumb_link(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn breadcrumb_link(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <a
             class=(class!(
                 "transition-colors hover:text-foreground",
@@ -83,7 +95,7 @@ pub async fn breadcrumb_link(#[default] mut attrs: Attributes, #[default] child:
         >
             (child)
         </a>
-    }
+    })
 }
 
 /// The last step of the trail: the current page, which is not a link.
@@ -91,8 +103,11 @@ pub async fn breadcrumb_link(#[default] mut attrs: Attributes, #[default] child:
 /// It carries `aria-current="page"`, so assistive technology announces it as
 /// where the reader is.
 #[component]
-pub async fn breadcrumb_page(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn breadcrumb_page(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <span
             aria-current="page"
             class=(class!("font-medium text-foreground", attrs.remove("class")))
@@ -100,7 +115,7 @@ pub async fn breadcrumb_page(#[default] mut attrs: Attributes, #[default] child:
         >
             (child)
         </span>
-    }
+    })
 }
 
 /// The divider between two steps of a [`breadcrumb_list`].
@@ -108,15 +123,15 @@ pub async fn breadcrumb_page(#[default] mut attrs: Attributes, #[default] child:
 /// It is a chevron pointing along the trail, hidden from assistive
 /// technology, which reads the steps as a list without it.
 #[component]
-pub async fn breadcrumb_separator(#[default] mut attrs: Attributes) -> Result {
-    view! {
+pub async fn breadcrumb_separator(#[default] mut attrs: Attributes) -> Result<impl View> {
+    Ok(view! {
         <li aria-hidden="true" class=(attrs.remove("class")) (attrs)>
             icon(
                 data: iconify_icon!("feather:chevron-right"),
                 attrs: attributes! { class="size-3.5" }
             )
         </li>
-    }
+    })
 }
 
 /// A stand-in for the steps left out of a long trail.
@@ -125,8 +140,8 @@ pub async fn breadcrumb_separator(#[default] mut attrs: Attributes) -> Result {
 /// says nothing to assistive technology, so a word standing in for it is read
 /// out instead.
 #[component]
-pub async fn breadcrumb_ellipsis(#[default] mut attrs: Attributes) -> Result {
-    view! {
+pub async fn breadcrumb_ellipsis(#[default] mut attrs: Attributes) -> Result<impl View> {
+    Ok(view! {
         <span class=(class!("flex items-center", attrs.remove("class"))) (attrs)>
             icon(
                 data: iconify_icon!("feather:more-horizontal"),
@@ -134,5 +149,5 @@ pub async fn breadcrumb_ellipsis(#[default] mut attrs: Attributes) -> Result {
             )
             <span class="sr-only">"More"</span>
         </span>
-    }
+    })
 }

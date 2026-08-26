@@ -1,6 +1,6 @@
 use serde::Serialize;
 use topcoat_core::context::Cx;
-use topcoat_view::{NodeViewParts, PartsWriter, View};
+use topcoat_view::{NodeViewParts, PartsWriter, ViewHandle};
 use uuid::Uuid;
 
 use crate::{SHARD_ROUTE_PREFIX, ShardId};
@@ -27,14 +27,14 @@ impl Default for ReactiveScopeId {
 pub struct ReactiveScope {
     id: ReactiveScopeId,
     shard_id: ShardId,
-    exprs: Vec<View>,
-    placeholder: View,
+    exprs: Vec<ViewHandle>,
+    placeholder: ViewHandle,
 }
 
 impl ReactiveScope {
     #[inline]
     #[must_use]
-    pub fn new(shard_id: ShardId, exprs: Vec<View>, placeholder: View) -> Self {
+    pub fn new(shard_id: ShardId, exprs: Vec<ViewHandle>, placeholder: ViewHandle) -> Self {
         Self {
             id: ReactiveScopeId::new(),
             shard_id,
@@ -64,7 +64,7 @@ impl NodeViewParts for ReactiveScope {
         let last = self.exprs.len().saturating_sub(1);
         for (index, expr) in self.exprs.into_iter().enumerate() {
             parts.push_promoted_str_unescaped(&"\"");
-            topcoat_view::internal::view(parts, expr);
+            parts.push_view_handle(expr);
             parts.push_promoted_str_unescaped(&"\"");
             if index != last {
                 parts.push_promoted_str_unescaped(&", ");

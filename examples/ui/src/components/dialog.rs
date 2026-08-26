@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, View, class, component, view},
+    view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`dialog`] overlay: a layer covering the viewport,
@@ -82,9 +82,9 @@ pub async fn dialog(
     mut attrs: Attributes,
     /// The dialog's content.
     #[default]
-    child: View,
-) -> Result {
-    view! {
+    child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <dialog
             open=(open)
             class=(class!(OVERLAY, FADE, attrs.remove("class")))
@@ -92,7 +92,7 @@ pub async fn dialog(
         >
             (child)
         </dialog>
-    }
+    })
 }
 
 /// The classes for the [`dialog_content`] panel: a raised surface styled like
@@ -131,36 +131,45 @@ const MOTION: StaticClass = class!(
 /// overlay up to a readable maximum, so a wider or narrower dialog is a
 /// `max-w-*` class among the `attrs`.
 #[component]
-pub async fn dialog_content(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn dialog_content(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div class=(class!(CONTENT, MOTION, attrs.remove("class"))) (attrs)>
             (child)
         </div>
-    }
+    })
 }
 
 /// The opening section of a [`dialog_content`], stacking a [`dialog_title`]
 /// and an optional [`dialog_description`].
 #[component]
-pub async fn dialog_header(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn dialog_header(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div class=(class!("flex flex-col gap-1.5", attrs.remove("class"))) (attrs)>
             (child)
         </div>
-    }
+    })
 }
 
 /// The heading of a [`dialog`], rendered as an `<h2>`.
 #[component]
-pub async fn dialog_title(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn dialog_title(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <h2
             class=(class!("text-lg leading-none font-semibold", attrs.remove("class")))
             (attrs)
         >
             (child)
         </h2>
-    }
+    })
 }
 
 /// The supporting text under a [`dialog_title`], telling the reader what the
@@ -168,16 +177,16 @@ pub async fn dialog_title(#[default] mut attrs: Attributes, #[default] child: Vi
 #[component]
 pub async fn dialog_description(
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <p
             class=(class!("text-sm text-muted-foreground", attrs.remove("class")))
             (attrs)
         >
             (child)
         </p>
-    }
+    })
 }
 
 /// The closing section of a [`dialog_content`], a row of actions ending at
@@ -186,8 +195,11 @@ pub async fn dialog_description(
 /// The row wraps, so actions that do not fit the panel's width move onto
 /// their own line instead of overflowing it.
 #[component]
-pub async fn dialog_footer(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn dialog_footer(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div
             class=(class!(
                 "flex flex-wrap items-center justify-end gap-2",
@@ -197,5 +209,5 @@ pub async fn dialog_footer(#[default] mut attrs: Attributes, #[default] child: V
         >
             (child)
         </div>
-    }
+    })
 }

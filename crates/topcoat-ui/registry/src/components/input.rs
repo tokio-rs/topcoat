@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, class, component, view},
+    view::{Attributes, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`input`] control.
@@ -30,6 +30,6 @@ const INPUT: StaticClass = class!(
 /// }
 /// ```
 #[component]
-pub async fn input(#[default] mut attrs: Attributes) -> Result {
-    view! { <input class=(class!(INPUT, attrs.remove("class"))) (attrs)> }
+pub async fn input(#[default] mut attrs: Attributes) -> Result<impl View> {
+    Ok(view! { <input class=(class!(INPUT, attrs.remove("class"))) (attrs)> })
 }

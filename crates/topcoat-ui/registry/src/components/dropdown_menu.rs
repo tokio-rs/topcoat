@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     icon::{icon, iconify::iconify_icon},
-    view::{Attributes, StaticClass, View, attributes, class, component, view},
+    view::{Attributes, Child, StaticClass, View, attributes, class, component, view},
 };
 
 /// A dropdown menu: a trigger that toggles a floating panel of actions.
@@ -29,15 +29,18 @@ use topcoat::{
 /// }
 /// ```
 #[component]
-pub async fn dropdown_menu(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn dropdown_menu(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <details
             class=(class!("group relative inline-block", attrs.remove("class")))
             (attrs)
         >
             (child)
         </details>
-    }
+    })
 }
 
 /// The classes making a `<summary>` a plain clickable trigger: the default
@@ -71,13 +74,13 @@ const TRIGGER: StaticClass = class!("cursor-pointer list-none [&::-webkit-detail
 #[component]
 pub async fn dropdown_menu_trigger(
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <summary class=(class!(TRIGGER, attrs.remove("class"))) (attrs)>
             (child)
         </summary>
-    }
+    })
 }
 
 /// The classes shared by the [`dropdown_menu_content`] and
@@ -95,16 +98,16 @@ const PANEL: StaticClass = class!(
 #[component]
 pub async fn dropdown_menu_content(
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div
             class=(class!(PANEL, "top-full left-0 mt-1", attrs.remove("class")))
             (attrs)
         >
             (child)
         </div>
-    }
+    })
 }
 
 /// The classes for a [`dropdown_menu_item`] row.
@@ -121,11 +124,11 @@ const ITEM: StaticClass = class!(
 #[component]
 pub async fn dropdown_menu_item(
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <button class=(class!(ITEM, attrs.remove("class"))) (attrs)>(child)</button>
-    }
+    })
 }
 
 /// A nested submenu placed among the items of a [`dropdown_menu_content`].
@@ -155,12 +158,15 @@ pub async fn dropdown_menu_item(
 /// }
 /// ```
 #[component]
-pub async fn dropdown_menu_sub(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn dropdown_menu_sub(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <details class=(class!("group/sub relative", attrs.remove("class"))) (attrs)>
             (child)
         </details>
-    }
+    })
 }
 
 /// The trigger row of a [`dropdown_menu_sub`]: a `<summary>` styled as a
@@ -173,9 +179,9 @@ pub async fn dropdown_menu_sub(#[default] mut attrs: Attributes, #[default] chil
 #[component]
 pub async fn dropdown_menu_sub_trigger(
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <summary
             class=(class!(
                 ITEM,
@@ -191,7 +197,7 @@ pub async fn dropdown_menu_sub_trigger(
                 attrs: attributes! { class="ml-auto size-4" }
             )
         </summary>
-    }
+    })
 }
 
 /// The floating panel of a [`dropdown_menu_sub`], holding the submenu's items.
@@ -203,25 +209,25 @@ pub async fn dropdown_menu_sub_trigger(
 #[component]
 pub async fn dropdown_menu_sub_content(
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div
             class=(class!(PANEL, "top-0 left-full ml-1", attrs.remove("class")))
             (attrs)
         >
             (child)
         </div>
-    }
+    })
 }
 
 /// A non-interactive heading grouping the items after it.
 #[component]
 pub async fn dropdown_menu_label(
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <p
             class=(class!(
                 "px-2 py-1.5 text-xs font-medium text-muted-foreground",
@@ -231,13 +237,13 @@ pub async fn dropdown_menu_label(
         >
             (child)
         </p>
-    }
+    })
 }
 
 /// A hairline rule separating groups of items.
 #[component]
-pub async fn dropdown_menu_separator(#[default] mut attrs: Attributes) -> Result {
-    view! {
+pub async fn dropdown_menu_separator(#[default] mut attrs: Attributes) -> Result<impl View> {
+    Ok(view! {
         <hr class=(class!("-mx-1 my-1 border-border", attrs.remove("class"))) (attrs)>
-    }
+    })
 }

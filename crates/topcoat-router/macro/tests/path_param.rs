@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{CatchAllSegments, Router, error::RouterErrorExt, href, page, path_param},
-    view::view,
+    view::{View, view},
 };
 
 mod common;
@@ -13,24 +13,24 @@ use common::send;
 path_param!(post_id: u32);
 
 #[page("/posts/{post_id}")]
-async fn post(cx: &Cx) -> Result {
+async fn post(cx: &Cx) -> Result<impl View> {
     let id = path_param::<PostId>(cx).ok_or_bad_request("post_id must be a number")?;
-    view! {
+    Ok(view! {
         "post "
         (id)
-    }
+    })
 }
 
 // A borrowed (`str`) path parameter: the raw segment is exposed without parsing.
 path_param!(slug);
 
 #[page("/tags/{slug}")]
-async fn tag(cx: &Cx) -> Result {
+async fn tag(cx: &Cx) -> Result<impl View> {
     let slug = path_param::<Slug>(cx);
-    view! {
+    Ok(view! {
         "tag "
         (slug)
-    }
+    })
 }
 
 // `error = ...` declares the response for a failed parse on the parameter
@@ -38,24 +38,24 @@ async fn tag(cx: &Cx) -> Result {
 path_param!(user_id: u32, error = not_found);
 
 #[page("/users/{user_id}")]
-async fn user(cx: &Cx) -> Result {
+async fn user(cx: &Cx) -> Result<impl View> {
     let id = path_param::<UserId>(cx)?;
-    view! {
+    Ok(view! {
         "user "
         (id)
-    }
+    })
 }
 
 // A bare `error = bad_request` prefills the description with the parameter name.
 path_param!(item_id: u32, error = bad_request);
 
 #[page("/items/{item_id}")]
-async fn item(cx: &Cx) -> Result {
+async fn item(cx: &Cx) -> Result<impl View> {
     let id = path_param::<ItemId>(cx)?;
-    view! {
+    Ok(view! {
         "item "
         (id)
-    }
+    })
 }
 
 // `error = bad_request("...")` overrides the prefilled description.
@@ -65,59 +65,59 @@ path_param!(
 );
 
 #[page("/orders/{order_id}")]
-async fn order(cx: &Cx) -> Result {
+async fn order(cx: &Cx) -> Result<impl View> {
     let id = path_param::<OrderId>(cx)?;
-    view! {
+    Ok(view! {
         "order "
         (id)
-    }
+    })
 }
 
 // `error = redirect("...")` sends the client elsewhere on a failed parse.
 path_param!(page_id: u32, error = redirect("/pages"));
 
 #[page("/pages/{page_id}")]
-async fn page_detail(cx: &Cx) -> Result {
+async fn page_detail(cx: &Cx) -> Result<impl View> {
     let id = path_param::<PageId>(cx)?;
-    view! {
+    Ok(view! {
         "page "
         (id)
-    }
+    })
 }
 
 path_param!(*doc_path);
 
 #[page("/docs/{*doc_path}")]
-async fn document(cx: &Cx) -> Result {
+async fn document(cx: &Cx) -> Result<impl View> {
     let path: CatchAllSegments<'_> = path_param::<DocPath>(cx);
     let path = path.collect::<Vec<_>>().join("][");
     let path = format!("[{path}]");
-    view! { (path) }
+    Ok(view! { (path) })
 }
 
 path_param!(*number_path: u32, error = bad_request);
 
 #[page("/numbers/{*number_path}")]
-async fn numbers(cx: &Cx) -> Result {
+async fn numbers(cx: &Cx) -> Result<impl View> {
     let number_values = path_param::<NumberPath>(cx)?;
-    view! { (format!("{number_values:?}")) }
+    Ok(view! { (format!("{number_values:?}")) })
 }
 
 path_param!(*raw_numbers: u32);
 
 #[page("/raw-numbers/{*raw_numbers}")]
-async fn raw_numbers(cx: &Cx) -> Result {
+async fn raw_numbers(cx: &Cx) -> Result<impl View> {
     let number_values =
         path_param::<RawNumbers>(cx).ok_or_bad_request("every segment must be a number")?;
-    view! { (format!("{number_values:?}")) }
+    Ok(view! { (format!("{number_values:?}")) })
 }
 
 path_param!(missing: u32);
 
 #[page("/missing-param")]
-async fn missing_param(cx: &Cx) -> Result {
+async fn missing_param(cx: &Cx) -> Result<impl View> {
     let _ = path_param::<Missing>(cx);
-    view! { "unreachable" }
+    Ok(view! { "unreachable" })
 }
 
 path_param!(pub public_id: u32);
@@ -127,11 +127,11 @@ path_param!(pub *public_parts);
 // A page linking to pages that take a parameter: the marker resolves to the
 // path the router serves it at, and the values fill that path's parameters.
 #[page("/links")]
-async fn links() -> Result {
-    view! {
+async fn links() -> Result<impl View> {
+    Ok(view! {
         <a href=(href!(post, PostId(42)))>"post"</a>
         <a href=(href!(document, DocPath(["guides", "getting started"])))>"guides"</a>
-    }
+    })
 }
 
 #[tokio::test]

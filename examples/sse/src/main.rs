@@ -12,7 +12,7 @@ use topcoat::{
         content::sse::{Event, KeepAlive, Sse, last_event_id},
         page, route,
     },
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -26,8 +26,8 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -45,7 +45,7 @@ async fn home() -> Result {
                 <script src=(asset!("./feed.js"))></script>
             </body>
         </html>
-    }
+    })
 }
 
 #[route(GET "/ticks")]

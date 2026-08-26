@@ -5,7 +5,7 @@ use topcoat_router::{
     Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId, RouterBuilder,
     response::IntoResponse,
 };
-use topcoat_view::View;
+use topcoat_view::ViewHandle;
 
 pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/shards";
 
@@ -27,7 +27,7 @@ impl ShardId {
 
 /// The future returned by [`Shard::render`]: a boxed, `Send` future borrowing
 /// the shard and its request context.
-pub type ShardFuture<'cx> = Pin<Box<dyn Future<Output = Result<View>> + Send + 'cx>>;
+pub type ShardFuture<'cx> = Pin<Box<dyn Future<Output = Result<ViewHandle>> + Send + 'cx>>;
 
 /// A component that re-renders on the server when its runtime expression
 /// arguments change.

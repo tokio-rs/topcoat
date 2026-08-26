@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, Class, StaticClass, View, class, component, view},
+    view::{Attributes, Child, Class, StaticClass, View, class, component, view},
 };
 
 /// The visual style of a [`badge`].
@@ -80,11 +80,11 @@ pub fn badge_variants(variant: BadgeVariant) -> Class<(StaticClass, StaticClass)
 pub async fn badge(
     #[default] variant: BadgeVariant,
     #[default] mut attrs: Attributes,
-    #[default] child: View,
-) -> Result {
-    view! {
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <span class=(class!(BASE, variant.classes(), attrs.remove("class"))) (attrs)>
             (child)
         </span>
-    }
+    })
 }

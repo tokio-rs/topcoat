@@ -54,7 +54,7 @@ use topcoat::{
     icon::{icon, iconify::iconify_icon},
     router::{Router, RouterBuilderDiscoverExt, page, query_params},
     tailwind,
-    view::{View, attributes, class, component, view},
+    view::{Child, View, attributes, class, component, view},
 };
 
 /// A stand-in portrait for the workspace's owner, served from the example's
@@ -290,10 +290,10 @@ fn status_variant(status: &str) -> BadgeVariant {
 }
 
 #[page("/")]
-async fn home(cx: &Cx) -> Result {
+async fn home(cx: &Cx) -> Result<impl View> {
     let state = State::read(cx)?;
 
-    view! {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -386,13 +386,13 @@ async fn home(cx: &Cx) -> Result {
                 filters_sheet(state: &state)
             </body>
         </html>
-    }
+    })
 }
 
 /// A masonry cell: keeps a demo from splitting across columns.
 #[component]
-async fn demo(child: View) -> Result {
-    view! { <div class="mb-4 break-inside-avoid">(child)</div> }
+async fn demo(child: Child<'_>) -> Result<impl View> {
+    Ok(view! { <div class="mb-4 break-inside-avoid">(child)</div> })
 }
 
 /// The parts of the page's state a form does not set, carried along as hidden
@@ -403,14 +403,14 @@ async fn demo(child: View) -> Result {
 /// `sets` names the parameters the form has controls for, separated by spaces;
 /// those are left out, since the form submits its own values for them.
 #[component]
-async fn state_fields(state: &State, sets: &str) -> Result {
-    view! {
+async fn state_fields(state: &State, sets: &str) -> Result<impl View> {
+    Ok(view! {
         for (key, value) in state.params() {
             if !sets.split_whitespace().any(|set| set == key) {
                 <input type="hidden" name=(key) value=(value)>
             }
         }
-    }
+    })
 }
 
 /// The people with access to the workspace, after its owner: the initials
@@ -427,8 +427,8 @@ const ROLES: [&str; 3] = ["Owner", "Member", "Viewer"];
 /// The workspace's roster: its owner in full, then everyone else with the role
 /// they hold.
 #[component]
-async fn team_card() -> Result {
-    view! {
+async fn team_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Your team")
@@ -494,13 +494,13 @@ async fn team_card() -> Result {
                 )
             )
         )
-    }
+    })
 }
 
 /// The button family: variants, sizes, and states at a glance.
 #[component]
-async fn buttons_card() -> Result {
-    view! {
+async fn buttons_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Buttons")
@@ -544,14 +544,14 @@ async fn buttons_card() -> Result {
                 </div>
             )
         )
-    }
+    })
 }
 
 /// Notices standing on their own: an alert is a surface already, so it needs
 /// no card under it.
 #[component]
-async fn notices() -> Result {
-    view! {
+async fn notices() -> Result<impl View> {
+    Ok(view! {
         <div class="flex flex-col gap-3">
             // The leading icon is an ordinary child: the alert lays out a
             // column for it only when one is there.
@@ -575,14 +575,14 @@ async fn notices() -> Result {
                 alert_description("Push to a branch to see it build here.")
             )
         </div>
-    }
+    })
 }
 
 /// A creation form: a labeled control per field, and a footer that commits or
 /// puts them back.
 #[component]
-async fn create_card() -> Result {
-    view! {
+async fn create_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Create project")
@@ -641,7 +641,7 @@ async fn create_card() -> Result {
                 </form>
             )
         )
-    }
+    })
 }
 
 /// A card that tabs between panels.
@@ -649,8 +649,8 @@ async fn create_card() -> Result {
 /// Which panel shows is in the URL, so each trigger is a link and only the
 /// panel being read is rendered.
 #[component]
-async fn overview_card(state: &State) -> Result {
-    view! {
+async fn overview_card(state: &State) -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Project")
@@ -681,14 +681,14 @@ async fn overview_card(state: &State) -> Result {
                 )
             )
         )
-    }
+    })
 }
 
 /// Environment statuses told through the badge variants, and a rollout told
 /// through the progress bar.
 #[component]
-async fn status_card() -> Result {
-    view! {
+async fn status_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Deployment status")
@@ -730,14 +730,14 @@ async fn status_card() -> Result {
                 </a>
             )
         )
-    }
+    })
 }
 
 /// A settings card whose actions open the overlays. Nothing about a trigger is
 /// special: opening one is navigating to the URL the page renders it open for.
 #[component]
-async fn settings_card(state: &State) -> Result {
-    view! {
+async fn settings_card(state: &State) -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Project settings")
@@ -772,7 +772,7 @@ async fn settings_card(state: &State) -> Result {
                 </div>
             )
         )
-    }
+    })
 }
 
 /// The deployments the table pages through: the commit, the environment it
@@ -800,7 +800,7 @@ const PER_PAGE: usize = 3;
 /// Both the filters and the page come from the URL, so the links below the
 /// table are what change the rows and which page reads as the current one.
 #[component]
-async fn deployments_card(state: &State) -> Result {
+async fn deployments_card(state: &State) -> Result<impl View> {
     let rows: Vec<_> = DEPLOYMENTS
         .into_iter()
         .filter(|&(_, env, status)| state.shows(env, status))
@@ -813,7 +813,7 @@ async fn deployments_card(state: &State) -> Result {
     let previous = state.page_href(page.saturating_sub(1).max(1));
     let next = state.page_href((page + 1).min(pages));
 
-    view! {
+    Ok(view! {
         card(
             card_header(
                 card_title("Deployments")
@@ -896,7 +896,7 @@ async fn deployments_card(state: &State) -> Result {
                 )
             )
         )
-    }
+    })
 }
 
 /// Whether `number` gets a link of its own while `page` is the one being read:
@@ -913,8 +913,8 @@ fn listed(number: usize, page: usize, pages: usize) -> bool {
 
 /// Notification settings mixing checkboxes and switches through their states.
 #[component]
-async fn notifications_card() -> Result {
-    view! {
+async fn notifications_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Notifications")
@@ -966,14 +966,14 @@ async fn notifications_card() -> Result {
                 </div>
             )
         )
-    }
+    })
 }
 
 /// A branch switcher: a menu whose items reach the server, since a menu item
 /// is a button and a form around it is all it takes.
 #[component]
-async fn branches_card(state: &State) -> Result {
-    view! {
+async fn branches_card(state: &State) -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Branches")
@@ -1027,7 +1027,7 @@ async fn branches_card(state: &State) -> Result {
                 </form>
             )
         )
-    }
+    })
 }
 
 /// The plans a workspace can run on: the value each goes by, its name, its
@@ -1041,8 +1041,8 @@ const PLANS: [(&str, &str, &str, bool); 4] = [
 
 /// A plan picker, built on a radio group.
 #[component]
-async fn plan_card() -> Result {
-    view! {
+async fn plan_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Billing plan")
@@ -1077,13 +1077,13 @@ async fn plan_card() -> Result {
             )
             card_footer(button(attrs: attributes! { class="w-full" }, "Upgrade"))
         )
-    }
+    })
 }
 
 /// A FAQ whose answers fold away, one open at a time.
 #[component]
-async fn faq_card() -> Result {
-    view! {
+async fn faq_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Questions")
@@ -1122,14 +1122,14 @@ async fn faq_card() -> Result {
                 )
             )
         )
-    }
+    })
 }
 
 /// A share sheet, and the two things that show on hover: a tooltip carrying a
 /// few words, and a hover card carrying a view.
 #[component]
-async fn share_card() -> Result {
-    view! {
+async fn share_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Share this document")
@@ -1184,14 +1184,14 @@ async fn share_card() -> Result {
                 </div>
             )
         )
-    }
+    })
 }
 
 /// A toolbar of toggles: a segmented control where picking one lets go of the
 /// rest, and toggles that press on their own.
 #[component]
-async fn toolbar_card() -> Result {
-    view! {
+async fn toolbar_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Report")
@@ -1239,13 +1239,13 @@ async fn toolbar_card() -> Result {
                 </div>
             )
         )
-    }
+    })
 }
 
 /// A documentation page header: the trail to it, and the shortcuts it lists.
 #[component]
-async fn docs_card() -> Result {
-    view! {
+async fn docs_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 breadcrumb(
@@ -1288,14 +1288,14 @@ async fn docs_card() -> Result {
                 </div>
             )
         )
-    }
+    })
 }
 
 /// The shapes a page takes while it waits: the roster before it arrives, and
 /// the two ways of saying that work is under way.
 #[component]
-async fn pending_card() -> Result {
-    view! {
+async fn pending_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Restoring the workspace")
@@ -1328,14 +1328,14 @@ async fn pending_card() -> Result {
                 </div>
             )
         )
-    }
+    })
 }
 
 /// A dark-scheme demo: the `dark` class on the wrapper restyles everything
 /// inside it, because components reference theme tokens instead of raw colors.
 #[component]
-async fn deploy_card() -> Result {
-    view! {
+async fn deploy_card() -> Result<impl View> {
+    Ok(view! {
         <div class="dark">
             card(
                 card_header(
@@ -1354,7 +1354,7 @@ async fn deploy_card() -> Result {
                 )
             )
         </div>
-    }
+    })
 }
 
 /// The dialog over the page, shown while the URL names it.
@@ -1363,8 +1363,8 @@ async fn deploy_card() -> Result {
 /// corner button and "Cancel" do as links, and "Save" does by submitting the
 /// form without an overlay among its fields.
 #[component]
-async fn rename_dialog(state: &State) -> Result {
-    view! {
+async fn rename_dialog(state: &State) -> Result<impl View> {
+    Ok(view! {
         dialog(
             open: state.overlay == Some("rename"),
             dialog_content(
@@ -1406,13 +1406,13 @@ async fn rename_dialog(state: &State) -> Result {
                 </form>
             )
         )
-    }
+    })
 }
 
 /// The alert dialog behind the delete action: it asks the question and offers
 /// nothing but the two answers to it.
 #[component]
-async fn delete_dialog(state: &State) -> Result {
+async fn delete_dialog(state: &State) -> Result<impl View> {
     // Bound out here rather than inline: a hyphenated attribute name inside an
     // `attributes!` nested in a `view!` currently trips `topcoat fmt`.
     let labels = attributes! {
@@ -1420,7 +1420,7 @@ async fn delete_dialog(state: &State) -> Result {
         aria-describedby="delete-description"
     };
 
-    view! {
+    Ok(view! {
         alert_dialog(
             open: state.overlay == Some("delete"),
             attrs: labels,
@@ -1450,7 +1450,7 @@ async fn delete_dialog(state: &State) -> Result {
                 )
             )
         )
-    }
+    })
 }
 
 /// The sheet behind the deployments table's "Filters" link: a panel along one
@@ -1459,8 +1459,8 @@ async fn delete_dialog(state: &State) -> Result {
 /// Applying the filters is submitting the form, which puts them in the URL and
 /// leaves out the overlay, so the sheet closes on the filtered table.
 #[component]
-async fn filters_sheet(state: &State) -> Result {
-    view! {
+async fn filters_sheet(state: &State) -> Result<impl View> {
+    Ok(view! {
         sheet(
             open: state.overlay == Some("filters"),
             sheet_content(
@@ -1546,5 +1546,5 @@ async fn filters_sheet(state: &State) -> Result {
                 </form>
             )
         )
-    }
+    })
 }

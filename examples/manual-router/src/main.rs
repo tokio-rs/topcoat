@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
-    router::{Router, href, layout, page, route},
-    view::view,
+    router::{Router, Slot, href, layout, page, route},
+    view::{View, view},
 };
 
 // --- Server -----------------------------------------------------------------
@@ -30,8 +30,8 @@ fn router() -> Router {
 
 // Wraps every page, because every page path starts with `/`.
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    view! {
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <html>
             <head>topcoat::dev::script()</head>
             <body>
@@ -50,56 +50,56 @@ async fn root_layout(slot: Result) -> Result {
                 <hr>
 
                 // The page, or the nested layout wrapping it.
-                (slot?)
+                (slot)
             </body>
         </html>
-    }
+    })
 }
 
 // Wraps `/docs` and every page below it.
 #[layout("/docs")]
-async fn docs_layout(slot: Result) -> Result {
-    view! {
+async fn docs_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <section>
             <p>"docs layout"</p>
-            (slot?)
+            (slot)
         </section>
-    }
+    })
 }
 
 // --- Pages ------------------------------------------------------------------
 
 // A page declares its own path, but still has to be registered in `router`.
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <h1>"home"</h1>
         <p>"registered with .page(home)"</p>
-    }
+    })
 }
 
 #[page("/about")]
-async fn about() -> Result {
-    view! {
+async fn about() -> Result<impl View> {
+    Ok(view! {
         <h1>"about"</h1>
         <p>"#[page(\"/about\")]"</p>
-    }
+    })
 }
 
 #[page("/docs")]
-async fn docs() -> Result {
-    view! {
+async fn docs() -> Result<impl View> {
+    Ok(view! {
         <h1>"docs"</h1>
         <p>"wrapped by #[layout(\"/docs\")]"</p>
-    }
+    })
 }
 
 #[page("/docs/install")]
-async fn install() -> Result {
-    view! {
+async fn install() -> Result<impl View> {
+    Ok(view! {
         <h1>"install"</h1>
         <p>"also wrapped by #[layout(\"/docs\")]"</p>
-    }
+    })
 }
 
 // --- Routes -----------------------------------------------------------------

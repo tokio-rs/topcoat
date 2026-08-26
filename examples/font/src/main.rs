@@ -3,7 +3,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     font::{Font, font, fontsource::fontsource_font},
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::view,
+    view::{View, view},
 };
 
 // `host: Asset` downloads the font files into the asset bundle, so Topcoat
@@ -34,8 +34,8 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -57,5 +57,5 @@ async fn home() -> Result {
                 </h2>
             </body>
         </html>
-    }
+    })
 }

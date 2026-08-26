@@ -3,7 +3,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     router::{Router, RouterBuilderDiscoverExt, page},
     runtime::{Event, procedure},
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -19,8 +19,8 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -51,7 +51,7 @@ async fn home() -> Result {
                 </button>
             </body>
         </html>
-    }
+    })
 }
 
 // The arguments come from the client, so a real application would validate

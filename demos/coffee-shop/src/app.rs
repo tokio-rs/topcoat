@@ -9,13 +9,13 @@ use topcoat::{
     cookie::RouterBuilderCookieExt,
     font::{Font, fontsource::fontsource_font},
     router::{
-        Router, RouterBuilderDiscoverExt,
+        Router, RouterBuilderDiscoverExt, Slot,
         content::Form,
         error::{SeeOther, see_other},
         href, layout, module_router, page, route,
     },
     tailwind,
-    view::{attributes, class, view},
+    view::{View, attributes, class, view},
 };
 
 use crate::{
@@ -45,8 +45,8 @@ pub fn router(db: Db) -> Router {
 
 // The layout in the root module wraps every page.
 #[layout]
-async fn shell(cx: &Cx, slot: Result) -> Result {
-    view! {
+async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -91,7 +91,7 @@ async fn shell(cx: &Cx, slot: Result) -> Result {
                     </nav>
                 </header>
 
-                <main class="mx-auto w-full max-w-3xl flex-1 px-6 py-10">(slot?)</main>
+                <main class="mx-auto w-full max-w-3xl flex-1 px-6 py-10">(slot)</main>
 
                 <footer class="border-t border-border">
                     <p
@@ -105,13 +105,13 @@ async fn shell(cx: &Cx, slot: Result) -> Result {
                 </footer>
             </body>
         </html>
-    }
+    })
 }
 
 // A page in the root module renders at /.
 #[page]
-pub async fn page(cx: &Cx) -> Result {
-    view! {
+pub async fn page(cx: &Cx) -> Result<impl View> {
+    Ok(view! {
         <section class="flex flex-col items-center gap-5 pt-6 text-center">
             <img src=(asset!("./hero.svg")) alt="A cup of coffee" class="size-36">
 
@@ -182,7 +182,7 @@ pub async fn page(cx: &Cx) -> Result {
                 }
             }
         </section>
-    }
+    })
 }
 
 #[derive(Deserialize)]

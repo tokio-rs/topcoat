@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, View, class, component, view},
+    view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
 /// A radio group component: a set of options of which one can be picked.
@@ -27,8 +27,11 @@ use topcoat::{
 /// }
 /// ```
 #[component]
-pub async fn radio_group(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn radio_group(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div
             role="radiogroup"
             class=(class!("grid gap-3", attrs.remove("class")))
@@ -36,7 +39,7 @@ pub async fn radio_group(#[default] mut attrs: Attributes, #[default] child: Vie
         >
             (child)
         </div>
-    }
+    })
 }
 
 /// The classes for the native `<input type="radio">` inside a
@@ -66,11 +69,11 @@ const DOT: StaticClass = class!(
 /// forwarded to the `<input>`; a `class` among them is appended to the
 /// wrapping element's classes. Pair it with a `label` naming the option.
 #[component]
-pub async fn radio_group_item(#[default] mut attrs: Attributes) -> Result {
+pub async fn radio_group_item(#[default] mut attrs: Attributes) -> Result<impl View> {
     // The dot cannot be drawn by the `<input>` itself, which renders no
     // children or pseudo-elements: it is a sibling overlaid on the control,
     // revealed by the input's `peer` state while picked.
-    view! {
+    Ok(view! {
         <span
             class=(class!(
                 "relative inline-flex shrink-0 has-[:disabled]:opacity-50",
@@ -80,5 +83,5 @@ pub async fn radio_group_item(#[default] mut attrs: Attributes) -> Result {
             <input type="radio" class=(RADIO) (attrs)>
             <span class=(DOT)></span>
         </span>
-    }
+    })
 }

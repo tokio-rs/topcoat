@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::view,
+    view::{View, view},
 };
 
 // Registered as app context below, so every request shares this counter.
@@ -23,11 +23,11 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home(cx: &Cx) -> Result {
+async fn home(cx: &Cx) -> Result<impl View> {
     let views = app_context::<PageViews>(cx);
     let current = views.0.fetch_add(1, Ordering::Relaxed) + 1;
 
-    view! {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -42,5 +42,5 @@ async fn home(cx: &Cx) -> Result {
                 </p>
             </body>
         </html>
-    }
+    })
 }

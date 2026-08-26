@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, PromotedStr, StaticClass, View, class, component, view},
+    view::{Attributes, Child, PromotedStr, StaticClass, View, class, component, view},
 };
 
 /// How a [`toggle`] relates to the others sharing its `name`.
@@ -105,18 +105,18 @@ pub async fn toggle(
     mut attrs: Attributes,
     /// The toggle's content.
     #[default]
-    child: View,
-) -> Result {
+    child: Child<'_>,
+) -> Result<impl View> {
     // The input is taken out of the layout rather than hidden outright: a
     // `display: none` control is neither focusable nor announced, while an
     // `sr-only` one still takes keyboard focus and reads as the checkbox or
     // radio button it is, named by the label around it.
-    view! {
+    Ok(view! {
         <label class=(class!(BASE, size.classes(), attrs.remove("class")))>
             <input type=(kind.input_type()) class="sr-only" (attrs)>
             (child)
         </label>
-    }
+    })
 }
 
 /// A row of [`toggle`]s that belong together.
@@ -140,8 +140,11 @@ pub async fn toggle(
 /// }
 /// ```
 #[component]
-pub async fn toggle_group(#[default] mut attrs: Attributes, #[default] child: View) -> Result {
-    view! {
+pub async fn toggle_group(
+    #[default] mut attrs: Attributes,
+    #[default] child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div
             class=(class!(
                 "inline-flex w-fit items-center gap-1 rounded-lg border border-border p-1 \
@@ -152,5 +155,5 @@ pub async fn toggle_group(#[default] mut attrs: Attributes, #[default] child: Vi
         >
             (child)
         </div>
-    }
+    })
 }

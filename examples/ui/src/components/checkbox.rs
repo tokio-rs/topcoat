@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     icon::{icon, iconify::iconify_icon},
-    view::{Attributes, StaticClass, attributes, class, component, view},
+    view::{Attributes, StaticClass, View, attributes, class, component, view},
 };
 
 /// The classes for the native `<input type="checkbox">` inside the
@@ -36,11 +36,11 @@ const CHECKBOX: StaticClass = class!(
 /// }
 /// ```
 #[component]
-pub async fn checkbox(#[default] mut attrs: Attributes) -> Result {
+pub async fn checkbox(#[default] mut attrs: Attributes) -> Result<impl View> {
     // The checkmark cannot be drawn by the `<input>` itself, which renders no
     // children or pseudo-elements: it is a sibling icon overlaid on the
     // control, revealed by the input's `peer` state while checked.
-    view! {
+    Ok(view! {
         <span
             class=(class!(
                 "relative inline-flex shrink-0 has-[:disabled]:opacity-50",
@@ -56,5 +56,5 @@ pub async fn checkbox(#[default] mut attrs: Attributes) -> Result {
                 }
             )
         </span>
-    }
+    })
 }

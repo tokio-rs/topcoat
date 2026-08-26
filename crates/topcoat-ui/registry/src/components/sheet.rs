@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, StaticClass, View, class, component, view},
+    view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
 /// The classes for the [`sheet`] overlay: a layer covering the viewport,
@@ -68,9 +68,9 @@ pub async fn sheet(
     mut attrs: Attributes,
     /// The sheet's content.
     #[default]
-    child: View,
-) -> Result {
-    view! {
+    child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <dialog
             open=(open)
             class=(class!(OVERLAY, FADE, attrs.remove("class")))
@@ -78,7 +78,7 @@ pub async fn sheet(
         >
             (child)
         </dialog>
-    }
+    })
 }
 
 /// The edge a [`sheet_content`] lies against.
@@ -172,14 +172,14 @@ pub async fn sheet_content(
     mut attrs: Attributes,
     /// The panel's sections.
     #[default]
-    child: View,
-) -> Result {
-    view! {
+    child: Child<'_>,
+) -> Result<impl View> {
+    Ok(view! {
         <div
             class=(class!(CONTENT, side.classes(), side.motion(), attrs.remove("class")))
             (attrs)
         >
             (child)
         </div>
-    }
+    })
 }

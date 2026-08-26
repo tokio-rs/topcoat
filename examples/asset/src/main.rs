@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt, asset},
     router::{Router, page},
-    view::view,
+    view::{View, view},
 };
 
 #[tokio::main]
@@ -16,8 +16,8 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>topcoat::dev::script()</head>
@@ -27,5 +27,5 @@ async fn home() -> Result {
                 <img src=(asset!("./ferris.png"))>
             </body>
         </html>
-    }
+    })
 }

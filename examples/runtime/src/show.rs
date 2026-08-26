@@ -1,8 +1,12 @@
-use topcoat::{Result, router::page, view::view};
+use topcoat::{
+    Result,
+    router::page,
+    view::{View, view},
+};
 
 #[page]
-pub async fn page() -> Result {
-    view! {
+pub async fn page() -> Result<impl View> {
+    Ok(view! {
         signal show = false;
 
         <button @click=$(|_e| show.toggle())>
@@ -12,5 +16,5 @@ pub async fn page() -> Result {
 
         // A bind attribute keeps `hidden` in sync with the signal.
         <div :hidden=$(!show.get())>"hello world!"</div>
-    }
+    })
 }

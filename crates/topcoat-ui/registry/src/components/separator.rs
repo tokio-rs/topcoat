@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    view::{Attributes, PromotedStr, StaticClass, class, component, view},
+    view::{Attributes, PromotedStr, StaticClass, View, class, component, view},
 };
 
 /// The direction a [`separator`] runs in.
@@ -79,12 +79,12 @@ pub async fn separator(
     /// Extra attributes for the `<hr>` element.
     #[default]
     mut attrs: Attributes,
-) -> Result {
-    view! {
+) -> Result<impl View> {
+    Ok(view! {
         <hr
             class=(class!(SEPARATOR, orientation.classes(), attrs.remove("class")))
             aria-orientation=(orientation.aria())
             (attrs)
         >
-    }
+    })
 }

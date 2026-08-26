@@ -1,33 +1,33 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Router, layout, page, request::uri},
-    view::view,
+    router::{Router, Slot, layout, page, request::uri},
+    view::{View, view},
 };
 
 mod common;
 use common::send;
 
 #[layout("/")]
-async fn shell(slot: Result) -> Result {
-    view! { <main>(slot?)</main> }
+async fn shell(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! { <main>(slot)</main> })
 }
 
 #[layout("/nested")]
-async fn section_layout(cx: &Cx, slot: Result) -> Result {
-    view! { <section data-path=(uri(cx).path())>(slot?)</section> }
+async fn section_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! { <section data-path=(uri(cx).path())>(slot)</section> })
 }
 
 #[page("/nested/inner")]
-async fn inner() -> Result {
-    view! { "inner" }
+async fn inner() -> Result<impl View> {
+    Ok(view! { "inner" })
 }
 
 // A layout used as a component: the child view is passed as the `slot` prop.
 #[page("/composed")]
-async fn composed() -> Result {
-    let content = view! { <p>"content"</p> }?;
-    view! { shell(slot: Ok(content)) }
+async fn composed() -> Result<impl View> {
+    let content = view! { <p>"content"</p> };
+    Ok(view! { shell(slot: Ok(content)) })
 }
 
 #[tokio::test]
