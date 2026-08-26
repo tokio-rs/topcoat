@@ -18,7 +18,6 @@
 
 mod builder;
 mod capture;
-mod cx_view;
 mod either_view;
 mod join_view;
 mod lazy_view;
@@ -30,7 +29,6 @@ mod then_view;
 
 pub use builder::*;
 pub use capture::*;
-pub use cx_view::*;
 pub use either_view::*;
 pub use join_view::*;
 pub use lazy_view::*;

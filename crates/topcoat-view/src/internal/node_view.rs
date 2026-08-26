@@ -9,7 +9,7 @@ use topcoat_core::{context::Cx, error::Result};
 use crate::{
     BoxView, Child, NodeViewParts, Swap, View,
     buffer::{ViewBuffer, ViewHandle},
-    internal::{CxView, LiveView, MoveView},
+    internal::{LiveView, MoveView},
 };
 
 pin_project! {
@@ -164,9 +164,4 @@ nested_view! {
 nested_view! {
     /// A nested `view!` invocation: it polls through in place.
     impl<Fut> for MoveView<Fut>
-}
-
-nested_view! {
-    /// A `view! { cx => ... }` invocation: it polls through in place.
-    impl<V> for CxView<V>
 }

@@ -4,7 +4,6 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Captured, ClassViewParts, HtmlContext, PartsWriter, PromotedStr, StaticStr, Unescaped,
-    ViewHandle,
 };
 
 /// Converts a value used as an attribute value into view parts.
@@ -222,25 +221,6 @@ impl AttributeValueViewParts for &bool {
     #[inline]
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         (*self).into_view_parts(cx, parts);
-    }
-}
-
-/// A view spliced in verbatim as an attribute value.
-///
-/// The view's content renders exactly as it was sealed when the view was
-/// built, bypassing the attribute value position's escaping. The caller must
-/// ensure that sealing is valid inside a double-quoted attribute value;
-/// content sealed for the text position keeps its double quotes and can
-/// break out of the attribute.
-impl AttributeValueViewParts for Unescaped<ViewHandle> {
-    #[inline]
-    fn attribute_present(&self) -> bool {
-        true
-    }
-
-    #[inline]
-    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_view_handle(self.0);
     }
 }
 
