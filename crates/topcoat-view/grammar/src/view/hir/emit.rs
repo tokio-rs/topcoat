@@ -67,15 +67,17 @@ impl Emitter {
         });
     }
 
-    /// Returns the template's value: the hoist phase, then a `JoinView`
-    /// over the registered units with the burst as its closure.
+    /// Returns a block that runs the hoist phase, builds the template's
+    /// `JoinView`, and ends with `tail` applied to the join expression.
     ///
     /// The units nest as `JoinUnit` pairs terminated by `()`, and their
     /// contents come back in the same nested shape, destructured into the
     /// `__view` identifiers the burst reads. The closure takes ownership of
     /// the hoisted bindings it reads, so the view owns everything it
-    /// renders.
-    pub(super) fn finish(self) -> TokenStream {
+    /// renders. What the hoisted bindings borrow stays alive for the whole
+    /// block, so `tail` can consume the view where those borrows are still
+    /// valid.
+    pub(super) fn finish(self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
         let units = self.units.iter().rev().fold(quote! { () }, |rest, ident| {
             quote! { #topcoat_view::internal::JoinUnit::new(#ident, #rest) }
         });
@@ -87,14 +89,17 @@ impl Emitter {
             });
         let hoist = &self.hoist;
         let burst = &self.burst;
-        quote! {{
-            #hoist
+        let tail = tail(quote! {
             #topcoat_view::internal::JoinView::new(
                 #units,
                 move |__b, #contents| {
                     #burst
                 },
             )
+        });
+        quote! {{
+            #hoist
+            #tail
         }}
     }
 }

@@ -23,7 +23,8 @@ impl Scope {
     ///
     /// The block captures every value the template uses, so the view owns
     /// its data and the expressions inside borrow from the block. The built
-    /// view never leaves the block, which keeps those borrows valid.
+    /// view is driven inside the block that evaluates the template, so what
+    /// its expressions borrow from that block is still alive.
     ///
     /// With `owns_cx`, the block expects an owned `__cx` context in scope
     /// and captures it, rebinding `__cx` to a borrow of it inside; the view
@@ -65,13 +66,21 @@ impl Scope {
 
     /// Emits this scope as a `MoveView` whose async body runs `prologue`,
     /// builds the scope's view, and drives it in place.
+    ///
+    /// The drive happens inside the block that evaluates the template, so
+    /// the view may borrow from that block's bindings, including references
+    /// to temporaries the template declares.
     fn emit_move_view(&self, move_token: TokenStream, prologue: TokenStream) -> TokenStream {
-        let view = self.emit_view();
+        let body = self.emit_view_with(|view| {
+            quote! {
+                let __view = #view;
+                <#topcoat_view::internal::MoveView>::drive(__cx, __view).await
+            }
+        });
         quote! {
             #topcoat_view::internal::MoveView::new(async #move_token {
                 #prologue
-                let __view = #view;
-                <#topcoat_view::internal::MoveView>::drive(__cx, __view).await
+                #body
             })
         }
     }
@@ -85,11 +94,18 @@ impl Scope {
     /// branch or iteration takes its pattern bindings with it, since the
     /// expressions move them into the view.
     pub(crate) fn emit_view(&self) -> TokenStream {
+        self.emit_view_with(|view| view)
+    }
+
+    /// Emits this scope as a block that evaluates the scope's expressions
+    /// in source order, builds its `JoinView`, and ends with `tail` applied
+    /// to that view, inside the block.
+    fn emit_view_with(&self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
         let mut emitter = Emitter::new();
         for node in &self.nodes {
             node.emit(&mut emitter);
         }
-        emitter.finish()
+        emitter.finish(tail)
     }
 }
 
@@ -142,6 +158,20 @@ mod tests {
             out.contains("MoveView > :: drive (__cx , __view) . await"),
             "{out}"
         );
+    }
+
+    #[test]
+    fn a_root_view_is_driven_inside_the_template_block() {
+        let mut builder = ViewBuilder::new();
+        builder.local_binding(&syn::parse_quote!(x), &syn::parse_quote!(&value()));
+        builder.expr(ExprKind::Node, quote! { x });
+        let out = rendered(builder);
+        // The binding borrows a temporary that lives until the end of its
+        // block; the drive runs in that block, so the borrow is still valid.
+        assert!(!out.contains("let __view = {"), "{out}");
+        let block = out.find("{ let x = & value ()").expect(&out);
+        let drive = out.find(":: drive (__cx , __view) . await }").expect(&out);
+        assert!(block < drive, "{out}");
     }
 
     #[test]
