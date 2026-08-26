@@ -3,10 +3,7 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{
-    ParseOption,
-    paths::{topcoat_runtime, topcoat_view},
-};
+use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime};
 
 use crate::{
     attributes::{

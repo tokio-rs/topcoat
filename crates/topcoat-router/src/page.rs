@@ -1,7 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use topcoat_core::context::Cx;
-use topcoat_view::{BoxView, Child, ViewExt, internal::MoveView};
+use topcoat_view::{BoxView, Child, internal::MoveView};
 
 use crate::{
     Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId,
@@ -283,7 +283,7 @@ impl Route for PageWithLayouts {
                 let view = inner.render(body);
                 MoveView::drive(&owned, view).await
             });
-            view.boxed().async_into_response(cx).await
+            view.async_into_response(cx).await
         })
     }
 }
