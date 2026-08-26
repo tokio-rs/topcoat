@@ -107,7 +107,7 @@ impl ToTokens for Shard {
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
-                let __placeholder = #topcoat_view::ViewExt::first(
+                let __placeholder = #topcoat_view::ViewExt::single(
                     #ident::handler(__cx, #(#call_args),*).await?,
                     __cx,
                 )
@@ -156,7 +156,7 @@ impl ToTokens for Shard {
                         let (#(#value_idents,)*) =
                             #topcoat_runtime::Surrogate::into_real(__args);
                         let __view = #ident::handler(cx, #(#call_args),*).await?;
-                        #topcoat_error::Result::Ok(#topcoat_view::ViewExt::first(__view, cx).await?)
+                        #topcoat_error::Result::Ok(#topcoat_view::ViewExt::single(__view, cx).await?)
                     })
                 }
             }

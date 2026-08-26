@@ -48,7 +48,7 @@ async fn sibling_components_render_concurrently_in_source_order() {
         };
 
         assert_eq!(
-            result.first(__cx).await.unwrap().render(__cx),
+            result.single(__cx).await.unwrap().render(__cx),
             "<p><i>a</i>-<i>b</i></p>"
         );
     })
@@ -70,7 +70,7 @@ async fn loop_iterations_render_concurrently_in_iteration_order() {
         };
 
         assert_eq!(
-            result.first(__cx).await.unwrap().render(__cx),
+            result.single(__cx).await.unwrap().render(__cx),
             "<ul><li><i>a</i></li><li><i>b</i></li><li><i>c</i></li></ul>",
         );
     })
@@ -91,7 +91,7 @@ async fn taken_if_branch_renders_concurrently_with_siblings() {
         };
 
         assert_eq!(
-            result.first(__cx).await.unwrap().render(__cx),
+            result.single(__cx).await.unwrap().render(__cx),
             "<i>always</i><i>sometimes</i>"
         );
     })
@@ -121,7 +121,7 @@ async fn taken_match_arm_renders_concurrently_with_siblings() {
         };
 
         assert_eq!(
-            result.first(__cx).await.unwrap().render(__cx),
+            result.single(__cx).await.unwrap().render(__cx),
             "<i>always</i><i>one</i>"
         );
     })
@@ -145,7 +145,7 @@ async fn child_views_render_concurrently_with_their_parents_siblings() {
         };
 
         assert_eq!(
-            result.first(__cx).await.unwrap().render(__cx),
+            result.single(__cx).await.unwrap().render(__cx),
             "<i>sibling</i><div><i>inner</i></div>",
         );
     })
@@ -170,7 +170,7 @@ async fn a_component_renders_concurrently_with_its_own_child() {
         };
 
         assert_eq!(
-            result.first(__cx).await.unwrap().render(__cx),
+            result.single(__cx).await.unwrap().render(__cx),
             "<div><i>inner</i></div>"
         );
     })
@@ -194,7 +194,7 @@ async fn nested_components_render_concurrently_at_every_depth() {
         };
 
         assert_eq!(
-            result.first(__cx).await.unwrap().render(__cx),
+            result.single(__cx).await.unwrap().render(__cx),
             "<div><div><i>deep</i></div></div>",
         );
     })
@@ -218,7 +218,7 @@ async fn joined_components_still_read_earlier_local_bindings() {
     };
 
     assert_eq!(
-        result.first(__cx).await.unwrap().render(__cx),
+        result.single(__cx).await.unwrap().render(__cx),
         "<b>hello</b><b>goodbye</b>",
     );
 }
@@ -241,7 +241,7 @@ async fn concurrent_loop_interleaves_static_markup_in_order() {
         };
 
         assert_eq!(
-            result.first(__cx).await.unwrap().render(__cx),
+            result.single(__cx).await.unwrap().render(__cx),
             "<ol><li value=\"1\"><i>a</i>A</li><li value=\"2\"><i>b</i>B</li></ol>",
         );
     })
@@ -266,7 +266,7 @@ async fn taken_branches_carry_their_pattern_bindings_to_the_join() {
         };
 
         assert_eq!(
-            result.first(__cx).await.unwrap().render(__cx),
+            result.single(__cx).await.unwrap().render(__cx),
             "<i>one</i><i>two</i>"
         );
     })
@@ -291,7 +291,7 @@ async fn taken_match_arms_carry_their_pattern_bindings_to_the_join() {
     };
 
     assert_eq!(
-        result.first(__cx).await.unwrap().render(__cx),
+        result.single(__cx).await.unwrap().render(__cx),
         "<b>always</b><b>picked</b>"
     );
 }
@@ -309,7 +309,7 @@ async fn a_binding_borrowed_from_an_outer_value_lives_until_the_join() {
     };
 
     assert_eq!(
-        result.first(__cx).await.unwrap().render(__cx),
+        result.single(__cx).await.unwrap().render(__cx),
         "<b>always</b><b>borrowed</b>"
     );
 }

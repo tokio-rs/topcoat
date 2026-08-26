@@ -55,7 +55,7 @@ where
                     let render = render
                         .take()
                         .expect("`poll_first` called again after it returned `Ready`");
-                    let view = render(cx.clone());
+                    let view = render(cx.clone()); // TODO maybe we dont need to clone here??
                     self.as_mut().set(Self::View { view });
                 }
                 LazyViewProj::View { view } => return view.poll_first(cx, task, buf),

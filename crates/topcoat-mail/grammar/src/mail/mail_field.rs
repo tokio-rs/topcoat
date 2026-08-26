@@ -77,7 +77,7 @@ impl MailField {
                 quote! {
                     let __html = #view;
                     let __builder = __builder.#method(
-                        #topcoat_view::ViewExt::first(__html, #cx).await?,
+                        #topcoat_view::ViewExt::single(__html, #cx).await?,
                     );
                 }
             }

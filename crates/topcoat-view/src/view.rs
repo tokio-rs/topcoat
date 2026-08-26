@@ -2,7 +2,7 @@ use std::{
     fmt,
     future::poll_fn,
     pin::{Pin, pin},
-    task::{Context, Poll},
+    task::{Context, Poll, Waker},
 };
 
 use futures_core::Stream;
@@ -79,7 +79,8 @@ pub trait ViewExt: View {
     ///
     /// The returned handle is self-contained: it can be rendered, stored,
     /// or spliced into another view. Any updates the view would emit after
-    /// its first content are discarded.
+    /// its first content are discarded; [`single`](ViewExt::single) asserts
+    /// there are none instead.
     fn first(self, cx: &Cx) -> impl Future<Output = Result<ViewHandle>> + Send
     where
         Self: Sized,
@@ -89,6 +90,43 @@ pub trait ViewExt: View {
             let mut view = pin!(self);
             let content = poll_fn(|task| view.as_mut().poll_first(cx, task, &mut buffer)).await?;
             Ok(content.seal(buffer))
+        }
+    }
+
+    /// Resolves the content of a view that never updates.
+    ///
+    /// The returned handle is self-contained, like the one
+    /// [`first`](ViewExt::first) returns. Where `first` discards the updates
+    /// a view emits after its first content, `single` asserts there are
+    /// none: the view must complete right after its first content, without
+    /// emitting or waiting on a swap. This is the method to reach for when
+    /// a view is rendered once, into a fragment or a string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the view is live, that is, if it emits or waits on an
+    /// update after its first content. Such a view is rendered with
+    /// [`live`](ViewExt::live) instead.
+    fn single(self, cx: &Cx) -> impl Future<Output = Result<ViewHandle>> + Send
+    where
+        Self: Sized,
+    {
+        async move {
+            let mut buffer = ViewBuffer::new();
+            let mut view = pin!(self);
+            let content = poll_fn(|task| view.as_mut().poll_first(cx, task, &mut buffer)).await?;
+            let mut task = Context::from_waker(Waker::noop());
+            match view
+                .as_mut()
+                .poll_swap(cx, &mut task, &mut ViewBuffer::new())
+            {
+                Poll::Ready(None) => Ok(content.seal(buffer)),
+                Poll::Ready(Some(Err(error))) => Err(error),
+                Poll::Ready(Some(Ok(_))) | Poll::Pending => panic!(
+                    "`single` called on a live view, which updates after its first content; \
+                     render it with `live` to receive the updates"
+                ),
+            }
         }
     }
 

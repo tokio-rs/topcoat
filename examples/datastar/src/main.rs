@@ -74,7 +74,7 @@ async fn increment(
             (count)
         </li>
     }
-    .first(cx)
+    .single(cx)
     .await?;
 
     // One event updates the counter signal, the other appends the log entry.

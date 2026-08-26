@@ -131,7 +131,7 @@ mod tests {
     #[tokio::test]
     async fn view_handle_responds_with_its_html() {
         let cx = CxTestBuilder::new().build();
-        let handle = view! { cx => <p>"hello"</p> }.first(&cx).await.unwrap();
+        let handle = view! { cx => <p>"hello"</p> }.single(&cx).await.unwrap();
 
         let response = handle.into_response(&cx).unwrap();
 
@@ -153,7 +153,7 @@ mod tests {
             ((HeaderName::from_static("x-custom"), HeaderValue::from_static("yes")))
             <p>"missing"</p>
         }
-        .first(&cx)
+        .single(&cx)
         .await
         .unwrap();
 

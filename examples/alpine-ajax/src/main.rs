@@ -82,7 +82,7 @@ async fn increment(cx: &Cx) -> Result<Response> {
     // An Alpine AJAX request only receives the targeted element.
     if ajax_request(cx) {
         return view! { <span id="count">(count)</span> }
-            .first(cx)
+            .single(cx)
             .await?
             .into_response(cx);
     }

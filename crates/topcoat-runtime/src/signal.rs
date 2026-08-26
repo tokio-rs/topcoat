@@ -247,7 +247,7 @@ mod tests {
 
         let cx = Cx::default();
         let view = NodeView::new(SignalDeclaration::new(&signal));
-        let html = block_on(view.first(&cx)).unwrap().render(&cx);
+        let html = block_on(view.single(&cx)).unwrap().render(&cx);
 
         // The comment context escaped `>`, so the only `-->` left is the
         // marker's own terminator; the payload cannot end the comment early.

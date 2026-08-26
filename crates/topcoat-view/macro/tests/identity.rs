@@ -52,7 +52,7 @@ async fn identities_are_stable_across_renders() {
     let __cx = &cx;
     let render = || async {
         view! { probe(label: "a") }
-            .first(__cx)
+            .single(__cx)
             .await
             .unwrap()
             .render(__cx)
@@ -68,7 +68,7 @@ async fn sibling_invocations_have_distinct_identities() {
         probe(label: "a")
         probe(label: "b")
     }
-    .first(__cx)
+    .single(__cx)
     .await
     .unwrap()
     .render(__cx);
@@ -87,7 +87,7 @@ async fn keys_give_each_iteration_its_own_stable_identity() {
                 probe(key: label, label: label)
             }
         }
-        .first(__cx)
+        .single(__cx)
         .await
         .unwrap()
         .render(__cx);
@@ -110,7 +110,7 @@ async fn the_same_key_at_two_sites_stays_distinct() {
         probe(key: 1, label: "a")
         probe(key: 1, label: "b")
     }
-    .first(__cx)
+    .single(__cx)
     .await
     .unwrap()
     .render(__cx);
@@ -124,7 +124,7 @@ async fn an_unkeyed_component_outside_a_loop_is_unambiguous() {
     let cx = empty_cx();
     let __cx = &cx;
     let rendered = view! { ambiguity() }
-        .first(__cx)
+        .single(__cx)
         .await
         .unwrap()
         .render(__cx);
@@ -140,7 +140,7 @@ async fn an_unkeyed_component_in_a_loop_reports_the_missing_key() {
             ambiguity()
         }
     }
-    .first(__cx)
+    .single(__cx)
     .await
     .unwrap()
     .render(__cx);
@@ -159,7 +159,7 @@ async fn an_ambiguous_invocation_poisons_its_children() {
             wrapper(ambiguity())
         }
     }
-    .first(__cx)
+    .single(__cx)
     .await
     .unwrap()
     .render(__cx);
@@ -178,7 +178,7 @@ async fn a_key_resolves_the_children_of_a_repeated_invocation() {
             wrapper(key: item, probe(label: item))
         }
     }
-    .first(__cx)
+    .single(__cx)
     .await
     .unwrap()
     .render(__cx);

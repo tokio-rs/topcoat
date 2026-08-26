@@ -5,7 +5,7 @@ use topcoat::{
 
 async fn r(v: impl View) -> String {
     let cx = Cx::default();
-    v.first(&cx).await.unwrap().render(&cx)
+    v.single(&cx).await.unwrap().render(&cx)
 }
 
 #[tokio::test]
