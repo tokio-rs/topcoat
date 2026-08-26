@@ -1,4 +1,4 @@
-use topcoat_view::{View, svg::ViewBox};
+use topcoat_view::{ViewHandle, svg::ViewBox};
 
 /// The renderable data of an SVG icon: its view box and its body markup.
 ///
@@ -8,13 +8,13 @@ use topcoat_view::{View, svg::ViewBox};
 #[derive(Debug, Clone)]
 pub struct IconData {
     view_box: ViewBox,
-    body: View,
+    body: ViewHandle,
 }
 
 impl IconData {
     /// Creates an icon from its view box and body view.
     #[must_use]
-    pub fn new(view_box: ViewBox, body: View) -> Self {
+    pub fn new(view_box: ViewBox, body: ViewHandle) -> Self {
         Self { view_box, body }
     }
 
@@ -24,7 +24,7 @@ impl IconData {
     pub const fn unescaped_unchecked(view_box: ViewBox, body: &'static str) -> Self {
         Self {
             view_box,
-            body: View::unescaped_unchecked(body),
+            body: ViewHandle::unescaped_unchecked(body),
         }
     }
 
@@ -36,7 +36,7 @@ impl IconData {
 
     /// Consumes the icon and returns its body view.
     #[must_use]
-    pub fn into_body(self) -> View {
+    pub fn into_body(self) -> ViewHandle {
         self.body
     }
 }

@@ -24,8 +24,8 @@ pub async fn icon(
     /// Extra attributes for the `<svg>` element.
     #[default]
     attrs: Attributes,
-) -> Result<View> {
-    view! {
+) -> Result<impl View> {
+    Ok(view! {
         <svg
             viewBox=(data.view_box())
             width=(size)
@@ -38,5 +38,5 @@ pub async fn icon(
         >
             (data.into_body())
         </svg>
-    }
+    })
 }

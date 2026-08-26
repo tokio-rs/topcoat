@@ -8,7 +8,7 @@ use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
     Result,
-    view::{component, view},
+    view::{View, component, view},
 };
 
 /// Notify the topcoat dev server that the application is ready.
@@ -50,23 +50,25 @@ fn http_to_ws(url: &str) -> String {
     }
 }
 
-// /// Inject the `topcoat dev` client script.
-// ///
-// /// The script reloads the page once a new build is serving, and shows a
-// /// small floating status indicator while the dev server is rebuilding or
-// /// after a build failure. Pass `status_indicator: false` to disable the
-// /// indicator while keeping live reload.
-// ///
-// /// Renders nothing when the app is not running under `topcoat dev`.
-// #[component]
-// pub async fn script(#[default(true)] status_indicator: bool) -> Result {
-//     let Ok(base) = std::env::var("TOPCOAT_DEV_URL") else {
-//         return view! {};
-//     };
-//     let src = format!("{base}/dev.js");
-//     // Read by dev.js; only rendered when the indicator is disabled.
-//     let indicator_off = (!status_indicator).then_some("false");
-//
-//     view! { <script src=(src) data-status-indicator=(indicator_off)></script> }
-// }
-// TODO!
+/// Inject the `topcoat dev` client script.
+///
+/// The script reloads the page once a new build is serving, and shows a
+/// small floating status indicator while the dev server is rebuilding or
+/// after a build failure. Pass `status_indicator: false` to disable the
+/// indicator while keeping live reload.
+///
+/// Renders nothing when the app is not running under `topcoat dev`.
+#[component]
+pub async fn script(#[default(true)] status_indicator: bool) -> Result<impl View> {
+    let src = std::env::var("TOPCOAT_DEV_URL")
+        .ok()
+        .map(|base| format!("{base}/dev.js"));
+    // Read by dev.js; only rendered when the indicator is disabled.
+    let indicator_off = (!status_indicator).then_some("false");
+
+    Ok(view! {
+        if let Some(src) = src {
+            <script src=(src) data-status-indicator=(indicator_off)></script>
+        }
+    })
+}

@@ -48,7 +48,7 @@ async fn home() -> Result<impl View> {
             <head>
                 <title>"Hello world"</title>
                 // Reloads the browser when the dev server rebuilds the app.
-                // topcoat::dev::script() // TODO
+                topcoat::dev::script()
                 (ViewHandle::unescaped_unchecked(SWAP_SCRIPT))
             </head>
             <body>

@@ -28,8 +28,8 @@ pub async fn link(
     /// the stylesheet.
     #[default(true)]
     preload: bool,
-) -> Result<View> {
-    view! {
+) -> Result<impl View> {
+    Ok(view! {
         if preload {
             for face in font.faces().iter() {
                 if let Some(source) = face.src().first() {
@@ -38,7 +38,7 @@ pub async fn link(
             }
         }
         <link rel="stylesheet" href=(font)>
-    }
+    })
 }
 
 /// Renders a `rel="preload"` `<link>` for a single font [`FontSource`].
@@ -50,8 +50,8 @@ pub async fn link(
 pub async fn preload_link(
     /// The font source to preload.
     source: &FontSource,
-) -> Result<View> {
-    view! {
+) -> Result<impl View> {
+    Ok(view! {
         if let FontSource::Url { url, format, .. } = source {
             <link
                 rel="preload"
@@ -61,5 +61,5 @@ pub async fn preload_link(
                 crossorigin="true"
             >
         }
-    }
+    })
 }
