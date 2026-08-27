@@ -7,6 +7,7 @@ use crate::buffer::Instruction;
 pub(super) struct InstructionPtr(usize);
 
 impl InstructionPtr {
+    #[inline]
     pub(super) fn increment(&mut self) {
         self.0 += 1;
     }
@@ -27,15 +28,18 @@ impl InstructionBuffer {
     }
 
     /// Returns the address the next pushed instruction will live at.
+    #[inline]
     #[must_use]
     pub(super) fn next_ptr(&self) -> InstructionPtr {
         InstructionPtr(self.instructions.len())
     }
 
+    #[inline]
     pub(super) fn push(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
     }
 
+    #[inline]
     pub(super) fn fetch(&self, ptr: InstructionPtr) -> &Instruction {
         &self.instructions[ptr.0]
     }

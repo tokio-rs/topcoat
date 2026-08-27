@@ -56,21 +56,25 @@ impl ConstBuffer {
         Self::default()
     }
 
+    #[inline]
     pub(super) fn push_static_str(&mut self, value: &'static str) -> StaticStrPtr {
         self.static_strs.push(value);
         StaticStrPtr(self.static_strs.len() - 1)
     }
 
+    #[inline]
     #[must_use]
     pub(super) fn fetch_static_str(&self, ptr: StaticStrPtr) -> &'static str {
         self.static_strs[ptr.0]
     }
 
+    #[inline]
     pub(super) fn push_string(&mut self, value: String) -> StringPtr {
         self.strings.push(value);
         StringPtr(self.strings.len() - 1)
     }
 
+    #[inline]
     #[must_use]
     pub(super) fn fetch_string(&self, ptr: StringPtr) -> &str {
         &self.strings[ptr.0]
@@ -81,6 +85,7 @@ impl ConstBuffer {
     /// # Panics
     ///
     /// Panics if the string is longer than `u32::MAX` bytes.
+    #[inline]
     pub(super) fn push_str(&mut self, value: &str) -> StrPtr {
         let offset = self.strs.len();
         let len = u32::try_from(value.len()).expect("string exceeds the buffer's length limit");
@@ -88,16 +93,19 @@ impl ConstBuffer {
         StrPtr { offset, len }
     }
 
+    #[inline]
     #[must_use]
     pub(super) fn fetch_str(&self, ptr: StrPtr) -> &str {
         &self.strs[ptr.offset..ptr.offset + ptr.len as usize]
     }
 
+    #[inline]
     pub(super) fn push_dyn(&mut self, value: Box<dyn DynViewPart>) -> DynPtr {
         self.dyns.push(value);
         DynPtr(self.dyns.len() - 1)
     }
 
+    #[inline]
     #[must_use]
     pub(super) fn fetch_dyn(&self, ptr: DynPtr) -> &dyn DynViewPart {
         &*self.dyns[ptr.0]
@@ -105,11 +113,13 @@ impl ConstBuffer {
 
     /// Stores the buffer an owned view holds together with the entry of its
     /// instruction block.
+    #[inline]
     pub(super) fn push_view(&mut self, buffer: Arc<ViewBuffer>, entry: InstructionPtr) -> ViewPtr {
         self.views.push((buffer, entry));
         ViewPtr(self.views.len() - 1)
     }
 
+    #[inline]
     #[must_use]
     pub(super) fn fetch_view(&self, ptr: ViewPtr) -> (&Arc<ViewBuffer>, InstructionPtr) {
         let (buffer, entry) = &self.views[ptr.0];
@@ -117,12 +127,14 @@ impl ConstBuffer {
     }
 
     #[cfg(feature = "http")]
+    #[inline]
     pub(super) fn push_headers(&mut self, value: http::HeaderMap) -> HeadersPtr {
         self.headers.push(value);
         HeadersPtr(self.headers.len() - 1)
     }
 
     #[cfg(feature = "http")]
+    #[inline]
     #[must_use]
     pub(super) fn fetch_headers(&self, ptr: HeadersPtr) -> &http::HeaderMap {
         &self.headers[ptr.0]
