@@ -1,13 +1,13 @@
 use topcoat::{
     Result,
     context::Cx,
-    view::{Child, View, ViewBuffer, ViewExt, component, view},
+    view::{Child, View, ViewExt, component, view},
 };
 
-// `view!` lowers component calls to expressions that reference `__cx` and
-// `__buf`. In real code those names are supplied by `#[page]`, `#[layout]`,
-// and `#[component]`. These tests stand in for those wrappers by binding them
-// by hand and sealing the content into the buffer.
+// `view!` lowers component calls to expressions that reference `__cx`. In
+// real code that name is supplied by `#[page]`, `#[layout]`, and
+// `#[component]`. These tests stand in for those wrappers by binding it by
+// hand.
 fn empty_cx() -> Cx {
     Cx::default()
 }
@@ -27,11 +27,10 @@ async fn greeting(name: &str) -> Result<impl View> {
 async fn component_with_named_arg_renders_inline() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let result = view! { <main>greeting(name: "Ada")</main> };
 
     assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
+        result.single().await.unwrap().render(__cx),
         "<main><h1>Hello, Ada!</h1></main>"
     );
 }
@@ -45,11 +44,10 @@ async fn badge(label: &str, tone: &str) -> Result<impl View> {
 async fn component_with_multiple_named_args_renders_attributes() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let result = view! { badge(label: "New", tone: "success") };
 
     assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
+        result.single().await.unwrap().render(__cx),
         r#"<span class="badge badge-success">New</span>"#,
     );
 }
@@ -68,7 +66,6 @@ async fn panel(title: &str, child: Child<'_>) -> Result<impl View> {
 async fn component_with_trailing_child_nodes_collects_them_as_child_view() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let result = view! {
         panel(
             title: "Profile",
@@ -78,7 +75,7 @@ async fn component_with_trailing_child_nodes_collects_them_as_child_view() {
     };
 
     assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
+        result.single().await.unwrap().render(__cx),
         "<section class=\"panel\"><h2>Profile</h2><div class=\"body\"><p>hello</p><p>world</p></div></section>",
     );
 }
@@ -92,9 +89,8 @@ async fn nested_caller(child: Child<'_>) -> Result<impl View> {
 async fn component_can_call_other_components_and_forward_child_views() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let result = view! { nested_caller(<em>"inner"</em>) };
-    let html = result.single().await.unwrap().seal(__buf).render(__cx);
+    let html = result.single().await.unwrap().render(__cx);
 
     assert!(html.contains("<h2>Outer</h2>"));
     assert!(html.contains("<em>inner</em>"));
@@ -109,13 +105,9 @@ async fn no_args_component() -> Result<impl View> {
 async fn component_without_args_renders() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let result = view! { no_args_component() };
 
-    assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
-        "<p>static</p>"
-    );
+    assert_eq!(result.single().await.unwrap().render(__cx), "<p>static</p>");
 }
 
 #[component]
@@ -128,11 +120,10 @@ async fn uses_cx(cx: &Cx) -> Result<impl View> {
 async fn component_can_take_cx_param() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let result = view! { uses_cx() };
 
     assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
+        result.single().await.unwrap().render(__cx),
         "<p>cx component</p>"
     );
 }
@@ -147,20 +138,13 @@ async fn shout(label: impl Into<String> + Send) -> Result<impl View> {
 async fn component_with_impl_trait_param_accepts_any_impl() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let result = view! { shout(label: "hi") };
 
-    assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
-        "<b>HI</b>"
-    );
+    assert_eq!(result.single().await.unwrap().render(__cx), "<b>HI</b>");
 
     let result = view! { shout(label: String::from("owned")) };
 
-    assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
-        "<b>OWNED</b>"
-    );
+    assert_eq!(result.single().await.unwrap().render(__cx), "<b>OWNED</b>");
 }
 
 #[component]
@@ -178,11 +162,10 @@ async fn item_list(items: impl IntoIterator<Item = u8> + Send) -> Result<impl Vi
 async fn component_with_bounded_impl_trait_param_renders() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let result = view! { item_list(items: vec![1, 2, 3]) };
 
     assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
+        result.single().await.unwrap().render(__cx),
         "<ul><li>1</li><li>2</li><li>3</li></ul>",
     );
 }
@@ -196,11 +179,10 @@ async fn count<T: Send + Sync>(items: Vec<T>) -> Result<impl View> {
 async fn generic_component_renders() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let result = view! { count(items: vec!["a", "b", "c"]) };
 
     assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
+        result.single().await.unwrap().render(__cx),
         "<span>3</span>"
     );
 }
@@ -230,7 +212,6 @@ async fn tree(node: &TreeNode) -> Result<impl View> {
 async fn boxed_component_renders_itself_recursively() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let root = TreeNode {
         label: "root",
         children: vec![
@@ -250,7 +231,7 @@ async fn boxed_component_renders_itself_recursively() {
     let result = view! { <ul>tree(node: &root)</ul> };
 
     assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
+        result.single().await.unwrap().render(__cx),
         "<ul><li>root<ul><li>a<ul><li>a1</li></ul></li><li>b</li></ul></li></ul>",
     );
 }
@@ -281,11 +262,10 @@ async fn odd_steps(n: u32) -> Result<impl View> {
 async fn mutually_recursive_components_need_only_one_boxed() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let result = view! { even_steps(n: 3) };
 
     assert_eq!(
-        result.single().await.unwrap().seal(__buf).render(__cx),
+        result.single().await.unwrap().render(__cx),
         "<i>3</i><b>2</b><i>1</i><b>0</b>",
     );
 }

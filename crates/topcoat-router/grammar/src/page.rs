@@ -137,7 +137,6 @@ impl ToTokens for Page {
             fn render<'a>(
                 &'a self,
                 cx: &'a #topcoat_context::Cx,
-                buf: &'a #topcoat_view::ViewBuffer,
                 body: #topcoat_router::Body,
             ) -> #topcoat_view::BoxView<'a> {
                 ::std::boxed::Box::pin(#topcoat_view::internal::MoveView::new(async move {
@@ -146,7 +145,7 @@ impl ToTokens for Page {
                         #body_prop
                         .build();
                     let view = <#ident as #topcoat_view::Component>::render(
-                        #ident, cx, buf, props,
+                        #ident, cx, props,
                     )
                     .await?;
                     #topcoat_view::internal::drive(view).await

@@ -165,11 +165,7 @@ mod tests {
     use crate::{buffer::ViewBuffer, internal::Builder};
 
     fn render(cx: &Cx, attrs: Attributes) -> String {
-        let buffer = ViewBuffer::new();
-        buffer
-            .block(|parts| Builder::new(cx, parts).attributes(attrs))
-            .seal(&buffer)
-            .render(cx)
+        ViewBuffer::build(|parts| Builder::new(cx, parts).attributes(attrs)).render(cx)
     }
 
     #[test]

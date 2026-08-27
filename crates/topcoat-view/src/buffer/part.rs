@@ -5,7 +5,7 @@ use http::{HeaderMap, StatusCode};
 use topcoat_core::context::Cx;
 
 use crate::{
-    AttributeCollector, CollectedPart, HtmlContext, HtmlWriter, ViewHandle, buffer::Inner,
+    AttributeCollector, CollectedPart, HtmlContext, HtmlWriter, ViewHandle, buffer::ViewBuffer,
 };
 
 /// A boxed view part that writes its output at render time.
@@ -76,7 +76,7 @@ pub struct PartsWriter<'a> {
 impl<'a> PartsWriter<'a> {
     /// Creates a writer that seals everything pushed into it with `context`.
     #[inline]
-    pub(super) fn new(buffer: &'a mut Inner, context: HtmlContext) -> Self {
+    pub(super) fn new(buffer: &'a mut ViewBuffer, context: HtmlContext) -> Self {
         Self {
             sink: Sink::Buffer(buffer),
             context,
@@ -339,8 +339,8 @@ macro_rules! impl_sink_primitive {
 
 /// Where a writer's pushes go.
 enum Sink<'a> {
-    /// The storage of a view buffer under construction.
-    Buffer(&'a mut Inner),
+    /// A view buffer under construction.
+    Buffer(&'a mut ViewBuffer),
     /// The collector capturing one attribute key or value, with the
     /// context it renders parts under.
     Collector {
@@ -465,9 +465,7 @@ mod tests {
 
     /// Builds a view through a writer sealed with `context` and renders it.
     fn render_with(context: HtmlContext, f: impl FnOnce(&mut PartsWriter<'_>)) -> String {
-        let buffer = crate::ViewBuffer::new();
-        let view = buffer.block(|parts| parts.in_context(context, f));
-        view.seal(&buffer).render(&Cx::default())
+        ViewBuffer::build(|parts| parts.in_context(context, f)).render(&Cx::default())
     }
 
     #[test]

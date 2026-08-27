@@ -306,7 +306,7 @@ impl From<ModuleRouterBuilder> for RouterBuilder {
 #[cfg(test)]
 mod tests {
     use topcoat_core::context::Cx;
-    use topcoat_view::{BoxView, ViewBuffer};
+    use topcoat_view::BoxView;
 
     use super::*;
     use crate::{Body, Method, Methods, RouteId};
@@ -331,7 +331,7 @@ mod tests {
             self.module_path
         }
 
-        fn render<'a>(&'a self, _cx: &'a Cx, _buf: &'a ViewBuffer, _body: Body) -> BoxView<'a> {
+        fn render<'a>(&'a self, _cx: &'a Cx, _body: Body) -> BoxView<'a> {
             unreachable!("test render function is never called")
         }
     }

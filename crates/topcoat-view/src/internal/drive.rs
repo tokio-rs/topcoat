@@ -7,7 +7,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{Step, Swap, View, ViewBuffer, ViewHandle};
+use crate::{Step, Swap, View, ViewHandle};
 
 thread_local! {
     /// The tunnel between a collecting poll and the drive inside it, on the
@@ -112,38 +112,20 @@ fn try_yield(emission: &mut Option<Emission>) {
 /// Panics when polled outside the poll of the `view!` template or `live!`
 /// region whose body awaits it.
 #[doc(hidden)]
-pub fn drive<V: View>(view: V) -> DriveView<'static, V> {
+pub fn drive<V: View>(view: V) -> DriveView<V> {
     DriveView {
         view,
-        seal: None,
-        done: false,
-        pending: None,
-    }
-}
-
-/// Returns the future a body awaits to poll `view` in place and seal its
-/// first content into `buf`, the buffer the view was built with.
-///
-/// Like [`drive`], except that the content tunneled out is self-contained,
-/// for a template that builds in a buffer of its own.
-#[doc(hidden)]
-pub fn drive_sealed<V: View>(buf: &ViewBuffer, view: V) -> DriveView<'_, V> {
-    DriveView {
-        view,
-        seal: Some(buf),
         done: false,
         pending: None,
     }
 }
 
 pin_project! {
-    /// The future behind [`drive`] and [`drive_sealed`].
+    /// The future behind [`drive`].
     #[must_use = "futures do nothing unless polled"]
-    pub struct DriveView<'a, V> {
+    pub struct DriveView<V> {
         #[pin]
         view: V,
-        // The buffer the first content is sealed into, if any.
-        seal: Option<&'a ViewBuffer>,
         // Whether the view reported it has no further updates; the future
         // resolves once the emission that came with the report is placed.
         done: bool,
@@ -152,7 +134,7 @@ pin_project! {
     }
 }
 
-impl<V> Future for DriveView<'_, V>
+impl<V> Future for DriveView<V>
 where
     V: View,
 {
@@ -174,10 +156,6 @@ where
             }
             match ready!(this.view.as_mut().poll(cx))? {
                 Step::Content { content, live } => {
-                    let content = match this.seal {
-                        Some(buf) => content.seal(buf),
-                        None => content,
-                    };
                     *this.pending = Some(Emission::Content(content));
                     *this.done = !live;
                 }

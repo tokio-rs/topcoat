@@ -482,11 +482,7 @@ mod tests {
     /// Writes a captured value in attribute value position and renders it.
     fn render(value: &AttributeValue) -> String {
         let cx = Cx::default();
-        let buffer = ViewBuffer::new();
-        buffer
-            .block(|parts| Builder::new(&cx, parts).attribute_value(value))
-            .seal(&buffer)
-            .render(&cx)
+        ViewBuffer::build(|parts| Builder::new(&cx, parts).attribute_value(value)).render(&cx)
     }
 
     #[test]

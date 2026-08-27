@@ -23,10 +23,10 @@ async fn next<V: View>(swaps: &mut Swaps<V>) -> Option<Result<Swap>> {
 async fn region_emitting_once_renders_as_plain_content() {
     let cx = &Cx::default();
     let html = view! { cx => <main>(live! { emit! { load(fail: false) } })</main> }
-    .single()
-    .await
-    .unwrap()
-    .render(cx);
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
 
     assert_eq!(html, "<main><p>loaded</p></main>");
 }
@@ -57,9 +57,9 @@ async fn region_remapping_a_failed_emission_renders_as_plain_content() {
 async fn region_failing_before_its_content_fails_the_view() {
     let cx = &Cx::default();
     let error = view! { cx => <main>(live! { emit! { load(fail: true) } })</main> }
-    .single()
-    .await
-    .unwrap_err();
+        .single()
+        .await
+        .unwrap_err();
 
     assert_eq!(error.to_string(), "boom");
 }

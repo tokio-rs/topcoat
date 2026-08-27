@@ -71,17 +71,12 @@ impl ToTokens for Component {
 
         let attrs = item.attrs;
         item.attrs = vec![parse_quote!(#[allow(clippy::unused_async)])];
-        // The implicit `__cx` context and `__buf` buffer parameters carry
-        // what `view!` bodies read: the request context and the buffer the
-        // component's view builds into.
+        // The implicit `__cx` context parameter carries what `view!` bodies
+        // read: the request context.
         item.sig.generics.params.insert(0, parse_quote! { '__cx });
         item.sig
             .inputs
             .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
-        item.sig
-            .inputs
-            .insert(1, parse_quote! { __buf: &'__cx #topcoat_view::ViewBuffer });
-
         // The `#[default]` and `#[into]` helper attributes are only meaningful to
         // the `Props` derive, which sees them on the generated struct's fields.
         // They are not valid on the re-emitted function's parameters, so strip
@@ -220,7 +215,6 @@ impl ToTokens for Component {
                 fn render<'__cx, '__props>(
                     self,
                     cx: &'__cx #topcoat_context::Cx,
-                    buf: &'__cx #topcoat_view::ViewBuffer,
                     props: Self::Props<'__props>,
                 ) -> ::core::pin::Pin<::std::boxed::Box<
                     dyn ::core::future::Future<Output = #return_ty>
@@ -234,7 +228,7 @@ impl ToTokens for Component {
                 {
                     ::std::boxed::Box::pin(async move {
                         #item
-                        #ident(cx, buf, #(#args),*).await
+                        #ident(cx, #(#args),*).await
                     })
                 }
             }
@@ -243,7 +237,6 @@ impl ToTokens for Component {
                 fn render<'__cx, '__props>(
                     self,
                     cx: &'__cx #topcoat_context::Cx,
-                    buf: &'__cx #topcoat_view::ViewBuffer,
                     props: Self::Props<'__props>,
                 ) -> impl Future<Output = #return_ty> + ::core::marker::Send + '__cx
                 where
@@ -252,7 +245,7 @@ impl ToTokens for Component {
                     Self::Props<'__props>: '__cx,
                 {
                     #item
-                    #ident(cx, buf, #(#args),*)
+                    #ident(cx, #(#args),*)
                 }
             }
         };

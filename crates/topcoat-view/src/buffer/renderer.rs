@@ -4,24 +4,23 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Formatter,
-    buffer::{Inner, Instruction, InstructionPtr, StrPtr},
+    buffer::{Instruction, InstructionPtr, StrPtr, ViewBuffer},
 };
 
 /// Executes a view's instruction block into a [`Formatter`].
 ///
 /// Execution starts at the view's entry, descends into nested views through
-/// [`Call`](Instruction::Call) instructions, follows the
-/// [`Jmp`](Instruction::Jmp) redirects of filled view slots, and finishes
-/// when a [`Ret`](Instruction::Ret) is reached with an empty call stack.
+/// [`Call`](Instruction::Call) instructions, and finishes when a
+/// [`Ret`](Instruction::Ret) is reached with an empty call stack.
 pub(super) struct Renderer<'a> {
-    buffer: &'a Inner,
+    buffer: &'a ViewBuffer,
     ptr: InstructionPtr,
     stack: Vec<InstructionPtr>,
 }
 
 impl<'a> Renderer<'a> {
     #[must_use]
-    pub(super) fn new(buffer: &'a Inner, entry: InstructionPtr) -> Self {
+    pub(super) fn new(buffer: &'a ViewBuffer, entry: InstructionPtr) -> Self {
         Self {
             buffer,
             ptr: entry,
@@ -30,11 +29,6 @@ impl<'a> Renderer<'a> {
     }
 
     /// Executes instructions from the entry until the block returns.
-    ///
-    /// # Panics
-    ///
-    /// Panics if execution reaches a reserved view slot that was never
-    /// filled.
     pub(super) fn execute(&mut self, cx: &Cx, f: &mut Formatter<'_>) {
         use std::fmt::Write;
 
@@ -52,13 +46,9 @@ impl<'a> Renderer<'a> {
                     Some(ptr) => self.ptr = ptr,
                     None => break,
                 },
-                Instruction::Jmp { entry } => self.ptr = *entry,
-                Instruction::Placeholder => {
-                    panic!("tried to render a placeholder view before it was filled")
-                }
                 Instruction::ViewHandle { ptr } => {
                     let (buffer, entry) = consts.fetch_view(*ptr);
-                    Renderer::new(&buffer.lock(), entry).execute(cx, f);
+                    Renderer::new(buffer, entry).execute(cx, f);
                 }
 
                 Instruction::Bool(inner) => f.write_str(if *inner { "true" } else { "false" }),

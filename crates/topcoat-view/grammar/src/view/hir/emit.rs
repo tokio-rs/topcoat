@@ -68,8 +68,8 @@ impl Emitter {
     }
 
     /// Returns a block that runs the hoist phase, builds the template's
-    /// `JoinView` against the ambient `__cx` context and `__buf` buffer,
-    /// and ends with `tail` applied to the join expression.
+    /// `JoinView` against the ambient `__cx` context, and ends with `tail`
+    /// applied to the join expression.
     ///
     /// The units nest as `JoinUnit` pairs terminated by `()`, and their
     /// contents come back in the same nested shape, destructured into the
@@ -93,7 +93,6 @@ impl Emitter {
         let tail = tail(quote! {
             #topcoat_view::internal::JoinView::new(
                 __cx,
-                __buf,
                 #units,
                 move |__b, #contents| {
                     #burst

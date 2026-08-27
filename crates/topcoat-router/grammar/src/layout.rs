@@ -111,7 +111,6 @@ impl ToTokens for Layout {
             fn render<'a>(
                 &'a self,
                 cx: &'a #topcoat_context::Cx,
-                buf: &'a #topcoat_view::ViewBuffer,
                 slot: #topcoat_router::Slot<'a>,
             ) -> #topcoat_view::BoxView<'a> {
                 ::std::boxed::Box::pin(#topcoat_view::internal::MoveView::new(async move {
@@ -119,7 +118,7 @@ impl ToTokens for Layout {
                         .slot(slot)
                         .build();
                     let view = <#ident as #topcoat_view::Component>::render(
-                        #ident, cx, buf, props,
+                        #ident, cx, props,
                     )
                     .await?;
                     #topcoat_view::internal::drive(view).await

@@ -5,10 +5,9 @@ mod instruction;
 mod instruction_buffer;
 mod part;
 mod renderer;
-mod view_slot;
+mod scope;
 
 use core::fmt::NumBuffer;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 #[cfg(feature = "http")]
 use const_buffer::HeadersPtr;
@@ -19,21 +18,18 @@ use instruction::Instruction;
 use instruction_buffer::{InstructionBuffer, InstructionPtr};
 pub use part::*;
 use renderer::Renderer;
-pub use view_slot::*;
+pub(crate) use scope::*;
 
 use crate::HtmlContext;
 
 /// The instruction buffer of a build.
 ///
-/// Every view built against a buffer appends its instructions here, and
-/// rendering a [`ViewHandle`] executes them. A buffer is a handle to shared
-/// storage, so the views of one build all reach the same storage through the
-/// reference they were built with: a component receives it beside the
-/// request context, and a `view!` template captures it from its scope.
-///
-/// A `view!` invocation naming its context, `view! { cx => ... }`, creates a
-/// buffer of its own and seals its content into it, so the content it
-/// resolves to is self-contained.
+/// The outermost view of a build creates a buffer and installs it in a
+/// [`ViewBufferScope`] for the duration of each of its polls. Every view
+/// built inside those polls appends its instructions here, and rendering a
+/// [`ViewHandle`] executes them. Once the outermost view resolves its
+/// content, the buffer is sealed into the handle, which then carries it
+/// wherever it renders.
 ///
 /// # Contiguity
 ///
@@ -44,10 +40,11 @@ use crate::HtmlContext;
 /// happen between a block's first push and its final return instruction.
 /// Futures interleave only at await points, so concurrently built sibling
 /// views each still land in one piece.
-#[derive(Debug, Clone)]
-pub struct ViewBuffer {
+#[derive(Debug)]
+pub(crate) struct ViewBuffer {
     id: ViewBufferId,
-    inner: Arc<Mutex<Inner>>,
+    instructions: InstructionBuffer,
+    consts: ConstBuffer,
 }
 
 impl Default for ViewBuffer {
@@ -59,15 +56,11 @@ impl Default for ViewBuffer {
 impl ViewBuffer {
     /// Creates an empty buffer.
     #[must_use]
-    pub fn new() -> Self {
-        let id = ViewBufferId::next();
+    pub(crate) fn new() -> Self {
         Self {
-            id,
-            inner: Arc::new(Mutex::new(Inner {
-                id,
-                instructions: InstructionBuffer::new(),
-                consts: ConstBuffer::new(),
-            })),
+            id: ViewBufferId::next(),
+            instructions: InstructionBuffer::new(),
+            consts: ConstBuffer::new(),
         }
     }
 
@@ -76,13 +69,12 @@ impl ViewBuffer {
         self.id
     }
 
-    /// Locks the storage for one synchronous burst.
-    ///
-    /// A burst never panics while holding the lock in a way that leaves the
-    /// storage inconsistent, since every push is a single append, so a
-    /// poisoned lock is safe to reuse.
-    fn lock(&self) -> MutexGuard<'_, Inner> {
-        self.inner.lock().unwrap_or_else(PoisonError::into_inner)
+    /// Builds a self-contained view in one synchronous burst from the parts
+    /// `f` pushes: one block in a fresh buffer, sealed into the handle.
+    #[cfg(test)]
+    pub(crate) fn build(f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
+        let mut buffer = Self::new();
+        buffer.block(f).seal(buffer)
     }
 
     /// Appends one view's instruction block in one synchronous burst,
@@ -93,104 +85,15 @@ impl ViewBuffer {
     /// writer's accumulated size hint. `f` must not build other views in
     /// this buffer; nested views are built first and spliced into the block
     /// with [`PartsWriter::push_view_handle`].
-    pub(crate) fn block(&self, f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
-        let mut inner = self.lock();
-        let entry = inner.next_ptr();
-        let mut parts = PartsWriter::new(&mut inner, HtmlContext::Text);
+    pub(crate) fn block(&mut self, f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
+        let entry = self.next_ptr();
+        let mut parts = PartsWriter::new(self, HtmlContext::Text);
         f(&mut parts);
         let size_hint = parts.size_hint();
-        inner.push_ret();
+        self.push_ret();
         ViewHandle::from_scope(self.id, entry, size_hint)
     }
 
-    /// Reserves a slot for a view that resolves later, such as the child of
-    /// a concurrently rendering component.
-    ///
-    /// Returns a placeholder view pointing at the slot and the slot itself.
-    /// Once [`fill_view`](Self::fill_view) redirects the slot, the
-    /// placeholder renders the filled view's content; rendering it before
-    /// that panics. The placeholder carries no size hint, since the filled
-    /// view's is not known yet.
-    #[must_use]
-    pub fn reserve_view(&self) -> (ViewHandle, ViewSlot) {
-        let mut inner = self.lock();
-        let ptr = inner.next_ptr();
-        inner.push_instruction(Instruction::Placeholder);
-        let slot = ViewSlot::new(self.id, ptr);
-        (ViewHandle::from_scope(self.id, ptr, 0), slot)
-    }
-
-    /// Redirects a reserved slot to `view`, resolving its placeholder.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the slot was reserved in a different buffer, if the view
-    /// was built in a different, still building buffer, or if the slot was
-    /// already filled.
-    pub fn fill_view(&self, slot: ViewSlot, view: ViewHandle) {
-        assert!(
-            slot.buffer() == self.id,
-            "tried to fill a view slot outside the `view!` invocation it was reserved in",
-        );
-        let mut inner = self.lock();
-        let entry = match view.repr() {
-            // A static view has no block to jump to, so it is materialized
-            // as one.
-            ViewRepr::Static(body) => {
-                let entry = inner.next_ptr();
-                inner.push_static_str(body, HtmlContext::Unescaped);
-                inner.push_ret();
-                entry
-            }
-            ViewRepr::Scoped { buffer, entry, .. } => {
-                assert!(
-                    buffer == self.id,
-                    "tried to use a view outside the `view!` invocation it was built in",
-                );
-                entry
-            }
-            // A view sealed into this same buffer is a block here already.
-            ViewRepr::Owned { buffer, entry, .. } if buffer.id() == self.id => entry,
-            // An owned view's block lives in its own buffer, so it is
-            // materialized as a block holding one splice instruction.
-            ViewRepr::Owned { buffer, entry, .. } => {
-                let block_entry = inner.next_ptr();
-                let ptr = inner.consts.push_view(buffer, entry);
-                inner.push_instruction(Instruction::ViewHandle { ptr });
-                inner.push_ret();
-                block_entry
-            }
-        };
-        let instruction = inner.instructions.fetch_mut(slot.ptr());
-        assert!(
-            matches!(instruction, Instruction::Placeholder),
-            "tried to fill a view slot twice",
-        );
-        *instruction = Instruction::Jmp { entry };
-    }
-
-    /// Prints the buffer's fields and how many instructions and constants of
-    /// each kind it holds.
-    #[allow(unused)]
-    fn print_stats(&self) {
-        println!("ViewBuffer {{");
-        println!("  id: {:?}", self.id);
-        let inner = self.lock();
-        inner.instructions.print_stats();
-        inner.consts.print_stats();
-        println!("}}");
-    }
-}
-
-/// The storage behind a [`ViewBuffer`], reached under its lock.
-#[derive(Debug)]
-struct Inner {
-    id: ViewBufferId,
-    instructions: InstructionBuffer,
-    consts: ConstBuffer,
-}
-
-impl Inner {
     /// Returns the address the next pushed instruction will live at.
     fn next_ptr(&self) -> InstructionPtr {
         self.instructions.next_ptr()
@@ -223,10 +126,6 @@ impl Inner {
                     buffer == self.id,
                     "tried to use a view outside the `view!` invocation it was built in",
                 );
-                self.push_instruction(Instruction::Call { entry });
-            }
-            // A view sealed into this same buffer is a block here already.
-            ViewRepr::Owned { buffer, entry, .. } if buffer.id() == self.id => {
                 self.push_instruction(Instruction::Call { entry });
             }
             ViewRepr::Owned { buffer, entry, .. } => {
@@ -377,5 +276,16 @@ impl Inner {
     fn push_headers(&mut self, value: http::HeaderMap) {
         let ptr = self.consts.push_headers(value);
         self.push_instruction(Instruction::Headers { ptr });
+    }
+
+    /// Prints the buffer's fields and how many instructions and constants of
+    /// each kind it holds.
+    #[allow(unused)]
+    fn print_stats(&self) {
+        println!("ViewBuffer {{");
+        println!("  id: {:?}", self.id);
+        self.instructions.print_stats();
+        self.consts.print_stats();
+        println!("}}");
     }
 }

@@ -292,11 +292,7 @@ mod tests {
     /// Writes a captured key in attribute key position and renders it.
     fn render(key: &AttributeKey) -> String {
         let cx = Cx::default();
-        let buffer = ViewBuffer::new();
-        buffer
-            .block(|parts| Builder::new(&cx, parts).attribute_key(key))
-            .seal(&buffer)
-            .render(&cx)
+        ViewBuffer::build(|parts| Builder::new(&cx, parts).attribute_key(key)).render(&cx)
     }
 
     #[test]

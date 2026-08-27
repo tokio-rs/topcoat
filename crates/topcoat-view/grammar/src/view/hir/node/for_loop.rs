@@ -32,7 +32,7 @@ impl Emit for ForLoop {
                 for #pat in #expr {
                     __iterations.push(#topcoat_view::ViewExt::boxed(#body));
                 }
-                #topcoat_view::internal::LoopView::new(__buf, __iterations)
+                #topcoat_view::internal::LoopView::new(__iterations)
             };
         });
         emitter.unit(Span::call_site(), &ident);

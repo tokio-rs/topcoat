@@ -8,11 +8,10 @@ use crate::view::View;
 /// The parsed body of a `live!` invocation: plain Rust statements that emit
 /// views at the region with `emit!`.
 ///
-/// Lowers to a [`LiveView`](topcoat_view::internal::LiveView) value over
-/// the ambient `__buf` buffer, wrapping the body as the async block driving
-/// the region verbatim, so it must end in an expression producing the
-/// region's `Result<(), Error>`: the final `emit!` itself, an explicit
-/// `Ok(())`, or a diverging `loop`.
+/// Lowers to a [`LiveView`](topcoat_view::internal::LiveView) value
+/// wrapping the body as the async block driving the region verbatim, so it
+/// must end in an expression producing the region's `Result<(), Error>`:
+/// the final `emit!` itself, an explicit `Ok(())`, or a diverging `loop`.
 pub struct Live {
     pub body: Vec<syn::Stmt>,
 }
@@ -29,7 +28,7 @@ impl ToTokens for Live {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let body = &self.body;
         quote! {
-            #topcoat_view::internal::LiveView::new(__buf, async move {
+            #topcoat_view::internal::LiveView::new(async move {
                 #(#body)*
             })
         }
@@ -116,10 +115,10 @@ mod tests {
     }
 
     #[test]
-    fn live_builds_in_the_ambient_buffer() {
+    fn live_wraps_the_body_alone() {
         let live: Live = syn::parse_str("emit! { \"x\" }").unwrap();
         let out = live.to_token_stream().to_string();
-        assert!(out.contains("LiveView :: new (__buf , async move"), "{out}");
+        assert!(out.contains("LiveView :: new (async move"), "{out}");
     }
 
     #[test]
@@ -130,11 +129,7 @@ mod tests {
             out.starts_with(":: topcoat_view :: internal :: drive ("),
             "{out}"
         );
-        assert!(
-            out.contains("let __buf = :: topcoat_view :: ViewBuffer :: new ()"),
-            "{out}"
-        );
-        assert!(out.contains("drive_sealed (__buf , __view)"), "{out}");
+        assert!(out.contains("ScopeView :: self_contained ("), "{out}");
         assert!(!out.contains("let __cx"), "{out}");
         assert!(out.ends_with(") . await"), "{out}");
     }
@@ -144,6 +139,6 @@ mod tests {
         let emit: Emit = syn::parse_str("cx => <p>\"hi\"</p>").unwrap();
         let out = emit.to_token_stream().to_string();
         assert!(out.contains("let __cx"), "{out}");
-        assert!(out.contains("drive_sealed (__buf , __view)"), "{out}");
+        assert!(out.contains("ScopeView :: self_contained ("), "{out}");
     }
 }

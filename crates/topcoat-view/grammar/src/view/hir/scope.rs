@@ -18,32 +18,34 @@ impl Scope {
         Self { nodes }
     }
 
-    /// Emits a top-level `view!` invocation: a `MoveView` whose `async move`
-    /// body builds the scope's view and drives it in place.
+    /// Emits a top-level `view!` invocation: a `ScopeView` around a
+    /// `MoveView` whose `async move` body builds the scope's view and
+    /// drives it in place.
     ///
     /// The block captures every value the template uses, so the view owns
     /// its data and the expressions inside borrow from the block. The built
     /// view is driven inside the block that evaluates the template, so what
-    /// its expressions borrow from that block is still alive.
+    /// its expressions borrow from that block is still alive. The
+    /// `ScopeView` makes the view own the buffer of the build when it is the
+    /// outermost view; nested inside another build, it appends to that
+    /// build's buffer.
     ///
     /// With `owns_cx`, the block expects an owned `__cx` context in scope
     /// and captures it, rebinding `__cx` to a borrow of it inside; the view
     /// then does not borrow the caller's context. With `self_contained`,
-    /// the block creates the `__buf` buffer the template builds in and
-    /// seals the content into it, so the view does not depend on an
-    /// ambient buffer either.
+    /// the view always owns a buffer of its own, so its content renders
+    /// anywhere even when it is built inside another build.
     pub fn emit_root(&self, owns_cx: bool, self_contained: bool) -> TokenStream {
         let mut prologue = TokenStream::new();
         if owns_cx {
             prologue.extend(quote! { let __cx = &__cx; });
         }
+        let view = self.emit_move_view(&quote! { move }, &prologue);
         if self_contained {
-            prologue.extend(quote! {
-                let __buf = #topcoat_view::ViewBuffer::new();
-                let __buf = &__buf;
-            });
+            quote! { #topcoat_view::internal::ScopeView::self_contained(#view) }
+        } else {
+            quote! { #topcoat_view::internal::ScopeView::new(#view) }
         }
-        self.emit_move_view(&quote! { move }, &prologue, self_contained)
     }
 
     /// Emits this scope as the body of a branch or iteration whose pattern
@@ -65,7 +67,6 @@ impl Scope {
         let view = self.emit_move_view(
             &TokenStream::new(),
             &quote! { let (#(#rebinds,)*) = __captured.take(); },
-            false,
         );
         quote! {{
             let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
@@ -78,23 +79,12 @@ impl Scope {
     ///
     /// The drive happens inside the block that evaluates the template, so
     /// the view may borrow from that block's bindings, including references
-    /// to temporaries the template declares. A `sealed` drive seals the
-    /// content into the `__buf` buffer the prologue created.
-    fn emit_move_view(
-        &self,
-        move_token: &TokenStream,
-        prologue: &TokenStream,
-        sealed: bool,
-    ) -> TokenStream {
-        let drive = if sealed {
-            quote! { #topcoat_view::internal::drive_sealed(__buf, __view) }
-        } else {
-            quote! { #topcoat_view::internal::drive(__view) }
-        };
+    /// to temporaries the template declares.
+    fn emit_move_view(&self, move_token: &TokenStream, prologue: &TokenStream) -> TokenStream {
         let body = self.emit_view_with(|view| {
             quote! {
                 let __view = #view;
-                #drive.await
+                #topcoat_view::internal::drive(__view).await
             }
         });
         quote! {
@@ -171,28 +161,29 @@ mod tests {
     }
 
     #[test]
-    fn a_root_view_is_a_move_view_driving_its_body() {
+    fn a_root_view_is_a_scoped_move_view_driving_its_body() {
         let out = rendered(ViewBuilder::new());
+        assert!(
+            out.starts_with(":: topcoat_view :: internal :: ScopeView :: new ("),
+            "{out}"
+        );
         assert!(out.contains("MoveView :: new (async move"), "{out}");
         assert!(out.contains(":: drive (__view) . await"), "{out}");
     }
 
     #[test]
-    fn a_self_contained_root_creates_and_seals_its_buffer() {
+    fn a_self_contained_root_owns_its_buffer() {
         let out = ViewBuilder::new()
             .finish()
             .emit_root(true, true)
             .to_string();
+        assert!(
+            out.starts_with(":: topcoat_view :: internal :: ScopeView :: self_contained ("),
+            "{out}"
+        );
         assert!(out.contains("let __cx = & __cx ;"), "{out}");
-        assert!(
-            out.contains("let __buf = :: topcoat_view :: ViewBuffer :: new () ;"),
-            "{out}"
-        );
-        assert!(out.contains("let __buf = & __buf ;"), "{out}");
-        assert!(
-            out.contains(":: drive_sealed (__buf , __view) . await"),
-            "{out}"
-        );
+        assert!(!out.contains("__buf"), "{out}");
+        assert!(out.contains(":: drive (__view) . await"), "{out}");
     }
 
     #[test]
@@ -212,7 +203,7 @@ mod tests {
     #[test]
     fn a_view_without_units_joins_over_unit() {
         let out = rendered(ViewBuilder::new());
-        assert!(out.contains("JoinView :: new (__cx , __buf , () , move | __b , () |"));
+        assert!(out.contains("JoinView :: new (__cx , () , move | __b , () |"));
     }
 
     #[test]
@@ -258,7 +249,7 @@ mod tests {
         builder.str_unescaped("</p>");
         let out = rendered(builder);
         assert!(out.contains(
-            "let __expr0 = :: topcoat_view :: internal :: NodeView :: new (__cx , __buf , value)"
+            "let __expr0 = :: topcoat_view :: internal :: NodeView :: new (__cx , value)"
         ));
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
         assert!(out.contains("JoinView :: new"));
@@ -304,7 +295,7 @@ mod tests {
         let out = rendered(builder);
         assert!(out.contains("for x in xs"));
         assert!(out.contains("__iterations . push (:: topcoat_view :: ViewExt :: boxed"));
-        assert!(out.contains("LoopView :: new (__buf , __iterations)"));
+        assert!(out.contains("LoopView :: new (__iterations)"));
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
     }
 

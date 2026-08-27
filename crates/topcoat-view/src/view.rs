@@ -58,7 +58,10 @@ pub enum Step {
 /// A `view!` invocation evaluates to a value implementing this trait, and a
 /// component returns one as `Result<impl View>`. Constructing a view does no
 /// work; everything it writes happens inside [`poll`](View::poll), into the
-/// [`ViewBuffer`](crate::ViewBuffer) the view was built with.
+/// buffer of the build the view is polled in. The outermost view of a build
+/// owns that buffer and resolves to self-contained content; every view
+/// nested inside it resolves to content pointing into the buffer, which the
+/// enclosing views splice into their own.
 ///
 /// The first poll to resolve yields the view's first content. Every poll
 /// after it yields an update one of the view's live regions emitted, until
@@ -83,10 +86,10 @@ pub trait View: Send {
 /// Blanket implemented, so implementing [`View`] is enough to get them and an
 /// implementation never has to care about them.
 ///
-/// The handle a combinator resolves is self-contained when the view builds
-/// in a buffer of its own, as a `view!` invocation naming its context does;
-/// a view built against a shared buffer resolves a handle into that buffer,
-/// which [`ViewHandle::seal`] makes self-contained.
+/// The handle a combinator resolves is self-contained when the view is the
+/// outermost view of its build, as a `view!` invocation polled outside any
+/// other is. A view polled inside an enclosing build resolves a handle into
+/// that build's buffer, which renders only while the build is running.
 pub trait ViewExt: View {
     /// Resolves the view's first content.
     ///

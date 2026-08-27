@@ -142,11 +142,7 @@ mod tests {
 
     fn render(attribute: impl AttributeViewParts) -> String {
         let cx = Cx::default();
-        let buffer = ViewBuffer::new();
-        buffer
-            .block(|parts| Builder::new(&cx, parts).attributes(attribute))
-            .seal(&buffer)
-            .render(&cx)
+        ViewBuffer::build(|parts| Builder::new(&cx, parts).attributes(attribute)).render(&cx)
     }
 
     #[test]

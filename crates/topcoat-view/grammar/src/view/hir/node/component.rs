@@ -139,7 +139,6 @@ impl Component {
             Component::render(
                 #path::default(),
                 __cx,
-                __buf,
                 props,
             )
         }}

@@ -7,24 +7,24 @@ use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    BoxView, Child, NodeViewParts, Step, View, ViewBuffer,
-    internal::{LiveView, MoveView},
+    BoxView, Child, NodeViewParts, Step, View,
+    buffer::ViewBufferScope,
+    internal::{LiveView, MoveView, ScopeView},
 };
 
 pin_project! {
     /// A node position's value as a [`View`].
     ///
     /// The `view!` expansion wraps every dynamic node position in this
-    /// type, with the request context and buffer of the template. A
-    /// [`NodeViewParts`] value renders as a one-shot view, appending its
-    /// parts to the buffer in a single burst and never updating; a nested
-    /// view polls through in place.
+    /// type, with the request context of the template. A [`NodeViewParts`]
+    /// value renders as a one-shot view, appending its parts to the buffer
+    /// of the build in a single burst and never updating; a nested view
+    /// polls through in place.
     ///
     /// A fully generic `T: View` impl would overlap the [`NodeViewParts`]
     /// one, so the nested-view side is implemented per wrapped type instead.
     pub struct NodeView<'a, T> {
         cx: &'a Cx,
-        buf: &'a ViewBuffer,
         #[pin]
         value: Option<T>,
     }
@@ -32,10 +32,9 @@ pin_project! {
 
 impl<'a, T> NodeView<'a, T> {
     #[must_use]
-    pub fn new(cx: &'a Cx, buf: &'a ViewBuffer, value: T) -> Self {
+    pub fn new(cx: &'a Cx, value: T) -> Self {
         Self {
             cx,
-            buf,
             value: Some(value),
         }
     }
@@ -62,9 +61,7 @@ where
             .get_mut()
             .take()
             .expect("`poll` called again after the position's content resolved");
-        let content = this
-            .buf
-            .block(|parts| value.into_view_parts(this.cx, parts));
+        let content = ViewBufferScope::block(|parts| value.into_view_parts(this.cx, parts));
         Poll::Ready(Ok(Step::Content {
             content,
             live: false,
@@ -110,10 +107,16 @@ macro_rules! nested_view {
 
 nested_view! {
     /// A `live!` region: it polls through in place.
-    impl<'b, Fut> for LiveView<'b, Fut>
+    impl<Fut> for LiveView<Fut>
 }
 
 nested_view! {
     /// A nested `view!` invocation: it polls through in place.
     impl<Fut> for MoveView<Fut>
+}
+
+nested_view! {
+    /// A nested `view!` invocation taking part in the build: it polls
+    /// through in place.
+    impl<V> for ScopeView<V>
 }

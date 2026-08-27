@@ -353,7 +353,7 @@ mod tests {
         context::{Cx, app_context, request_context},
         error::Result,
     };
-    use topcoat_view::{BoxView, ViewBuffer, ViewExt, internal::MoveView};
+    use topcoat_view::{BoxView, ViewExt, internal::MoveView};
 
     use super::*;
     use crate::{
@@ -486,7 +486,7 @@ mod tests {
     }
 
     // Page and layout render functions for the rendering tests.
-    fn render_page(cx: &Cx, _buf: &ViewBuffer, _body: Body) -> BoxView<'static> {
+    fn render_page(cx: &Cx, _body: Body) -> BoxView<'static> {
         view! { cx => "page" }.boxed()
     }
 
@@ -507,12 +507,12 @@ mod tests {
         }
     }
 
-    fn render_panicking_page(cx: &Cx, _buf: &ViewBuffer, _body: Body) -> BoxView<'static> {
+    fn render_panicking_page(cx: &Cx, _body: Body) -> BoxView<'static> {
         view! { cx => (Panicking) }.boxed()
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
-    fn layout_root<'a>(cx: &Cx, _buf: &ViewBuffer, slot: Slot<'a>) -> BoxView<'a> {
+    fn layout_root<'a>(cx: &Cx, slot: Slot<'a>) -> BoxView<'a> {
         view! {
             cx =>
             "R["
@@ -523,7 +523,7 @@ mod tests {
     }
 
     /// Wraps the child content in `A[ ... ]`.
-    fn layout_admin<'a>(cx: &Cx, _buf: &ViewBuffer, slot: Slot<'a>) -> BoxView<'a> {
+    fn layout_admin<'a>(cx: &Cx, slot: Slot<'a>) -> BoxView<'a> {
         view! {
             cx =>
             "A["
@@ -696,13 +696,13 @@ mod tests {
         Box::pin(async move { Err(rewrite("/x", Body::empty()).into()) })
     }
 
-    fn render_rewriting_page(_cx: &Cx, _buf: &ViewBuffer, _body: Body) -> BoxView<'static> {
+    fn render_rewriting_page(_cx: &Cx, _body: Body) -> BoxView<'static> {
         Box::pin(MoveView::new(async move {
             Err(rewrite("/x", Body::empty()).into())
         }))
     }
 
-    fn layout_rewrites<'a>(_cx: &Cx, _buf: &ViewBuffer, _slot: Slot<'a>) -> BoxView<'a> {
+    fn layout_rewrites<'a>(_cx: &Cx, _slot: Slot<'a>) -> BoxView<'a> {
         Box::pin(MoveView::new(async move {
             Err(rewrite("/x", Body::empty()).into())
         }))

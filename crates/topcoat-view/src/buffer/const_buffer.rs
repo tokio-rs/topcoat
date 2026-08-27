@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     DynViewPart,
     buffer::{InstructionPtr, ViewBuffer},
@@ -43,7 +45,7 @@ pub(super) struct ConstBuffer {
     strings: Vec<String>,
     strs: String,
     dyns: Vec<Box<dyn DynViewPart>>,
-    views: Vec<(ViewBuffer, InstructionPtr)>,
+    views: Vec<(Arc<ViewBuffer>, InstructionPtr)>,
     #[cfg(feature = "http")]
     headers: Vec<http::HeaderMap>,
 }
@@ -103,13 +105,13 @@ impl ConstBuffer {
 
     /// Stores the buffer an owned view holds together with the entry of its
     /// instruction block.
-    pub(super) fn push_view(&mut self, buffer: ViewBuffer, entry: InstructionPtr) -> ViewPtr {
+    pub(super) fn push_view(&mut self, buffer: Arc<ViewBuffer>, entry: InstructionPtr) -> ViewPtr {
         self.views.push((buffer, entry));
         ViewPtr(self.views.len() - 1)
     }
 
     #[must_use]
-    pub(super) fn fetch_view(&self, ptr: ViewPtr) -> (&ViewBuffer, InstructionPtr) {
+    pub(super) fn fetch_view(&self, ptr: ViewPtr) -> (&Arc<ViewBuffer>, InstructionPtr) {
         let (buffer, entry) = &self.views[ptr.0];
         (buffer, *entry)
     }

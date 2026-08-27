@@ -8,7 +8,10 @@ use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
 use super::drive::{Emission, collect};
-use crate::{RegionId, Step, Swap, View, ViewBuffer, buffer::ViewHandle};
+use crate::{
+    RegionId, Step, Swap, View,
+    buffer::{ViewBufferScope, ViewHandle},
+};
 
 /// The id of the next live region.
 ///
@@ -24,11 +27,10 @@ pin_project! {
     /// `emit!`, which drives a self-contained view in place: the first
     /// emission becomes the region's content, and every later one becomes a
     /// [`Swap`] replacing that content on the client. The content is
-    /// surrounded by marker comments in the buffer the region was built
-    /// with, unless the body completes along with it: a region that emits
-    /// once renders as plain content and never updates.
-    pub struct LiveView<'a, Fut> {
-        buf: &'a ViewBuffer,
+    /// surrounded by marker comments in the buffer of the build, unless the
+    /// body completes along with it: a region that emits once renders as
+    /// plain content and never updates.
+    pub struct LiveView<Fut> {
         #[pin]
         body: Fut,
         // The region's id, decided when its first content is emitted with
@@ -37,21 +39,17 @@ pin_project! {
     }
 }
 
-impl<'a, Fut> LiveView<'a, Fut>
+impl<Fut> LiveView<Fut>
 where
     Fut: Future<Output = Result<()>>,
 {
     #[doc(hidden)]
-    pub fn new(buf: &'a ViewBuffer, body: Fut) -> Self {
-        Self {
-            buf,
-            body,
-            region: None,
-        }
+    pub fn new(body: Fut) -> Self {
+        Self { body, region: None }
     }
 }
 
-impl<Fut> View for LiveView<'_, Fut>
+impl<Fut> View for LiveView<Fut>
 where
     Fut: Future<Output = Result<()>> + Send,
 {
@@ -82,7 +80,7 @@ where
             (Emission::Content(content), None) => {
                 let region = RegionId(NEXT_REGION.fetch_add(1, Ordering::Relaxed));
                 *this.region = Some(region);
-                let content = this.buf.block(|parts| {
+                let content = ViewBufferScope::block(|parts| {
                     parts.push_str_unescaped(&format!("<!--tc:{}-->", region.0));
                     parts.push_view_handle(content);
                     parts.push_str_unescaped(&format!("<!--/tc:{}-->", region.0));

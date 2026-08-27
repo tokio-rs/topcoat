@@ -7,19 +7,21 @@ use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
 
 use super::Builder;
-use crate::{Step, View, ViewBuffer, buffer::ViewHandle};
+use crate::{
+    Step, View,
+    buffer::{ViewBufferScope, ViewHandle},
+};
 
 pin_project! {
     /// A template as a [`View`]: its dynamic node positions driven
     /// concurrently, and its instruction block built from their contents.
     ///
     /// Every unit is driven toward its content; once all have resolved, the
-    /// burst runs, pushing the template's block into the buffer in one
-    /// synchronous burst that splices the contents in position order. After
-    /// that the units' updates merge into one stream of swaps.
+    /// burst runs, pushing the template's block into the buffer of the
+    /// build in one synchronous burst that splices the contents in position
+    /// order. After that the units' updates merge into one stream of swaps.
     pub struct JoinView<'a, U, F> {
         cx: &'a Cx,
-        buf: &'a ViewBuffer,
         #[pin]
         units: U,
         // The burst; taken when the units resolve.
@@ -33,10 +35,9 @@ where
     F: FnOnce(&mut Builder<'_, '_, '_>, U::Contents),
 {
     #[must_use]
-    pub fn new(cx: &'a Cx, buf: &'a ViewBuffer, units: U, burst: F) -> Self {
+    pub fn new(cx: &'a Cx, units: U, burst: F) -> Self {
         Self {
             cx,
-            buf,
             units,
             burst: Some(burst),
         }
@@ -56,9 +57,8 @@ where
         ready!(this.units.as_mut().poll_contents(cx))?;
         let contents = this.units.as_mut().take_contents();
         let burst = this.burst.take().expect("the burst is still to run");
-        let content = this
-            .buf
-            .block(|parts| burst(&mut Builder::new(this.cx, parts), contents));
+        let content =
+            ViewBufferScope::block(|parts| burst(&mut Builder::new(this.cx, parts), contents));
         Poll::Ready(Ok(Step::Content {
             content,
             live: this.units.is_live(),

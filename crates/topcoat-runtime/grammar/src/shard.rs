@@ -108,7 +108,7 @@ impl ToTokens for Shard {
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
                 let __placeholder = #topcoat_view::ViewExt::single(
-                    #ident::handler(__cx, __buf, #(#call_args),*).await?,
+                    #ident::handler(__cx, #(#call_args),*).await?,
                 )
                 .await?;
                 let __scope = #topcoat_runtime::ReactiveScope::new(
@@ -124,13 +124,12 @@ impl ToTokens for Shard {
         // associated function. Associated items are reached through the type
         // rather than lexical scope, so `#ident::handler` is callable from
         // the component face and the trait implementation below. The leading
-        // `__cx` and `__buf` parameters carry the ambient context and buffer
-        // that `view!` bodies read.
+        // `__cx` parameter carries the ambient context that `view!` bodies
+        // read.
         let handler = quote! {
             impl #ident {
                 async fn handler(
                     __cx: &#topcoat_context::Cx,
-                    __buf: &#topcoat_view::ViewBuffer,
                     #inputs
                 ) #output #block
             }
@@ -158,12 +157,11 @@ impl ToTokens for Shard {
                                 ::from_request(cx, body).await?;
                         let (#(#value_idents,)*) =
                             #topcoat_runtime::Surrogate::into_real(__args);
-                        // The handler's view builds into a buffer of this
-                        // request's own, so its content is sealed into it.
-                        let __buf = #topcoat_view::ViewBuffer::new();
-                        let __view = #ident::handler(cx, &__buf, #(#call_args),*).await?;
-                        let __content = #topcoat_view::ViewExt::single(__view).await?;
-                        #topcoat_error::Result::Ok(__content.seal(&__buf))
+                        // The handler's view is the outermost view of this
+                        // request's build, so its content is self-contained.
+                        let __view = #ident::handler(cx, #(#call_args),*).await?;
+                        let __view = #topcoat_view::internal::ScopeView::new(__view);
+                        #topcoat_view::ViewExt::single(__view).await
                     })
                 }
             }

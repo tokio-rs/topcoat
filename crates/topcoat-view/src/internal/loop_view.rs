@@ -5,7 +5,10 @@ use std::{
 
 use topcoat_core::error::Result;
 
-use crate::{Step, View, ViewBuffer, buffer::ViewHandle};
+use crate::{
+    Step, View,
+    buffer::{ViewBufferScope, ViewHandle},
+};
 
 /// The iterations of a `for` body as one node value.
 ///
@@ -16,8 +19,7 @@ use crate::{Step, View, ViewBuffer, buffer::ViewHandle};
 /// The iterations share one view type, so the expansion boxes each body.
 /// The `Unpin` bound this trades on is what lets the loop hold its views in
 /// a plain `Vec`.
-pub struct LoopView<'a, V> {
-    buf: &'a ViewBuffer,
+pub struct LoopView<V> {
     iterations: Vec<Iteration<V>>,
     /// Whether the loop's block was built from the iterations' contents.
     built: bool,
@@ -30,14 +32,13 @@ struct Iteration<V> {
     content: Option<ViewHandle>,
 }
 
-impl<'a, V> LoopView<'a, V>
+impl<V> LoopView<V>
 where
     V: View + Unpin,
 {
     #[must_use]
-    pub fn new(buf: &'a ViewBuffer, views: Vec<V>) -> Self {
+    pub fn new(views: Vec<V>) -> Self {
         Self {
-            buf,
             iterations: views
                 .into_iter()
                 .map(|view| Iteration {
@@ -78,7 +79,7 @@ where
         if !ready {
             return Poll::Pending;
         }
-        let content = self.buf.block(|parts| {
+        let content = ViewBufferScope::block(|parts| {
             for iteration in &mut self.iterations {
                 let content = iteration
                     .content
@@ -134,7 +135,7 @@ where
     }
 }
 
-impl<V> View for LoopView<'_, V>
+impl<V> View for LoopView<V>
 where
     V: View + Unpin,
 {

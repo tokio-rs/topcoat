@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use topcoat::{
     Result,
     context::Cx,
-    view::{Child, View, ViewBuffer, ViewExt, component, identity::Identity, view},
+    view::{Child, View, ViewExt, component, identity::Identity, view},
 };
 
 fn empty_cx() -> Cx {
@@ -50,13 +50,11 @@ fn ids(rendered: &str) -> HashMap<String, String> {
 async fn identities_are_stable_across_renders() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let render = || async {
         view! { probe(label: "a") }
             .single()
             .await
             .unwrap()
-            .seal(__buf)
             .render(__cx)
     };
     assert_eq!(render().await, render().await);
@@ -66,7 +64,6 @@ async fn identities_are_stable_across_renders() {
 async fn sibling_invocations_have_distinct_identities() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let rendered = view! {
         probe(label: "a")
         probe(label: "b")
@@ -74,7 +71,6 @@ async fn sibling_invocations_have_distinct_identities() {
     .single()
     .await
     .unwrap()
-    .seal(__buf)
     .render(__cx);
 
     let ids = ids(&rendered);
@@ -85,7 +81,6 @@ async fn sibling_invocations_have_distinct_identities() {
 async fn keys_give_each_iteration_its_own_stable_identity() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let render = |labels: Vec<&'static str>| async move {
         let rendered = view! {
             for label in labels {
@@ -95,7 +90,6 @@ async fn keys_give_each_iteration_its_own_stable_identity() {
         .single()
         .await
         .unwrap()
-        .seal(__buf)
         .render(__cx);
         ids(&rendered)
     };
@@ -112,7 +106,6 @@ async fn keys_give_each_iteration_its_own_stable_identity() {
 async fn the_same_key_at_two_sites_stays_distinct() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let rendered = view! {
         probe(key: 1, label: "a")
         probe(key: 1, label: "b")
@@ -120,7 +113,6 @@ async fn the_same_key_at_two_sites_stays_distinct() {
     .single()
     .await
     .unwrap()
-    .seal(__buf)
     .render(__cx);
 
     let ids = ids(&rendered);
@@ -131,13 +123,7 @@ async fn the_same_key_at_two_sites_stays_distinct() {
 async fn an_unkeyed_component_outside_a_loop_is_unambiguous() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
-    let rendered = view! { ambiguity() }
-        .single()
-        .await
-        .unwrap()
-        .seal(__buf)
-        .render(__cx);
+    let rendered = view! { ambiguity() }.single().await.unwrap().render(__cx);
     assert_eq!(rendered, "ok");
 }
 
@@ -145,7 +131,6 @@ async fn an_unkeyed_component_outside_a_loop_is_unambiguous() {
 async fn an_unkeyed_component_in_a_loop_reports_the_missing_key() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let rendered = view! {
         for _ in 0..1 {
             ambiguity()
@@ -154,7 +139,6 @@ async fn an_unkeyed_component_in_a_loop_reports_the_missing_key() {
     .single()
     .await
     .unwrap()
-    .seal(__buf)
     .render(__cx);
 
     assert!(rendered.contains("`ambiguity`"), "names the invocation");
@@ -166,7 +150,6 @@ async fn an_unkeyed_component_in_a_loop_reports_the_missing_key() {
 async fn an_ambiguous_invocation_poisons_its_children() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let rendered = view! {
         for _ in 0..1 {
             wrapper(ambiguity())
@@ -175,7 +158,6 @@ async fn an_ambiguous_invocation_poisons_its_children() {
     .single()
     .await
     .unwrap()
-    .seal(__buf)
     .render(__cx);
 
     // The child's error names the outermost invocation missing its key.
@@ -186,7 +168,6 @@ async fn an_ambiguous_invocation_poisons_its_children() {
 async fn a_key_resolves_the_children_of_a_repeated_invocation() {
     let cx = empty_cx();
     let __cx = &cx;
-    let __buf = &ViewBuffer::new();
     let items = vec!["a", "b"];
     let rendered = view! {
         for item in items {
@@ -196,7 +177,6 @@ async fn a_key_resolves_the_children_of_a_repeated_invocation() {
     .single()
     .await
     .unwrap()
-    .seal(__buf)
     .render(__cx);
 
     let ids = ids(&rendered);

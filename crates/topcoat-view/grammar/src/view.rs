@@ -53,20 +53,16 @@ impl Parse for View {
 impl View {
     /// Expands the view to the expression evaluating to its value.
     ///
-    /// A self-contained view builds in a buffer of its own and seals its
-    /// content into it, so what it resolves to renders anywhere. Otherwise
-    /// the view builds into the ambient `__buf` buffer of its scope and
-    /// resolves to a handle into it. A view naming its context is always
-    /// self-contained, since it may be built outside any scope providing a
-    /// buffer.
+    /// The view owns the buffer of the build when it is the outermost view
+    /// polled, and appends to the enclosing build's buffer otherwise. A
+    /// self-contained view always builds in a buffer of its own, so what it
+    /// resolves to renders anywhere.
     #[must_use]
     pub fn expand(&self, self_contained: bool) -> TokenStream {
         let mut builder = ViewBuilder::new();
         self.nodes.lower(&mut builder);
         let owns_cx = self.cx.is_some();
-        let view = builder
-            .finish()
-            .emit_root(owns_cx, self_contained || owns_cx);
+        let view = builder.finish().emit_root(owns_cx, self_contained);
 
         // When an explicit context is named, the view owns a copy of it
         // rather than borrowing it, so the view can outlive the binding it
@@ -165,16 +161,16 @@ mod tests {
     }
 
     #[test]
-    fn explicit_cx_builds_in_its_own_buffer() {
+    fn explicit_cx_takes_part_in_the_enclosing_build() {
         let tokens = parse("cx => <div></div>").to_token_stream().to_string();
-        assert!(tokens.contains("let __buf"), "{tokens}");
-        assert!(tokens.contains("drive_sealed (__buf , __view)"), "{tokens}");
+        assert!(tokens.contains("ScopeView :: new ("), "{tokens}");
+        assert!(!tokens.contains("self_contained"), "{tokens}");
     }
 
     #[test]
-    fn omitted_cx_builds_in_the_ambient_buffer() {
+    fn omitted_cx_takes_part_in_the_enclosing_build() {
         let tokens = parse("<div></div>").to_token_stream().to_string();
-        assert!(!tokens.contains("let __buf"), "{tokens}");
+        assert!(tokens.contains("ScopeView :: new ("), "{tokens}");
         assert!(tokens.contains("drive (__view)"), "{tokens}");
     }
 
@@ -182,7 +178,6 @@ mod tests {
     fn a_self_contained_expansion_keeps_the_ambient_cx() {
         let tokens = parse("<div></div>").expand(true).to_string();
         assert!(!tokens.contains("let __cx"), "{tokens}");
-        assert!(tokens.contains("let __buf"), "{tokens}");
-        assert!(tokens.contains("drive_sealed (__buf , __view)"), "{tokens}");
+        assert!(tokens.contains("ScopeView :: self_contained ("), "{tokens}");
     }
 }

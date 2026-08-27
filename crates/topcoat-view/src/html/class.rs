@@ -397,11 +397,7 @@ mod tests {
 
     fn render(class: Class<impl ClassEntries>) -> String {
         let cx = Cx::default();
-        let buffer = ViewBuffer::new();
-        buffer
-            .block(|parts| Builder::new(&cx, parts).attribute_value(class))
-            .seal(&buffer)
-            .render(&cx)
+        ViewBuffer::build(|parts| Builder::new(&cx, parts).attribute_value(class)).render(&cx)
     }
 
     #[test]

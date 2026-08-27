@@ -11,10 +11,6 @@ pub(super) enum Instruction {
     Call { entry: InstructionPtr },
     /// Return back to the previous call instruction, if any.
     Ret,
-    /// Jump to `entry` without recording a return address.
-    Jmp { entry: InstructionPtr },
-    /// Holds a reserved slot until it is filled; executing it panics.
-    Placeholder,
     /// Execute a spliced owned view's block in the buffer it carries.
     ViewHandle { ptr: ViewPtr },
 

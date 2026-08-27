@@ -224,7 +224,10 @@ mod tests {
         task::{Context, Poll, Waker},
     };
 
-    use topcoat_view::{ViewBuffer, ViewExt, internal::NodeView};
+    use topcoat_view::{
+        ViewExt,
+        internal::{NodeView, ScopeView},
+    };
 
     use super::*;
 
@@ -246,9 +249,8 @@ mod tests {
         let signal = Signal::new(String::from("a-->b\"c&d"));
 
         let cx = Cx::default();
-        let buf = ViewBuffer::new();
-        let view = NodeView::new(&cx, &buf, SignalDeclaration::new(&signal));
-        let html = block_on(view.single()).unwrap().seal(&buf).render(&cx);
+        let view = ScopeView::new(NodeView::new(&cx, SignalDeclaration::new(&signal)));
+        let html = block_on(view.single()).unwrap().render(&cx);
 
         // The comment context escaped `>`, so the only `-->` left is the
         // marker's own terminator; the payload cannot end the comment early.
