@@ -351,7 +351,7 @@ mod tests {
     }
 
     #[test]
-    fn children_pass_as_a_lazy_child_value() {
+    fn children_pass_as_a_child_value() {
         let mut builder = ViewBuilder::new();
         add_component_with_children(&mut builder, "wrapper", &syn::parse_quote!(inner()));
         let out = rendered(builder);

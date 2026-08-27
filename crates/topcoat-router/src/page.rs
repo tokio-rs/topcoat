@@ -60,7 +60,7 @@ impl<P: Page + ?Sized> Page for &'static P {
         (**self).path()
     }
 
-    fn render<'a>(&self, cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a> {
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a> {
         (**self).render(cx, buf, body)
     }
 }
@@ -132,13 +132,6 @@ impl Page for PageFn {
 
 /// The content a [`Layout`] wraps: the page, already composed with any inner
 /// layouts.
-///
-/// Interpolating the slot into the layout's template renders it there,
-/// under the template's request context: the slot is built lazily, with the
-/// context and buffer of the template interpolating it. A layout provides
-/// request context values to everything beneath it by deriving a context
-/// with [`Cx::with`](topcoat_core::context::Cx::with) and rendering its
-/// template under it (`view! { cx => ... }`).
 pub type Slot<'a> = Child<'a>;
 
 /// A layout handler that wraps pages whose path starts with the layout's path
@@ -175,7 +168,8 @@ inventory::collect!(&'static dyn Layout);
 
 /// The render function backing a [`LayoutFn`], receiving the child content as
 /// a [`Slot`].
-pub type LayoutRenderFn = for<'a> fn(cx: &Cx, buf: &ViewBuffer, slot: Slot<'a>) -> BoxView<'a>;
+pub type LayoutRenderFn =
+    for<'a> fn(cx: &'a Cx, buf: &'a ViewBuffer, slot: Slot<'a>) -> BoxView<'a>;
 
 /// A [`Layout`] backed by a plain render function.
 ///
@@ -209,7 +203,7 @@ impl Layout for LayoutFn {
         &self.path
     }
 
-    fn render<'s>(&'s self, cx: &Cx, buf: &ViewBuffer, slot: Slot<'s>) -> BoxView<'s> {
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, slot: Slot<'a>) -> BoxView<'a> {
         (self.render)(cx, buf, slot)
     }
 }
@@ -231,20 +225,12 @@ impl PageWithLayoutsInner {
     /// Composes the page with its layouts: the page is the innermost slot,
     /// each layout wraps the slot beneath it, and the outermost layout is
     /// the view.
-    ///
-    /// Nothing runs until the view is polled: each layout decides when its
-    /// slot renders and which context it sees, since every slot is built
-    /// lazily with the context and buffer of the template interpolating it.
     fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a> {
-        let Some((outermost, inner)) = self.layouts.split_first() else {
-            return self.page.render(cx, buf, body);
-        };
-        let page = &self.page;
-        let mut slot = Slot::lazy(move |cx, buf| page.render(cx, buf, body));
-        for layout in inner.iter().rev() {
-            slot = Slot::lazy(move |cx, buf| layout.render(cx, buf, slot));
+        let mut view = self.page.render(cx, buf, body);
+        for layout in self.layouts.iter().rev() {
+            view = layout.render(cx, buf, Slot::new(view));
         }
-        outermost.render(cx, buf, slot)
+        view
     }
 }
 

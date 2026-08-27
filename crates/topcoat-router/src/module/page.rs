@@ -19,7 +19,7 @@ pub trait ModulePage: Send + Sync + 'static {
     fn module_path(&self) -> &'static str;
 
     /// Renders the page [`View`] building into `buf` under `cx`.
-    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_>;
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a>;
 
     /// Returns whether this page handles the current request.
     ///
@@ -48,7 +48,7 @@ impl<P: ModulePage + ?Sized> ModulePage for &'static P {
         (**self).module_path()
     }
 
-    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_> {
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a> {
         (**self).render(cx, buf, body)
     }
 }
@@ -82,7 +82,7 @@ impl<P: ModulePage> Page for ResolvedPage<P> {
         &self.path
     }
 
-    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_> {
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a> {
         self.page.render(cx, buf, body)
     }
 }
@@ -99,7 +99,7 @@ pub trait ModuleLayout: Send + Sync + 'static {
 
     /// Renders the layout, embedding the given child content [`Slot`], into
     /// `buf` under `cx`.
-    fn render<'s>(&'s self, cx: &Cx, buf: &ViewBuffer, slot: Slot<'s>) -> BoxView<'s>;
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, slot: Slot<'a>) -> BoxView<'a>;
 }
 
 impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
@@ -107,7 +107,7 @@ impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
         (**self).module_path()
     }
 
-    fn render<'s>(&'s self, cx: &Cx, buf: &ViewBuffer, slot: Slot<'s>) -> BoxView<'s> {
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, slot: Slot<'a>) -> BoxView<'a> {
         (**self).render(cx, buf, slot)
     }
 }
@@ -133,7 +133,7 @@ impl<L: ModuleLayout> Layout for ResolvedLayout<L> {
         &self.path
     }
 
-    fn render<'s>(&'s self, cx: &Cx, buf: &ViewBuffer, slot: Slot<'s>) -> BoxView<'s> {
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, slot: Slot<'a>) -> BoxView<'a> {
         self.layout.render(cx, buf, slot)
     }
 }

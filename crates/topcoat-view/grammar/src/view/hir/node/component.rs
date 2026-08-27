@@ -109,7 +109,7 @@ impl Component {
     /// Returns the expression yielding this component's render future, with
     /// the props evaluated eagerly.
     ///
-    /// The invocation's child nodes pass as a lazy [`Child`]: the component
+    /// The invocation's child nodes pass as a [`Child`]: the component
     /// decides where they render by interpolating the value into its own
     /// template, which drives them concurrently with the rest of it.
     fn render_future(&self) -> TokenStream {

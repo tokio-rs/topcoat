@@ -72,8 +72,7 @@ where
     }
 }
 
-/// A component's child content: the children's view polls through in place,
-/// built against this position's context and buffer if it was deferred.
+/// A component's child content: the children's view polls through in place.
 impl View for NodeView<'_, Child<'_>> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let this = self.project();
@@ -82,7 +81,7 @@ impl View for NodeView<'_, Child<'_>> {
             .get_mut()
             .as_mut()
             .expect("a nested view keeps its value");
-        child.view(this.cx, this.buf).poll(cx)
+        child.view().poll(cx)
     }
 }
 

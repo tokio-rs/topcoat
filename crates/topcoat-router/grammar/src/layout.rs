@@ -107,24 +107,19 @@ impl ToTokens for Layout {
             #item
         };
 
-        // The view owns copies of the request context and buffer it is
-        // rendered with and drives the component's view in place, which
-        // lets the view borrow them.
         let render = quote! {
-            fn render<'s>(
-                &'s self,
-                cx: &#topcoat_context::Cx,
-                buf: &#topcoat_view::ViewBuffer,
-                slot: #topcoat_router::Slot<'s>,
-            ) -> #topcoat_view::BoxView<'s> {
-                let cx = cx.clone();
-                let buf = buf.clone();
+            fn render<'a>(
+                &'a self,
+                cx: &'a #topcoat_context::Cx,
+                buf: &'a #topcoat_view::ViewBuffer,
+                slot: #topcoat_router::Slot<'a>,
+            ) -> #topcoat_view::BoxView<'a> {
                 ::std::boxed::Box::pin(#topcoat_view::internal::MoveView::new(async move {
                     let props = <#ident as #topcoat_view::Component>::props_builder()
                         .slot(slot)
                         .build();
                     let view = <#ident as #topcoat_view::Component>::render(
-                        #ident, &cx, &buf, props,
+                        #ident, cx, buf, props,
                     )
                     .await?;
                     #topcoat_view::internal::drive(view).await

@@ -331,7 +331,7 @@ mod tests {
             self.module_path
         }
 
-        fn render(&self, _cx: &Cx, _buf: &ViewBuffer, _body: Body) -> BoxView<'_> {
+        fn render<'a>(&'a self, _cx: &'a Cx, _buf: &'a ViewBuffer, _body: Body) -> BoxView<'a> {
             unreachable!("test render function is never called")
         }
     }
