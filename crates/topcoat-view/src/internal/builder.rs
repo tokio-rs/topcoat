@@ -2,7 +2,8 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts, HtmlContext,
-    PartsWriter, Unescaped, ViewHandle, buffer::ViewBufferScope, html::ElementNameViewParts,
+    NodeViewParts, PartsWriter, Unescaped, ViewHandle, buffer::ViewBufferScope,
+    html::ElementNameViewParts,
 };
 
 /// The handle a block is filled through: the request context plus a writer
@@ -51,6 +52,15 @@ impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
     #[inline]
     pub fn markup(&mut self, s: &'static &'static str) {
         self.parts.push_promoted_str_unescaped(s);
+    }
+
+    /// Appends a value in a text node position.
+    #[inline]
+    pub fn node(&mut self, value: impl NodeViewParts) {
+        let cx = self.cx;
+        self.parts.in_context(HtmlContext::Text, |parts| {
+            value.into_view_parts(cx, parts);
+        });
     }
 
     /// Appends a value in an element name position.

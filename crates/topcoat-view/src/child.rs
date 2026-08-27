@@ -1,6 +1,11 @@
-use std::pin::Pin;
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-use crate::{BoxView, View};
+use topcoat_core::error::Result;
+
+use crate::{BoxView, Step, View};
 
 /// The child content a component invocation passes to its component.
 ///
@@ -21,11 +26,6 @@ impl<'a> Child<'a> {
             view: Box::pin(view),
         }
     }
-
-    /// Returns the child's view.
-    pub(crate) fn view(&mut self) -> Pin<&mut (dyn View + 'a)> {
-        self.view.as_mut()
-    }
 }
 
 /// No child content: renders nothing, like a component invoked without
@@ -33,5 +33,12 @@ impl<'a> Child<'a> {
 impl Default for Child<'_> {
     fn default() -> Self {
         Self::new(())
+    }
+}
+
+/// The children's view polls through in place.
+impl View for Child<'_> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+        self.get_mut().view.as_mut().poll(cx)
     }
 }

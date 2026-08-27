@@ -224,10 +224,7 @@ mod tests {
         task::{Context, Poll, Waker},
     };
 
-    use topcoat_view::{
-        ViewExt,
-        internal::{NodeView, ScopeView},
-    };
+    use topcoat::view::{ViewExt, view};
 
     use super::*;
 
@@ -249,7 +246,7 @@ mod tests {
         let signal = Signal::new(String::from("a-->b\"c&d"));
 
         let cx = Cx::default();
-        let view = ScopeView::new(NodeView::new(&cx, SignalDeclaration::new(&signal)));
+        let view = view! { cx => (SignalDeclaration::new(&signal)) };
         let html = block_on(view.single()).unwrap().render(&cx);
 
         // The comment context escaped `>`, so the only `-->` left is the

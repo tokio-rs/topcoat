@@ -8,7 +8,8 @@
 //! A template expands to a composition of the [`View`](crate::View)
 //! combinators defined here: a [`JoinView`](crate::internal::JoinView) drives the template's
 //! dynamic node positions concurrently and builds its instruction block from their
-//! contents, [`NodeView`](crate::internal::NodeView) wraps a position's value,
+//! contents, [`NodeClassify`](crate::internal::NodeClassify) splits a position's value into
+//! the parts the block pushes and the view the join drives,
 //! [`ThenView`](crate::internal::ThenView) adapts a future resolving to a view,
 //! [`EitherView`](crate::internal::EitherView) unifies branch types, a
 //! [`LoopView`](crate::internal::LoopView) joins a `for` body's iterations,
@@ -28,7 +29,7 @@ mod join_view;
 mod live_view;
 mod loop_view;
 mod move_view;
-mod node_view;
+mod node_classify;
 mod scope_view;
 mod then_view;
 
@@ -40,6 +41,6 @@ pub use join_view::*;
 pub use live_view::*;
 pub use loop_view::*;
 pub use move_view::*;
-pub use node_view::*;
+pub use node_classify::*;
 pub use scope_view::*;
 pub use then_view::*;

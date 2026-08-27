@@ -3140,6 +3140,7 @@ dependencies = [
  "ref-cast",
  "serde",
  "serde_json",
+ "topcoat",
  "topcoat-asset",
  "topcoat-core",
  "topcoat-router",

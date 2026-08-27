@@ -1,12 +1,13 @@
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::Ident;
 use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::emit::{Emit, Emitter};
 
-/// A dynamic expression: a node position is driven as a joined unit, any
-/// other position is pushed through its [`ExprKind`]'s builder method.
+/// A dynamic expression: a node position is split into the parts the burst
+/// pushes and the unit the join drives, any other position is pushed
+/// through its [`ExprKind`]'s builder method.
 pub(crate) struct ExprNode {
     pub kind: ExprKind,
     pub tokens: TokenStream,
@@ -26,9 +27,16 @@ impl Emit for ExprNode {
 
         match self.kind {
             ExprKind::Node => {
+                // The value's type decides what it is: a parts value is
+                // pushed at the position and the join drives the unit `()`,
+                // a view is driven by the join and its content is spliced
+                // at the position. The burst does both, and one of them is
+                // a no-op.
+                let parts = format_ident!("{ident}_parts");
                 emitter.hoist(quote! {
-                    let #ident = #topcoat_view::internal::NodeView::new(__cx, #tokens);
+                    let (#parts, #ident) = #topcoat_view::internal::NodeClassify::classify(#tokens);
                 });
+                emitter.burst(quote! { __b.node(#parts); });
                 emitter.unit(Span::call_site(), &ident);
             }
             kind => {
@@ -40,10 +48,10 @@ impl Emit for ExprNode {
     }
 }
 
-/// Identifies how an [`ExprNode`] is emitted: a node position joins the
-/// template's units, every other position maps to the builder method that
-/// seals the expression with the right position and dispatches the
-/// corresponding `*ViewParts` trait.
+/// Identifies how an [`ExprNode`] is emitted: a node position is classified
+/// and joins the template's units, every other position maps to the builder
+/// method that seals the expression with the right position and dispatches
+/// the corresponding `*ViewParts` trait.
 #[derive(Copy, Clone)]
 pub(crate) enum ExprKind {
     Node,

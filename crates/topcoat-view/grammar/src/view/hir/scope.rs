@@ -272,21 +272,27 @@ mod tests {
     }
 
     #[test]
-    fn node_expression_is_hoisted_and_joined_as_a_unit() {
+    fn node_expression_is_classified_and_joined_as_a_unit() {
         let mut builder = ViewBuilder::new();
         builder.str_unescaped("<p>");
         builder.expr(ExprKind::Node, quote! { value });
         builder.str_unescaped("</p>");
         let out = rendered(builder);
-        assert!(out.contains(
-            "let __expr0 = :: topcoat_view :: internal :: NodeView :: new (__cx , value)"
-        ));
-        assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
-        assert!(out.contains("JoinView :: new"));
-        assert!(out.contains("move | __b , (__view0 , ()) |"));
-        assert!(out.contains("__b . markup (& \"<p>\")"));
-        assert!(out.contains("__b . view (__view0)"));
-        assert!(out.contains("__b . markup (& \"</p>\")"));
+        assert!(
+            out.contains(
+                "let (__expr0_parts , __expr0) = :: topcoat_view :: internal :: NodeClassify :: classify (value)"
+            ),
+            "{out}"
+        );
+        assert!(out.contains("JoinUnit :: new (__expr0 , ())"), "{out}");
+        assert!(out.contains("JoinView :: new"), "{out}");
+        assert!(out.contains("move | __b , (__view0 , ()) |"), "{out}");
+        assert!(out.contains("__b . markup (& \"<p>\")"), "{out}");
+        assert!(
+            out.contains("__b . node (__expr0_parts) ; __b . view (__view0)"),
+            "{out}"
+        );
+        assert!(out.contains("__b . markup (& \"</p>\")"), "{out}");
     }
 
     #[test]
@@ -298,8 +304,14 @@ mod tests {
         });
         let out = rendered(builder);
         assert!(out.contains("let __expr0 = if cond"), "{out}");
-        assert!(out.contains("ViewHandle :: unescaped_unchecked (\"yes\")"), "{out}");
-        assert!(out.contains("ViewHandle :: unescaped_unchecked (\"no\")"), "{out}");
+        assert!(
+            out.contains("ViewHandle :: unescaped_unchecked (\"yes\")"),
+            "{out}"
+        );
+        assert!(
+            out.contains("ViewHandle :: unescaped_unchecked (\"no\")"),
+            "{out}"
+        );
         assert!(out.contains("__b . view (__expr0)"), "{out}");
         assert!(!out.contains("EitherView"), "{out}");
         assert!(!out.contains("JoinUnit :: new (__expr0"), "{out}");
@@ -328,7 +340,10 @@ mod tests {
         });
         let out = rendered(builder);
         assert!(out.contains("if cond"), "{out}");
-        assert!(out.contains("else { :: topcoat_view :: ViewHandle :: empty () }"), "{out}");
+        assert!(
+            out.contains("else { :: topcoat_view :: ViewHandle :: empty () }"),
+            "{out}"
+        );
     }
 
     #[test]
@@ -344,7 +359,10 @@ mod tests {
         assert!(out.contains("__views . push ("), "{out}");
         assert!(out.contains("Builder :: block (__cx , | __b |"), "{out}");
         assert!(out.contains("__b . attribute_unescaped (__expr0)"), "{out}");
-        assert!(out.contains("for __view in __expr0 { __b . view (__view) ; }"), "{out}");
+        assert!(
+            out.contains("for __view in __expr0 { __b . view (__view) ; }"),
+            "{out}"
+        );
         assert!(!out.contains("LoopView"), "{out}");
         assert!(!out.contains("Capture"), "{out}");
     }
@@ -357,7 +375,7 @@ mod tests {
         });
         let out = rendered(builder);
         assert!(out.contains("LoopView :: new (__iterations)"), "{out}");
-        assert!(out.contains("NodeView :: new (__cx , x)"), "{out}");
+        assert!(out.contains("NodeClassify :: classify (x)"), "{out}");
         assert!(out.contains("Capture ((x ,))"), "{out}");
     }
 
@@ -535,7 +553,10 @@ mod tests {
             add_component(body, "item");
         });
         let out = rendered(builder);
-        assert!(out.contains("__iterations . push (:: std :: boxed :: Box :: pin ("), "{out}");
+        assert!(
+            out.contains("__iterations . push (:: std :: boxed :: Box :: pin ("),
+            "{out}"
+        );
         assert!(out.contains("LoopView :: new (__iterations)"), "{out}");
         assert!(out.contains("ThenView :: new"), "{out}");
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"), "{out}");

@@ -26,6 +26,12 @@ pub trait NodeViewParts {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
 }
 
+/// Renders nothing.
+impl NodeViewParts for () {
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, _parts: &mut PartsWriter<'_>) {}
+}
+
 impl NodeViewParts for ViewHandle {
     #[inline]
     fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
