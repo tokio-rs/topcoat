@@ -3,7 +3,6 @@ use quote::{ToTokens, quote};
 use syn::{
     FnArg, ItemFn, LitStr, Pat, ReturnType,
     parse::{Parse, ParseStream},
-    parse_quote,
     spanned::Spanned,
 };
 use topcoat_core_grammar::paths::{
@@ -22,17 +21,11 @@ impl Parse for LayoutAttr {
     }
 }
 
-/// A layout function parameter, classified by name.
-enum LayoutArg {
-    /// The `cx: &Cx` request context parameter.
-    Cx,
-    /// The `slot: Result` child content parameter.
-    Slot,
-}
-
+/// The annotated `async fn` that becomes a layout: a component taking the
+/// child content as its `slot` parameter and, optionally, the request
+/// context as `cx`.
 pub struct LayoutItem {
     item: ItemFn,
-    args: Vec<LayoutArg>,
 }
 
 impl Parse for LayoutItem {
@@ -51,45 +44,35 @@ impl Parse for LayoutItem {
             ));
         }
 
-        let mut args: Vec<LayoutArg> = Vec::new();
+        let (mut slot, mut cx) = (false, false);
         for arg in &item.sig.inputs {
-            match arg {
-                FnArg::Receiver(receiver) => {
-                    return Err(syn::Error::new_spanned(
-                        receiver,
-                        "layout functions cannot take a `self` receiver",
-                    ));
-                }
-                FnArg::Typed(pat_type) => match &*pat_type.pat {
-                    Pat::Ident(pi)
-                        if pi.ident == "slot"
-                            && !args.iter().any(|arg| matches!(arg, LayoutArg::Slot)) =>
-                    {
-                        args.push(LayoutArg::Slot);
-                    }
-                    Pat::Ident(pi)
-                        if pi.ident == "cx"
-                            && !args.iter().any(|arg| matches!(arg, LayoutArg::Cx)) =>
-                    {
-                        args.push(LayoutArg::Cx);
-                    }
-                    _ => {
-                        return Err(syn::Error::new_spanned(
-                            pat_type,
-                            "layout functions only accept a `slot: Result` and an optional `cx: &Cx` parameter",
-                        ));
-                    }
-                },
+            let FnArg::Typed(pat_type) = arg else {
+                return Err(syn::Error::new_spanned(
+                    arg,
+                    "layout functions cannot take a `self` receiver",
+                ));
+            };
+            let seen = match &*pat_type.pat {
+                Pat::Ident(pat) if pat.ident == "slot" => &mut slot,
+                Pat::Ident(pat) if pat.ident == "cx" => &mut cx,
+                _ => &mut true,
+            };
+            if *seen {
+                return Err(syn::Error::new_spanned(
+                    pat_type,
+                    "layout functions only accept a `slot: Slot<'_>` and an optional `cx: &Cx` parameter",
+                ));
             }
+            *seen = true;
         }
-        if !args.iter().any(|arg| matches!(arg, LayoutArg::Slot)) {
+        if !slot {
             return Err(syn::Error::new_spanned(
                 &item.sig,
                 "layout functions must take a `slot: Slot<'_>` parameter",
             ));
         }
 
-        Ok(Self { item, args })
+        Ok(Self { item })
     }
 }
 
