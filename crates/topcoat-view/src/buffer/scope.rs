@@ -1,9 +1,6 @@
 use std::cell::Cell;
 
-use crate::{
-    PartsWriter, ViewHandle,
-    buffer::{InstructionPtr, ViewBuffer},
-};
+use crate::{PartsWriter, ViewHandle, buffer::ViewBuffer};
 
 thread_local! {
     /// The buffer of the build running on the current thread, if any.
@@ -103,121 +100,6 @@ impl Drop for ViewBufferScope<'_> {
     }
 }
 
-/// A block under construction in the installed buffer.
-///
-/// Opening takes the buffer out of the scope, like
-/// [`ViewBufferScope::with`] does for the duration of its closure, and
-/// holds it until the block is closed, so a block can be filled across a
-/// region of straight-line code instead of a single closure. While the
-/// buffer is out, nothing else can build into it, and a re-entrant access
-/// fails like an access outside any scope; a region that needs to wait,
-/// such as an `await`, suspends the block meanwhile and resumes it after.
-/// Dropping the guard without closing the block, as a panic in the region
-/// does, puts the buffer back.
-pub(crate) struct OpenBlock {
-    /// The buffer; `None` while the block is suspended.
-    buffer: Option<Box<ViewBuffer>>,
-    entry: InstructionPtr,
-    /// The jump ending the appended part of a suspended block, patched to
-    /// the next instruction when the block resumes.
-    suspended: Option<InstructionPtr>,
-}
-
-impl OpenBlock {
-    /// Starts a block in the installed buffer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if no scope is active on the current thread.
-    pub(crate) fn open() -> Self {
-        let mut buffer = Self::take();
-        let entry = buffer.open_block();
-        Self {
-            buffer: Some(buffer),
-            entry,
-            suspended: None,
-        }
-    }
-
-    /// Takes the installed buffer out of the scope.
-    fn take() -> Box<ViewBuffer> {
-        CURRENT.take().unwrap_or_else(|| {
-            panic!(
-                "no view is building on the current task: build views with `view!`, \
-                 on the task that polls the outermost invocation"
-            )
-        })
-    }
-
-    /// Returns the buffer the block is appended to.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the block is suspended.
-    #[inline]
-    pub(crate) fn buffer(&mut self) -> &mut ViewBuffer {
-        self.buffer
-            .as_deref_mut()
-            .expect("the block is suspended: resume it before appending to it")
-    }
-
-    /// Puts the buffer back into the scope until [`resume`](Self::resume),
-    /// so other blocks may be built meanwhile.
-    ///
-    /// The instructions appended after resuming continue the block through
-    /// a jump, so the block stays one sequence to render.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the block is suspended already.
-    pub(crate) fn suspend(&mut self) {
-        assert!(self.suspended.is_none(), "the block is suspended already");
-        let mut buffer = self
-            .buffer
-            .take()
-            .expect("a block that is not suspended holds the buffer");
-        self.suspended = Some(buffer.suspend_block());
-        CURRENT.set(Some(buffer));
-    }
-
-    /// Takes the buffer back out of the scope and continues the block.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the block is not suspended, or if no scope is active on
-    /// the current thread.
-    pub(crate) fn resume(&mut self) {
-        let jmp = self.suspended.take().expect("the block is not suspended");
-        let mut buffer = Self::take();
-        buffer.resume_block(jmp);
-        self.buffer = Some(buffer);
-    }
-
-    /// Terminates the block, puts the buffer back into the scope, and
-    /// returns the handle to the block.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the block is suspended.
-    pub(crate) fn close(mut self) -> ViewHandle {
-        let mut buffer = self
-            .buffer
-            .take()
-            .expect("the block is suspended: resume it before closing it");
-        let handle = buffer.close_block(self.entry);
-        CURRENT.set(Some(buffer));
-        handle
-    }
-}
-
-impl Drop for OpenBlock {
-    fn drop(&mut self) {
-        if let Some(buffer) = self.buffer.take() {
-            CURRENT.set(Some(buffer));
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use topcoat_core::context::Cx;
@@ -250,7 +132,7 @@ mod tests {
     #[test]
     fn a_nested_install_parks_the_enclosing_buffer() {
         let mut outer = Some(Box::new(ViewBuffer::new()));
-        let outer_scope = ViewBufferScope::install(&mut outer);
+        let _outer_scope = ViewBufferScope::install(&mut outer);
         let outer_view = ViewBufferScope::block(|parts| {
             parts.push_str("outer");
         });
@@ -269,7 +151,7 @@ mod tests {
             parts.push_view_handle(outer_view);
             parts.push_view_handle(inner_view);
         });
-        drop(outer_scope);
+        drop(_outer_scope);
         let view = view.seal(*outer.expect("the outer buffer was swapped back"));
         assert_eq!(view.render(&Cx::default()), "outerinner");
     }
@@ -288,86 +170,6 @@ mod tests {
         ViewBufferScope::with(|_outer| {
             ViewBufferScope::with(|_inner| {});
         });
-    }
-
-    #[test]
-    fn an_open_block_holds_the_buffer_until_it_is_closed() {
-        let mut slot = Some(Box::new(ViewBuffer::new()));
-        let view = {
-            let _scope = ViewBufferScope::install(&mut slot);
-            let mut block = OpenBlock::open();
-            assert!(!ViewBufferScope::is_active());
-            PartsWriter::new(block.buffer(), crate::HtmlContext::Text).push_str("a < b");
-            let view = block.close();
-            assert!(ViewBufferScope::is_active());
-            view
-        };
-        let buffer = slot.expect("the buffer was swapped back on exit");
-        assert_eq!(view.seal(*buffer).render(&Cx::default()), "a &lt; b");
-    }
-
-    #[test]
-    fn a_suspended_block_resumes_after_blocks_built_in_between() {
-        let cx = &Cx::default();
-        let mut slot = Some(Box::new(ViewBuffer::new()));
-        let (view, other) = {
-            let _scope = ViewBufferScope::install(&mut slot);
-            let mut block = OpenBlock::open();
-            PartsWriter::new(block.buffer(), crate::HtmlContext::Text).push_str("a");
-            block.suspend();
-            assert!(ViewBufferScope::is_active());
-            let other = ViewBufferScope::block(|parts| {
-                parts.push_str("other");
-            });
-            block.resume();
-            assert!(!ViewBufferScope::is_active());
-            PartsWriter::new(block.buffer(), crate::HtmlContext::Text).push_str("b");
-            block.suspend();
-            block.resume();
-            PartsWriter::new(block.buffer(), crate::HtmlContext::Text).push_str("c");
-            (block.close(), other)
-        };
-        let _scope = ViewBufferScope::install(&mut slot);
-        assert_eq!(view.render(cx), "abc");
-        assert_eq!(other.render(cx), "other");
-    }
-
-    #[test]
-    #[should_panic(expected = "resume it before appending")]
-    fn appending_to_a_suspended_block_panics() {
-        let mut slot = Some(Box::new(ViewBuffer::new()));
-        let _scope = ViewBufferScope::install(&mut slot);
-        let mut block = OpenBlock::open();
-        block.suspend();
-        let _ = block.buffer();
-    }
-
-    #[test]
-    fn dropping_a_suspended_block_leaves_the_buffer_in_the_scope() {
-        let mut slot = Some(Box::new(ViewBuffer::new()));
-        let _scope = ViewBufferScope::install(&mut slot);
-        let mut block = OpenBlock::open();
-        block.suspend();
-        drop(block);
-        assert!(ViewBufferScope::is_active());
-    }
-
-    #[test]
-    fn an_open_block_puts_the_buffer_back_when_the_region_panics() {
-        let mut slot = Some(Box::new(ViewBuffer::new()));
-        let _scope = ViewBufferScope::install(&mut slot);
-        let result = std::panic::catch_unwind(|| {
-            let _block = OpenBlock::open();
-            panic!("boom");
-        });
-        assert!(result.is_err());
-        assert!(ViewBufferScope::is_active());
-    }
-
-    #[test]
-    #[should_panic(expected = "no view is building on the current task")]
-    fn opening_a_block_outside_a_scope_panics() {
-        let _block = OpenBlock::open();
     }
 
     #[test]

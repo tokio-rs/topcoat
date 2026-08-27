@@ -47,14 +47,17 @@ pub(super) enum ViewRepr {
     Scoped {
         buffer: ViewBufferId,
         entry: InstructionPtr,
+        /// An estimate of the number of bytes the block writes when
+        /// rendered, accumulated while the view was built.
+        size_hint: usize,
     },
     /// An instruction block starting at `entry` in a buffer the view holds
     /// on to itself.
     Owned {
         buffer: Arc<ViewBuffer>,
         entry: InstructionPtr,
-        /// An estimate of the number of bytes the buffer writes when
-        /// rendered, accumulated while it was built.
+        /// An estimate of the number of bytes the block writes when
+        /// rendered, accumulated while the view was built.
         size_hint: usize,
     },
 }
@@ -68,11 +71,19 @@ impl Default for ViewRepr {
 
 impl ViewHandle {
     /// Creates the handle for an instruction block built in the buffer
-    /// identified by `buffer`.
+    /// identified by `buffer`, estimated to write `size_hint` bytes.
     #[inline]
-    pub(super) fn from_scope(buffer: ViewBufferId, entry: InstructionPtr) -> Self {
+    pub(super) fn from_scope(
+        buffer: ViewBufferId,
+        entry: InstructionPtr,
+        size_hint: usize,
+    ) -> Self {
         Self {
-            repr: ViewRepr::Scoped { buffer, entry },
+            repr: ViewRepr::Scoped {
+                buffer,
+                entry,
+                size_hint,
+            },
         }
     }
 
@@ -83,16 +94,12 @@ impl ViewHandle {
     }
 
     /// Returns an estimate of the number of bytes the view writes when
-    /// rendered, beyond what the buffer it was built in already counts.
-    ///
-    /// A nested handle's parts were counted by its buffer as they were
-    /// appended, so it contributes nothing on its own.
+    /// rendered.
     #[inline]
     pub(super) fn size_hint(&self) -> usize {
         match &self.repr {
             ViewRepr::Static(body) => body.len(),
-            ViewRepr::Scoped { .. } => 0,
-            ViewRepr::Owned { size_hint, .. } => *size_hint,
+            ViewRepr::Scoped { size_hint, .. } | ViewRepr::Owned { size_hint, .. } => *size_hint,
         }
     }
 
@@ -109,16 +116,20 @@ impl ViewHandle {
     pub(crate) fn seal(self, buffer: ViewBuffer) -> Self {
         match self.repr {
             ViewRepr::Static(_) | ViewRepr::Owned { .. } => self,
-            ViewRepr::Scoped { buffer: id, entry } => {
+            ViewRepr::Scoped {
+                buffer: id,
+                entry,
+                size_hint,
+            } => {
                 assert!(
                     id == buffer.id(),
                     "tried to seal a view into a buffer it was not built in",
                 );
                 Self {
                     repr: ViewRepr::Owned {
-                        size_hint: buffer.size_hint(),
                         buffer: Arc::new(buffer),
                         entry,
+                        size_hint,
                     },
                 }
             }
@@ -357,113 +368,20 @@ mod tests {
     }
 
     #[test]
-    fn a_sealed_view_carries_the_size_hint_of_its_buffer() {
-        let other = owned(|parts| {
-            parts.push_str_unescaped("123456");
-        });
+    fn size_hint_accumulates_across_splices() {
         let mut buffer = ViewBuffer::new();
         let inner = nested(&mut buffer, |parts| {
             parts.push_str_unescaped("12345678");
         });
         let outer = nested(&mut buffer, |parts| {
-            // A nested view's parts were counted when they were appended;
-            // static and owned views bring their own estimate.
+            parts.push_view_handle(inner.clone());
             parts.push_view_handle(inner);
             parts.push_view_handle(ViewHandle::unescaped_unchecked("<hr>"));
-            parts.push_view_handle(other);
         });
-        let ViewRepr::Owned { size_hint, .. } = outer.seal(buffer).repr() else {
-            panic!("expected an owned view");
+        let ViewRepr::Scoped { size_hint, .. } = outer.repr() else {
+            panic!("expected a nested view");
         };
-        assert_eq!(size_hint, 8 + 4 + 6);
-    }
-
-    #[test]
-    fn a_filled_slot_renders_like_a_spliced_view() {
-        let cx = &Cx::default();
-        let nested_body = |parts: &mut PartsWriter<'_>| {
-            parts.push_str("a < b");
-        };
-        let expected = owned(|parts| {
-            parts.push_str_unescaped("<p>");
-            parts.push_view_handle(owned(nested_body));
-            parts.push_view_handle(ViewHandle::unescaped_unchecked("<hr>"));
-            parts.push_view_handle(ViewHandle::empty());
-            parts.push_str_unescaped("</p>");
-        })
-        .render(cx);
-
-        let (rendered, _buffer) = in_scope(|| {
-            let mut slots = Vec::new();
-            let outer = ViewBufferScope::block(|parts| {
-                parts.push_str_unescaped("<p>");
-                slots.push(parts.reserve());
-                slots.push(parts.reserve());
-                slots.push(parts.reserve());
-                parts.push_str_unescaped("</p>");
-            });
-            // Filled out of order and with each kind of view: a nested
-            // handle into the buffer, a static one, and an empty one.
-            slots[1].fill(ViewHandle::unescaped_unchecked("<hr>"));
-            slots[2].fill(ViewHandle::empty());
-            slots[0].fill(ViewBufferScope::block(nested_body));
-            outer.render(cx)
-        });
-        assert_eq!(rendered, expected);
-        assert_eq!(rendered, "<p>a &lt; b<hr></p>");
-    }
-
-    #[test]
-    fn a_slot_filled_with_an_owned_view_splices_its_buffer() {
-        let cx = &Cx::default();
-        let (rendered, _buffer) = in_scope(|| {
-            let mut slot = None;
-            let outer = ViewBufferScope::block(|parts| {
-                slot = Some(parts.reserve());
-            });
-            slot.unwrap().fill(owned(|parts| {
-                parts.push_str("x < y");
-            }));
-            outer.render(cx)
-        });
-        assert_eq!(rendered, "x &lt; y");
-    }
-
-    #[test]
-    #[should_panic(expected = "before every node position in it resolved")]
-    fn rendering_a_view_with_an_unfilled_slot_panics() {
-        in_scope(|| {
-            let outer = ViewBufferScope::block(|parts| {
-                parts.reserve();
-            });
-            let _ = outer.render(&Cx::default());
-        });
-    }
-
-    #[test]
-    #[should_panic(expected = "tried to fill a view slot twice")]
-    fn filling_a_slot_twice_panics() {
-        in_scope(|| {
-            let mut slot = None;
-            ViewBufferScope::block(|parts| {
-                slot = Some(parts.reserve());
-            });
-            let slot = slot.unwrap();
-            slot.fill(ViewHandle::empty());
-            slot.fill(ViewHandle::empty());
-        });
-    }
-
-    #[test]
-    #[should_panic(expected = "outside the `view!` invocation it was reserved in")]
-    fn filling_a_slot_in_a_different_build_panics() {
-        let mut slot = None;
-        in_scope(|| {
-            ViewBufferScope::block(|parts| {
-                slot = Some(parts.reserve());
-            });
-        });
-        in_scope(|| slot.unwrap().fill(ViewHandle::empty()));
+        assert_eq!(size_hint, 8 + 8 + 4);
     }
 
     #[test]

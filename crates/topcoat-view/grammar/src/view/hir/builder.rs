@@ -4,8 +4,8 @@ use proc_macro2::{Span, TokenStream};
 use syn::{Expr, Pat, Path};
 
 use super::{
-    Bindings, Component, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchArm, MatchExpr, Node,
-    Scope, Statement, StaticSegment, emit::Placement,
+    Component, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchArm, MatchExpr, Node, Scope,
+    Statement, StaticSegment,
 };
 use crate::view::{NamedArg, Nodes};
 
@@ -27,13 +27,9 @@ pub(crate) struct ViewBuilder {
     /// the nested builders of one expansion so every site gets a distinct
     /// ordinal.
     sites: Rc<Cell<u32>>,
-    /// How often the scope this builder lowers renders per pass over its
-    /// template.
-    placement: Placement,
-    /// The bindings of the patterns enclosing this scope within its
-    /// template, which die with the branch or iteration that produced
-    /// them.
-    bindings: Bindings,
+    /// Whether this builder lowers a `for` body, where every invocation
+    /// site repeats.
+    repeats: bool,
 }
 
 impl ViewBuilder {
@@ -42,27 +38,19 @@ impl ViewBuilder {
             nodes: Vec::new(),
             static_segment: String::new(),
             sites: Rc::new(Cell::new(0)),
-            placement: Placement::Once,
-            bindings: Bindings::empty(),
+            repeats: false,
         }
     }
 
     /// Returns a builder for a nested scope, sharing this builder's site
     /// numbering.
-    fn nested(&self, placement: Placement, bindings: Bindings) -> Self {
+    fn nested(&self, repeats: bool) -> Self {
         Self {
             nodes: Vec::new(),
             static_segment: String::new(),
             sites: Rc::clone(&self.sites),
-            placement,
-            bindings,
+            repeats,
         }
-    }
-
-    /// Whether this builder lowers a `for` body, where every invocation
-    /// site repeats.
-    fn repeats(&self) -> bool {
-        self.placement == Placement::Repeated
     }
 
     fn flush(&mut self) {
@@ -118,9 +106,7 @@ impl ViewBuilder {
     /// The invocation is numbered with the next site ordinal, and remembers
     /// whether it sits in a `for` body, where it repeats without a `key`
     /// telling the repetitions apart. The children lower as their own
-    /// template below this one, so they do not repeat relative to it; the
-    /// invocation records which bindings of the enclosing patterns the
-    /// children mention, for them to capture.
+    /// invocations below this one, so they do not repeat relative to it.
     pub fn component(
         &mut self,
         path: &Path,
@@ -133,20 +119,16 @@ impl ViewBuilder {
         let ordinal = self.sites.get();
         self.sites.set(ordinal + 1);
         let children = (!children.is_empty()).then(|| {
-            let mut child_builder = self.nested(Placement::Once, Bindings::empty());
+            let mut child_builder = self.nested(false);
             children.lower(&mut child_builder);
             child_builder.finish()
-        });
-        let captures = children.as_ref().map_or_else(Bindings::empty, |children| {
-            self.bindings.mentioned_in(children)
         });
         self.nodes.push(Node::Component(Component {
             path: path.clone(),
             named_args,
             key: key.cloned(),
             ordinal,
-            repeats: self.repeats(),
-            captures,
+            repeats: self.repeats,
             children,
             span,
         }));
@@ -154,8 +136,7 @@ impl ViewBuilder {
 
     pub fn for_loop(&mut self, pat: &Pat, expr: &Expr, f: impl FnOnce(&mut ViewBuilder)) {
         self.flush();
-        let bindings = self.bindings.with(Bindings::of_pattern(pat));
-        let mut body = self.nested(Placement::Repeated, bindings);
+        let mut body = self.nested(true);
         f(&mut body);
         self.nodes.push(Node::ForLoop(ForLoop {
             pat: pat.clone(),
@@ -166,10 +147,8 @@ impl ViewBuilder {
 
     pub fn if_else(&mut self, expr: &Expr, f: impl FnOnce(&mut ViewBuilder, &mut ViewBuilder)) {
         self.flush();
-        let placement = self.placement.branch();
-        let then_bindings = self.bindings.with(Bindings::of_condition(expr));
-        let mut then_branch = self.nested(placement, then_bindings);
-        let mut else_branch = self.nested(placement, self.bindings.clone());
+        let mut then_branch = self.nested(self.repeats);
+        let mut else_branch = self.nested(self.repeats);
         f(&mut then_branch, &mut else_branch);
         self.nodes.push(Node::IfElse(IfElse {
             expr: expr.clone(),
@@ -182,7 +161,7 @@ impl ViewBuilder {
         self.flush();
         let mut builder = MatchArmsBuilder {
             arms: Vec::new(),
-            template: self.nested(self.placement.branch(), self.bindings.clone()),
+            template: self.nested(self.repeats),
         };
         f(&mut builder);
         self.nodes.push(Node::MatchExpr(MatchExpr {
@@ -194,7 +173,7 @@ impl ViewBuilder {
     /// Flushes any pending literal markup and returns the lowered [`Scope`].
     pub fn finish(mut self) -> Scope {
         self.flush();
-        Scope::new(self.nodes, self.placement)
+        Scope::new(self.nodes)
     }
 }
 
@@ -209,8 +188,7 @@ pub(crate) struct MatchArmsBuilder {
 
 impl MatchArmsBuilder {
     pub fn arm(&mut self, pat: &Pat, guard: Option<&Expr>, f: impl FnOnce(&mut ViewBuilder)) {
-        let bindings = self.template.bindings.with(Bindings::of_pattern(pat));
-        let mut body = self.template.nested(self.template.placement, bindings);
+        let mut body = self.template.nested(self.template.repeats);
         f(&mut body);
         self.arms.push(MatchArm {
             pat: pat.clone(),

@@ -1,18 +1,13 @@
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::{Expr, Ident, Pat, Token};
 
-use super::Scope;
-
-/// The bindings the control-flow patterns enclosing a scope introduce into
-/// it.
+/// The bindings a control-flow pattern introduces into its body's scope.
 ///
-/// A component's children under such patterns must own these values,
-/// because they die with the branch or iteration that produced them while
-/// the children live on in the component's props.
-/// [`Scope::emit_child`](super::Scope::emit_child) moves them into the
-/// children through `Capture`.
-#[derive(Clone)]
+/// A body's view must own these values, because they die with the branch or
+/// iteration that produced them while the view lives on.
+/// [`Scope::emit_captured`](super::Scope::emit_captured) moves them into the
+/// view through `Capture`.
 pub(crate) struct Bindings(Vec<Binding>);
 
 impl Bindings {
@@ -39,31 +34,6 @@ impl Bindings {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.0.is_empty()
-    }
-
-    /// Returns the bindings `scope` mentions anywhere in its expressions,
-    /// which are the ones it may borrow.
-    pub(crate) fn mentioned_in(&self, scope: &Scope) -> Self {
-        Self(
-            self.0
-                .iter()
-                .filter(|binding| scope.mentions(&binding.ident))
-                .cloned()
-                .collect(),
-        )
-    }
-
-    /// Returns these bindings extended by `other`, for a scope nested under
-    /// one more pattern.
-    ///
-    /// A name bound again by the inner pattern shadows the outer binding,
-    /// so it is kept once.
-    pub(crate) fn with(&self, other: Self) -> Self {
-        let mut bindings = self.clone();
-        for binding in other.0 {
-            bindings.push(binding);
-        }
-        bindings
     }
 
     /// Returns the bound identifiers, for packing the values into a
@@ -152,56 +122,11 @@ impl Bindings {
     }
 }
 
-/// Whether `ident` appears anywhere in `tokens`, at any nesting depth.
-///
-/// A string literal counts when it holds `{ident}` or `{ident:`, the
-/// inline argument of a formatting macro, which borrows the name like an
-/// expression would.
-pub(crate) fn mentions(tokens: &TokenStream, ident: &Ident) -> bool {
-    tokens.clone().into_iter().any(|tree| match tree {
-        TokenTree::Ident(other) => other == *ident,
-        TokenTree::Group(group) => mentions(&group.stream(), ident),
-        TokenTree::Literal(literal) => {
-            let literal = literal.to_string();
-            literal.contains(&format!("{{{ident}}}")) || literal.contains(&format!("{{{ident}:"))
-        }
-        TokenTree::Punct(_) => false,
-    })
-}
-
-/// Whether `tokens` contain an `.await`, at any nesting depth.
-///
-/// The body of an `expr!` invocation is left out: a runtime expression is
-/// compiled to JavaScript, so an `await` in it never waits on the server.
-pub(crate) fn awaits(tokens: &TokenStream) -> bool {
-    let mut previous: [Option<TokenTree>; 2] = [None, None];
-    for tree in tokens.clone() {
-        let found = match &tree {
-            TokenTree::Ident(ident) => ident == "await",
-            TokenTree::Group(group) => {
-                let runtime = matches!(
-                    &previous,
-                    [Some(TokenTree::Ident(name)), Some(TokenTree::Punct(bang))]
-                        if name == "expr" && bang.as_char() == '!'
-                );
-                !runtime && awaits(&group.stream())
-            }
-            TokenTree::Punct(_) | TokenTree::Literal(_) => false,
-        };
-        if found {
-            return true;
-        }
-        previous = [previous[1].take(), Some(tree)];
-    }
-    false
-}
-
 /// A single bound identifier with the mutability of its binding.
 ///
-/// Its tokens are the rebinding pattern inside the children's body: the
+/// Its tokens are the rebinding pattern inside the view's body: the
 /// identifier keeps its span, so lints on the binding still point at the
 /// source pattern.
-#[derive(Clone)]
 pub(crate) struct Binding {
     mutability: Option<Token![mut]>,
     ident: Ident,
@@ -264,44 +189,6 @@ mod tests {
     fn deduplicates_across_or_alternatives() {
         let pat = parse_pattern("Ok(value) | Err(value)");
         assert_eq!(pattern_idents(&pat), ["value"]);
-    }
-
-    #[test]
-    fn mentions_finds_an_ident_at_any_depth() {
-        let ident: Ident = syn::parse_quote!(x);
-        assert!(mentions(&quote! { f(a, (b, [x.y])) }, &ident));
-        assert!(!mentions(&quote! { f(a, (b, [xy])) }, &ident));
-        assert!(!mentions(&quote! { "x" }, &ident));
-    }
-
-    #[test]
-    fn awaits_finds_an_await_at_any_depth() {
-        assert!(awaits(&quote! { f(g().await?) }));
-        assert!(!awaits(&quote! { f(g()) }));
-    }
-
-    #[test]
-    fn awaits_leaves_runtime_expressions_alone() {
-        assert!(!awaits(
-            &quote! { ::topcoat_runtime_macro::expr! { async |e| { f().await } } }
-        ));
-        assert!(awaits(&quote! { g(expr! { a }, h().await) }));
-    }
-
-    #[test]
-    fn mentions_finds_an_inline_format_argument() {
-        let ident: Ident = syn::parse_quote!(x);
-        assert!(mentions(&quote! { format!("{x}") }, &ident));
-        assert!(mentions(&quote! { format!("{x:?}") }, &ident));
-        assert!(!mentions(&quote! { format!("{xy}") }, &ident));
-    }
-
-    #[test]
-    fn extending_keeps_a_shadowed_name_once() {
-        let outer = Bindings::of_pattern(&parse_pattern("(a, b)"));
-        let inner = Bindings::of_pattern(&parse_pattern("Some(b) | None"));
-        let idents: Vec<_> = outer.with(inner).idents().map(Ident::to_string).collect();
-        assert_eq!(idents, ["a", "b"]);
     }
 
     #[test]

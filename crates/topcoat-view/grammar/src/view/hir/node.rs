@@ -13,15 +13,10 @@ pub(crate) use for_loop::*;
 pub(crate) use if_else::*;
 pub(crate) use local::*;
 pub(crate) use match_expr::*;
-use quote::ToTokens;
 pub(crate) use statement::*;
 pub(crate) use static_segment::*;
-use syn::Ident;
 
-use super::{
-    bindings::mentions,
-    emit::{Emit, Emitter},
-};
+use super::emit::{Emit, Emitter};
 
 /// A single node of a lowered [`View`](crate::view::View). Produced by
 /// [`ViewBuilder`](super::ViewBuilder), emitted by [`Scope`](super::Scope).
@@ -30,7 +25,7 @@ pub(crate) enum Node {
     StaticSegment(StaticSegment),
     /// A component invocation, emitted through the props builder.
     Component(Component),
-    /// A dynamic expression, emitted through its [`ExprKind`]'s position.
+    /// A dynamic expression, emitted through its [`ExprKind`]'s helper.
     ExprNode(ExprNode),
     /// A `let pat = expr;` binding, in scope for the nodes that follow it.
     Local(Local),
@@ -45,53 +40,26 @@ pub(crate) enum Node {
 }
 
 impl Node {
-    /// Whether any expression of this node, or of a scope nested in it,
-    /// mentions `ident`.
+    /// Whether this node renders a component or fills a node position, in
+    /// the node itself or anywhere under its nested scopes, so its content
+    /// can only resolve by being polled.
     ///
-    /// A pattern is not an expression: it may bind the name again, but it
-    /// never reads it.
-    pub(super) fn mentions(&self, ident: &Ident) -> bool {
+    /// A node position counts because its value may be a lazy view, which
+    /// only its type tells.
+    pub(crate) fn is_async(&self) -> bool {
         match self {
-            Self::StaticSegment(_) => false,
-            Self::Component(node) => {
-                node.named_args
-                    .iter()
-                    .any(|arg| mentions(&arg.value.to_token_stream(), ident))
-                    || node
-                        .key
-                        .as_ref()
-                        .is_some_and(|key| mentions(&key.value.to_token_stream(), ident))
-                    || node
-                        .children
-                        .as_ref()
-                        .is_some_and(|children| children.mentions(ident))
-            }
-            Self::ExprNode(node) => mentions(&node.tokens, ident),
-            Self::Local(node) => mentions(&node.expr.to_token_stream(), ident),
-            Self::Statement(node) => mentions(&node.tokens, ident),
-            Self::ForLoop(node) => {
-                mentions(&node.expr.to_token_stream(), ident) || node.body.mentions(ident)
-            }
-            Self::IfElse(node) => {
-                mentions(&node.expr.to_token_stream(), ident)
-                    || node.then_branch.mentions(ident)
-                    || node.else_branch.mentions(ident)
-            }
-            Self::MatchExpr(node) => {
-                mentions(&node.expr.to_token_stream(), ident)
-                    || node.arms.iter().any(|arm| {
-                        arm.guard
-                            .as_ref()
-                            .is_some_and(|guard| mentions(&guard.to_token_stream(), ident))
-                            || arm.body.mentions(ident)
-                    })
-            }
+            Self::Component(_) => true,
+            Self::ExprNode(node) => node.is_node_position(),
+            Self::ForLoop(node) => node.body.is_async(),
+            Self::IfElse(node) => node.then_branch.is_async() || node.else_branch.is_async(),
+            Self::MatchExpr(node) => node.arms.iter().any(|arm| arm.body.is_async()),
+            Self::StaticSegment(_) | Self::Local(_) | Self::Statement(_) => false,
         }
     }
 }
 
 impl Emit for Node {
-    fn emit(&self, emitter: &mut Emitter<'_>) {
+    fn emit(&self, emitter: &mut Emitter) {
         match self {
             Self::StaticSegment(node) => node.emit(emitter),
             Self::Component(node) => node.emit(emitter),

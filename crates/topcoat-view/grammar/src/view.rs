@@ -171,7 +171,7 @@ mod tests {
     fn omitted_cx_takes_part_in_the_enclosing_build() {
         let tokens = parse("<div></div>").to_token_stream().to_string();
         assert!(tokens.contains("ScopeView :: new ("), "{tokens}");
-        assert!(tokens.contains(":: drive ("), "{tokens}");
+        assert!(tokens.contains("drive (__view)"), "{tokens}");
     }
 
     #[test]

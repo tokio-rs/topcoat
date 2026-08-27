@@ -83,7 +83,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 style="list-style: none; padding: 0; display: flex; \
                     flex-direction: column; gap: 0.375em;"
             >
-                for todo in &todos {
+                for todo in todos {
                     <li style="display: flex; align-items: center; gap: 0.5em;">
                         toggle_checkbox(todo: &todo)
 

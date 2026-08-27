@@ -46,10 +46,6 @@ impl<'a> Renderer<'a> {
                     Some(ptr) => self.ptr = ptr,
                     None => break,
                 },
-                Instruction::Jmp { entry } => self.ptr = *entry,
-                Instruction::Placeholder => {
-                    panic!("tried to render a view before every node position in it resolved")
-                }
                 Instruction::ViewHandle { ptr } => {
                     let (buffer, entry) = consts.fetch_view(*ptr);
                     Renderer::new(buffer, entry).execute(cx, f);

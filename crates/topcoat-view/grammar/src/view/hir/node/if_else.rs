@@ -1,10 +1,10 @@
-use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use proc_macro2::Span;
+use quote::quote;
 use syn::Expr;
+use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::hir::{
-    Scope,
-    bindings::awaits,
+    Bindings, Scope,
     emit::{Emit, Emitter},
 };
 
@@ -15,58 +15,44 @@ pub(crate) struct IfElse {
     pub else_branch: Scope,
 }
 
-impl IfElse {
-    /// Returns the condition with every awaiting operand evaluated with
-    /// the block suspended.
-    ///
-    /// A `let` in the condition is not an expression, so a `let` chain is
-    /// walked down to its scrutinees and plain operands, each wrapped on
-    /// its own.
-    fn condition(expr: &Expr) -> TokenStream {
-        match expr {
-            Expr::Let(let_) => {
-                let pat = &let_.pat;
-                let scrutinee = Self::condition(&let_.expr);
-                quote! { let #pat = #scrutinee }
-            }
-            Expr::Binary(binary) if matches!(binary.op, syn::BinOp::And(_)) => {
-                let left = Self::condition(&binary.left);
-                let right = Self::condition(&binary.right);
-                quote! { #left && #right }
-            }
-            expr => {
-                let tokens = expr.to_token_stream();
-                if awaits(&tokens) {
-                    Emitter::awaited(&tokens)
-                } else {
-                    tokens
-                }
-            }
-        }
-    }
-}
-
 impl Emit for IfElse {
-    fn emit(&self, emitter: &mut Emitter<'_>) {
+    fn emit(&self, emitter: &mut Emitter) {
+        let ident = emitter.fresh_ident();
         let Self {
             expr,
             then_branch,
             else_branch,
         } = self;
-        let expr = Self::condition(expr);
-        // The taken branch renders right inside the branch, where the
-        // condition's bindings are alive. An empty else branch is left
-        // out.
-        emitter.control_flow(|emitter| {
-            let then_branch = emitter.nested(then_branch);
-            let else_branch = emitter.nested(else_branch);
-            let else_branch = (!else_branch.is_empty()).then(|| quote! { else { #else_branch } });
-            quote! {
-                if #expr {
-                    #then_branch
-                }
-                #else_branch
-            }
-        });
+
+        if then_branch.is_async() || else_branch.is_async() {
+            // The branches build views of different types; `EitherView`
+            // unifies them, and only the taken branch is driven as this
+            // position's unit. The then branch takes the bindings of the
+            // condition's `let` patterns with it; the else branch binds
+            // nothing.
+            let then_branch = then_branch.emit_captured(&Bindings::of_condition(expr));
+            let else_branch = else_branch.emit_view();
+
+            emitter.hoist(quote! {
+                let #ident = if #expr {
+                    #topcoat_view::internal::EitherView::left(#then_branch)
+                } else {
+                    #topcoat_view::internal::EitherView::right(#else_branch)
+                };
+            });
+            emitter.unit(Span::call_site(), &ident);
+        } else {
+            // The taken branch builds its block right inside the branch,
+            // where the condition's bindings are alive. An empty else
+            // branch still yields the empty view, so both branches produce
+            // a handle to splice.
+            let then_branch = then_branch.emit_block();
+            let else_branch = else_branch.emit_block();
+
+            emitter.hoist(quote! {
+                let #ident = if #expr { #then_branch } else { #else_branch };
+            });
+            emitter.burst(quote! { __b.view(#ident); });
+        }
     }
 }

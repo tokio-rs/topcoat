@@ -8,8 +8,8 @@ pub(crate) struct StaticSegment {
 }
 
 impl Emit for StaticSegment {
-    fn emit(&self, emitter: &mut Emitter<'_>) {
+    fn emit(&self, emitter: &mut Emitter) {
         let string = &self.string;
-        emitter.push(quote! { __b.markup(&#string); });
+        emitter.burst(quote! { __b.markup(&#string); });
     }
 }
