@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     htmx::{HxResponseTrigger, hx_request},
-    router::{Router, RouterBuilderDiscoverExt, href, layout, page, route},
+    router::{Router, RouterBuilderDiscoverExt, Slot, href, layout, page, route},
     view::{View, ViewExt, ViewHandle, view},
 };
 

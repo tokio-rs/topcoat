@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{
-        Body, Router, RouterBuilderDiscoverExt, StatusCode,
+        Body, Router, RouterBuilderDiscoverExt, Slot, StatusCode,
         error::{ForbiddenError, NotFoundError, RouterErrorExt, forbidden, rewrite},
         href, layout, not_found, page, path_param,
     },

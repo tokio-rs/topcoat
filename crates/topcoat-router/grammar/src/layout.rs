@@ -85,7 +85,7 @@ impl Parse for LayoutItem {
         if !args.iter().any(|arg| matches!(arg, LayoutArg::Slot)) {
             return Err(syn::Error::new_spanned(
                 &item.sig,
-                "layout functions must take a `slot: Result` parameter",
+                "layout functions must take a `slot: Slot<'_>` parameter",
             ));
         }
 
@@ -117,18 +117,11 @@ impl ToTokens for Layout {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let attr = &self.0;
         let item = &self.1.item;
-        let args = &self.1.args;
         let ident = &item.sig.ident;
 
-        let mut face = item.clone();
-        for (arg, input) in args.iter().zip(&mut face.sig.inputs) {
-            if let (LayoutArg::Slot, FnArg::Typed(pat_type)) = (arg, input) {
-                pat_type.ty = parse_quote! { #topcoat_router::Slot<'_> };
-            }
-        }
         let marker = quote! {
             #[#topcoat_view_macro::component]
-            #face
+            #item
         };
 
         // The view owns copies of the request context and buffer it is
