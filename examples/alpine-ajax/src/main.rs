@@ -28,30 +28,30 @@ async fn main() {
 
 #[layout("/")]
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
-    // Alpine AJAX requests only need the targeted content, not the document.
-    if ajax_request(cx) {
-        return slot;
-    }
-
     Ok(view! {
-        <!DOCTYPE html>
-        <html>
-            <head>
-                // `defer` ensures that Alpine initializes after the page body
-                // has been parsed.
-                <script
-                    defer=""
-                    src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"
-                ></script>
-                <script
-                    defer=""
-                    src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"
-                ></script>
+        if ajax_request(cx) {
+            // Alpine AJAX requests only need the targeted content, not the document.
+            (slot)
+        } else {
+            <!DOCTYPE html>
+            <html>
+                <head>
+                    // `defer` ensures that Alpine initializes after the page body
+                    // has been parsed.
+                    <script
+                        defer=""
+                        src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"
+                    ></script>
+                    <script
+                        defer=""
+                        src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"
+                    ></script>
 
-                topcoat::dev::script()
-            </head>
-            <body>(slot)</body>
-        </html>
+                    topcoat::dev::script()
+                </head>
+                <body>(slot)</body>
+            </html>
+        }
     })
 }
 
