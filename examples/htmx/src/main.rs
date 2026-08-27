@@ -4,7 +4,7 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     htmx::{HxResponseTrigger, hx_request},
-    router::{Router, RouterBuilderDiscoverExt, Slot, href, layout, page, route},
+    router::{Router, RouterBuilderDiscoverExt, href, layout, page, route},
     view::{View, ViewExt, ViewHandle, view},
 };
 
@@ -22,25 +22,25 @@ async fn main() {
 
 #[layout("/")]
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
-    // htmx requests only need the page fragment, not the document.
-    if hx_request(cx) {
-        return slot;
-    }
-
     Ok(view! {
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <script
-                    src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
-                ></script>
+        if hx_request(cx) {
+            // htmx requests only need the page fragment, not the document.
+            (slot)
+        } else {
+            <!DOCTYPE html>
+            <html>
+                <head>
+                    <script
+                        src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+                    ></script>
 
-                topcoat::dev::script()
-            </head>
+                    topcoat::dev::script()
+                </head>
 
-            // Boost links and forms so htmx can handle navigation.
-            <body hx-boost="true">(slot)</body>
-        </html>
+                // Boost links and forms so htmx can handle navigation.
+                <body hx-boost="true">(slot)</body>
+            </html>
+        }
     })
 }
 

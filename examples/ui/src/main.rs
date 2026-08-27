@@ -809,11 +809,12 @@ async fn deployments_card(state: &State) -> Result<impl View> {
     // A filter can leave fewer pages than the URL asks for, so the page being
     // read is the last one that still has rows on it.
     let page = state.page.min(pages);
-    let shown = rows.chunks(PER_PAGE).nth(page - 1).unwrap_or_default();
     let previous = state.page_href(page.saturating_sub(1).max(1));
     let next = state.page_href((page + 1).min(pages));
 
     Ok(view! {
+        let shown = rows.chunks(PER_PAGE).nth(page - 1).unwrap_or_default();
+
         card(
             card_header(
                 card_title("Deployments")
