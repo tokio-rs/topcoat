@@ -1,9 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    FnArg, ItemFn, LitStr, Pat, ReturnType,
+    FnArg, ItemFn, LitStr, Pat, ReturnType, Type,
     parse::{Parse, ParseStream},
-    parse_quote,
     spanned::Spanned,
 };
 use topcoat_core_grammar::{
@@ -11,10 +10,7 @@ use topcoat_core_grammar::{
     paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro},
 };
 
-use super::{
-    common::{HandlerArg, HandlerArgs},
-    method::Methods,
-};
+use super::method::Methods;
 
 pub struct PageAttr {
     /// The declared HTTP methods; the page serves `GET` when omitted.
@@ -31,9 +27,21 @@ impl Parse for PageAttr {
     }
 }
 
+/// The annotated `async fn` that becomes a page: a component optionally
+/// taking the request body as its `body` parameter and the request context
+/// as `cx`.
 pub struct PageItem {
     item: ItemFn,
-    args: HandlerArgs,
+}
+
+impl PageItem {
+    /// The declared type of the `body` parameter, if any.
+    fn body(&self) -> Option<&Type> {
+        self.item.sig.inputs.iter().find_map(|arg| match arg {
+            FnArg::Typed(pat_type) if is_named(&pat_type.pat, "body") => Some(&*pat_type.ty),
+            _ => None,
+        })
+    }
 }
 
 impl Parse for PageItem {
@@ -51,19 +59,38 @@ impl Parse for PageItem {
                 "page functions must declare a return type",
             ));
         }
-        let args = HandlerArgs::parse(&item, "page")?;
-        for (arg, input) in args.iter().zip(&item.sig.inputs) {
-            if let (HandlerArg::Cx, FnArg::Typed(pat_type)) = (arg, input)
-                && !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "cx")
-            {
+
+        let (mut body, mut cx) = (false, false);
+        for arg in &item.sig.inputs {
+            let FnArg::Typed(pat_type) = arg else {
+                return Err(syn::Error::new_spanned(
+                    arg,
+                    "page functions cannot take a `self` receiver",
+                ));
+            };
+            let seen = if is_named(&pat_type.pat, "body") {
+                &mut body
+            } else if is_named(&pat_type.pat, "cx") {
+                &mut cx
+            } else {
+                &mut true
+            };
+            if *seen {
                 return Err(syn::Error::new_spanned(
                     pat_type,
-                    "the request context parameter must be named `cx`",
+                    "page functions only accept an optional `body` request parameter and an optional `cx: &Cx` parameter",
                 ));
             }
+            *seen = true;
         }
-        Ok(Self { item, args })
+
+        Ok(Self { item })
     }
+}
+
+/// Whether the pattern binds a plain identifier of the given name.
+fn is_named(pat: &Pat, name: &str) -> bool {
+    matches!(pat, Pat::Ident(pat) if pat.ident == name)
 }
 
 pub struct Page(PageAttr, PageItem);
@@ -80,7 +107,7 @@ impl Page {
     ///
     /// Returns an error if either token stream fails to parse as a
     /// [`PageAttr`] or [`PageItem`], or if the item is not a valid page
-    /// handler.
+    /// function.
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
         Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
     }
@@ -90,31 +117,19 @@ impl ToTokens for Page {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let attr = &self.0;
         let item = &self.1.item;
-        let args = &self.1.args;
         let ident = &item.sig.ident;
 
-        let mut face = item.clone();
-        for (arg, input) in args.iter().zip(&mut face.sig.inputs) {
-            if let (HandlerArg::Request(_), FnArg::Typed(pat_type)) = (arg, input)
-                && !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "body")
-            {
-                let pat = std::mem::replace(&mut *pat_type.pat, parse_quote! { body });
-                face.block
-                    .stmts
-                    .insert(0, parse_quote! { let #pat = body; });
-            }
-        }
         let component = quote! {
             #[#topcoat_view_macro::component]
-            #face
+            #item
         };
 
         // A request that fails to parse becomes the error the view's stream
         // yields, exactly like an error from the page body.
-        let (parse_request, body_prop) = match args.request() {
-            Some(request_ty) => (
-                quote_spanned! {request_ty.span()=>
-                    let body = <#request_ty as #topcoat_router::request::FromRequest>::from_request(&cx, body).await?;
+        let (parse_request, body_prop) = match self.1.body() {
+            Some(body_ty) => (
+                quote_spanned! {body_ty.span()=>
+                    let body = <#body_ty as #topcoat_router::request::FromRequest>::from_request(&cx, body).await?;
                 },
                 Some(quote! { .body(body) }),
             ),
@@ -273,13 +288,26 @@ mod tests {
 
     #[test]
     fn accepts_async_fn_with_return_type() {
-        syn::parse_str::<PageItem>("async fn home(cx: &Cx) -> Result { todo!() }").unwrap();
+        let item = syn::parse_str::<PageItem>("async fn home() -> Result { todo!() }").unwrap();
+        assert!(item.body().is_none());
     }
 
     #[test]
-    fn accepts_a_destructured_request_parameter() {
+    fn accepts_a_body_parameter() {
+        let item =
+            syn::parse_str::<PageItem>("async fn search(body: Form<Search>) -> Result { todo!() }")
+                .unwrap();
+        assert!(item.body().is_some());
+    }
+
+    #[test]
+    fn accepts_cx_and_body_in_any_order() {
         syn::parse_str::<PageItem>(
-            "async fn search(Form(input): Form<Search>, cx: &Cx) -> Result { todo!() }",
+            "async fn search(cx: &Cx, body: Form<Search>) -> Result { todo!() }",
+        )
+        .unwrap();
+        syn::parse_str::<PageItem>(
+            "async fn search(body: Form<Search>, cx: &Cx) -> Result { todo!() }",
         )
         .unwrap();
     }
@@ -301,8 +329,20 @@ mod tests {
     }
 
     #[test]
-    fn rejects_multiple_request_parameters() {
-        let err = parse_err("async fn home(a: Form<A>, b: Form<B>) -> Result { todo!() }");
-        assert!(err.contains("more than one request body parameter"));
+    fn rejects_unknown_parameter_names() {
+        let err = parse_err("async fn home(input: Form<A>) -> Result { todo!() }");
+        assert!(err.contains("only accept"));
+    }
+
+    #[test]
+    fn rejects_destructured_parameters() {
+        let err = parse_err("async fn home(Form(input): Form<A>) -> Result { todo!() }");
+        assert!(err.contains("only accept"));
+    }
+
+    #[test]
+    fn rejects_duplicate_body_parameters() {
+        let err = parse_err("async fn home(body: Form<A>, body: Form<B>) -> Result { todo!() }");
+        assert!(err.contains("only accept"));
     }
 }
