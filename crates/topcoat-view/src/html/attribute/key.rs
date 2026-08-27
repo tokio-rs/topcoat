@@ -279,7 +279,7 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
-    use crate::{Attributes, buffer::ViewBuffer, internal::Builder};
+    use crate::{Attributes, internal::Builder};
 
     /// Captures `key` the way [`Attributes::insert`] does.
     fn capture(key: impl AttributeKeyViewParts) -> AttributeKey {
@@ -292,7 +292,7 @@ mod tests {
     /// Writes a captured key in attribute key position and renders it.
     fn render(key: &AttributeKey) -> String {
         let cx = Cx::default();
-        ViewBuffer::build(|parts| Builder::new(&cx, parts).attribute_key(key)).render(&cx)
+        Builder::build(&cx, |b| b.attribute_key(key)).render(&cx)
     }
 
     #[test]

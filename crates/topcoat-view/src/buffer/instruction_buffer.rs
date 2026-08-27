@@ -4,7 +4,7 @@ use crate::buffer::Instruction;
 
 /// The address of an instruction in an [`InstructionBuffer`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct InstructionPtr(usize);
+pub(crate) struct InstructionPtr(usize);
 
 impl InstructionPtr {
     #[inline]
@@ -44,6 +44,11 @@ impl InstructionBuffer {
         &self.instructions[ptr.0]
     }
 
+    #[inline]
+    pub(super) fn fetch_mut(&mut self, ptr: InstructionPtr) -> &mut Instruction {
+        &mut self.instructions[ptr.0]
+    }
+
     /// Prints how many instructions of each kind the buffer holds.
     #[allow(unused)]
     pub(super) fn print_stats(&self) {
@@ -57,6 +62,8 @@ impl InstructionBuffer {
             let name = match instruction {
                 Instruction::Call { .. } => "Call",
                 Instruction::Ret => "Ret",
+                Instruction::Jmp { .. } => "Jmp",
+                Instruction::Placeholder => "Placeholder",
                 Instruction::ViewHandle { .. } => "ViewHandle",
                 Instruction::Bool(_) => "Bool",
                 Instruction::I8(_) => "I8",

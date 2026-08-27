@@ -6,7 +6,8 @@ use topcoat_core_grammar::paths::topcoat_view;
 use crate::view::{
     NamedArg,
     hir::{
-        Scope,
+        Bindings, Scope,
+        bindings::awaits,
         emit::{Emit, Emitter},
     },
 };
@@ -22,6 +23,9 @@ pub(crate) struct Component {
     pub ordinal: u32,
     /// Whether the invocation sits in a `for` body, so the site repeats.
     pub repeats: bool,
+    /// The bindings of the patterns enclosing the invocation, which the
+    /// children take along.
+    pub captures: Bindings,
     pub children: Option<Scope>,
     pub span: Span,
 }
@@ -116,6 +120,7 @@ impl Component {
         let Self {
             path,
             named_args,
+            captures,
             children,
             ..
         } = self;
@@ -126,7 +131,7 @@ impl Component {
             quote! { .#ident(#value) }
         });
         let child = children.as_ref().map(|scope| {
-            let child = scope.emit_view();
+            let child = scope.emit_child(captures);
             quote! { .child(#topcoat_view::Child::new(#child)) }
         });
 
@@ -145,16 +150,38 @@ impl Component {
     }
 }
 
+impl Component {
+    /// Whether building the props awaits, so the render future must be
+    /// created with the block suspended.
+    ///
+    /// The children are a template of their own, driven later, so an
+    /// `await` in them does not count.
+    fn awaits(&self) -> bool {
+        self.named_args
+            .iter()
+            .any(|arg| awaits(&arg.value.to_token_stream()))
+            || self
+                .key
+                .as_ref()
+                .is_some_and(|key| awaits(&key.value.to_token_stream()))
+    }
+}
+
 impl Emit for Component {
-    fn emit(&self, emitter: &mut Emitter) {
-        let ident = emitter.fresh_ident();
+    fn emit(&self, emitter: &mut Emitter<'_>) {
         let span = self.span;
-
         let future = self.identity_future(&self.render_future());
-
-        emitter.hoist(quote_spanned! {span=>
-            let #ident = #topcoat_view::internal::ThenView::new(#future);
+        let view = quote_spanned! {span=>
+            #topcoat_view::internal::ThenView::new(#future)
+        };
+        let view = if self.awaits() {
+            Emitter::awaited(&view)
+        } else {
+            view
+        };
+        let store = emitter.site(&quote_spanned! {span=>
+            #topcoat_view::internal::NodePosition::render(#view, &mut __b)
         });
-        emitter.unit(span, &ident);
+        emitter.push(store);
     }
 }

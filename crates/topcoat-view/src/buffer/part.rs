@@ -5,7 +5,8 @@ use http::{HeaderMap, StatusCode};
 use topcoat_core::context::Cx;
 
 use crate::{
-    AttributeCollector, CollectedPart, HtmlContext, HtmlWriter, ViewHandle, buffer::ViewBuffer,
+    AttributeCollector, CollectedPart, HtmlContext, HtmlWriter, ViewHandle,
+    buffer::{ViewBuffer, ViewSlot},
 };
 
 /// A boxed view part that writes its output at render time.
@@ -38,7 +39,7 @@ macro_rules! impl_push_primitive {
         /// HTML context, so no escaping applies.
         #[inline]
         pub fn $method(&mut self, value: $ty) -> &mut Self {
-            self.size_hint += $size_hint;
+            self.sink.add_size_hint($size_hint);
             self.sink.$method(value);
             self
         }
@@ -63,24 +64,22 @@ macro_rules! impl_push_primitive {
 /// position trait. The `push_*_unescaped` methods are the only way to opt
 /// out of that protection.
 ///
-/// The writer also accumulates a size hint: an estimate of the number of
-/// bytes everything pushed so far will write when rendered. The estimate
-/// becomes the built view's size hint, which pre-allocates the output buffer
-/// at render time.
+/// Every push also records a size hint: an estimate of the number of bytes
+/// the pushed part writes when rendered. The buffer accumulates the
+/// estimates into the size hint of the content it is sealed into, which
+/// pre-allocates the output buffer at render time.
 pub struct PartsWriter<'a> {
     sink: Sink<'a>,
     context: HtmlContext,
-    size_hint: usize,
 }
 
 impl<'a> PartsWriter<'a> {
     /// Creates a writer that seals everything pushed into it with `context`.
     #[inline]
-    pub(super) fn new(buffer: &'a mut ViewBuffer, context: HtmlContext) -> Self {
+    pub(crate) fn new(buffer: &'a mut ViewBuffer, context: HtmlContext) -> Self {
         Self {
             sink: Sink::Buffer(buffer),
             context,
-            size_hint: 0,
         }
     }
 
@@ -95,14 +94,7 @@ impl<'a> PartsWriter<'a> {
         Self {
             sink: Sink::Collector { collector, cx },
             context,
-            size_hint: 0,
         }
-    }
-
-    /// Returns the accumulated size hint of everything pushed so far.
-    #[inline]
-    pub(super) fn size_hint(&self) -> usize {
-        self.size_hint
     }
 
     /// Runs `f` with this writer sealing for a different context, then
@@ -138,7 +130,8 @@ impl<'a> PartsWriter<'a> {
     /// Appends a borrowed string, sealed with this writer's context.
     #[inline]
     pub fn push_str(&mut self, value: &str) -> &mut Self {
-        self.size_hint += Self::str_size_hint(value, self.context);
+        self.sink
+            .add_size_hint(Self::str_size_hint(value, self.context));
         self.sink.push_str(value, self.context);
         self
     }
@@ -146,7 +139,8 @@ impl<'a> PartsWriter<'a> {
     /// Appends a static string, sealed with this writer's context.
     #[inline]
     pub fn push_static_str(&mut self, value: &'static str) -> &mut Self {
-        self.size_hint += Self::str_size_hint(value, self.context);
+        self.sink
+            .add_size_hint(Self::str_size_hint(value, self.context));
         self.sink.push_static_str(value, self.context);
         self
     }
@@ -160,7 +154,8 @@ impl<'a> PartsWriter<'a> {
     /// the string is written as a literal.
     #[inline]
     pub fn push_promoted_str(&mut self, value: &'static &'static str) -> &mut Self {
-        self.size_hint += Self::str_size_hint(value, self.context);
+        self.sink
+            .add_size_hint(Self::str_size_hint(value, self.context));
         self.sink.push_promoted_str(value, self.context);
         self
     }
@@ -168,7 +163,8 @@ impl<'a> PartsWriter<'a> {
     /// Appends an owned string, sealed with this writer's context.
     #[inline]
     pub fn push_string(&mut self, value: String) -> &mut Self {
-        self.size_hint += Self::str_size_hint(&value, self.context);
+        self.sink
+            .add_size_hint(Self::str_size_hint(&value, self.context));
         self.sink.push_string(value, self.context);
         self
     }
@@ -180,7 +176,7 @@ impl<'a> PartsWriter<'a> {
     /// runtime's escaping and can lead to XSS vulnerabilities.
     #[inline]
     pub fn push_str_unescaped(&mut self, value: &str) -> &mut Self {
-        self.size_hint += value.len();
+        self.sink.add_size_hint(value.len());
         self.sink.push_str(value, HtmlContext::Unescaped);
         self
     }
@@ -192,7 +188,7 @@ impl<'a> PartsWriter<'a> {
     /// runtime's escaping and can lead to XSS vulnerabilities.
     #[inline]
     pub fn push_static_str_unescaped(&mut self, value: &'static str) -> &mut Self {
-        self.size_hint += value.len();
+        self.sink.add_size_hint(value.len());
         self.sink.push_static_str(value, HtmlContext::Unescaped);
         self
     }
@@ -210,7 +206,7 @@ impl<'a> PartsWriter<'a> {
     /// runtime's escaping and can lead to XSS vulnerabilities.
     #[inline]
     pub fn push_promoted_str_unescaped(&mut self, value: &'static &'static str) -> &mut Self {
-        self.size_hint += value.len();
+        self.sink.add_size_hint(value.len());
         self.sink.push_promoted_str(value, HtmlContext::Unescaped);
         self
     }
@@ -222,7 +218,7 @@ impl<'a> PartsWriter<'a> {
     /// runtime's escaping and can lead to XSS vulnerabilities.
     #[inline]
     pub fn push_string_unescaped(&mut self, value: String) -> &mut Self {
-        self.size_hint += value.len();
+        self.sink.add_size_hint(value.len());
         self.sink.push_string(value, HtmlContext::Unescaped);
         self
     }
@@ -256,7 +252,7 @@ impl<'a> PartsWriter<'a> {
     #[inline]
     pub fn push_char(&mut self, value: char) -> &mut Self {
         // One to four UTF-8 bytes, or an escape sequence.
-        self.size_hint += 3;
+        self.sink.add_size_hint(3);
         self.sink.push_char(value, self.context);
         self
     }
@@ -287,7 +283,7 @@ impl<'a> PartsWriter<'a> {
     /// this writer's context.
     #[inline]
     pub fn push_dyn(&mut self, part: Box<dyn DynViewPart>) -> &mut Self {
-        self.size_hint += part.size_hint();
+        self.sink.add_size_hint(part.size_hint());
         self.sink.push_dyn(part, self.context);
         self
     }
@@ -295,17 +291,32 @@ impl<'a> PartsWriter<'a> {
     /// Appends a nested view.
     ///
     /// The view's content was already sealed with the contexts it was built
-    /// for; this writer's context does not apply. The view's size hint joins
-    /// this writer's, so a view spliced twice counts its output twice.
+    /// for; this writer's context does not apply.
     ///
     /// # Panics
     ///
     /// Panics if the view was built in a different, still building buffer.
     #[inline]
     pub fn push_view_handle(&mut self, handle: ViewHandle) -> &mut Self {
-        self.size_hint += handle.size_hint();
         self.sink.push_view(handle);
         self
+    }
+
+    /// Reserves a node position for a view that resolves later.
+    ///
+    /// Pushes a placeholder and returns the slot to fill it through. The
+    /// block does not render until the slot is filled.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the writer collects an attribute, which has no node
+    /// positions.
+    #[inline]
+    pub(crate) fn reserve(&mut self) -> ViewSlot {
+        match &mut self.sink {
+            Sink::Buffer(buffer) => buffer.reserve(),
+            Sink::Collector { .. } => panic!("an attribute has no node position to reserve"),
+        }
     }
 
     /// Records a response status code; renders no content.
@@ -350,6 +361,15 @@ enum Sink<'a> {
 }
 
 impl Sink<'_> {
+    /// Records the estimated size of a pushed part; a collected attribute
+    /// keeps no estimate.
+    #[inline]
+    fn add_size_hint(&mut self, bytes: usize) {
+        if let Self::Buffer(buffer) = self {
+            buffer.add_size_hint(bytes);
+        }
+    }
+
     #[inline]
     fn push_str(&mut self, value: &str, context: HtmlContext) {
         match self {

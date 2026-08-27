@@ -12,6 +12,9 @@
 //! component-based product grid parameterized by size to show how rendering
 //! scales with document length.
 
+// The scenarios return `Result<impl View>` to mirror component signatures.
+#![allow(clippy::unnecessary_wraps)]
+
 use std::{
     future::Future,
     hint::black_box,

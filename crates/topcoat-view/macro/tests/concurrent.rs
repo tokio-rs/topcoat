@@ -281,9 +281,9 @@ async fn taken_match_arms_carry_their_pattern_bindings_to_the_join() {
     let choice = Some(String::from("picked"));
     let result = view! {
         echo(text: "always")
-        match choice {
+        match &choice {
             Some(text) => {
-                echo(text: &text)
+                echo(text: text)
             }
             None => {
                 echo(text: "none")

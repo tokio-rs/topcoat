@@ -393,11 +393,11 @@ pub type StaticClass = Class<Unescaped<PromotedStr>>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AttributeValue, Attributes, buffer::ViewBuffer, internal::Builder};
+    use crate::{AttributeValue, Attributes, internal::Builder};
 
     fn render(class: Class<impl ClassEntries>) -> String {
         let cx = Cx::default();
-        ViewBuffer::build(|parts| Builder::new(&cx, parts).attribute_value(class)).render(&cx)
+        Builder::build(&cx, |b| b.attribute_value(class)).render(&cx)
     }
 
     #[test]
