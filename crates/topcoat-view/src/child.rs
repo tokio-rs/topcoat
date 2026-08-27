@@ -17,7 +17,7 @@ pub struct Child<'a> {
 
 /// A build deferred until the child is interpolated, run with the request
 /// context and buffer of the template interpolating it.
-type Build<'a> = Box<dyn FnOnce(&Cx, &ViewBuffer) -> BoxView<'a> + Send + 'a>;
+type Build<'a> = Box<dyn FnOnce(&'a Cx, &'a ViewBuffer) -> BoxView<'a> + Send + 'a>;
 
 /// Whether the child's view exists yet.
 enum State<'a> {
@@ -43,7 +43,7 @@ impl<'a> Child<'a> {
     /// where it renders rather than where it was created. A caller provides
     /// context to the child by interpolating it under a derived context.
     #[must_use]
-    pub fn lazy(build: impl FnOnce(&Cx, &ViewBuffer) -> BoxView<'a> + Send + 'a) -> Self {
+    pub fn lazy(build: impl FnOnce(&'a Cx, &'a ViewBuffer) -> BoxView<'a> + Send + 'a) -> Self {
         Self {
             state: State::Lazy(Box::new(build)),
         }
@@ -51,7 +51,7 @@ impl<'a> Child<'a> {
 
     /// Returns the child's view, building it against `cx` and `buf` if it
     /// was deferred.
-    pub(crate) fn view(&mut self, cx: &Cx, buf: &ViewBuffer) -> Pin<&mut (dyn View + 'a)> {
+    pub(crate) fn view(&mut self, cx: &'a Cx, buf: &'a ViewBuffer) -> Pin<&mut (dyn View + 'a)> {
         if let State::Lazy(_) = self.state {
             let State::Lazy(build) = mem::replace(&mut self.state, State::View(Box::pin(())))
             else {

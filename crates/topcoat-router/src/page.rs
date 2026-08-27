@@ -31,11 +31,7 @@ pub trait Page: Send + Sync + 'static {
 
     /// Renders the page to a [`View`](topcoat_view::View) building into
     /// `buf` under the request context `cx`.
-    ///
-    /// The returned view may borrow `self`; it holds on to copies of the
-    /// context and buffer rather than borrowing them. An error in the page
-    /// body surfaces when the view is polled rather than returned here.
-    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_>;
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a>;
 
     /// Returns whether this page handles the current request.
     ///
@@ -64,7 +60,7 @@ impl<P: Page + ?Sized> Page for &'static P {
         (**self).path()
     }
 
-    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_> {
+    fn render<'a>(&self, cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a> {
         (**self).render(cx, buf, body)
     }
 }
@@ -73,7 +69,7 @@ impl<P: Page + ?Sized> Page for &'static P {
 inventory::collect!(&'static dyn Page);
 
 /// The render function backing a [`PageFn`].
-pub type PageRenderFn = fn(cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'static>;
+pub type PageRenderFn = for<'a> fn(cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a>;
 
 /// A [`Page`] backed by a plain render function.
 ///
@@ -129,7 +125,7 @@ impl Page for PageFn {
         &self.path
     }
 
-    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_> {
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a> {
         (self.render)(cx, buf, body)
     }
 }
@@ -161,10 +157,7 @@ pub trait Layout: Send + Sync + 'static {
     /// Renders the layout, embedding the given child content [`Slot`], to a
     /// [`View`](topcoat_view::View) building into `buf` under the request
     /// context `cx`.
-    ///
-    /// The returned view may borrow `self` and the slot; it holds on to
-    /// copies of the context and buffer rather than borrowing them.
-    fn render<'s>(&'s self, cx: &Cx, buf: &ViewBuffer, slot: Slot<'s>) -> BoxView<'s>;
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, slot: Slot<'a>) -> BoxView<'a>;
 }
 
 impl<L: Layout + ?Sized> Layout for &'static L {
@@ -172,7 +165,7 @@ impl<L: Layout + ?Sized> Layout for &'static L {
         (**self).path()
     }
 
-    fn render<'s>(&'s self, cx: &Cx, buf: &ViewBuffer, slot: Slot<'s>) -> BoxView<'s> {
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, slot: Slot<'a>) -> BoxView<'a> {
         (**self).render(cx, buf, slot)
     }
 }
@@ -242,7 +235,7 @@ impl PageWithLayoutsInner {
     /// Nothing runs until the view is polled: each layout decides when its
     /// slot renders and which context it sees, since every slot is built
     /// lazily with the context and buffer of the template interpolating it.
-    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_> {
+    fn render<'a>(&'a self, cx: &'a Cx, buf: &'a ViewBuffer, body: Body) -> BoxView<'a> {
         let Some((outermost, inner)) = self.layouts.split_first() else {
             return self.page.render(cx, buf, body);
         };
