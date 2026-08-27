@@ -2,11 +2,11 @@ use topcoat::{
     Result,
     context::Cx,
     router::{
-        Body, Router, RouterBuilderDiscoverExt, Slot, StatusCode,
+        Body, Router, RouterBuilderDiscoverExt, StatusCode,
         error::{ForbiddenError, NotFoundError, RouterErrorExt, forbidden, rewrite},
         href, layout, not_found, page, path_param,
     },
-    view::{View, view},
+    view::{View, emit, live, view},
 };
 
 #[tokio::main]
@@ -35,22 +35,22 @@ async fn home() -> Result<impl View> {
 // replace it with a branded error page.
 #[layout("/")]
 async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
-    let content = match slot {
-        Err(error) if error.downcast_ref::<NotFoundError>().is_some() => view! {
-            (StatusCode::NOT_FOUND)
-            <h1>"Page not found"</h1>
-        },
-        Err(error) if error.downcast_ref::<ForbiddenError>().is_some() => view! {
-            (StatusCode::FORBIDDEN)
-            <h1>"Access denied"</h1>
-        },
-        content => content,
-    }?;
-
     Ok(view! {
         <html>
             <body>
-                (content)
+                (live! {
+                    match emit! { (slot) } {
+                        Err(error) if error.downcast_ref::<NotFoundError>().is_some() => emit! {
+                            (StatusCode::NOT_FOUND)
+                            <h1>"Page not found"</h1>
+                        },
+                        Err(error) if error.downcast_ref::<ForbiddenError>().is_some() => emit! {
+                            (StatusCode::FORBIDDEN)
+                            <h1>"Access denied"</h1>
+                        },
+                        slot => slot,
+                    }
+                })
                 <p><a href=(href!(home))>"Home"</a></p>
             </body>
         </html>
