@@ -102,7 +102,7 @@ impl ToTokens for Layout {
         let item = &self.1.item;
         let ident = &item.sig.ident;
 
-        let marker = quote! {
+        let component = quote! {
             #[#topcoat_view_macro::component]
             #item
         };
@@ -162,7 +162,7 @@ impl ToTokens for Layout {
         });
 
         quote! {
-            #marker
+            #component
 
             const _: () = {
                 #layout

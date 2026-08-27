@@ -104,7 +104,7 @@ impl ToTokens for Page {
                     .insert(0, parse_quote! { let #pat = body; });
             }
         }
-        let marker = quote! {
+        let component = quote! {
             #[#topcoat_view_macro::component]
             #face
         };
@@ -216,7 +216,7 @@ impl ToTokens for Page {
         });
 
         quote! {
-            #marker
+            #component
 
             const _: () = {
                 static ID: ::std::sync::LazyLock<#topcoat_router::RouteId> =
