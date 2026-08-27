@@ -50,16 +50,28 @@ impl Parse for View {
     }
 }
 
-impl ToTokens for View {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
+impl View {
+    /// Expands the view to the expression evaluating to its value.
+    ///
+    /// A self-contained view builds in a buffer of its own and seals its
+    /// content into it, so what it resolves to renders anywhere. Otherwise
+    /// the view builds into the ambient `__buf` buffer of its scope and
+    /// resolves to a handle into it. A view naming its context is always
+    /// self-contained, since it may be built outside any scope providing a
+    /// buffer.
+    #[must_use]
+    pub fn expand(&self, self_contained: bool) -> TokenStream {
         let mut builder = ViewBuilder::new();
         self.nodes.lower(&mut builder);
-        let view = builder.finish().emit_root(self.cx.is_some());
+        let owns_cx = self.cx.is_some();
+        let view = builder
+            .finish()
+            .emit_root(owns_cx, self_contained || owns_cx);
 
         // When an explicit context is named, the view owns a copy of it
         // rather than borrowing it, so the view can outlive the binding it
         // was named from. Inside a component/page/layout the `__cx` binding
-        // is already in scope, so we emit the view untouched.
+        // is already in scope, so the view is emitted untouched.
         match &self.cx {
             Some(cx) => {
                 let cx = &cx.cx;
@@ -67,10 +79,15 @@ impl ToTokens for View {
                     let __cx: #topcoat_context::Cx = (#cx).clone();
                     #view
                 }}
-                .to_tokens(tokens);
             }
-            None => view.to_tokens(tokens),
+            None => view,
         }
+    }
+}
+
+impl ToTokens for View {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.expand(false).to_tokens(tokens);
     }
 }
 
@@ -145,5 +162,27 @@ mod tests {
     fn omitted_cx_emits_no_binding() {
         let tokens = parse("<div></div>").to_token_stream().to_string();
         assert!(!tokens.contains("let __cx"), "{tokens}");
+    }
+
+    #[test]
+    fn explicit_cx_builds_in_its_own_buffer() {
+        let tokens = parse("cx => <div></div>").to_token_stream().to_string();
+        assert!(tokens.contains("let __buf"), "{tokens}");
+        assert!(tokens.contains("drive_sealed (__buf , __view)"), "{tokens}");
+    }
+
+    #[test]
+    fn omitted_cx_builds_in_the_ambient_buffer() {
+        let tokens = parse("<div></div>").to_token_stream().to_string();
+        assert!(!tokens.contains("let __buf"), "{tokens}");
+        assert!(tokens.contains("drive (__view)"), "{tokens}");
+    }
+
+    #[test]
+    fn a_self_contained_expansion_keeps_the_ambient_cx() {
+        let tokens = parse("<div></div>").expand(true).to_string();
+        assert!(!tokens.contains("let __cx"), "{tokens}");
+        assert!(tokens.contains("let __buf"), "{tokens}");
+        assert!(tokens.contains("drive_sealed (__buf , __view)"), "{tokens}");
     }
 }

@@ -58,7 +58,7 @@ async fn spread_inserts_attribute_fragment_into_element() {
     let cx = &Cx::default();
     let attrs = topcoat::view::attributes! { cx => type="submit" };
     let result = view! { cx => <button (attrs)>"Save"</button> };
-    let html = result.single(cx).await.unwrap().render(cx);
+    let html = result.single().await.unwrap().render(cx);
 
     assert_eq!(html, r#"<button type="submit">Save</button>"#);
 }
@@ -70,7 +70,7 @@ async fn spread_follows_other_attributes() {
     let cx = &Cx::default();
     let attrs = topcoat::view::attributes! { cx => type="submit" };
     let result = view! { cx => <button class="btn" (attrs)>"Save"</button> };
-    let html = result.single(cx).await.unwrap().render(cx);
+    let html = result.single().await.unwrap().render(cx);
 
     assert!(html.contains(r#"class="btn""#));
     assert!(html.contains(r#"type="submit""#));
@@ -98,7 +98,7 @@ async fn spread_merges_within_attributes_macro() {
 
     // The spread's keys replace earlier ones, so `class` renders as `btn`.
     let result = view! { cx => <div (merged)></div> };
-    let html = result.single(cx).await.unwrap().render(cx);
+    let html = result.single().await.unwrap().render(cx);
     assert!(html.contains(r#"class="btn""#));
     assert!(!html.contains(r#"class="card""#));
 }

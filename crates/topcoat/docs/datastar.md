@@ -83,7 +83,7 @@ use topcoat::{
 
 #[route(POST "/entries")]
 async fn create(cx: &Cx) -> Result<PatchElements> {
-    let entry = view! { <li>"A new entry"</li> }?;
+    let entry = view! { cx => <li>"A new entry"</li> }?;
     Ok(PatchElements::new(entry.render(cx))
         .selector("#feed")
         .mode(ElementPatchMode::Prepend))
@@ -154,7 +154,7 @@ use topcoat::{
 
 #[route(POST "/save")]
 async fn save() -> Result<(DatastarSelector, DatastarMode, View)> {
-    let status = view! { <p>"Saved!"</p> }?;
+    let status = view! { cx => <p>"Saved!"</p> }?;
     Ok((
         DatastarSelector::from("#status"),
         DatastarMode(ElementPatchMode::Inner),

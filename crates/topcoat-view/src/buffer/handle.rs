@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 #[cfg(feature = "http")]
 use http::{HeaderMap, StatusCode};
 use topcoat_core::context::Cx;
@@ -26,9 +24,10 @@ use crate::{
 /// A handle is either self-contained or nested. A self-contained handle
 /// carries everything it needs to render: it can be stored, sent across
 /// tasks, spliced into another view, and rendered anywhere. A nested handle
-/// is what a [`View`](crate::View) returns as its content: it points into
-/// the buffer the view was polled with and only means something to the
-/// caller holding that buffer, who splices it into content of its own.
+/// is what a [`View`](crate::View) built against a shared buffer returns as
+/// its content: it points into that buffer and only means something to a
+/// caller holding it, who splices it into content of its own or makes it
+/// self-contained with [`seal`](Self::seal).
 #[derive(Debug, Default, Clone)]
 pub struct ViewHandle {
     repr: ViewRepr,
@@ -53,7 +52,7 @@ pub(super) enum ViewRepr {
     /// An instruction block starting at `entry` in a buffer the view holds
     /// on to itself.
     Owned {
-        buffer: Arc<ViewBuffer>,
+        buffer: ViewBuffer,
         entry: InstructionPtr,
         /// An estimate of the number of bytes the block writes when
         /// rendered, accumulated while the view was built.
@@ -102,16 +101,19 @@ impl ViewHandle {
         }
     }
 
-    /// Makes the view self-contained by taking ownership of the buffer its
+    /// Makes a nested handle self-contained by holding on to the buffer its
     /// instructions were appended to.
     ///
-    /// A static view carries no instructions, so it passes through and the
-    /// buffer is dropped.
+    /// The buffer is what the view was built with: a `view!` template's
+    /// ambient buffer, or one created for the build with
+    /// [`ViewBuffer::new`]. A handle that is self-contained already passes
+    /// through.
     ///
     /// # Panics
     ///
-    /// Panics if the view's instructions live in a different buffer.
-    pub(crate) fn seal(self, buffer: ViewBuffer) -> Self {
+    /// Panics if the handle's instructions live in a different buffer.
+    #[must_use]
+    pub fn seal(self, buffer: &ViewBuffer) -> Self {
         match self.repr {
             ViewRepr::Static(_) | ViewRepr::Owned { .. } => self,
             ViewRepr::Scoped {
@@ -125,7 +127,7 @@ impl ViewHandle {
                 );
                 Self {
                     repr: ViewRepr::Owned {
-                        buffer: Arc::new(buffer),
+                        buffer: buffer.clone(),
                         entry,
                         size_hint,
                     },
@@ -225,7 +227,7 @@ impl ViewHandle {
                 panic!("tried to render a nested view handle; only a self-contained view renders")
             }
             ViewRepr::Owned { buffer, entry, .. } => {
-                Renderer::new(&buffer, entry).execute(cx, f);
+                Renderer::new(&buffer.lock(), entry).execute(cx, f);
             }
         }
     }
@@ -257,15 +259,15 @@ mod tests {
 
     /// Appends a nested view to `buffer` in one synchronous burst from the
     /// parts `f` pushes.
-    fn nested(buffer: &mut ViewBuffer, f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
-        buffer.block(&Cx::default(), |b| f(b.parts()))
+    fn nested(buffer: &ViewBuffer, f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
+        buffer.block(f)
     }
 
     /// Builds a self-contained view in one synchronous burst from the parts
     /// `f` pushes.
     fn owned(f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
-        let mut buffer = ViewBuffer::new();
-        nested(&mut buffer, f).seal(buffer)
+        let buffer = ViewBuffer::new();
+        nested(&buffer, f).seal(&buffer)
     }
 
     #[test]
@@ -277,33 +279,36 @@ mod tests {
 
     #[test]
     fn push_view_splices_nested_views() {
-        let mut buffer = ViewBuffer::new();
-        let inner = nested(&mut buffer, |parts| {
+        let buffer = ViewBuffer::new();
+        let inner = nested(&buffer, |parts| {
             parts.push_str("a < b");
         });
-        let outer = nested(&mut buffer, |parts| {
+        let outer = nested(&buffer, |parts| {
             parts.push_str_unescaped("<p>");
             parts.push_view_handle(inner);
             parts.push_str_unescaped("</p>");
         });
-        assert_eq!(outer.seal(buffer).render(&Cx::default()), "<p>a &lt; b</p>");
+        assert_eq!(
+            outer.seal(&buffer).render(&Cx::default()),
+            "<p>a &lt; b</p>"
+        );
     }
 
     #[test]
     fn document_order_follows_splice_order_not_buffer_order() {
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         // Built in reverse: `second` occupies earlier buffer addresses.
-        let second = nested(&mut buffer, |parts| {
+        let second = nested(&buffer, |parts| {
             parts.push_str("B");
         });
-        let first = nested(&mut buffer, |parts| {
+        let first = nested(&buffer, |parts| {
             parts.push_str("A");
         });
-        let outer = nested(&mut buffer, |parts| {
+        let outer = nested(&buffer, |parts| {
             parts.push_view_handle(first);
             parts.push_view_handle(second);
         });
-        assert_eq!(outer.seal(buffer).render(&Cx::default()), "AB");
+        assert_eq!(outer.seal(&buffer).render(&Cx::default()), "AB");
     }
 
     #[test]
@@ -349,30 +354,33 @@ mod tests {
 
     #[test]
     fn filled_view_slot_renders_the_resolved_view() {
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         let (placeholder, slot) = buffer.reserve_view();
         // The outer view splices the placeholder before the child exists.
-        let outer = nested(&mut buffer, |parts| {
+        let outer = nested(&buffer, |parts| {
             parts.push_str_unescaped("<p>");
             parts.push_view_handle(placeholder);
             parts.push_str_unescaped("</p>");
         });
-        let child = nested(&mut buffer, |parts| {
+        let child = nested(&buffer, |parts| {
             parts.push_str("a < b");
         });
         buffer.fill_view(slot, child);
-        assert_eq!(outer.seal(buffer).render(&Cx::default()), "<p>a &lt; b</p>");
+        assert_eq!(
+            outer.seal(&buffer).render(&Cx::default()),
+            "<p>a &lt; b</p>"
+        );
     }
 
     #[test]
     fn a_placeholder_renders_the_view_filling_its_slot() {
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         let (placeholder, slot) = buffer.reserve_view();
-        let child = nested(&mut buffer, |parts| {
+        let child = nested(&buffer, |parts| {
             parts.push_str("a < b");
         });
         buffer.fill_view(slot, child);
-        assert_eq!(placeholder.seal(buffer).render(&Cx::default()), "a &lt; b");
+        assert_eq!(placeholder.seal(&buffer).render(&Cx::default()), "a &lt; b");
     }
 
     #[test]
@@ -380,37 +388,37 @@ mod tests {
         let inner = owned(|parts| {
             parts.push_str("a < b");
         });
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         let (placeholder, slot) = buffer.reserve_view();
         buffer.fill_view(slot, inner);
-        assert_eq!(placeholder.seal(buffer).render(&Cx::default()), "a &lt; b");
+        assert_eq!(placeholder.seal(&buffer).render(&Cx::default()), "a &lt; b");
     }
 
     #[test]
     fn static_views_fill_a_slot_like_nested_ones() {
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         let (placeholder, slot) = buffer.reserve_view();
         buffer.fill_view(slot, ViewHandle::unescaped_unchecked("<hr>"));
-        assert_eq!(placeholder.seal(buffer).render(&Cx::default()), "<hr>");
+        assert_eq!(placeholder.seal(&buffer).render(&Cx::default()), "<hr>");
 
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         let (placeholder, slot) = buffer.reserve_view();
         buffer.fill_view(slot, ViewHandle::empty());
-        assert_eq!(placeholder.seal(buffer).render(&Cx::default()), "");
+        assert_eq!(placeholder.seal(&buffer).render(&Cx::default()), "");
     }
 
     #[test]
     #[should_panic(expected = "before it was filled")]
     fn rendering_an_unfilled_placeholder_panics() {
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         let (placeholder, _slot) = buffer.reserve_view();
-        let _ = placeholder.seal(buffer).render(&Cx::default());
+        let _ = placeholder.seal(&buffer).render(&Cx::default());
     }
 
     #[test]
     #[should_panic(expected = "tried to fill a view slot twice")]
     fn filling_a_slot_twice_panics() {
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         let (_placeholder, slot) = buffer.reserve_view();
         buffer.fill_view(slot, ViewHandle::empty());
         buffer.fill_view(slot, ViewHandle::empty());
@@ -419,19 +427,19 @@ mod tests {
     #[test]
     #[should_panic(expected = "outside the `view!` invocation it was reserved in")]
     fn filling_a_slot_in_a_different_buffer_panics() {
-        let mut reserved_in = ViewBuffer::new();
+        let reserved_in = ViewBuffer::new();
         let (_placeholder, slot) = reserved_in.reserve_view();
-        let mut other = ViewBuffer::new();
+        let other = ViewBuffer::new();
         other.fill_view(slot, ViewHandle::empty());
     }
 
     #[test]
     fn size_hint_accumulates_across_splices() {
-        let mut buffer = ViewBuffer::new();
-        let inner = nested(&mut buffer, |parts| {
+        let buffer = ViewBuffer::new();
+        let inner = nested(&buffer, |parts| {
             parts.push_str_unescaped("12345678");
         });
-        let outer = nested(&mut buffer, |parts| {
+        let outer = nested(&buffer, |parts| {
             parts.push_view_handle(inner.clone());
             parts.push_view_handle(inner);
             parts.push_view_handle(ViewHandle::unescaped_unchecked("<hr>"));
@@ -445,18 +453,18 @@ mod tests {
     #[test]
     #[should_panic(expected = "tried to render a nested view handle")]
     fn rendering_a_nested_view_panics() {
-        let mut buffer = ViewBuffer::new();
-        let view = nested(&mut buffer, |_parts| {});
+        let buffer = ViewBuffer::new();
+        let view = nested(&buffer, |_parts| {});
         let _ = view.render(&Cx::default());
     }
 
     #[test]
     #[should_panic(expected = "outside the `view!` invocation it was built in")]
     fn splicing_a_nested_view_from_a_different_buffer_panics() {
-        let mut built_in = ViewBuffer::new();
-        let view = nested(&mut built_in, |_parts| {});
-        let mut other = ViewBuffer::new();
-        nested(&mut other, |parts| {
+        let built_in = ViewBuffer::new();
+        let view = nested(&built_in, |_parts| {});
+        let other = ViewBuffer::new();
+        nested(&other, |parts| {
             parts.push_view_handle(view);
         });
     }
@@ -464,9 +472,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "tried to seal a view into a buffer it was not built in")]
     fn sealing_a_view_into_a_different_buffer_panics() {
-        let mut built_in = ViewBuffer::new();
-        let view = nested(&mut built_in, |_parts| {});
-        let _ = view.seal(ViewBuffer::new());
+        let built_in = ViewBuffer::new();
+        let view = nested(&built_in, |_parts| {});
+        let _ = view.seal(&ViewBuffer::new());
     }
 
     #[cfg(feature = "http")]

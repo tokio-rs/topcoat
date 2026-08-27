@@ -63,21 +63,14 @@ impl MailField {
 
         match value {
             FieldValue::Html(html) => {
-                let view = &html.view;
-                // The view resolves to its first content here, against the
-                // named context when the body leads with `cx =>` and the
-                // ambient `__cx` otherwise.
-                let cx = view.cx.as_ref().map_or_else(
-                    || quote! { __cx },
-                    |leading| {
-                        let cx = &leading.cx;
-                        quote! { &(#cx).clone() }
-                    },
-                );
+                // The view resolves to its self-contained content here,
+                // against the named context when the body leads with
+                // `cx =>` and the ambient `__cx` otherwise.
+                let view = html.view.expand(true);
                 quote! {
                     let __html = #view;
                     let __builder = __builder.#method(
-                        #topcoat_view::ViewExt::single(__html, #cx).await?,
+                        #topcoat_view::ViewExt::single(__html).await?,
                     );
                 }
             }

@@ -131,29 +131,28 @@ impl ToTokens for Layout {
             #face
         };
 
-        // The view picks up the request context it is first polled with, so
-        // an outer layout's derived context reaches this one. It owns that
-        // context and drives the component's view in place, which lets the
-        // view borrow it.
+        // The view owns copies of the request context and buffer it is
+        // rendered with and drives the component's view in place, which
+        // lets the view borrow them.
         let render = quote! {
             fn render<'s>(
                 &'s self,
+                cx: &#topcoat_context::Cx,
+                buf: &#topcoat_view::ViewBuffer,
                 slot: #topcoat_router::Slot<'s>,
             ) -> #topcoat_view::BoxView<'s> {
-                ::std::boxed::Box::pin(#topcoat_view::internal::LazyView::new(
-                    move |cx: #topcoat_context::Cx| {
-                        #topcoat_view::internal::MoveView::new(async move {
-                            let props = <#ident as #topcoat_view::Component>::props_builder()
-                                .slot(slot)
-                                .build();
-                            let view = <#ident as #topcoat_view::Component>::render(
-                                #ident, &cx, props,
-                            )
-                            .await?;
-                            <#topcoat_view::internal::MoveView>::drive(&cx, view).await
-                        })
-                    },
-                ))
+                let cx = cx.clone();
+                let buf = buf.clone();
+                ::std::boxed::Box::pin(#topcoat_view::internal::MoveView::new(async move {
+                    let props = <#ident as #topcoat_view::Component>::props_builder()
+                        .slot(slot)
+                        .build();
+                    let view = <#ident as #topcoat_view::Component>::render(
+                        #ident, &cx, &buf, props,
+                    )
+                    .await?;
+                    #topcoat_view::internal::drive(view).await
+                }))
             }
         };
         let (layout, submit_as) = if let Some(path) = attr.path.as_ref() {

@@ -28,14 +28,22 @@ impl Scope {
     ///
     /// With `owns_cx`, the block expects an owned `__cx` context in scope
     /// and captures it, rebinding `__cx` to a borrow of it inside; the view
-    /// then does not borrow the caller's context.
-    pub fn emit_root(&self, owns_cx: bool) -> TokenStream {
-        let prologue = if owns_cx {
-            quote! { let __cx = &__cx; }
-        } else {
-            TokenStream::new()
-        };
-        self.emit_move_view(quote! { move }, prologue)
+    /// then does not borrow the caller's context. With `self_contained`,
+    /// the block creates the `__buf` buffer the template builds in and
+    /// seals the content into it, so the view does not depend on an
+    /// ambient buffer either.
+    pub fn emit_root(&self, owns_cx: bool, self_contained: bool) -> TokenStream {
+        let mut prologue = TokenStream::new();
+        if owns_cx {
+            prologue.extend(quote! { let __cx = &__cx; });
+        }
+        if self_contained {
+            prologue.extend(quote! {
+                let __buf = #topcoat_view::ViewBuffer::new();
+                let __buf = &__buf;
+            });
+        }
+        self.emit_move_view(&quote! { move }, &prologue, self_contained)
     }
 
     /// Emits this scope as the body of a branch or iteration whose pattern
@@ -55,8 +63,9 @@ impl Scope {
         let idents = bindings.idents();
         let rebinds = bindings.rebinds();
         let view = self.emit_move_view(
-            TokenStream::new(),
-            quote! { let (#(#rebinds,)*) = __captured.take(); },
+            &TokenStream::new(),
+            &quote! { let (#(#rebinds,)*) = __captured.take(); },
+            false,
         );
         quote! {{
             let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
@@ -69,12 +78,23 @@ impl Scope {
     ///
     /// The drive happens inside the block that evaluates the template, so
     /// the view may borrow from that block's bindings, including references
-    /// to temporaries the template declares.
-    fn emit_move_view(&self, move_token: TokenStream, prologue: TokenStream) -> TokenStream {
+    /// to temporaries the template declares. A `sealed` drive seals the
+    /// content into the `__buf` buffer the prologue created.
+    fn emit_move_view(
+        &self,
+        move_token: &TokenStream,
+        prologue: &TokenStream,
+        sealed: bool,
+    ) -> TokenStream {
+        let drive = if sealed {
+            quote! { #topcoat_view::internal::drive_sealed(__buf, __view) }
+        } else {
+            quote! { #topcoat_view::internal::drive(__view) }
+        };
         let body = self.emit_view_with(|view| {
             quote! {
                 let __view = #view;
-                <#topcoat_view::internal::MoveView>::drive(__cx, __view).await
+                #drive.await
             }
         });
         quote! {
@@ -122,7 +142,7 @@ mod tests {
     };
 
     fn rendered(builder: ViewBuilder) -> String {
-        builder.finish().emit_root(false).to_string()
+        builder.finish().emit_root(false, false).to_string()
     }
 
     fn add_component(builder: &mut ViewBuilder, name: &str) {
@@ -154,8 +174,23 @@ mod tests {
     fn a_root_view_is_a_move_view_driving_its_body() {
         let out = rendered(ViewBuilder::new());
         assert!(out.contains("MoveView :: new (async move"), "{out}");
+        assert!(out.contains(":: drive (__view) . await"), "{out}");
+    }
+
+    #[test]
+    fn a_self_contained_root_creates_and_seals_its_buffer() {
+        let out = ViewBuilder::new()
+            .finish()
+            .emit_root(true, true)
+            .to_string();
+        assert!(out.contains("let __cx = & __cx ;"), "{out}");
         assert!(
-            out.contains("MoveView > :: drive (__cx , __view) . await"),
+            out.contains("let __buf = :: topcoat_view :: ViewBuffer :: new () ;"),
+            "{out}"
+        );
+        assert!(out.contains("let __buf = & __buf ;"), "{out}");
+        assert!(
+            out.contains(":: drive_sealed (__buf , __view) . await"),
             "{out}"
         );
     }
@@ -170,14 +205,14 @@ mod tests {
         // block; the drive runs in that block, so the borrow is still valid.
         assert!(!out.contains("let __view = {"), "{out}");
         let block = out.find("{ let x = & value ()").expect(&out);
-        let drive = out.find(":: drive (__cx , __view) . await }").expect(&out);
+        let drive = out.find(":: drive (__view) . await }").expect(&out);
         assert!(block < drive, "{out}");
     }
 
     #[test]
     fn a_view_without_units_joins_over_unit() {
         let out = rendered(ViewBuilder::new());
-        assert!(out.contains("JoinView :: new (() , move | __b , () |"));
+        assert!(out.contains("JoinView :: new (__cx , __buf , () , move | __b , () |"));
     }
 
     #[test]
@@ -222,9 +257,9 @@ mod tests {
         builder.expr(ExprKind::Node, quote! { value });
         builder.str_unescaped("</p>");
         let out = rendered(builder);
-        assert!(
-            out.contains("let __expr0 = :: topcoat_view :: internal :: NodeView :: new (value)")
-        );
+        assert!(out.contains(
+            "let __expr0 = :: topcoat_view :: internal :: NodeView :: new (__cx , __buf , value)"
+        ));
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
         assert!(out.contains("JoinView :: new"));
         assert!(out.contains("move | __b , (__view0 , ()) |"));
@@ -269,7 +304,7 @@ mod tests {
         let out = rendered(builder);
         assert!(out.contains("for x in xs"));
         assert!(out.contains("__iterations . push (:: topcoat_view :: ViewExt :: boxed"));
-        assert!(out.contains("LoopView :: new (__iterations)"));
+        assert!(out.contains("LoopView :: new (__buf , __iterations)"));
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
     }
 

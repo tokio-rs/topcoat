@@ -492,7 +492,7 @@ impl Default for RouterBuilder {
 #[cfg(test)]
 mod tests {
     use topcoat_core::context::Cx;
-    use topcoat_view::BoxView;
+    use topcoat_view::{BoxView, ViewBuffer};
 
     use super::*;
     use crate::{
@@ -510,7 +510,7 @@ mod tests {
     }
 
     /// A stand-in page; builder tests register pages without rendering them.
-    fn render_page(_body: Body) -> BoxView<'static> {
+    fn render_page(_cx: &Cx, _buf: &ViewBuffer, _body: Body) -> BoxView<'static> {
         Box::pin(())
     }
 

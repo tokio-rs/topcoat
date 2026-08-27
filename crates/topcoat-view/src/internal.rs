@@ -6,21 +6,23 @@
 //! user's scope.
 //!
 //! A template expands to a composition of the [`View`](crate::View)
-//! combinators defined here: a [`JoinView`] drives the template's dynamic
-//! node positions concurrently and builds its instruction block from their
-//! contents, [`NodeView`] wraps a position's value, [`ThenView`] adapts a
-//! future resolving to a view, [`EitherView`] unifies branch types, a
-//! [`LoopView`] joins a `for` body's iterations, [`LiveView`] backs a
-//! `live!` region, [`MoveView`] owns a template's captured environment, and
-//! [`LazyView`] builds a view from the context it is first polled with.
-//! The [`Builder`] is the handle a burst pushes its block's parts through,
-//! sealed with the HTML context of the position they fill.
+//! combinators defined here: a [`JoinView`](crate::internal::JoinView) drives the template's
+//! dynamic node positions concurrently and builds its instruction block from their
+//! contents, [`NodeView`](crate::internal::NodeView) wraps a position's value,
+//! [`ThenView`](crate::internal::ThenView) adapts a future resolving to a view,
+//! [`EitherView`](crate::internal::EitherView) unifies branch types, a
+//! [`LoopView`](crate::internal::LoopView) joins a `for` body's iterations,
+//! [`LiveView`](crate::internal::LiveView) backs a `live!` region, and
+//! [`MoveView`](crate::internal::MoveView) owns a template's captured environment. A body inside a
+//! `MoveView` or `live!` region awaits [`drive`](crate::internal::drive) to poll a view in place.
+//! The [`Builder`](crate::internal::Builder) is the handle a burst pushes its block's
+//! parts through, sealed with the HTML context of the position they fill.
 
 mod builder;
 mod capture;
+mod drive;
 mod either_view;
 mod join_view;
-mod lazy_view;
 mod live_view;
 mod loop_view;
 mod move_view;
@@ -29,9 +31,9 @@ mod then_view;
 
 pub use builder::*;
 pub use capture::*;
+pub use drive::*;
 pub use either_view::*;
 pub use join_view::*;
-pub use lazy_view::*;
 pub use live_view::*;
 pub use loop_view::*;
 pub use move_view::*;

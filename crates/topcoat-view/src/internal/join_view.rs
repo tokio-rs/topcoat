@@ -7,20 +7,19 @@ use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
 
 use super::Builder;
-use crate::{
-    Swap, View,
-    buffer::{ViewBuffer, ViewHandle},
-};
+use crate::{Swap, View, ViewBuffer, buffer::ViewHandle};
 
 pin_project! {
     /// A template as a [`View`]: its dynamic node positions driven
     /// concurrently, and its instruction block built from their contents.
     ///
     /// `poll_first` drives every unit toward its content; once all have
-    /// resolved, the burst runs, pushing the template's block in one
-    /// synchronous burst that splices the contents in position order. After
-    /// that the units' updates merge into one stream of swaps.
-    pub struct JoinView<U, F> {
+    /// resolved, the burst runs, pushing the template's block into the
+    /// buffer in one synchronous burst that splices the contents in position
+    /// order. After that the units' updates merge into one stream of swaps.
+    pub struct JoinView<'a, U, F> {
+        cx: &'a Cx,
+        buf: &'a ViewBuffer,
         #[pin]
         units: U,
         // The burst; taken when the units resolve.
@@ -28,49 +27,43 @@ pin_project! {
     }
 }
 
-impl<U, F> JoinView<U, F>
+impl<'a, U, F> JoinView<'a, U, F>
 where
     U: JoinUnits,
     F: FnOnce(&mut Builder<'_, '_, '_>, U::Contents),
 {
     #[must_use]
-    pub fn new(units: U, burst: F) -> Self {
+    pub fn new(cx: &'a Cx, buf: &'a ViewBuffer, units: U, burst: F) -> Self {
         Self {
+            cx,
+            buf,
             units,
             burst: Some(burst),
         }
     }
 }
 
-impl<U, F> View for JoinView<U, F>
+impl<U, F> View for JoinView<'_, U, F>
 where
     U: JoinUnits + Send,
     F: FnOnce(&mut Builder<'_, '_, '_>, U::Contents) + Send,
 {
-    fn poll_first(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Result<ViewHandle>> {
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
         let mut this = self.project();
-        ready!(this.units.as_mut().poll_contents(cx, task, buf))?;
+        ready!(this.units.as_mut().poll_contents(cx))?;
         let contents = this.units.take_contents();
         let burst = this
             .burst
             .take()
             .expect("`poll_first` called again after it returned `Ready`");
-        let view = buf.block(cx, |b| burst(b, contents));
+        let view = this
+            .buf
+            .block(|parts| burst(&mut Builder::new(this.cx, parts), contents));
         Poll::Ready(Ok(view))
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Option<Result<Swap>>> {
-        self.project().units.poll_swap(cx, task, buf)
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
+        self.project().units.poll_swap(cx)
     }
 }
 
@@ -87,46 +80,26 @@ pub trait JoinUnits {
 
     /// Polls every unit still waiting toward its content; ready when all
     /// have resolved, or with the first unit's error.
-    fn poll_contents(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Result<()>>;
+    fn poll_contents(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>>;
 
     /// Takes the resolved contents out of the units.
     fn take_contents(self: Pin<&mut Self>) -> Self::Contents;
 
     /// Polls the units for the next update; ready with `None` once every
     /// unit has no further updates.
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Option<Result<Swap>>>;
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>>;
 }
 
 impl JoinUnits for () {
     type Contents = ();
 
-    fn poll_contents(
-        self: Pin<&mut Self>,
-        _cx: &Cx,
-        _task: &mut Context<'_>,
-        _buf: &mut ViewBuffer,
-    ) -> Poll<Result<()>> {
+    fn poll_contents(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<()>> {
         Poll::Ready(Ok(()))
     }
 
     fn take_contents(self: Pin<&mut Self>) -> Self::Contents {}
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        _cx: &Cx,
-        _task: &mut Context<'_>,
-        _buf: &mut ViewBuffer,
-    ) -> Poll<Option<Result<Swap>>> {
+    fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
         Poll::Ready(None)
     }
 }
@@ -168,22 +141,17 @@ where
 {
     type Contents = (ViewHandle, Rest::Contents);
 
-    fn poll_contents(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Result<()>> {
+    fn poll_contents(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         let this = self.project();
         let mut ready = true;
         if this.content.is_none() {
-            match this.view.poll_first(cx, task, buf) {
+            match this.view.poll_first(cx) {
                 Poll::Ready(Ok(content)) => *this.content = Some(content),
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                 Poll::Pending => ready = false,
             }
         }
-        match this.rest.poll_contents(cx, task, buf) {
+        match this.rest.poll_contents(cx) {
             Poll::Ready(Ok(())) => {}
             Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
             Poll::Pending => ready = false,
@@ -204,22 +172,17 @@ where
         (content, this.rest.take_contents())
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Option<Result<Swap>>> {
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
         let this = self.project();
         let mut pending = false;
         if !*this.done {
-            match this.view.poll_swap(cx, task, buf) {
+            match this.view.poll_swap(cx) {
                 Poll::Ready(Some(item)) => return Poll::Ready(Some(item)),
                 Poll::Ready(None) => *this.done = true,
                 Poll::Pending => pending = true,
             }
         }
-        match this.rest.poll_swap(cx, task, buf) {
+        match this.rest.poll_swap(cx) {
             Poll::Ready(Some(item)) => Poll::Ready(Some(item)),
             Poll::Ready(None) if !pending => Poll::Ready(None),
             Poll::Ready(None) | Poll::Pending => Poll::Pending,

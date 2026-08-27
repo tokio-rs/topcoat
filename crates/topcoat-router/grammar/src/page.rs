@@ -120,27 +120,29 @@ impl ToTokens for Page {
             ),
             None => (quote! { ::core::mem::drop(body); }, None),
         };
-        // The view picks up the request context it is first polled with, so
-        // a layout's derived context reaches the page. It owns that context
-        // and drives the component's view in place, which lets the view
-        // borrow it.
+        // The view owns copies of the request context and buffer it is
+        // rendered with and drives the component's view in place, which
+        // lets the view borrow them.
         let render = quote! {
-            fn render(&self, body: #topcoat_router::Body) -> #topcoat_view::BoxView<'_> {
-                ::std::boxed::Box::pin(#topcoat_view::internal::LazyView::new(
-                    move |cx: #topcoat_context::Cx| {
-                        #topcoat_view::internal::MoveView::new(async move {
-                            #parse_request
-                            let props = <#ident as #topcoat_view::Component>::props_builder()
-                                #body_prop
-                                .build();
-                            let view = <#ident as #topcoat_view::Component>::render(
-                                #ident, &cx, props,
-                            )
-                            .await?;
-                            <#topcoat_view::internal::MoveView>::drive(&cx, view).await
-                        })
-                    },
-                ))
+            fn render(
+                &self,
+                cx: &#topcoat_context::Cx,
+                buf: &#topcoat_view::ViewBuffer,
+                body: #topcoat_router::Body,
+            ) -> #topcoat_view::BoxView<'_> {
+                let cx = cx.clone();
+                let buf = buf.clone();
+                ::std::boxed::Box::pin(#topcoat_view::internal::MoveView::new(async move {
+                    #parse_request
+                    let props = <#ident as #topcoat_view::Component>::props_builder()
+                        #body_prop
+                        .build();
+                    let view = <#ident as #topcoat_view::Component>::render(
+                        #ident, &cx, &buf, props,
+                    )
+                    .await?;
+                    #topcoat_view::internal::drive(view).await
+                }))
             }
         };
         let methods = attr.methods.as_ref().map_or_else(

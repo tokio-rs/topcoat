@@ -1,7 +1,10 @@
 use std::{borrow::Cow, sync::Arc};
 
 use topcoat_core::context::Cx;
-use topcoat_view::{BoxView, Child, internal::MoveView};
+use topcoat_view::{
+    BoxView, Child, ViewBuffer,
+    internal::{MoveView, drive_sealed},
+};
 
 use crate::{
     Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId,
@@ -26,12 +29,13 @@ pub trait Page: Send + Sync + 'static {
     /// The URL path this page handles.
     fn path(&self) -> &Path;
 
-    /// Renders the page to a [`View`](topcoat_view::View).
+    /// Renders the page to a [`View`](topcoat_view::View) building into
+    /// `buf` under the request context `cx`.
     ///
-    /// The returned view may borrow `self`. It sees the request context it
-    /// is polled with, and an error in the page body surfaces when it is
-    /// polled rather than returned here.
-    fn render(&self, body: Body) -> BoxView<'_>;
+    /// The returned view may borrow `self`; it holds on to copies of the
+    /// context and buffer rather than borrowing them. An error in the page
+    /// body surfaces when the view is polled rather than returned here.
+    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_>;
 
     /// Returns whether this page handles the current request.
     ///
@@ -60,8 +64,8 @@ impl<P: Page + ?Sized> Page for &'static P {
         (**self).path()
     }
 
-    fn render(&self, body: Body) -> BoxView<'_> {
-        (**self).render(body)
+    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_> {
+        (**self).render(cx, buf, body)
     }
 }
 
@@ -69,7 +73,7 @@ impl<P: Page + ?Sized> Page for &'static P {
 inventory::collect!(&'static dyn Page);
 
 /// The render function backing a [`PageFn`].
-pub type PageRenderFn = fn(body: Body) -> BoxView<'static>;
+pub type PageRenderFn = fn(cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'static>;
 
 /// A [`Page`] backed by a plain render function.
 ///
@@ -125,8 +129,8 @@ impl Page for PageFn {
         &self.path
     }
 
-    fn render(&self, body: Body) -> BoxView<'_> {
-        (self.render)(body)
+    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_> {
+        (self.render)(cx, buf, body)
     }
 }
 
@@ -134,10 +138,11 @@ impl Page for PageFn {
 /// layouts.
 ///
 /// Interpolating the slot into the layout's template renders it there,
-/// under the template's request context. A layout provides request context
-/// values to everything beneath it by deriving a context with
-/// [`Cx::with`](topcoat_core::context::Cx::with) and rendering its template
-/// under it (`view! { cx => ... }`).
+/// under the template's request context: the slot is built lazily, with the
+/// context and buffer of the template interpolating it. A layout provides
+/// request context values to everything beneath it by deriving a context
+/// with [`Cx::with`](topcoat_core::context::Cx::with) and rendering its
+/// template under it (`view! { cx => ... }`).
 pub type Slot<'a> = Child<'a>;
 
 /// A layout handler that wraps pages whose path starts with the layout's path
@@ -153,11 +158,13 @@ pub trait Layout: Send + Sync + 'static {
     /// The path prefix this layout applies to.
     fn path(&self) -> &Path;
 
-    /// Renders the layout, embedding the given child content [`Slot`].
+    /// Renders the layout, embedding the given child content [`Slot`], to a
+    /// [`View`](topcoat_view::View) building into `buf` under the request
+    /// context `cx`.
     ///
-    /// The returned view may borrow `self` and the slot. It sees the request
-    /// context it is polled with.
-    fn render<'s>(&'s self, slot: Slot<'s>) -> BoxView<'s>;
+    /// The returned view may borrow `self` and the slot; it holds on to
+    /// copies of the context and buffer rather than borrowing them.
+    fn render<'s>(&'s self, cx: &Cx, buf: &ViewBuffer, slot: Slot<'s>) -> BoxView<'s>;
 }
 
 impl<L: Layout + ?Sized> Layout for &'static L {
@@ -165,8 +172,8 @@ impl<L: Layout + ?Sized> Layout for &'static L {
         (**self).path()
     }
 
-    fn render<'s>(&'s self, slot: Slot<'s>) -> BoxView<'s> {
-        (**self).render(slot)
+    fn render<'s>(&'s self, cx: &Cx, buf: &ViewBuffer, slot: Slot<'s>) -> BoxView<'s> {
+        (**self).render(cx, buf, slot)
     }
 }
 
@@ -175,7 +182,7 @@ inventory::collect!(&'static dyn Layout);
 
 /// The render function backing a [`LayoutFn`], receiving the child content as
 /// a [`Slot`].
-pub type LayoutRenderFn = for<'a> fn(slot: Slot<'a>) -> BoxView<'a>;
+pub type LayoutRenderFn = for<'a> fn(cx: &Cx, buf: &ViewBuffer, slot: Slot<'a>) -> BoxView<'a>;
 
 /// A [`Layout`] backed by a plain render function.
 ///
@@ -209,8 +216,8 @@ impl Layout for LayoutFn {
         &self.path
     }
 
-    fn render<'s>(&'s self, slot: Slot<'s>) -> BoxView<'s> {
-        (self.render)(slot)
+    fn render<'s>(&'s self, cx: &Cx, buf: &ViewBuffer, slot: Slot<'s>) -> BoxView<'s> {
+        (self.render)(cx, buf, slot)
     }
 }
 
@@ -233,17 +240,18 @@ impl PageWithLayoutsInner {
     /// the view.
     ///
     /// Nothing runs until the view is polled: each layout decides when its
-    /// slot renders and which context it sees.
-    fn render(&self, body: Body) -> BoxView<'_> {
-        let page = self.page.render(body);
+    /// slot renders and which context it sees, since every slot is built
+    /// lazily with the context and buffer of the template interpolating it.
+    fn render(&self, cx: &Cx, buf: &ViewBuffer, body: Body) -> BoxView<'_> {
         let Some((outermost, inner)) = self.layouts.split_first() else {
-            return page;
+            return self.page.render(cx, buf, body);
         };
-        let mut slot = Slot::new(page);
+        let page = &self.page;
+        let mut slot = Slot::lazy(move |cx, buf| page.render(cx, buf, body));
         for layout in inner.iter().rev() {
-            slot = Slot::new(layout.render(slot));
+            slot = Slot::lazy(move |cx, buf| layout.render(cx, buf, slot));
         }
-        outermost.render(slot)
+        outermost.render(cx, buf, slot)
     }
 }
 
@@ -274,14 +282,16 @@ impl Route for PageWithLayouts {
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
-        // The response body outlives the handler, so the view owns the pair
-        // and a copy of the request context and drives itself in place.
+        // The response body outlives the handler, so the view owns the pair,
+        // a copy of the request context, and the buffer it builds in, and
+        // drives itself in place.
         let inner = Arc::clone(&self.inner);
         let owned = cx.clone();
         Box::pin(async move {
             let view = MoveView::new(async move {
-                let view = inner.render(body);
-                MoveView::drive(&owned, view).await
+                let buf = ViewBuffer::new();
+                let view = inner.render(&owned, &buf, body);
+                drive_sealed(&buf, view).await
             });
             view.async_into_response(cx).await
         })

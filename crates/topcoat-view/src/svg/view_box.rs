@@ -57,14 +57,14 @@ impl AttributeValueViewParts for ViewBox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::buffer::ViewBuffer;
+    use crate::{buffer::ViewBuffer, internal::Builder};
 
     fn render(value: impl AttributeValueViewParts) -> String {
         let cx = Cx::default();
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         buffer
-            .block(&cx, |b| b.attribute_value(value))
-            .seal(buffer)
+            .block(|parts| Builder::new(&cx, parts).attribute_value(value))
+            .seal(&buffer)
             .render(&cx)
     }
 

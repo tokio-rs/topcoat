@@ -53,7 +53,7 @@ where
 /// An error in the first content surfaces here, before any headers are sent,
 /// so it becomes the error response like any handler error.
 async fn stream<V: View + 'static>(view: V, cx: &Cx) -> Result<Response> {
-    let (content, swaps) = view.live(cx).await?;
+    let (content, swaps) = view.live().await?;
     let rendered = content.render_response(cx);
     let body = ViewBody {
         cx: cx.clone(),
@@ -94,13 +94,13 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
 
     fn poll_frame(
         self: Pin<&mut Self>,
-        task: &mut Context<'_>,
+        cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
         let this = self.get_mut();
         if let Some(first) = this.first.take() {
             return Poll::Ready(Some(Ok(Frame::data(first.into()))));
         }
-        match Pin::new(&mut this.swaps).poll_next(task) {
+        match Pin::new(&mut this.swaps).poll_next(cx) {
             // A swap streams down as an inert template plus a script
             // applying it to the swap's region.
             Poll::Ready(Some(Ok(swap))) => {
@@ -131,7 +131,7 @@ mod tests {
     #[tokio::test]
     async fn view_handle_responds_with_its_html() {
         let cx = CxTestBuilder::new().build();
-        let handle = view! { cx => <p>"hello"</p> }.single(&cx).await.unwrap();
+        let handle = view! { cx => <p>"hello"</p> }.single().await.unwrap();
 
         let response = handle.into_response(&cx).unwrap();
 
@@ -153,7 +153,7 @@ mod tests {
             ((HeaderName::from_static("x-custom"), HeaderValue::from_static("yes")))
             <p>"missing"</p>
         }
-        .single(&cx)
+        .single()
         .await
         .unwrap();
 

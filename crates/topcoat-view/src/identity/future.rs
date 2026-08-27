@@ -89,9 +89,9 @@ mod tests {
     /// a tight loop is sufficient.
     fn block_on<F: Future>(fut: F) -> F::Output {
         let mut fut = pin!(fut);
-        let mut task = Context::from_waker(Waker::noop());
+        let mut cx = Context::from_waker(Waker::noop());
         loop {
-            if let Poll::Ready(output) = fut.as_mut().poll(&mut task) {
+            if let Poll::Ready(output) = fut.as_mut().poll(&mut cx) {
                 return output;
             }
         }
@@ -145,15 +145,15 @@ mod tests {
         };
         let mut first = pin!(sibling(1));
         let mut second = pin!(sibling(2));
-        let mut task = Context::from_waker(Waker::noop());
+        let mut cx = Context::from_waker(Waker::noop());
 
         // Interleave the two futures across their yield points.
-        assert!(first.as_mut().poll(&mut task).is_pending());
-        assert!(second.as_mut().poll(&mut task).is_pending());
-        let Poll::Ready(first) = first.as_mut().poll(&mut task) else {
+        assert!(first.as_mut().poll(&mut cx).is_pending());
+        assert!(second.as_mut().poll(&mut cx).is_pending());
+        let Poll::Ready(first) = first.as_mut().poll(&mut cx) else {
             panic!("ready on the second poll");
         };
-        let Poll::Ready(second) = second.as_mut().poll(&mut task) else {
+        let Poll::Ready(second) = second.as_mut().poll(&mut cx) else {
             panic!("ready on the second poll");
         };
         assert_ne!(first, second);
@@ -165,8 +165,8 @@ mod tests {
     fn the_future_restores_the_identity_when_a_poll_panics() {
         let mut fut = pin!(IdentityFuture::child(SITE_A, async { panic!("boom") }));
         let result = catch_unwind(AssertUnwindSafe(|| {
-            let mut task = Context::from_waker(Waker::noop());
-            let _ = fut.as_mut().poll(&mut task);
+            let mut cx = Context::from_waker(Waker::noop());
+            let _ = fut.as_mut().poll(&mut cx);
         }));
         assert!(result.is_err());
         assert_eq!(Identity::current(), Identity::ROOT);

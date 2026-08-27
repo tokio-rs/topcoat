@@ -20,7 +20,7 @@ impl Emit for ExprNode {
         match self.kind {
             ExprKind::Node => {
                 emitter.hoist(quote! {
-                    let #ident = #topcoat_view::internal::NodeView::new(#tokens);
+                    let #ident = #topcoat_view::internal::NodeView::new(__cx, __buf, #tokens);
                 });
                 emitter.unit(Span::call_site(), &ident);
             }

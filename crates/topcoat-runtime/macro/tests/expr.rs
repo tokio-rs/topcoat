@@ -20,7 +20,7 @@ async fn toggle_reaches_the_generated_javascript() {
 
         <button @click=$(|_e| open.toggle())>"x"</button>
     }
-    .single(cx)
+    .single()
     .await
     .unwrap()
     .render(cx);
@@ -38,7 +38,7 @@ async fn increment_and_decrement_reach_the_generated_javascript() {
         <button @click=$(|_e| count.increment())>"+"</button>
         <button @click=$(|_e| count.decrement())>"-"</button>
     }
-    .single(cx)
+    .single()
     .await
     .unwrap()
     .render(cx);
@@ -56,7 +56,7 @@ async fn push_str_reaches_the_generated_javascript_with_its_argument() {
 
         <button @click=$(|_e| name.push_str("!"))>"x"</button>
     }
-    .single(cx)
+    .single()
     .await
     .unwrap()
     .render(cx);
@@ -84,7 +84,7 @@ async fn procedure_call_inside_if_is_an_async_func() {
             "Test"
         </button>
     }
-    .single(cx)
+    .single()
     .await
     .unwrap()
     .render(cx);
@@ -110,7 +110,7 @@ async fn procedure_call_inside_block_is_an_async_func() {
             "Test"
         </button>
     }
-    .single(cx)
+    .single()
     .await
     .unwrap()
     .render(cx);
@@ -136,7 +136,7 @@ async fn push_str_accepts_the_owned_string_from_an_event() {
             @input=$(|e: topcoat::runtime::Event| { message.push_str(e.target.value) })
         >
     }
-    .single(cx)
+    .single()
     .await
     .unwrap()
     .render(cx);

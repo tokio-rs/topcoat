@@ -100,7 +100,7 @@ use topcoat::{
 
 #[route(POST "/save")]
 async fn save(cx: &Cx) -> Result<(HxRetarget, HxReswap, View)> {
-    let body = view! { <div>"Saved!"</div> }?;
+    let body = view! { cx => <div>"Saved!"</div> }?;
     Ok((
         HxRetarget::from("#status"),
         HxReswap(SwapOption::InnerHtml),

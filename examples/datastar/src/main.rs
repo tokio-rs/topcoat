@@ -69,12 +69,13 @@ async fn increment(
     let count = counter.count + 1;
 
     let entry = view! {
+        cx =>
         <li>
             "Counted to "
             (count)
         </li>
     }
-    .single(cx)
+    .single()
     .await?;
 
     // One event updates the counter signal, the other appends the log entry.

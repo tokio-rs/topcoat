@@ -8,10 +8,11 @@ use crate::view::View;
 /// The parsed body of a `live!` invocation: plain Rust statements that emit
 /// views at the region with `emit!`.
 ///
-/// Lowers to a [`LiveView`](topcoat_view::LiveView) value wrapping the body
-/// as the async block driving the region verbatim, so it must end in an
-/// expression producing the region's `Result<(), Error>`: the final `emit!`
-/// itself, an explicit `Ok(())`, or a diverging `loop`.
+/// Lowers to a [`LiveView`](topcoat_view::internal::LiveView) value over
+/// the ambient `__buf` buffer, wrapping the body as the async block driving
+/// the region verbatim, so it must end in an expression producing the
+/// region's `Result<(), Error>`: the final `emit!` itself, an explicit
+/// `Ok(())`, or a diverging `loop`.
 pub struct Live {
     pub body: Vec<syn::Stmt>,
 }
@@ -28,7 +29,7 @@ impl ToTokens for Live {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let body = &self.body;
         quote! {
-            #topcoat_view::internal::LiveView::new(async move {
+            #topcoat_view::internal::LiveView::new(__buf, async move {
                 #(#body)*
             })
         }
@@ -57,9 +58,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Live {
 /// The parsed body of an `emit!` invocation: a view body, emitted at the
 /// enclosing `live!` invocation's region.
 ///
-/// Lowers to an [`EmitView`](topcoat_view::EmitView) wrapping the view,
-/// awaited in place: the invocation is an expression of type
-/// `Result<(), Error>`.
+/// Lowers to the self-contained view, built in a buffer of its own so the
+/// emitted content renders on its own, driven in place with
+/// [`drive`](topcoat_view::internal::drive): the invocation is an
+/// expression of type `Result<(), Error>`.
 pub struct Emit {
     pub view: View,
 }
@@ -74,9 +76,9 @@ impl Parse for Emit {
 
 impl ToTokens for Emit {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let view = &self.view;
+        let view = self.view.expand(true);
         quote! {
-            #topcoat_view::internal::EmitView::new(__cx, #view).await
+            #topcoat_view::internal::drive(#view).await
         }
         .to_tokens(tokens);
     }
@@ -114,10 +116,34 @@ mod tests {
     }
 
     #[test]
-    fn emit_awaits_an_emit_view_wrapping_the_view() {
+    fn live_builds_in_the_ambient_buffer() {
+        let live: Live = syn::parse_str("emit! { \"x\" }").unwrap();
+        let out = live.to_token_stream().to_string();
+        assert!(out.contains("LiveView :: new (__buf , async move"), "{out}");
+    }
+
+    #[test]
+    fn emit_drives_a_self_contained_view() {
         let emit: Emit = syn::parse_str("<p>\"hi\"</p>").unwrap();
         let out = emit.to_token_stream().to_string();
-        assert!(out.contains("EmitView :: new (__cx ,"), "{out}");
+        assert!(
+            out.starts_with(":: topcoat_view :: internal :: drive ("),
+            "{out}"
+        );
+        assert!(
+            out.contains("let __buf = :: topcoat_view :: ViewBuffer :: new ()"),
+            "{out}"
+        );
+        assert!(out.contains("drive_sealed (__buf , __view)"), "{out}");
+        assert!(!out.contains("let __cx"), "{out}");
         assert!(out.ends_with(") . await"), "{out}");
+    }
+
+    #[test]
+    fn emit_accepts_a_leading_cx_argument() {
+        let emit: Emit = syn::parse_str("cx => <p>\"hi\"</p>").unwrap();
+        let out = emit.to_token_stream().to_string();
+        assert!(out.contains("let __cx"), "{out}");
+        assert!(out.contains("drive_sealed (__buf , __view)"), "{out}");
     }
 }

@@ -488,7 +488,7 @@ These declarations require the `router` feature (or the `topcoat-view` crate's `
 
 # Rendering Outside A Component
 
-Inside a [`component`], `#[page]`, `#[layout]`, or `#[shard]`, the request context is in scope implicitly, so `view!` can render components and reactive markup with no ceremony. In a plain function you pass it explicitly at the start of the `view!` macro:
+Inside a [`component`], `#[page]`, `#[layout]`, or `#[shard]`, the request context and the buffer the view builds into are in scope implicitly, so `view!` can render components and reactive markup with no ceremony. In a plain function you pass the context explicitly at the start of the `view!` macro:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*};
@@ -498,6 +498,8 @@ async fn render(cx: &Cx) -> Result {
     view! { cx => greeting(name: "World") }
 }
 ```
+
+A view naming its context is self-contained: it builds in a buffer of its own, so the content it resolves to renders anywhere, whether the view becomes a response on its own or is interpolated into another view.
 
 # Custom Values In Markup
 

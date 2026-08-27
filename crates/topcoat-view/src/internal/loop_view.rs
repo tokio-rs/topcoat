@@ -3,12 +3,9 @@ use std::{
     task::{Context, Poll},
 };
 
-use topcoat_core::{context::Cx, error::Result};
+use topcoat_core::error::Result;
 
-use crate::{
-    Swap, View,
-    buffer::{ViewBuffer, ViewHandle},
-};
+use crate::{Swap, View, ViewBuffer, buffer::ViewHandle};
 
 /// The iterations of a `for` body as one node value.
 ///
@@ -19,7 +16,8 @@ use crate::{
 /// The iterations share one view type, so the expansion boxes each body.
 /// The `Unpin` bound this trades on is what lets the loop hold its views in
 /// a plain `Vec`.
-pub struct LoopView<V> {
+pub struct LoopView<'a, V> {
+    buf: &'a ViewBuffer,
     iterations: Vec<Iteration<V>>,
 }
 
@@ -30,13 +28,14 @@ struct Iteration<V> {
     content: Option<ViewHandle>,
 }
 
-impl<V> LoopView<V>
+impl<'a, V> LoopView<'a, V>
 where
     V: View + Unpin,
 {
     #[must_use]
-    pub fn new(views: Vec<V>) -> Self {
+    pub fn new(buf: &'a ViewBuffer, views: Vec<V>) -> Self {
         Self {
+            buf,
             iterations: views
                 .into_iter()
                 .map(|view| Iteration {
@@ -48,16 +47,11 @@ where
     }
 }
 
-impl<V> View for LoopView<V>
+impl<V> View for LoopView<'_, V>
 where
     V: View + Unpin,
 {
-    fn poll_first(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Result<ViewHandle>> {
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
         let this = self.get_mut();
         let mut ready = true;
         for iteration in &mut this.iterations {
@@ -68,7 +62,7 @@ where
                 .view
                 .as_mut()
                 .expect("`poll_first` called again after it returned `Ready`");
-            match Pin::new(view).poll_first(cx, task, buf) {
+            match Pin::new(view).poll_first(cx) {
                 Poll::Ready(Ok(content)) => iteration.content = Some(content),
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                 Poll::Pending => ready = false,
@@ -77,31 +71,26 @@ where
         if !ready {
             return Poll::Pending;
         }
-        let view = buf.block(cx, |b| {
+        let view = this.buf.block(|parts| {
             for iteration in &mut this.iterations {
                 let content = iteration
                     .content
                     .take()
                     .expect("every iteration resolved its content");
-                b.view(content);
+                parts.push_view_handle(content);
             }
         });
         Poll::Ready(Ok(view))
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Option<Result<Swap>>> {
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
         let this = self.get_mut();
         let mut pending = false;
         for iteration in &mut this.iterations {
             let Some(view) = iteration.view.as_mut() else {
                 continue;
             };
-            match Pin::new(view).poll_swap(cx, task, buf) {
+            match Pin::new(view).poll_swap(cx) {
                 Poll::Ready(Some(item)) => return Poll::Ready(Some(item)),
                 Poll::Ready(None) => iteration.view = None,
                 Poll::Pending => pending = true,

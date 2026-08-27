@@ -4,7 +4,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Formatter,
-    buffer::{Instruction, InstructionPtr, StrPtr, ViewBuffer},
+    buffer::{Inner, Instruction, InstructionPtr, StrPtr},
 };
 
 /// Executes a view's instruction block into a [`Formatter`].
@@ -14,14 +14,14 @@ use crate::{
 /// [`Jmp`](Instruction::Jmp) redirects of filled view slots, and finishes
 /// when a [`Ret`](Instruction::Ret) is reached with an empty call stack.
 pub(super) struct Renderer<'a> {
-    buffer: &'a ViewBuffer,
+    buffer: &'a Inner,
     ptr: InstructionPtr,
     stack: Vec<InstructionPtr>,
 }
 
 impl<'a> Renderer<'a> {
     #[must_use]
-    pub(super) fn new(buffer: &'a ViewBuffer, entry: InstructionPtr) -> Self {
+    pub(super) fn new(buffer: &'a Inner, entry: InstructionPtr) -> Self {
         Self {
             buffer,
             ptr: entry,
@@ -58,7 +58,7 @@ impl<'a> Renderer<'a> {
                 }
                 Instruction::ViewHandle { ptr } => {
                     let (buffer, entry) = consts.fetch_view(*ptr);
-                    Renderer::new(buffer, entry).execute(cx, f);
+                    Renderer::new(&buffer.lock(), entry).execute(cx, f);
                 }
 
                 Instruction::Bool(inner) => f.write_str(if *inner { "true" } else { "false" }),

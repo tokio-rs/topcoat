@@ -121,6 +121,7 @@ async fn create_comment(cx: &Cx /* , Form(input): Form<NewComment> */) -> Result
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
             view! {
+                cx =>
                 <form id="comment_form" x-target="comment_form comments" x-target.422="comment_form">
                     <textarea name="body"></textarea>
                     <p class="error">(message)</p>

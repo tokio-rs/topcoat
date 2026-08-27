@@ -4,12 +4,13 @@ use tokio::{sync::Barrier, time::timeout};
 use topcoat::{
     Result,
     context::Cx,
-    view::{Child, View, ViewExt, component, view},
+    view::{Child, View, ViewBuffer, ViewExt, component, view},
 };
 
-// `view!` lowers component calls to expressions that reference `__cx`. In real
-// code that name is supplied by `#[page]`, `#[layout]`, `#[route]`, and
-// `#[component]`. These tests stand in for those wrappers by binding it by hand.
+// `view!` lowers component calls to expressions that reference `__cx` and
+// `__buf`. In real code those names are supplied by `#[page]`, `#[layout]`,
+// and `#[component]`. These tests stand in for those wrappers by binding them
+// by hand and sealing the content into the buffer.
 fn empty_cx() -> Cx {
     Cx::default()
 }
@@ -38,6 +39,7 @@ async fn sibling_components_render_concurrently_in_source_order() {
     assert_concurrent(async {
         let cx = empty_cx();
         let __cx = &cx;
+        let __buf = &ViewBuffer::new();
         let barrier = Barrier::new(2);
         let result = view! {
             <p>
@@ -48,7 +50,7 @@ async fn sibling_components_render_concurrently_in_source_order() {
         };
 
         assert_eq!(
-            result.single(__cx).await.unwrap().render(__cx),
+            result.single().await.unwrap().seal(__buf).render(__cx),
             "<p><i>a</i>-<i>b</i></p>"
         );
     })
@@ -60,6 +62,7 @@ async fn loop_iterations_render_concurrently_in_iteration_order() {
     assert_concurrent(async {
         let cx = empty_cx();
         let __cx = &cx;
+        let __buf = &ViewBuffer::new();
         let barrier = Barrier::new(3);
         let result = view! {
             <ul>
@@ -70,7 +73,7 @@ async fn loop_iterations_render_concurrently_in_iteration_order() {
         };
 
         assert_eq!(
-            result.single(__cx).await.unwrap().render(__cx),
+            result.single().await.unwrap().seal(__buf).render(__cx),
             "<ul><li><i>a</i></li><li><i>b</i></li><li><i>c</i></li></ul>",
         );
     })
@@ -82,6 +85,7 @@ async fn taken_if_branch_renders_concurrently_with_siblings() {
     assert_concurrent(async {
         let cx = empty_cx();
         let __cx = &cx;
+        let __buf = &ViewBuffer::new();
         let barrier = Barrier::new(2);
         let result = view! {
             meet(barrier: &barrier, label: "always")
@@ -91,7 +95,7 @@ async fn taken_if_branch_renders_concurrently_with_siblings() {
         };
 
         assert_eq!(
-            result.single(__cx).await.unwrap().render(__cx),
+            result.single().await.unwrap().seal(__buf).render(__cx),
             "<i>always</i><i>sometimes</i>"
         );
     })
@@ -103,6 +107,7 @@ async fn taken_match_arm_renders_concurrently_with_siblings() {
     assert_concurrent(async {
         let cx = empty_cx();
         let __cx = &cx;
+        let __buf = &ViewBuffer::new();
         let barrier = Barrier::new(2);
         let choice = 1_u8;
         let result = view! {
@@ -121,7 +126,7 @@ async fn taken_match_arm_renders_concurrently_with_siblings() {
         };
 
         assert_eq!(
-            result.single(__cx).await.unwrap().render(__cx),
+            result.single().await.unwrap().seal(__buf).render(__cx),
             "<i>always</i><i>one</i>"
         );
     })
@@ -138,6 +143,7 @@ async fn child_views_render_concurrently_with_their_parents_siblings() {
     assert_concurrent(async {
         let cx = empty_cx();
         let __cx = &cx;
+        let __buf = &ViewBuffer::new();
         let barrier = Barrier::new(2);
         let result = view! {
             meet(barrier: &barrier, label: "sibling")
@@ -145,7 +151,7 @@ async fn child_views_render_concurrently_with_their_parents_siblings() {
         };
 
         assert_eq!(
-            result.single(__cx).await.unwrap().render(__cx),
+            result.single().await.unwrap().seal(__buf).render(__cx),
             "<i>sibling</i><div><i>inner</i></div>",
         );
     })
@@ -164,13 +170,14 @@ async fn a_component_renders_concurrently_with_its_own_child() {
     assert_concurrent(async {
         let cx = empty_cx();
         let __cx = &cx;
+        let __buf = &ViewBuffer::new();
         let barrier = Barrier::new(2);
         let result = view! {
             meet_wrapper(barrier: &barrier, meet(barrier: &barrier, label: "inner"))
         };
 
         assert_eq!(
-            result.single(__cx).await.unwrap().render(__cx),
+            result.single().await.unwrap().seal(__buf).render(__cx),
             "<div><i>inner</i></div>"
         );
     })
@@ -185,6 +192,7 @@ async fn nested_components_render_concurrently_at_every_depth() {
     assert_concurrent(async {
         let cx = empty_cx();
         let __cx = &cx;
+        let __buf = &ViewBuffer::new();
         let barrier = Barrier::new(3);
         let result = view! {
             meet_wrapper(
@@ -194,7 +202,7 @@ async fn nested_components_render_concurrently_at_every_depth() {
         };
 
         assert_eq!(
-            result.single(__cx).await.unwrap().render(__cx),
+            result.single().await.unwrap().seal(__buf).render(__cx),
             "<div><div><i>deep</i></div></div>",
         );
     })
@@ -210,6 +218,7 @@ async fn echo(text: &str) -> Result<impl View> {
 async fn joined_components_still_read_earlier_local_bindings() {
     let cx = empty_cx();
     let __cx = &cx;
+    let __buf = &ViewBuffer::new();
     let result = view! {
         let greeting = "hello";
         echo(text: greeting)
@@ -218,7 +227,7 @@ async fn joined_components_still_read_earlier_local_bindings() {
     };
 
     assert_eq!(
-        result.single(__cx).await.unwrap().render(__cx),
+        result.single().await.unwrap().seal(__buf).render(__cx),
         "<b>hello</b><b>goodbye</b>",
     );
 }
@@ -228,6 +237,7 @@ async fn concurrent_loop_interleaves_static_markup_in_order() {
     assert_concurrent(async {
         let cx = empty_cx();
         let __cx = &cx;
+        let __buf = &ViewBuffer::new();
         let barrier = Barrier::new(2);
         let result = view! {
             <ol>
@@ -241,7 +251,7 @@ async fn concurrent_loop_interleaves_static_markup_in_order() {
         };
 
         assert_eq!(
-            result.single(__cx).await.unwrap().render(__cx),
+            result.single().await.unwrap().seal(__buf).render(__cx),
             "<ol><li value=\"1\"><i>a</i>A</li><li value=\"2\"><i>b</i>B</li></ol>",
         );
     })
@@ -253,6 +263,7 @@ async fn taken_branches_carry_their_pattern_bindings_to_the_join() {
     assert_concurrent(async {
         let cx = empty_cx();
         let __cx = &cx;
+        let __buf = &ViewBuffer::new();
         let barrier = Barrier::new(2);
         let first = Some("one");
         let second = Some("two");
@@ -266,7 +277,7 @@ async fn taken_branches_carry_their_pattern_bindings_to_the_join() {
         };
 
         assert_eq!(
-            result.single(__cx).await.unwrap().render(__cx),
+            result.single().await.unwrap().seal(__buf).render(__cx),
             "<i>one</i><i>two</i>"
         );
     })
@@ -277,6 +288,7 @@ async fn taken_branches_carry_their_pattern_bindings_to_the_join() {
 async fn taken_match_arms_carry_their_pattern_bindings_to_the_join() {
     let cx = empty_cx();
     let __cx = &cx;
+    let __buf = &ViewBuffer::new();
     let choice = Some(String::from("picked"));
     let result = view! {
         echo(text: "always")
@@ -291,7 +303,7 @@ async fn taken_match_arms_carry_their_pattern_bindings_to_the_join() {
     };
 
     assert_eq!(
-        result.single(__cx).await.unwrap().render(__cx),
+        result.single().await.unwrap().seal(__buf).render(__cx),
         "<b>always</b><b>picked</b>"
     );
 }
@@ -300,6 +312,7 @@ async fn taken_match_arms_carry_their_pattern_bindings_to_the_join() {
 async fn a_binding_borrowed_from_an_outer_value_lives_until_the_join() {
     let cx = empty_cx();
     let __cx = &cx;
+    let __buf = &ViewBuffer::new();
     let name = Some(String::from("borrowed"));
     let result = view! {
         echo(text: "always")
@@ -309,7 +322,7 @@ async fn a_binding_borrowed_from_an_outer_value_lives_until_the_join() {
     };
 
     assert_eq!(
-        result.single(__cx).await.unwrap().render(__cx),
+        result.single().await.unwrap().seal(__buf).render(__cx),
         "<b>always</b><b>borrowed</b>"
     );
 }

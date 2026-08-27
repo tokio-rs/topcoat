@@ -6,9 +6,9 @@ use std::{
 };
 
 use futures_core::Stream;
-use topcoat_core::{context::Cx, error::Result};
+use topcoat_core::error::Result;
 
-use crate::buffer::{ViewBuffer, ViewHandle};
+use crate::buffer::ViewHandle;
 
 /// The identity of a live region within a rendered view.
 ///
@@ -38,89 +38,76 @@ pub struct Swap {
 /// A `view!` invocation evaluates to a value implementing this trait, and a
 /// component returns one as `Result<impl View>`. Constructing a view does no
 /// work; everything it writes happens inside the poll methods, into the
-/// buffer the caller passes in.
+/// [`ViewBuffer`](crate::ViewBuffer) the view was built with.
 ///
 /// [`poll_first`](View::poll_first) drives the view to its first content: a
 /// [`ViewHandle`] pointing at the instruction block the view appended to
-/// `buf`. After that, [`poll_swap`](View::poll_swap) streams the updates its
-/// live regions emit, until it returns `None`.
+/// its buffer. After that, [`poll_swap`](View::poll_swap) streams the
+/// updates its live regions emit, until it returns `None`.
 pub trait View: Send {
     /// Polls toward the view's first content.
     ///
-    /// On `Ready`, the view has appended its instruction block to `buf` and
-    /// the returned handle points at it. Must not be polled again after it
-    /// returned `Ready`.
-    fn poll_first(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Result<ViewHandle>>;
+    /// On `Ready`, the view has appended its instruction block to its buffer
+    /// and the returned handle points at it. Must not be polled again after
+    /// it returned `Ready`.
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>>;
 
     /// Polls for the next live update, once the first content resolved.
     ///
     /// Returns `Ready(None)` when the view emits no further updates. Must
     /// only be polled after [`poll_first`](View::poll_first) returned
     /// `Ready`.
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Option<Result<Swap>>>;
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>>;
 }
 
 /// Combinators available on every [`View`].
 ///
 /// Blanket implemented, so implementing [`View`] is enough to get them and an
 /// implementation never has to care about them.
+///
+/// The handle a combinator resolves is self-contained when the view builds
+/// in a buffer of its own, as a `view!` invocation naming its context does;
+/// a view built against a shared buffer resolves a handle into that buffer,
+/// which [`ViewHandle::seal`] makes self-contained.
 pub trait ViewExt: View {
     /// Resolves the view's first content.
     ///
-    /// The returned handle is self-contained: it can be rendered, stored,
-    /// or spliced into another view. Any updates the view would emit after
-    /// its first content are discarded; [`single`](ViewExt::single) asserts
-    /// there are none instead.
-    fn first(self, cx: &Cx) -> impl Future<Output = Result<ViewHandle>> + Send
+    /// Any updates the view would emit after its first content are
+    /// discarded; [`single`](ViewExt::single) asserts there are none
+    /// instead.
+    fn first(self) -> impl Future<Output = Result<ViewHandle>> + Send
     where
         Self: Sized,
     {
         async move {
-            let mut buffer = ViewBuffer::new();
             let mut view = pin!(self);
-            let content = poll_fn(|task| view.as_mut().poll_first(cx, task, &mut buffer)).await?;
-            Ok(content.seal(buffer))
+            poll_fn(|cx| view.as_mut().poll_first(cx)).await
         }
     }
 
     /// Resolves the content of a view that never updates.
     ///
-    /// The returned handle is self-contained, like the one
-    /// [`first`](ViewExt::first) returns. Where `first` discards the updates
-    /// a view emits after its first content, `single` asserts there are
-    /// none: the view must complete right after its first content, without
-    /// emitting or waiting on a swap. This is the method to reach for when
-    /// a view is rendered once, into a fragment or a string.
+    /// Where [`first`](ViewExt::first) discards the updates a view emits
+    /// after its first content, `single` asserts there are none: the view
+    /// must complete right after its first content, without emitting or
+    /// waiting on a swap. This is the method to reach for when a view is
+    /// rendered once, into a fragment or a string.
     ///
     /// # Panics
     ///
     /// Panics if the view is live, that is, if it emits or waits on an
     /// update after its first content. Such a view is rendered with
     /// [`live`](ViewExt::live) instead.
-    fn single(self, cx: &Cx) -> impl Future<Output = Result<ViewHandle>> + Send
+    fn single(self) -> impl Future<Output = Result<ViewHandle>> + Send
     where
         Self: Sized,
     {
         async move {
-            let mut buffer = ViewBuffer::new();
             let mut view = pin!(self);
-            let content = poll_fn(|task| view.as_mut().poll_first(cx, task, &mut buffer)).await?;
-            let mut task = Context::from_waker(Waker::noop());
-            match view
-                .as_mut()
-                .poll_swap(cx, &mut task, &mut ViewBuffer::new())
-            {
-                Poll::Ready(None) => Ok(content.seal(buffer)),
+            let content = poll_fn(|cx| view.as_mut().poll_first(cx)).await?;
+            let mut cx = Context::from_waker(Waker::noop());
+            match view.as_mut().poll_swap(&mut cx) {
+                Poll::Ready(None) => Ok(content),
                 Poll::Ready(Some(Err(error))) => Err(error),
                 Poll::Ready(Some(Ok(_))) | Poll::Pending => panic!(
                     "`single` called on a live view, which updates after its first content; \
@@ -132,24 +119,16 @@ pub trait ViewExt: View {
 
     /// Resolves the view's first content and keeps the updates that follow.
     ///
-    /// The returned handle is self-contained, like the one
-    /// [`first`](ViewExt::first) returns. The stream beside it yields a
-    /// [`Swap`] for every live region that re-renders and ends once the view
-    /// has no further updates.
-    fn live(self, cx: &Cx) -> impl Future<Output = Result<(ViewHandle, Swaps<Self>)>> + Send
+    /// The stream beside the content yields a [`Swap`] for every live region
+    /// that re-renders and ends once the view has no further updates.
+    fn live(self) -> impl Future<Output = Result<(ViewHandle, Swaps<Self>)>> + Send
     where
         Self: Sized,
     {
         async move {
-            let mut buffer = ViewBuffer::new();
             let mut view = Box::pin(self);
-            let content = poll_fn(|task| view.as_mut().poll_first(cx, task, &mut buffer)).await?;
-            let swaps = Swaps {
-                cx: cx.clone(),
-                view,
-                buffer: ViewBuffer::new(),
-            };
-            Ok((content.seal(buffer), swaps))
+            let content = poll_fn(|cx| view.as_mut().poll_first(cx)).await?;
+            Ok((content, Swaps { view }))
         }
     }
 
@@ -174,38 +153,23 @@ impl<V: View + ?Sized> ViewExt for V {}
 /// Yields a [`Swap`] for every live region that re-renders and ends once the
 /// view has no further updates.
 pub struct Swaps<V> {
-    cx: Cx,
     view: Pin<Box<V>>,
-    buffer: ViewBuffer,
 }
 
 impl<V: View> Stream for Swaps<V> {
     type Item = Result<Swap>;
 
-    fn poll_next(self: Pin<&mut Self>, task: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
-        this.view
-            .as_mut()
-            .poll_swap(&this.cx, task, &mut this.buffer)
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.get_mut().view.as_mut().poll_swap(cx)
     }
 }
 
 impl View for () {
-    fn poll_first(
-        self: Pin<&mut Self>,
-        _cx: &Cx,
-        _task: &mut Context<'_>,
-        _buf: &mut ViewBuffer,
-    ) -> Poll<Result<ViewHandle>> {
+    fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
         Poll::Ready(Ok(ViewHandle::empty()))
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        _cx: &Cx,
-        _task: &mut Context<'_>,
-        _buf: &mut ViewBuffer,
-    ) -> Poll<Option<Result<Swap>>> {
+    fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
         Poll::Ready(None)
     }
 }
@@ -213,21 +177,11 @@ impl View for () {
 pub type BoxView<'a> = Pin<Box<dyn View + 'a>>;
 
 impl View for BoxView<'_> {
-    fn poll_first(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Result<ViewHandle>> {
-        self.get_mut().as_mut().poll_first(cx, task, buf)
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
+        self.get_mut().as_mut().poll_first(cx)
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &Cx,
-        task: &mut Context<'_>,
-        buf: &mut ViewBuffer,
-    ) -> Poll<Option<Result<Swap>>> {
-        self.get_mut().as_mut().poll_swap(cx, task, buf)
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
+        self.get_mut().as_mut().poll_swap(cx)
     }
 }

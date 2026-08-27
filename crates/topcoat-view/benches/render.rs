@@ -445,7 +445,7 @@ fn bench_render(c: &mut Criterion) {
     block_on(async {
         let static_view = static_page(&cx)
             .expect("build static_page")
-            .single(&cx)
+            .single()
             .await
             .expect("render static_page");
         measure(&mut group, "static_page", &cx, &static_view);
@@ -453,7 +453,7 @@ fn bench_render(c: &mut Criterion) {
         let comments = make_comments(200);
         let comment_view = comment_feed(&cx, &comments)
             .expect("build comment_feed")
-            .single(&cx)
+            .single()
             .await
             .expect("render comment_feed");
         measure(&mut group, "text_escaping", &cx, &comment_view);
@@ -461,7 +461,7 @@ fn bench_render(c: &mut Criterion) {
         let number_rows = make_number_rows(120, 10);
         let number_view = numeric_table(&cx, &number_rows)
             .expect("build numeric_table")
-            .single(&cx)
+            .single()
             .await
             .expect("render numeric_table");
         measure(&mut group, "numeric_table", &cx, &number_view);
@@ -469,7 +469,7 @@ fn bench_render(c: &mut Criterion) {
         let tags = make_tags(200);
         let tag_view = tag_cloud(&cx, &tags)
             .expect("build tag_cloud")
-            .single(&cx)
+            .single()
             .await
             .expect("render tag_cloud");
         measure(&mut group, "attributes", &cx, &tag_view);
@@ -480,7 +480,7 @@ fn bench_render(c: &mut Criterion) {
             let products = make_products(count);
             let grid_view = product_grid(&cx, &products)
                 .expect("build product_grid")
-                .single(&cx)
+                .single()
                 .await
                 .expect("render product_grid");
             measure(&mut group, format!("product_grid/{count}"), &cx, &grid_view);

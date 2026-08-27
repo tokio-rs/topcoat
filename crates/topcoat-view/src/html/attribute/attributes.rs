@@ -162,13 +162,13 @@ mod tests {
     use topcoat_core::context::Cx;
 
     use super::*;
-    use crate::buffer::ViewBuffer;
+    use crate::{buffer::ViewBuffer, internal::Builder};
 
     fn render(cx: &Cx, attrs: Attributes) -> String {
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         buffer
-            .block(cx, |b| b.attributes(attrs))
-            .seal(buffer)
+            .block(|parts| Builder::new(cx, parts).attributes(attrs))
+            .seal(&buffer)
             .render(cx)
     }
 

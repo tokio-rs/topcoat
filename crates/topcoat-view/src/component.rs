@@ -1,6 +1,6 @@
 use topcoat_core::{context::Cx, error::Result};
 
-use crate::{Props, View};
+use crate::{Props, View, ViewBuffer};
 
 pub trait Component {
     /// The component's props, generic over the lifetime of anything they
@@ -20,10 +20,11 @@ pub trait Component {
     /// Renders the component to a [`View`].
     ///
     /// The returned future is the component's body; the [`View`] it resolves
-    /// to may borrow `cx` and the props.
+    /// to builds into `buf` and may borrow `cx`, `buf`, and the props.
     fn render<'cx, 'a>(
         self,
         cx: &'cx Cx,
+        buf: &'cx ViewBuffer,
         props: Self::Props<'a>,
     ) -> impl Future<Output = Result<impl View + 'cx>> + Send + 'cx
     where

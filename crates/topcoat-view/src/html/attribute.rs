@@ -138,14 +138,14 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::buffer::ViewBuffer;
+    use crate::{buffer::ViewBuffer, internal::Builder};
 
     fn render(attribute: impl AttributeViewParts) -> String {
         let cx = Cx::default();
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         buffer
-            .block(&cx, |b| b.attributes(attribute))
-            .seal(buffer)
+            .block(|parts| Builder::new(&cx, parts).attributes(attribute))
+            .seal(&buffer)
             .render(&cx)
     }
 

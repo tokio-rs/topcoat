@@ -64,7 +64,9 @@ struct Counter(AtomicU64);
 #[route(POST "/increment")]
 async fn increment(cx: &Cx) -> Result<(HxResponseTrigger, ViewHandle)> {
     let count = app_context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
-    let fragment = view! { <span id="count">(count)</span> }.single(cx).await?;
+    let fragment = view! { cx => <span id="count">(count)</span> }
+        .single()
+        .await?;
 
     // The trigger becomes an `HX-Trigger: counted` response header, which
     // fires a `counted` event in the browser.

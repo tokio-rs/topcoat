@@ -469,7 +469,7 @@ impl Captured for AttributeValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Attributes, buffer::ViewBuffer};
+    use crate::{Attributes, buffer::ViewBuffer, internal::Builder};
 
     /// Captures `value` the way [`Attributes::insert`] does.
     fn capture(value: impl AttributeValueViewParts) -> AttributeValue {
@@ -482,10 +482,10 @@ mod tests {
     /// Writes a captured value in attribute value position and renders it.
     fn render(value: &AttributeValue) -> String {
         let cx = Cx::default();
-        let mut buffer = ViewBuffer::new();
+        let buffer = ViewBuffer::new();
         buffer
-            .block(&cx, |b| b.attribute_value(value))
-            .seal(buffer)
+            .block(|parts| Builder::new(&cx, parts).attribute_value(value))
+            .seal(&buffer)
             .render(&cx)
     }
 

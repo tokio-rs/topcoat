@@ -224,16 +224,16 @@ mod tests {
         task::{Context, Poll, Waker},
     };
 
-    use topcoat_view::{ViewExt, internal::NodeView};
+    use topcoat_view::{ViewBuffer, ViewExt, internal::NodeView};
 
     use super::*;
 
     /// Drives a future that never yields to completion.
     fn block_on<F: Future>(future: F) -> F::Output {
         let mut future = pin!(future);
-        let mut task = Context::from_waker(Waker::noop());
+        let mut cx = Context::from_waker(Waker::noop());
         loop {
-            if let Poll::Ready(output) = future.as_mut().poll(&mut task) {
+            if let Poll::Ready(output) = future.as_mut().poll(&mut cx) {
                 return output;
             }
         }
@@ -246,8 +246,9 @@ mod tests {
         let signal = Signal::new(String::from("a-->b\"c&d"));
 
         let cx = Cx::default();
-        let view = NodeView::new(SignalDeclaration::new(&signal));
-        let html = block_on(view.single(&cx)).unwrap().render(&cx);
+        let buf = ViewBuffer::new();
+        let view = NodeView::new(&cx, &buf, SignalDeclaration::new(&signal));
+        let html = block_on(view.single()).unwrap().seal(&buf).render(&cx);
 
         // The comment context escaped `>`, so the only `-->` left is the
         // marker's own terminator; the payload cannot end the comment early.
