@@ -7,7 +7,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{Swap, View, ViewBuffer, ViewHandle};
+use crate::{Step, Swap, View, ViewBuffer, ViewHandle};
 
 thread_local! {
     /// The tunnel between a collecting poll and the drive inside it, on the
@@ -99,12 +99,13 @@ fn try_yield(emission: &mut Option<Emission>) {
 
 /// Returns the future a body awaits to poll `view` in place.
 ///
-/// Each poll forwards to the view: first `poll_first`, whose content is
-/// tunneled to the collecting poll as the body's own, then `poll_swap` for
-/// every swap after it, each tunneled through verbatim. The future stays
-/// pending after each emission, so the view lives on in the body for the
-/// next poll, and resolves once the view has no further updates. An error
-/// the view produces is returned to the body instead of being tunneled.
+/// Each poll forwards to the view and tunnels what it yields to the
+/// collecting poll: the first content as the body's own, every swap after
+/// it verbatim. The future stays pending after an emission the view may
+/// follow up on, so the view lives on in the body for the next poll, and
+/// resolves once the view has no further updates, right along with the
+/// last emission when the view reports so. An error the view produces is
+/// returned to the body instead of being tunneled.
 ///
 /// # Panics
 ///
@@ -115,7 +116,7 @@ pub fn drive<V: View>(view: V) -> DriveView<'static, V> {
     DriveView {
         view,
         seal: None,
-        first: true,
+        done: false,
         pending: None,
     }
 }
@@ -130,7 +131,7 @@ pub fn drive_sealed<V: View>(buf: &ViewBuffer, view: V) -> DriveView<'_, V> {
     DriveView {
         view,
         seal: Some(buf),
-        first: true,
+        done: false,
         pending: None,
     }
 }
@@ -143,7 +144,9 @@ pin_project! {
         view: V,
         // The buffer the first content is sealed into, if any.
         seal: Option<&'a ViewBuffer>,
-        first: bool,
+        // Whether the view reported it has no further updates; the future
+        // resolves once the emission that came with the report is placed.
+        done: bool,
         // An emission waiting for the tunnel to be free.
         pending: Option<Emission>,
     }
@@ -161,23 +164,28 @@ where
             if this.pending.is_some() {
                 try_yield(this.pending);
                 // Placed or not, the emission awaits collection by the
-                // enclosing poll; resume when polled again.
-                return Poll::Pending;
-            }
-            if *this.first {
-                let content = ready!(this.view.as_mut().poll_first(cx))?;
-                *this.first = false;
-                let content = match this.seal {
-                    Some(buf) => content.seal(buf),
-                    None => content,
+                // enclosing poll; resume when polled again, unless it was
+                // the view's last.
+                return if this.pending.is_none() && *this.done {
+                    Poll::Ready(Ok(()))
+                } else {
+                    Poll::Pending
                 };
-                *this.pending = Some(Emission::Content(content));
-            } else {
-                match ready!(this.view.as_mut().poll_swap(cx)) {
-                    Some(Ok(swap)) => *this.pending = Some(Emission::Swap(swap)),
-                    Some(Err(error)) => return Poll::Ready(Err(error)),
-                    None => return Poll::Ready(Ok(())),
+            }
+            match ready!(this.view.as_mut().poll(cx))? {
+                Step::Content { content, live } => {
+                    let content = match this.seal {
+                        Some(buf) => content.seal(buf),
+                        None => content,
+                    };
+                    *this.pending = Some(Emission::Content(content));
+                    *this.done = !live;
                 }
+                Step::Swap { swap, live } => {
+                    *this.pending = Some(Emission::Swap(swap));
+                    *this.done = !live;
+                }
+                Step::Done => return Poll::Ready(Ok(())),
             }
         }
     }

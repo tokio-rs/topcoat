@@ -7,16 +7,16 @@ use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
 
 use super::Builder;
-use crate::{Swap, View, ViewBuffer, buffer::ViewHandle};
+use crate::{Step, View, ViewBuffer, buffer::ViewHandle};
 
 pin_project! {
     /// A template as a [`View`]: its dynamic node positions driven
     /// concurrently, and its instruction block built from their contents.
     ///
-    /// `poll_first` drives every unit toward its content; once all have
-    /// resolved, the burst runs, pushing the template's block into the
-    /// buffer in one synchronous burst that splices the contents in position
-    /// order. After that the units' updates merge into one stream of swaps.
+    /// Every unit is driven toward its content; once all have resolved, the
+    /// burst runs, pushing the template's block into the buffer in one
+    /// synchronous burst that splices the contents in position order. After
+    /// that the units' updates merge into one stream of swaps.
     pub struct JoinView<'a, U, F> {
         cx: &'a Cx,
         buf: &'a ViewBuffer,
@@ -48,22 +48,21 @@ where
     U: JoinUnits + Send,
     F: FnOnce(&mut Builder<'_, '_, '_>, U::Contents) + Send,
 {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let mut this = self.project();
+        if this.burst.is_none() {
+            return this.units.poll_swap(cx);
+        }
         ready!(this.units.as_mut().poll_contents(cx))?;
-        let contents = this.units.take_contents();
-        let burst = this
-            .burst
-            .take()
-            .expect("`poll_first` called again after it returned `Ready`");
-        let view = this
+        let contents = this.units.as_mut().take_contents();
+        let burst = this.burst.take().expect("the burst is still to run");
+        let content = this
             .buf
             .block(|parts| burst(&mut Builder::new(this.cx, parts), contents));
-        Poll::Ready(Ok(view))
-    }
-
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        self.project().units.poll_swap(cx)
+        Poll::Ready(Ok(Step::Content {
+            content,
+            live: this.units.is_live(),
+        }))
     }
 }
 
@@ -85,9 +84,12 @@ pub trait JoinUnits {
     /// Takes the resolved contents out of the units.
     fn take_contents(self: Pin<&mut Self>) -> Self::Contents;
 
-    /// Polls the units for the next update; ready with `None` once every
-    /// unit has no further updates.
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>>;
+    /// Whether any unit may still update.
+    fn is_live(&self) -> bool;
+
+    /// Polls the units for the next update: a [`Step::Swap`], or
+    /// [`Step::Done`] once every unit has no further updates.
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>>;
 }
 
 impl JoinUnits for () {
@@ -99,8 +101,12 @@ impl JoinUnits for () {
 
     fn take_contents(self: Pin<&mut Self>) -> Self::Contents {}
 
-    fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        Poll::Ready(None)
+    fn is_live(&self) -> bool {
+        false
+    }
+
+    fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<Step>> {
+        Poll::Ready(Ok(Step::Done))
     }
 }
 
@@ -145,8 +151,14 @@ where
         let this = self.project();
         let mut ready = true;
         if this.content.is_none() {
-            match this.view.poll_first(cx) {
-                Poll::Ready(Ok(content)) => *this.content = Some(content),
+            match this.view.poll(cx) {
+                Poll::Ready(Ok(Step::Content { content, live })) => {
+                    *this.content = Some(content);
+                    *this.done = !live;
+                }
+                Poll::Ready(Ok(Step::Swap { .. } | Step::Done)) => {
+                    panic!("a view swapped or completed before its first content")
+                }
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                 Poll::Pending => ready = false,
             }
@@ -172,20 +184,37 @@ where
         (content, this.rest.take_contents())
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
+    fn is_live(&self) -> bool {
+        !self.done || self.rest.is_live()
+    }
+
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let this = self.project();
         let mut pending = false;
         if !*this.done {
-            match this.view.poll_swap(cx) {
-                Poll::Ready(Some(item)) => return Poll::Ready(Some(item)),
-                Poll::Ready(None) => *this.done = true,
+            match this.view.poll(cx) {
+                Poll::Ready(Ok(Step::Swap { swap, live })) => {
+                    *this.done = !live;
+                    return Poll::Ready(Ok(Step::Swap {
+                        swap,
+                        live: live || this.rest.is_live(),
+                    }));
+                }
+                Poll::Ready(Ok(Step::Done)) => *this.done = true,
+                Poll::Ready(Ok(Step::Content { .. })) => panic!("a view produced content twice"),
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                 Poll::Pending => pending = true,
             }
         }
         match this.rest.poll_swap(cx) {
-            Poll::Ready(Some(item)) => Poll::Ready(Some(item)),
-            Poll::Ready(None) if !pending => Poll::Ready(None),
-            Poll::Ready(None) | Poll::Pending => Poll::Pending,
+            Poll::Ready(Ok(Step::Swap { swap, live })) => Poll::Ready(Ok(Step::Swap {
+                swap,
+                live: live || !*this.done,
+            })),
+            Poll::Ready(Ok(Step::Done)) if !pending => Poll::Ready(Ok(Step::Done)),
+            Poll::Ready(Ok(Step::Done)) | Poll::Pending => Poll::Pending,
+            Poll::Ready(Ok(Step::Content { .. })) => panic!("a view produced content twice"),
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
         }
     }
 }

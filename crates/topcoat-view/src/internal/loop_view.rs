@@ -5,7 +5,7 @@ use std::{
 
 use topcoat_core::error::Result;
 
-use crate::{Swap, View, ViewBuffer, buffer::ViewHandle};
+use crate::{Step, View, ViewBuffer, buffer::ViewHandle};
 
 /// The iterations of a `for` body as one node value.
 ///
@@ -19,6 +19,8 @@ use crate::{Swap, View, ViewBuffer, buffer::ViewHandle};
 pub struct LoopView<'a, V> {
     buf: &'a ViewBuffer,
     iterations: Vec<Iteration<V>>,
+    /// Whether the loop's block was built from the iterations' contents.
+    built: bool,
 }
 
 struct Iteration<V> {
@@ -43,27 +45,32 @@ where
                     content: None,
                 })
                 .collect(),
+            built: false,
         }
     }
-}
 
-impl<V> View for LoopView<'_, V>
-where
-    V: View + Unpin,
-{
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
-        let this = self.get_mut();
+    /// Polls every iteration still waiting toward its content, and builds
+    /// the loop's block once all have resolved.
+    fn poll_content(&mut self, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let mut ready = true;
-        for iteration in &mut this.iterations {
+        for iteration in &mut self.iterations {
             if iteration.content.is_some() {
                 continue;
             }
             let view = iteration
                 .view
                 .as_mut()
-                .expect("`poll_first` called again after it returned `Ready`");
-            match Pin::new(view).poll_first(cx) {
-                Poll::Ready(Ok(content)) => iteration.content = Some(content),
+                .expect("an iteration keeps its view until its content resolved");
+            match Pin::new(view).poll(cx) {
+                Poll::Ready(Ok(Step::Content { content, live })) => {
+                    iteration.content = Some(content);
+                    if !live {
+                        iteration.view = None;
+                    }
+                }
+                Poll::Ready(Ok(Step::Swap { .. } | Step::Done)) => {
+                    panic!("a view swapped or completed before its first content")
+                }
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                 Poll::Pending => ready = false,
             }
@@ -71,8 +78,8 @@ where
         if !ready {
             return Poll::Pending;
         }
-        let view = this.buf.block(|parts| {
-            for iteration in &mut this.iterations {
+        let content = self.buf.block(|parts| {
+            for iteration in &mut self.iterations {
                 let content = iteration
                     .content
                     .take()
@@ -80,26 +87,63 @@ where
                 parts.push_view_handle(content);
             }
         });
-        Poll::Ready(Ok(view))
+        self.built = true;
+        Poll::Ready(Ok(Step::Content {
+            content,
+            live: self.is_live(),
+        }))
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        let this = self.get_mut();
+    /// Polls the iterations still updating for the next swap.
+    fn poll_swap(&mut self, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let mut pending = false;
-        for iteration in &mut this.iterations {
+        let mut swapped = None;
+        for iteration in &mut self.iterations {
             let Some(view) = iteration.view.as_mut() else {
                 continue;
             };
-            match Pin::new(view).poll_swap(cx) {
-                Poll::Ready(Some(item)) => return Poll::Ready(Some(item)),
-                Poll::Ready(None) => iteration.view = None,
+            match Pin::new(view).poll(cx) {
+                Poll::Ready(Ok(Step::Swap { swap, live })) => {
+                    if !live {
+                        iteration.view = None;
+                    }
+                    swapped = Some(swap);
+                    break;
+                }
+                Poll::Ready(Ok(Step::Done)) => iteration.view = None,
+                Poll::Ready(Ok(Step::Content { .. })) => panic!("a view produced content twice"),
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                 Poll::Pending => pending = true,
             }
         }
-        if pending {
-            Poll::Pending
+        match swapped {
+            Some(swap) => Poll::Ready(Ok(Step::Swap {
+                swap,
+                live: self.is_live(),
+            })),
+            None if pending => Poll::Pending,
+            None => Poll::Ready(Ok(Step::Done)),
+        }
+    }
+
+    /// Whether any iteration may still update.
+    fn is_live(&self) -> bool {
+        self.iterations
+            .iter()
+            .any(|iteration| iteration.view.is_some())
+    }
+}
+
+impl<V> View for LoopView<'_, V>
+where
+    V: View + Unpin,
+{
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+        let this = self.get_mut();
+        if this.built {
+            this.poll_swap(cx)
         } else {
-            Poll::Ready(None)
+            this.poll_content(cx)
         }
     }
 }

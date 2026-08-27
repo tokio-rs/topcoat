@@ -7,8 +7,7 @@ use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    BoxView, Child, NodeViewParts, Swap, View, ViewBuffer,
-    buffer::ViewHandle,
+    BoxView, Child, NodeViewParts, Step, View, ViewBuffer,
     internal::{LiveView, MoveView},
 };
 
@@ -42,13 +41,13 @@ impl<'a, T> NodeView<'a, T> {
     }
 
     /// Projects to the wrapped view, for the nested-view impls.
-    fn nested(self: Pin<&mut Self>, expect: &'static str) -> Pin<&mut T> {
-        self.project().value.as_pin_mut().expect(expect)
+    fn nested(self: Pin<&mut Self>) -> Pin<&mut T> {
+        self.project()
+            .value
+            .as_pin_mut()
+            .expect("a nested view keeps its value")
     }
 }
-
-const FIRST_AGAIN: &str = "`poll_first` called again after it returned `Ready`";
-const SWAP_BEFORE_FIRST: &str = "`poll_swap` called before `poll_first` returned `Ready`";
 
 /// A [`NodeViewParts`] value: its parts are appended in one burst, and the
 /// position never updates.
@@ -56,47 +55,41 @@ impl<T> View for NodeView<'_, T>
 where
     T: NodeViewParts + Send + Unpin,
 {
-    fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let this = self.project();
-        let value = this.value.get_mut().take().expect(FIRST_AGAIN);
-        let view = this
+        let value = this
+            .value
+            .get_mut()
+            .take()
+            .expect("`poll` called again after the position's content resolved");
+        let content = this
             .buf
             .block(|parts| value.into_view_parts(this.cx, parts));
-        Poll::Ready(Ok(view))
-    }
-
-    fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        Poll::Ready(None)
+        Poll::Ready(Ok(Step::Content {
+            content,
+            live: false,
+        }))
     }
 }
 
 /// A component's child content: the children's view polls through in place,
 /// built against this position's context and buffer if it was deferred.
 impl View for NodeView<'_, Child<'_>> {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let this = self.project();
-        let child = this.value.get_mut().as_mut().expect(FIRST_AGAIN);
-        child.view(this.cx, this.buf).poll_first(cx)
-    }
-
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        let this = self.project();
-        let child = this.value.get_mut().as_mut().expect(SWAP_BEFORE_FIRST);
-        child.view(this.cx, this.buf).poll_swap(cx)
+        let child = this
+            .value
+            .get_mut()
+            .as_mut()
+            .expect("a nested view keeps its value");
+        child.view(this.cx, this.buf).poll(cx)
     }
 }
 
 /// A boxed view: it polls through in place.
 impl View for NodeView<'_, BoxView<'_>> {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
-        self.nested(FIRST_AGAIN).get_mut().as_mut().poll_first(cx)
-    }
-
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        self.nested(SWAP_BEFORE_FIRST)
-            .get_mut()
-            .as_mut()
-            .poll_swap(cx)
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+        self.nested().get_mut().as_mut().poll(cx)
     }
 }
 
@@ -109,18 +102,8 @@ macro_rules! nested_view {
         where
             $ty: View,
         {
-            fn poll_first(
-                self: Pin<&mut Self>,
-                cx: &mut Context<'_>,
-            ) -> Poll<Result<ViewHandle>> {
-                self.nested(FIRST_AGAIN).poll_first(cx)
-            }
-
-            fn poll_swap(
-                self: Pin<&mut Self>,
-                cx: &mut Context<'_>,
-            ) -> Poll<Option<Result<Swap>>> {
-                self.nested(SWAP_BEFORE_FIRST).poll_swap(cx)
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+                self.nested().poll(cx)
             }
         }
     };

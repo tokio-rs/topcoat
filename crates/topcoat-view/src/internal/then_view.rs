@@ -6,7 +6,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{Swap, View, buffer::ViewHandle};
+use crate::{Step, View};
 
 pin_project! {
     /// The view a future resolves to.
@@ -37,24 +37,15 @@ where
     F: Future<Output = Result<V>> + Send,
     V: View,
 {
-    fn poll_first(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         loop {
             match self.as_mut().project() {
                 ThenViewProj::Future { future } => {
                     let view = ready!(future.poll(cx))?;
                     self.as_mut().set(Self::View { view });
                 }
-                ThenViewProj::View { view } => return view.poll_first(cx),
+                ThenViewProj::View { view } => return view.poll(cx),
             }
-        }
-    }
-
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        match self.project() {
-            ThenViewProj::Future { .. } => {
-                panic!("`poll_swap` called before `poll_first` returned `Ready`")
-            }
-            ThenViewProj::View { view } => view.poll_swap(cx),
         }
     }
 }

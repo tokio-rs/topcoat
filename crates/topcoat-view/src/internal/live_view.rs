@@ -8,7 +8,7 @@ use pin_project_lite::pin_project;
 use topcoat_core::error::{Error, Result};
 
 use super::drive::{Emission, collect};
-use crate::{RegionId, Swap, View, ViewBuffer, buffer::ViewHandle};
+use crate::{RegionId, Step, Swap, View, ViewBuffer, buffer::ViewHandle};
 
 /// The id of the next live region.
 ///
@@ -29,12 +29,11 @@ pin_project! {
         buf: &'a ViewBuffer,
         #[pin]
         body: Fut,
-        // The region's id, decided at the first poll.
+        // The region's id, decided when its first content is emitted.
         region: Option<RegionId>,
         // An error the body completed with while an emission was still in
-        // flight; yielded through `poll_swap` after it.
+        // flight; yielded by the poll after it.
         error: Option<Error>,
-        done: bool,
     }
 }
 
@@ -49,7 +48,6 @@ where
             body,
             region: None,
             error: None,
-            done: false,
         }
     }
 }
@@ -58,86 +56,57 @@ impl<Fut> View for LiveView<'_, Fut>
 where
     Fut: Future<Output = Result<()>> + Send,
 {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let this = self.project();
-        let region = *this
-            .region
-            .get_or_insert_with(|| RegionId(NEXT_REGION.fetch_add(1, Ordering::Relaxed)));
+        if let Some(error) = this.error.take() {
+            return Poll::Ready(Err(error));
+        }
         let (poll, emitted) = collect(this.body, cx);
         if let Some(emission) = emitted {
-            match poll {
-                Poll::Ready(Ok(())) => *this.done = true,
-                Poll::Ready(Err(error)) => *this.error = Some(error),
-                Poll::Pending => {}
-            }
-            return match emission {
-                Emission::Content(content) => {
-                    let view = this.buf.block(|parts| {
+            let live = match poll {
+                Poll::Ready(Ok(())) => false,
+                Poll::Ready(Err(error)) => {
+                    *this.error = Some(error);
+                    true
+                }
+                Poll::Pending => true,
+            };
+            return Poll::Ready(Ok(match (emission, *this.region) {
+                (Emission::Content(content), None) => {
+                    let region = RegionId(NEXT_REGION.fetch_add(1, Ordering::Relaxed));
+                    *this.region = Some(region);
+                    let content = this.buf.block(|parts| {
                         parts.push_str_unescaped(&format!("<!--tc:{}-->", region.0));
                         parts.push_view_handle(content);
                         parts.push_str_unescaped(&format!("<!--/tc:{}-->", region.0));
                     });
-                    Poll::Ready(Ok(view))
+                    Step::Content { content, live }
                 }
-                Emission::Swap(_) => {
-                    panic!("a live region emitted a swap before its first content")
-                }
-            };
-        }
-        match poll {
-            Poll::Pending => Poll::Pending,
-            // The body completed without emitting; the region renders
-            // nothing and can never update, so no markers are written.
-            Poll::Ready(Ok(())) => {
-                *this.done = true;
-                Poll::Ready(Ok(ViewHandle::empty()))
-            }
-            Poll::Ready(Err(error)) => {
-                *this.done = true;
-                Poll::Ready(Err(error))
-            }
-        }
-    }
-
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        let this = self.project();
-        if let Some(error) = this.error.take() {
-            *this.done = true;
-            return Poll::Ready(Some(Err(error)));
-        }
-        if *this.done {
-            return Poll::Ready(None);
-        }
-        let region = this
-            .region
-            .expect("`poll_swap` called before `poll_first` returned `Ready`");
-        let (poll, emitted) = collect(this.body, cx);
-        if let Some(emission) = emitted {
-            match poll {
-                Poll::Ready(Ok(())) => *this.done = true,
-                Poll::Ready(Err(error)) => *this.error = Some(error),
-                Poll::Pending => {}
-            }
-            return Poll::Ready(Some(Ok(match emission {
-                Emission::Content(replacement) => Swap {
-                    region,
-                    replacement,
+                (Emission::Content(replacement), Some(region)) => Step::Swap {
+                    swap: Swap {
+                        region,
+                        replacement,
+                    },
+                    live,
                 },
                 // A nested region's swap targets its own region; it passes
                 // through untouched.
-                Emission::Swap(swap) => swap,
-            })));
+                (Emission::Swap(swap), Some(_)) => Step::Swap { swap, live },
+                (Emission::Swap(_), None) => {
+                    panic!("a live region emitted a swap before its first content")
+                }
+            }));
         }
         match poll {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(Ok(())) => {
-                *this.done = true;
-                Poll::Ready(None)
-            }
-            Poll::Ready(Err(error)) => {
-                *this.done = true;
-                Poll::Ready(Some(Err(error)))
-            }
+            Poll::Ready(Ok(())) if this.region.is_some() => Poll::Ready(Ok(Step::Done)),
+            // The body completed without emitting; the region renders
+            // nothing and can never update, so no markers are written.
+            Poll::Ready(Ok(())) => Poll::Ready(Ok(Step::Content {
+                content: ViewHandle::empty(),
+                live: false,
+            })),
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
         }
     }
 }

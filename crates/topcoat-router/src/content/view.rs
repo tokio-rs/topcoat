@@ -50,11 +50,16 @@ where
 /// Resolves the view's first content into the response and hands the swaps
 /// that follow to the body.
 ///
-/// An error in the first content surfaces here, before any headers are sent,
-/// so it becomes the error response like any handler error.
+/// A view that reports it never updates replies with its content alone, as
+/// a complete body. An error in the first content surfaces here, before any
+/// headers are sent, so it becomes the error response like any handler
+/// error.
 async fn stream<V: View + 'static>(view: V, cx: &Cx) -> Result<Response> {
     let (content, swaps) = view.live().await?;
     let rendered = content.render_response(cx);
+    if !swaps.is_live() {
+        return html_response(cx, rendered.html, rendered.status_code, rendered.headers);
+    }
     let body = ViewBody {
         cx: cx.clone(),
         first: Some(rendered.html),

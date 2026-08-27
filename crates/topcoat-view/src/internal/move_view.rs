@@ -7,7 +7,7 @@ use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
 use super::drive::{Emission, collect};
-use crate::{Swap, View, buffer::ViewHandle};
+use crate::{Step, View, buffer::ViewHandle};
 
 pin_project! {
     /// A view owning the data of the scope it was built in.
@@ -23,7 +23,8 @@ pin_project! {
     pub struct MoveView<Fut> {
         #[pin]
         body: Fut,
-        done: bool,
+        // Whether the first content was yielded.
+        started: bool,
     }
 }
 
@@ -33,7 +34,10 @@ where
 {
     #[doc(hidden)]
     pub fn new(body: Fut) -> Self {
-        Self { body, done: false }
+        Self {
+            body,
+            started: false,
+        }
     }
 }
 
@@ -41,59 +45,33 @@ impl<Fut> View for MoveView<Fut>
 where
     Fut: Future<Output = Result<()>> + Send,
 {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewHandle>> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let this = self.project();
         let (poll, emission) = collect(this.body, cx);
+        let live = poll.is_pending();
         match emission {
             Some(Emission::Content(content)) => {
-                if poll.is_ready() {
-                    *this.done = true;
-                }
-                Poll::Ready(Ok(content))
+                assert!(!*this.started, "a `MoveView` body drove content twice");
+                *this.started = true;
+                Poll::Ready(Ok(Step::Content { content, live }))
             }
-            Some(Emission::Swap(_)) => panic!("a `MoveView` body swapped before its first content"),
+            Some(Emission::Swap(swap)) => {
+                assert!(
+                    *this.started,
+                    "a `MoveView` body swapped before its first content"
+                );
+                Poll::Ready(Ok(Step::Swap { swap, live }))
+            }
             None => match poll {
                 Poll::Pending => Poll::Pending,
+                Poll::Ready(Ok(())) if *this.started => Poll::Ready(Ok(Step::Done)),
                 // The body completed without driving a view; it renders
                 // nothing and can never update.
-                Poll::Ready(Ok(())) => {
-                    *this.done = true;
-                    Poll::Ready(Ok(ViewHandle::empty()))
-                }
-                Poll::Ready(Err(error)) => {
-                    *this.done = true;
-                    Poll::Ready(Err(error))
-                }
-            },
-        }
-    }
-
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Swap>>> {
-        let this = self.project();
-        if *this.done {
-            return Poll::Ready(None);
-        }
-        let (poll, emission) = collect(this.body, cx);
-        match emission {
-            Some(Emission::Swap(swap)) => {
-                if poll.is_ready() {
-                    *this.done = true;
-                }
-                Poll::Ready(Some(Ok(swap)))
-            }
-            Some(Emission::Content(_)) => {
-                panic!("`poll_swap` called before `poll_first` returned `Ready`")
-            }
-            None => match poll {
-                Poll::Pending => Poll::Pending,
-                Poll::Ready(Ok(())) => {
-                    *this.done = true;
-                    Poll::Ready(None)
-                }
-                Poll::Ready(Err(error)) => {
-                    *this.done = true;
-                    Poll::Ready(Some(Err(error)))
-                }
+                Poll::Ready(Ok(())) => Poll::Ready(Ok(Step::Content {
+                    content: ViewHandle::empty(),
+                    live: false,
+                })),
+                Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
             },
         }
     }
