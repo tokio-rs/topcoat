@@ -3249,6 +3249,7 @@ dependencies = [
 name = "topcoat-view-macro"
 version = "0.6.2"
 dependencies = [
+ "futures-core",
  "quote",
  "syn",
  "tokio",
