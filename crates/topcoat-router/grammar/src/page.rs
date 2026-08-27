@@ -60,7 +60,7 @@ impl Parse for PageItem {
             let (HandlerArg::Cx, FnArg::Typed(pat_type)) = (arg, input) else {
                 continue;
             };
-            if !is_named(&pat_type.pat, "cx") {
+            if !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "cx") {
                 return Err(syn::Error::new_spanned(
                     pat_type,
                     "the request context parameter must be named `cx`",
@@ -70,11 +70,6 @@ impl Parse for PageItem {
 
         Ok(Self { item, args })
     }
-}
-
-/// Whether the pattern binds a plain identifier of the given name.
-fn is_named(pat: &Pat, name: &str) -> bool {
-    matches!(pat, Pat::Ident(pat) if pat.ident == name)
 }
 
 pub struct Page(PageAttr, PageItem);
@@ -109,7 +104,7 @@ impl ToTokens for Page {
         let mut face = item.clone();
         for (arg, input) in args.iter().zip(&mut face.sig.inputs) {
             if let (HandlerArg::Request(_), FnArg::Typed(pat_type)) = (arg, input)
-                && !is_named(&pat_type.pat, "body")
+                && !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "body")
             {
                 let pat = std::mem::replace(&mut *pat_type.pat, parse_quote! { body });
                 face.block
