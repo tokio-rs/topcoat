@@ -3,7 +3,7 @@ use quote::quote;
 use topcoat_core_grammar::paths::topcoat_view;
 
 use super::{
-    Bindings, Node,
+    Bindings, Node, StaticSegment,
     emit::{Emit, Emitter},
 };
 
@@ -16,6 +16,36 @@ pub(crate) struct Scope {
 impl Scope {
     pub(super) fn new(nodes: Vec<Node>) -> Self {
         Self { nodes }
+    }
+
+    /// Whether this scope renders a component or fills a node position,
+    /// directly or anywhere under its nested scopes, so its content can only
+    /// resolve by being polled.
+    pub(crate) fn is_async(&self) -> bool {
+        self.nodes.iter().any(Node::is_async)
+    }
+
+    /// Emits this scope as an expression building its instruction block
+    /// right where it is evaluated, yielding the handle to the block.
+    ///
+    /// For a scope that is not async: nothing is polled, and the block may
+    /// read whatever the iteration or branch around it binds. A scope
+    /// without content, or with literal markup only, needs no block at all.
+    pub(crate) fn emit_block(&self) -> TokenStream {
+        debug_assert!(!self.is_async(), "an async scope resolves by being polled");
+        match self.nodes.as_slice() {
+            [] => quote! { #topcoat_view::ViewHandle::empty() },
+            [Node::StaticSegment(StaticSegment { string })] => {
+                quote! { #topcoat_view::ViewHandle::unescaped_unchecked(#string) }
+            }
+            nodes => {
+                let mut emitter = Emitter::new(true);
+                for node in nodes {
+                    node.emit(&mut emitter);
+                }
+                emitter.finish_block()
+            }
+        }
     }
 
     /// Emits a top-level `view!` invocation: a `ScopeView` around a
@@ -111,7 +141,7 @@ impl Scope {
     /// in source order, builds its `JoinView`, and ends with `tail` applied
     /// to that view, inside the block.
     fn emit_view_with(&self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
-        let mut emitter = Emitter::new();
+        let mut emitter = Emitter::new(false);
         for node in &self.nodes {
             node.emit(&mut emitter);
         }
@@ -260,43 +290,93 @@ mod tests {
     }
 
     #[test]
-    fn if_else_wraps_the_branch_views_in_either() {
+    fn if_else_without_components_splices_the_taken_branch_in_place() {
         let mut builder = ViewBuilder::new();
         builder.if_else(&syn::parse_quote!(cond), |then_branch, else_branch| {
             then_branch.str_unescaped("yes");
             else_branch.str_unescaped("no");
         });
         let out = rendered(builder);
-        assert!(out.contains("let __expr0 = if cond"));
-        assert!(out.contains("EitherView :: left"));
-        assert!(out.contains("EitherView :: right"));
-        assert!(out.contains("\"yes\""));
-        assert!(out.contains("\"no\""));
-        assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
+        assert!(out.contains("let __expr0 = if cond"), "{out}");
+        assert!(out.contains("ViewHandle :: unescaped_unchecked (\"yes\")"), "{out}");
+        assert!(out.contains("ViewHandle :: unescaped_unchecked (\"no\")"), "{out}");
+        assert!(out.contains("__b . view (__expr0)"), "{out}");
+        assert!(!out.contains("EitherView"), "{out}");
+        assert!(!out.contains("JoinUnit :: new (__expr0"), "{out}");
     }
 
     #[test]
-    fn if_without_else_still_emits_an_else_view() {
+    fn if_else_with_a_component_branch_wraps_the_branch_views_in_either() {
+        let mut builder = ViewBuilder::new();
+        builder.if_else(&syn::parse_quote!(cond), |then_branch, else_branch| {
+            add_component(then_branch, "yes");
+            else_branch.str_unescaped("no");
+        });
+        let out = rendered(builder);
+        assert!(out.contains("let __expr0 = if cond"), "{out}");
+        assert!(out.contains("EitherView :: left"), "{out}");
+        assert!(out.contains("EitherView :: right"), "{out}");
+        assert!(out.contains("\"no\""), "{out}");
+        assert!(out.contains("JoinUnit :: new (__expr0 , ())"), "{out}");
+    }
+
+    #[test]
+    fn if_without_else_still_splices_an_else_view() {
         let mut builder = ViewBuilder::new();
         builder.if_else(&syn::parse_quote!(cond), |then_branch, _| {
             then_branch.str_unescaped("yes");
         });
         let out = rendered(builder);
-        assert!(out.contains("if cond"));
-        assert!(out.contains("EitherView :: right"));
+        assert!(out.contains("if cond"), "{out}");
+        assert!(out.contains("else { :: topcoat_view :: ViewHandle :: empty () }"), "{out}");
     }
 
     #[test]
-    fn for_loop_joins_iterations_into_a_loop_view() {
+    fn for_loop_without_node_positions_builds_each_iteration_in_place() {
         let mut builder = ViewBuilder::new();
         builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.str_unescaped("x");
+            body.str_unescaped("<b");
+            body.expr(ExprKind::AttributeUnescaped, quote! { ("id", x) });
+            body.str_unescaped("></b>");
         });
         let out = rendered(builder);
-        assert!(out.contains("for x in xs"));
-        assert!(out.contains("__iterations . push (:: topcoat_view :: ViewExt :: boxed"));
-        assert!(out.contains("LoopView :: new (__iterations)"));
-        assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
+        assert!(out.contains("for x in xs"), "{out}");
+        assert!(out.contains("__views . push ("), "{out}");
+        assert!(out.contains("Builder :: block (__cx , | __b |"), "{out}");
+        assert!(out.contains("__b . attribute_unescaped (__expr0)"), "{out}");
+        assert!(out.contains("for __view in __expr0 { __b . view (__view) ; }"), "{out}");
+        assert!(!out.contains("LoopView"), "{out}");
+        assert!(!out.contains("Capture"), "{out}");
+    }
+
+    #[test]
+    fn a_node_position_in_a_for_body_keeps_the_loop_joined() {
+        let mut builder = ViewBuilder::new();
+        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
+            body.expr(ExprKind::Node, quote! { x });
+        });
+        let out = rendered(builder);
+        assert!(out.contains("LoopView :: new (__iterations)"), "{out}");
+        assert!(out.contains("NodeView :: new (__cx , x)"), "{out}");
+        assert!(out.contains("Capture ((x ,))"), "{out}");
+    }
+
+    #[test]
+    fn control_flow_inside_a_plain_for_body_builds_in_place() {
+        let mut builder = ViewBuilder::new();
+        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
+            body.str_unescaped("<b");
+            body.if_else(&syn::parse_quote!(x.ok), |then_branch, _| {
+                then_branch.expr(ExprKind::AttributeUnescaped, quote! { ("id", x.name) });
+            });
+            body.str_unescaped("></b>");
+        });
+        let out = rendered(builder);
+        assert!(out.contains("let __expr0 = if x . ok"), "{out}");
+        assert!(out.contains("__b . attribute_unescaped (__expr0)"), "{out}");
+        assert!(out.contains("__b . view (__expr0)"), "{out}");
+        assert!(!out.contains("EitherView"), "{out}");
+        assert!(!out.contains("LoopView"), "{out}");
     }
 
     #[test]
@@ -315,10 +395,11 @@ mod tests {
             );
         });
         let out = rendered(builder);
-        assert!(out.contains("let __expr0 = match v"));
-        assert!(out.contains("A =>"));
-        assert!(out.contains("B if flag =>"));
-        assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
+        assert!(out.contains("let __expr0 = match v"), "{out}");
+        assert!(out.contains("A =>"), "{out}");
+        assert!(out.contains("B if flag =>"), "{out}");
+        assert!(out.contains("__b . view (__expr0)"), "{out}");
+        assert!(!out.contains("EitherView"), "{out}");
     }
 
     #[test]
@@ -448,15 +529,16 @@ mod tests {
     }
 
     #[test]
-    fn for_loop_with_component_body_boxes_each_iteration() {
+    fn for_loop_with_component_body_pins_each_iteration() {
         let mut builder = ViewBuilder::new();
         builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
             add_component(body, "item");
         });
         let out = rendered(builder);
-        assert!(out.contains("ViewExt :: boxed"));
-        assert!(out.contains("LoopView :: new"));
-        assert!(out.contains("ThenView :: new"));
+        assert!(out.contains("__iterations . push (:: std :: boxed :: Box :: pin ("), "{out}");
+        assert!(out.contains("LoopView :: new (__iterations)"), "{out}");
+        assert!(out.contains("ThenView :: new"), "{out}");
+        assert!(out.contains("JoinUnit :: new (__expr0 , ())"), "{out}");
     }
 
     #[test]

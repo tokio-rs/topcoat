@@ -24,20 +24,35 @@ impl Emit for IfElse {
             else_branch,
         } = self;
 
-        // The branches build views of different types; `EitherView` unifies
-        // them, and only the taken branch is driven as this position's unit.
-        // The then branch takes the bindings of the condition's `let`
-        // patterns with it; the else branch binds nothing.
-        let then_branch = then_branch.emit_captured(&Bindings::of_condition(expr));
-        let else_branch = else_branch.emit_view();
+        if then_branch.is_async() || else_branch.is_async() {
+            // The branches build views of different types; `EitherView`
+            // unifies them, and only the taken branch is driven as this
+            // position's unit. The then branch takes the bindings of the
+            // condition's `let` patterns with it; the else branch binds
+            // nothing.
+            let then_branch = then_branch.emit_captured(&Bindings::of_condition(expr));
+            let else_branch = else_branch.emit_view();
 
-        emitter.hoist(quote! {
-            let #ident = if #expr {
-                #topcoat_view::internal::EitherView::left(#then_branch)
-            } else {
-                #topcoat_view::internal::EitherView::right(#else_branch)
-            };
-        });
-        emitter.unit(Span::call_site(), &ident);
+            emitter.hoist(quote! {
+                let #ident = if #expr {
+                    #topcoat_view::internal::EitherView::left(#then_branch)
+                } else {
+                    #topcoat_view::internal::EitherView::right(#else_branch)
+                };
+            });
+            emitter.unit(Span::call_site(), &ident);
+        } else {
+            // The taken branch builds its block right inside the branch,
+            // where the condition's bindings are alive. An empty else
+            // branch still yields the empty view, so both branches produce
+            // a handle to splice.
+            let then_branch = then_branch.emit_block();
+            let else_branch = else_branch.emit_block();
+
+            emitter.hoist(quote! {
+                let #ident = if #expr { #then_branch } else { #else_branch };
+            });
+            emitter.burst(quote! { __b.view(#ident); });
+        }
     }
 }

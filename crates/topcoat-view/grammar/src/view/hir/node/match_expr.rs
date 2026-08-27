@@ -19,6 +19,25 @@ impl Emit for MatchExpr {
         let ident = emitter.fresh_ident();
         let expr = &self.expr;
 
+        if !self.arms.iter().any(|arm| arm.body.is_async()) {
+            // The taken arm builds its block right inside the arm, where
+            // its pattern's bindings are alive.
+            let arms = self.arms.iter().map(|arm| {
+                let pat = &arm.pat;
+                let guard = arm.guard.as_ref().map(|guard| quote! { if #guard });
+                let body = arm.body.emit_block();
+                quote! { #pat #guard => #body }
+            });
+
+            emitter.hoist(quote! {
+                let #ident = match #expr {
+                    #(#arms,)*
+                };
+            });
+            emitter.burst(quote! { __b.view(#ident); });
+            return;
+        }
+
         // The arm bodies build views of different types; nested
         // `EitherView`s unify them, and only the taken arm is driven as this
         // position's unit. The arm's view takes its pattern's bindings with

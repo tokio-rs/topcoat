@@ -39,6 +39,25 @@ pub(crate) enum Node {
     MatchExpr(MatchExpr),
 }
 
+impl Node {
+    /// Whether this node renders a component or fills a node position, in
+    /// the node itself or anywhere under its nested scopes, so its content
+    /// can only resolve by being polled.
+    ///
+    /// A node position counts because its value may be a lazy view, which
+    /// only its type tells.
+    pub(crate) fn is_async(&self) -> bool {
+        match self {
+            Self::Component(_) => true,
+            Self::ExprNode(node) => node.is_node_position(),
+            Self::ForLoop(node) => node.body.is_async(),
+            Self::IfElse(node) => node.then_branch.is_async() || node.else_branch.is_async(),
+            Self::MatchExpr(node) => node.arms.iter().any(|arm| arm.body.is_async()),
+            Self::StaticSegment(_) | Self::Local(_) | Self::Statement(_) => false,
+        }
+    }
+}
+
 impl Emit for Node {
     fn emit(&self, emitter: &mut Emitter) {
         match self {

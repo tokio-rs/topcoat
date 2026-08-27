@@ -8,34 +8,42 @@ pub(crate) trait Emit {
     fn emit(&self, emitter: &mut Emitter);
 }
 
-/// Collects the two phases a view template expands to: the value expression
-/// of the template's `JoinView`.
+/// Collects the two phases a view template expands to.
 ///
 /// The hoist phase evaluates every expression of the view in source order
-/// and binds the results to fresh identifiers. Every dynamic node position —
-/// a plain interpolation, a component, a control-flow construct — is
-/// registered as a *unit*: an inert view driven concurrently with the other
-/// units by the `JoinView`, which resolves each position's content. The
-/// burst phase becomes the join's burst closure: it pushes the view's
-/// instruction block in one synchronous burst that only reads the hoisted
-/// bindings and the resolved contents.
+/// and binds the results to fresh identifiers. The burst phase pushes the
+/// view's instruction block in one synchronous burst that only reads the
+/// hoisted bindings.
 ///
-/// After the burst builds the template's content, the join keeps streaming
-/// the units' swaps — live updates targeting their own regions.
+/// A scope that renders a component, or fills a node position, resolves
+/// its content by being polled: the expansion is the value expression of
+/// the template's `JoinView`. Every dynamic node position is registered as
+/// a *unit*, an inert view driven concurrently with the other units by the
+/// join, and the burst phase becomes the join's burst closure, splicing the
+/// contents the join resolved. After the burst builds the template's
+/// content, the join keeps streaming the units' swaps.
+///
+/// A scope that renders no component and fills no node position builds
+/// synchronously: the hoist phase runs and the burst pushes the block right
+/// where the scope is evaluated, with control flow splicing the handles of
+/// blocks built the same way. Nothing is polled, boxed, or captured.
 pub(crate) struct Emitter {
     hoist: TokenStream,
     burst: TokenStream,
     counter: u32,
+    /// Whether the scope builds synchronously instead of as a join.
+    sync: bool,
     /// The hoisted bindings joined as units, in position order.
     units: Vec<Ident>,
 }
 
 impl Emitter {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(sync: bool) -> Self {
         Self {
             hoist: TokenStream::new(),
             burst: TokenStream::new(),
             counter: 0,
+            sync,
             units: Vec::new(),
         }
     }
@@ -59,7 +67,13 @@ impl Emitter {
 
     /// Registers the hoisted binding `ident` as a joined unit and splices
     /// the content the join resolves for it into the burst.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the scope builds synchronously: a synchronous scope has no
+    /// join to drive units.
     pub(super) fn unit(&mut self, span: Span, ident: &Ident) {
+        assert!(!self.sync, "a synchronous scope joins no units");
         let view = format_ident!("__view{}", self.units.len());
         self.units.push(ident.clone());
         self.burst(quote_spanned! {span=>
@@ -102,6 +116,25 @@ impl Emitter {
         quote! {{
             #hoist
             #tail
+        }}
+    }
+
+    /// Returns a block that runs the hoist phase and then builds the
+    /// scope's instruction block in one burst against the ambient `__cx`
+    /// context, yielding the handle to the block.
+    ///
+    /// The block lands in the buffer of the build right where the scope is
+    /// evaluated, so the burst may read what the iteration or branch around
+    /// it binds.
+    pub(super) fn finish_block(self) -> TokenStream {
+        debug_assert!(self.sync, "a joined scope finishes as a join");
+        let hoist = &self.hoist;
+        let burst = &self.burst;
+        quote! {{
+            #hoist
+            #topcoat_view::internal::Builder::block(__cx, |__b| {
+                #burst
+            })
         }}
     }
 }

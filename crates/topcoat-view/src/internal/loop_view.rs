@@ -16,9 +16,9 @@ use crate::{
 /// the loop's own block splices them in iteration order. After that the
 /// iterations' updates merge into one stream of swaps.
 ///
-/// The iterations share one view type, so the expansion boxes each body.
-/// The `Unpin` bound this trades on is what lets the loop hold its views in
-/// a plain `Vec`.
+/// The iterations share one view type, pinned on the heap by the
+/// expansion. The `Unpin` bound this trades on is what lets the loop hold
+/// its views in a plain `Vec`.
 pub struct LoopView<V> {
     iterations: Vec<Iteration<V>>,
     /// Whether the loop's block was built from the iterations' contents.

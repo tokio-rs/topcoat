@@ -12,6 +12,13 @@ pub(crate) struct ExprNode {
     pub tokens: TokenStream,
 }
 
+impl ExprNode {
+    /// Whether this expression fills a node position.
+    pub(crate) fn is_node_position(&self) -> bool {
+        matches!(self.kind, ExprKind::Node)
+    }
+}
+
 impl Emit for ExprNode {
     fn emit(&self, emitter: &mut Emitter) {
         let ident = emitter.fresh_ident();
@@ -49,9 +56,15 @@ pub(crate) enum ExprKind {
 }
 
 impl ExprKind {
+    /// Returns the builder method a position other than a node position is
+    /// pushed through.
+    ///
+    /// # Panics
+    ///
+    /// Panics for a node position, which is joined as a unit instead.
     pub(crate) fn builder_method(self) -> Ident {
         let name = match self {
-            Self::Node => "node",
+            Self::Node => panic!("a node position is joined as a unit, not pushed"),
             Self::ElementName => "element_name",
             Self::Attribute => "attribute",
             Self::AttributeUnescaped => "attribute_unescaped",

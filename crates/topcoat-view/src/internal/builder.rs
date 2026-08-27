@@ -2,7 +2,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts, HtmlContext,
-    PartsWriter, Unescaped, ViewHandle, html::ElementNameViewParts,
+    PartsWriter, Unescaped, ViewHandle, buffer::ViewBufferScope, html::ElementNameViewParts,
 };
 
 /// The handle a block is filled through: the request context plus a writer
@@ -19,6 +19,20 @@ pub struct Builder<'a, 'b, 'c> {
 impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
     pub(crate) fn new(cx: &'a Cx, parts: &'b mut PartsWriter<'c>) -> Self {
         Self { cx, parts }
+    }
+
+    /// Appends one view's instruction block to the buffer of the build in
+    /// one synchronous burst, pushing its parts through the builder handed
+    /// to `f`, and returns the handle to the block.
+    ///
+    /// `f` must not build other views; nested views are built first and
+    /// spliced into the block with [`view`](Self::view).
+    ///
+    /// # Panics
+    ///
+    /// Panics if no view is building on the current task.
+    pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> ViewHandle {
+        ViewBufferScope::block(|parts| f(&mut Builder::new(cx, parts)))
     }
 
     /// Returns the writer over the block, in text context.

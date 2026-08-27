@@ -1,6 +1,7 @@
 use std::{
     fmt,
     future::poll_fn,
+    ops::DerefMut,
     pin::{Pin, pin},
     task::{Context, Poll, ready},
 };
@@ -236,7 +237,13 @@ impl View for () {
 
 pub type BoxView<'a> = Pin<Box<dyn View + 'a>>;
 
-impl View for BoxView<'_> {
+/// A pinned pointer to a view, like a [`BoxView`], polls the view it points
+/// at.
+impl<P> View for Pin<P>
+where
+    P: DerefMut + Unpin + Send,
+    P::Target: View,
+{
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         self.get_mut().as_mut().poll(cx)
     }
