@@ -23,6 +23,20 @@ async fn toggle_reaches_the_generated_javascript() {
 }
 
 #[tokio::test]
+async fn bool_then_avoids_javascript_thenable_assimilation() {
+    let cx = &Cx::default();
+    let html = view! {
+        cx =>
+        $(true.then(|| "yes").unwrap())
+    }
+    .unwrap()
+    .render(cx);
+
+    assert!(html.contains(".then_("), "{html}");
+    assert!(!html.contains(".then("), "{html}");
+}
+
+#[tokio::test]
 async fn increment_and_decrement_reach_the_generated_javascript() {
     let cx = &Cx::default();
     let html = view! {

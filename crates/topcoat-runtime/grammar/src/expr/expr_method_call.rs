@@ -24,7 +24,17 @@ impl Expr {
         Self::dispatch(&call.receiver, &mut receiver, js, names)?;
 
         let method = &call.method;
-        write!(js, ".{method}(").unwrap();
+
+        // JavaScript treats any object with a callable `then` property as a
+        // Promise-like thenable. Exposing Rust's `bool::then` under that
+        // name causes boolean procedure results resolve to `undefined`.
+        // To prevent this, here we add an exception for methods named `then`
+        // to be defined as `then_`.
+        if method == "then" {
+            js.push_str(".then_(");
+        } else {
+            write!(js, ".{method}(").unwrap();
+        }
 
         let mut args = Vec::with_capacity(call.args.len());
         for (i, arg) in call.args.iter().enumerate() {
