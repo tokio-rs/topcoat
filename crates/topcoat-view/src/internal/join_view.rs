@@ -49,7 +49,7 @@ where
     U: JoinUnits + Send,
     F: FnOnce(&mut Builder<'_, '_, '_>, U::Contents) + Send,
 {
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let mut this = self.project();
         if this.burst.is_none() {
             return this.units.poll_swap(cx);
@@ -151,7 +151,7 @@ where
         let this = self.project();
         let mut ready = true;
         if this.content.is_none() {
-            match this.view.poll(cx) {
+            match this.view.poll_first(cx) {
                 Poll::Ready(Ok(Step::Content { content, live })) => {
                     *this.content = Some(content);
                     *this.done = !live;
@@ -192,7 +192,7 @@ where
         let this = self.project();
         let mut pending = false;
         if !*this.done {
-            match this.view.poll(cx) {
+            match this.view.poll_first(cx) {
                 Poll::Ready(Ok(Step::Swap { swap, live })) => {
                     *this.done = !live;
                     return Poll::Ready(Ok(Step::Swap {

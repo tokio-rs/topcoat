@@ -6,7 +6,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{Step, View};
+use crate::{View, ViewFirst, ViewSwap};
 
 pin_project! {
     /// Unifies the branch values of an `if`/`else` or `match` in node
@@ -39,10 +39,17 @@ where
     A: View,
     B: View,
 {
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         match self.project() {
-            EitherViewProj::Left { view } => view.poll(cx),
-            EitherViewProj::Right { view } => view.poll(cx),
+            EitherViewProj::Left { view } => view.poll_first(cx),
+            EitherViewProj::Right { view } => view.poll_first(cx),
+        }
+    }
+
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+        match self.project() {
+            EitherViewProj::Left { view } => view.poll_swap(cx),
+            EitherViewProj::Right { view } => view.poll_swap(cx),
         }
     }
 }

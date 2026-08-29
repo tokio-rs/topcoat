@@ -9,7 +9,7 @@ use topcoat_core::error::Result;
 
 use super::drive::{Emission, collect};
 use crate::{
-    RegionId, Step, Swap, View,
+    RegionId, Step, View, ViewSwap,
     buffer::{ViewBufferScope, ViewHandle},
 };
 
@@ -53,7 +53,7 @@ impl<Fut> View for LiveView<Fut>
 where
     Fut: Future<Output = Result<()>> + Send,
 {
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let this = self.project();
         let (poll, emitted) = collect(this.body, cx);
         // An error the body completes with takes precedence over the
@@ -88,7 +88,7 @@ where
                 Step::Content { content, live }
             }
             (Emission::Content(replacement), Some(region)) => Step::Swap {
-                swap: Swap {
+                swap: ViewSwap {
                     region,
                     replacement,
                 },

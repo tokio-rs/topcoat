@@ -7,7 +7,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{Step, Swap, View, ViewHandle};
+use crate::{Step, View, ViewHandle, ViewSwap};
 
 thread_local! {
     /// The tunnel between a collecting poll and the drive inside it, on the
@@ -39,7 +39,7 @@ pub(super) enum Emission {
     Content(ViewHandle),
     /// A swap the driven view emitted after its first content, passed
     /// through verbatim.
-    Swap(Swap),
+    Swap(ViewSwap),
 }
 
 /// Restores the tunnel state a [`collect`] parked, also when the collected
@@ -154,7 +154,7 @@ where
                     Poll::Pending
                 };
             }
-            match ready!(this.view.as_mut().poll(cx))? {
+            match ready!(this.view.as_mut().poll_first(cx))? {
                 Step::Content { content, live } => {
                     *this.pending = Some(Emission::Content(content));
                     *this.done = !live;

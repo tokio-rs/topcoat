@@ -45,7 +45,7 @@ impl<Fut> View for MoveView<Fut>
 where
     Fut: Future<Output = Result<()>> + Send,
 {
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
         let this = self.project();
         let (poll, emission) = collect(this.body, cx);
         let live = poll.is_pending();

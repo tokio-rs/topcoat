@@ -6,19 +6,13 @@ use crate::{
     html::ElementNameViewParts,
 };
 
-/// The handle a block is filled through: the request context plus a writer
-/// over the buffer the block is appended to.
-///
-/// Each method pushes one of the block's parts, sealing it with the
-/// [`HtmlContext`] of the position it fills by dispatching the matching
-/// `*ViewParts` trait.
 pub struct Builder<'a, 'b, 'c> {
     cx: &'a Cx,
     parts: &'b mut PartsWriter<'c>,
 }
 
 impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
-    pub(crate) fn new(cx: &'a Cx, parts: &'b mut PartsWriter<'c>) -> Self {
+    fn new(cx: &'a Cx, parts: &'b mut PartsWriter<'c>) -> Self {
         Self { cx, parts }
     }
 
@@ -35,16 +29,6 @@ impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
     pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> ViewHandle {
         ViewBufferScope::block(|parts| f(&mut Builder::new(cx, parts)))
     }
-
-    /// Returns the writer over the block, in text context.
-    ///
-    /// For compositions that push through the writer directly instead of a
-    /// position method, like the runtime's JavaScript views.
-    #[inline]
-    pub fn parts(&mut self) -> &mut PartsWriter<'c> {
-        self.parts
-    }
-
     /// Appends a literal markup segment, verbatim.
     ///
     /// The segment is passed as `&"..."` so it stays out of the buffer's

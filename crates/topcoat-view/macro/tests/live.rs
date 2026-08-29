@@ -4,7 +4,7 @@ use futures_core::Stream;
 use topcoat::{
     Result,
     context::Cx,
-    view::{Swap, Swaps, View, ViewExt, component, emit, live, view},
+    view::{Swaps, View, ViewExt, ViewSwap, component, emit, live, view},
 };
 
 #[component]
@@ -15,7 +15,7 @@ async fn load(fail: bool) -> Result<impl View> {
     Ok(view! { <p>"loaded"</p> })
 }
 
-async fn next<V: View>(swaps: &mut Swaps<V>) -> Option<Result<Swap>> {
+async fn next<V: View>(swaps: &mut Swaps<V>) -> Option<Result<ViewSwap>> {
     poll_fn(|cx| Pin::new(&mut *swaps).poll_next(cx)).await
 }
 

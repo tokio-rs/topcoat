@@ -38,7 +38,7 @@ impl Default for Child<'_> {
 
 /// The children's view polls through in place.
 impl View for Child<'_> {
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
-        self.get_mut().view.as_mut().poll(cx)
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+        self.get_mut().view.as_mut().poll_first(cx)
     }
 }
