@@ -127,7 +127,7 @@ impl State {
             branch: one_of(branch, &BRANCHES)
                 .or(one_of(branch, &TAGS))
                 .unwrap_or(BRANCHES[0]),
-            overlay: one_of(query.overlay.as_deref(), &OVERLAYS),
+            overlay: one_of(query.overlay.as_deref(), &OVERLAYS.map(|(value, _)| value)),
             side: one_of(query.side.as_deref(), &SIDES.map(|(value, ..)| value))
                 .unwrap_or(SIDES[0].0),
         })
@@ -260,8 +260,13 @@ const BRANCHES: [&str; 3] = ["main", "feature/showcase", "feature/dark-mode"];
 /// The tags a preview can build from instead of a branch.
 const TAGS: [&str; 3] = ["v1.2.0", "v1.1.0", "v1.0.0"];
 
-/// The overlays that can cover the page, one at a time.
-const OVERLAYS: [&str; 3] = ["rename", "delete", "filters"];
+/// The overlays that can cover the page, one at a time: the value each goes
+/// by in the URL, and the word for it.
+const OVERLAYS: [(&str, &str); 3] = [
+    ("rename", "Dialog"),
+    ("delete", "Alert dialog"),
+    ("filters", "Sheet"),
+];
 
 /// The edges the sheet can come in from: the value each goes by in the URL,
 /// the word for it, and the side itself. The first is the one it comes from
@@ -340,6 +345,7 @@ async fn home(cx: &Cx) -> Result {
                     // A masonry of small, self-contained demos, each built
                     // from the installed components.
                     <div class="mt-14 columns-1 gap-4 sm:columns-2 xl:columns-3">
+                        demo(overlays_card(state: &state))
                         demo(team_card())
                         demo(buttons_card())
                         demo(notices())
@@ -410,6 +416,43 @@ async fn state_fields(state: &State, sets: &str) -> Result {
                 <input type="hidden" name=(key) value=(value)>
             }
         }
+    }
+}
+
+/// The overlays gathered in one place, so each is one click from the top of
+/// the page.
+///
+/// A trigger is a plain link to this page with the overlay named in its query
+/// string, which is all it takes to open one: the same overlays are opened
+/// from the cards they belong to further down.
+#[component]
+async fn overlays_card(state: &State) -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Overlays")
+                card_description(
+                    "The URL is what holds one open, so it survives a reload \
+                     and can be linked to."
+                )
+            )
+            card_content(
+                <div class="flex flex-wrap gap-2">
+                    for (overlay, name) in OVERLAYS {
+                        <a
+                            href=(state.href("overlay", Some(overlay)))
+                            class=(button_variants(
+                                ButtonVariant::Outline,
+                                ButtonSize::Sm,
+                            ))
+                        >
+                            "Open "
+                            (name.to_lowercase())
+                        </a>
+                    }
+                </div>
+            )
+        )
     }
 }
 
@@ -1242,7 +1285,15 @@ async fn toolbar_card() -> Result {
     }
 }
 
-/// A documentation page header: the trail to it, and the shortcuts it lists.
+/// The keys that move through a form, and what each one does. They are the
+/// browser's own, so they work on this page as they read here.
+const KEYS: [(&str, &[&str]); 3] = [
+    ("Move to the next control", &["Tab"]),
+    ("Move back to the one before", &["Shift", "Tab"]),
+    ("Submit the form", &["Enter"]),
+];
+
+/// A documentation page header: the trail to it, and the keys it documents.
 #[component]
 async fn docs_card() -> Result {
     view! {
@@ -1271,15 +1322,15 @@ async fn docs_card() -> Result {
                 card_description("A panel over the page for a single task.")
             )
             card_content(
-                <div class="flex flex-col gap-3">
-                    for (action, keys) in [
-                        ("Search the docs", ["Ctrl", "K"]),
-                        ("Copy the snippet", ["Ctrl", "C"]),
-                    ] {
+                // The section a docs page ends on: how the dialog's form is
+                // worked from the keyboard.
+                <h3 class="text-sm font-medium">"Keyboard"</h3>
+                <div class="mt-3 flex flex-col gap-3">
+                    for (action, keys) in KEYS {
                         <div class="flex items-center justify-between gap-4">
                             <p class="text-sm text-muted-foreground">(action)</p>
                             kbd_group(
-                                for key in keys {
+                                for key in keys.iter().copied() {
                                     kbd((key))
                                 }
                             )
