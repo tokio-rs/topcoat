@@ -343,23 +343,24 @@ async fn home(cx: &Cx) -> Result {
                     </header>
 
                     // A masonry of small, self-contained demos, each built
-                    // from the installed components.
+                    // from the installed components. They run from the plainest
+                    // components to the ones assembled out of them.
                     <div class="mt-14 columns-1 gap-4 sm:columns-2 xl:columns-3">
-                        demo(overlays_card(state: &state))
-                        demo(team_card())
                         demo(buttons_card())
                         demo(notices())
-                        demo(create_card())
-                        demo(overview_card(state: &state))
+                        demo(team_card())
                         demo(status_card())
+                        demo(create_card())
+                        demo(notifications_card())
+                        demo(plan_card())
+                        demo(overlays_card(state: &state))
+                        demo(overview_card(state: &state))
+                        demo(faq_card())
+                        demo(branches_card(state: &state))
+                        demo(toolbar_card())
+                        demo(share_card())
                         demo(settings_card(state: &state))
                         demo(deployments_card(state: &state))
-                        demo(notifications_card())
-                        demo(branches_card(state: &state))
-                        demo(plan_card())
-                        demo(faq_card())
-                        demo(share_card())
-                        demo(toolbar_card())
                         demo(docs_card())
                         demo(pending_card())
                         demo(deploy_card())
@@ -419,40 +420,84 @@ async fn state_fields(state: &State, sets: &str) -> Result {
     }
 }
 
-/// The overlays gathered in one place, so each is one click from the top of
-/// the page.
-///
-/// A trigger is a plain link to this page with the overlay named in its query
-/// string, which is all it takes to open one: the same overlays are opened
-/// from the cards they belong to further down.
+/// The button family: variants, sizes, and states at a glance.
 #[component]
-async fn overlays_card(state: &State) -> Result {
+async fn buttons_card() -> Result {
     view! {
         card(
             card_header(
-                card_title("Overlays")
-                card_description(
-                    "The URL is what holds one open, so it survives a reload \
-                     and can be linked to."
-                )
+                card_title("Buttons")
+                card_description("Every variant, size, and state.")
             )
             card_content(
-                <div class="flex flex-wrap gap-2">
-                    for (overlay, name) in OVERLAYS {
-                        <a
-                            href=(state.href("overlay", Some(overlay)))
-                            class=(button_variants(
-                                ButtonVariant::Outline,
-                                ButtonSize::Sm,
-                            ))
-                        >
-                            "Open "
-                            (name.to_lowercase())
-                        </a>
-                    }
+                <div class="flex flex-col gap-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        for (variant, name) in [
+                            (ButtonVariant::Primary, "Primary"),
+                            (ButtonVariant::Secondary, "Secondary"),
+                            (ButtonVariant::Outline, "Outline"),
+                            (ButtonVariant::Ghost, "Ghost"),
+                            (ButtonVariant::Destructive, "Destructive"),
+                        ] {
+                            button(size: ButtonSize::Sm, variant: variant, (name))
+                        }
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        button(size: ButtonSize::Sm, "Small")
+                        button(size: ButtonSize::Md, "Medium")
+                        button(size: ButtonSize::Lg, "Large")
+                        button(
+                            size: ButtonSize::Icon,
+                            variant: ButtonVariant::Outline,
+                            icon(data: iconify_icon!("feather:plus"), label: "Add item")
+                        )
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        button(
+                            variant: ButtonVariant::Outline,
+                            attrs: attributes! { disabled="" },
+                            "Disabled"
+                        )
+                        button(
+                            attrs: attributes! { disabled="" },
+                            spinner()
+                            "Saving..."
+                        )
+                    </div>
                 </div>
             )
         )
+    }
+}
+
+/// Notices standing on their own: an alert is a surface already, so it needs
+/// no card under it.
+#[component]
+async fn notices() -> Result {
+    view! {
+        <div class="flex flex-col gap-3">
+            // The leading icon is an ordinary child: the alert lays out a
+            // column for it only when one is there.
+            alert(
+                icon(data: iconify_icon!("feather:info"))
+                alert_title("Scheduled maintenance")
+                alert_description(
+                    "The dashboard is read-only on Sunday, 02:00 to 04:00 UTC."
+                )
+            )
+            alert(
+                variant: AlertVariant::Destructive,
+                icon(data: iconify_icon!("feather:alert-triangle"))
+                alert_title("Build failed")
+                alert_description(
+                    "The preview build could not resolve its dependencies."
+                )
+            )
+            alert(
+                alert_title("No deployments yet")
+                alert_description("Push to a branch to see it build here.")
+            )
+        </div>
     }
 }
 
@@ -540,84 +585,52 @@ async fn team_card() -> Result {
     }
 }
 
-/// The button family: variants, sizes, and states at a glance.
+/// Environment statuses told through the badge variants, and a rollout told
+/// through the progress bar.
 #[component]
-async fn buttons_card() -> Result {
+async fn status_card() -> Result {
     view! {
         card(
             card_header(
-                card_title("Buttons")
-                card_description("Every variant, size, and state.")
+                card_title("Deployment status")
+                card_description("How the last builds ended up.")
             )
             card_content(
                 <div class="flex flex-col gap-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                        for (variant, name) in [
-                            (ButtonVariant::Primary, "Primary"),
-                            (ButtonVariant::Secondary, "Secondary"),
-                            (ButtonVariant::Outline, "Outline"),
-                            (ButtonVariant::Ghost, "Ghost"),
-                            (ButtonVariant::Destructive, "Destructive"),
-                        ] {
-                            button(size: ButtonSize::Sm, variant: variant, (name))
-                        }
+                    for (status, variant) in STATUSES {
+                        let count = DEPLOYMENTS
+                            .iter()
+                            .filter(|(_, _, value)| *value == status)
+                            .count();
+
+                        <div class="flex items-center justify-between gap-4">
+                            badge(variant: variant, (status))
+                            <p class="text-sm text-muted-foreground">
+                                (format!("{count} deployments"))
+                            </p>
+                        </div>
+                    }
+                </div>
+                separator(attrs: attributes! { class="my-4" })
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between gap-4">
+                        <p class="text-sm text-muted-foreground">
+                            "Rolling out to production"
+                        </p>
+                        <p class="text-sm font-medium">"62%"</p>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        button(size: ButtonSize::Sm, "Small")
-                        button(size: ButtonSize::Md, "Medium")
-                        button(size: ButtonSize::Lg, "Large")
-                        button(
-                            size: ButtonSize::Icon,
-                            variant: ButtonVariant::Outline,
-                            icon(data: iconify_icon!("feather:plus"), label: "Add item")
-                        )
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        button(
-                            variant: ButtonVariant::Outline,
-                            attrs: attributes! { disabled="" },
-                            "Disabled"
-                        )
-                        button(
-                            attrs: attributes! { disabled="" },
-                            spinner()
-                            "Saving..."
-                        )
-                    </div>
+                    progress(value: 62.0)
                 </div>
             )
+            card_footer(
+                <p class="text-sm text-muted-foreground">"Rolled out with"</p>
+                // Anything can borrow a badge's looks: `badge_variants`
+                // returns the class string for a variant.
+                <a href="#changelog" class=(badge_variants(BadgeVariant::Outline))>
+                    "v2.0.4"
+                </a>
+            )
         )
-    }
-}
-
-/// Notices standing on their own: an alert is a surface already, so it needs
-/// no card under it.
-#[component]
-async fn notices() -> Result {
-    view! {
-        <div class="flex flex-col gap-3">
-            // The leading icon is an ordinary child: the alert lays out a
-            // column for it only when one is there.
-            alert(
-                icon(data: iconify_icon!("feather:info"))
-                alert_title("Scheduled maintenance")
-                alert_description(
-                    "The dashboard is read-only on Sunday, 02:00 to 04:00 UTC."
-                )
-            )
-            alert(
-                variant: AlertVariant::Destructive,
-                icon(data: iconify_icon!("feather:alert-triangle"))
-                alert_title("Build failed")
-                alert_description(
-                    "The preview build could not resolve its dependencies."
-                )
-            )
-            alert(
-                alert_title("No deployments yet")
-                alert_description("Push to a branch to see it build here.")
-            )
-        </div>
     }
 }
 
@@ -687,6 +700,151 @@ async fn create_card() -> Result {
     }
 }
 
+/// Notification settings mixing checkboxes and switches through their states.
+#[component]
+async fn notifications_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Notifications")
+                card_description("Pick what lands in your inbox.")
+            )
+            card_content(
+                <div class="flex flex-col gap-3">
+                    <div class="flex items-center gap-2">
+                        checkbox(attrs: attributes! { id="notify-deploys" checked="" })
+                        label(
+                            attrs: attributes! { for="notify-deploys" },
+                            "Deploy results"
+                        )
+                    </div>
+                    <div class="flex items-center gap-2">
+                        checkbox(attrs: attributes! { id="notify-mentions" })
+                        label(attrs: attributes! { for="notify-mentions" }, "Mentions")
+                    </div>
+                    <div class="flex items-center gap-2">
+                        checkbox(
+                            attrs: attributes! { id="notify-digest" checked="" disabled="" }
+                        )
+                        label(
+                            attrs: attributes! { for="notify-digest" class="opacity-50" },
+                            "Weekly digest (managed by your org)"
+                        )
+                    </div>
+                </div>
+                separator(attrs: attributes! { class="my-4" })
+                <div class="flex flex-col gap-3">
+                    <div class="flex items-center justify-between gap-4">
+                        label(
+                            attrs: attributes! { for="notify-push" },
+                            "Push notifications"
+                        )
+                        switch(attrs: attributes! { id="notify-push" checked="" })
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        label(attrs: attributes! { for="notify-quiet" }, "Quiet hours")
+                        switch(attrs: attributes! { id="notify-quiet" })
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        label(
+                            attrs: attributes! { for="notify-sms" class="opacity-50" },
+                            "Text messages (not on this plan)"
+                        )
+                        switch(attrs: attributes! { id="notify-sms" disabled="" })
+                    </div>
+                </div>
+            )
+        )
+    }
+}
+
+/// The plans a workspace can run on: the value each goes by, its name, its
+/// price, and whether it can be picked here.
+const PLANS: [(&str, &str, &str, bool); 4] = [
+    ("starter", "Starter", "Free", true),
+    ("pro", "Pro", "$24 / month", true),
+    ("scale", "Scale", "$96 / month", true),
+    ("enterprise", "Enterprise", "Contact sales", false),
+];
+
+/// A plan picker, built on a radio group.
+#[component]
+async fn plan_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Billing plan")
+                card_description("Pick the plan this workspace runs on.")
+            )
+            card_content(
+                radio_group(
+                    // The name the options share is what has the browser let
+                    // go of one when another is picked.
+                    for (value, name, price, available) in PLANS {
+                        <div class="flex items-center gap-2">
+                            radio_group_item(
+                                attrs: attributes! {
+                                    id=(value)
+                                    name="plan"
+                                    value=(value)
+                                    checked=(value == "pro")
+                                    disabled=(!available)
+                                }
+                            )
+                            label(
+                                attrs: attributes! {
+                                    for=(value)
+                                    class=(class!("flex-1", "opacity-50" if !available))
+                                },
+                                (name)
+                            )
+                            <p class="text-sm text-muted-foreground">(price)</p>
+                        </div>
+                    }
+                )
+            )
+            card_footer(button(attrs: attributes! { class="w-full" }, "Upgrade"))
+        )
+    }
+}
+
+/// The overlays gathered in one place, so each can be opened without hunting
+/// for the card it belongs to.
+///
+/// A trigger is a plain link to this page with the overlay named in its query
+/// string, which is all it takes to open one: the same overlays are opened
+/// from the cards they belong to further down.
+#[component]
+async fn overlays_card(state: &State) -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Overlays")
+                card_description(
+                    "The URL is what holds one open, so it survives a reload \
+                     and can be linked to."
+                )
+            )
+            card_content(
+                <div class="flex flex-wrap gap-2">
+                    for (overlay, name) in OVERLAYS {
+                        <a
+                            href=(state.href("overlay", Some(overlay)))
+                            class=(button_variants(
+                                ButtonVariant::Outline,
+                                ButtonSize::Sm,
+                            ))
+                        >
+                            "Open "
+                            (name.to_lowercase())
+                        </a>
+                    }
+                </div>
+            )
+        )
+    }
+}
+
 /// A card that tabs between panels.
 ///
 /// Which panel shows is in the URL, so each trigger is a link and only the
@@ -727,50 +885,224 @@ async fn overview_card(state: &State) -> Result {
     }
 }
 
-/// Environment statuses told through the badge variants, and a rollout told
-/// through the progress bar.
+/// A FAQ whose answers fold away, one open at a time.
 #[component]
-async fn status_card() -> Result {
+async fn faq_card() -> Result {
     view! {
         card(
             card_header(
-                card_title("Deployment status")
-                card_description("How the last builds ended up.")
+                card_title("Questions")
+                card_description("The rest is in the docs.")
             )
             card_content(
-                <div class="flex flex-col gap-3">
-                    for (status, variant) in STATUSES {
-                        let count = DEPLOYMENTS
-                            .iter()
-                            .filter(|(_, _, value)| *value == status)
-                            .count();
-
-                        <div class="flex items-center justify-between gap-4">
-                            badge(variant: variant, (status))
-                            <p class="text-sm text-muted-foreground">
-                                (format!("{count} deployments"))
-                            </p>
-                        </div>
+                accordion(
+                    // The name the sections share is what closes the open one
+                    // when another is opened.
+                    for (question, answer, open) in [
+                        (
+                            "Where do the components live?",
+                            "In your own source tree, under the components \
+                             directory you picked.",
+                            true,
+                        ),
+                        (
+                            "Can I edit them?",
+                            "They are yours: restyle, rewrite, and extend them \
+                             like any other file.",
+                            false,
+                        ),
+                        (
+                            "How do updates work?",
+                            "`topcoat ui list` marks what the registry has \
+                             changed since you added it.",
+                            false,
+                        ),
+                    ] {
+                        accordion_item(
+                            attrs: attributes! { name="faq" open=(open) },
+                            accordion_trigger((question))
+                            accordion_content((answer))
+                        )
                     }
-                </div>
-                separator(attrs: attributes! { class="my-4" })
-                <div class="flex flex-col gap-2">
-                    <div class="flex items-center justify-between gap-4">
-                        <p class="text-sm text-muted-foreground">
-                            "Rolling out to production"
-                        </p>
-                        <p class="text-sm font-medium">"62%"</p>
+                )
+            )
+        )
+    }
+}
+
+/// A branch switcher: a menu whose items reach the server, since a menu item
+/// is a button and a form around it is all it takes.
+#[component]
+async fn branches_card(state: &State) -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Branches")
+                card_description("Switch the branch this preview builds from.")
+            )
+            card_content(
+                // The form carries the rest of the page's state along, and the
+                // item that was clicked adds the branch it stands for; the
+                // page comes back built from that branch.
+                <form>
+                    state_fields(state: state, sets: "branch")
+                    dropdown_menu(
+                        // The trigger takes any content; this one borrows the
+                        // outline button's looks and adds a flipping chevron.
+                        dropdown_menu_trigger(
+                            attrs: attributes! {
+                                class=(button_variants(
+                                    ButtonVariant::Outline,
+                                    ButtonSize::Sm,
+                                ))
+                            },
+                            (state.branch)
+                            icon(
+                                data: iconify_icon!("feather:chevron-down"),
+                                attrs: attributes! { class="transition-transform group-open:rotate-180" }
+                            )
+                        )
+                        dropdown_menu_content(
+                            dropdown_menu_label("Switch branch")
+                            for branch in BRANCHES {
+                                dropdown_menu_item(
+                                    attrs: attributes! { name="branch" value=(branch) },
+                                    (branch)
+                                )
+                            }
+                            dropdown_menu_separator()
+                            // A submenu opens its own panel beside this row.
+                            dropdown_menu_sub(
+                                dropdown_menu_sub_trigger("Checkout tag")
+                                dropdown_menu_sub_content(
+                                    for tag in TAGS {
+                                        dropdown_menu_item(
+                                            attrs: attributes! { name="branch" value=(tag) },
+                                            (tag)
+                                        )
+                                    }
+                                )
+                            )
+                        )
+                    )
+                </form>
+            )
+        )
+    }
+}
+
+/// A toolbar of toggles: a segmented control where picking one lets go of the
+/// rest, and toggles that press on their own.
+#[component]
+async fn toolbar_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Report")
+                card_description("The range it covers, and how it reads.")
+            )
+            card_content(
+                <div class="flex flex-col items-start gap-4">
+                    toggle_group(
+                        for (value, text, picked) in [
+                            ("day", "Day", false),
+                            ("week", "Week", true),
+                            ("month", "Month", false),
+                        ] {
+                            toggle(
+                                kind: ToggleKind::Exclusive,
+                                size: ToggleSize::Sm,
+                                attrs: attributes! { name="range" value=(value) checked=(picked) },
+                                (text)
+                            )
+                        }
+                    )
+                    <div class="flex items-center gap-1">
+                        for (name, data, text, pressed) in [
+                            ("bold", iconify_icon!("feather:bold"), "Bold", true),
+                            ("italic", iconify_icon!("feather:italic"), "Italic", false),
+                            (
+                                "underline",
+                                iconify_icon!("feather:underline"),
+                                "Underline",
+                                false,
+                            ),
+                        ] {
+                            toggle(
+                                attrs: attributes! { name=(name) checked=(pressed) },
+                                icon(data: data, label: text)
+                            )
+                        }
                     </div>
-                    progress(value: 62.0)
+                    toggle(
+                        size: ToggleSize::Lg,
+                        attrs: attributes! { name="live" checked="" },
+                        icon(data: iconify_icon!("feather:activity"))
+                        "Live updates"
+                    )
                 </div>
             )
-            card_footer(
-                <p class="text-sm text-muted-foreground">"Rolled out with"</p>
-                // Anything can borrow a badge's looks: `badge_variants`
-                // returns the class string for a variant.
-                <a href="#changelog" class=(badge_variants(BadgeVariant::Outline))>
-                    "v2.0.4"
-                </a>
+        )
+    }
+}
+
+/// A share sheet, and the two things that show on hover: a tooltip carrying a
+/// few words, and a hover card carrying a view.
+#[component]
+async fn share_card() -> Result {
+    view! {
+        card(
+            card_header(
+                card_title("Share this document")
+                card_description("Anyone with the link can view it.")
+            )
+            card_content(
+                <div class="flex items-center gap-2">
+                    label(attrs: attributes! { for="share" class="sr-only" }, "Link")
+                    input(
+                        attrs: attributes! {
+                            id="share"
+                            readonly=""
+                            value="https://topcoat.dev/d/quickstart"
+                        }
+                    )
+                    tooltip(
+                        button(
+                            size: ButtonSize::Icon,
+                            variant: ButtonVariant::Outline,
+                            attrs: attributes! { type="button" },
+                            icon(
+                                data: iconify_icon!("feather:copy"),
+                                label: "Copy link"
+                            )
+                        )
+                        tooltip_content("Copy link")
+                    )
+                </div>
+                <div class="mt-4 flex items-center gap-2 text-sm">
+                    <p class="text-muted-foreground">"Shared with"</p>
+                    hover_card(
+                        <a href="#ada" class="font-medium underline">"@ada"</a>
+                        hover_card_content(
+                            <div class="flex items-center gap-3">
+                                avatar(
+                                    size: AvatarSize::Md,
+                                    avatar_image(attrs: attributes! { src=(PORTRAIT) })
+                                    avatar_fallback("AL")
+                                )
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-medium">"Ada Lovelace"</p>
+                                    <p class="truncate text-xs text-muted-foreground">
+                                        "Owner"
+                                    </p>
+                                </div>
+                            </div>
+                            <p class="text-xs text-muted-foreground">
+                                "Joined in 2024. Deploys on Fridays anyway."
+                            </p>
+                        )
+                    )
+                </div>
             )
         )
     }
@@ -952,337 +1284,6 @@ async fn deployments_card(state: &State) -> Result {
 /// time is what "Previous" and "Next" are already for.
 fn listed(number: usize, page: usize, pages: usize) -> bool {
     number == 1 || number == pages || number == page
-}
-
-/// Notification settings mixing checkboxes and switches through their states.
-#[component]
-async fn notifications_card() -> Result {
-    view! {
-        card(
-            card_header(
-                card_title("Notifications")
-                card_description("Pick what lands in your inbox.")
-            )
-            card_content(
-                <div class="flex flex-col gap-3">
-                    <div class="flex items-center gap-2">
-                        checkbox(attrs: attributes! { id="notify-deploys" checked="" })
-                        label(
-                            attrs: attributes! { for="notify-deploys" },
-                            "Deploy results"
-                        )
-                    </div>
-                    <div class="flex items-center gap-2">
-                        checkbox(attrs: attributes! { id="notify-mentions" })
-                        label(attrs: attributes! { for="notify-mentions" }, "Mentions")
-                    </div>
-                    <div class="flex items-center gap-2">
-                        checkbox(
-                            attrs: attributes! { id="notify-digest" checked="" disabled="" }
-                        )
-                        label(
-                            attrs: attributes! { for="notify-digest" class="opacity-50" },
-                            "Weekly digest (managed by your org)"
-                        )
-                    </div>
-                </div>
-                separator(attrs: attributes! { class="my-4" })
-                <div class="flex flex-col gap-3">
-                    <div class="flex items-center justify-between gap-4">
-                        label(
-                            attrs: attributes! { for="notify-push" },
-                            "Push notifications"
-                        )
-                        switch(attrs: attributes! { id="notify-push" checked="" })
-                    </div>
-                    <div class="flex items-center justify-between gap-4">
-                        label(attrs: attributes! { for="notify-quiet" }, "Quiet hours")
-                        switch(attrs: attributes! { id="notify-quiet" })
-                    </div>
-                    <div class="flex items-center justify-between gap-4">
-                        label(
-                            attrs: attributes! { for="notify-sms" class="opacity-50" },
-                            "Text messages (not on this plan)"
-                        )
-                        switch(attrs: attributes! { id="notify-sms" disabled="" })
-                    </div>
-                </div>
-            )
-        )
-    }
-}
-
-/// A branch switcher: a menu whose items reach the server, since a menu item
-/// is a button and a form around it is all it takes.
-#[component]
-async fn branches_card(state: &State) -> Result {
-    view! {
-        card(
-            card_header(
-                card_title("Branches")
-                card_description("Switch the branch this preview builds from.")
-            )
-            card_content(
-                // The form carries the rest of the page's state along, and the
-                // item that was clicked adds the branch it stands for; the
-                // page comes back built from that branch.
-                <form>
-                    state_fields(state: state, sets: "branch")
-                    dropdown_menu(
-                        // The trigger takes any content; this one borrows the
-                        // outline button's looks and adds a flipping chevron.
-                        dropdown_menu_trigger(
-                            attrs: attributes! {
-                                class=(button_variants(
-                                    ButtonVariant::Outline,
-                                    ButtonSize::Sm,
-                                ))
-                            },
-                            (state.branch)
-                            icon(
-                                data: iconify_icon!("feather:chevron-down"),
-                                attrs: attributes! { class="transition-transform group-open:rotate-180" }
-                            )
-                        )
-                        dropdown_menu_content(
-                            dropdown_menu_label("Switch branch")
-                            for branch in BRANCHES {
-                                dropdown_menu_item(
-                                    attrs: attributes! { name="branch" value=(branch) },
-                                    (branch)
-                                )
-                            }
-                            dropdown_menu_separator()
-                            // A submenu opens its own panel beside this row.
-                            dropdown_menu_sub(
-                                dropdown_menu_sub_trigger("Checkout tag")
-                                dropdown_menu_sub_content(
-                                    for tag in TAGS {
-                                        dropdown_menu_item(
-                                            attrs: attributes! { name="branch" value=(tag) },
-                                            (tag)
-                                        )
-                                    }
-                                )
-                            )
-                        )
-                    )
-                </form>
-            )
-        )
-    }
-}
-
-/// The plans a workspace can run on: the value each goes by, its name, its
-/// price, and whether it can be picked here.
-const PLANS: [(&str, &str, &str, bool); 4] = [
-    ("starter", "Starter", "Free", true),
-    ("pro", "Pro", "$24 / month", true),
-    ("scale", "Scale", "$96 / month", true),
-    ("enterprise", "Enterprise", "Contact sales", false),
-];
-
-/// A plan picker, built on a radio group.
-#[component]
-async fn plan_card() -> Result {
-    view! {
-        card(
-            card_header(
-                card_title("Billing plan")
-                card_description("Pick the plan this workspace runs on.")
-            )
-            card_content(
-                radio_group(
-                    // The name the options share is what has the browser let
-                    // go of one when another is picked.
-                    for (value, name, price, available) in PLANS {
-                        <div class="flex items-center gap-2">
-                            radio_group_item(
-                                attrs: attributes! {
-                                    id=(value)
-                                    name="plan"
-                                    value=(value)
-                                    checked=(value == "pro")
-                                    disabled=(!available)
-                                }
-                            )
-                            label(
-                                attrs: attributes! {
-                                    for=(value)
-                                    class=(class!("flex-1", "opacity-50" if !available))
-                                },
-                                (name)
-                            )
-                            <p class="text-sm text-muted-foreground">(price)</p>
-                        </div>
-                    }
-                )
-            )
-            card_footer(button(attrs: attributes! { class="w-full" }, "Upgrade"))
-        )
-    }
-}
-
-/// A FAQ whose answers fold away, one open at a time.
-#[component]
-async fn faq_card() -> Result {
-    view! {
-        card(
-            card_header(
-                card_title("Questions")
-                card_description("The rest is in the docs.")
-            )
-            card_content(
-                accordion(
-                    // The name the sections share is what closes the open one
-                    // when another is opened.
-                    for (question, answer, open) in [
-                        (
-                            "Where do the components live?",
-                            "In your own source tree, under the components \
-                             directory you picked.",
-                            true,
-                        ),
-                        (
-                            "Can I edit them?",
-                            "They are yours: restyle, rewrite, and extend them \
-                             like any other file.",
-                            false,
-                        ),
-                        (
-                            "How do updates work?",
-                            "`topcoat ui list` marks what the registry has \
-                             changed since you added it.",
-                            false,
-                        ),
-                    ] {
-                        accordion_item(
-                            attrs: attributes! { name="faq" open=(open) },
-                            accordion_trigger((question))
-                            accordion_content((answer))
-                        )
-                    }
-                )
-            )
-        )
-    }
-}
-
-/// A share sheet, and the two things that show on hover: a tooltip carrying a
-/// few words, and a hover card carrying a view.
-#[component]
-async fn share_card() -> Result {
-    view! {
-        card(
-            card_header(
-                card_title("Share this document")
-                card_description("Anyone with the link can view it.")
-            )
-            card_content(
-                <div class="flex items-center gap-2">
-                    label(attrs: attributes! { for="share" class="sr-only" }, "Link")
-                    input(
-                        attrs: attributes! {
-                            id="share"
-                            readonly=""
-                            value="https://topcoat.dev/d/quickstart"
-                        }
-                    )
-                    tooltip(
-                        button(
-                            size: ButtonSize::Icon,
-                            variant: ButtonVariant::Outline,
-                            attrs: attributes! { type="button" },
-                            icon(
-                                data: iconify_icon!("feather:copy"),
-                                label: "Copy link"
-                            )
-                        )
-                        tooltip_content("Copy link")
-                    )
-                </div>
-                <div class="mt-4 flex items-center gap-2 text-sm">
-                    <p class="text-muted-foreground">"Shared with"</p>
-                    hover_card(
-                        <a href="#ada" class="font-medium underline">"@ada"</a>
-                        hover_card_content(
-                            <div class="flex items-center gap-3">
-                                avatar(
-                                    size: AvatarSize::Md,
-                                    avatar_image(attrs: attributes! { src=(PORTRAIT) })
-                                    avatar_fallback("AL")
-                                )
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-medium">"Ada Lovelace"</p>
-                                    <p class="truncate text-xs text-muted-foreground">
-                                        "Owner"
-                                    </p>
-                                </div>
-                            </div>
-                            <p class="text-xs text-muted-foreground">
-                                "Joined in 2024. Deploys on Fridays anyway."
-                            </p>
-                        )
-                    )
-                </div>
-            )
-        )
-    }
-}
-
-/// A toolbar of toggles: a segmented control where picking one lets go of the
-/// rest, and toggles that press on their own.
-#[component]
-async fn toolbar_card() -> Result {
-    view! {
-        card(
-            card_header(
-                card_title("Report")
-                card_description("The range it covers, and how it reads.")
-            )
-            card_content(
-                <div class="flex flex-col items-start gap-4">
-                    toggle_group(
-                        for (value, text, picked) in [
-                            ("day", "Day", false),
-                            ("week", "Week", true),
-                            ("month", "Month", false),
-                        ] {
-                            toggle(
-                                kind: ToggleKind::Exclusive,
-                                size: ToggleSize::Sm,
-                                attrs: attributes! { name="range" value=(value) checked=(picked) },
-                                (text)
-                            )
-                        }
-                    )
-                    <div class="flex items-center gap-1">
-                        for (name, data, text, pressed) in [
-                            ("bold", iconify_icon!("feather:bold"), "Bold", true),
-                            ("italic", iconify_icon!("feather:italic"), "Italic", false),
-                            (
-                                "underline",
-                                iconify_icon!("feather:underline"),
-                                "Underline",
-                                false,
-                            ),
-                        ] {
-                            toggle(
-                                attrs: attributes! { name=(name) checked=(pressed) },
-                                icon(data: data, label: text)
-                            )
-                        }
-                    </div>
-                    toggle(
-                        size: ToggleSize::Lg,
-                        attrs: attributes! { name="live" checked="" },
-                        icon(data: iconify_icon!("feather:activity"))
-                        "Live updates"
-                    )
-                </div>
-            )
-        )
-    }
 }
 
 /// The keys that move through a form, and what each one does. They are the
