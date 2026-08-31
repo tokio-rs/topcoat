@@ -75,7 +75,8 @@ where
 
                 let live = poll.is_pending();
                 if !live {
-                    // The body is done, so nothing will replace this content and it needs no markers.
+                    // The body is done, so nothing will replace this content and it needs no
+                    // markers.
                     return Poll::Ready(Ok(ViewFirst {
                         content: first.content,
                         live,

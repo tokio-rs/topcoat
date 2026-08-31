@@ -9,7 +9,10 @@ use crate::{View, ViewBufferScope, ViewFirst, ViewSwap};
 
 pub struct LoopView<V> {
     bodies: Vec<Body<V>>,
-    last_swap_index: usize,
+    // Where the next swap scan starts. Advanced past each body that
+    // delivered a swap, so its siblings get a turn before it comes up
+    // again.
+    next_swap_index: usize,
 }
 
 struct Body<V> {
@@ -33,7 +36,7 @@ where
                     done: false,
                 })
                 .collect(),
-            last_swap_index: 0,
+            next_swap_index: 0,
         }
     }
 }
@@ -53,6 +56,7 @@ where
                 Poll::Pending => all_ready = false,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Ready(Ok(first)) => {
+                    body.done = !first.live;
                     body.ready = Some(first);
                 }
             }
@@ -79,25 +83,31 @@ where
     }
 
     fn poll_swap(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
-        for i in self.last_swap_index + 1..self.bodies.len() {
+        // One full turn around the ring, so every waiting body is polled
+        // before this view settles on pending.
+        let len = self.bodies.len();
+        let mut all_done = true;
+        for offset in 0..len {
+            let i = (self.next_swap_index + offset) % len;
             let body = &mut self.bodies[i];
             if body.done {
                 continue;
             }
             match Pin::new(&mut body.view).poll_swap(cx) {
-                Poll::Pending => {}
+                Poll::Pending => all_done = false,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Ready(Ok(None)) => body.done = true,
                 Poll::Ready(Ok(Some(swap))) => {
-                    self.last_swap_index = i;
+                    self.next_swap_index = (i + 1) % len;
                     return Poll::Ready(Ok(Some(swap)));
                 }
             }
         }
 
-        // TODO: not ideal, should loop around.
-
-        self.last_swap_index = 0;
-        Poll::Pending
+        if all_done {
+            Poll::Ready(Ok(None))
+        } else {
+            Poll::Pending
+        }
     }
 }

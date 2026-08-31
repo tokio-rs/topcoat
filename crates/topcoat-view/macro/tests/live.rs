@@ -165,6 +165,52 @@ async fn region_emitting_three_times_swaps_its_content_twice() {
 }
 
 #[tokio::test]
+async fn first_loop_iteration_delivers_its_swap() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! {
+        cx =>
+        <ul>
+            for label in ["only"] {
+                <li>(live! {
+                    emit! { <i>(label) "1"</i> }?;
+                    emit! { <i>(label) "2"</i> }
+                })</li>
+            }
+        </ul>
+    });
+
+    assert!(first(&mut view).await.unwrap().live);
+    let swap = next_swap(&mut view).await.unwrap().unwrap();
+    assert_eq!(swap.replacement.render(cx), "<i>only2</i>");
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn live_loop_iterations_take_turns_swapping() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! {
+        cx =>
+        <ul>
+            for label in ["a", "b"] {
+                <li>(live! {
+                    emit! { <i>(label) "1"</i> }?;
+                    emit! { <i>(label) "2"</i> }?;
+                    emit! { <i>(label) "3"</i> }
+                })</li>
+            }
+        </ul>
+    });
+
+    assert!(first(&mut view).await.unwrap().live);
+
+    let mut swaps = Vec::new();
+    while let Some(swap) = next_swap(&mut view).await.unwrap() {
+        swaps.push(swap.replacement.render(cx));
+    }
+    assert_eq!(swaps, ["<i>a2</i>", "<i>b2</i>", "<i>a3</i>", "<i>b3</i>"]);
+}
+
+#[tokio::test]
 #[should_panic(expected = "used `.single()` on a View that is live")]
 async fn single_panics_on_a_region_that_may_update() {
     let cx = &Cx::default();
