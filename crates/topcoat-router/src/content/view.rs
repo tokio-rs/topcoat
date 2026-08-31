@@ -48,6 +48,7 @@ async fn stream<V: View + Unpin + 'static>(mut view: V, cx: &Cx) -> Result<Respo
         let body = ViewBody {
             cx: cx.clone(),
             first: Some(rendered.html),
+            done: false,
             view,
         };
         html_response(cx, Body::new(body), rendered.status_code, rendered.headers)
@@ -81,6 +82,9 @@ pin_project! {
     struct ViewBody<V> {
         cx: Cx,
         first: Option<String>,
+        // Whether the view has reported it has no further swaps. Polling a
+        // view past that point resumes a future that already completed.
+        done: bool,
         #[pin]
         view: V,
     }
@@ -98,6 +102,9 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
         if let Some(first) = this.first.take() {
             return Poll::Ready(Some(Ok(Frame::data(first.into()))));
         }
+        if *this.done {
+            return Poll::Ready(None);
+        }
         match this.view.poll_swap(cx) {
             Poll::Ready(Ok(Some(swap))) => {
                 let region = swap.region;
@@ -108,9 +115,19 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
                 );
                 Poll::Ready(Some(Ok(Frame::data(envelope.into()))))
             }
-            Poll::Ready(Ok(None)) => Poll::Ready(None),
-            Poll::Ready(Err(error)) => Poll::Ready(Some(Err(error.into()))),
+            Poll::Ready(Ok(None)) => {
+                *this.done = true;
+                Poll::Ready(None)
+            }
+            Poll::Ready(Err(error)) => {
+                *this.done = true;
+                Poll::Ready(Some(Err(error.into())))
+            }
             Poll::Pending => Poll::Pending,
         }
+    }
+
+    fn is_end_stream(&self) -> bool {
+        self.first.is_none() && self.done
     }
 }

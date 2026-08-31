@@ -1,6 +1,7 @@
 use std::{
     cell::Cell,
     future::Ready,
+    mem,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -40,18 +41,21 @@ where
     fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         let this = self.project();
         let (poll, yielded) = {
-            let _guard = FirstGuard::new();
-            (this.body.poll(cx), FIRST_YIELD.take())
+            let _guard = YieldGuard::new();
+            (this.body.poll(cx), YIELD.take())
         };
 
         match (poll, yielded) {
-            (Poll::Pending, Some(value)) => Poll::Ready(Ok(value)),
-            (Poll::Pending, None) => Poll::Pending,
-            (Poll::Ready(_), Some(_)) => {
+            (Poll::Pending, Yield::First(first)) => Poll::Ready(Ok(first)),
+            (Poll::Pending, Yield::NotSet) => Poll::Pending,
+            (Poll::Pending, Yield::Swap(_)) => {
+                panic!("move view future yielded a swap before its first content")
+            }
+            (Poll::Ready(_), Yield::First(_) | Yield::Swap(_)) => {
                 panic!("move view future yielded without returning pending")
             }
-            (Poll::Ready(Err(e)), None) => Poll::Ready(Err(e)),
-            (Poll::Ready(Ok(())), None) => {
+            (Poll::Ready(Err(e)), Yield::NotSet) => Poll::Ready(Err(e)),
+            (Poll::Ready(Ok(())), Yield::NotSet) => {
                 panic!("move view future completed without yielding anything")
             }
         }
@@ -60,18 +64,21 @@ where
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
         let (poll, yielded) = {
-            let _guard = SwapGuard::new();
-            (this.body.poll(cx), SWAP_YIELD.take())
+            let _guard = YieldGuard::new();
+            (this.body.poll(cx), YIELD.take())
         };
 
         match (poll, yielded) {
-            (Poll::Pending, Some(value)) => Poll::Ready(Ok(Some(value))),
-            (Poll::Pending, None) => Poll::Pending,
-            (Poll::Ready(_), Some(_)) => {
+            (Poll::Pending, Yield::Swap(swap)) => Poll::Ready(Ok(Some(swap))),
+            (Poll::Pending, Yield::NotSet) => Poll::Pending,
+            (Poll::Pending, Yield::First(_)) => {
+                panic!("move view future yielded first content twice")
+            }
+            (Poll::Ready(_), Yield::First(_) | Yield::Swap(_)) => {
                 panic!("move view future yielded without returning pending")
             }
-            (Poll::Ready(Err(e)), None) => Poll::Ready(Err(e)),
-            (Poll::Ready(Ok(())), None) => Poll::Ready(Ok(None)),
+            (Poll::Ready(Err(e)), Yield::NotSet) => Poll::Ready(Err(e)),
+            (Poll::Ready(Ok(())), Yield::NotSet) => Poll::Ready(Ok(None)),
         }
     }
 }
@@ -96,7 +103,7 @@ where
             match this.view.poll_first(cx) {
                 Poll::Ready(Ok(first)) => {
                     *this.first = false;
-                    FIRST_YIELD.set(Some(first));
+                    YIELD.set(Yield::First(first));
                     Poll::Pending
                 }
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
@@ -104,10 +111,11 @@ where
             }
         } else {
             match this.view.poll_swap(cx) {
-                Poll::Ready(Ok(swap)) => {
-                    SWAP_YIELD.set(swap);
+                Poll::Ready(Ok(Some(swap))) => {
+                    YIELD.set(Yield::Swap(swap));
                     Poll::Pending
                 }
+                Poll::Ready(Ok(None)) => Poll::Ready(Ok(())),
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
                 Poll::Pending => Poll::Pending,
             }
@@ -116,45 +124,40 @@ where
 }
 
 thread_local! {
-    static FIRST_YIELD: Cell<Option<ViewFirst>> = const { Cell::new(None) };
+    /// What the view driven on this task handed back on its last poll.
+    ///
+    /// A driven view reports out of band because it is polled through a
+    /// future, which has no room for a value in its pending state. The slot
+    /// is read back by the poll that set it going, so it only ever holds a
+    /// value across a single poll.
+    static YIELD: Cell<Yield> = const { Cell::new(Yield::NotSet) };
 }
 
-struct FirstGuard {
-    prev: Option<ViewFirst>,
+/// The value a driven view handed back, if any.
+#[derive(Default)]
+enum Yield {
+    /// The view has not reported since the slot was last read.
+    #[default]
+    NotSet,
+    /// The view's first content.
+    First(ViewFirst),
+    /// An update to content the view already reported.
+    Swap(ViewSwap),
 }
 
-impl FirstGuard {
+/// Keeps the yield slot of an enclosing poll while a nested one runs.
+struct YieldGuard {
+    prev: Yield,
+}
+
+impl YieldGuard {
     fn new() -> Self {
-        Self {
-            prev: FIRST_YIELD.take(),
-        }
+        Self { prev: YIELD.take() }
     }
 }
 
-impl Drop for FirstGuard {
+impl Drop for YieldGuard {
     fn drop(&mut self) {
-        FIRST_YIELD.replace(self.prev.take());
-    }
-}
-
-thread_local! {
-    static SWAP_YIELD: Cell<Option<ViewSwap>> = const { Cell::new(None) };
-}
-
-struct SwapGuard {
-    prev: Option<ViewSwap>,
-}
-
-impl SwapGuard {
-    fn new() -> Self {
-        Self {
-            prev: SWAP_YIELD.take(),
-        }
-    }
-}
-
-impl Drop for SwapGuard {
-    fn drop(&mut self) {
-        SWAP_YIELD.replace(self.prev.take());
+        YIELD.set(mem::take(&mut self.prev));
     }
 }
