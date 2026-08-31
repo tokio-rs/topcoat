@@ -65,10 +65,10 @@ impl ToTokens for Component {
         item.attrs = vec![parse_quote!(#[allow(clippy::unused_async)])];
         // The implicit `__cx` context parameter carries what `view!` bodies
         // read: the request context.
-        item.sig.generics.params.insert(0, parse_quote! { '__cx });
+        item.sig.generics.params.insert(0, parse_quote! { '__a });
         item.sig
             .inputs
-            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
+            .insert(0, parse_quote! { __cx: &'__a #topcoat_context::Cx });
         // The `#[default]` and `#[into]` helper attributes are only meaningful to
         // the `Props` derive, which sees them on the generated struct's fields.
         // They are not valid on the re-emitted function's parameters, so strip
@@ -79,16 +79,16 @@ impl ToTokens for Component {
             }
         }
 
-        // A returned view that borrows lives no longer than the context the
-        // trait method hands out. The method spells the return type out in an
-        // associated type position, where elision does not apply, so name the
-        // context lifetime there and tie the parameters it borrows from to it.
-        let mut context_lifetime_visitor = ContextLifetimeVisitor { used: false };
-        context_lifetime_visitor.visit_return_type_mut(&mut item.sig.output);
-        if context_lifetime_visitor.used {
-            for input in &mut item.sig.inputs {
-                context_lifetime_visitor.visit_fn_arg_mut(input);
-            }
+        // A component's borrows all live for the request: the context and
+        // every reference parameter arrive together, and the returned view
+        // may borrow from any of them. Renaming every elided lifetime to the
+        // one `'__a` says exactly that, gives the return type a name to use
+        // where the trait method spells it out and elision does not apply,
+        // and leaves an erased view (`BoxView`) a single lifetime to infer.
+        let mut signature_lifetimes = LifetimeVisitor::default();
+        signature_lifetimes.visit_return_type_mut(&mut item.sig.output);
+        for input in &mut item.sig.inputs {
+            signature_lifetimes.visit_fn_arg_mut(input);
         }
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("validated in Parse");
@@ -96,7 +96,7 @@ impl ToTokens for Component {
 
         let mut fields = Vec::new();
         let mut args = Vec::new();
-        let mut implicit_lifetime_visitor = ImplicitLifetimeVisitor { used: false };
+        let mut field_lifetimes = LifetimeVisitor::default();
         let mut impl_traits_visitor = ImplTraitParamVisitor {
             prefix: String::new(),
             count: 0,
@@ -114,7 +114,7 @@ impl ToTokens for Component {
                 args.push(quote! { cx });
             } else {
                 let mut ty = (*pat_type.ty).clone();
-                implicit_lifetime_visitor.visit_type_mut(&mut ty);
+                field_lifetimes.visit_type_mut(&mut ty);
                 impl_traits_visitor.prefix = pi.ident.unraw().to_string().to_pascal_case();
                 impl_traits_visitor.count = 0;
                 impl_traits_visitor.visit_type_mut(&mut ty);
@@ -126,8 +126,8 @@ impl ToTokens for Component {
             }
         }
 
-        if implicit_lifetime_visitor.used {
-            generics.params.insert(0, parse_quote! { '__implicit });
+        if field_lifetimes.used {
+            generics.params.insert(0, parse_quote! { '__a });
         }
         generics.params.extend(
             impl_traits_visitor
@@ -206,15 +206,15 @@ impl ToTokens for Component {
         .to_tokens(tokens);
 
         let render = quote! {
-            fn render<'__cx, '__props>(
+            fn render<'__a, '__props>(
                 self,
-                cx: &'__cx #topcoat_context::Cx,
+                cx: &'__a #topcoat_context::Cx,
                 props: Self::Props<'__props>,
-            ) -> impl Future<Output = #return_ty> + ::core::marker::Send + '__cx
+            ) -> impl Future<Output = #return_ty> + ::core::marker::Send + '__a
             where
-                '__props: '__cx,
-                Self: '__cx,
-                Self::Props<'__props>: '__cx,
+                '__props: '__a,
+                Self: '__a,
+                Self::Props<'__props>: '__a,
             {
                 #item
                 #ident(cx, #(#args),*)
@@ -278,44 +278,29 @@ impl VisitMut for ImplTraitParamVisitor {
     }
 }
 
-/// Names the context lifetime where an elided one appears, for a type spelled
-/// outside a signature that could elide it.
-struct ContextLifetimeVisitor {
+/// Renames every elided lifetime to `'__a`.
+///
+/// A component has one lifetime: everything it borrows lives for the
+/// request. The single name spells that out in positions where elision
+/// does not apply, like the props struct's fields and the return type
+/// respelled in the `render` signature.
+#[derive(Default)]
+struct LifetimeVisitor {
+    /// Whether any elided lifetime was renamed.
     used: bool,
 }
 
-impl VisitMut for ContextLifetimeVisitor {
+impl VisitMut for LifetimeVisitor {
     fn visit_lifetime_mut(&mut self, lt: &mut Lifetime) {
         if lt.ident == "_" {
-            *lt = parse_quote! { '__cx };
+            *lt = parse_quote! { '__a };
             self.used = true;
         }
     }
 
     fn visit_type_reference_mut(&mut self, tr: &mut TypeReference) {
         if tr.lifetime.is_none() {
-            tr.lifetime = Some(parse_quote! { '__cx });
-            self.used = true;
-        }
-        visit_mut::visit_type_reference_mut(self, tr);
-    }
-}
-
-struct ImplicitLifetimeVisitor {
-    used: bool,
-}
-
-impl VisitMut for ImplicitLifetimeVisitor {
-    fn visit_lifetime_mut(&mut self, lt: &mut Lifetime) {
-        if lt.ident == "_" {
-            *lt = parse_quote! { '__implicit };
-            self.used = true;
-        }
-    }
-
-    fn visit_type_reference_mut(&mut self, tr: &mut TypeReference) {
-        if tr.lifetime.is_none() {
-            tr.lifetime = Some(parse_quote! { '__implicit });
+            tr.lifetime = Some(parse_quote! { '__a });
             self.used = true;
         }
         visit_mut::visit_type_reference_mut(self, tr);

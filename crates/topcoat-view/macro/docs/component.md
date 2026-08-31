@@ -168,42 +168,8 @@ async fn countdown(n: u32) -> Result<impl View> {
 
 The other components in a cycle keep returning `impl View` as they are; one erased type is enough for all of them.
 
-A boxed view borrows for as long as what it renders from, which an `impl View` return type cannot express when the component takes a reference. Return a [`BoxView`] with an elided lifetime instead:
-
-```rust
-use topcoat::{
-    Result,
-    view::{BoxView, ViewExt, component, view},
-};
-
-struct Comment {
-    body: String,
-    replies: Vec<Comment>,
-}
-
-#[component]
-async fn comment_thread(comment: &Comment) -> Result<BoxView<'_>> {
-    Ok(view! {
-        <li>
-            (&comment.body)
-            if !comment.replies.is_empty() {
-                <ul>
-                    for reply in &comment.replies {
-                        comment_thread(comment: reply)
-                    }
-                </ul>
-            }
-        </li>
-    }
-    .boxed())
-}
-```
-
-A loop body is boxed for the view that drives its iterations, so a component whose only recursion runs through a `for` body needs no boxing of its own.
-
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html
-[`BoxView`]: type.BoxView.html
 [`Child`]: struct.Child.html
 [`View`]: trait.View.html
 [`component`]: attr.component.html

@@ -280,6 +280,49 @@ async fn a_boxed_view_lets_a_component_render_itself_recursively() {
     );
 }
 
+// The elided lifetimes of a component's signature all name one lifetime,
+// so a borrowing component erases its view behind `impl View`: the boxed
+// view's lifetime resolves to that one lifetime without the return type
+// spelling out `BoxView`.
+#[component]
+async fn erased_tree(node: &TreeNode) -> Result<impl View> {
+    Ok(view! {
+        <li>
+            (node.label)
+            if !node.children.is_empty() {
+                <ul>
+                    for child in &node.children {
+                        erased_tree(node: child)
+                    }
+                </ul>
+            }
+        </li>
+    }
+    .boxed())
+}
+
+#[tokio::test]
+async fn boxing_behind_impl_view_lets_a_borrowing_component_recurse() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let root = TreeNode {
+        label: "root",
+        children: vec![TreeNode {
+            label: "a",
+            children: vec![TreeNode {
+                label: "a1",
+                children: vec![],
+            }],
+        }],
+    };
+    let result = view! { <ul>erased_tree(node: &root)</ul> };
+
+    assert_eq!(
+        result.single().await.unwrap().render(__cx),
+        "<ul><li>root<ul><li>a<ul><li>a1</li></ul></li></ul></li></ul>",
+    );
+}
+
 // A cycle only needs one erased view type: `odd_steps` returns `impl View`
 // because `even_steps` boxes its own view, which breaks the cycle for both.
 // Borrowing nothing, `even_steps` keeps `impl View` and boxes behind it.
