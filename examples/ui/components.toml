@@ -97,7 +97,7 @@ hash = "sha256:b43fd188519fd83a1161ac995422244d95169ed870c9677974ffd53f84c79b77"
 file = "src/components/skeleton.rs"
 
 [registries.topcoat.components.spinner]
-hash = "sha256:25bf884f5a5fc1c36c77f1c77fcb0399ce5fe3abf94539e1d961b5121863ebdf"
+hash = "sha256:1e373e4dc4a1bd79164a64b5624d304f4c386c2d70d3ae2949b6746618a67884"
 file = "src/components/spinner.rs"
 
 [registries.topcoat.components.switch]
