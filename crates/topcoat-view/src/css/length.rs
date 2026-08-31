@@ -544,7 +544,7 @@ impl AttributeValueViewParts for Length {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{buffer::ViewBuffer, internal::Builder};
+    use crate::internal::Builder;
 
     /// Every unit constructor paired with its rendered form. The numeric value
     /// is the same across cases so each assertion focuses on the unit suffix.
@@ -602,7 +602,7 @@ mod tests {
 
     fn render(value: impl AttributeValueViewParts) -> String {
         let cx = Cx::default();
-        ViewBuffer::build(|parts| Builder::new(&cx, parts).attribute_value(value)).render(&cx)
+        Builder::build(&cx, |b| b.attribute_value(value)).render(&cx)
     }
 
     #[test]

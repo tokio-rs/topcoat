@@ -18,16 +18,16 @@ The root path is `/`. Non-root paths must start with `/` and may not contain emp
 A page is an async function annotated with [`#[page]`](page) and a path, returning a rendered view:
 
 ```rust
-use topcoat::{Result, router::page, view::view};
+use topcoat::{Result, router::page, view::{View, view}};
 
 #[page("/")]
-async fn home() -> Result {
-    view! { <h1>"Home"</h1> }
+async fn home() -> Result<impl View> {
+    Ok(view! { <h1>"Home"</h1> })
 }
 
 #[page("/users/{id}")]
-async fn user_profile() -> Result {
-    view! { <h1>"User profile"</h1> }
+async fn user_profile() -> Result<impl View> {
+    Ok(view! { <h1>"User profile"</h1> })
 }
 ```
 
@@ -37,18 +37,18 @@ See [`#[page]`](page) for the handler signature, module-derived paths, and using
 
 # Layouts
 
-A layout wraps pages. It receives the rendered inner page (or nested layout) as a `Result<View>`, to embed in its own view. Annotate it with [`#[layout]`](layout):
+A layout wraps pages. It receives the inner page (or nested layout) as a [`Slot`], to embed in its own view. Annotate it with [`#[layout]`](layout):
 
 ```rust
 use topcoat::{
     Result,
-    router::layout,
-    view::view,
+    router::{Slot, layout},
+    view::{View, view},
 };
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    view! {
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <body>
@@ -56,10 +56,10 @@ async fn root_layout(slot: Result) -> Result {
                     <a href="/">"Home"</a>
                     <a href="/about">"About"</a>
                 </nav>
-                (slot?)
+                (slot)
             </body>
         </html>
-    }
+    })
 }
 ```
 
@@ -143,15 +143,15 @@ use topcoat::{
     Result,
     context::Cx,
     router::{page, path_param},
-    view::view,
+    view::{View, view},
 };
 
 path_param!(post_id: u64, error = bad_request);
 
 #[page("/posts/{post_id}")]
-async fn post(cx: &Cx) -> Result {
+async fn post(cx: &Cx) -> Result<impl View> {
     let post_id = path_param::<PostId>(cx)?;
-    view! { <h1>"Post " (post_id)</h1> }
+    Ok(view! { <h1>"Post " (post_id)</h1> })
 }
 ```
 
@@ -170,7 +170,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{page, query_params},
-    view::view,
+    view::{View, view},
 };
 
 #[query_params(error = bad_request)]
@@ -180,12 +180,12 @@ struct PostsQuery {
 }
 
 #[page("/posts")]
-async fn posts(cx: &Cx) -> Result {
+async fn posts(cx: &Cx) -> Result<impl View> {
     let query = query_params::<PostsQuery>(cx)?;
-    view! {
+    Ok(view! {
         <p>"page: " (query.page.unwrap_or(1))</p>
         <p>"search: " (query.q.as_deref().unwrap_or(""))</p>
-    }
+    })
 }
 ```
 
@@ -198,13 +198,13 @@ Every page, layout, layer, and route handler returns a [`Result`](crate::Result)
 The [`error`](mod@error) module has a constructor for each response, like [`not_found()`](error::not_found) or [`redirect(uri)`](error::redirect), and the [`RouterErrorExt`](error::RouterErrorExt) methods that turn an `Option` or `Result` into one:
 
 ```rust
-# use topcoat::{Result, context::Cx, router::{error::RouterErrorExt, page}, view::view};
+# use topcoat::{Result, context::Cx, router::{error::RouterErrorExt, page}, view::{View, view}};
 # struct User;
 # async fn current_session(_cx: &Cx) -> Option<User> { None }
 #[page("/dashboard")]
-async fn dashboard(cx: &Cx) -> Result {
+async fn dashboard(cx: &Cx) -> Result<impl View> {
     let _user = current_session(cx).await.ok_or_unauthorized()?;
-    view! { <h1>"Dashboard"</h1> }
+    Ok(view! { <h1>"Dashboard"</h1> })
 }
 ```
 
@@ -219,36 +219,38 @@ use topcoat::{
     Result,
     context::Cx,
     router::{
-        StatusCode,
+        Slot, StatusCode,
         error::{NotFoundError, RouterErrorExt},
         layout, page,
     },
-    view::view,
+    view::{View, emit, live, view},
 };
 
 # struct Post { title: String }
 # async fn find_post(_cx: &Cx) -> Option<Post> { None }
 #[page("/posts/{id}")]
-async fn post(cx: &Cx) -> Result {
+async fn post(cx: &Cx) -> Result<impl View> {
     let post = find_post(cx).await.ok_or_not_found()?;
-    view! { <h1>(post.title)</h1> }
+    Ok(view! { <h1>(post.title)</h1> })
 }
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    let content = match slot {
-        Err(error) if error.downcast_ref::<NotFoundError>().is_some() => view! {
-            (StatusCode::NOT_FOUND)
-            <h1>"Page not found"</h1>
-        },
-        content => content,
-    }?;
-
-    view! {
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <html>
-            <body>(content)</body>
+            <body>
+                (live! {
+                    match emit! { (slot) } {
+                        Err(error) if error.downcast_ref::<NotFoundError>().is_some() => emit! {
+                            (StatusCode::NOT_FOUND)
+                            <h1>"Page not found"</h1>
+                        },
+                        slot => slot,
+                    }
+                })
+            </body>
         </html>
-    }
+    })
 }
 ```
 
@@ -263,13 +265,13 @@ The router applies an [`OriginPolicy`] to every request before any layer or hand
 Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
 
 ```rust
-# use topcoat::{Result, context::Cx, router::{Body, Next, layer, layout, page, response::Response, route}, view::view};
-# #[layout("/")] async fn root_layout(slot: Result) -> Result { view! { (slot?) } }
-# #[layout("/settings")] async fn settings_layout(slot: Result) -> Result { view! { (slot?) } }
+# use topcoat::{Result, context::Cx, router::{Body, Next, Slot, layer, layout, page, response::Response, route}, view::{View, view}};
+# #[layout("/")] async fn root_layout(slot: Slot<'_>) -> Result<impl View> { Ok(view! { (slot) }) }
+# #[layout("/settings")] async fn settings_layout(slot: Slot<'_>) -> Result<impl View> { Ok(view! { (slot) }) }
 # #[layer("/")] async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
-# #[page("/")] async fn home() -> Result { view! { <h1>"Home"</h1> } }
-# #[page("/about")] async fn about() -> Result { view! { <h1>"About"</h1> } }
-# #[page("/settings/profile")] async fn profile() -> Result { view! { <h1>"Profile"</h1> } }
+# #[page("/")] async fn home() -> Result<impl View> { Ok(view! { <h1>"Home"</h1> }) }
+# #[page("/about")] async fn about() -> Result<impl View> { Ok(view! { <h1>"About"</h1> }) }
+# #[page("/settings/profile")] async fn profile() -> Result<impl View> { Ok(view! { <h1>"Profile"</h1> }) }
 # #[route(GET "/api/health")] async fn health() -> Result<&'static str> { Ok("ok") }
 use topcoat::router::Router;
 
@@ -348,8 +350,10 @@ With the `tower` feature enabled, the [`tower`](mod@tower) module bridges the to
 use topcoat::{
     Result,
     context::Cx,
-    router::{Body, Next, Router, content::Json, layer, layout, page, response::Response, route},
-    view::view,
+    router::{
+        Body, Next, Router, Slot, content::Json, layer, layout, page, response::Response, route,
+    },
+    view::{View, view},
 };
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -358,8 +362,8 @@ struct NewUser {
 }
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    view! {
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <body>
@@ -367,10 +371,10 @@ async fn root_layout(slot: Result) -> Result {
                     <a href="/">"Home"</a>
                     <a href="/users">"Users"</a>
                 </nav>
-                (slot?)
+                (slot)
             </body>
         </html>
-    }
+    })
 }
 
 #[layer("/api")]
@@ -381,18 +385,18 @@ async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! { <h1>"Welcome"</h1> }
+async fn home() -> Result<impl View> {
+    Ok(view! { <h1>"Welcome"</h1> })
 }
 
 #[page("/users")]
-async fn users_list() -> Result {
-    view! { <h1>"All users"</h1> }
+async fn users_list() -> Result<impl View> {
+    Ok(view! { <h1>"All users"</h1> })
 }
 
 #[page("/users/{id}")]
-async fn user_profile() -> Result {
-    view! { <h1>"User profile"</h1> }
+async fn user_profile() -> Result<impl View> {
+    Ok(view! { <h1>"User profile"</h1> })
 }
 
 #[route(GET "/api/health")]

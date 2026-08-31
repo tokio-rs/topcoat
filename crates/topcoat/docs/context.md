@@ -64,7 +64,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{page, path_param, query_params},
-    view::view,
+    view::{View, view},
 };
 
 path_param!(post_id: uuid::Uuid, error = bad_request);
@@ -75,15 +75,15 @@ struct PostQuery {
 }
 
 #[page("/posts/{post_id}")]
-async fn post(cx: &Cx) -> Result {
+async fn post(cx: &Cx) -> Result<impl View> {
     let post_id = path_param::<PostId>(cx)?;
     let query = query_params::<PostQuery>(cx)?;
 
-    view! {
+    Ok(view! {
         <article data-preview=(query.preview.unwrap_or(false))>
             "post id: " (post_id.to_string())
         </article>
-    }
+    })
 }
 ```
 

@@ -17,46 +17,46 @@ The function is `async` and returns [`Result`](../type.Result.html). It may take
 Explicit path:
 
 ```rust
-# use topcoat::{Result, router::page, view::view};
+# use topcoat::{Result, router::page, view::{View, view}};
 #[page("/users/{id}")]
-async fn user_profile() -> Result {
-    view! { <h1>"User profile"</h1> }
+async fn user_profile() -> Result<impl View> {
+    Ok(view! { <h1>"User profile"</h1> })
 }
 ```
 
 Module-derived path (in `src/app/about.rs` under `module_router!()`, this serves `/about`):
 
 ```rust
-# use topcoat::{Result, router::page, view::view};
+# use topcoat::{Result, router::page, view::{View, view}};
 #[page]
-async fn about() -> Result {
-    view! { <h1>"About"</h1> }
+async fn about() -> Result<impl View> {
+    Ok(view! { <h1>"About"</h1> })
 }
 ```
 
 Declaring a method (a form submission answered with a rendered view):
 
 ```rust
-# use topcoat::{Result, router::{content::Form, page}, view::view};
+# use topcoat::{Result, router::{content::Form, page}, view::{View, view}};
 # use serde::Deserialize;
 # #[derive(Deserialize)]
 # struct Signup { email: String }
 #[page(POST "/signup")]
-async fn signup(Form(input): Form<Signup>) -> Result {
-    view! { <h1>"Welcome, " (input.email)</h1> }
+async fn signup(Form(input): Form<Signup>) -> Result<impl View> {
+    Ok(view! { <h1>"Welcome, " (input.email)</h1> })
 }
 ```
 
 Reading a request body:
 
 ```rust
-# use topcoat::{Result, router::{content::Form, page}, view::view};
+# use topcoat::{Result, router::{content::Form, page}, view::{View, view}};
 # use serde::Deserialize;
 # #[derive(Deserialize)]
 # struct Search { q: String }
 #[page("/contact")]
-async fn contact(Form(input): Form<Search>) -> Result {
-    view! { <main>"searching for " (input.q)</main> }
+async fn contact(Form(input): Form<Search>) -> Result<impl View> {
+    Ok(view! { <main>"searching for " (input.q)</main> })
 }
 ```
 
@@ -65,21 +65,21 @@ async fn contact(Form(input): Form<Search>) -> Result {
 A page doubles as a [component](../view/attr.component.html): calling it inside [`view!`](../view/macro.view.html) renders it inline. A page that reads a request body takes the already-parsed value as a `body` prop instead of parsing the request.
 
 ```rust
-# use topcoat::{Result, router::{content::Form, page}, view::view};
+# use topcoat::{Result, router::{content::Form, page}, view::{View, view}};
 # use serde::Deserialize;
 # #[derive(Deserialize)]
 # struct Search { q: String }
 # #[page("/contact")]
-# async fn contact(Form(input): Form<Search>) -> Result {
-#     view! { <main>"searching for " (input.q)</main> }
+# async fn contact(Form(input): Form<Search>) -> Result<impl View> {
+#     Ok(view! { <main>"searching for " (input.q)</main> })
 # }
 #[page("/preview")]
-async fn preview() -> Result {
+async fn preview() -> Result<impl View> {
     let query = Search {
         q: String::from("topcoat"),
     };
-    view! {
+    Ok(view! {
         contact(body: Form(query))
-    }
+    })
 }
 ```

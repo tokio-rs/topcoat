@@ -135,13 +135,16 @@ mod tests {
     #[test]
     fn explicit_cx_binds_the_context_identifier() {
         let tokens = parse("cx => <div></div>").to_token_stream().to_string();
-        assert!(tokens.contains("let __cx"), "{tokens}");
+        assert!(tokens.contains("let __cx : "), "{tokens}");
+        assert!(tokens.contains("Cx = (cx) . clone () ;"), "{tokens}");
     }
 
     #[test]
     fn omitted_cx_emits_no_binding() {
         let tokens = parse("<div></div>").to_token_stream().to_string();
-        assert!(!tokens.contains("let __cx"), "{tokens}");
+        // The view borrows whatever context is already in scope instead of
+        // cloning one of its own.
+        assert!(!tokens.contains("clone ()"), "{tokens}");
     }
 
     #[test]
@@ -155,13 +158,6 @@ mod tests {
     fn omitted_cx_takes_part_in_the_enclosing_build() {
         let tokens = parse("<div></div>").to_token_stream().to_string();
         assert!(tokens.contains("ScopeView :: new ("), "{tokens}");
-        assert!(tokens.contains("drive (__view)"), "{tokens}");
-    }
-
-    #[test]
-    fn a_self_contained_expansion_keeps_the_ambient_cx() {
-        let tokens = parse("<div></div>").expand(true).to_string();
-        assert!(!tokens.contains("let __cx"), "{tokens}");
-        assert!(tokens.contains("ScopeView :: self_contained ("), "{tokens}");
+        assert!(tokens.contains("MoveView :: drive ("), "{tokens}");
     }
 }

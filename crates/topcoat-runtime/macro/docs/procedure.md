@@ -18,8 +18,8 @@ Inside a runtime expression, call a procedure like an ordinary async function an
 # #[procedure]
 # async fn double(value: f64) -> Result<f64> { Ok(value * 2.0) }
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal count = 1.0;
 
     <button
@@ -32,7 +32,7 @@ view! {
     </button>
 
     $(count.get())
-}
+})
 # }
 ```
 

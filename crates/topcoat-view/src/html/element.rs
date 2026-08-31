@@ -8,13 +8,13 @@ use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped};
 /// element in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
-/// # use topcoat::view::{component, view};
+/// # use topcoat::view::{View, component, view};
 /// # #[component]
-/// # async fn example() -> topcoat::Result {
+/// # async fn example() -> topcoat::Result<impl View> {
 /// # let tag_name = "div";
-/// view! {
+/// Ok(view! {
 ///     <(tag_name)></(tag_name)>
-/// }
+/// })
 /// # }
 /// ```
 pub trait ElementNameViewParts {

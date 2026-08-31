@@ -9,15 +9,15 @@ Interactive pages need the runtime's browser script. `script()` renders the scri
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn document() -> Result {
-view! {
+# async fn document() -> Result<impl View> {
+Ok(view! {
     <html>
         <head>
             topcoat::runtime::script()
         </head>
         <body></body>
     </html>
-}
+})
 # }
 ```
 
@@ -46,10 +46,10 @@ A `$(...)` block is a **runtime expression** and can stand wherever a view node 
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     <p>"The answer: " $(1.0 + 2.0)</p>
-}
+})
 # }
 ```
 
@@ -66,12 +66,12 @@ A **signal** is a piece of state that lives in the browser. Declare one with a `
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal count = 0.0;
 
     <p>"Count: " $(count.get())</p>
-}
+})
 # }
 ```
 
@@ -86,13 +86,13 @@ An attribute starting with `@` attaches an event handler: `@click`, `@input`, or
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal count = 0.0;
 
     <button @click=$(|_e| count.set(count.get() + 1.0))>"+1"</button>
     <p>"Count: " $(count.get())</p>
-}
+})
 # }
 ```
 
@@ -103,12 +103,12 @@ The closure receives an [`Event`] mirroring the DOM event: fields like `e.target
 ```rust
 # use topcoat::{Result, view::*, runtime::Event};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal query = String::new();
 
     <input @input=$(|e: Event| query.set(e.target.value))>
-}
+})
 # }
 ```
 
@@ -123,13 +123,13 @@ An attribute starting with `:` is a **bind attribute**: its value is a runtime e
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal open = false;
 
     <button @click=$(|_e| open.set(!open.get()))>"What is Topcoat?"</button>
     <p :hidden=$(!open.get())>"A fullstack Rust framework."</p>
-}
+})
 # }
 ```
 
@@ -138,8 +138,8 @@ Combining a bind attribute with an event handler syncs an element and a signal i
 ```rust
 # use topcoat::{Result, view::*, runtime::Event};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal name = String::new();
 
     <input
@@ -148,7 +148,7 @@ view! {
     >
 
     <p>"Hello, " $(name.get()) "!"</p>
-}
+})
 # }
 ```
 
@@ -164,8 +164,8 @@ async fn double(value: f64) -> Result<f64> {
 }
 
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal count = 1.0;
 
     <button @click=$(async |_e| {
@@ -174,7 +174,7 @@ view! {
     })>
         "double it"
     </button>
-}
+})
 # }
 ```
 
@@ -188,24 +188,24 @@ When it is the markup itself that needs the server -- fresh search results as th
 # use topcoat::{Result, context::Cx, view::*, runtime::{shard, Event}};
 # async fn search_products(_cx: &Cx, _query: &str) -> Result<Vec<String>> { Ok(vec![]) }
 #[shard]
-async fn search_results(cx: &Cx, query: String) -> Result {
+async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
     let products = search_products(cx, &query).await?;
-    view! {
+    Ok(view! {
         for product in products {
             <div>(product)</div>
         }
-    }
+    })
 }
 
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal query = String::new();
 
     <input @input=$(|e: Event| query.set(e.target.value))>
 
     search_results(query: $(query.get()))
-}
+})
 # }
 ```
 

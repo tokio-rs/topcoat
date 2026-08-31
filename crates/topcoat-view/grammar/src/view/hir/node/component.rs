@@ -126,7 +126,7 @@ impl Component {
             quote! { .#ident(#value) }
         });
         let child = children.as_ref().map(|scope| {
-            let child = scope.emit_view(false);
+            let child = scope.emit_inert();
             quote! { .child(#topcoat_view::Child::new(#child)) }
         });
 

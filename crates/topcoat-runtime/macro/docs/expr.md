@@ -5,12 +5,12 @@ Because every expression must behave identically in both languages, only a limit
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal show = false;
 
     $(if show.get() { "shown" } else { "hidden" })
-}
+})
 # }
 ```
 
@@ -25,12 +25,12 @@ An identifier that is not defined inside the expression is captured from the sur
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example(step: f64) -> Result {
-view! {
+# async fn example(step: f64) -> Result<impl View> {
+Ok(view! {
     signal count = 0.0;
 
     $(count.get() + step)
-}
+})
 # }
 ```
 
@@ -71,15 +71,15 @@ The `raw!` macro escapes to hand-written JavaScript for the parts of an expressi
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal name = String::new();
 
     $({
         let n = name.get();
         raw!("${n}.toUpperCase()", n.to_uppercase())
     })
-}
+})
 # }
 ```
 

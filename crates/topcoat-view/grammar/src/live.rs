@@ -93,3 +93,55 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Emit {
         self.view.pretty_print(printer);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use quote::ToTokens;
+
+    use super::*;
+
+    fn emit(source: &str) -> String {
+        syn::parse_str::<Emit>(source)
+            .unwrap()
+            .to_token_stream()
+            .to_string()
+    }
+
+    #[test]
+    fn an_emitted_view_is_driven_into_the_live_view() {
+        let tokens = emit("<div></div>");
+        assert!(tokens.starts_with(":: topcoat_view :: internal :: LiveView :: drive ("));
+        assert!(tokens.ends_with(". await"), "{tokens}");
+    }
+
+    #[test]
+    fn an_emitted_view_is_self_contained() {
+        let tokens = emit("<div></div>");
+        assert!(tokens.contains("ScopeView :: self_contained ("), "{tokens}");
+    }
+
+    #[test]
+    fn an_emitted_view_keeps_the_ambient_cx() {
+        let tokens = emit("<div></div>");
+        assert!(!tokens.contains("let __cx"), "{tokens}");
+    }
+
+    #[test]
+    fn an_explicit_cx_binds_the_context_identifier() {
+        let tokens = emit("cx => <div></div>");
+        assert!(tokens.contains("let __cx"), "{tokens}");
+    }
+
+    #[test]
+    fn a_live_body_is_wrapped_in_an_async_block() {
+        let tokens = syn::parse_str::<Live>("let x = 1; emit! { <div></div> }")
+            .unwrap()
+            .to_token_stream()
+            .to_string();
+        assert!(
+            tokens.starts_with(":: topcoat_view :: internal :: LiveView :: new (async move {"),
+            "{tokens}"
+        );
+        assert!(tokens.contains("let x = 1 ;"), "{tokens}");
+    }
+}

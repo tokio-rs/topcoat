@@ -90,17 +90,17 @@ use topcoat::{
     Result,
     context::Cx,
     router::{error::RouterErrorExt, page},
-    view::view,
+    view::{View, view},
 };
 # #[derive(Clone)] struct User { name: String }
 # async fn current_user(_cx: &Cx) -> Result<Option<User>> { Ok(None) }
 
 #[page("/account")]
-async fn account(cx: &Cx) -> Result {
+async fn account(cx: &Cx) -> Result<impl View> {
     let user = current_user(cx).await?.ok_or_redirect("/login")?;
-    view! {
+    Ok(view! {
         <h1>"Account of " (&user.name)</h1>
-    }
+    })
 }
 ```
 

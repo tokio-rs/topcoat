@@ -177,54 +177,67 @@ mod tests {
 
     #[test]
     fn accepts_a_slot_parameter() {
-        syn::parse_str::<LayoutItem>("async fn shell(slot: Result) -> Result { todo!() }").unwrap();
+        syn::parse_str::<LayoutItem>(
+            "async fn shell(slot: Slot<'_>) -> Result<impl View> { todo!() }",
+        )
+        .unwrap();
     }
 
     #[test]
     fn accepts_cx_and_slot_in_any_order() {
-        syn::parse_str::<LayoutItem>("async fn shell(cx: &Cx, slot: Result) -> Result { todo!() }")
-            .unwrap();
-        syn::parse_str::<LayoutItem>("async fn shell(slot: Result, cx: &Cx) -> Result { todo!() }")
-            .unwrap();
+        syn::parse_str::<LayoutItem>(
+            "async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> { todo!() }",
+        )
+        .unwrap();
+        syn::parse_str::<LayoutItem>(
+            "async fn shell(slot: Slot<'_>, cx: &Cx) -> Result<impl View> { todo!() }",
+        )
+        .unwrap();
     }
 
     #[test]
     fn rejects_non_async_fn() {
         assert!(
-            parse_err("fn shell(slot: Result) -> Result { todo!() }").contains("must be async")
+            parse_err("fn shell(slot: Slot<'_>) -> Result<impl View> { todo!() }")
+                .contains("must be async")
         );
     }
 
     #[test]
     fn rejects_missing_return_type() {
         assert!(
-            parse_err("async fn shell(slot: Result) {}").contains("must declare a return type")
+            parse_err("async fn shell(slot: Slot<'_>) {}").contains("must declare a return type")
         );
     }
 
     #[test]
     fn rejects_missing_slot() {
         assert!(
-            parse_err("async fn shell(cx: &Cx) -> Result { todo!() }")
-                .contains("must take a `slot: Result` parameter")
+            parse_err("async fn shell(cx: &Cx) -> Result<impl View> { todo!() }")
+                .contains("must take a `slot: Slot<'_>` parameter")
         );
     }
 
     #[test]
     fn rejects_self_receiver() {
-        let err = parse_err("async fn shell(&self, slot: Result) -> Result { todo!() }");
+        let err =
+            parse_err("async fn shell(&self, slot: Slot<'_>) -> Result<impl View> { todo!() }");
         assert!(err.contains("cannot take a `self` receiver"));
     }
 
     #[test]
     fn rejects_unknown_parameter_names() {
-        let err = parse_err("async fn shell(slot: Result, body: Form<A>) -> Result { todo!() }");
+        let err = parse_err(
+            "async fn shell(slot: Slot<'_>, body: Form<A>) -> Result<impl View> { todo!() }",
+        );
         assert!(err.contains("only accept"));
     }
 
     #[test]
     fn rejects_duplicate_slot_parameters() {
-        let err = parse_err("async fn shell(slot: Result, slot: Result) -> Result { todo!() }");
+        let err = parse_err(
+            "async fn shell(slot: Slot<'_>, slot: Slot<'_>) -> Result<impl View> { todo!() }",
+        );
         assert!(err.contains("only accept"));
     }
 }

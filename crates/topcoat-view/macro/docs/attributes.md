@@ -4,8 +4,8 @@ Use it when attributes need to be passed around, assembled outside a [`view!`] c
 
 ```rust
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result {
-use topcoat::view::{attributes, view};
+# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+use topcoat::view::{View, attributes, view};
 
 let attrs = attributes! {
     class="button"
@@ -13,9 +13,9 @@ let attrs = attributes! {
     aria-label="Save changes"
 };
 
-view! {
+Ok(view! {
     <button (attrs)>"Save"</button>
-}
+})
 # }
 ```
 
@@ -27,8 +27,8 @@ So literal attributes, expression values, dynamic names, binding attributes, eve
 
 ```rust
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result {
-use topcoat::view::{attributes, view};
+# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+use topcoat::view::{View, attributes, view};
 
 let id = "submit";
 let extra = [
@@ -57,7 +57,7 @@ let attrs = attributes! {
         _ => aria-label="Button",
     }
 };
-# view! { <button (attrs)></button> }
+# Ok(view! { <button (attrs)></button> })
 # }
 ```
 
@@ -68,9 +68,9 @@ let attrs = attributes! {
 The generated value is [`topcoat::view::Attributes`]. It is a runtime collection of attributes with unique keys.
 
 ```rust
-# use topcoat::{Result, context::Cx, view::{component, view}};
+# use topcoat::{Result, context::Cx, view::{View, component, view}};
 # #[component]
-# async fn example(cx: &Cx) -> Result {
+# async fn example(cx: &Cx) -> Result<impl View> {
 use topcoat::view::attributes;
 
 let mut attrs = attributes! {
@@ -82,7 +82,7 @@ attrs.insert(cx, "data-state", "loading");
 attrs.insert(cx, "disabled", true);
 
 assert!(attrs.contains_key("class"));
-# view! { <div (attrs)></div> }
+# Ok(view! { <div (attrs)></div> })
 # }
 ```
 
@@ -94,19 +94,19 @@ Insert an [`Attributes`] value into an element by using it as a parenthesized at
 
 ```rust
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result {
-use topcoat::view::{attributes, view};
+# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+use topcoat::view::{View, attributes, view};
 
 let attrs = attributes! {
     class="card"
     data-kind="summary"
 };
 
-view! {
+Ok(view! {
     <article (attrs)>
         <h2>"Summary"</h2>
     </article>
-}
+})
 # }
 ```
 
@@ -121,21 +121,21 @@ Components can accept [`Attributes`] as a normal argument. This is useful for fo
 ```rust
 use topcoat::{
     Result,
-    view::{Attributes, View, attributes, component, view},
+    view::{Attributes, Child, View, attributes, component, view},
 };
 
 #[component]
-async fn panel(attrs: Attributes, child: View) -> Result {
-    view! {
+async fn panel(attrs: Attributes, #[default] child: Child<'_>) -> Result<impl View> {
+    Ok(view! {
         <section (attrs)>
             (child)
         </section>
-    }
+    })
 }
 
 # #[topcoat::view::component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     panel(
         attrs: attributes! {
             class="panel"
@@ -143,7 +143,7 @@ view! {
         },
         <p>"Account settings"</p>
     )
-}
+})
 # }
 ```
 

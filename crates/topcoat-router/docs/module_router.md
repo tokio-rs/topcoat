@@ -76,27 +76,27 @@ The function name does not affect the path. Two module-derived handlers in the s
 A `#[page]` serves `GET` unless the attribute declares other methods, such as `#[page(POST)]`. A `#[layout]` wraps pages in its module and descendant modules.
 
 ```rust
-# use topcoat::{Result, router::{layout, page}, view::view};
+# use topcoat::{Result, router::{Slot, layout, page}, view::{View, view}};
 // src/app.rs: both handlers use "/"
 #[layout]
-async fn root_layout(slot: Result) -> Result {
-    view! {
-        <html><body>(slot?)</body></html>
-    }
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
+        <html><body>(slot)</body></html>
+    })
 }
 
 #[page]
-async fn home() -> Result {
-    view! { <h1>"Home"</h1> }
+async fn home() -> Result<impl View> {
+    Ok(view! { <h1>"Home"</h1> })
 }
 ```
 
 ```rust
-# use topcoat::{Result, router::page, view::view};
+# use topcoat::{Result, router::page, view::{View, view}};
 // src/app/about.rs: GET /about
 #[page]
-async fn about() -> Result {
-    view! { <h1>"About"</h1> }
+async fn about() -> Result<impl View> {
+    Ok(view! { <h1>"About"</h1> })
 }
 ```
 
@@ -148,15 +148,15 @@ use topcoat::{
     Result,
     context::Cx,
     router::{page, path_param},
-    view::view,
+    view::{View, view},
 };
 
 path_param!(post_id: u64, error = bad_request);
 
 #[page]
-async fn post(cx: &Cx) -> Result {
+async fn post(cx: &Cx) -> Result<impl View> {
     let post_id = path_param::<PostId>(cx)?;
-    view! { <h1>"Post " (post_id)</h1> }
+    Ok(view! { <h1>"Post " (post_id)</h1> })
 }
 ```
 
@@ -208,7 +208,7 @@ Query parameters do not affect module-derived paths. Declare a named-field struc
 #     Result,
 #     context::Cx,
 #     router::{page, query_params},
-#     view::view,
+#     view::{View, view},
 # };
 #[query_params(error = bad_request)]
 struct PostsQuery {
@@ -219,12 +219,12 @@ struct PostsQuery {
 // In src/app/posts.rs, this serves /posts and accepts
 // requests such as /posts?page=2&q=rust.
 #[page]
-async fn posts(cx: &Cx) -> Result {
+async fn posts(cx: &Cx) -> Result<impl View> {
     let query = query_params::<PostsQuery>(cx)?;
-    view! {
+    Ok(view! {
         <p>"page: " (query.page.unwrap_or(1))</p>
         <p>"search: " (query.q.as_deref().unwrap_or(""))</p>
-    }
+    })
 }
 ```
 
@@ -285,10 +285,10 @@ Adding a path string to `#[page]`, `#[layout]`, `#[layer]`, or `#[route]` disabl
 `module_router!()` discovers module-derived handlers. Register an explicit-path handler by name:
 
 ```rust
-# use topcoat::{Result, router::page, view::view};
+# use topcoat::{Result, router::page, view::{View, view}};
 #[page("/legacy")]
-async fn legacy() -> Result {
-    view! { <h1>"Legacy"</h1> }
+async fn legacy() -> Result<impl View> {
+    Ok(view! { <h1>"Legacy"</h1> })
 }
 
 pub fn router() -> topcoat::router::Router {

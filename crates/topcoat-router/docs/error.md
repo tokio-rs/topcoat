@@ -9,15 +9,15 @@ Every error type in this module has a constructor function named after its respo
 A constructor returns a concrete error type that converts into the handler's error, so bubble it up with `?` or return it directly:
 
 ```rust
-use topcoat::{Result, context::Cx, router::{error::not_found, page}, view::view};
+use topcoat::{Result, context::Cx, router::{error::not_found, page}, view::{View, view}};
 # struct Post;
 # async fn find_post(_cx: &Cx) -> Option<Post> { None }
 #[page("/posts/{id}")]
-async fn post(cx: &Cx) -> Result {
+async fn post(cx: &Cx) -> Result<impl View> {
     let Some(_post) = find_post(cx).await else {
         return Err(not_found().into());
     };
-    view! { <h1>"Post"</h1> }
+    Ok(view! { <h1>"Post"</h1> })
 }
 ```
 
@@ -28,13 +28,13 @@ The router raises some of these itself: a request that matches no route gets a [
 Usually the failing value is the condition. [`RouterErrorExt`] adds `ok_or_*` methods to [`Option`] and [`core::result::Result`] that replace `None` (or any `Err`) with a router error, ready for `?`:
 
 ```rust
-# use topcoat::{Result, context::Cx, router::{error::RouterErrorExt, page}, view::view};
+# use topcoat::{Result, context::Cx, router::{error::RouterErrorExt, page}, view::{View, view}};
 # struct User;
 # async fn current_session(_cx: &Cx) -> Option<User> { None }
 #[page("/dashboard")]
-async fn dashboard(cx: &Cx) -> Result {
+async fn dashboard(cx: &Cx) -> Result<impl View> {
     let _user = current_session(cx).await.ok_or_unauthorized()?;
-    view! { <h1>"Dashboard"</h1> }
+    Ok(view! { <h1>"Dashboard"</h1> })
 }
 ```
 
@@ -47,25 +47,27 @@ An error keeps its type on the way out, so an outer handler can pick it up with 
 ```rust
 use topcoat::{
     Result,
-    router::{StatusCode, error::ForbiddenError, layout},
-    view::view,
+    router::{Slot, StatusCode, error::ForbiddenError, layout},
+    view::{View, emit, live, view},
 };
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    let content = match slot {
-        Err(error) if error.downcast_ref::<ForbiddenError>().is_some() => view! {
-            (StatusCode::FORBIDDEN)
-            <h1>"Access denied"</h1>
-        },
-        content => content,
-    }?;
-
-    view! {
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <html>
-            <body>(content)</body>
+            <body>
+                (live! {
+                    match emit! { (slot) } {
+                        Err(error) if error.downcast_ref::<ForbiddenError>().is_some() => emit! {
+                            (StatusCode::FORBIDDEN)
+                            <h1>"Access denied"</h1>
+                        },
+                        slot => slot,
+                    }
+                })
+            </body>
         </html>
-    }
+    })
 }
 ```
 
@@ -87,14 +89,14 @@ This registers a page resolving every otherwise unmatched URL under its path to 
 A rewrite dispatches the request again at a different path, running the whole route stack as if that path had been requested in the first place. Unlike a redirect it is invisible to the client: the browser URL stays what was requested, and no extra round trip happens. Build one with [`rewrite(path, body)`](rewrite) and return it like any other router error:
 
 ```rust
-use topcoat::{Result, context::Cx, router::{Body, error::rewrite, page}, view::view};
+use topcoat::{Result, context::Cx, router::{Body, error::rewrite, page}, view::{View, view}};
 # async fn beta_tester(_cx: &Cx) -> bool { false }
 #[page("/dashboard")]
-async fn dashboard(cx: &Cx) -> Result {
+async fn dashboard(cx: &Cx) -> Result<impl View> {
     if beta_tester(cx).await {
         return Err(rewrite("/dashboard-beta", Body::empty()).into());
     }
-    view! { <h1>"Dashboard"</h1> }
+    Ok(view! { <h1>"Dashboard"</h1> })
 }
 ```
 

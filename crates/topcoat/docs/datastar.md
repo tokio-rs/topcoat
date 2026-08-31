@@ -18,13 +18,13 @@ Datastar is a client-side script the browser must load before any `data-*` attri
 use topcoat::{
     Result,
     asset::asset,
-    router::layout,
-    view::view,
+    router::{Slot, layout},
+    view::{View, view},
 };
 
 #[layout]
-async fn root(slot: Result) -> Result {
-    view! {
+async fn root(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -33,9 +33,9 @@ async fn root(slot: Result) -> Result {
                     src=(asset!("https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.2/bundles/datastar.js"))
                 ></script>
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
-    }
+    })
 }
 ```
 
@@ -78,12 +78,12 @@ use topcoat::{
     context::Cx,
     datastar::{ElementPatchMode, PatchElements},
     router::route,
-    view::view,
+    view::{ViewExt, view},
 };
 
 #[route(POST "/entries")]
 async fn create(cx: &Cx) -> Result<PatchElements> {
-    let entry = view! { cx => <li>"A new entry"</li> }?;
+    let entry = view! { cx => <li>"A new entry"</li> }.single().await?;
     Ok(PatchElements::new(entry.render(cx))
         .selector("#feed")
         .mode(ElementPatchMode::Prepend))
@@ -147,14 +147,15 @@ Simple request-response updates do not need an event stream: Datastar also patch
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     datastar::{DatastarMode, DatastarSelector, ElementPatchMode},
     router::route,
-    view::{View, view},
+    view::{ViewExt, ViewHandle, view},
 };
 
 #[route(POST "/save")]
-async fn save() -> Result<(DatastarSelector, DatastarMode, View)> {
-    let status = view! { cx => <p>"Saved!"</p> }?;
+async fn save(cx: &Cx) -> Result<(DatastarSelector, DatastarMode, ViewHandle)> {
+    let status = view! { cx => <p>"Saved!"</p> }.single().await?;
     Ok((
         DatastarSelector::from("#status"),
         DatastarMode(ElementPatchMode::Inner),

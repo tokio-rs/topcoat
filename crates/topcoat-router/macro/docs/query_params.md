@@ -19,18 +19,18 @@ struct PageQuery {
 A query string that fails to parse is usually answered with a user-facing error response. Declare that response once on the struct with `error = ...`, and the `Err` side of the `Result` becomes the corresponding router error, ready to be bubbled up with `?`:
 
 ```rust
-# use topcoat::{context::Cx, Result, router::{page, query_params}, view::view};
+# use topcoat::{context::Cx, Result, router::{page, query_params}, view::{View, view}};
 #[query_params(error = bad_request)]
 struct PageQuery {
     page: Option<u32>,
 }
 
 #[page("/posts")]
-async fn posts(cx: &Cx) -> Result {
+async fn posts(cx: &Cx) -> Result<impl View> {
     // Responds with a 400 naming the failing key when the query string
     // does not match.
     let query = query_params::<PageQuery>(cx)?;
-    view! { "currently on page: " (query.page) }
+    Ok(view! { "currently on page: " (query.page) })
 }
 ```
 

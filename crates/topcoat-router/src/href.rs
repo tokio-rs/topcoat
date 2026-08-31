@@ -422,7 +422,7 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 ///     Result,
 ///     context::Cx,
 ///     router::{href, page, path_param},
-///     view::view,
+///     view::{View, view},
 /// };
 ///
 /// path_param!(post_id: u64);
@@ -433,13 +433,13 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 /// }
 ///
 /// #[page("/posts")]
-/// async fn posts(cx: &Cx) -> Result {
+/// async fn posts(cx: &Cx) -> Result<impl View> {
 ///     let comments = href("/posts/{post_id}", (PostId(5),))
 ///         .query(Pagination { page: 2 })
 ///         .fragment("comments");
-///     view! {
+///     Ok(view! {
 ///         <a href=(comments)>"Comments of the fifth post"</a>
-///     }
+///     })
 /// }
 /// ```
 ///
@@ -493,7 +493,7 @@ where
 ///         error::{SeeOther, bad_request, see_other},
 ///         href, page, path_param, route,
 ///     },
-///     view::view,
+///     view::{View, view},
 /// };
 ///
 /// path_param!(post_id: u64, error = bad_request);
@@ -504,23 +504,23 @@ where
 /// }
 ///
 /// #[page("/posts")]
-/// async fn posts(cx: &Cx) -> Result {
-///     view! {
+/// async fn posts(cx: &Cx) -> Result<impl View> {
+///     Ok(view! {
 ///         <a href=(href!(post, PostId(1)))>"The first post"</a>
 ///         <a href=(href!(post, PostId(1)).fragment("comments"))>"Its comments"</a>
 ///         <a href=(href!(posts).query(Pagination { page: 2 }))>"Next page"</a>
-///     }
+///     })
 /// }
 ///
 /// #[page("/posts/{post_id}")]
-/// async fn post(cx: &Cx) -> Result {
+/// async fn post(cx: &Cx) -> Result<impl View> {
 ///     let post_id = path_param::<PostId>(cx)?;
 ///
-///     view! {
+///     Ok(view! {
 ///         <form method="post" action=(href!(publish, PostId(*post_id)))>
 ///             <button>"Publish"</button>
 ///         </form>
-///     }
+///     })
 /// }
 ///
 /// #[route(POST "/posts/{post_id}/publish")]
@@ -706,16 +706,16 @@ where
     ///     Result,
     ///     context::Cx,
     ///     router::{href, page},
-    ///     view::view,
+    ///     view::{View, view},
     /// };
     ///
     /// #[page("/posts")]
-    /// async fn posts(cx: &Cx) -> Result {
+    /// async fn posts(cx: &Cx) -> Result<impl View> {
     ///     let link = href!(posts);
     ///     let current = link.is_current(cx);
-    ///     view! {
+    ///     Ok(view! {
     ///         <a href=(link) aria-current=(current.then_some("page"))>"Posts"</a>
-    ///     }
+    ///     })
     /// }
     /// ```
     ///

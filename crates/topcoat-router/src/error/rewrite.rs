@@ -32,16 +32,16 @@ pub(crate) const REWRITE_LIMIT: usize = 8;
 ///     Result,
 ///     context::Cx,
 ///     router::{Body, error::rewrite, page},
-///     view::view,
+///     view::{View, view},
 /// };
 /// # async fn beta_tester(_cx: &Cx) -> bool { false }
 ///
 /// #[page("/dashboard")]
-/// async fn dashboard(cx: &Cx) -> Result {
+/// async fn dashboard(cx: &Cx) -> Result<impl View> {
 ///     if beta_tester(cx).await {
 ///         return Err(rewrite("/dashboard-beta", Body::empty()).into());
 ///     }
-///     view! { <h1>"Dashboard"</h1> }
+///     Ok(view! { <h1>"Dashboard"</h1> })
 /// }
 /// ```
 #[must_use]

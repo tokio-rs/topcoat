@@ -39,15 +39,15 @@ The formatter parses Rust source, finds macro invocations it knows how to format
 In normal Topcoat code, this most notably means the HTML inside of a `view!` macro invocation is formatted:
 
 ```rust
-use topcoat::{router::page, view::view};
+use topcoat::{router::page, view::{View, view}};
 
 #[page("/")]
-async fn page() -> topcoat::Result {
-    view! {
+async fn page() -> topcoat::Result<impl View> {
+    Ok(view! {
         <main>
             <h1>"Hello"</h1>
         </main>
-    }
+    })
 }
 ```
 

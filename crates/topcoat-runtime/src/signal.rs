@@ -252,7 +252,7 @@ mod tests {
         // The comment context escaped `>`, so the only `-->` left is the
         // marker's own terminator; the payload cannot end the comment early.
         assert_eq!(html.matches("-->").count(), 1);
-        assert!(html.ends_with(") -->"));
+        assert!(html.ends_with(")-->"), "{html}");
         assert!(html.contains("--&gt;"));
         // The JSON's own quotes round-trip as entities the client decodes.
         assert!(html.contains("&quot;"));

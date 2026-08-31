@@ -130,7 +130,7 @@ Now the component that needs authentication declares it by calling `require_auth
 ```rust
 use topcoat::{
     context::Cx,
-    view::{component, view},
+    view::{View, component, view},
     Result,
 };
 
@@ -140,15 +140,15 @@ use topcoat::{
 #
 /// Renders the current user's avatar and requires authentication wherever it is used.
 #[component]
-async fn user_avatar(cx: &Cx) -> Result {
+async fn user_avatar(cx: &Cx) -> Result<impl View> {
     let user = require_auth(cx).await?;
 
-    view! {
+    Ok(view! {
         <img
             src=(user.avatar_url)
             alt=(format!("{}'s avatar", user.name))
         >
-    }
+    })
 }
 ```
 

@@ -47,8 +47,9 @@ pub fn redirect(uri: impl AsRef<str>) -> RedirectError {
 ///     router::{error::redirect_permanent, page},
 /// };
 ///
+/// // The page always redirects, so it renders no view of its own.
 /// #[page]
-/// async fn legacy_profile(cx: &Cx) -> Result {
+/// async fn legacy_profile(cx: &Cx) -> Result<()> {
 ///     Err(redirect_permanent("/profile").into())
 /// }
 /// ```

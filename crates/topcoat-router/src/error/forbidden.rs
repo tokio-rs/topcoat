@@ -14,10 +14,10 @@ use crate::response::{IntoResponse, Response};
 /// # use topcoat::view::View;
 /// # struct User;
 /// # impl User { fn is_admin(&self) -> bool { true } }
-/// # fn render_admin(_cx: &Cx) -> View { View::default() }
+/// # fn render_admin(_cx: &Cx) -> impl View {}
 /// use topcoat::{Result, context::Cx, router::error::forbidden};
 ///
-/// async fn admin_panel(cx: &Cx, user: &User) -> Result<View> {
+/// async fn admin_panel(cx: &Cx, user: &User) -> Result<impl View> {
 ///     if !user.is_admin() {
 ///         return Err(forbidden().into());
 ///     }

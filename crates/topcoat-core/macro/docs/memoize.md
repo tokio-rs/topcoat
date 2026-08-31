@@ -255,8 +255,8 @@ It is *not* a substitute for a long-lived cache (Redis, an LRU, etc.). Cross-req
 use topcoat::{
     context::{Cx, memoize},
     Result,
-    router::{layout, page},
-    view::view,
+    router::{Slot, layout, page},
+    view::{View, view},
 };
 
 #[memoize(as_ref)]
@@ -265,15 +265,15 @@ async fn current_user(cx: &Cx) -> Option<User> {
 }
 
 #[page]
-async fn dashboard(cx: &Cx) -> Result {
+async fn dashboard(cx: &Cx) -> Result<impl View> {
     let user = current_user(cx).await; // computes once
-    view! { <h1>"Welcome, " (user.unwrap().name.clone())</h1> }
+    Ok(view! { <h1>"Welcome, " (user.unwrap().name.clone())</h1> })
 }
 
 #[layout]
-async fn root(cx: &Cx, slot: Result) -> Result {
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     let user = current_user(cx).await; // cache hit, no extra DB query
-    view! {
+    Ok(view! {
         <header>
             match user {
                 Some(u) => {
@@ -282,8 +282,8 @@ async fn root(cx: &Cx, slot: Result) -> Result {
                 None => <a href="/login">"Sign in"</a>,
             }
         </header>
-        (slot?)
-    }
+        (slot)
+    })
 }
 ```
 

@@ -11,8 +11,8 @@ Unlike HTML however, text nodes must be quoted.
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     <!DOCTYPE html>
     <html>
         <head>
@@ -25,7 +25,7 @@ view! {
             <hr>
         </body>
     </html>
-}
+})
 # }
 ```
 
@@ -34,10 +34,10 @@ Element names can use dashes, so custom elements fit naturally:
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     <my-widget data-widget-id="profile"></my-widget>
-}
+})
 # }
 ```
 
@@ -51,13 +51,13 @@ In child position, the expression becomes a node:
 # use topcoat::{Result, view::*};
 # struct User { name: &'static str }
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let user = User { name: "Ada" };
-# let sidebar = view! { <aside></aside> }?;
-view! {
+# let sidebar = view! { <aside></aside> };
+Ok(view! {
     <h1>"Hello, " (user.name) "!"</h1>
     (sidebar)
-}
+})
 # }
 ```
 
@@ -66,12 +66,12 @@ In attribute value position, the expression becomes the value:
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let url = "/posts";
 # let is_current = true;
-view! {
+Ok(view! {
     <a href=(url) aria-current=(is_current)>"Open"</a>
-}
+})
 # }
 ```
 
@@ -80,13 +80,13 @@ The same parenthesized expression syntax can also be used for dynamic attribute 
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 let tag = "section";
 let attr = "data-state";
 
-view! {
+Ok(view! {
     <(tag) (attr)="ready">"Loaded"</(tag)>
-}
+})
 # }
 ```
 
@@ -95,12 +95,12 @@ Due to a limitation in Rust macros, text nodes must be quoted:
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let computed_text = "Computed";
-view! {
+Ok(view! {
     <p>"This is text"</p>
     <p>(computed_text)</p>
-}
+})
 # }
 ```
 
@@ -115,15 +115,15 @@ Use `if`, `else if`, and `else` to choose which markup is emitted.
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let user: Option<()> = None;
-view! {
+Ok(view! {
     if user.is_some() {
         <a href="/account">"Account"</a>
     } else {
         <a href="/login">"Sign in"</a>
     }
-}
+})
 # }
 ```
 
@@ -132,9 +132,9 @@ In attributes, each branch emits attributes instead of child nodes:
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let current = true;
-view! {
+Ok(view! {
     <a
         href="/posts"
         if current {
@@ -144,7 +144,7 @@ view! {
     >
         "Posts"
     </a>
-}
+})
 # }
 ```
 
@@ -156,9 +156,9 @@ Use `for pat in expr { ... }` to render the body once for each item.
 # use topcoat::{Result, view::*};
 # struct Post { url: &'static str, title: &'static str }
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let posts = vec![Post { url: "/a", title: "A" }];
-view! {
+Ok(view! {
     <ul>
         for post in posts {
             <li>
@@ -166,7 +166,7 @@ view! {
             </li>
         }
     </ul>
-}
+})
 # }
 ```
 
@@ -175,15 +175,15 @@ In attributes, a loop can emit zero or more attributes. This is useful when you 
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let attrs = vec![("data-id", "1")];
-view! {
+Ok(view! {
     <div
         for (name, value) in attrs {
             (name)=(value)
         }
     ></div>
-}
+})
 # }
 ```
 
@@ -195,17 +195,17 @@ Use `match` to choose markup from patterns. Match arms can also use guards.
 # use topcoat::{Result, view::*};
 # enum Status { Draft, Published { title: &'static str }, Archived }
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let status = Status::Draft;
 # let show_archived = true;
-view! {
+Ok(view! {
     match status {
         Status::Draft => <span>"Draft"</span>,
         Status::Published { title } => <a href="/posts">(title)</a>,
         Status::Archived if show_archived => <span>"Archived"</span>,
         _ => "",
     }
-}
+})
 # }
 ```
 
@@ -215,9 +215,9 @@ A match arm body is one view node. If a branch needs multiple sibling nodes, wra
 # use topcoat::{Result, view::*};
 # struct User { name: &'static str }
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let user: Option<User> = None;
-view! {
+Ok(view! {
     match user {
         Some(user) => {
             <h1>(user.name)</h1>
@@ -225,7 +225,7 @@ view! {
         },
         None => <a href="/login">"Sign in"</a>,
     }
-}
+})
 # }
 ```
 
@@ -235,16 +235,16 @@ In attributes, each arm can emit attribute nodes:
 # use topcoat::{Result, view::*};
 # enum State { Open, Closed }
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let state = State::Open;
-view! {
+Ok(view! {
     <article
         match state {
             State::Open => class="open",
             State::Closed => aria-disabled="true",
         }
     ></article>
-}
+})
 # }
 ```
 
@@ -256,16 +256,16 @@ Use `let pat = expr;` to bind values for later nodes in the same body.
 # use topcoat::{Result, view::*};
 # struct Post { title: &'static str, url: &'static str }
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let post = Post { title: " Hello ", url: "/hello" };
-view! {
+Ok(view! {
     <article>
         let title = post.title.trim();
 
         <h1>(title)</h1>
         <a href=(post.url)>"Read"</a>
     </article>
-}
+})
 # }
 ```
 
@@ -276,9 +276,9 @@ The same works in an attribute list. The binding is in scope for attributes that
 # struct Post { slug: &'static str, title: &'static str }
 # impl Post { fn url(&self) -> &str { "/hello" } }
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let post = Post { slug: "hello", title: "Hello" };
-view! {
+Ok(view! {
     <a
         let href = post.url();
         href=(href)
@@ -286,7 +286,7 @@ view! {
     >
         (post.title)
     </a>
-}
+})
 # }
 ```
 
@@ -297,12 +297,12 @@ Components are called inside [`view!`] with a call syntax similar to functions. 
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn panel(title: &str, child: View) -> Result { view! { <section>(title)(child)</section> } }
+# async fn panel(title: &str, #[default] child: Child<'_>) -> Result<impl View> { Ok(view! { <section>(title)(child)</section> }) }
 # #[component]
-# async fn badge(label: &str, tone: &str) -> Result { view! { <span>(label)(tone)</span> } }
+# async fn badge(label: &str, tone: &str) -> Result<impl View> { Ok(view! { <span>(label)(tone)</span> }) }
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     panel(
         // Named title parameter:
         title: "Profile",
@@ -313,7 +313,7 @@ view! {
             tone: "success",
         )
     )
-}
+})
 # }
 ```
 
@@ -322,24 +322,24 @@ The child nodes desugar to:
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn panel(title: &str, child: View) -> Result { view! { <section>(title)(child)</section> } }
+# async fn panel(title: &str, #[default] child: Child<'_>) -> Result<impl View> { Ok(view! { <section>(title)(child)</section> }) }
 # #[component]
-# async fn badge(label: &str, tone: &str) -> Result { view! { <span>(label)(tone)</span> } }
+# async fn badge(label: &str, tone: &str) -> Result<impl View> { Ok(view! { <span>(label)(tone)</span> }) }
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     panel(
         title: "Profile",
         // Named child parameter:
-        child: view! {
+        child: Child::new(view! {
             <p>"Account details"</p>
             badge(
                 label: "Active",
                 tone: "success",
             )
-        }?
+        })
     )
-}
+})
 # }
 ```
 
@@ -353,15 +353,15 @@ Each component invocation has a stable identity derived from the chain of invoca
 # use topcoat::{Result, view::*};
 # struct Post { id: u64, title: &'static str }
 # #[component]
-# async fn post_card(title: &str) -> Result { view! { <article>(title)</article> } }
+# async fn post_card(title: &str) -> Result<impl View> { Ok(view! { <article>(title)</article> }) }
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let posts = vec![Post { id: 1, title: "A" }];
-view! {
+Ok(view! {
     for post in posts {
         post_card(key: post.id, title: post.title)
     }
-}
+})
 # }
 ```
 
@@ -386,10 +386,10 @@ When the value is known where the view is written, prefer the literal form `disa
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     <input type="email" required="" disabled="">
-}
+})
 # }
 ```
 
@@ -398,12 +398,12 @@ When the value is only known at run time, pass an expression. Expression attribu
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 let is_disabled = false;
 let is_current = true;
 let maybe_title: Option<&str> = None;
 
-view! {
+Ok(view! {
     <button
         disabled=(is_disabled)
         aria-current=(is_current.then_some("page"))
@@ -411,7 +411,7 @@ view! {
     >
         "Save"
     </button>
-}
+})
 # }
 ```
 
@@ -422,10 +422,10 @@ This omission logic applies to expression attributes. Literal attributes are alw
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     <button disabled="false">"Still disabled in HTML"</button>
-}
+})
 # }
 ```
 
@@ -434,11 +434,11 @@ Attributes that take the literal strings `"true"` and `"false"` as values, such 
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 # let expanded = false;
-view! {
+Ok(view! {
     <button aria-expanded=(if expanded { "true" } else { "false" })>"Menu"</button>
-}
+})
 # }
 ```
 
@@ -457,12 +457,12 @@ A view can declare the status code and headers of the HTTP response it renders i
 # use topcoat::{Result, view::*};
 # use topcoat::router::{StatusCode, HeaderValue, header};
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     (StatusCode::NOT_FOUND)
     ((header::CACHE_CONTROL, HeaderValue::from_static("no-store")))
     <h1>"Page not found"</h1>
-}
+})
 # }
 ```
 
@@ -470,13 +470,13 @@ Competing declarations resolve by render order: the first status code rendered w
 
 ```rust
 # use topcoat::{Result, view::*};
-# use topcoat::router::{HeaderValue, header, layout};
+# use topcoat::router::{HeaderValue, Slot, header, layout};
 #[layout("/docs")]
-async fn docs_layout(slot: Result) -> Result {
-    view! {
-        <main>(slot?)</main>
+async fn docs_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
+        <main>(slot)</main>
         ((header::CACHE_CONTROL, HeaderValue::from_static("max-age=60")))
-    }
+    })
 }
 ```
 
@@ -493,9 +493,9 @@ Inside a [`component`], `#[page]`, `#[layout]`, or `#[shard]`, the request conte
 ```rust
 # use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn greeting(name: &str) -> Result { view! { <h1>(name)</h1> } }
-async fn render(cx: &Cx) -> Result {
-    view! { cx => greeting(name: "World") }
+# async fn greeting(name: &str) -> Result<impl View> { Ok(view! { <h1>(name)</h1> }) }
+async fn render(cx: &Cx) -> Result<impl View> {
+    Ok(view! { cx => greeting(name: "World") })
 }
 ```
 
@@ -518,7 +518,7 @@ For example, a type can opt into child-node rendering by implementing [`NodeView
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 use topcoat::{context::Cx, view::{NodeViewParts, PartsWriter}};
 
 struct Badge(String);
@@ -529,9 +529,9 @@ impl NodeViewParts for Badge {
     }
 }
 
-view! {
+Ok(view! {
     <p>(Badge("New".to_owned()))</p>
-}
+})
 # }
 ```
 
@@ -540,7 +540,7 @@ For attribute values, implement [`AttributeValueViewParts`]. Its [`attribute_pre
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn example() -> Result {
+# async fn example() -> Result<impl View> {
 use topcoat::{context::Cx, view::{AttributeValueViewParts, PartsWriter}};
 
 struct DataId(Option<String>);
@@ -557,9 +557,9 @@ impl AttributeValueViewParts for DataId {
     }
 }
 
-view! {
+Ok(view! {
     <article data-id=(DataId(Some("post-1".to_owned())))></article>
-}
+})
 # }
 ```
 

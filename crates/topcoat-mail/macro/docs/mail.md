@@ -3,14 +3,15 @@ Declares a [`Mail`] as a list of `name: value` fields.
 Each field lowers to the [`MailBuilder`] method of the same name, with conversions layered on top: addresses can be written as strings or `(name, address)` pairs, and the `html` field takes an inline [`view!`] body. The macro is an expression producing `Result<Mail>`, so a field value that fails, such as an invalid address string, surfaces as an error at the invocation.
 
 ```rust
-# use topcoat::Result;
+# use topcoat::{Result, context::Cx};
 # use topcoat::mail::mail;
-# async fn example() -> Result<()> {
+# async fn example(cx: &Cx) -> Result<()> {
 let mail = mail! {
     from: ("Topcoat", "welcome@example.com"),
     to: "ada@example.com",
     subject: "Welcome, Ada!",
     html: {
+        cx =>
         <h1>"Welcome!"</h1>
         <p>"Your account is ready."</p>
     },
@@ -83,12 +84,12 @@ An unbraced `html` value is an expression, so a prebuilt [`View`] can be passed 
 Mail without a plain-text alternative scores worse with spam filters, so by default the text body is derived from the HTML body when the mail is assembled. Declare `text` to send your own wording instead, or pass [`TextBody::None`] to send the HTML alone:
 
 ```rust
-# use topcoat::Result;
+# use topcoat::{Result, context::Cx};
 # use topcoat::mail::{TextBody, mail};
-# async fn example() -> Result<()> {
-let derived = mail! { html: { <p>"Hi"</p> } }?;
+# async fn example(cx: &Cx) -> Result<()> {
+let derived = mail! { html: { cx => <p>"Hi"</p> } }?;
 let declared = mail! { text: "Hi there" }?;
-let html_alone = mail! { html: { <p>"Hi"</p> }, text: TextBody::None }?;
+let html_alone = mail! { html: { cx => <p>"Hi"</p> }, text: TextBody::None }?;
 
 assert_eq!(derived.text(), &TextBody::FromHtml);
 assert_eq!(declared.text(), &TextBody::Text("Hi there".to_owned()));
@@ -102,12 +103,13 @@ assert_eq!(html_alone.text(), &TextBody::None);
 `attachments` takes a single [`Attachment`] or a collection. A downloadable attachment is presented to the recipient as a file; an [inline attachment](struct.Attachment.html#method.inline) is displayed where the HTML body references its content id through a `cid:` URL. `headers` adds custom `(name, value)` pairs to the message:
 
 ```rust
-# use topcoat::Result;
+# use topcoat::{Result, context::Cx};
 # use topcoat::mail::{Attachment, mail};
-# async fn example() -> Result<()> {
+# async fn example(cx: &Cx) -> Result<()> {
 let mail = mail! {
     subject: "Your invoice",
     html: {
+        cx =>
         <img src="cid:logo" alt="Example logo">
         <p>"The invoice is attached."</p>
     },
@@ -147,6 +149,6 @@ mail! {
 [`TextBody::None`]: enum.TextBody.html#variant.None
 [`Transport`]: trait.Transport.html
 [`TryIntoMailboxes`]: trait.TryIntoMailboxes.html
-[`View`]: ../view/struct.View.html
+[`View`]: ../view/trait.View.html
 [`send`]: fn.send.html
 [`view!`]: ../view/macro.view.html

@@ -41,14 +41,14 @@ use topcoat::{
     context::{Cx, app_context},
     Result,
     router::page,
-    view::view,
+    view::{View, view},
 };
 
 #[page]
-async fn user_profile(cx: &Cx) -> Result {
+async fn user_profile(cx: &Cx) -> Result<impl View> {
     let db: &Database = app_context(cx);
     let user = db.fetch_user(42).await;
-    view! { <h1>"Hello, " (user.name) </h1> }
+    Ok(view! { <h1>"Hello, " (user.name) </h1> })
 }
 ```
 

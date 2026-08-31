@@ -282,7 +282,7 @@ mod tests {
     fn in_scope<R>(f: impl FnOnce() -> R) -> (R, ViewBuffer) {
         let mut slot = Some(Box::new(ViewBuffer::new()));
         let output = {
-            let _scope = ViewBufferScope::install(&mut slot);
+            let _scope = ViewBufferScope::new(&mut slot);
             f()
         };
         (output, *slot.expect("the buffer was swapped back on exit"))
@@ -387,8 +387,10 @@ mod tests {
     #[test]
     fn a_nested_view_renders_inside_its_build() {
         let (rendered, _buffer) = in_scope(|| {
-            let view = ViewBufferScope::block(|parts| {
-                parts.push_str("a < b");
+            let view = ViewBufferScope::with(|buffer| {
+                buffer.block(|parts| {
+                    parts.push_str("a < b");
+                })
             });
             view.render(&Cx::default())
         });
@@ -396,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "no view is building on the current task")]
+    #[should_panic(expected = "outside of a `ViewBufferScope`")]
     fn rendering_a_nested_view_outside_any_build_panics() {
         let mut buffer = ViewBuffer::new();
         let view = nested(&mut buffer, |_parts| {});

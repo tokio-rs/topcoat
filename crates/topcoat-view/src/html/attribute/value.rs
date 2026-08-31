@@ -12,13 +12,13 @@ use crate::{
 /// element in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
-/// # use topcoat::view::{component, view};
+/// # use topcoat::view::{View, component, view};
 /// # #[component]
-/// # async fn example() -> topcoat::Result {
+/// # async fn example() -> topcoat::Result<impl View> {
 /// # let my_value = "primary";
-/// view! {
+/// Ok(view! {
 ///     <div class=(my_value)></div>
-/// }
+/// })
 /// # }
 /// ```
 ///
@@ -469,7 +469,7 @@ impl Captured for AttributeValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Attributes, buffer::ViewBuffer, internal::Builder};
+    use crate::{Attributes, internal::Builder};
 
     /// Captures `value` the way [`Attributes::insert`] does.
     fn capture(value: impl AttributeValueViewParts) -> AttributeValue {
@@ -482,7 +482,7 @@ mod tests {
     /// Writes a captured value in attribute value position and renders it.
     fn render(value: &AttributeValue) -> String {
         let cx = Cx::default();
-        ViewBuffer::build(|parts| Builder::new(&cx, parts).attribute_value(value)).render(&cx)
+        Builder::build(&cx, |b| b.attribute_value(value)).render(&cx)
     }
 
     #[test]

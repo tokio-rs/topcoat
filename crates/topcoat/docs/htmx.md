@@ -18,21 +18,21 @@ htmx is a client-side script the browser must load before any `hx-*` attribute d
 use topcoat::{
     Result,
     asset::asset,
-    router::layout,
-    view::view,
+    router::{Slot, layout},
+    view::{View, view},
 };
 
 #[layout]
-async fn root(slot: Result) -> Result {
-    view! {
+async fn root(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
                 <script src=(asset!("https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"))></script>
             </head>
-            <body>(slot?)</body>
+            <body>(slot)</body>
         </html>
-    }
+    })
 }
 ```
 
@@ -47,27 +47,27 @@ use topcoat::{
     Result,
     context::Cx,
     htmx::hx_request,
-    router::layout,
-    view::view,
+    router::{Slot, layout},
+    view::{View, view},
 };
 
 #[layout]
-async fn root(cx: &Cx, slot: Result) -> Result {
-    // htmx only swaps out the target element, so we do not need to return
-    // the full layout shell. Just the page's content is enough.
-    if hx_request(cx) {
-        return slot;
-    }
-
-    // Non-htmx requests require a full page render including the layout shell.
-    view! {
-        <html>
-            <body>
-                <nav> /* persistent navigation */ </nav>
-                <main>(slot?)</main>
-            </body>
-        </html>
-    }
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
+        if hx_request(cx) {
+            // htmx only swaps out the target element, so we do not need to
+            // render the full layout shell. Just the page's content is enough.
+            (slot)
+        } else {
+            // Non-htmx requests require a full page render including the shell.
+            <html>
+                <body>
+                    <nav> /* persistent navigation */ </nav>
+                    <main>(slot)</main>
+                </body>
+            </html>
+        }
+    })
 }
 ```
 
@@ -95,12 +95,12 @@ use topcoat::{
     context::Cx,
     htmx::{HxRetarget, HxReswap, SwapOption},
     router::route,
-    view::{View, view},
+    view::{ViewExt, ViewHandle, view},
 };
 
 #[route(POST "/save")]
-async fn save(cx: &Cx) -> Result<(HxRetarget, HxReswap, View)> {
-    let body = view! { cx => <div>"Saved!"</div> }?;
+async fn save(cx: &Cx) -> Result<(HxRetarget, HxReswap, ViewHandle)> {
+    let body = view! { cx => <div>"Saved!"</div> }.single().await?;
     Ok((
         HxRetarget::from("#status"),
         HxReswap(SwapOption::InnerHtml),

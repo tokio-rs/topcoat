@@ -35,13 +35,13 @@ impl<K, V> Attribute<K, V> {
 /// in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
-/// # use topcoat::view::{Attributes, component, view};
+/// # use topcoat::view::{Attributes, View, component, view};
 /// # #[component]
-/// # async fn example() -> topcoat::Result {
+/// # async fn example() -> topcoat::Result<impl View> {
 /// # let my_value = Attributes::new();
-/// view! {
+/// Ok(view! {
 ///     <input (my_value)>
-/// }
+/// })
 /// # }
 /// ```
 ///
@@ -138,11 +138,11 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{buffer::ViewBuffer, internal::Builder};
+    use crate::internal::Builder;
 
     fn render(attribute: impl AttributeViewParts) -> String {
         let cx = Cx::default();
-        ViewBuffer::build(|parts| Builder::new(&cx, parts).attributes(attribute)).render(&cx)
+        Builder::build(&cx, |b| b.attributes(attribute)).render(&cx)
     }
 
     #[test]

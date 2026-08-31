@@ -9,31 +9,31 @@ use topcoat::{
     Result,
     asset::{Asset, asset},
     router::page,
-    view::view,
+    view::{View, view},
 };
 
 const FERRIS: Asset = asset!("./ferris.png");
 
 #[page]
-async fn about_page() -> Result {
-    view! {
+async fn about_page() -> Result<impl View> {
+    Ok(view! {
         <img src=(FERRIS)>
-    }
+    })
 }
 ```
 
 You can also call the macro inline:
 
 ```rust
-# use topcoat::{asset::asset, view::view};
+# use topcoat::{asset::asset, view::{View, view}};
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result {
-view! {
+# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+Ok(view! {
     <script
         type="module"
         src=(asset!("https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"))
     ></script>
-}
+})
 # }
 ```
 

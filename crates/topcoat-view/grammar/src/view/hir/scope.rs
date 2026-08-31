@@ -56,13 +56,25 @@ impl Scope {
     }
 
     pub fn emit_emit(&self, owns_cx: bool) -> TokenStream {
-        let inner = self.emit_inner(|view| view);
+        let inner = self.emit_inert();
         quote! { #topcoat_view::internal::ScopeView::self_contained(#inner) }
+    }
+
+    /// Emits this scope as an inert view value: a block expression that
+    /// evaluates the scope's expressions in source order and builds its
+    /// `JoinView`.
+    ///
+    /// The view owns the evaluated values; whatever the expressions borrow
+    /// from the environment, it borrows. Nothing is moved into an async
+    /// block, so a scope nested in an enclosing one leaves that scope's
+    /// bindings borrowed rather than taking them.
+    pub(crate) fn emit_inert(&self) -> TokenStream {
+        self.emit_inner(|view| view)
     }
 
     pub(crate) fn emit_captured(&self, bindings: &Bindings) -> TokenStream {
         if bindings.is_empty() {
-            return self.emit_inner(|view| view);
+            return self.emit_inert();
         }
 
         let idents = bindings.idents();
@@ -141,22 +153,21 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("MoveView :: new (async move"), "{out}");
-        assert!(out.contains(":: drive (__view) . await"), "{out}");
+        assert!(out.contains("MoveView :: drive ("), "{out}");
+        assert!(out.ends_with(". await } }))"), "{out}");
     }
 
     #[test]
-    fn a_self_contained_root_owns_its_buffer() {
-        let out = ViewBuilder::new()
-            .finish()
-            .emit_view(true, true)
-            .to_string();
+    fn an_emitted_root_is_a_self_contained_scope_over_its_body() {
+        let out = ViewBuilder::new().finish().emit_emit(false).to_string();
         assert!(
             out.starts_with(":: topcoat_view :: internal :: ScopeView :: self_contained ("),
             "{out}"
         );
-        assert!(out.contains("let __cx = & __cx ;"), "{out}");
-        assert!(!out.contains("__buf"), "{out}");
-        assert!(out.contains(":: drive (__view) . await"), "{out}");
+        // The body is emitted inline, so it is neither moved into an async
+        // block nor driven: the caller awaits it where it is emitted.
+        assert!(!out.contains("MoveView"), "{out}");
+        assert!(!out.contains(":: drive (__view) . await"), "{out}");
     }
 
     #[test]
@@ -167,10 +178,10 @@ mod tests {
         let out = rendered(builder);
         // The binding borrows a temporary that lives until the end of its
         // block; the drive runs in that block, so the borrow is still valid.
-        assert!(!out.contains("let __view = {"), "{out}");
         let block = out.find("{ let x = & value ()").expect(&out);
-        let drive = out.find(":: drive (__view) . await }").expect(&out);
+        let drive = out.find("MoveView :: drive (").expect(&out);
         assert!(block < drive, "{out}");
+        assert!(out.ends_with(". await } }))"), "{out}");
     }
 
     #[test]

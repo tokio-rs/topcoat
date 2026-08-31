@@ -13,12 +13,12 @@ path_param!(post_id: u64);
 For an explicit route path, write a placeholder with the declaration's name.
 
 ```rust
-# use topcoat::{Result, router::{page, path_param}, view::view};
+# use topcoat::{Result, router::{page, path_param}, view::{View, view}};
 path_param!(post_id: u64);
 
 #[page("/posts/{post_id}")]
-async fn post() -> Result {
-    view! { "post" }
+async fn post() -> Result<impl View> {
+    Ok(view! { "post" })
 }
 ```
 
@@ -26,12 +26,12 @@ The declaration also emits a [`segment!`](macro.segment.html) override. Under [`
 
 ```rust
 // src/app/posts/id.rs serves /posts/{post_id}.
-# use topcoat::{Result, router::{page, path_param}, view::view};
+# use topcoat::{Result, router::{page, path_param}, view::{View, view}};
 path_param!(post_id: u64);
 
 #[page]
-async fn post() -> Result {
-    view! { "post" }
+async fn post() -> Result<impl View> {
+    Ok(view! { "post" })
 }
 ```
 
@@ -44,26 +44,26 @@ Reading a name that the matched route did not capture panics with `path paramete
 [`path_param::<T>(cx)`](fn.path_param.html) reads the parameter from the matched route. A declaration with `: Type` parses the segment with [`FromStr`](core::str::FromStr) and memoizes the result for the request.
 
 ```rust
-# use topcoat::{context::Cx, Result, router::{error::RouterErrorExt, page, path_param}, view::view};
+# use topcoat::{context::Cx, Result, router::{error::RouterErrorExt, page, path_param}, view::{View, view}};
 path_param!(post_id: u64);
 
 #[page("/posts/{post_id}")]
-async fn post(cx: &Cx) -> Result {
+async fn post(cx: &Cx) -> Result<impl View> {
     let post_id: &u64 = path_param::<PostId>(cx).ok_or_not_found()?;
-    view! { "post " (post_id) }
+    Ok(view! { "post " (post_id) })
 }
 ```
 
 Without a type, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str` without allocating or failing.
 
 ```rust
-# use topcoat::{context::Cx, Result, router::{page, path_param}, view::view};
+# use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
 path_param!(slug);
 
 #[page("/posts/{slug}")]
-async fn post(cx: &Cx) -> Result {
+async fn post(cx: &Cx) -> Result<impl View> {
     let slug: &str = path_param::<Slug>(cx);
-    view! { "slug " (slug) }
+    Ok(view! { "slug " (slug) })
 }
 ```
 
@@ -74,13 +74,13 @@ The unparsed declaration generates `struct Slug<T: AsRef<str> = String>(T)`. `St
 `error = ...` maps a parse failure to a router error, so a handler can use `?`.
 
 ```rust
-# use topcoat::{context::Cx, Result, router::{page, path_param}, view::view};
+# use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
 path_param!(post_id: u64, error = not_found);
 
 #[page("/posts/{post_id}")]
-async fn post(cx: &Cx) -> Result {
+async fn post(cx: &Cx) -> Result<impl View> {
     let post_id = path_param::<PostId>(cx)?;
-    view! { "post " (post_id) }
+    Ok(view! { "post " (post_id) })
 }
 ```
 
@@ -123,14 +123,14 @@ Keep the declaration private when only descendant modules read it. Use the narro
 Prefix the name with `*` to capture the remaining path as separate decoded segments. A catch-all must be the last served segment and matches at least one segment.
 
 ```rust
-# use topcoat::{context::Cx, Result, router::{CatchAllSegments, page, path_param}, view::view};
+# use topcoat::{context::Cx, Result, router::{CatchAllSegments, page, path_param}, view::{View, view}};
 path_param!(*doc_path);
 
 #[page("/docs/{*doc_path}")]
-async fn document(cx: &Cx) -> Result {
+async fn document(cx: &Cx) -> Result<impl View> {
     let path: CatchAllSegments<'_> = path_param::<DocPath>(cx);
     let path = path.collect::<std::path::PathBuf>();
-    view! { (path.display().to_string()) }
+    Ok(view! { (path.display().to_string()) })
 }
 ```
 
@@ -139,13 +139,13 @@ async fn document(cx: &Cx) -> Result {
 A typed catch-all parses each segment and returns a memoized slice.
 
 ```rust
-# use topcoat::{context::Cx, Result, router::{page, path_param}, view::view};
+# use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
 path_param!(*ids: u32, error = bad_request);
 
 #[page("/archive/{*ids}")]
-async fn archive(cx: &Cx) -> Result {
+async fn archive(cx: &Cx) -> Result<impl View> {
     let ids: &[u32] = path_param::<Ids>(cx)?;
-    view! { (format!("{ids:?}")) }
+    Ok(view! { (format!("{ids:?}")) })
 }
 ```
 
@@ -160,28 +160,28 @@ An unparsed catch-all accepts any `IntoIterator` whose items implement `AsRef<st
 The declared type can also be used in combination with the [`href!`](macro.href.html) macro. It fills the parameter slot of the handler's path to construct a URL string:
 
 ```rust
-# use topcoat::{Result, router::{href, page, path_param}, view::view};
+# use topcoat::{Result, router::{href, page, path_param}, view::{View, view}};
 path_param!(post_id: u64);
 path_param!(*doc_path);
 
 #[page("/posts/{post_id}")]
-async fn post() -> Result {
-    view! { "post" }
+async fn post() -> Result<impl View> {
+    Ok(view! { "post" })
 }
 
 #[page("/docs/{*doc_path}")]
-async fn document() -> Result {
-    view! { "doc" }
+async fn document() -> Result<impl View> {
+    Ok(view! { "doc" })
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         // /posts/1
         <a href=(href!(post, PostId(1)))>"The first post"</a>
         // /docs/guides/getting%20started
         <a href=(href!(document, DocPath(["guides", "getting started"])))>"Guides"</a>
-    }
+    })
 }
 ```
 

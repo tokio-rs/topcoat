@@ -1,16 +1,16 @@
 A shard is a special type of component that can re-run whenever its arguments change in the browser. Arguments are runtime [expressions](macro.expr.html): the browser tracks the signals they read, and when one changes it requests a fresh render from the server and swaps the result into the DOM. Shards are exposed as API endpoints from your server; arguments **must not be trusted**.
 
 ```rust
-use topcoat::{Result, context::Cx, runtime::shard, view::view};
+use topcoat::{Result, context::Cx, runtime::shard, view::{View, view}};
 
 #[shard]
-async fn search_results(cx: &Cx, query: String) -> Result {
+async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
     let products = search_products(cx, &query).await?;
-    view! {
+    Ok(view! {
         for product in products {
             <div>(product)</div>
         }
-    }
+    })
 }
 # async fn search_products(_cx: &Cx, _query: &str) -> Result<Vec<String>> { Ok(vec![]) }
 ```
@@ -22,16 +22,16 @@ Inside a [`view!`] body, call a shard like a component, passing a runtime expres
 ```rust
 # use topcoat::{Result, view::*, runtime::{shard, Event}};
 # #[shard]
-# async fn search_results(query: String) -> Result { view! { (query) } }
+# async fn search_results(query: String) -> Result<impl View> { Ok(view! { (query) }) }
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     signal query = String::new();
 
     <input :value=$(query.get()) @input=$(|e: Event| query.set(e.target.value))>
 
     search_results(query: $(query.get()))
-}
+})
 # }
 ```
 
@@ -48,18 +48,18 @@ A shard's content is a full view: it can declare signals, attach event handlers,
 A shard has its own endpoint, and a request to it runs the shard function alone. Guards applied by the page or its layouts never run, so a shard that renders private content resolves authorization itself. The caller picks the argument values, so that check covers them too: confirm the current user may see the data the arguments select.
 
 ```rust
-use topcoat::{Result, context::Cx, runtime::shard, view::view};
+use topcoat::{Result, context::Cx, runtime::shard, view::{View, view}};
 
 #[shard]
-async fn ledger_rows(cx: &Cx, account: String) -> Result {
+async fn ledger_rows(cx: &Cx, account: String) -> Result<impl View> {
     let user = require_auth(cx).await?;
     let rows = fetch_rows(cx, &user, &account).await?;
 
-    view! {
+    Ok(view! {
         for row in rows {
             <div>(row)</div>
         }
-    }
+    })
 }
 # struct User;
 # async fn require_auth(_cx: &Cx) -> Result<User> { Ok(User) }
@@ -79,9 +79,9 @@ A parameter named `cx` borrowing [`Cx`] is special: just like in a component, it
 Each shard is served by a route on the [`Router`]. `.discover()` registers every shard linked into the binary; alternatively, mount shards individually:
 
 ```rust
-# use topcoat::{Result, router::Router, runtime::{shard, RouterBuilderShardExt}, view::view};
+# use topcoat::{Result, router::Router, runtime::{shard, RouterBuilderShardExt}, view::{View, view}};
 # #[shard]
-# async fn search_results(query: String) -> Result { view! { (query) } }
+# async fn search_results(query: String) -> Result<impl View> { Ok(view! { (query) }) }
 let router = Router::builder().shard(search_results).build();
 ```
 

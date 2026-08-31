@@ -12,13 +12,13 @@ use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped, buffer::ViewHandle};
 /// in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
-/// # use topcoat::view::{component, view};
+/// # use topcoat::view::{View, component, view};
 /// # #[component]
-/// # async fn example() -> topcoat::Result {
+/// # async fn example() -> topcoat::Result<impl View> {
 /// # let my_value = "value";
-/// view! {
+/// Ok(view! {
 ///     <div>(my_value)</div>
-/// }
+/// })
 /// # }
 /// ```
 pub trait NodeViewParts {

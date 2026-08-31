@@ -6,43 +6,43 @@ A layout registers like any other handler: pass the function name to [`RouterBui
 
 # Handler signature
 
-The function is `async` and returns [`Result`](../type.Result.html). It takes the inner page's rendered output as `slot`, of type [`Result`](../type.Result.html)`<`[`View`](../view/struct.View.html)`>`, and embeds it (with `?`) somewhere in its own view. It may also take [`cx: &Cx`](../context/struct.Cx.html). Both parameters are recognized by name, may appear in either order, and no other parameters are accepted.
+The function is `async` and returns a [`Result`](../type.Result.html) of a view. It takes the inner page's content as `slot`, of type [`Slot`](type.Slot.html), and interpolates it somewhere in its own view. It may also take [`cx: &Cx`](../context/struct.Cx.html). Both parameters are recognized by name, may appear in either order, and no other parameters are accepted.
 
-Because `slot` is a `Result`, a layout sees the inner page's error before it becomes a response. Matching on the error instead of bubbling it up with `?` replaces the error output; the [router](index.html#status-codes-and-headers) docs show a branded not-found page built this way.
+A layout renders before the page it wraps resolves, so the page's error reaches the layout where the slot is interpolated. Emitting the slot from a [`live!`](../view/macro.live.html) region hands the layout that error instead of letting it become the response, which is how a branded error page is built; see the [error](../router/error/index.html) docs.
 
 # Examples
 
 Explicit path:
 
 ```rust
-use topcoat::{Result, router::layout, view::view};
+use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
 
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    view! {
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <body>
                 <nav><a href="/">"Home"</a></nav>
-                (slot?)
+                (slot)
             </body>
         </html>
-    }
+    })
 }
 ```
 
 Module-derived path (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings`):
 
 ```rust
-# use topcoat::{Result, router::layout, view::view};
+# use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
 #[layout]
-async fn settings_layout(slot: Result) -> Result {
-    view! {
+async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <section>
             <nav>"Settings nav"</nav>
-            (slot?)
+            (slot)
         </section>
-    }
+    })
 }
 ```
 
@@ -51,25 +51,25 @@ async fn settings_layout(slot: Result) -> Result {
 When several layouts match a page, they nest from least specific (outermost) to most specific (innermost):
 
 ```rust
-# use topcoat::{Result, router::{layout, page}, view::view};
+# use topcoat::{Result, router::{Slot, layout, page}, view::{View, view}};
 #[layout("/")]
-async fn root_layout(slot: Result) -> Result {
-    view! { <html><body>(slot?)</body></html> }
+async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! { <html><body>(slot)</body></html> })
 }
 
 #[layout("/settings")]
-async fn settings_layout(slot: Result) -> Result {
-    view! {
+async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <div class="settings-shell">
             <nav>"Settings nav"</nav>
-            (slot?)
+            (slot)
         </div>
-    }
+    })
 }
 
 #[page("/settings/profile")]
-async fn profile() -> Result {
-    view! { <h1>"Profile"</h1> }
+async fn profile() -> Result<impl View> {
+    Ok(view! { <h1>"Profile"</h1> })
 }
 ```
 
@@ -77,19 +77,18 @@ A request to `/settings/profile` renders `root_layout` > `settings_layout` > `pr
 
 # Layouts as components
 
-A layout doubles as a [component](../view/attr.component.html), taking a `Result<View>` as its `slot` property:
+A layout doubles as a [component](../view/attr.component.html), taking a [`Slot`](type.Slot.html) as its `slot` property:
 
 ```rust
-# use topcoat::{Result, router::{layout, page}, view::view};
+# use topcoat::{Result, router::{Slot, layout, page}, view::{View, view}};
 # #[layout("/")]
-# async fn root_layout(slot: Result) -> Result {
-#     view! { <body>(slot?)</body> }
+# async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+#     Ok(view! { <body>(slot)</body> })
 # }
 #[page("/standalone")]
-async fn standalone() -> Result {
-    let content = view! { <p>"content"</p> }?;
-    view! {
-        root_layout(slot: Ok(content))
-    }
+async fn standalone() -> Result<impl View> {
+    Ok(view! {
+        root_layout(slot: Slot::new(view! { <p>"content"</p> }))
+    })
 }
 ```

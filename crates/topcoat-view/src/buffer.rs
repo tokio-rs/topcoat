@@ -70,6 +70,14 @@ impl ViewBuffer {
         self.id
     }
 
+    /// Builds a self-contained view in one synchronous burst from the parts
+    /// `f` pushes: one block in a fresh buffer, sealed into the handle.
+    #[cfg(test)]
+    pub(crate) fn build(f: impl FnOnce(&mut PartsWriter<'_>)) -> ViewHandle {
+        let mut buffer = Self::new();
+        buffer.block(f).seal(buffer)
+    }
+
     /// Appends one view's instruction block in one synchronous burst,
     /// filled by `f` through a [`PartsWriter`].
     ///

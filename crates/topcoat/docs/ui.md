@@ -50,14 +50,14 @@ Link the generated stylesheet from your root layout, as with any Tailwind setup.
 use topcoat::{
     Result,
     font::fontsource::fontsource_font,
-    router::layout,
+    router::{Slot, layout},
     tailwind,
-    view::view,
+    view::{View, view},
 };
 
 #[layout]
-async fn layout(slot: Result) -> Result {
-    view! {
+async fn layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -65,10 +65,10 @@ async fn layout(slot: Result) -> Result {
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
             </head>
             <body>
-                (slot?)
+                (slot)
             </body>
         </html>
-    }
+    })
 }
 ```
 
@@ -110,11 +110,11 @@ use components::card::{
 };
 use components::input::input;
 use components::label::label;
-use topcoat::{Result, view::{attributes, component, view}};
+use topcoat::{Result, view::{View, attributes, component, view}};
 
 #[component]
-async fn sign_in() -> Result {
-    view! {
+async fn sign_in() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Sign in")
@@ -130,7 +130,7 @@ async fn sign_in() -> Result {
             )
             card_footer(button(attrs: attributes! { class="w-full" }, "Sign in"))
         )
-    }
+    })
 }
 ```
 

@@ -1,18 +1,18 @@
-Components are async functions annotated with [`#[component]`][`component`]. They return a [`View`] through the usual Topcoat [`Result`] type, and can take typed parameters like any other Rust function.
+Components are async functions annotated with [`#[component]`][`component`]. They return a value implementing [`View`] through the usual Topcoat [`Result`] type, and can take typed parameters like any other Rust function.
 
 ```rust
 use topcoat::{
     Result,
-    view::{component, view},
+    view::{View, component, view},
 };
 
 #[component]
-async fn badge(label: &str, tone: &str) -> Result {
-    view! {
+async fn badge(label: &str, tone: &str) -> Result<impl View> {
+    Ok(view! {
         <span class=(format!("badge badge-{tone}"))>
             (label)
         </span>
-    }
+    })
 }
 ```
 
@@ -23,17 +23,17 @@ Call components inside [`view!`] with a call syntax similar to function calls, b
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn badge(label: &str, tone: &str) -> Result { view! { <span>(label)(tone)</span> } }
+# async fn badge(label: &str, tone: &str) -> Result<impl View> { Ok(view! { <span>(label)(tone)</span> }) }
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     <header>
         badge(
             label: "New",
             tone: "success",
         )
     </header>
-}
+})
 # }
 ```
 
@@ -41,31 +41,31 @@ The name `key` is reserved: a `key:` argument keys the invocation's identity ins
 
 # Child Content
 
-If a component accepts a parameter named `child` with type [`View`], any extra view nodes in the call are collected and passed as that child view.
+If a component accepts a parameter named `child` with type [`Child`], any extra view nodes in the call are collected and passed as that child view. Give it `#[default]` so the component can also be called without children.
 
 ```rust
 use topcoat::{
     Result,
-    view::{View, component, view},
+    view::{Child, View, component, view},
 };
 
 #[component]
-async fn panel(title: &str, child: View) -> Result {
-    view! {
+async fn panel(title: &str, #[default] child: Child<'_>) -> Result<impl View> {
+    Ok(view! {
         <section class="panel">
             <h2>(title)</h2>
             <div class="panel-body">
                 (child)
             </div>
         </section>
-    }
+    })
 }
 
 # #[component]
-# async fn badge(label: &str, tone: &str) -> Result { view! { <span>(label)(tone)</span> } }
+# async fn badge(label: &str, tone: &str) -> Result<impl View> { Ok(view! { <span>(label)(tone)</span> }) }
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     panel(
         title: "Profile",
         // Child nodes:
@@ -75,7 +75,7 @@ view! {
             tone: "success",
         )
     )
-}
+})
 # }
 ```
 
@@ -89,13 +89,13 @@ A component's properties can be modified with attributes:
 - `#[into]` lets callers pass anything that converts via `Into`. While you could use `impl Into<T>` instead, using `#[into]` calls `.into()` outside of your function body and prevents many monomorphizations of the function itself.
 
 ```rust
-# use topcoat::{Result, view::{component, view}};
+# use topcoat::{Result, view::{View, component, view}};
 # #[derive(Default)]
 # struct Tone;
 #[component]
-async fn badge(#[into] label: String, #[default] tone: Tone, #[default(80)] max_length: usize) -> Result {
+async fn badge(#[into] label: String, #[default] tone: Tone, #[default(80)] max_length: usize) -> Result<impl View> {
     // ...
-#     view! { <span>(label)</span> }
+#     Ok(view! { <span>(label)</span> })
 }
 ```
 
@@ -104,20 +104,20 @@ async fn badge(#[into] label: String, #[default] tone: Tone, #[default(80)] max_
 Components can be generic. Depending on usage, you may need to declare the type as `Send` or `Sync`:
 
 ```rust
-# use topcoat::{Result, view::{component, view}};
+# use topcoat::{Result, view::{View, component, view}};
 #[component]
-async fn count<T: Send + Sync>(items: Vec<T>) -> Result {
-    view! { <span>(items.len())</span> }
+async fn count<T: Send + Sync>(items: Vec<T>) -> Result<impl View> {
+    Ok(view! { <span>(items.len())</span> })
 }
 ```
 
 `impl Trait` parameters work too:
 
 ```rust
-# use topcoat::{Result, view::{component, view}};
+# use topcoat::{Result, view::{View, component, view}};
 #[component]
-async fn shout(label: impl Into<String> + Send) -> Result {
-    view! { <b>(label.into().to_uppercase())</b> }
+async fn shout(label: impl Into<String> + Send) -> Result<impl View> {
+    Ok(view! { <b>(label.into().to_uppercase())</b> })
 }
 ```
 
@@ -132,14 +132,14 @@ use topcoat::{
     Result,
     context::Cx,
     router::request::uri,
-    view::{component, view},
+    view::{View, component, view},
 };
 
 #[component]
-async fn current_path(cx: &Cx) -> Result {
-    view! {
+async fn current_path(cx: &Cx) -> Result<impl View> {
+    Ok(view! {
         <span>(uri(cx).path())</span>
-    }
+    })
 }
 ```
 
@@ -151,7 +151,7 @@ A component calling itself, either directly or indirectly, causes a dependency c
 ```rust
 use topcoat::{
     Result,
-    view::{component, view},
+    view::{View, component, view},
 };
 
 struct Comment {
@@ -160,8 +160,8 @@ struct Comment {
 }
 
 #[component(boxed)]
-async fn comment_thread(comment: &Comment) -> Result {
-    view! {
+async fn comment_thread(comment: &Comment) -> Result<impl View> {
+    Ok(view! {
         <li>
             (&comment.body)
             if !comment.replies.is_empty() {
@@ -172,12 +172,13 @@ async fn comment_thread(comment: &Comment) -> Result {
                 </ul>
             }
         </li>
-    }
+    })
 }
 ```
 
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html
-[`View`]: struct.View.html
+[`Child`]: struct.Child.html
+[`View`]: trait.View.html
 [`component`]: attr.component.html
 [`view!`]: macro.view.html

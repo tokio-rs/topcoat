@@ -9,7 +9,7 @@ use topcoat::{
     Result,
     font::{Font, font},
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::view,
+    view::{View, view},
 };
 
 // Declare the "Orbitron" font.
@@ -32,8 +32,8 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <head>
@@ -43,7 +43,7 @@ async fn home() -> Result {
                 <h1 style="font-family: 'Orbitron'">"Hello!"</h1>
             </body>
         </html>
-    }
+    })
 }
 ```
 

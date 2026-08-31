@@ -16,6 +16,13 @@ impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
         Self { cx, parts }
     }
 
+    /// Builds a self-contained view in one synchronous burst, pushing its
+    /// parts through the builder handed to `f`.
+    #[cfg(test)]
+    pub(crate) fn build(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> ViewHandle {
+        crate::buffer::ViewBuffer::build(|parts| f(&mut Builder::new(cx, parts)))
+    }
+
     /// Appends one view's instruction block to the buffer of the build in
     /// one synchronous burst, pushing its parts through the builder handed
     /// to `f`, and returns the handle to the block.

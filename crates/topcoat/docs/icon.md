@@ -9,7 +9,7 @@ use topcoat::{
     Result,
     icon::{IconData, icon},
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::{svg::ViewBox, view},
+    view::{View, svg::ViewBox, view},
 };
 
 // An icon is a view box plus a raw SVG body:
@@ -26,15 +26,15 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <body>
                 <p>"Move to " icon(data: TRASH, label: "trash")</p>
             </body>
         </html>
-    }
+    })
 }
 ```
 
@@ -44,10 +44,10 @@ The rendered `<svg>` is `1em` square by default, so the icon matches the font si
 # use topcoat::{Result, icon::{IconData, icon}, view::*};
 # const TRASH: IconData = IconData::unescaped_unchecked(svg::ViewBox::new(0.0, 0.0, 24.0, 24.0), "<g/>");
 # #[component]
-# async fn example() -> Result {
-view! {
+# async fn example() -> Result<impl View> {
+Ok(view! {
     icon(data: TRASH, size: 48, label: "Delete")
-}
+})
 # }
 ```
 

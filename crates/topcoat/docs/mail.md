@@ -71,12 +71,13 @@ Addresses can be written as strings, `(name, address)` pairs, or [`Mailbox`] val
 The `attachments` field carries files with the mail. A downloadable [`Attachment`] is presented to the recipient as a file; an [inline attachment](Attachment::inline) is displayed where the HTML body references its content id through a `cid:` URL:
 
 ```rust
-# use topcoat::Result;
+# use topcoat::{Result, context::Cx};
 # use topcoat::mail::{Attachment, mail};
-# async fn example() -> Result<()> {
+# async fn example(cx: &Cx) -> Result<()> {
 let mail = mail! {
     subject: "Your invoice",
     html: {
+        cx =>
         <img src="cid:logo" alt="Example logo">
         <p>"The invoice is attached."</p>
     },

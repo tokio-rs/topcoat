@@ -331,13 +331,13 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 /// class list without present entries omits the whole attribute:
 ///
 /// ```rust
-/// # use topcoat::view::{class, component, view};
+/// # use topcoat::view::{View, class, component, view};
 /// # #[component]
-/// # async fn example() -> topcoat::Result {
+/// # async fn example() -> topcoat::Result<impl View> {
 /// # let is_active = true;
-/// view! {
+/// Ok(view! {
 ///     <button class=(class!("btn", "active" if is_active))>"Save"</button>
-/// }
+/// })
 /// # }
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
@@ -393,11 +393,11 @@ pub type StaticClass = Class<Unescaped<PromotedStr>>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AttributeValue, Attributes, buffer::ViewBuffer, internal::Builder};
+    use crate::{AttributeValue, Attributes, internal::Builder};
 
     fn render(class: Class<impl ClassEntries>) -> String {
         let cx = Cx::default();
-        ViewBuffer::build(|parts| Builder::new(&cx, parts).attribute_value(class)).render(&cx)
+        Builder::build(&cx, |b| b.attribute_value(class)).render(&cx)
     }
 
     #[test]

@@ -6,12 +6,12 @@ use std::ops::Deref;
 /// Use it to optimize your rendering, for example for static class strings.
 ///
 /// ```rust
-/// # use topcoat::view::{PromotedStr, component, view};
+/// # use topcoat::view::{PromotedStr, View, component, view};
 /// # #[component]
-/// # async fn example() -> topcoat::Result {
-/// view! {
+/// # async fn example() -> topcoat::Result<impl View> {
+/// Ok(view! {
 ///     <div>(PromotedStr(&"hello"))</div>
-/// }
+/// })
 /// # }
 /// ```
 ///
@@ -38,13 +38,13 @@ impl Deref for PromotedStr {
 /// wrapping one in this type records the string as is:
 ///
 /// ```rust
-/// # use topcoat::view::{StaticStr, component, view};
+/// # use topcoat::view::{StaticStr, View, component, view};
 /// # #[component]
-/// # async fn example() -> topcoat::Result {
+/// # async fn example() -> topcoat::Result<impl View> {
 /// # let name: &'static str = "hello";
-/// view! {
+/// Ok(view! {
 ///     <div>(StaticStr(name))</div>
-/// }
+/// })
 /// # }
 /// ```
 ///
