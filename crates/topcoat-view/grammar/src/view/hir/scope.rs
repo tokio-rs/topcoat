@@ -46,7 +46,7 @@ impl Scope {
             }
         });
         quote! {
-            #topcoat_view::internal::ScopeView::self_contained(
+            #topcoat_view::internal::ScopeView::new(
                 #topcoat_view::internal::MoveView::new(async move {
                     let __cx = &__cx;
                     #inner
@@ -61,6 +61,10 @@ impl Scope {
     }
 
     pub(crate) fn emit_captured(&self, bindings: &Bindings) -> TokenStream {
+        if bindings.is_empty() {
+            self.emit_view(false);
+        }
+
         let idents = bindings.idents();
         let rebinds = bindings.rebinds();
 
