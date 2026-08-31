@@ -1,20 +1,20 @@
 use std::{
     cell::Cell,
+    future::Ready,
     pin::Pin,
     sync::atomic::{AtomicU64, Ordering},
     task::{Context, Poll},
 };
 
 use pin_project_lite::pin_project;
-use topcoat_core::{context::Cx, error::Result};
+use topcoat_core::error::Result;
 
 use crate::{RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
 
 static NEXT_REGION: AtomicU64 = AtomicU64::new(1);
 
 pin_project! {
-    pub struct LiveView<'cx, Fut> {
-        cx: &'cx Cx,
+    pub struct LiveView<Fut> {
         #[pin]
         body: Fut,
         region: Option<RegionId>,
@@ -22,14 +22,13 @@ pin_project! {
     }
 }
 
-impl<'cx, Fut> LiveView<'cx, Fut>
+impl<Fut> LiveView<Fut>
 where
     Fut: Future<Output = Result<()>>,
 {
     #[doc(hidden)]
-    pub fn new(cx: &'cx Cx, body: Fut) -> Self {
+    pub fn new(body: Fut) -> Self {
         Self {
-            cx,
             body,
             region: None,
             stash: None,
@@ -37,13 +36,13 @@ where
     }
 }
 
-impl<Fut> LiveView<'_, Fut> {
+impl LiveView<Ready<()>> {
     pub fn drive<V: View>(view: V) -> impl Future<Output = Result<()>> {
         DriveFuture { view, first: true }
     }
 }
 
-impl<Fut> View for LiveView<'_, Fut>
+impl<Fut> View for LiveView<Fut>
 where
     Fut: Future<Output = Result<()>> + Send,
 {

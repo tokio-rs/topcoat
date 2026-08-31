@@ -26,6 +26,15 @@ impl<V> ScopeView<V> {
             polled: false,
         }
     }
+
+    #[must_use]
+    pub fn self_contained(view: V) -> Self {
+        Self {
+            view,
+            buffer: Some(Box::new(ViewBuffer::new())),
+            polled: false,
+        }
+    }
 }
 
 impl<V> View for ScopeView<V>
@@ -35,7 +44,7 @@ where
     fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         let this = self.project();
 
-        if !*this.polled && !ViewBufferScope::is_active() {
+        if !*this.polled && !this.buffer.is_some() && !ViewBufferScope::is_active() {
             *this.buffer = Some(Box::new(ViewBuffer::new()));
         }
         *this.polled = true;

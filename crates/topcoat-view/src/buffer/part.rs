@@ -246,9 +246,9 @@ impl<'a> PartsWriter<'a> {
             "tried to push comment in html context {:?}",
             self.context,
         );
-        self.push_promoted_str_unescaped(&"<!-- ");
+        self.push_promoted_str_unescaped(&"<!--");
         self.in_context(HtmlContext::Comment, build);
-        self.push_promoted_str_unescaped(&" -->");
+        self.push_promoted_str_unescaped(&"-->");
         self
     }
 

@@ -5,13 +5,6 @@ use topcoat_core_grammar::paths::topcoat_view;
 
 use crate::view::View;
 
-/// The parsed body of a `live!` invocation: plain Rust statements that emit
-/// views at the region with `emit!`.
-///
-/// Lowers to a [`LiveView`](topcoat_view::internal::LiveView) value
-/// wrapping the body as the async block driving the region verbatim, so it
-/// must end in an expression producing the region's `Result<(), Error>`:
-/// the final `emit!` itself, an explicit `Ok(())`, or a diverging `loop`.
 pub struct Live {
     pub body: Vec<syn::Stmt>,
 }
@@ -54,13 +47,6 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Live {
     }
 }
 
-/// The parsed body of an `emit!` invocation: a view body, emitted at the
-/// enclosing `live!` invocation's region.
-///
-/// Lowers to the self-contained view, built in a buffer of its own so the
-/// emitted content renders on its own, driven in place with
-/// [`drive`](topcoat_view::internal::drive): the invocation is an
-/// expression of type `Result<(), Error>`.
 pub struct Emit {
     pub view: View,
 }
@@ -77,7 +63,7 @@ impl ToTokens for Emit {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let view = self.view.expand(true);
         quote! {
-            #topcoat_view::internal::drive(#view).await
+            #topcoat_view::internal::LiveView::drive(#view).await
         }
         .to_tokens(tokens);
     }

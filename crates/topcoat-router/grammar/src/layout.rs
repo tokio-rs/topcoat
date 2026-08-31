@@ -121,7 +121,7 @@ impl ToTokens for Layout {
                         #ident, cx, props,
                     )
                     .await?;
-                    #topcoat_view::internal::drive(view).await
+                    #topcoat_view::internal::MoveView::drive(view).await
                 }))
             }
         };
