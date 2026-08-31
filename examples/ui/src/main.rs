@@ -384,7 +384,7 @@ async fn home(cx: &Cx) -> Result {
                                 ))
                             >
                                 "Read the docs"
-                                icon(data: iconify_icon!("feather:arrow-right"))
+                                icon(data: iconify_icon!("lucide:arrow-right"))
                             </a>
                             <a
                                 href=(REPOSITORY)
@@ -486,7 +486,7 @@ async fn buttons_card() -> Result {
                         button(
                             size: ButtonSize::Icon,
                             variant: ButtonVariant::Outline,
-                            icon(data: iconify_icon!("feather:plus"), label: "Add item")
+                            icon(data: iconify_icon!("lucide:plus"), label: "Add item")
                         )
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -516,7 +516,7 @@ async fn notices() -> Result {
             // The leading icon is an ordinary child: the alert lays out a
             // column for it only when one is there.
             alert(
-                icon(data: iconify_icon!("feather:info"))
+                icon(data: iconify_icon!("lucide:info"))
                 alert_title("Every control is a link or a form")
                 alert_description(
                     "Nothing on this page needs scripting; the URL holds what \
@@ -525,7 +525,7 @@ async fn notices() -> Result {
             )
             alert(
                 variant: AlertVariant::Destructive,
-                icon(data: iconify_icon!("feather:alert-triangle"))
+                icon(data: iconify_icon!("lucide:triangle-alert"))
                 alert_title("The destructive variant")
                 alert_description(
                     "For what went wrong, and for what cannot be taken back."
@@ -982,7 +982,7 @@ async fn branches_card(state: &State) -> Result {
                             },
                             (state.branch)
                             icon(
-                                data: iconify_icon!("feather:chevron-down"),
+                                data: iconify_icon!("lucide:chevron-down"),
                                 attrs: attributes! { class="transition-transform group-open:rotate-180" }
                             )
                         )
@@ -1051,11 +1051,11 @@ async fn toolbar_card() -> Result {
                         separator(orientation: SeparatorOrientation::Vertical)
                         <div class="flex items-center gap-1">
                             for (name, data, text, pressed) in [
-                                ("bold", iconify_icon!("feather:bold"), "Bold", true),
-                                ("italic", iconify_icon!("feather:italic"), "Italic", false),
+                                ("bold", iconify_icon!("lucide:bold"), "Bold", true),
+                                ("italic", iconify_icon!("lucide:italic"), "Italic", false),
                                 (
                                     "underline",
-                                    iconify_icon!("feather:underline"),
+                                    iconify_icon!("lucide:underline"),
                                     "Underline",
                                     false,
                                 ),
@@ -1070,7 +1070,7 @@ async fn toolbar_card() -> Result {
                     toggle(
                         size: ToggleSize::Lg,
                         attrs: attributes! { name="live" checked="" },
-                        icon(data: iconify_icon!("feather:activity"))
+                        icon(data: iconify_icon!("lucide:activity"))
                         "Live updates"
                     )
                 </div>
@@ -1107,7 +1107,7 @@ async fn share_card() -> Result {
                             ))
                         >
                             icon(
-                                data: iconify_icon!("feather:book-open"),
+                                data: iconify_icon!("lucide:book-open"),
                                 label: "Read the docs"
                             )
                         </a>
@@ -1254,7 +1254,7 @@ async fn deployments_card(state: &State) -> Result {
                         href=(state.href("overlay", Some("filters")))
                         class=(button_variants(ButtonVariant::Outline, ButtonSize::Sm))
                     >
-                        icon(data: iconify_icon!("feather:filter"))
+                        icon(data: iconify_icon!("lucide:filter"))
                         "Filters"
                     </a>
                 </div>
@@ -1478,7 +1478,7 @@ async fn rename_dialog(state: &State) -> Result {
                         "absolute top-3 right-3",
                     ))
                 >
-                    icon(data: iconify_icon!("feather:x"), label: "Close")
+                    icon(data: iconify_icon!("lucide:x"), label: "Close")
                 </a>
                 <form class="flex flex-col gap-4">
                     state_fields(state: state, sets: "overlay name")

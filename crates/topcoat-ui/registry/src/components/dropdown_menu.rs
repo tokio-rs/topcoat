@@ -62,7 +62,7 @@ const TRIGGER: StaticClass = class!("cursor-pointer list-none [&::-webkit-detail
 ///         },
 ///         "Options"
 ///         icon(
-///             data: iconify_icon!("feather:chevron-down"),
+///             data: iconify_icon!("lucide:chevron-down"),
 ///             attrs: attributes! { class="group-open:rotate-180" }
 ///         )
 ///     )
@@ -187,7 +187,7 @@ pub async fn dropdown_menu_sub_trigger(
         >
             (child)
             icon(
-                data: iconify_icon!("feather:chevron-right"),
+                data: iconify_icon!("lucide:chevron-right"),
                 attrs: attributes! { class="ml-auto size-4" }
             )
         </summary>

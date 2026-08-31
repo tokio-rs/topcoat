@@ -36,7 +36,7 @@ pub async fn spinner(
 ) -> Result {
     view! {
         icon(
-            data: iconify_icon!("feather:loader"),
+            data: iconify_icon!("lucide:loader-circle"),
             size: size,
             label: label,
             attrs: attributes! {
