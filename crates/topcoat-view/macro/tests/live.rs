@@ -1,10 +1,13 @@
-use std::{future::poll_fn, io, pin::Pin};
+use std::{
+    future::poll_fn,
+    io,
+    pin::{Pin, pin},
+};
 
-use futures_core::Stream;
 use topcoat::{
     Result,
     context::Cx,
-    view::{Swaps, View, ViewExt, ViewSwap, component, emit, live, view},
+    view::{View, ViewExt, ViewFirst, ViewSwap, component, emit, live, view},
 };
 
 #[component]
@@ -15,8 +18,14 @@ async fn load(fail: bool) -> Result<impl View> {
     Ok(view! { <p>"loaded"</p> })
 }
 
-async fn next<V: View>(swaps: &mut Swaps<V>) -> Option<Result<ViewSwap>> {
-    poll_fn(|cx| Pin::new(&mut *swaps).poll_next(cx)).await
+/// Polls `view` for its first content.
+async fn first<V: View>(view: &mut Pin<&mut V>) -> Result<ViewFirst> {
+    poll_fn(|cx| view.as_mut().poll_first(cx)).await
+}
+
+/// Polls `view` for its next swap.
+async fn next_swap<V: View>(view: &mut Pin<&mut V>) -> Result<Option<ViewSwap>> {
+    poll_fn(|cx| view.as_mut().poll_swap(cx)).await
 }
 
 #[tokio::test]
@@ -29,6 +38,27 @@ async fn region_emitting_once_renders_as_plain_content() {
         .render(cx);
 
     assert_eq!(html, "<main><p>loaded</p></main>");
+}
+
+#[tokio::test]
+async fn region_emitting_once_is_not_live() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! { cx => <main>(live! { emit! { load(fail: false) } })</main> });
+
+    assert!(!first(&mut view).await.unwrap().live);
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn region_emitting_a_view_against_its_own_cx_renders_its_content() {
+    let cx = &Cx::default();
+    let html = view! { cx => <main>(live! { emit! { cx => <p>"own"</p> } })</main> }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+    assert_eq!(html, "<main><p>own</p></main>");
 }
 
 #[tokio::test]
@@ -86,7 +116,7 @@ async fn region_failing_after_an_emission_fails_the_view() {
 #[tokio::test]
 async fn region_emitting_twice_swaps_its_content() {
     let cx = &Cx::default();
-    let (content, mut swaps) = view! {
+    let mut view = pin!(view! {
         cx =>
         <main>
             (live! {
@@ -94,25 +124,48 @@ async fn region_emitting_twice_swaps_its_content() {
                 emit! { <p>"second"</p> }
             })
         </main>
-    }
-    .live()
-    .await
-    .unwrap();
-    assert!(swaps.is_live());
+    });
 
-    let swap = next(&mut swaps).await.unwrap().unwrap();
+    // The first content marks the region off, so the swap can find it again.
+    let content = first(&mut view).await.unwrap();
+    assert!(content.live);
+
+    let swap = next_swap(&mut view).await.unwrap().unwrap();
     let region = swap.region;
     assert_eq!(
-        content.render(cx),
+        content.content.render(cx),
         format!("<main><!--tc:{region}--><p>first</p><!--/tc:{region}--></main>")
     );
     assert_eq!(swap.replacement.render(cx), "<p>second</p>");
-    assert!(!swaps.is_live());
-    assert!(next(&mut swaps).await.is_none());
+
+    // The body ran out of emissions, so the region is done.
+    assert!(next_swap(&mut view).await.unwrap().is_none());
 }
 
 #[tokio::test]
-#[should_panic(expected = "`single` called on a live view")]
+async fn region_emitting_three_times_swaps_its_content_twice() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! {
+        cx =>
+        <main>
+            (live! {
+                emit! { <p>"one"</p> }?;
+                emit! { <p>"two"</p> }?;
+                emit! { <p>"three"</p> }
+            })
+        </main>
+    });
+
+    assert!(first(&mut view).await.unwrap().live);
+    let swap = next_swap(&mut view).await.unwrap().unwrap();
+    assert_eq!(swap.replacement.render(cx), "<p>two</p>");
+    let swap = next_swap(&mut view).await.unwrap().unwrap();
+    assert_eq!(swap.replacement.render(cx), "<p>three</p>");
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+#[should_panic(expected = "used `.single()` on a View that is live")]
 async fn single_panics_on_a_region_that_may_update() {
     let cx = &Cx::default();
     let _ = view! {

@@ -1,6 +1,7 @@
 mod attributes;
 mod class;
 mod component;
+mod concurrent;
 mod control_flow;
 mod identity;
 mod live;

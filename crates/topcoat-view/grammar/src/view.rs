@@ -135,16 +135,16 @@ mod tests {
     #[test]
     fn explicit_cx_binds_the_context_identifier() {
         let tokens = parse("cx => <div></div>").to_token_stream().to_string();
-        assert!(tokens.contains("let __cx : "), "{tokens}");
         assert!(tokens.contains("Cx = (cx) . clone () ;"), "{tokens}");
+        assert!(tokens.contains("let __cx = & __cx ;"), "{tokens}");
     }
 
     #[test]
     fn omitted_cx_emits_no_binding() {
-        let tokens = parse("<div></div>").to_token_stream().to_string();
         // The view borrows whatever context is already in scope instead of
         // cloning one of its own.
-        assert!(!tokens.contains("clone ()"), "{tokens}");
+        let tokens = parse("<div></div>").to_token_stream().to_string();
+        assert!(!tokens.contains("let __cx"), "{tokens}");
     }
 
     #[test]

@@ -4,7 +4,6 @@ use std::{
 };
 
 use bytes::Bytes;
-use futures_core::Stream;
 use futures_util::future::poll_fn;
 use http::{HeaderMap, StatusCode};
 use http_body::Frame;
@@ -108,7 +107,7 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
         match this.view.poll_swap(cx) {
             Poll::Ready(Ok(Some(swap))) => {
                 let region = swap.region;
-                let html = swap.replacement.render(&this.cx);
+                let html = swap.replacement.render(this.cx);
                 let envelope = format!(
                     "<template data-tc-swap=\"{region}\">{html}</template>\
                      <script>topcoat.swap({region})</script>",

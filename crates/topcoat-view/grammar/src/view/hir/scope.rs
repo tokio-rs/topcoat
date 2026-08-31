@@ -39,7 +39,20 @@ impl Scope {
         }
     }
 
+    /// Emits a top-level `view!` invocation: a `ScopeView` around a
+    /// `MoveView` whose `async move` body builds the scope's view and drives
+    /// it in place.
+    ///
+    /// The block captures every value the template uses, so the view owns its
+    /// data and the expressions inside borrow from the block. The built view
+    /// is driven inside the block that evaluates the template, so what its
+    /// expressions borrow from that block is still alive.
+    ///
+    /// With `owns_cx`, the block expects an owned `__cx` context in scope and
+    /// captures it, rebinding `__cx` to a borrow of it inside; the view then
+    /// does not borrow the caller's context.
     pub fn emit_view(&self, owns_cx: bool) -> TokenStream {
+        let prologue = borrow_cx(owns_cx);
         let inner = self.emit_inner(|view| {
             quote! {
                 #topcoat_view::internal::MoveView::drive(#view).await
@@ -48,16 +61,32 @@ impl Scope {
         quote! {
             #topcoat_view::internal::ScopeView::new(
                 #topcoat_view::internal::MoveView::new(async move {
-                    let __cx = &__cx;
+                    #prologue
                     #inner
                 })
             )
         }
     }
 
+    /// Emits an `emit!` invocation: the scope's view, built inline in a
+    /// `ScopeView` of its own.
+    ///
+    /// The view always owns a buffer, so its content renders anywhere even
+    /// when it is emitted inside another build. Nothing is moved into an
+    /// async block: the caller awaits the view where it is emitted, so the
+    /// template borrows from the enclosing block as it stands.
+    ///
+    /// With `owns_cx`, an owned `__cx` context is in scope and the view
+    /// borrows it.
     pub fn emit_emit(&self, owns_cx: bool) -> TokenStream {
+        let prologue = borrow_cx(owns_cx);
         let inner = self.emit_inert();
-        quote! { #topcoat_view::internal::ScopeView::self_contained(#inner) }
+        quote! {
+            #topcoat_view::internal::ScopeView::self_contained({
+                #prologue
+                #inner
+            })
+        }
     }
 
     /// Emits this scope as an inert view value: a block expression that
@@ -101,6 +130,17 @@ impl Scope {
             node.emit(&mut emitter);
         }
         emitter.finish(tail)
+    }
+}
+
+/// Rebinds an owned `__cx` context to a borrow of it, so the template reads
+/// the same `&Cx` it would from an ambient context. Empty when the context is
+/// already borrowed.
+fn borrow_cx(owns_cx: bool) -> TokenStream {
+    if owns_cx {
+        quote! { let __cx = &__cx; }
+    } else {
+        TokenStream::new()
     }
 }
 
@@ -424,7 +464,7 @@ mod tests {
         let mut builder = ViewBuilder::new();
         add_component(&mut builder, "solo");
         let out = rendered(builder);
-        assert!(out.contains("IdentityFuture :: child"));
+        assert!(out.contains("IdentityGuard :: enter ("));
         assert!(out.contains("SiteKey :: new"));
         assert!(out.contains("file ! ()"));
     }
@@ -448,7 +488,7 @@ mod tests {
         let mut builder = ViewBuilder::new();
         add_keyed_component(&mut builder, "card", &syn::parse_quote!(item.id));
         let out = rendered(builder);
-        assert!(out.contains("IdentityFuture :: keyed"));
+        assert!(out.contains("IdentityGuard :: enter_keyed"));
         assert!(out.contains("item . id"));
     }
 
@@ -459,7 +499,7 @@ mod tests {
             add_component(body, "card");
         });
         let out = rendered(builder);
-        assert!(out.contains("IdentityFuture :: ambiguous"));
+        assert!(out.contains("IdentityGuard :: enter_ambiguous"));
         assert!(out.contains("\"`card`\""));
     }
 
@@ -470,8 +510,8 @@ mod tests {
             add_keyed_component(body, "card", &syn::parse_quote!(x));
         });
         let out = rendered(builder);
-        assert!(out.contains("IdentityFuture :: keyed"));
-        assert!(!out.contains("IdentityFuture :: ambiguous"));
+        assert!(out.contains("IdentityGuard :: enter_keyed"));
+        assert!(!out.contains("IdentityGuard :: enter_ambiguous"));
     }
 
     #[test]
@@ -483,7 +523,7 @@ mod tests {
             });
         });
         let out = rendered(builder);
-        assert!(out.contains("IdentityFuture :: ambiguous"));
+        assert!(out.contains("IdentityGuard :: enter_ambiguous"));
     }
 
     #[test]
@@ -496,8 +536,8 @@ mod tests {
         // The wrapper repeats unkeyed, but its child does not repeat
         // relative to it; the wrapper's ambiguity poisons the child at
         // runtime instead.
-        assert_eq!(out.matches("IdentityFuture :: ambiguous").count(), 1);
-        assert_eq!(out.matches("IdentityFuture :: child").count(), 1);
+        assert_eq!(out.matches("IdentityGuard :: enter_ambiguous").count(), 1);
+        assert_eq!(out.matches("IdentityGuard :: enter (").count(), 1);
     }
 
     #[test]

@@ -26,24 +26,16 @@ use crate::component::{ComponentAttr, ComponentItem};
 /// - a zero-sized marker struct named after the function that implements
 ///   [`topcoat::view::Component`] with a `render` method calling the original function body.
 ///
-/// With the `boxed` argument (`#[component(boxed)]`), `render` returns a
-/// heap-allocated `Pin<Box<dyn Future>>` whose type is spelled out in the
-/// signature, so the compiler never has to infer the future type from the
-/// body. Recursive components need this on at least one component in the
-/// cycle: with only opaque futures, computing any one future type requires
-/// type-checking the body that awaits the next, which loops back around.
-///
 /// [`Props`]: derive.Props.html
 /// [`topcoat::view::Component`]: trait.Component.html
 pub struct Component {
-    attr: ComponentAttr,
     item: ComponentItem,
 }
 
 impl Component {
     #[must_use]
-    pub fn new(attr: ComponentAttr, item: ComponentItem) -> Self {
-        Self { attr, item }
+    pub fn new(_attr: ComponentAttr, item: ComponentItem) -> Self {
+        Self { item }
     }
 
     /// Parses a `#[component]` attribute and function item from token streams.
@@ -87,6 +79,17 @@ impl ToTokens for Component {
             }
         }
 
+        // A returned view that borrows lives no longer than the context the
+        // trait method hands out. The method spells the return type out in an
+        // associated type position, where elision does not apply, so name the
+        // context lifetime there and tie the parameters it borrows from to it.
+        let mut context_lifetime_visitor = ContextLifetimeVisitor { used: false };
+        context_lifetime_visitor.visit_return_type_mut(&mut item.sig.output);
+        if context_lifetime_visitor.used {
+            for input in &mut item.sig.inputs {
+                context_lifetime_visitor.visit_fn_arg_mut(input);
+            }
+        }
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("validated in Parse");
         };
@@ -202,51 +205,19 @@ impl ToTokens for Component {
         }
         .to_tokens(tokens);
 
-        // In boxed mode the future type is spelled out in the signature, so
-        // the compiler never has to infer it from the body. That breaks the
-        // inference cycle recursive components would otherwise cause, where
-        // computing one component's opaque future type requires type-checking
-        // the body that awaits the next component's, looping back around.
-        // Refining the trait's opaque return type to the concrete boxed one is
-        // deliberate and invisible to `view!` callers.
-        let render = if self.attr.boxed() {
-            quote! {
-                #[allow(refining_impl_trait)]
-                fn render<'__cx, '__props>(
-                    self,
-                    cx: &'__cx #topcoat_context::Cx,
-                    props: Self::Props<'__props>,
-                ) -> ::core::pin::Pin<::std::boxed::Box<
-                    dyn ::core::future::Future<Output = #return_ty>
-                        + ::core::marker::Send
-                        + '__cx,
-                >>
-                where
-                    '__props: '__cx,
-                    Self: '__cx,
-                    Self::Props<'__props>: '__cx,
-                {
-                    ::std::boxed::Box::pin(async move {
-                        #item
-                        #ident(cx, #(#args),*).await
-                    })
-                }
-            }
-        } else {
-            quote! {
-                fn render<'__cx, '__props>(
-                    self,
-                    cx: &'__cx #topcoat_context::Cx,
-                    props: Self::Props<'__props>,
-                ) -> impl Future<Output = #return_ty> + ::core::marker::Send + '__cx
-                where
-                    '__props: '__cx,
-                    Self: '__cx,
-                    Self::Props<'__props>: '__cx,
-                {
-                    #item
-                    #ident(cx, #(#args),*)
-                }
+        let render = quote! {
+            fn render<'__cx, '__props>(
+                self,
+                cx: &'__cx #topcoat_context::Cx,
+                props: Self::Props<'__props>,
+            ) -> impl Future<Output = #return_ty> + ::core::marker::Send + '__cx
+            where
+                '__props: '__cx,
+                Self: '__cx,
+                Self::Props<'__props>: '__cx,
+            {
+                #item
+                #ident(cx, #(#args),*)
             }
         };
 
@@ -304,6 +275,29 @@ impl VisitMut for ImplTraitParamVisitor {
             self.params.push(parse_quote! { #ident: #bounds });
             *ty = parse_quote! { #ident };
         }
+    }
+}
+
+/// Names the context lifetime where an elided one appears, for a type spelled
+/// outside a signature that could elide it.
+struct ContextLifetimeVisitor {
+    used: bool,
+}
+
+impl VisitMut for ContextLifetimeVisitor {
+    fn visit_lifetime_mut(&mut self, lt: &mut Lifetime) {
+        if lt.ident == "_" {
+            *lt = parse_quote! { '__cx };
+            self.used = true;
+        }
+    }
+
+    fn visit_type_reference_mut(&mut self, tr: &mut TypeReference) {
+        if tr.lifetime.is_none() {
+            tr.lifetime = Some(parse_quote! { '__cx });
+            self.used = true;
+        }
+        visit_mut::visit_type_reference_mut(self, tr);
     }
 }
 

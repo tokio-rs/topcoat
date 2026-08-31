@@ -46,6 +46,15 @@ impl<F: Future + Send> IdentityFuture<F> {
         }
     }
 
+    /// Wraps `fut` at `identity`, without deriving from the installed one.
+    ///
+    /// The door for polling a future at an identity derived earlier, for
+    /// example one an [`IdentityGuard`] already installed while the future
+    /// was built.
+    pub fn install(identity: Identity, fut: F) -> impl Future<Output = F::Output> + Send {
+        Self { fut, identity }
+    }
+
     /// Wraps `fut` as a child invocation at `site` whose repetitions cannot
     /// be told apart, recording `label` as the ambiguity.
     pub fn ambiguous(

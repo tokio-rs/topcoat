@@ -85,7 +85,7 @@ where
                 continue;
             }
             match Pin::new(&mut body.view).poll_swap(cx) {
-                Poll::Pending => continue,
+                Poll::Pending => {}
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Ready(Ok(None)) => body.done = true,
                 Poll::Ready(Ok(Some(swap))) => {

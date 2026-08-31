@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    view::{Child, View, ViewExt, component, view},
+    view::{BoxView, Child, View, ViewExt, component, view},
 };
 
 // `view!` lowers component calls to expressions that reference `__cx`. In
@@ -192,7 +192,9 @@ struct TreeNode {
     children: Vec<TreeNode>,
 }
 
-#[component(boxed)]
+// A loop body is boxed for the `LoopView` that drives its iterations, so a
+// component recursing through one needs no boxing of its own.
+#[component]
 async fn tree(node: &TreeNode) -> Result<impl View> {
     Ok(view! {
         <li>
@@ -209,7 +211,7 @@ async fn tree(node: &TreeNode) -> Result<impl View> {
 }
 
 #[tokio::test]
-async fn boxed_component_renders_itself_recursively() {
+async fn a_component_recursing_through_a_loop_renders_itself() {
     let cx = empty_cx();
     let __cx = &cx;
     let root = TreeNode {
@@ -236,16 +238,60 @@ async fn boxed_component_renders_itself_recursively() {
     );
 }
 
-// A cycle only needs one boxed component: `odd_steps` stays a plain
-// `#[component]` because `even_steps` breaks the cycle for both.
-#[component(boxed)]
+// Recursing through a branch instead of a loop, the component's own view type
+// would contain itself. Boxing the view erases it; a view that borrows takes
+// the lifetime of what it borrows from.
+#[component]
+async fn boxed_tree(node: &TreeNode) -> Result<BoxView<'_>> {
+    Ok(view! {
+        <li>
+            (node.label)
+            if !node.children.is_empty() {
+                <ul>
+                    for child in &node.children {
+                        boxed_tree(node: child)
+                    }
+                </ul>
+            }
+        </li>
+    }
+    .boxed())
+}
+
+#[tokio::test]
+async fn a_boxed_view_lets_a_component_render_itself_recursively() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let root = TreeNode {
+        label: "root",
+        children: vec![TreeNode {
+            label: "a",
+            children: vec![TreeNode {
+                label: "a1",
+                children: vec![],
+            }],
+        }],
+    };
+    let result = view! { <ul>boxed_tree(node: &root)</ul> };
+
+    assert_eq!(
+        result.single().await.unwrap().render(__cx),
+        "<ul><li>root<ul><li>a<ul><li>a1</li></ul></li></ul></li></ul>",
+    );
+}
+
+// A cycle only needs one erased view type: `odd_steps` returns `impl View`
+// because `even_steps` boxes its own view, which breaks the cycle for both.
+// Borrowing nothing, `even_steps` keeps `impl View` and boxes behind it.
+#[component]
 async fn even_steps(n: u32) -> Result<impl View> {
     Ok(view! {
         <i>(n)</i>
         if n > 0 {
             odd_steps(n: n - 1)
         }
-    })
+    }
+    .boxed())
 }
 
 #[component]
@@ -259,7 +305,7 @@ async fn odd_steps(n: u32) -> Result<impl View> {
 }
 
 #[tokio::test]
-async fn mutually_recursive_components_need_only_one_boxed() {
+async fn mutually_recursive_components_need_only_one_boxed_view() {
     let cx = empty_cx();
     let __cx = &cx;
     let result = view! { even_steps(n: 3) };

@@ -69,8 +69,8 @@ fn measure(
 /// A page made entirely of static markup: no interpolation, no escaping, no
 /// control flow. Isolates the cost of emitting literal HTML and growing the
 /// output buffer, which is the fast path the renderer takes most often.
-fn static_page(cx: &Cx) -> Result<impl View> {
-    Ok(view! {
+fn static_page(cx: &Cx) -> impl View {
+    view! {
         cx =>
         <!DOCTYPE html>
         <html lang="en">
@@ -176,7 +176,7 @@ fn static_page(cx: &Cx) -> Result<impl View> {
                 </footer>
             </body>
         </html>
-    })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -187,8 +187,8 @@ fn static_page(cx: &Cx) -> Result<impl View> {
 /// with HTML-significant characters (`<`, `>`, `&`, quotes), so this scenario
 /// exercises the escaping path in the formatter rather than the bulk copy of
 /// safe runs.
-fn comment_feed(cx: &Cx, comments: &[String]) -> Result<impl View> {
-    Ok(view! {
+fn comment_feed(cx: &Cx, comments: &[String]) -> impl View {
+    view! {
         cx =>
         <ul class="space-y-4">
             for comment in comments {
@@ -199,7 +199,7 @@ fn comment_feed(cx: &Cx, comments: &[String]) -> Result<impl View> {
                 </li>
             }
         </ul>
-    })
+    }
 }
 
 fn make_comments(count: usize) -> Vec<String> {
@@ -221,8 +221,8 @@ fn make_comments(count: usize) -> Vec<String> {
 
 /// A dense table of integers. Every cell formats a number through the
 /// `Display`-based render path, isolating numeric formatting from markup.
-fn numeric_table(cx: &Cx, rows: &[Vec<i64>]) -> Result<impl View> {
-    Ok(view! {
+fn numeric_table(cx: &Cx, rows: &[Vec<i64>]) -> impl View {
+    view! {
         cx =>
         <table class="w-full text-right font-mono text-sm">
             <tbody>
@@ -235,7 +235,7 @@ fn numeric_table(cx: &Cx, rows: &[Vec<i64>]) -> Result<impl View> {
                 }
             </tbody>
         </table>
-    })
+    }
 }
 
 fn make_number_rows(rows: usize, cols: usize) -> Vec<Vec<i64>> {
@@ -260,8 +260,8 @@ fn make_number_rows(rows: usize, cols: usize) -> Vec<Vec<i64>> {
 /// One element per item, each carrying several dynamic attributes. Isolates the
 /// attribute-writing path: name emission, value escaping, and the surrounding
 /// quoting.
-fn tag_cloud(cx: &Cx, tags: &[Tag]) -> Result<impl View> {
-    Ok(view! {
+fn tag_cloud(cx: &Cx, tags: &[Tag]) -> impl View {
+    view! {
         cx =>
         <div class="flex flex-wrap gap-2">
             for tag in tags {
@@ -278,7 +278,7 @@ fn tag_cloud(cx: &Cx, tags: &[Tag]) -> Result<impl View> {
                 </a>
             }
         </div>
-    })
+    }
 }
 
 struct Tag {
@@ -420,8 +420,8 @@ async fn product_card(product: &Product) -> Result<impl View> {
 ///
 /// Like the leaf scenarios above, it threads the request context into `view!`
 /// with the `cx,` form; on top of that it invokes a component (`product_card`).
-fn product_grid(cx: &Cx, products: &[Product]) -> Result<impl View> {
-    Ok(view! {
+fn product_grid(cx: &Cx, products: &[Product]) -> impl View {
+    view! {
         cx =>
         <main class="mx-auto w-full max-w-6xl px-4 py-10">
             <h1 class="text-2xl font-bold tracking-tight">"All products"</h1>
@@ -431,7 +431,7 @@ fn product_grid(cx: &Cx, products: &[Product]) -> Result<impl View> {
                 }
             </div>
         </main>
-    })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -443,16 +443,11 @@ fn bench_render(c: &mut Criterion) {
     let mut group = c.benchmark_group("view_render");
 
     block_on(async {
-        let static_view = static_page(&cx)
-            .expect("build static_page")
-            .single()
-            .await
-            .expect("render static_page");
+        let static_view = static_page(&cx).single().await.expect("render static_page");
         measure(&mut group, "static_page", &cx, &static_view);
 
         let comments = make_comments(200);
         let comment_view = comment_feed(&cx, &comments)
-            .expect("build comment_feed")
             .single()
             .await
             .expect("render comment_feed");
@@ -460,7 +455,6 @@ fn bench_render(c: &mut Criterion) {
 
         let number_rows = make_number_rows(120, 10);
         let number_view = numeric_table(&cx, &number_rows)
-            .expect("build numeric_table")
             .single()
             .await
             .expect("render numeric_table");
@@ -468,7 +462,6 @@ fn bench_render(c: &mut Criterion) {
 
         let tags = make_tags(200);
         let tag_view = tag_cloud(&cx, &tags)
-            .expect("build tag_cloud")
             .single()
             .await
             .expect("render tag_cloud");
@@ -479,7 +472,6 @@ fn bench_render(c: &mut Criterion) {
         for &count in &[12usize, 96, 768] {
             let products = make_products(count);
             let grid_view = product_grid(&cx, &products)
-                .expect("build product_grid")
                 .single()
                 .await
                 .expect("render product_grid");

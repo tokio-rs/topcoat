@@ -69,19 +69,21 @@ impl ToTokens for Emit {
         let owns_cx = self.view.cx.is_some();
         let view = builder.finish().emit_emit(owns_cx);
 
-        let view = match &self.view.cx {
+        let drive = quote! {
+            #topcoat_view::internal::LiveView::drive(#view).await
+        };
+
+        // The view borrows the context rather than moving it, so the binding
+        // has to outlive the drive it is emitted for.
+        match &self.view.cx {
             Some(cx) => {
                 let cx = &cx.cx;
                 quote! {{
                     let __cx: #topcoat_context::Cx = (#cx).clone();
-                    #view
+                    #drive
                 }}
             }
-            None => view,
-        };
-
-        quote! {
-            #topcoat_view::internal::LiveView::drive(#view).await
+            None => drive,
         }
         .to_tokens(tokens);
     }
@@ -129,7 +131,8 @@ mod tests {
     #[test]
     fn an_explicit_cx_binds_the_context_identifier() {
         let tokens = emit("cx => <div></div>");
-        assert!(tokens.contains("let __cx"), "{tokens}");
+        assert!(tokens.contains("Cx = (cx) . clone () ;"), "{tokens}");
+        assert!(tokens.contains("let __cx = & __cx ;"), "{tokens}");
     }
 
     #[test]

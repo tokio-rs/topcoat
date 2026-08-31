@@ -50,16 +50,12 @@ where
         }
     }
 
-    fn poll_swap(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
-        loop {
-            match self.as_mut().project() {
-                ThenViewProj::Future { .. } => {
-                    panic!(
-                        "called `.poll_swap` on a `ThenView` that has not yet emitted any `First` content"
-                    );
-                }
-                ThenViewProj::View { view } => return view.poll_swap(cx),
-            }
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+        match self.project() {
+            ThenViewProj::Future { .. } => panic!(
+                "called `.poll_swap` on a `ThenView` that has not yet emitted any `First` content"
+            ),
+            ThenViewProj::View { view } => view.poll_swap(cx),
         }
     }
 }

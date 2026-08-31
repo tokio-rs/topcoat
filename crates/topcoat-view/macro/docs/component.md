@@ -146,12 +146,34 @@ async fn current_path(cx: &Cx) -> Result<impl View> {
 
 # Recursive Components
 
-A component calling itself, either directly or indirectly, causes a dependency cycle in the created `Future`. To fix the issue, use `#[component(boxed)]` on one of the components in the cycle:
+A component returns an anonymous view type, so a component calling itself, directly or indirectly, describes a type that contains itself. Break the cycle by erasing the view type of one component in it: box the view with [`boxed`](trait.ViewExt.html#method.boxed).
 
 ```rust
 use topcoat::{
     Result,
-    view::{View, component, view},
+    view::{View, ViewExt, component, view},
+};
+
+#[component]
+async fn countdown(n: u32) -> Result<impl View> {
+    Ok(view! {
+        <li>(n)</li>
+        if n > 0 {
+            countdown(n: n - 1)
+        }
+    }
+    .boxed())
+}
+```
+
+The other components in a cycle keep returning `impl View` as they are; one erased type is enough for all of them.
+
+A boxed view borrows for as long as what it renders from, which an `impl View` return type cannot express when the component takes a reference. Return a [`BoxView`] with an elided lifetime instead:
+
+```rust
+use topcoat::{
+    Result,
+    view::{BoxView, ViewExt, component, view},
 };
 
 struct Comment {
@@ -159,8 +181,8 @@ struct Comment {
     replies: Vec<Comment>,
 }
 
-#[component(boxed)]
-async fn comment_thread(comment: &Comment) -> Result<impl View> {
+#[component]
+async fn comment_thread(comment: &Comment) -> Result<BoxView<'_>> {
     Ok(view! {
         <li>
             (&comment.body)
@@ -172,12 +194,16 @@ async fn comment_thread(comment: &Comment) -> Result<impl View> {
                 </ul>
             }
         </li>
-    })
+    }
+    .boxed())
 }
 ```
 
+A loop body is boxed for the view that drives its iterations, so a component whose only recursion runs through a `for` body needs no boxing of its own.
+
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html
+[`BoxView`]: type.BoxView.html
 [`Child`]: struct.Child.html
 [`View`]: trait.View.html
 [`component`]: attr.component.html

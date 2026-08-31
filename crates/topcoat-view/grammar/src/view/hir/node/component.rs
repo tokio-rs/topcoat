@@ -67,19 +67,19 @@ impl Component {
         }
     }
 
-    /// Wraps `future` to install this invocation's identity around every
-    /// poll, deriving it from the identity installed at construction.
+    /// Emits the guard entering this invocation's identity, derived from the
+    /// identity installed where the invocation sits.
     ///
     /// A `key:` argument mixes its value into the identity, telling
     /// repetitions of the site apart. The value passes through the `key`
     /// method of a throwaway props builder, which hands it back through its
     /// callback: a real method call gives `key:` the completion, hover, and
-    /// rename support of a prop, while the props of `future` stay untouched
-    /// and carry nothing extra. Without a key, an invocation that repeats
-    /// derives an ambiguous identity naming this invocation, so consuming
-    /// the identity, or any identity below it, errors with a pointer to the
-    /// missing `key`.
-    fn identity_future(&self, future: &TokenStream) -> TokenStream {
+    /// rename support of a prop, while the invocation's own props stay
+    /// untouched and carry nothing extra. Without a key, an invocation that
+    /// repeats derives an ambiguous identity naming this invocation, so
+    /// consuming the identity, or any identity below it, errors with a
+    /// pointer to the missing `key`.
+    fn identity_guard(&self) -> TokenStream {
         let span = self.path.span();
         let site = self.site();
         match (&self.key, self.repeats) {
@@ -92,17 +92,17 @@ impl Component {
                     let mut __key = ::core::option::Option::None;
                     #path::props_builder()
                         .#ident(#value, |__value| __key = ::core::option::Option::Some(__value));
-                    #topcoat_view::identity::IdentityFuture::keyed(#site, __key.unwrap(), #future)
+                    #topcoat_view::identity::IdentityGuard::enter_keyed(#site, __key.unwrap())
                 }}
             }
             (None, true) => {
                 let label = self.label();
                 quote_spanned! {span=>
-                    #topcoat_view::identity::IdentityFuture::ambiguous(#site, #label, #future)
+                    #topcoat_view::identity::IdentityGuard::enter_ambiguous(#site, #label)
                 }
             }
             (None, false) => quote_spanned! {span=>
-                #topcoat_view::identity::IdentityFuture::child(#site, #future)
+                #topcoat_view::identity::IdentityGuard::enter(#site)
             },
         }
     }
@@ -150,10 +150,20 @@ impl Emit for Component {
         let ident = emitter.fresh_ident();
         let span = self.span;
 
-        let future = self.identity_future(&self.render_future());
+        // The props are built under the invocation's identity, so a child
+        // view carries it too, and the future is polled at that same
+        // identity once the guard is gone.
+        let guard = self.identity_guard();
+        let future = self.render_future();
 
         emitter.hoist(quote_spanned! {span=>
-            let #ident = #topcoat_view::internal::ThenView::new(#future);
+            let #ident = #topcoat_view::internal::ThenView::new({
+                let __guard = #guard;
+                let __identity = #topcoat_view::identity::IdentityGuard::identity(&__guard);
+                let __future = #future;
+                ::core::mem::drop(__guard);
+                #topcoat_view::identity::IdentityFuture::install(__identity, __future)
+            });
         });
         emitter.unit(span, &ident);
     }

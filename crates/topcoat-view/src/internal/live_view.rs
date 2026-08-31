@@ -73,6 +73,15 @@ where
                     return Poll::Ready(Err(e));
                 }
 
+                let live = poll.is_pending();
+                if !live {
+                    // The body is done, so nothing will replace this content and it needs no markers.
+                    return Poll::Ready(Ok(ViewFirst {
+                        content: first.content,
+                        live,
+                    }));
+                }
+
                 let first = ViewFirst {
                     content: ViewBufferScope::with(|buffer| {
                         buffer.block(|parts| {
@@ -87,7 +96,7 @@ where
                             });
                         })
                     }),
-                    live: poll.is_pending(),
+                    live,
                 };
                 Poll::Ready(Ok(first))
             }
