@@ -113,8 +113,7 @@ impl Scope {
     fn emit_move_view(&self, move_token: &TokenStream, prologue: &TokenStream) -> TokenStream {
         let body = self.emit_view_with(|view| {
             quote! {
-                let __view = #view;
-                #topcoat_view::internal::drive(__view).await
+                #topcoat_view::internal::MoveView::drive(#view).await
             }
         });
         quote! {

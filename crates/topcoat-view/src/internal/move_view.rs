@@ -1,4 +1,5 @@
 use std::{
+    cell::Cell,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -6,25 +7,12 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use super::drive::{Emission, collect};
-use crate::{Step, View, buffer::ViewHandle};
+use crate::{View, ViewFirst, ViewSwap};
 
 pin_project! {
-    /// A view owning the data of the scope it was built in.
-    ///
-    /// The `view!` macro wraps a template's body in this type. The body is
-    /// an `async move` block: it captures every value the template uses, so
-    /// the template has no lifetime tied to the scope it was written in.
-    /// Inside the block, the body builds the template's view borrowing those
-    /// captures and awaits [`drive`](super::drive), which polls it in place
-    /// and tunnels its content and swaps out as this view's own. The built
-    /// view never leaves the block, so its borrows stay valid for as long
-    /// as the body lives.
     pub struct MoveView<Fut> {
         #[pin]
         body: Fut,
-        // Whether the first content was yielded.
-        started: bool,
     }
 }
 
@@ -34,10 +22,13 @@ where
 {
     #[doc(hidden)]
     pub fn new(body: Fut) -> Self {
-        Self {
-            body,
-            started: false,
-        }
+        Self { body }
+    }
+}
+
+impl<Fut> MoveView<Fut> {
+    pub fn drive<V: View>(view: V) -> DriveFuture<V> {
+        DriveFuture { view, first: true }
     }
 }
 
@@ -45,34 +36,124 @@ impl<Fut> View for MoveView<Fut>
 where
     Fut: Future<Output = Result<()>> + Send,
 {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         let this = self.project();
-        let (poll, emission) = collect(this.body, cx);
-        let live = poll.is_pending();
-        match emission {
-            Some(Emission::Content(content)) => {
-                assert!(!*this.started, "a `MoveView` body drove content twice");
-                *this.started = true;
-                Poll::Ready(Ok(Step::Content { content, live }))
+        let (poll, yielded) = {
+            let _guard = FirstGuard::new();
+            (this.body.poll(cx), FIRST_YIELD.take())
+        };
+
+        match (poll, yielded) {
+            (Poll::Pending, Some(value)) => Poll::Ready(Ok(value)),
+            (Poll::Pending, None) => Poll::Pending,
+            (Poll::Ready(_), Some(_)) => {
+                panic!("move view future yielded without returning pending")
             }
-            Some(Emission::Swap(swap)) => {
-                assert!(
-                    *this.started,
-                    "a `MoveView` body swapped before its first content"
-                );
-                Poll::Ready(Ok(Step::Swap { swap, live }))
+            (Poll::Ready(Err(e)), None) => Poll::Ready(Err(e)),
+            (Poll::Ready(Ok(())), None) => {
+                panic!("move view future completed without yielding anything")
             }
-            None => match poll {
-                Poll::Pending => Poll::Pending,
-                Poll::Ready(Ok(())) if *this.started => Poll::Ready(Ok(Step::Done)),
-                // The body completed without driving a view; it renders
-                // nothing and can never update.
-                Poll::Ready(Ok(())) => Poll::Ready(Ok(Step::Content {
-                    content: ViewHandle::empty(),
-                    live: false,
-                })),
-                Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
-            },
         }
+    }
+
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+        let this = self.project();
+        let (poll, yielded) = {
+            let _guard = SwapGuard::new();
+            (this.body.poll(cx), SWAP_YIELD.take())
+        };
+
+        match (poll, yielded) {
+            (Poll::Pending, Some(value)) => Poll::Ready(Ok(Some(value))),
+            (Poll::Pending, None) => Poll::Pending,
+            (Poll::Ready(_), Some(_)) => {
+                panic!("move view future yielded without returning pending")
+            }
+            (Poll::Ready(Err(e)), None) => Poll::Ready(Err(e)),
+            (Poll::Ready(Ok(())), None) => Poll::Ready(Ok(None)),
+        }
+    }
+}
+
+pin_project! {
+    pub struct DriveFuture<V> {
+        #[pin]
+        view: V,
+        first: bool,
+    }
+}
+
+impl<V> Future for DriveFuture<V>
+where
+    V: View,
+{
+    type Output = Result<()>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        if *this.first {
+            match this.view.poll_first(cx) {
+                Poll::Ready(Ok(first)) => {
+                    *this.first = false;
+                    FIRST_YIELD.set(Some(first));
+                    Poll::Pending
+                }
+                Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+                Poll::Pending => Poll::Pending,
+            }
+        } else {
+            match this.view.poll_swap(cx) {
+                Poll::Ready(Ok(swap)) => {
+                    SWAP_YIELD.set(swap);
+                    Poll::Pending
+                }
+                Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+                Poll::Pending => Poll::Pending,
+            }
+        }
+    }
+}
+
+thread_local! {
+    static FIRST_YIELD: Cell<Option<ViewFirst>> = const { Cell::new(None) };
+}
+
+struct FirstGuard {
+    prev: Option<ViewFirst>,
+}
+
+impl FirstGuard {
+    fn new() -> Self {
+        Self {
+            prev: FIRST_YIELD.take(),
+        }
+    }
+}
+
+impl Drop for FirstGuard {
+    fn drop(&mut self) {
+        FIRST_YIELD.replace(self.prev.take());
+    }
+}
+
+thread_local! {
+    static SWAP_YIELD: Cell<Option<ViewSwap>> = const { Cell::new(None) };
+}
+
+struct SwapGuard {
+    prev: Option<ViewSwap>,
+}
+
+impl SwapGuard {
+    fn new() -> Self {
+        Self {
+            prev: SWAP_YIELD.take(),
+        }
+    }
+}
+
+impl Drop for SwapGuard {
+    fn drop(&mut self) {
+        SWAP_YIELD.replace(self.prev.take());
     }
 }

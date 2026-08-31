@@ -27,7 +27,7 @@ impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
     ///
     /// Panics if no view is building on the current task.
     pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> ViewHandle {
-        ViewBufferScope::block(|parts| f(&mut Builder::new(cx, parts)))
+        ViewBufferScope::with(|buffer| buffer.block(|parts| f(&mut Builder::new(cx, parts))))
     }
     /// Appends a literal markup segment, verbatim.
     ///
