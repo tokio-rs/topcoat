@@ -113,16 +113,12 @@ impl ToTokens for Layout {
                 cx: &'a #topcoat_context::Cx,
                 slot: #topcoat_router::Slot<'a>,
             ) -> #topcoat_view::BoxView<'a> {
-                ::std::boxed::Box::pin(#topcoat_view::internal::MoveView::new(async move {
-                    let props = <#ident as #topcoat_view::Component>::props_builder()
-                        .slot(slot)
-                        .build();
-                    let view = <#ident as #topcoat_view::Component>::render(
-                        #ident, cx, props,
-                    )
-                    .await?;
-                    #topcoat_view::internal::MoveView::drive(view).await
-                }))
+                let props = <#ident as #topcoat_view::Component>::props_builder()
+                    .slot(slot)
+                    .build();
+                ::std::boxed::Box::pin(#topcoat_view::internal::ThenView::new(
+                    <#ident as #topcoat_view::Component>::render(#ident, cx, props)
+                ))
             }
         };
         let (layout, submit_as) = if let Some(path) = attr.path.as_ref() {
