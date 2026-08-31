@@ -27,11 +27,20 @@ impl<V> ScopeView<V> {
         }
     }
 
+    /// Creates a scope that owns its buffer from the start.
+    ///
+    /// The buffer is installed while `f` builds the view, so everything the
+    /// build pushes lands in the same buffer the polls install again.
     #[must_use]
-    pub fn self_contained(view: V) -> Self {
+    pub fn self_contained(f: impl FnOnce() -> V) -> Self {
+        let mut buffer = Some(Box::new(ViewBuffer::new()));
+        let view = {
+            let _scope = ViewBufferScope::new(&mut buffer);
+            f()
+        };
         Self {
             view,
-            buffer: Some(Box::new(ViewBuffer::new())),
+            buffer,
             polled: false,
         }
     }

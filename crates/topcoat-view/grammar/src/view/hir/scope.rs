@@ -72,9 +72,11 @@ impl Scope {
     /// `ScopeView` of its own.
     ///
     /// The view always owns a buffer, so its content renders anywhere even
-    /// when it is emitted inside another build. Nothing is moved into an
-    /// async block: the caller awaits the view where it is emitted, so the
-    /// template borrows from the enclosing block as it stands.
+    /// when it is emitted inside another build. The body builds inside a
+    /// closure the scope evaluates with that buffer installed, so the blocks
+    /// it hoists land in the buffer its polls run against. Nothing is moved
+    /// into an async block: the caller awaits the view where it is emitted,
+    /// so the template borrows from the enclosing block as it stands.
     ///
     /// With `owns_cx`, an owned `__cx` context is in scope and the view
     /// borrows it.
@@ -82,7 +84,7 @@ impl Scope {
         let prologue = borrow_cx(owns_cx);
         let inner = self.emit_inert();
         quote! {
-            #topcoat_view::internal::ScopeView::self_contained({
+            #topcoat_view::internal::ScopeView::self_contained(|| {
                 #prologue
                 #inner
             })
@@ -201,7 +203,7 @@ mod tests {
     fn an_emitted_root_is_a_self_contained_scope_over_its_body() {
         let out = ViewBuilder::new().finish().emit_emit(false).to_string();
         assert!(
-            out.starts_with(":: topcoat_view :: internal :: ScopeView :: self_contained ("),
+            out.starts_with(":: topcoat_view :: internal :: ScopeView :: self_contained (||"),
             "{out}"
         );
         // The body is emitted inline, so it is neither moved into an async

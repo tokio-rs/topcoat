@@ -114,6 +114,62 @@ async fn region_failing_after_an_emission_fails_the_view() {
 }
 
 #[tokio::test]
+async fn region_hoisting_sync_control_flow_renders() {
+    let cx = &Cx::default();
+    let html = view! {
+        cx =>
+        <main>
+            (live! {
+                emit! {
+                    <ul>
+                        for x in ["a", "b"] {
+                            <li data-x=(x)>"item"</li>
+                        }
+                    </ul>
+                }
+            })
+        </main>
+    }
+    .single()
+    .await
+    .unwrap()
+    .render(cx);
+
+    assert_eq!(
+        html,
+        r#"<main><ul><li data-x="a">item</li><li data-x="b">item</li></ul></main>"#
+    );
+}
+
+#[tokio::test]
+async fn swapped_emission_hoisting_sync_control_flow_renders() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! {
+        cx =>
+        <main>
+            (live! {
+                emit! { <p>"first"</p> }?;
+                emit! {
+                    <ul>
+                        for x in ["a", "b"] {
+                            <li data-x=(x)>"item"</li>
+                        }
+                    </ul>
+                }
+            })
+        </main>
+    });
+
+    assert!(first(&mut view).await.unwrap().live);
+    let swap = next_swap(&mut view).await.unwrap().unwrap();
+    assert_eq!(
+        swap.replacement.render(cx),
+        r#"<ul><li data-x="a">item</li><li data-x="b">item</li></ul>"#
+    );
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
 async fn region_emitting_twice_swaps_its_content() {
     let cx = &Cx::default();
     let mut view = pin!(view! {
