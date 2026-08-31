@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{ToTokens, quote};
 use syn::{
     Ident, Token,
     ext::IdentExt,
@@ -63,10 +63,7 @@ impl MailField {
 
         match value {
             FieldValue::Html(html) => {
-                // The view resolves to its self-contained content here,
-                // against the named context when the body leads with
-                // `cx =>` and the ambient `__cx` otherwise.
-                let view = html.view.expand(true);
+                let view = html.view.to_token_stream();
                 quote! {
                     let __html = #view;
                     let __builder = __builder.#method(

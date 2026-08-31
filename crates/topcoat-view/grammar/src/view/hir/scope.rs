@@ -18,19 +18,10 @@ impl Scope {
         Self { nodes }
     }
 
-    /// Whether this scope renders a component or fills a node position,
-    /// directly or anywhere under its nested scopes, so its content can only
-    /// resolve by being polled.
     pub(crate) fn is_async(&self) -> bool {
         self.nodes.iter().any(Node::is_async)
     }
 
-    /// Emits this scope as an expression building its instruction block
-    /// right where it is evaluated, yielding the handle to the block.
-    ///
-    /// For a scope that is not async: nothing is polled, and the block may
-    /// read whatever the iteration or branch around it binds. A scope
-    /// without content, or with literal markup only, needs no block at all.
     pub(crate) fn emit_block(&self) -> TokenStream {
         debug_assert!(!self.is_async(), "an async scope resolves by being polled");
         match self.nodes.as_slice() {
@@ -48,98 +39,47 @@ impl Scope {
         }
     }
 
-    /// Emits a top-level `view!` invocation: a `ScopeView` around a
-    /// `MoveView` whose `async move` body builds the scope's view and
-    /// drives it in place.
-    ///
-    /// The block captures every value the template uses, so the view owns
-    /// its data and the expressions inside borrow from the block. The built
-    /// view is driven inside the block that evaluates the template, so what
-    /// its expressions borrow from that block is still alive. The
-    /// `ScopeView` makes the view own the buffer of the build when it is the
-    /// outermost view; nested inside another build, it appends to that
-    /// build's buffer.
-    ///
-    /// With `owns_cx`, the block expects an owned `__cx` context in scope
-    /// and captures it, rebinding `__cx` to a borrow of it inside; the view
-    /// then does not borrow the caller's context. With `self_contained`,
-    /// the view always owns a buffer of its own, so its content renders
-    /// anywhere even when it is built inside another build.
-    pub fn emit_root(&self, owns_cx: bool, self_contained: bool) -> TokenStream {
-        let mut prologue = TokenStream::new();
-        if owns_cx {
-            prologue.extend(quote! { let __cx = &__cx; });
-        }
-        let view = self.emit_move_view(&quote! { move }, &prologue);
-        if self_contained {
-            quote! { #topcoat_view::internal::ScopeView::self_contained(#view) }
-        } else {
-            quote! { #topcoat_view::internal::ScopeView::new(#view) }
-        }
-    }
-
-    /// Emits this scope as the body of a branch or iteration whose pattern
-    /// binds `bindings`.
-    ///
-    /// The bound values die with the branch or iteration that produced them
-    /// while the view lives on, so the view must own them: a nested
-    /// `MoveView` carries them in a `Capture` packed where they are still
-    /// alive and taken back apart inside its body. The body is not `move`,
-    /// so everything else stays borrowed from the enclosing scope and a
-    /// value shared by all iterations is not moved into the first. Without
-    /// bindings the scope is a plain view in the enclosing scope.
-    pub(crate) fn emit_captured(&self, bindings: &Bindings) -> TokenStream {
-        if bindings.is_empty() {
-            return self.emit_view();
-        }
-        let idents = bindings.idents();
-        let rebinds = bindings.rebinds();
-        let view = self.emit_move_view(
-            &TokenStream::new(),
-            &quote! { let (#(#rebinds,)*) = __captured.take(); },
-        );
-        quote! {{
-            let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
-            #view
-        }}
-    }
-
-    /// Emits this scope as a `MoveView` whose async body runs `prologue`,
-    /// builds the scope's view, and drives it in place.
-    ///
-    /// The drive happens inside the block that evaluates the template, so
-    /// the view may borrow from that block's bindings, including references
-    /// to temporaries the template declares.
-    fn emit_move_view(&self, move_token: &TokenStream, prologue: &TokenStream) -> TokenStream {
-        let body = self.emit_view_with(|view| {
+    pub fn emit_view(&self, owns_cx: bool) -> TokenStream {
+        let inner = self.emit_inner(|view| {
             quote! {
                 #topcoat_view::internal::MoveView::drive(#view).await
             }
         });
         quote! {
-            #topcoat_view::internal::MoveView::new(async #move_token {
-                #prologue
-                #body
-            })
+            #topcoat_view::internal::ScopeView::self_contained(
+                #topcoat_view::internal::MoveView::new(async move {
+                    let __cx = &__cx;
+                    #inner
+                })
+            )
         }
     }
 
-    /// Emits this scope as an inert view value: a block expression that
-    /// evaluates the scope's expressions in source order and builds its
-    /// `JoinView`.
-    ///
-    /// The view owns the evaluated values; whatever the expressions borrow
-    /// from the environment, it borrows. A nested scope built inside a
-    /// branch or iteration takes its pattern bindings with it, since the
-    /// expressions move them into the view.
-    pub(crate) fn emit_view(&self) -> TokenStream {
-        self.emit_view_with(|view| view)
+    pub fn emit_emit(&self, owns_cx: bool) -> TokenStream {
+        let inner = self.emit_inner(|view| view);
+        quote! { #topcoat_view::internal::ScopeView::self_contained(#inner) }
     }
 
-    /// Emits this scope as a block that evaluates the scope's expressions
-    /// in source order, builds its `JoinView`, and ends with `tail` applied
-    /// to that view, inside the block.
-    fn emit_view_with(&self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
+    pub(crate) fn emit_captured(&self, bindings: &Bindings) -> TokenStream {
+        let idents = bindings.idents();
+        let rebinds = bindings.rebinds();
+
+        let inner = self.emit_inner(|view| {
+            quote! {
+                #topcoat_view::internal::MoveView::drive(#view).await
+            }
+        });
+
+        quote! {{
+            let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
+            #topcoat_view::internal::MoveView::new(async {
+                let (#(#rebinds,)*) = __captured.take();
+                #inner
+            })
+        }}
+    }
+
+    fn emit_inner(&self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
         let mut emitter = Emitter::new(false);
         for node in &self.nodes {
             node.emit(&mut emitter);
@@ -161,7 +101,7 @@ mod tests {
     };
 
     fn rendered(builder: ViewBuilder) -> String {
-        builder.finish().emit_root(false, false).to_string()
+        builder.finish().emit_view(false).to_string()
     }
 
     fn add_component(builder: &mut ViewBuilder, name: &str) {
@@ -204,7 +144,7 @@ mod tests {
     fn a_self_contained_root_owns_its_buffer() {
         let out = ViewBuilder::new()
             .finish()
-            .emit_root(true, true)
+            .emit_view(true, true)
             .to_string();
         assert!(
             out.starts_with(":: topcoat_view :: internal :: ScopeView :: self_contained ("),

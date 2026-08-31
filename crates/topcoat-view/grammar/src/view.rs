@@ -50,24 +50,13 @@ impl Parse for View {
     }
 }
 
-impl View {
-    /// Expands the view to the expression evaluating to its value.
-    ///
-    /// The view owns the buffer of the build when it is the outermost view
-    /// polled, and appends to the enclosing build's buffer otherwise. A
-    /// self-contained view always builds in a buffer of its own, so what it
-    /// resolves to renders anywhere.
-    #[must_use]
-    pub fn expand(&self, self_contained: bool) -> TokenStream {
+impl ToTokens for View {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut builder = ViewBuilder::new();
         self.nodes.lower(&mut builder);
         let owns_cx = self.cx.is_some();
-        let view = builder.finish().emit_root(owns_cx, self_contained);
+        let view = builder.finish().emit_view(owns_cx);
 
-        // When an explicit context is named, the view owns a copy of it
-        // rather than borrowing it, so the view can outlive the binding it
-        // was named from. Inside a component/page/layout the `__cx` binding
-        // is already in scope, so the view is emitted untouched.
         match &self.cx {
             Some(cx) => {
                 let cx = &cx.cx;
@@ -78,12 +67,7 @@ impl View {
             }
             None => view,
         }
-    }
-}
-
-impl ToTokens for View {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.expand(false).to_tokens(tokens);
+        .to_tokens(tokens);
     }
 }
 

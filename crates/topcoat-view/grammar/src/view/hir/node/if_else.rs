@@ -31,7 +31,7 @@ impl Emit for IfElse {
             // condition's `let` patterns with it; the else branch binds
             // nothing.
             let then_branch = then_branch.emit_captured(&Bindings::of_condition(expr));
-            let else_branch = else_branch.emit_view();
+            let else_branch = else_branch.emit_view(false);
 
             emitter.hoist(quote! {
                 let #ident = if #expr {

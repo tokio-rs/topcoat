@@ -1,9 +1,12 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::paths::topcoat_view;
+use topcoat_core_grammar::paths::{topcoat_context, topcoat_view};
 
-use crate::view::View;
+use crate::view::{
+    View,
+    hir::{LowerView, ViewBuilder},
+};
 
 pub struct Live {
     pub body: Vec<syn::Stmt>,
@@ -61,7 +64,22 @@ impl Parse for Emit {
 
 impl ToTokens for Emit {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let view = self.view.expand(true);
+        let mut builder = ViewBuilder::new();
+        self.view.nodes.lower(&mut builder);
+        let owns_cx = self.view.cx.is_some();
+        let view = builder.finish().emit_emit(owns_cx);
+
+        let view = match &self.view.cx {
+            Some(cx) => {
+                let cx = &cx.cx;
+                quote! {{
+                    let __cx: #topcoat_context::Cx = (#cx).clone();
+                    #view
+                }}
+            }
+            None => view,
+        };
+
         quote! {
             #topcoat_view::internal::LiveView::drive(#view).await
         }
