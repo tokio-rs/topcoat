@@ -55,9 +55,7 @@ pub trait ViewExt: View {
         async move {
             let mut view = pin!(self);
             let first = poll_fn(|cx| view.as_mut().poll_first(cx)).await?;
-            if first.live {
-                panic!("used `.single()` on a View that is live");
-            }
+            assert!(!first.live, "used `.single()` on a View that is live");
             Ok(first.content)
         }
     }

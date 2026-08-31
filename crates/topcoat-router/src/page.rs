@@ -3,7 +3,7 @@ use std::{borrow::Cow, sync::Arc};
 use topcoat_core::context::Cx;
 use topcoat_view::{
     BoxView, Child,
-    internal::{MoveView, ScopeView, drive},
+    internal::{MoveView, ScopeView},
 };
 
 use crate::{
@@ -267,7 +267,7 @@ impl Route for PageWithLayouts {
         Box::pin(async move {
             let view = MoveView::new(async move {
                 let view = inner.render(&owned, body);
-                drive(ScopeView::new(view)).await
+                MoveView::drive(ScopeView::new(view)).await
             });
             view.async_into_response(cx).await
         })

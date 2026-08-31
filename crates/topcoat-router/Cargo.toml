@@ -69,6 +69,7 @@ matchit.workspace = true
 percent-encoding.workspace = true
 inventory = { workspace = true, optional = true }
 multer = { workspace = true, optional = true }
+pin-project-lite.workspace = true
 ref-cast.workspace = true
 serde.workspace = true
 serde_json.workspace = true

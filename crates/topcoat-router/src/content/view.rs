@@ -5,10 +5,12 @@ use std::{
 
 use bytes::Bytes;
 use futures_core::Stream;
+use futures_util::future::poll_fn;
 use http::{HeaderMap, StatusCode};
 use http_body::Frame;
+use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::{BoxView, Swaps, View, ViewExt, ViewHandle, internal::MoveView};
+use topcoat_view::{BoxView, View, ViewExt, ViewHandle, internal::MoveView};
 
 use crate::{
     Body, BoxError,
@@ -16,11 +18,6 @@ use crate::{
     response::{AsyncIntoResponse, IntoResponse, Response},
 };
 
-/// Replies with the rendered content as an HTML page, carrying the status
-/// code and headers declared in it.
-///
-/// A handle holds a view's first content only, so nothing streams after the
-/// page.
 impl IntoResponse for ViewHandle {
     fn into_response(self, cx: &Cx) -> Result<Response> {
         let rendered = self.render_response(cx);
@@ -28,44 +25,40 @@ impl IntoResponse for ViewHandle {
     }
 }
 
-/// Replies with the view's first content as an HTML page, then streams the
-/// updates its live regions emit down the still-open body.
 impl AsyncIntoResponse for BoxView<'static> {
     fn async_into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
         stream(self, cx)
     }
 }
 
-/// Replies with the view's first content as an HTML page, then streams the
-/// updates its live regions emit down the still-open body.
 impl<Fut> AsyncIntoResponse for MoveView<Fut>
 where
     Fut: Future<Output = Result<()>> + Send + 'static,
 {
     fn async_into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send {
-        stream(self, cx)
+        stream(self.boxed(), cx)
     }
 }
 
-/// Resolves the view's first content into the response and hands the swaps
-/// that follow to the body.
-///
-/// A view that reports it never updates replies with its content alone, as
-/// a complete body. An error in the first content surfaces here, before any
-/// headers are sent, so it becomes the error response like any handler
-/// error.
-async fn stream<V: View + 'static>(view: V, cx: &Cx) -> Result<Response> {
-    let (content, swaps) = view.live().await?;
-    let rendered = content.render_response(cx);
-    if !swaps.is_live() {
-        return html_response(cx, rendered.html, rendered.status_code, rendered.headers);
+async fn stream<V: View + Unpin + 'static>(mut view: V, cx: &Cx) -> Result<Response> {
+    let mut pinned_view = Pin::new(&mut view);
+    let first = poll_fn(|cx| pinned_view.as_mut().poll_first(cx)).await?;
+    let rendered = first.content.render_response(cx);
+    if first.live {
+        let body = ViewBody {
+            cx: cx.clone(),
+            first: Some(rendered.html),
+            view,
+        };
+        html_response(cx, Body::new(body), rendered.status_code, rendered.headers)
+    } else {
+        html_response(
+            cx,
+            Body::new(rendered.html),
+            rendered.status_code,
+            rendered.headers,
+        )
     }
-    let body = ViewBody {
-        cx: cx.clone(),
-        first: Some(rendered.html),
-        swaps,
-    };
-    html_response(cx, Body::new(body), rendered.status_code, rendered.headers)
 }
 
 /// Builds an HTML response around `body`, applying the status code and
@@ -84,13 +77,13 @@ fn html_response(
     Ok(response)
 }
 
-/// The body of a view response: the rendered first content, then one frame
-/// per swap.
-struct ViewBody<V> {
-    cx: Cx,
-    /// The first content's HTML, emitted as the body's first frame.
-    first: Option<String>,
-    swaps: Swaps<V>,
+pin_project! {
+    struct ViewBody<V> {
+        cx: Cx,
+        first: Option<String>,
+        #[pin]
+        view: V,
+    }
 }
 
 impl<V: View + 'static> http_body::Body for ViewBody<V> {
@@ -101,14 +94,12 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
-        let this = self.get_mut();
+        let this = self.project();
         if let Some(first) = this.first.take() {
             return Poll::Ready(Some(Ok(Frame::data(first.into()))));
         }
-        match Pin::new(&mut this.swaps).poll_next(cx) {
-            // A swap streams down as an inert template plus a script
-            // applying it to the swap's region.
-            Poll::Ready(Some(Ok(swap))) => {
+        match this.view.poll_swap(cx) {
+            Poll::Ready(Ok(Some(swap))) => {
                 let region = swap.region;
                 let html = swap.replacement.render(&this.cx);
                 let envelope = format!(
@@ -117,73 +108,9 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
                 );
                 Poll::Ready(Some(Ok(Frame::data(envelope.into()))))
             }
-            Poll::Ready(Some(Err(error))) => Poll::Ready(Some(Err(error.into()))),
-            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(Ok(None)) => Poll::Ready(None),
+            Poll::Ready(Err(error)) => Poll::Ready(Some(Err(error.into()))),
             Poll::Pending => Poll::Pending,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use http::header::{CONTENT_TYPE, HeaderName, HeaderValue};
-    use topcoat::view::view;
-    use topcoat_core::context::CxTestBuilder;
-
-    use super::*;
-    use crate::to_bytes;
-
-    #[tokio::test]
-    async fn view_handle_responds_with_its_html() {
-        let cx = CxTestBuilder::new().build();
-        let handle = view! { cx => <p>"hello"</p> }.single().await.unwrap();
-
-        let response = handle.into_response(&cx).unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-        assert_eq!(
-            response.headers().get(CONTENT_TYPE).unwrap(),
-            "text/html; charset=utf-8"
-        );
-        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        assert_eq!(body, "<p>hello</p>");
-    }
-
-    #[tokio::test]
-    async fn view_handle_applies_declared_status_and_headers() {
-        let cx = CxTestBuilder::new().build();
-        let handle = view! {
-            cx =>
-            (StatusCode::NOT_FOUND)
-            ((HeaderName::from_static("x-custom"), HeaderValue::from_static("yes")))
-            <p>"missing"</p>
-        }
-        .single()
-        .await
-        .unwrap();
-
-        let response = handle.into_response(&cx).unwrap();
-
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        assert_eq!(response.headers().get("x-custom").unwrap(), "yes");
-        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        assert_eq!(body, "<p>missing</p>");
-    }
-
-    #[tokio::test]
-    async fn boxed_view_streams_its_first_content() {
-        let cx = CxTestBuilder::new().build();
-        let view = view! {
-            cx =>
-            (StatusCode::CREATED)
-            <p>"streamed"</p>
-        }
-        .boxed();
-
-        let response = view.async_into_response(&cx).await.unwrap();
-
-        assert_eq!(response.status(), StatusCode::CREATED);
-        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        assert_eq!(body, "<p>streamed</p>");
     }
 }

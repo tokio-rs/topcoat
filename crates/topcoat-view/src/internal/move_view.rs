@@ -1,5 +1,6 @@
 use std::{
     cell::Cell,
+    future::Ready,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -26,8 +27,8 @@ where
     }
 }
 
-impl<Fut> MoveView<Fut> {
-    pub fn drive<V: View>(view: V) -> DriveFuture<V> {
+impl MoveView<Ready<()>> {
+    pub fn drive<V: View>(view: V) -> impl Future<Output = Result<()>> {
         DriveFuture { view, first: true }
     }
 }

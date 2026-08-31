@@ -62,7 +62,7 @@ classify_view! {
 
 classify_view! {
     /// A `live!` region.
-    impl<Fut> for LiveView<Fut>
+    impl<'cx, Fut> for LiveView<'cx, Fut>
 }
 
 classify_view! {

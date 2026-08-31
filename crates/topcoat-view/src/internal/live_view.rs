@@ -38,7 +38,7 @@ where
 }
 
 impl<Fut> LiveView<'_, Fut> {
-    pub fn drive<V: View>(view: V) -> DriveFuture<V> {
+    pub fn drive<V: View>(view: V) -> impl Future<Output = Result<()>> {
         DriveFuture { view, first: true }
     }
 }

@@ -5,7 +5,7 @@ use std::{
 
 use topcoat_core::error::Result;
 
-use crate::{BoxView, Step, View};
+use crate::{BoxView, View, ViewFirst, ViewSwap};
 
 /// The child content a component invocation passes to its component.
 ///
@@ -38,7 +38,11 @@ impl Default for Child<'_> {
 
 /// The children's view polls through in place.
 impl View for Child<'_> {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Step>> {
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         self.get_mut().view.as_mut().poll_first(cx)
+    }
+
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+        self.get_mut().view.as_mut().poll_swap(cx)
     }
 }
