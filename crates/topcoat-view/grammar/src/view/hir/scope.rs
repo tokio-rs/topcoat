@@ -62,7 +62,7 @@ impl Scope {
 
     pub(crate) fn emit_captured(&self, bindings: &Bindings) -> TokenStream {
         if bindings.is_empty() {
-            self.emit_view(false);
+            return self.emit_inner(|view| view);
         }
 
         let idents = bindings.idents();
