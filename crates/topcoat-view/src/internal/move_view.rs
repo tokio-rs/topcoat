@@ -76,7 +76,7 @@ where
 }
 
 pin_project! {
-    pub struct DriveFuture<V> {
+    struct DriveFuture<V> {
         #[pin]
         view: V,
         first: bool,

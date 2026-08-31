@@ -7,34 +7,17 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use super::drive::{Emission, collect};
 use crate::{
-    RegionId, Step, View, ViewSwap,
+    RegionId, View, ViewSwap,
     buffer::{ViewBufferScope, ViewHandle},
 };
 
-/// The id of the next live region.
-///
-/// A process-wide counter, so every live region in a response is distinct
-/// without threading state through the request.
 static NEXT_REGION: AtomicU64 = AtomicU64::new(1);
 
 pin_project! {
-    /// A live region: a node position whose content is replaced by the views
-    /// its body emits.
-    ///
-    /// The `live!` macro wraps its body in this type. The body emits with
-    /// `emit!`, which drives a self-contained view in place: the first
-    /// emission becomes the region's content, and every later one becomes a
-    /// [`Swap`] replacing that content on the client. The content is
-    /// surrounded by marker comments in the buffer of the build, unless the
-    /// body completes along with it: a region that emits once renders as
-    /// plain content and never updates.
     pub struct LiveView<Fut> {
         #[pin]
         body: Fut,
-        // The region's id, decided when its first content is emitted with
-        // the body still running.
         region: Option<RegionId>,
     }
 }
