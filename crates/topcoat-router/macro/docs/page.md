@@ -10,7 +10,7 @@ A page registers like any other handler: pass the function name to [`RouterBuild
 
 # Handler signature
 
-The function is `async` and returns a [`Result`](../type.Result.html) of a view. It may take [`cx: &Cx`](../context/struct.Cx.html), one request body parameter implementing [`FromRequest`](request/trait.FromRequest.html), both, or neither. The body parameter may use a destructuring pattern such as `Json(input): Json<T>`. The parameters may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once.
+The function is `async` and returns a [`Result`](../type.Result.html) of a value implementing [`View`](../view/trait.View.html). It may take [`cx: &Cx`](../context/struct.Cx.html), one request body parameter implementing [`FromRequest`](request/trait.FromRequest.html), both, or neither. The body parameter may use a destructuring pattern such as `Json(input): Json<T>`. The parameters may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once.
 
 # Examples
 

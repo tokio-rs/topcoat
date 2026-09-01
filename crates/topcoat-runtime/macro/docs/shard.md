@@ -70,7 +70,7 @@ The [`context`] module covers writing guards as functions on [`Cx`].
 
 # Arguments And Return Type
 
-Argument types must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript. The return type is a [`Result`] of a view, like a component's.
+Argument types must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript. The return type is a [`Result`] of a value implementing [`View`], like a component's.
 
 A parameter named `cx` borrowing [`Cx`] is special: just like in a component, it is filled from the request context on the server and does not take an argument at the call site.
 
@@ -91,3 +91,4 @@ let router = Router::builder().shard(search_results).build();
 [`Router`]: ../router/struct.Router.html
 [`expr!`]: macro.expr.html
 [`view!`]: ../view/macro.view.html
+[`View`]: ../view/trait.View.html
