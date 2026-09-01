@@ -3,7 +3,7 @@ use std::time::Duration;
 use topcoat::{
     Result,
     router::{Router, RouterBuilderDiscoverExt, Slot, href, layout, page},
-    view::{View, emit, live, view},
+    view::{View, component, emit, live, view},
 };
 
 #[tokio::main]
@@ -29,6 +29,8 @@ async fn shell(slot: Slot<'_>) -> Result<impl View> {
                     <a href=(href!(quote))>"Quote"</a>
                     " | "
                     <a href=(href!(progress))>"Progress"</a>
+                    " | "
+                    <a href=(href!(weather))>"Weather"</a>
                 </nav>
                 (slot)
             </body>
@@ -76,4 +78,37 @@ async fn progress() -> Result<impl View> {
             emit! { <p>"Done!"</p> }
         })
     })
+}
+
+// A failed emission comes back as an Err instead of ending the stream, so
+// matching on it lets the region emit a fallback in its place.
+#[page("/weather")]
+async fn weather() -> Result<impl View> {
+    Ok(view! {
+        <h1>"Weather"</h1>
+        (live! {
+            emit! { <p>"Loading..."</p> }?;
+            match emit! { forecast() } {
+                Err(error) => emit! {
+                    <p>
+                        "The forecast is unavailable: "
+                        (error.to_string())
+                    </p>
+                },
+                emitted => emitted,
+            }
+        })
+    })
+}
+
+#[component]
+async fn forecast() -> Result<impl View> {
+    let forecast = fetch_forecast().await?;
+    Ok(view! { <p>(forecast)</p> })
+}
+
+// Stands in for a weather service that is down.
+async fn fetch_forecast() -> Result<&'static str> {
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    Err(std::io::Error::other("the weather service is unreachable").into())
 }
