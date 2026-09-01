@@ -109,7 +109,7 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
                 let region = swap.region;
                 let html = swap.replacement.render(this.cx);
                 let envelope = format!(
-                    "<template data-tc-swap=\"{region}\">{html}</template>\
+                    "<template data-topcoat-swap=\"{region}\">{html}</template>\
                      <script>topcoat.swap({region})</script>",
                 );
                 Poll::Ready(Some(Ok(Frame::data(envelope.into()))))

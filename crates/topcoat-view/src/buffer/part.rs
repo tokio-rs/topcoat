@@ -297,7 +297,7 @@ impl<'a> PartsWriter<'a> {
             self.context,
         );
         // A rendered boundary is a fixed frame around the id's digits.
-        self.size_hint += 21;
+        self.size_hint += 42;
         self.sink.push_region_start(region);
         self
     }
@@ -315,7 +315,7 @@ impl<'a> PartsWriter<'a> {
             self.context,
         );
         // A rendered boundary is a fixed frame around the id's digits.
-        self.size_hint += 22;
+        self.size_hint += 40;
         self.sink.push_region_end(region);
         self
     }

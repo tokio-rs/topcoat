@@ -91,14 +91,14 @@ impl<'a> Renderer<'a> {
                 }
 
                 Instruction::RegionStart(region) => {
-                    f.write_str("<!--tc:");
+                    f.write_str("<!--topcoat::region::start(");
                     f.write_str(region.as_u64().format_into(&mut NumBuffer::new()));
-                    f.write_str("-->");
+                    f.write_str(")-->");
                 }
                 Instruction::RegionEnd(region) => {
-                    f.write_str("<!--/tc:");
+                    f.write_str("<!--topcoat::region::end(");
                     f.write_str(region.as_u64().format_into(&mut NumBuffer::new()));
-                    f.write_str("-->");
+                    f.write_str(")-->");
                 }
 
                 #[cfg(feature = "http")]

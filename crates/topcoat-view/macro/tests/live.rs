@@ -190,7 +190,10 @@ async fn region_emitting_twice_swaps_its_content() {
     let region = swap.region;
     assert_eq!(
         content.content.render(cx),
-        format!("<main><!--tc:{region}--><p>first</p><!--/tc:{region}--></main>")
+        format!(
+            "<main><!--topcoat::region::start({region})--><p>first</p>\
+             <!--topcoat::region::end({region})--></main>"
+        )
     );
     assert_eq!(swap.replacement.render(cx), "<p>second</p>");
 
@@ -216,7 +219,8 @@ async fn region_ids_count_from_the_start_for_each_root_view() {
         assert!(content.live);
         assert_eq!(
             content.content.render(cx),
-            "<main><!--tc:1--><p>first</p><!--/tc:1--></main>"
+            "<main><!--topcoat::region::start(1)--><p>first</p>\
+             <!--topcoat::region::end(1)--></main>"
         );
         assert!(next_swap(&mut view).await.unwrap().is_some());
         assert!(next_swap(&mut view).await.unwrap().is_none());

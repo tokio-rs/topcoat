@@ -27,8 +27,8 @@ window.topcoat = {
         const walker = document.createTreeWalker(document.documentElement, NodeFilter.SHOW_COMMENT);
         while (walker.nextNode()) {
             const comment = walker.currentNode;
-            if (comment.data === `tc:${id}`) open = comment;
-            else if (comment.data === `/tc:${id}`) close = comment;
+            if (comment.data === `topcoat::region::start(${id})`) open = comment;
+            else if (comment.data === `topcoat::region::end(${id})`) close = comment;
         }
         if (open && close) {
             while (open.nextSibling && open.nextSibling !== close) open.nextSibling.remove();
