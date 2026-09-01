@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{Path, spanned::Spanned};
 use topcoat_core_grammar::paths::topcoat_view;
@@ -17,8 +17,9 @@ pub(crate) struct Component {
     pub named_args: Vec<NamedArg>,
     /// The `key:` argument keying the invocation's identity, if any.
     pub key: Option<NamedArg>,
-    /// Numbers this invocation site within the expansion, telling sites
-    /// apart when their spans collapse to a single location.
+    /// Numbers this invocation site within the expansion. Every site key in
+    /// one expansion resolves to the `view!` invocation's location, so the
+    /// ordinal is what tells the sites apart.
     pub ordinal: u32,
     /// Whether the invocation sits in a `for` body, so the site repeats.
     pub repeats: bool,
@@ -27,15 +28,26 @@ pub(crate) struct Component {
 }
 
 impl Component {
+    /// Returns `name` as an ident spanned onto the component path, so the
+    /// error for a missing prop or a path that is not a component points at
+    /// the invocation.
+    ///
+    /// These idents are the only generated tokens carrying the path's span.
+    /// Anything spanned onto the path shows up when the editor hovers the
+    /// component name, so the rest of the emission uses call-site spans to
+    /// keep the hover down to the component and its props methods.
+    fn diagnostic_ident(&self, name: &str) -> Ident {
+        Ident::new(name, self.path.span())
+    }
+
     /// Returns the site key expression naming this invocation site.
     ///
-    /// `file!`, `line!`, and `column!` are spanned onto the component path,
-    /// so they resolve to the invocation's own location in source; the
-    /// ordinal tells sites apart when a macro-generated body collapses
-    /// their spans.
+    /// `file!`, `line!`, and `column!` carry call-site spans, so they
+    /// resolve to the `view!` invocation's location; the ordinal tells the
+    /// sites within one expansion apart.
     fn site(&self) -> TokenStream {
         let ordinal = self.ordinal;
-        quote_spanned! {self.path.span()=>
+        quote! {
             const {
                 #topcoat_view::identity::SiteKey::new(
                     ::core::file!(),
@@ -48,13 +60,14 @@ impl Component {
     }
 
     /// Returns the expression naming this invocation in the ambiguity
-    /// error: the component path and its location in source.
+    /// error: the component path and the `view!` invocation's location in
+    /// source.
     fn label(&self) -> TokenStream {
         let name = format!(
             "`{}`",
             self.path.to_token_stream().to_string().replace(' ', ""),
         );
-        quote_spanned! {self.path.span()=>
+        quote! {
             ::core::concat!(
                 #name,
                 " at ",
@@ -80,28 +93,28 @@ impl Component {
     /// consuming the identity, or any identity below it, errors with a
     /// pointer to the missing `key`.
     fn identity_guard(&self) -> TokenStream {
-        let span = self.path.span();
         let site = self.site();
         match (&self.key, self.repeats) {
             (Some(arg), _) => {
                 let path = &self.path;
+                let props_builder = self.diagnostic_ident("props_builder");
                 let ident = &arg.ident;
                 let value = &arg.value;
-                quote_spanned! {span=> {
+                quote! {{
                     use #topcoat_view::Component;
                     let mut __key = ::core::option::Option::None;
-                    #path::props_builder()
+                    #path::#props_builder()
                         .#ident(#value, |__value| __key = ::core::option::Option::Some(__value));
                     #topcoat_view::identity::IdentityGuard::enter_keyed(#site, __key.unwrap())
                 }}
             }
             (None, true) => {
                 let label = self.label();
-                quote_spanned! {span=>
+                quote! {
                     #topcoat_view::identity::IdentityGuard::enter_ambiguous(#site, #label)
                 }
             }
-            (None, false) => quote_spanned! {span=>
+            (None, false) => quote! {
                 #topcoat_view::identity::IdentityGuard::enter(#site)
             },
         }
@@ -130,13 +143,16 @@ impl Component {
             quote! { .child(#topcoat_view::Child::new(#child)) }
         });
 
-        quote_spanned! {path.span()=> {
+        let props_builder = self.diagnostic_ident("props_builder");
+        let build = self.diagnostic_ident("build");
+        let render = self.diagnostic_ident("render");
+        quote! {{
             use #topcoat_view::Component;
-            let props = #path::props_builder()#(#setters)*#child.build();
+            let props = #path::#props_builder()#(#setters)*#child.#build();
             // The marker is built via `Default` so the same construction
             // works for both unit-struct and generic (`PhantomData`) markers.
             #[allow(clippy::default_constructed_unit_structs)]
-            Component::render(
+            Component::#render(
                 #path::default(),
                 __cx,
                 props,

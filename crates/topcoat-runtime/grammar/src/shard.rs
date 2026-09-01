@@ -100,8 +100,12 @@ impl ToTokens for Shard {
         // `Expr<T>` into its evaluated value (for the initial server render)
         // and its JavaScript source (tracked by the browser). The marker
         // struct the face expands to is a unit struct, so `#ident` stays a
-        // value usable directly in `router.shard(...)`.
+        // value usable directly in `router.shard(...)`. The function's doc
+        // comments ride along on the face, so the component expansion carries
+        // them onto the marker.
+        let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
         let marker = quote! {
+            #(#docs)*
             #[#topcoat_view_macro::component]
             #vis async fn #ident(#component_params) -> #topcoat_error::Result<impl #topcoat_view::View> {
                 #(
@@ -184,5 +188,28 @@ impl ToTokens for Shard {
             };
         }
         .to_tokens(tokens);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use quote::quote;
+
+    use super::*;
+
+    #[test]
+    fn doc_comments_ride_along_on_the_component_face() {
+        let shard = Shard::parse(
+            TokenStream::new(),
+            quote! {
+                /// Counts clicks.
+                async fn counter(count: i64) -> Result<impl View> { todo!() }
+            },
+        )
+        .unwrap();
+        let out = shard.to_token_stream().to_string();
+        let doc = out.find("Counts clicks.").expect(&out);
+        let face = out.find("async fn counter").expect(&out);
+        assert!(doc < face, "{out}");
     }
 }

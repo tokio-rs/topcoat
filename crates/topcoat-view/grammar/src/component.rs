@@ -23,8 +23,9 @@ use crate::component::{ComponentAttr, ComponentItem};
 ///   `ButtonProps`), deriving [`Props`] so it gets a typestate builder. `#[default]` and `#[into]`
 ///   on function parameters are forwarded to the corresponding props fields. `impl Trait` parameter
 ///   types are lifted into generic type parameters of the props struct.
-/// - a zero-sized marker struct named after the function that implements
-///   [`topcoat::view::Component`] with a `render` method calling the original function body.
+/// - a zero-sized marker struct named after the function, carrying the function's doc comments,
+///   that implements [`topcoat::view::Component`] with a `render` method calling the original
+///   function body.
 ///
 /// [`Props`]: derive.Props.html
 /// [`topcoat::view::Component`]: trait.Component.html
@@ -199,7 +200,14 @@ impl ToTokens for Component {
             )
         };
 
+        // The marker is what a `view!` invocation names, so it carries the
+        // function's doc comments: hovering the component shows them.
+        let docs = attrs
+            .iter()
+            .filter(|attr| attr.path().is_ident("doc"))
+            .collect::<Vec<_>>();
         quote_spanned! {ident.span()=>
+            #(#docs)*
             #[allow(non_camel_case_types)]
             #vis struct #ident #marker_impl_generics #marker_body
         }
@@ -304,5 +312,29 @@ impl VisitMut for LifetimeVisitor {
             self.used = true;
         }
         visit_mut::visit_type_reference_mut(self, tr);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use quote::quote;
+
+    use super::*;
+
+    #[test]
+    fn doc_comments_land_on_the_marker_and_props_structs() {
+        let component = Component::parse(
+            TokenStream::new(),
+            quote! {
+                /// Renders a badge.
+                async fn badge(label: &str) -> Result { todo!() }
+            },
+        )
+        .unwrap();
+        let out = component.to_token_stream().to_string();
+        let doc = out.find("Renders a badge.").expect(&out);
+        let marker = out.find("struct badge").expect(&out);
+        assert!(doc < marker, "{out}");
+        assert_eq!(out.matches("Renders a badge.").count(), 2, "{out}");
     }
 }
