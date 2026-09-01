@@ -55,6 +55,7 @@ members = [
     "examples/session",
     "examples/shard",
     "examples/sse",
+    "examples/streaming",
     "examples/tailwind",
     "examples/toasty-todo",
     "examples/ui",

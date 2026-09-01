@@ -2431,6 +2431,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "streaming"
+version = "0.6.2"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

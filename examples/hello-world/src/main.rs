@@ -1,9 +1,7 @@
-use std::time::Duration;
-
 use topcoat::{
     Result,
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::{View, emit, live, view},
+    view::{View, component, view},
 };
 
 #[tokio::main]
@@ -21,22 +19,22 @@ async fn home() -> Result<impl View> {
         <html>
             <head>
                 <title>"Hello world"</title>
+
                 // Reloads the browser when the dev server rebuilds the app.
                 topcoat::dev::script()
             </head>
-            <body>
-                (live! {
-                    for count in 0..100 {
-                        emit! {
-                            "Loading... "
-                            (count)
-                            "%"
-                        }?;
-                        tokio::time::sleep(Duration::from_millis(20)).await;
-                    }
-                    emit! { "Hello world!" }
-                })
-            </body>
+            <body>hello(name: "World")</body>
         </html>
+    })
+}
+
+#[component]
+async fn hello(name: &str) -> Result<impl View> {
+    Ok(view! {
+        <h1>
+            "Hello, "
+            (name)
+            "!"
+        </h1>
     })
 }

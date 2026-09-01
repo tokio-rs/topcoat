@@ -225,8 +225,7 @@ mod tests {
 
     /// A region that settles after a single emission.
     fn render_settled_region_page(cx: &Cx, _body: Body) -> BoxView<'_> {
-        view! { cx => <main>(live! { emit! { <p>"only"</p> } })</main> }
-        .boxed()
+        view! { cx => <main>(live! { emit! { <p>"only"</p> } })</main> }.boxed()
     }
 
     /// A region that emits twice, so the response streams one swap.
@@ -316,8 +315,7 @@ mod tests {
 
     /// A region that fails before it produces any content.
     fn render_failing_page(cx: &Cx, _body: Body) -> BoxView<'_> {
-        view! { cx => <main>(live! { Err(io::Error::other("boom").into()) })</main> }
-        .boxed()
+        view! { cx => <main>(live! { Err(io::Error::other("boom").into()) })</main> }.boxed()
     }
 
     /// A region that fails after its first emission, mid-stream.
