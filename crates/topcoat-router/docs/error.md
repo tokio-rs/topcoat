@@ -76,7 +76,9 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-The [`StatusCode`](crate::StatusCode) in the view keeps the response a 403; without it the replacement page would be served as a 200. Returning an error from the fallback rethrows it, so an error the boundary does not handle still reaches the enclosing handler.
+The [`StatusCode`](crate::StatusCode) in the view keeps the response a 403; without it the replacement page would be served as a 200. Returning an error from the fallback rethrows it; it will continue bubbling up the view tree.
+
+You may also use [`live!`](../view/macro.live.html) regions to handle errors instead of using the simpler `error_boundary` component.
 
 # Not-found pages
 
