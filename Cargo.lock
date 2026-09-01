@@ -1531,6 +1531,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 
 [[package]]
+name = "live"
+version = "0.6.2"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2431,14 +2439,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "streaming"
-version = "0.6.2"
-dependencies = [
- "tokio",
- "topcoat",
-]
-
-[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2449,6 +2449,14 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+
+[[package]]
+name = "suspense"
+version = "0.6.2"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
 
 [[package]]
 name = "syn"

@@ -1,5 +1,5 @@
 [package]
-name = "streaming"
+name = "suspense"
 version.workspace = true
 edition.workspace = true
 publish = false

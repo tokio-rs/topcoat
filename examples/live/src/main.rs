@@ -19,7 +19,7 @@ async fn shell(slot: Slot<'_>) -> Result<impl View> {
         <!DOCTYPE html>
         <html>
             <head>
-                <title>"Streaming"</title>
+                <title>"Live"</title>
 
                 // Reloads the browser when the dev server rebuilds the app.
                 topcoat::dev::script()
