@@ -88,7 +88,7 @@ const BASE: StaticClass = class!(
 /// view! {
 ///     toggle(
 ///         attrs: attributes! { name="bold" checked="" },
-///         icon(data: iconify_icon!("feather:bold"), label: "Bold")
+///         icon(data: iconify_icon!("lucide:bold"), label: "Bold")
 ///     )
 /// }
 /// ```

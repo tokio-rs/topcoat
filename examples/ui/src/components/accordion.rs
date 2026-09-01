@@ -113,7 +113,7 @@ pub async fn accordion_trigger(
         >
             (child)
             icon(
-                data: iconify_icon!("feather:chevron-down"),
+                data: iconify_icon!("lucide:chevron-down"),
                 attrs: attributes! {
                     class="size-4 shrink-0 text-muted-foreground transition-transform \
                         duration-200 ease-out group-open:rotate-180"

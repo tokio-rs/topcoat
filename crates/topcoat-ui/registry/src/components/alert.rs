@@ -55,7 +55,7 @@ const BASE: StaticClass = class!(
 /// view! {
 ///     alert(
 ///         variant: AlertVariant::Destructive,
-///         icon(data: iconify_icon!("feather:alert-triangle"))
+///         icon(data: iconify_icon!("lucide:triangle-alert"))
 ///         alert_title("Build failed")
 ///         alert_description("The last deploy did not finish.")
 ///     )

@@ -22,7 +22,7 @@ use topcoat::{
 ///         button(
 ///             size: ButtonSize::Icon,
 ///             variant: ButtonVariant::Outline,
-///             icon(data: iconify_icon!("feather:copy"), label: "Copy link")
+///             icon(data: iconify_icon!("lucide:copy"), label: "Copy link")
 ///         )
 ///         tooltip_content("Copy link")
 ///     )

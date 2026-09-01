@@ -127,7 +127,7 @@ pub async fn breadcrumb_separator(#[default] mut attrs: Attributes) -> Result<im
     Ok(view! {
         <li aria-hidden="true" class=(attrs.remove("class")) (attrs)>
             icon(
-                data: iconify_icon!("feather:chevron-right"),
+                data: iconify_icon!("lucide:chevron-right"),
                 attrs: attributes! { class="size-3.5" }
             )
         </li>
@@ -144,7 +144,7 @@ pub async fn breadcrumb_ellipsis(#[default] mut attrs: Attributes) -> Result<imp
     Ok(view! {
         <span class=(class!("flex items-center", attrs.remove("class"))) (attrs)>
             icon(
-                data: iconify_icon!("feather:more-horizontal"),
+                data: iconify_icon!("lucide:ellipsis"),
                 attrs: attributes! { class="size-4" }
             )
             <span class="sr-only">"More"</span>

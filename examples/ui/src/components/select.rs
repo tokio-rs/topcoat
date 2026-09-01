@@ -48,7 +48,7 @@ const PICKER: StaticClass = class!(
 );
 
 /// The icon marking the picker's checked option.
-const CHECKMARK: IconData = iconify_icon!("feather:check");
+const CHECKMARK: IconData = iconify_icon!("lucide:check");
 
 /// The inline style for the [`select`] wrapper, carrying [`CHECKMARK`] as a
 /// data URI in the `--select-checkmark` custom property. The indirection
@@ -121,7 +121,7 @@ pub async fn select(
         >
             <select class=(class!(SELECT, PICKER)) (attrs)>(child)</select>
             icon(
-                data: iconify_icon!("feather:chevron-down"),
+                data: iconify_icon!("lucide:chevron-down"),
                 attrs: attributes! {
                     class="pointer-events-none absolute top-1/2 right-3 size-4 \
                         -translate-y-1/2 text-muted-foreground transition-transform"

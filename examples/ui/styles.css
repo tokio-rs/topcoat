@@ -54,12 +54,12 @@
   --background: oklch(0.995 0.003 260);
   --foreground: oklch(0.24 0.012 260);
   --muted-foreground: oklch(0.51 0.014 260);
-  --primary: oklch(0.31 0.02 260);
+  --primary: oklch(0.21 0.02 260);
   --primary-foreground: oklch(0.985 0.003 260);
   --destructive: oklch(0.55 0.2 27);
   --destructive-foreground: oklch(0.99 0.012 27);
   --border: oklch(0.9 0.008 260);
-  --ring: oklch(0.62 0.06 260);
+  --ring: oklch(0.32 0.02 260);
   --shadow-xs: 0 1px 2px oklch(0.24 0.02 260 / 12%);
   --shadow-sm:
     0 1px 2px oklch(0.24 0.02 260 / 10%),
@@ -75,10 +75,11 @@
   --destructive: oklch(0.66 0.18 25);
   --destructive-foreground: oklch(0.14 0.02 25);
   --border: oklch(0.3 0.012 260);
-  --ring: oklch(0.6 0.05 260);
-  /* Light-mode shadows disappear on a dark background, so these are deeper. */
+  --ring: oklch(0.6 0.02 260);
   --shadow-xs: 0 1px 2px oklch(0 0 0 / 35%);
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / 35%), 0 2px 8px -2px oklch(0 0 0 / 30%);
+  --shadow-sm:
+    0 1px 2px oklch(0 0 0 / 35%),
+    0 2px 8px -2px oklch(0 0 0 / 30%);
 }
 
 @layer base {

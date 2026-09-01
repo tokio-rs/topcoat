@@ -149,7 +149,7 @@ pub async fn pagination_previous(
             ))
             (attrs)
         >
-            icon(data: iconify_icon!("feather:chevron-left"))
+            icon(data: iconify_icon!("lucide:chevron-left"))
             <span class=(LABEL)>(label)</span>
         </a>
     })
@@ -175,7 +175,7 @@ pub async fn pagination_next(
             (attrs)
         >
             <span class=(LABEL)>(label)</span>
-            icon(data: iconify_icon!("feather:chevron-right"))
+            icon(data: iconify_icon!("lucide:chevron-right"))
         </a>
     })
 }
@@ -196,7 +196,7 @@ pub async fn pagination_ellipsis(#[default] mut attrs: Attributes) -> Result<imp
             (attrs)
         >
             icon(
-                data: iconify_icon!("feather:more-horizontal"),
+                data: iconify_icon!("lucide:ellipsis"),
                 attrs: attributes! { class="size-4" }
             )
             <span class="sr-only">"More pages"</span>
