@@ -47,6 +47,7 @@ async fn stream<V: View + Unpin + 'static>(mut view: V, cx: &Cx) -> Result<Respo
         let body = ViewBody {
             cx: cx.clone(),
             first: Some(rendered.html),
+            script_sent: false,
             done: false,
             view,
         };
@@ -77,10 +78,41 @@ fn html_response(
     Ok(response)
 }
 
+/// Applies streamed swaps in the browser: replaces the content between a
+/// region's marker comments with the template the swap arrived in.
+///
+/// Sent once per streaming response, ahead of the first swap. The `??=`
+/// guard steps aside for an applier the page installed itself.
+const SWAP_SCRIPT: &str = r"<script>
+window.topcoat ??= {
+    swap(id) {
+        const script = document.currentScript;
+        const template = script.previousElementSibling;
+        let open = null;
+        let close = null;
+        const walker = document.createTreeWalker(document.documentElement, NodeFilter.SHOW_COMMENT);
+        while (walker.nextNode()) {
+            const comment = walker.currentNode;
+            if (comment.data === `topcoat::region::start(${id})`) open = comment;
+            else if (comment.data === `topcoat::region::end(${id})`) close = comment;
+        }
+        if (open && close) {
+            while (open.nextSibling && open.nextSibling !== close) open.nextSibling.remove();
+            close.parentNode.insertBefore(template.content, close);
+        }
+        template.remove();
+        script.remove();
+    },
+};
+</script>";
+
 pin_project! {
     struct ViewBody<V> {
         cx: Cx,
         first: Option<String>,
+        // Whether the swap applier script was already sent, which happens
+        // ahead of the first swap.
+        script_sent: bool,
         // Whether the view has reported it has no further swaps. Polling a
         // view past that point resumes a future that already completed.
         done: bool,
@@ -106,10 +138,12 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
         }
         match this.view.poll_swap(cx) {
             Poll::Ready(Ok(Some(swap))) => {
+                let script = if *this.script_sent { "" } else { SWAP_SCRIPT };
+                *this.script_sent = true;
                 let region = swap.region;
                 let html = swap.replacement.render(this.cx);
                 let envelope = format!(
-                    "<template data-topcoat-swap=\"{region}\">{html}</template>\
+                    "{script}<template data-topcoat-swap=\"{region}\">{html}</template>\
                      <script>topcoat.swap({region})</script>",
                 );
                 Poll::Ready(Some(Ok(Frame::data(envelope.into()))))
