@@ -3,7 +3,6 @@ use std::{
     future::Ready,
     mem,
     pin::Pin,
-    sync::atomic::{AtomicU64, Ordering},
     task::{Context, Poll},
 };
 
@@ -11,8 +10,6 @@ use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
 use crate::{EmitToken, RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
-
-static NEXT_REGION: AtomicU64 = AtomicU64::new(1);
 
 pin_project! {
     pub struct LiveView<Fut> {
@@ -49,9 +46,6 @@ where
 {
     fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         let mut this = self.project();
-        let region = *this
-            .region
-            .get_or_insert_with(|| RegionId(NEXT_REGION.fetch_add(1, Ordering::Relaxed)));
 
         let (poll, yielded) = {
             let _guard = YieldGuard::new();
@@ -62,11 +56,9 @@ where
             (Poll::Pending, Yield::First(first)) => {
                 // Poll again to determine liveness. If the second poll returns pending, we
                 // expect this view to yield again in the future.
-                let poll = {
+                let (poll, yielded) = {
                     let _guard = YieldGuard::new();
-                    let poll = this.body.poll(cx);
-                    *this.stash = YIELD.take().into_swap(region);
-                    poll
+                    (this.body.poll(cx), YIELD.take())
                 };
 
                 if let Poll::Ready(Err(e)) = poll {
@@ -82,6 +74,9 @@ where
                         live,
                     }));
                 }
+
+                let region = *this.region.get_or_insert_with(RegionId::next);
+                *this.stash = yielded.into_swap(region);
 
                 let first = ViewFirst {
                     content: ViewBufferScope::with(|buffer| {

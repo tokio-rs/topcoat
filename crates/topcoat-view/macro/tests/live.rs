@@ -199,6 +199,31 @@ async fn region_emitting_twice_swaps_its_content() {
 }
 
 #[tokio::test]
+async fn region_ids_count_from_the_start_for_each_root_view() {
+    let cx = &Cx::default();
+    for _ in 0..2 {
+        let mut view = pin!(view! {
+            cx =>
+            <main>
+                (live! {
+                    emit! { <p>"first"</p> }?;
+                    emit! { <p>"second"</p> }
+                })
+            </main>
+        });
+
+        let content = first(&mut view).await.unwrap();
+        assert!(content.live);
+        assert_eq!(
+            content.content.render(cx),
+            "<main><!--tc:1--><p>first</p><!--/tc:1--></main>"
+        );
+        assert!(next_swap(&mut view).await.unwrap().is_some());
+        assert!(next_swap(&mut view).await.unwrap().is_none());
+    }
+}
+
+#[tokio::test]
 async fn region_emitting_three_times_swaps_its_content_twice() {
     let cx = &Cx::default();
     let mut view = pin!(view! {

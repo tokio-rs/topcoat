@@ -282,7 +282,7 @@ mod tests {
     fn in_scope<R>(f: impl FnOnce() -> R) -> (R, ViewBuffer) {
         let mut slot = Some(Box::new(ViewBuffer::new()));
         let output = {
-            let _scope = ViewBufferScope::new(&mut slot);
+            let _buffer = ViewBufferScope::new(&mut slot);
             f()
         };
         (output, *slot.expect("the buffer was swapped back on exit"))

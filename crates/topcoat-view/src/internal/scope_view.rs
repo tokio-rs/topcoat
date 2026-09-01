@@ -6,13 +6,14 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{View, ViewBuffer, ViewBufferScope, ViewFirst, ViewSwap};
+use crate::{RegionScope, View, ViewBuffer, ViewBufferScope, ViewFirst, ViewSwap};
 
 pin_project! {
     pub struct ScopeView<V> {
         #[pin]
         view: V,
         buffer: Option<Box<ViewBuffer>>,
+        regions: u64,
         polled: bool,
     }
 }
@@ -23,6 +24,7 @@ impl<V> ScopeView<V> {
         Self {
             view,
             buffer: None,
+            regions: 1,
             polled: false,
         }
     }
@@ -35,12 +37,13 @@ impl<V> ScopeView<V> {
     pub fn self_contained(f: impl FnOnce() -> V) -> Self {
         let mut buffer = Some(Box::new(ViewBuffer::new()));
         let view = {
-            let _scope = ViewBufferScope::new(&mut buffer);
+            let _buffer = ViewBufferScope::new(&mut buffer);
             f()
         };
         Self {
             view,
             buffer,
+            regions: 1,
             polled: false,
         }
     }
@@ -58,8 +61,9 @@ where
         }
         *this.polled = true;
 
+        let _regions = RegionScope::new(this.regions);
         let poll = if this.buffer.is_some() {
-            let _scope = ViewBufferScope::new(this.buffer);
+            let _buffer = ViewBufferScope::new(this.buffer);
             this.view.poll_first(cx)
         } else {
             this.view.poll_first(cx)
@@ -80,6 +84,8 @@ where
     }
 
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
-        self.project().view.poll_swap(cx)
+        let this = self.project();
+        let _regions = RegionScope::new(this.regions);
+        this.view.poll_swap(cx)
     }
 }

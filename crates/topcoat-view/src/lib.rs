@@ -8,6 +8,7 @@ mod format;
 mod html;
 pub mod identity;
 mod props;
+mod region;
 mod string;
 pub mod svg;
 mod view;
@@ -19,6 +20,7 @@ pub use css::*;
 pub use format::*;
 pub use html::*;
 pub use props::*;
+pub use region::*;
 pub use string::*;
 pub use view::*;
 

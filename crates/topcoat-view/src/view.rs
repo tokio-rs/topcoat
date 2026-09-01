@@ -1,5 +1,4 @@
 use std::{
-    fmt,
     future::poll_fn,
     ops::DerefMut,
     pin::{Pin, pin},
@@ -8,16 +7,7 @@ use std::{
 
 use topcoat_core::error::Result;
 
-use crate::buffer::ViewHandle;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RegionId(pub(crate) u64);
-
-impl fmt::Display for RegionId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
-    }
-}
+use crate::{RegionId, buffer::ViewHandle};
 
 #[derive(Debug)]
 pub struct ViewFirst {

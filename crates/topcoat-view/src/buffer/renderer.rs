@@ -92,12 +92,12 @@ impl<'a> Renderer<'a> {
 
                 Instruction::RegionStart(region) => {
                     f.write_str("<!--tc:");
-                    f.write_str(region.0.format_into(&mut NumBuffer::new()));
+                    f.write_str(region.as_u64().format_into(&mut NumBuffer::new()));
                     f.write_str("-->");
                 }
                 Instruction::RegionEnd(region) => {
                     f.write_str("<!--/tc:");
-                    f.write_str(region.0.format_into(&mut NumBuffer::new()));
+                    f.write_str(region.as_u64().format_into(&mut NumBuffer::new()));
                     f.write_str("-->");
                 }
 
