@@ -1,4 +1,5 @@
 use std::{
+    fmt::Write,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -9,7 +10,7 @@ use http::{HeaderMap, StatusCode};
 use http_body::Frame;
 use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::{BoxView, View, ViewExt, ViewHandle, internal::MoveView};
+use topcoat_view::{BoxView, Formatter, View, ViewExt, ViewHandle, internal::MoveView};
 
 use crate::{
     Body, BoxError,
@@ -47,7 +48,7 @@ async fn stream<V: View + Unpin + 'static>(mut view: V, cx: &Cx) -> Result<Respo
         let body = ViewBody {
             cx: cx.clone(),
             first: Some(rendered.html),
-            script_sent: false,
+            script: Some(SWAP_SCRIPT),
             done: false,
             view,
         };
@@ -110,9 +111,8 @@ pin_project! {
     struct ViewBody<V> {
         cx: Cx,
         first: Option<String>,
-        // Whether the swap applier script was already sent, which happens
-        // ahead of the first swap.
-        script_sent: bool,
+        // The swap applier, taken by the first swap it is sent ahead of.
+        script: Option<&'static str>,
         // Whether the view has reported it has no further swaps. Polling a
         // view past that point resumes a future that already completed.
         done: bool,
@@ -138,14 +138,22 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
         }
         match this.view.poll_swap(cx) {
             Poll::Ready(Ok(Some(swap))) => {
-                let script = if *this.script_sent { "" } else { SWAP_SCRIPT };
-                *this.script_sent = true;
+                let script = this.script.take();
                 let region = swap.region;
-                let html = swap.replacement.render(this.cx);
-                let envelope = format!(
-                    "{script}<template data-topcoat-swap=\"{region}\">{html}</template>\
-                     <script>topcoat.swap({region})</script>",
+                // The envelope's fixed parts and two region ids on top of
+                // the replacement's own estimate.
+                let mut envelope = String::with_capacity(
+                    script.map_or(0, str::len) + swap.replacement.size_hint() + 96,
                 );
+                {
+                    let mut f = Formatter::new(&mut envelope);
+                    if let Some(script) = script {
+                        f.write_str(script);
+                    }
+                    write!(f, "<template data-topcoat-swap=\"{region}\">").unwrap();
+                    swap.replacement.render_into(this.cx, &mut f);
+                    write!(f, "</template><script>topcoat.swap({region})</script>").unwrap();
+                }
                 Poll::Ready(Some(Ok(Frame::data(envelope.into()))))
             }
             Poll::Ready(Ok(None)) => {

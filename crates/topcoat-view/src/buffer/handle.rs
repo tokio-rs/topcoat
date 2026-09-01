@@ -96,7 +96,8 @@ impl ViewHandle {
     /// Returns an estimate of the number of bytes the view writes when
     /// rendered.
     #[inline]
-    pub(super) fn size_hint(&self) -> usize {
+    #[must_use]
+    pub fn size_hint(&self) -> usize {
         match &self.repr {
             ViewRepr::Static(body) => body.len(),
             ViewRepr::Scoped { size_hint, .. } | ViewRepr::Owned { size_hint, .. } => *size_hint,
@@ -216,15 +217,19 @@ impl ViewHandle {
 
     /// Writes the view's output through `f`.
     ///
-    /// A nested handle renders against the buffer of the build it belongs
-    /// to, which must be the one running on the current task.
+    /// The formatter appends to its destination as it goes, so reserve the
+    /// [`size_hint`](Self::size_hint) up front to avoid reallocations. A
+    /// nested handle renders against the buffer of the build it belongs to,
+    /// which must be the one running on the current task.
     ///
     /// # Panics
     ///
     /// Panics if the view is a nested handle and no build is running on the
-    /// current task, or a different one is.
+    /// current task, or a different one is, or if a dynamic attribute key or
+    /// element name in the view contains a character that could break out of
+    /// the identifier.
     #[track_caller]
-    pub(crate) fn render_into(self, cx: &Cx, f: &mut Formatter<'_>) {
+    pub fn render_into(self, cx: &Cx, f: &mut Formatter<'_>) {
         match self.repr {
             ViewRepr::Static(body) => f.write_str(body),
             ViewRepr::Scoped { buffer, entry, .. } => ViewBufferScope::with(|active| {
