@@ -48,6 +48,7 @@ Each crate's `docs/` directory holds the user-facing guides for that crate, embe
 
 - [`crates/topcoat-view/macro/docs/view.md`](crates/topcoat-view/macro/docs/view.md): The `view!` macro: HTML-like templating syntax, expression interpolation, control flow (`if`/`for`/`match`/`let`), components, and conditional attributes.
 - [`crates/topcoat-view/macro/docs/component.md`](crates/topcoat-view/macro/docs/component.md): The `#[component]` macro: defining components, props, child content, generics, and the `cx` parameter.
+- [`crates/topcoat-view/macro/docs/live.md`](crates/topcoat-view/macro/docs/live.md): The `live!` and `emit!` macros: live regions that stream replacement content into a page, and the `suspense`/`error_boundary` components built on them.
 - [`crates/topcoat-view/macro/docs/attributes.md`](crates/topcoat-view/macro/docs/attributes.md): The `attributes!` macro and the runtime `Attributes` value for building/forwarding attribute collections.
 - [`crates/topcoat-view/macro/docs/class.md`](crates/topcoat-view/macro/docs/class.md): The `class!` macro: assembling a space-separated class list from static and conditional entries.
 - [`crates/topcoat-view/macro/docs/props.md`](crates/topcoat-view/macro/docs/props.md): The `props!` macro for building a component's props value.

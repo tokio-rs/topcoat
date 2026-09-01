@@ -10,12 +10,14 @@ pub fn view(tokens: TokenStream) -> TokenStream {
     quote! { #parsed }.into()
 }
 
+#[doc = include_str!("../docs/live.md")]
 #[proc_macro]
 pub fn live(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse_macro_input!(tokens as topcoat_view_grammar::live::Live);
     quote! { #parsed }.into()
 }
 
+#[doc = include_str!("../docs/live.md")]
 #[proc_macro]
 pub fn emit(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse_macro_input!(tokens as topcoat_view_grammar::live::Emit);
