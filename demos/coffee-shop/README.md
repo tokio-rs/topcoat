@@ -18,5 +18,6 @@ Each feature lives in one small file:
 | `topcoat ui` components, vendored source | [`src/components/`](src/components) |
 | `view!` control flow and `#[component]` props | [`src/app/menu.rs`](src/app/menu.rs) |
 | Signals and a `#[shard]`: live menu search | [`src/app/menu.rs`](src/app/menu.rs) |
+| `suspense` and `error_boundary`: the menu streams in behind a skeleton | [`src/app/menu.rs`](src/app/menu.rs) |
 | `path_param!`, runtime expressions, a `#[procedure]` | [`src/app/menu/drink.rs`](src/app/menu/drink.rs) |
 | Tailwind, a Fontsource font, an `asset!` image | [`build.rs`](build.rs), [`src/app.rs`](src/app.rs) |

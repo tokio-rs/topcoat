@@ -1,11 +1,13 @@
 pub mod drink;
 
+use std::time::Duration;
+
 use topcoat::{
     Result,
     context::Cx,
     router::{href, page},
     runtime::{Event, shard},
-    view::{View, attributes, component, view},
+    view::{View, attributes, component, error_boundary, suspense, view},
 };
 
 use crate::{
@@ -14,6 +16,7 @@ use crate::{
         button::{ButtonVariant, button},
         card::{card, card_content, card_description, card_header, card_title},
         input::input,
+        skeleton::skeleton,
     },
     models::{Drink, Roast, drinks},
 };
@@ -47,14 +50,37 @@ pub async fn page() -> Result<impl View> {
             )
         </div>
 
-        // The shard renders again on the server whenever `query` changes.
-        <div class="mt-6">drink_grid(query: $(query.get()))</div>
+        // The grid queries the database, so it streams in behind a
+        // skeleton, and a failure becomes a message in its place instead of
+        // taking down the page.
+        <div class="mt-6">
+            error_boundary(
+                fallback: |error| Ok(
+                        view! {
+                            <p class="text-muted-foreground">
+                                "The menu is unavailable: "
+                                (error.to_string())
+                            </p>
+                        },
+                    ),
+                suspense(
+                    fallback: view! { drink_grid_skeleton() },
+                    // The shard renders again on the server whenever `query`
+                    // changes.
+                    drink_grid(query: $(query.get()))
+                )
+            )
+        </div>
     })
 }
 
 /// The drinks matching the search, rendered on the server.
 #[shard]
 async fn drink_grid(cx: &Cx, query: String) -> Result<impl View> {
+    // Stands in for a slower lookup, so the skeleton is visible before the
+    // grid streams in.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
     // The query comes from the client, so treat it as untrusted input.
     let needle = query.trim().to_lowercase();
 
@@ -76,6 +102,28 @@ async fn drink_grid(cx: &Cx, query: String) -> Result<impl View> {
                 }
             </div>
         }
+    })
+}
+
+/// The grid's stand-in while the menu loads: skeleton cards in the same
+/// layout, so the page does not jump when the drinks land.
+#[component]
+async fn drink_grid_skeleton() -> Result<impl View> {
+    Ok(view! {
+        <div class="grid gap-4 sm:grid-cols-2">
+            for _ in 0..4 {
+                card(
+                    card_header(
+                        <div class="flex items-center justify-between gap-4">
+                            skeleton(attrs: attributes! { class="h-5 w-24" })
+                            skeleton(attrs: attributes! { class="h-5 w-20" })
+                        </div>
+                        skeleton(attrs: attributes! { class="h-4 w-full" })
+                    )
+                    card_content(skeleton(attrs: attributes! { class="h-5 w-14" }))
+                )
+            }
+        </div>
     })
 }
 

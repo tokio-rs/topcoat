@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 toasty = { workspace = true, features = ["sqlite"] }
-tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 topcoat = { workspace = true, features = ["font-fontsource", "tailwind"] }
 
 [build-dependencies]
