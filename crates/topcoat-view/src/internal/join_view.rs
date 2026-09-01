@@ -290,7 +290,10 @@ mod tests {
             }))
         }
 
-        fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+        fn poll_swap(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Result<Option<ViewSwap>>> {
             let this = self.get_mut();
             if this.remaining == 0 {
                 return Poll::Ready(Ok(None));
