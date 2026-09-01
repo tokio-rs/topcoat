@@ -20,8 +20,9 @@ export class Bool implements AttributeValueViewParts, NodeViewParts {
 		return new Bool(this.v !== other.v);
 	}
 
-	// biome-ignore lint/suspicious/noThenProperty: Intended behavior for cross compilation.
-	then<T>(f: () => T): Option<T> {
+	// `then` would make Bool a JavaScript thenable. Promise resolution would
+	// invoke it and replace a procedure's boolean result with `undefined`.
+	then_<T>(f: () => T): Option<T> {
 		return this.v ? Option.some(f()) : Option.none<T>();
 	}
 
