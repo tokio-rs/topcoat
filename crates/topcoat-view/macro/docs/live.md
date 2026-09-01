@@ -24,7 +24,7 @@ The page waits for a region's first emission and renders it with the rest of the
 
 The two most common shapes, a fallback that waits for one piece of content and a guard that catches a failed render, come prepackaged as the [`suspense`] and [`error_boundary`] components, described at the end of this guide. If one of them fits, you never need the macros; they are the general form behind both.
 
-# Emitting More Than Once
+# Emitting Many Times
 
 [`emit!`] accepts everything [`view!`] does: elements, text, interpolated expressions, control flow, and components. Between emissions the body is plain async Rust, so it can await work, loop, and branch. Because each emission replaces the previous one, a live region can narrate a long-running task as it happens:
 

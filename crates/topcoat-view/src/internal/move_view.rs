@@ -12,6 +12,14 @@ use topcoat_core::error::Result;
 use crate::{View, ViewFirst, ViewSwap};
 
 pin_project! {
+    /// A [`View`] polled through an async body that owns data the view
+    /// borrows.
+    ///
+    /// A top-level `view!` and a captured control-flow body expand to one:
+    /// the body moves the values the template captures into itself, builds
+    /// the nested view, and drives it in place, so the view's borrows stay
+    /// alive for as long as it runs. What the driven view resolves passes
+    /// through out of band, one value per poll.
     pub struct MoveView<Fut> {
         #[pin]
         body: Fut,
@@ -29,6 +37,9 @@ where
 }
 
 impl MoveView<Ready<()>> {
+    /// Drives `view` inside a move body, handing its first content and
+    /// every swap after it to the enclosing poll; resolves once the view
+    /// has no further updates.
     pub fn drive<V: View>(view: V) -> impl Future<Output = Result<()>> {
         DriveFuture { view, first: true }
     }

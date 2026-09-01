@@ -116,6 +116,7 @@ impl JsBuilder {
         self
     }
 
+    /// Finishes the builder into a [`Js`].
     #[must_use]
     pub fn build(self) -> Js {
         Js { parts: self.parts }

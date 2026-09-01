@@ -7,6 +7,11 @@ use topcoat_core::error::Result;
 
 use crate::{View, ViewBufferScope, ViewFirst, ViewSwap};
 
+/// The bodies of a `for` loop in node position, as one [`View`].
+///
+/// The bodies are driven concurrently. The first content concatenates
+/// theirs in iteration order and is live while any of them is. Swaps are
+/// collected round-robin, so one busy body cannot starve its siblings.
 pub struct LoopView<V> {
     bodies: Vec<Body<V>>,
     // Where the next swap scan starts. Advanced past each body that

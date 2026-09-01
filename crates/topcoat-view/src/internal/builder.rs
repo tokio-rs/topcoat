@@ -6,6 +6,11 @@ use crate::{
     html::ElementNameViewParts,
 };
 
+/// The handle a template's burst pushes its parts through.
+///
+/// Wraps a [`PartsWriter`] with the request context and enters the HTML
+/// context matching each position, so every value is escaped for where it
+/// lands.
 pub struct Builder<'a, 'b, 'c> {
     cx: &'a Cx,
     parts: &'b mut PartsWriter<'c>,

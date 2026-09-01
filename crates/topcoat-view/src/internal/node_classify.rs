@@ -17,6 +17,7 @@ pub trait NodeClassify {
     /// The view the join drives for the position.
     type Unit: View;
 
+    /// Splits the value into its parts and its view.
     fn classify(self) -> (Self::Parts, Self::Unit);
 }
 

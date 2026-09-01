@@ -9,13 +9,11 @@ use topcoat_core::error::Result;
 use crate::{View, ViewFirst, ViewSwap};
 
 pin_project! {
-    /// A [`View`] built from a [`Future`] that resolves to a [`View`].
+    /// A [`View`] built from a [`Future`] that resolves to one.
     ///
-    /// This view first awaits the future for its returned view, and then adopts
-    /// then re-emits all values from that view.
-    ///
-    /// This is useful, for example, for components, which are async functions that return
-    /// a view. The parent caller needs to convert their future into a new view to integrate.
+    /// The view awaits the future first and then polls the view it resolved
+    /// to in place. A component invocation becomes one: the component's
+    /// body is a future returning its view.
     #[project = ThenViewProj]
     pub enum ThenView<F, V> {
         Future { #[pin] future: F },

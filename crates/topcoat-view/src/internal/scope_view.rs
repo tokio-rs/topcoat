@@ -9,6 +9,15 @@ use topcoat_core::error::Result;
 use crate::{RegionScope, View, ViewBuffer, ViewBufferScope, ViewFirst, ViewSwap};
 
 pin_project! {
+    /// Installs the build environment around a [`View`]: a buffer for its
+    /// content and a counter for its region ids.
+    ///
+    /// A scope first polled with no build running owns its buffer and seals
+    /// its first content with it, making the content self-contained. Polled
+    /// inside a running build it defers to that build's buffer, and its
+    /// content splices into the enclosing view. The region counter persists
+    /// across polls, so a swap names the same region its content was framed
+    /// with.
     pub struct ScopeView<V> {
         #[pin]
         view: V,
@@ -19,6 +28,8 @@ pin_project! {
 }
 
 impl<V> ScopeView<V> {
+    /// Creates a scope that decides on first poll whether it needs a
+    /// buffer of its own.
     #[must_use]
     pub fn new(view: V) -> Self {
         Self {

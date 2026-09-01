@@ -12,6 +12,14 @@ use topcoat_core::error::Result;
 use crate::{EmitToken, RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
 
 pin_project! {
+    /// A `live!` region as a [`View`]: a body future whose emissions become
+    /// the region's content.
+    ///
+    /// The body reports each emission out of band while it runs. The first
+    /// one becomes the view's first content; when the body is already done
+    /// at that point the content is final and needs no markers. Otherwise
+    /// the content is framed with the markers of a freshly allocated region
+    /// and every later emission becomes a swap of that region.
     pub struct LiveView<Fut> {
         #[pin]
         body: Fut,
@@ -35,6 +43,11 @@ where
 }
 
 impl LiveView<Ready<Result<EmitToken>>> {
+    /// Drives `view` inside a live body: the future an `emit!` awaits.
+    ///
+    /// The view's first content and every swap after it are handed to the
+    /// enclosing poll as emissions, and the future resolves to the token
+    /// once the view has no further updates.
     pub fn drive<V: View>(view: V) -> impl Future<Output = Result<EmitToken>> {
         DriveFuture { view, first: true }
     }
