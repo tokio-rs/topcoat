@@ -16,13 +16,18 @@ pin_project! {
     /// Every unit is driven toward its content; once all have resolved, the
     /// burst runs, pushing the template's block into the buffer of the
     /// build in one synchronous burst that splices the contents in position
-    /// order. After that the units' updates merge into one stream of swaps.
+    /// order. After that the units' updates merge into one stream of swaps,
+    /// collected round-robin so one busy unit cannot starve its siblings.
     pub struct JoinView<'cx, U, F> {
         cx: &'cx Cx,
         #[pin]
         units: U,
         // The burst; taken when the units resolve.
         burst: Option<F>,
+        // Where the next swap scan starts. Advanced past each unit that
+        // delivered a swap, so its siblings get a turn before it comes up
+        // again.
+        next_swap_index: usize,
     }
 }
 
@@ -37,6 +42,7 @@ where
             cx,
             units,
             burst: Some(burst),
+            next_swap_index: 0,
         }
     }
 }
@@ -61,7 +67,30 @@ where
     }
 
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
-        self.project().units.poll_swap(cx)
+        let mut this = self.project();
+
+        // One full turn around the ring in two range scans, so every
+        // waiting unit is polled before this view settles on pending.
+        let len = U::LEN;
+        let start = *this.next_swap_index;
+        let mut all_done = true;
+        for (from, to) in [(start, len), (0, start)] {
+            match this.units.as_mut().poll_swap_range(cx, from, to) {
+                Poll::Pending => all_done = false,
+                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+                Poll::Ready(Ok(None)) => {}
+                Poll::Ready(Ok(Some((position, swap)))) => {
+                    *this.next_swap_index = (position + 1) % len;
+                    return Poll::Ready(Ok(Some(swap)));
+                }
+            }
+        }
+
+        if all_done {
+            Poll::Ready(Ok(None))
+        } else {
+            Poll::Pending
+        }
     }
 }
 
@@ -72,6 +101,9 @@ where
 /// [`JoinUnit`] per position, terminated by `()`. The contents come back in
 /// the same nested shape, destructured by the burst.
 pub trait JoinUnits {
+    /// The number of units in the list.
+    const LEN: usize;
+
     /// The units' contents, in position order: nested
     /// `(ViewHandle, ...)` pairs terminated by `()`.
     type Contents;
@@ -86,12 +118,20 @@ pub trait JoinUnits {
     /// Whether any unit may still update.
     fn is_live(&self) -> bool;
 
-    /// Polls the units for the next swap, or for `None` once every unit has
-    /// no further updates.
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>>;
+    /// Polls the units at positions `from..to` for the next swap, yielded
+    /// with its position, or for `None` once every unit in the range has no
+    /// further updates.
+    fn poll_swap_range(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        from: usize,
+        to: usize,
+    ) -> Poll<Result<Option<(usize, ViewSwap)>>>;
 }
 
 impl JoinUnits for () {
+    const LEN: usize = 0;
+
     type Contents = ();
 
     fn poll_contents(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<()>> {
@@ -104,7 +144,12 @@ impl JoinUnits for () {
         false
     }
 
-    fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap_range(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _from: usize,
+        _to: usize,
+    ) -> Poll<Result<Option<(usize, ViewSwap)>>> {
         Poll::Ready(Ok(None))
     }
 }
@@ -144,6 +189,8 @@ where
     V: View,
     Rest: JoinUnits,
 {
+    const LEN: usize = 1 + Rest::LEN;
+
     type Contents = (ViewHandle, Rest::Contents);
 
     fn poll_contents(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
@@ -187,26 +234,36 @@ where
         !self.done || self.rest.is_live()
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap_range(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        from: usize,
+        to: usize,
+    ) -> Poll<Result<Option<(usize, ViewSwap)>>> {
+        if to == 0 {
+            return Poll::Ready(Ok(None));
+        }
+
         let this = self.project();
         let mut pending = false;
 
-        if !*this.done {
+        if from == 0 && !*this.done {
             match this.view.poll_swap(cx) {
-                Poll::Ready(Ok(Some(swap))) => return Poll::Ready(Ok(Some(swap))),
+                Poll::Ready(Ok(Some(swap))) => return Poll::Ready(Ok(Some((0, swap)))),
                 Poll::Ready(Ok(None)) => *this.done = true,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Pending => pending = true,
             }
         }
 
-        match this.rest.poll_swap(cx) {
-            Poll::Ready(Ok(Some(swap))) => Poll::Ready(Ok(Some(swap))),
-            // The rest is done, but this unit still owes a swap.
+        match this
+            .rest
+            .poll_swap_range(cx, from.saturating_sub(1), to - 1)
+        {
+            Poll::Ready(Ok(Some((position, swap)))) => Poll::Ready(Ok(Some((position + 1, swap)))),
+            // The rest of the range is done, but this unit still owes a swap.
             Poll::Ready(Ok(None)) if pending => Poll::Pending,
-            Poll::Ready(Ok(None)) => Poll::Ready(Ok(None)),
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-            Poll::Pending => Poll::Pending,
+            other => other,
         }
     }
 }
