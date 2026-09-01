@@ -1,7 +1,7 @@
 #[cfg(feature = "http")]
 use crate::buffer::HeadersPtr;
 use crate::{
-    HtmlContext,
+    HtmlContext, RegionId,
     buffer::{DynPtr, InstructionPtr, StaticStrPtr, StringPtr, ViewPtr},
 };
 
@@ -93,6 +93,11 @@ pub(super) enum Instruction {
     },
     /// A part that writes its output at render time, and its context.
     Dyn { ptr: DynPtr, context: HtmlContext },
+
+    /// The start of a region.
+    RegionStart(RegionId),
+    /// The end of a region.
+    RegionEnd(RegionId),
 
     /// A response status code recorded at render time; renders no content.
     #[cfg(feature = "http")]

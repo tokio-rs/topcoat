@@ -86,15 +86,9 @@ where
                 let first = ViewFirst {
                     content: ViewBufferScope::with(|buffer| {
                         buffer.block(|parts| {
-                            parts.push_comment(|parts| {
-                                parts.push_promoted_str_unescaped(&"tc:");
-                                parts.push_u64(region.0);
-                            });
+                            parts.push_region_start(region);
                             parts.push_view_handle(first.content);
-                            parts.push_comment(|parts| {
-                                parts.push_promoted_str_unescaped(&"/tc:");
-                                parts.push_u64(region.0);
-                            });
+                            parts.push_region_end(region);
                         })
                     }),
                     live,

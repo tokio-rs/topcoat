@@ -5,7 +5,8 @@ use http::{HeaderMap, StatusCode};
 use topcoat_core::context::Cx;
 
 use crate::{
-    AttributeCollector, CollectedPart, HtmlContext, HtmlWriter, ViewHandle, buffer::ViewBuffer,
+    AttributeCollector, CollectedPart, HtmlContext, HtmlWriter, RegionId, ViewHandle,
+    buffer::ViewBuffer,
 };
 
 /// A boxed view part that writes its output at render time.
@@ -283,6 +284,42 @@ impl<'a> PartsWriter<'a> {
     impl_push_primitive!(push_f32, f32, 9);
     impl_push_primitive!(push_f64, f64, 13);
 
+    /// Appends the start of the region `region`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if used in a non-text HTML context.
+    #[inline]
+    pub(crate) fn push_region_start(&mut self, region: RegionId) -> &mut Self {
+        assert!(
+            self.context == HtmlContext::Text,
+            "tried to push region start in html context {:?}",
+            self.context,
+        );
+        // A rendered boundary is a fixed frame around the id's digits.
+        self.size_hint += 21;
+        self.sink.push_region_start(region);
+        self
+    }
+
+    /// Appends the end of the region `region`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if used in a non-text HTML context.
+    #[inline]
+    pub(crate) fn push_region_end(&mut self, region: RegionId) -> &mut Self {
+        assert!(
+            self.context == HtmlContext::Text,
+            "tried to push region end in html context {:?}",
+            self.context,
+        );
+        // A rendered boundary is a fixed frame around the id's digits.
+        self.size_hint += 22;
+        self.sink.push_region_end(region);
+        self
+    }
+
     /// Appends a part that writes its output at render time, sealed with
     /// this writer's context.
     #[inline]
@@ -421,6 +458,22 @@ impl Sink<'_> {
     ));
     impl_sink_primitive!(push_f32, f32, CollectedPart::F32);
     impl_sink_primitive!(push_f64, f64, CollectedPart::F64);
+
+    #[inline]
+    fn push_region_start(&mut self, region: RegionId) {
+        match self {
+            Self::Buffer(buffer) => buffer.push_region_start(region),
+            Self::Collector { .. } => panic!("tried to push a region into an attribute"),
+        }
+    }
+
+    #[inline]
+    fn push_region_end(&mut self, region: RegionId) {
+        match self {
+            Self::Buffer(buffer) => buffer.push_region_end(region),
+            Self::Collector { .. } => panic!("tried to push a region into an attribute"),
+        }
+    }
 
     #[inline]
     fn push_dyn(&mut self, part: Box<dyn DynViewPart>, context: HtmlContext) {

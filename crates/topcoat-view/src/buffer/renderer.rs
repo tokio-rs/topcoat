@@ -90,6 +90,17 @@ impl<'a> Renderer<'a> {
                     consts.fetch_dyn(*ptr).render(cx, &mut context.writer(f));
                 }
 
+                Instruction::RegionStart(region) => {
+                    f.write_str("<!--tc:");
+                    f.write_str(region.0.format_into(&mut NumBuffer::new()));
+                    f.write_str("-->");
+                }
+                Instruction::RegionEnd(region) => {
+                    f.write_str("<!--/tc:");
+                    f.write_str(region.0.format_into(&mut NumBuffer::new()));
+                    f.write_str("-->");
+                }
+
                 #[cfg(feature = "http")]
                 Instruction::StatusCode(status_code) => f.record_status_code(*status_code),
                 #[cfg(feature = "http")]

@@ -20,7 +20,7 @@ pub use part::*;
 use renderer::Renderer;
 pub(crate) use scope::*;
 
-use crate::HtmlContext;
+use crate::{HtmlContext, RegionId};
 
 /// The instruction buffer of a build.
 ///
@@ -285,6 +285,16 @@ impl ViewBuffer {
         }
         let ptr = self.consts.push_string(value);
         self.push_instruction(Instruction::String { ptr, context });
+    }
+
+    #[inline]
+    fn push_region_start(&mut self, value: RegionId) {
+        self.push_instruction(Instruction::RegionStart(value));
+    }
+
+    #[inline]
+    fn push_region_end(&mut self, value: RegionId) {
+        self.push_instruction(Instruction::RegionEnd(value));
     }
 
     #[inline]
