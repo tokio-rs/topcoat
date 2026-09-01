@@ -15,6 +15,7 @@ use topcoat_view::{BoxView, Formatter, View, ViewExt, ViewHandle, internal::Move
 use crate::{
     Body, BoxError,
     content::Html,
+    error::RedirectError,
     response::{AsyncIntoResponse, IntoResponse, Response},
 };
 
@@ -107,6 +108,25 @@ window.topcoat ??= {
 };
 </script>";
 
+/// Builds the script a mid-stream redirect is sent as: a navigation to the
+/// redirect's target. `replace` keeps the partially streamed page out of the
+/// session history, so going back skips it.
+fn redirect_script(redirect: &RedirectError) -> String {
+    // The location was built from a `str`, so it converts back.
+    let uri = redirect.location().to_str().unwrap_or_default();
+    let mut location = String::with_capacity(uri.len());
+    for c in uri.chars() {
+        match c {
+            '\\' => location.push_str("\\\\"),
+            '"' => location.push_str("\\\""),
+            // Keeps the target from closing the script element early.
+            '<' => location.push_str("\\x3C"),
+            c => location.push(c),
+        }
+    }
+    format!("<script>window.location.replace(\"{location}\")</script>")
+}
+
 pin_project! {
     struct ViewBody<V> {
         cx: Cx,
@@ -162,7 +182,15 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
             }
             Poll::Ready(Err(error)) => {
                 *this.done = true;
-                Poll::Ready(Some(Err(error.into())))
+                // The response committed with the first content, so a
+                // redirect can no longer change the status line; it degrades
+                // to a client-side navigation instead.
+                match error.downcast::<RedirectError>() {
+                    Ok(redirect) => {
+                        Poll::Ready(Some(Ok(Frame::data(redirect_script(&redirect).into()))))
+                    }
+                    Err(error) => Poll::Ready(Some(Err(error.into()))),
+                }
             }
             Poll::Pending => Poll::Pending,
         }
@@ -182,7 +210,7 @@ mod tests {
     use topcoat::view::{emit, live, view};
 
     use super::*;
-    use crate::{LayoutFn, Method, PageFn, Router, RouterBuilder, Slot, to_bytes};
+    use crate::{LayoutFn, Method, PageFn, Router, RouterBuilder, Slot, error::redirect, to_bytes};
 
     /// Dispatches a `GET` request for `path` through the router.
     async fn send(router: &Router, path: &str) -> Response {
@@ -565,5 +593,62 @@ mod tests {
         assert_eq!(error.to_string(), "late");
         // The failure ends the stream; the view is not polled again.
         assert!(frames.next().await.is_none());
+    }
+
+    /// A region that redirects before it produces any content.
+    fn render_redirecting_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! { cx => <main>(live! { Err(redirect("/target").into()) })</main> }.boxed()
+    }
+
+    /// A region that redirects after its first emission, mid-stream.
+    fn render_late_redirecting_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            cx =>
+            <main>
+                (live! {
+                    emit! { <p>"first"</p> }?;
+                    tokio::task::yield_now().await;
+                    Err(redirect("/target").into())
+                })
+            </main>
+        }
+        .boxed()
+    }
+
+    #[tokio::test]
+    async fn a_redirect_before_the_first_content_is_a_real_redirect() {
+        let response = send_page(render_redirecting_page).await;
+        // The redirect lands before the response commits, so the client gets
+        // a proper redirect response.
+        assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
+        assert_eq!(
+            response.headers().get(http::header::LOCATION).unwrap(),
+            "/target"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_redirect_after_the_first_content_streams_a_navigation_script() {
+        let response = send_page(render_late_redirecting_page).await;
+        // The response committed with the first content, so the status can
+        // no longer change; the redirect reaches the browser as a script.
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let frames = data_frames(response.into_body()).await;
+        assert_eq!(frames.len(), 2);
+        assert!(frames[0].starts_with("<main><!--topcoat::region::start(1)-->"));
+        assert_eq!(
+            frames[1],
+            "<script>window.location.replace(\"/target\")</script>"
+        );
+    }
+
+    #[test]
+    fn the_navigation_script_escapes_the_redirect_target() {
+        let script = redirect_script(&redirect("/a\"b\\c<d"));
+        assert_eq!(
+            script,
+            "<script>window.location.replace(\"/a\\\"b\\\\c\\x3Cd\")</script>"
+        );
     }
 }

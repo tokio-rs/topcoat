@@ -84,6 +84,11 @@ impl RedirectError {
             location: HeaderValue::try_from(uri).expect("redirect uri is not a valid header value"),
         }
     }
+
+    /// The target the redirect points at.
+    pub(crate) fn location(&self) -> &HeaderValue {
+        &self.location
+    }
 }
 
 impl std::fmt::Display for RedirectError {
