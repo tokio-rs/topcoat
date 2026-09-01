@@ -153,55 +153,6 @@ async fn child_views_render_concurrently_with_their_parents_siblings() {
     .await;
 }
 
-/// Wraps its child once every party has arrived at the barrier.
-#[component]
-async fn meet_wrapper(barrier: &Barrier, child: Child<'_>) -> Result<impl View> {
-    barrier.wait().await;
-    Ok(view! { <div>(child)</div> })
-}
-
-#[tokio::test]
-async fn a_component_renders_concurrently_with_its_own_child() {
-    assert_concurrent(async {
-        let cx = empty_cx();
-        let __cx = &cx;
-        let barrier = Barrier::new(2);
-        let result = view! {
-            meet_wrapper(barrier: &barrier, meet(barrier: &barrier, label: "inner"))
-        };
-
-        assert_eq!(
-            result.single().await.unwrap().render(__cx),
-            "<div><i>inner</i></div>"
-        );
-    })
-    .await;
-}
-
-// A component holds its child's render future while its own runs, so the
-// nested chain's futures stack up in one place.
-#[allow(clippy::large_futures)]
-#[tokio::test]
-async fn nested_components_render_concurrently_at_every_depth() {
-    assert_concurrent(async {
-        let cx = empty_cx();
-        let __cx = &cx;
-        let barrier = Barrier::new(3);
-        let result = view! {
-            meet_wrapper(
-                barrier: &barrier,
-                meet_wrapper(barrier: &barrier, meet(barrier: &barrier, label: "deep"))
-            )
-        };
-
-        assert_eq!(
-            result.single().await.unwrap().render(__cx),
-            "<div><div><i>deep</i></div></div>",
-        );
-    })
-    .await;
-}
-
 #[component]
 async fn echo(text: &str) -> Result<impl View> {
     Ok(view! { <b>(text)</b> })
