@@ -369,9 +369,34 @@ Key the invocation with a value that identifies the item behind it, such as its 
 
 A repeated invocation without a `key:` still renders, but its identity is ambiguous. Consuming an ambiguous identity, in the component itself or anywhere nested below it, errors with the location of the invocation that is missing its key.
 
+# Views Are Lazy
+
+A [`view!`] expression does not render where it is written. It evaluates to a value implementing [`View`], and the expressions inside run when that view renders: when it becomes a response, or when the view it is interpolated into does. A view that is never rendered never runs them, like a future that is never awaited.
+
+A view value behaves exactly like an `async move` block, which is what the macro expands to. It captures every variable the template mentions by moving it into the view:
+
+```rust
+# use topcoat::{Result, view::*};
+# #[component]
+# async fn example() -> Result<impl View> {
+let title = String::from("Hello");
+let header = view! { <h1>(title)</h1> };
+
+// `title` has moved into `header` and cannot be used here anymore.
+Ok(view! {
+    (header)
+    <p>"Welcome!"</p>
+})
+# }
+```
+
+When a value is needed both inside the view and after it, interpolate a clone instead.
+
+A view that captures a reference borrows whatever it points at, so it cannot outlive that data, exactly like an `async move` block. In practice this rarely gets in the way: component props and anything borrowed from the request context stay alive until the render is over, so they are safe to use in a view even when they are references, like a `&str` prop.
+
 # Concurrent Rendering
 
-The components inside a [`view!`] render concurrently. Sibling components, the iterations of a `for` loop, the taken branch of an `if` or `match`, a component and the child nodes passed to it, and components nested at any depth all start at the same time. A component waiting on a database query or an HTTP request therefore does not hold up the rest of the view, which avoids request waterfalls.
+The components inside a [`view!`] render concurrently. Sibling components, the iterations of a `for` loop, the taken branch of an `if` or `match` all start at the same time. A component waiting on a database query or an HTTP request therefore does not hold up the rest of the view, which avoids request waterfalls.
 
 The rendered markup always appears in source order, no matter which component finishes first. What is unspecified is the order in which component bodies run, and that order can change between renders. Treat a [`view!`] body as a set of functions without side effects: a component takes its props, reads the request context, and returns markup. Do not rely on another component in the same view having run first, and do not communicate between components through shared mutable state.
 
@@ -582,6 +607,7 @@ Ok(view! {
 [`topcoat::view::Attributes`]: struct.Attributes.html
 [`topcoat::view::Class`]: struct.Class.html
 [`view!`]: macro.view.html
+[`View`]: trait.View.html
 [`Identity`]: identity/struct.Identity.html
 [`Identity::current`]: identity/struct.Identity.html#method.current
 [`IdentityKey`]: identity/trait.IdentityKey.html
