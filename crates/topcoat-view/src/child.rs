@@ -5,7 +5,10 @@ use std::{
 
 use topcoat_core::error::Result;
 
-use crate::{BoxView, View, ViewFirst, ViewSwap};
+use crate::{
+    BoxView, View, ViewFirst, ViewSwap,
+    internal::{LiveView, MoveView, ScopeView},
+};
 
 /// The child content a component invocation passes to its component.
 ///
@@ -34,6 +37,44 @@ impl Default for Child<'_> {
     fn default() -> Self {
         Self::new(())
     }
+}
+
+/// An already boxed view becomes child content without boxing again.
+impl<'a> From<BoxView<'a>> for Child<'a> {
+    fn from(view: BoxView<'a>) -> Self {
+        Self { view }
+    }
+}
+
+/// Implements the conversion from a view type into child content, so a
+/// view-typed prop declared as `Child` accepts the type through `#[into]`.
+macro_rules! child_from_view {
+    ($(#[$doc:meta])* impl<$($param:tt),*> for $ty:ty) => {
+        $(#[$doc])*
+        impl<'a, $($param),*> From<$ty> for Child<'a>
+        where
+            $ty: View + 'a,
+        {
+            fn from(view: $ty) -> Self {
+                Self::new(view)
+            }
+        }
+    };
+}
+
+child_from_view! {
+    /// A `view!` template passes as child content.
+    impl<V> for ScopeView<V>
+}
+
+child_from_view! {
+    /// A `live!` region passes as child content.
+    impl<Fut> for LiveView<Fut>
+}
+
+child_from_view! {
+    /// A captured view block passes as child content.
+    impl<Fut> for MoveView<Fut>
 }
 
 /// The children's view polls through in place.
