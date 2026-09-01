@@ -51,26 +51,21 @@ macro_rules! classify_view {
 }
 
 classify_view! {
-    /// A component's child content.
     impl<'a> for Child<'a>
 }
 
 classify_view! {
-    /// A boxed view.
     impl<'a> for BoxView<'a>
 }
 
 classify_view! {
-    /// A `live!` region.
     impl<Fut> for LiveView<Fut>
 }
 
 classify_view! {
-    /// A nested `view!` invocation's template.
     impl<Fut> for MoveView<Fut>
 }
 
 classify_view! {
-    /// A nested `view!` invocation.
     impl<V> for ScopeView<V>
 }

@@ -68,10 +68,10 @@ async fn region_remapping_a_failed_emission_renders_as_plain_content() {
         cx =>
         <main>
             (live! {
-                if let Err(error) = emit! { load(fail: true) } {
-                    emit! { <p class="error">(error.to_string())</p> }?;
+                match emit! { load(fail: true) } {
+                    Err(error) => emit! { <p class="error">(error.to_string())</p> },
+                    emitted => emitted,
                 }
-                Ok(())
             })
         </main>
     }

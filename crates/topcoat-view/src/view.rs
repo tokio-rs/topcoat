@@ -31,6 +31,9 @@ pub struct ViewSwap {
     pub replacement: ViewHandle,
 }
 
+#[derive(Debug)]
+pub struct EmitToken;
+
 pub trait View: Send {
     fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>>;
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>>;

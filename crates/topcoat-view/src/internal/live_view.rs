@@ -10,7 +10,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
+use crate::{EmitToken, RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
 
 static NEXT_REGION: AtomicU64 = AtomicU64::new(1);
 
@@ -25,7 +25,7 @@ pin_project! {
 
 impl<Fut> LiveView<Fut>
 where
-    Fut: Future<Output = Result<()>>,
+    Fut: Future<Output = Result<EmitToken>>,
 {
     #[doc(hidden)]
     pub fn new(body: Fut) -> Self {
@@ -37,15 +37,15 @@ where
     }
 }
 
-impl LiveView<Ready<()>> {
-    pub fn drive<V: View>(view: V) -> impl Future<Output = Result<()>> {
+impl LiveView<Ready<Result<EmitToken>>> {
+    pub fn drive<V: View>(view: V) -> impl Future<Output = Result<EmitToken>> {
         DriveFuture { view, first: true }
     }
 }
 
 impl<Fut> View for LiveView<Fut>
 where
-    Fut: Future<Output = Result<()>> + Send,
+    Fut: Future<Output = Result<EmitToken>> + Send,
 {
     fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         let mut this = self.project();
@@ -109,7 +109,7 @@ where
                 panic!("live view future yielded without returning pending")
             }
             (Poll::Ready(Err(e)), Yield::NotSet) => Poll::Ready(Err(e)),
-            (Poll::Ready(Ok(())), Yield::NotSet) => {
+            (Poll::Ready(Ok(_)), Yield::NotSet) => {
                 panic!("live view future completed without yielding anything")
             }
         }
@@ -136,7 +136,7 @@ where
                 panic!("live view future yielded without returning pending")
             }
             (Poll::Ready(Err(e)), None) => Poll::Ready(Err(e)),
-            (Poll::Ready(Ok(())), None) => Poll::Ready(Ok(None)),
+            (Poll::Ready(Ok(_)), None) => Poll::Ready(Ok(None)),
         }
     }
 }
@@ -153,7 +153,7 @@ impl<V> Future for DriveFuture<V>
 where
     V: View,
 {
-    type Output = Result<()>;
+    type Output = Result<EmitToken>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
@@ -173,7 +173,7 @@ where
                     YIELD.set(Yield::Swap(swap));
                     Poll::Pending
                 }
-                Poll::Ready(Ok(None)) => Poll::Ready(Ok(())),
+                Poll::Ready(Ok(None)) => Poll::Ready(Ok(EmitToken)),
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
                 Poll::Pending => Poll::Pending,
             }
