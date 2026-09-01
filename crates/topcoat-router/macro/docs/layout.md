@@ -8,7 +8,7 @@ A layout registers like any other handler: pass the function name to [`RouterBui
 
 The function is `async` and returns a [`Result`](../type.Result.html) of a view. It takes the inner page's content as `slot`, of type [`Slot`](type.Slot.html), and interpolates it somewhere in its own view. It may also take [`cx: &Cx`](../context/struct.Cx.html). Both parameters are recognized by name, may appear in either order, and no other parameters are accepted.
 
-A layout renders before the page it wraps resolves, so the page's error reaches the layout where the slot is interpolated. Wrapping the slot in an [`error_boundary`](../view/struct.error_boundary.html) hands the layout that error instead of letting it become the response, which is how a branded error page is built; see the [error](../router/error/index.html) docs.
+A layout decides where and when its page (or nested layout) is rendered. Layouts can catch errors by wrapping the slot in an [`error_boundary`](../view/struct.error_boundary.html), which is how a branded error page is built; see the [error](../router/error/index.html) docs.
 
 # Examples
 
