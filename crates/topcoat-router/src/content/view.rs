@@ -172,3 +172,400 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
         self.first.is_none() && self.done
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+
+    use futures_util::StreamExt;
+    use http::header::CONTENT_TYPE;
+    use topcoat::view::{emit, live, view};
+
+    use super::*;
+    use crate::{LayoutFn, Method, PageFn, Router, RouterBuilder, Slot, to_bytes};
+
+    /// Dispatches a `GET` request for `path` through the router.
+    async fn send(router: &Router, path: &str) -> Response {
+        let request = http::Request::builder()
+            .method(Method::GET)
+            .uri(path)
+            .body(Body::empty())
+            .unwrap();
+        router.handle(request).await
+    }
+
+    /// Serves `render` as a page at `/p` and dispatches a `GET` to it.
+    async fn send_page(render: crate::PageRenderFn) -> Response {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::GET, "/p", render))
+            .build();
+        send(&router, "/p").await
+    }
+
+    /// Reads the response body as its data frames, one string per frame.
+    async fn data_frames(body: Body) -> Vec<String> {
+        let mut frames = body.into_data_stream();
+        let mut chunks = Vec::new();
+        while let Some(frame) = frames.next().await {
+            chunks.push(String::from_utf8(frame.unwrap().to_vec()).unwrap());
+        }
+        chunks
+    }
+
+    /// The envelope a swap for `region` arrives in.
+    fn swap_envelope(region: u64, replacement: &str) -> String {
+        format!(
+            "<template data-topcoat-swap=\"{region}\">{replacement}</template>\
+             <script>topcoat.swap({region})</script>"
+        )
+    }
+
+    // Page and layout render functions, since `PageFn`/`LayoutFn` are backed
+    // by plain `fn` pointers.
+
+    /// A region that settles after a single emission.
+    fn render_settled_region_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! { cx => <main>(live! { emit! { <p>"only"</p> } })</main> }
+        .boxed()
+    }
+
+    /// A region that emits twice, so the response streams one swap.
+    fn render_live_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            cx =>
+            <main>
+                (live! {
+                    emit! { <p>"first"</p> }?;
+                    emit! { <p>"second"</p> }
+                })
+            </main>
+        }
+        .boxed()
+    }
+
+    /// A region that emits three times, so the response streams two swaps.
+    fn render_thrice_emitting_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            cx =>
+            <main>
+                (live! {
+                    emit! { <p>"one"</p> }?;
+                    emit! { <p>"two"</p> }?;
+                    emit! { <p>"three"</p> }
+                })
+            </main>
+        }
+        .boxed()
+    }
+
+    /// Two sibling regions that each emit twice.
+    fn render_two_region_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            cx =>
+            <main>
+                <section>
+                    (live! {
+                        emit! { <p>"a1"</p> }?;
+                        emit! { <p>"a2"</p> }
+                    })
+                </section>
+                <section>
+                    (live! {
+                        emit! { <p>"b1"</p> }?;
+                        emit! { <p>"b2"</p> }
+                    })
+                </section>
+            </main>
+        }
+        .boxed()
+    }
+
+    /// A live page that declares a status code and a header in its first
+    /// content.
+    fn render_live_metadata_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            cx =>
+            (StatusCode::ACCEPTED)
+            ((
+                http::HeaderName::from_static("x-test"),
+                http::HeaderValue::from_static("1"),
+            ))
+            <main>
+                (live! {
+                    emit! { <p>"first"</p> }?;
+                    emit! { <p>"second"</p> }
+                })
+            </main>
+        }
+        .boxed()
+    }
+
+    /// A settled page that declares a status code and a header.
+    fn render_settled_metadata_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            cx =>
+            (StatusCode::CREATED)
+            ((
+                http::HeaderName::from_static("x-test"),
+                http::HeaderValue::from_static("1"),
+            ))
+            <p>"made"</p>
+        }
+        .boxed()
+    }
+
+    /// A region that fails before it produces any content.
+    fn render_failing_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! { cx => <main>(live! { Err(io::Error::other("boom").into()) })</main> }
+        .boxed()
+    }
+
+    /// A region that fails after its first emission, mid-stream.
+    ///
+    /// The suspension point after the emission commits the response before
+    /// the failure; a region that fails in the same poll as its emission
+    /// fails the view before any content is sent.
+    fn render_late_failing_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            cx =>
+            <main>
+                (live! {
+                    emit! { <p>"first"</p> }?;
+                    tokio::task::yield_now().await;
+                    Err(io::Error::other("late").into())
+                })
+            </main>
+        }
+        .boxed()
+    }
+
+    /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
+    fn wrap_layout<'a>(cx: &Cx, slot: Slot<'a>) -> BoxView<'a> {
+        view! {
+            cx =>
+            "R["
+            (slot)
+            "]"
+        }
+        .boxed()
+    }
+
+    #[tokio::test]
+    async fn a_page_with_a_settled_region_responds_with_plain_html() {
+        let response = send_page(render_settled_region_page).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+
+        // The region settled before the response, so no markers and no swap
+        // applier reach the client.
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(&body[..], b"<main><p>only</p></main>");
+    }
+
+    #[tokio::test]
+    async fn a_live_page_streams_its_first_content_then_its_swaps() {
+        let response = send_page(render_live_page).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+
+        let frames = data_frames(response.into_body()).await;
+        assert_eq!(frames.len(), 2);
+        // The first frame is the initial document, the region marked off so
+        // the swap can find it.
+        assert_eq!(
+            frames[0],
+            "<main><!--topcoat::region::start(1)--><p>first</p>\
+             <!--topcoat::region::end(1)--></main>"
+        );
+        // The swap arrives behind the applier, wrapped in a template the
+        // applier splices between the markers.
+        assert_eq!(
+            frames[1],
+            format!("{SWAP_SCRIPT}{}", swap_envelope(1, "<p>second</p>"))
+        );
+    }
+
+    #[tokio::test]
+    async fn the_swap_applier_is_sent_once_ahead_of_the_first_swap() {
+        let response = send_page(render_thrice_emitting_page).await;
+
+        let frames = data_frames(response.into_body()).await;
+        assert_eq!(frames.len(), 3);
+        assert_eq!(
+            frames[1],
+            format!("{SWAP_SCRIPT}{}", swap_envelope(1, "<p>two</p>"))
+        );
+        // Later swaps arrive bare: the applier is already installed.
+        assert_eq!(frames[2], swap_envelope(1, "<p>three</p>"));
+    }
+
+    #[tokio::test]
+    async fn sibling_regions_stream_their_own_swaps() {
+        let response = send_page(render_two_region_page).await;
+
+        let frames = data_frames(response.into_body()).await;
+        // Both regions are marked off in the initial document.
+        assert_eq!(
+            frames[0],
+            "<main>\
+             <section><!--topcoat::region::start(1)--><p>a1</p>\
+             <!--topcoat::region::end(1)--></section>\
+             <section><!--topcoat::region::start(2)--><p>b1</p>\
+             <!--topcoat::region::end(2)--></section>\
+             </main>"
+        );
+
+        // Each region swaps once, and the two share a single applier.
+        let swaps = frames[1..].concat();
+        assert_eq!(swaps.matches("window.topcoat ??=").count(), 1);
+        assert!(swaps.contains(&swap_envelope(1, "<p>a2</p>")), "{swaps}");
+        assert!(swaps.contains(&swap_envelope(2, "<p>b2</p>")), "{swaps}");
+    }
+
+    #[tokio::test]
+    async fn each_request_numbers_its_regions_from_the_start() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::GET, "/p", render_live_page))
+            .build();
+
+        for _ in 0..2 {
+            let response = send(&router, "/p").await;
+            let frames = data_frames(response.into_body()).await;
+            assert!(
+                frames[0].contains("<!--topcoat::region::start(1)-->"),
+                "{}",
+                frames[0]
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_live_page_streams_below_its_layouts() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::GET, "/p", render_live_page))
+            .layout(LayoutFn::new("/", wrap_layout))
+            .build();
+
+        let response = send(&router, "/p").await;
+        let frames = data_frames(response.into_body()).await;
+        assert_eq!(
+            frames[0],
+            "R[<main><!--topcoat::region::start(1)--><p>first</p>\
+             <!--topcoat::region::end(1)--></main>]"
+        );
+        assert_eq!(
+            frames[1],
+            format!("{SWAP_SCRIPT}{}", swap_envelope(1, "<p>second</p>"))
+        );
+    }
+
+    #[tokio::test]
+    async fn a_live_view_applies_its_declared_status_and_headers() {
+        let response = send_page(render_live_metadata_page).await;
+        // The metadata is collected from the first content, before the
+        // response commits.
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+        assert_eq!(response.headers().get("x-test").unwrap(), "1");
+
+        // The response still streams its swap.
+        let frames = data_frames(response.into_body()).await;
+        assert_eq!(frames.len(), 2);
+        assert!(frames[1].ends_with(&swap_envelope(1, "<p>second</p>")));
+    }
+
+    #[tokio::test]
+    async fn a_settled_view_applies_its_declared_status_and_headers() {
+        let response = send_page(render_settled_metadata_page).await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(response.headers().get("x-test").unwrap(), "1");
+
+        // The declarations render no content of their own.
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(&body[..], b"<p>made</p>");
+    }
+
+    #[tokio::test]
+    async fn a_view_handle_response_carries_its_status_and_headers() {
+        let cx = &Cx::default();
+        let handle = view! {
+            cx =>
+            (StatusCode::CREATED)
+            ((
+                http::HeaderName::from_static("x-test"),
+                http::HeaderValue::from_static("1"),
+            ))
+            <p>"made"</p>
+        }
+        .single()
+        .await
+        .unwrap();
+
+        let response = handle.into_response(cx).unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(response.headers().get("x-test").unwrap(), "1");
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(&body[..], b"<p>made</p>");
+    }
+
+    #[tokio::test]
+    async fn a_view_failing_before_its_first_content_is_a_server_error() {
+        let response = send_page(render_failing_page).await;
+        // The failure lands before the response commits, so the client gets
+        // a proper error response.
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(&body[..], b"internal server error");
+    }
+
+    /// A region that fails in the same poll as its first emission.
+    fn render_immediately_failing_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            cx =>
+            <main>
+                (live! {
+                    emit! { <p>"first"</p> }?;
+                    Err(io::Error::other("early").into())
+                })
+            </main>
+        }
+        .boxed()
+    }
+
+    #[tokio::test]
+    async fn a_failure_in_the_same_poll_as_the_emission_is_a_server_error() {
+        let response = send_page(render_immediately_failing_page).await;
+        // The failure arrives while the region's liveness is still being
+        // determined, before the response commits, so the emitted content is
+        // discarded in favor of a proper error response.
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(&body[..], b"internal server error");
+    }
+
+    #[tokio::test]
+    async fn a_failure_after_the_first_content_ends_the_stream_with_an_error() {
+        let response = send_page(render_late_failing_page).await;
+        // The response committed with the first content, so the status can
+        // no longer change; the failure surfaces from the body instead.
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let mut frames = response.into_body().into_data_stream();
+        let first = frames.next().await.unwrap().unwrap();
+        assert!(first.starts_with(b"<main><!--topcoat::region::start(1)-->"));
+        let error = frames.next().await.unwrap().unwrap_err();
+        assert_eq!(error.to_string(), "late");
+        // The failure ends the stream; the view is not polled again.
+        assert!(frames.next().await.is_none());
+    }
+}
