@@ -331,13 +331,13 @@ Ok(view! {
     panel(
         title: "Profile",
         // Named child parameter:
-        child: Child::new(view! {
+        child: view! {
             <p>"Account details"</p>
             badge(
                 label: "Active",
                 tone: "success",
             )
-        })
+        }.into()
     )
 })
 # }
