@@ -267,3 +267,68 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::task::Waker;
+
+    use super::*;
+    use crate::{RegionId, region::RegionScope};
+
+    /// A live view that delivers one swap for its region per poll, a fixed
+    /// number of times.
+    struct Ticker {
+        region: RegionId,
+        remaining: usize,
+    }
+
+    impl View for Ticker {
+        fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+            Poll::Ready(Ok(ViewFirst {
+                content: ViewHandle::empty(),
+                live: true,
+            }))
+        }
+
+        fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+            let this = self.get_mut();
+            if this.remaining == 0 {
+                return Poll::Ready(Ok(None));
+            }
+            this.remaining -= 1;
+            Poll::Ready(Ok(Some(ViewSwap {
+                region: this.region,
+                replacement: ViewHandle::empty(),
+            })))
+        }
+    }
+
+    #[test]
+    fn swaps_are_collected_round_robin() {
+        let mut counter = 1;
+        let _regions = RegionScope::new(&mut counter);
+        let (a, b, c) = (RegionId::next(), RegionId::next(), RegionId::next());
+
+        let ticker = |region, remaining| Ticker { region, remaining };
+        let units = JoinUnit::new(
+            ticker(a, 3),
+            JoinUnit::new(ticker(b, 1), JoinUnit::new(ticker(c, 2), ())),
+        );
+        let cx = Cx::default();
+        let mut view = std::pin::pin!(JoinView::new(&cx, units, |_, _| ()));
+
+        let mut task_cx = Context::from_waker(Waker::noop());
+        let mut order = Vec::new();
+        loop {
+            match view.as_mut().poll_swap(&mut task_cx) {
+                Poll::Ready(Ok(Some(swap))) => order.push(swap.region),
+                Poll::Ready(Ok(None)) => break,
+                Poll::Ready(Err(_)) => panic!("the tickers never fail"),
+                Poll::Pending => panic!("the tickers are always ready"),
+            }
+        }
+
+        // Every unit gets a turn between two swaps of a busier sibling.
+        assert_eq!(order, [a, b, c, a, c, a]);
+    }
+}
