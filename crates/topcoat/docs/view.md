@@ -14,5 +14,5 @@ This module provides Topcoat's HTML templating primitives:
 [`class!`]: macro.class.html
 [`live!`]: macro.live.html
 [`emit!`]: macro.emit.html
-[`suspense`]: fn.suspense.html
-[`error_boundary`]: fn.error_boundary.html
+[`suspense`]: struct.suspense.html
+[`error_boundary`]: struct.error_boundary.html

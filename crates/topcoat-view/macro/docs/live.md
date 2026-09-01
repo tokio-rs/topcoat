@@ -176,8 +176,8 @@ Both are small components built on [`live!`] and [`emit!`]. Reach for the macros
 [`Result`]: ../type.Result.html
 [`component`]: attr.component.html
 [`emit!`]: macro.emit.html
-[`error_boundary`]: fn.error_boundary.html
+[`error_boundary`]: struct.error_boundary.html
 [`live!`]: macro.live.html
-[`suspense`]: fn.suspense.html
+[`suspense`]: struct.suspense.html
 [`view!`]: macro.view.html
 [router's error guide]: https://docs.rs/topcoat/latest/topcoat/router/error/index.html

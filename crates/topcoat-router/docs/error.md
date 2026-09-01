@@ -42,7 +42,7 @@ The methods mirror the constructors: [`ok_or_not_found`](RouterErrorExt::ok_or_n
 
 # Catching an error
 
-An error keeps its type on the way out, so an outer handler can pick it up with `downcast_ref` and respond with a view instead. Wrap the content that may fail in an [`error_boundary`](https://docs.rs/topcoat/latest/topcoat/view/fn.error_boundary.html): when it fails, the boundary hands the error to its fallback and shows the view the fallback returns in its place. For example, a layout can replace a [`ForbiddenError`] bubbling out of any page below it with a branded access-denied page:
+An error keeps its type on the way out, so an outer handler can pick it up with `downcast_ref` and respond with a view instead. Wrap the content that may fail in an [`error_boundary`](https://docs.rs/topcoat/latest/topcoat/view/struct.error_boundary.html): when it fails, the boundary hands the error to its fallback and shows the view the fallback returns in its place. For example, a layout can replace a [`ForbiddenError`] bubbling out of any page below it with a branded access-denied page:
 
 ```rust
 use topcoat::{

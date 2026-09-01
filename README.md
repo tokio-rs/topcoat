@@ -38,7 +38,7 @@ Topcoat is a modular, batteries-included Rust framework for building full-stack 
 use topcoat::{
     Result,
     router::{Router, RouterBuilderDiscoverExt, page},
-    view::{component, view},
+    view::{View, component, view},
 };
 
 #[tokio::main]
@@ -47,20 +47,20 @@ async fn main() {
 }
 
 #[page("/")]
-async fn home() -> Result {
-    view! {
+async fn home() -> Result<impl View> {
+    Ok(view! {
         <!DOCTYPE html>
         <html>
             <body>
                 hello(name: "World")
             </body>
         </html>
-    }
+    })
 }
 
 #[component]
-async fn hello(name: &str) -> Result {
-    view! { <h1>"Hello, " (name) "!"</h1> }
+async fn hello(name: &str) -> Result<impl View> {
+    Ok(view! { <h1>"Hello, " (name) "!"</h1> })
 }
 ```
 
@@ -84,27 +84,27 @@ When an update does need the server, like fresh search results, mark the compone
 
 ```rust,ignore
 #[component]
-async fn search() -> Result {
-    view! {
+async fn search() -> Result<impl View> {
+    Ok(view! {
         signal query = String::new();
 
         <input @input=$(|e: Event| query.set(e.target.value))>
 
         // Updates as the user types.
         search_results(query: $(query.get()))
-    }
+    })
 }
 
 #[shard]
-async fn search_results(cx: &Cx, query: String) -> Result {
-    view! {
+async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
+    Ok(view! {
         <ul>
             // Your own server-side code, like a database query:
             for product in search_products(cx, &query).await? {
                 <li>(product.name)</li>
             }
         </ul>
-    }
+    })
 }
 ```
 
@@ -157,8 +157,8 @@ Topcoat UI is a component library based on [Tailwind](https://tailwindcss.com/) 
 
 ```rust,ignore
 #[component]
-async fn delete_card() -> Result {
-    view! {
+async fn delete_card() -> Result<impl View> {
+    Ok(view! {
         card(
             card_header(
                 card_title("Delete workspace")
@@ -172,7 +172,7 @@ async fn delete_card() -> Result {
                 button(variant: ButtonVariant::Destructive, "Delete workspace")
             )
         )
-    }
+    })
 }
 ```
 
@@ -208,6 +208,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [The `#[component]` macro](https://docs.rs/topcoat/latest/topcoat/view/attr.component.html): async functions as components, with child content.
 - [The `attributes!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html): reusable runtime attribute fragments.
 - [The `class!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.class.html): space-separated class lists from static and conditional entries.
+- [The `live!` and `emit!` macros](https://docs.rs/topcoat/latest/topcoat/view/macro.live.html): stream slow parts of a page in after the rest, with the `suspense` and `error_boundary` components built on them.
 
 **Routing**
 - [Router](https://docs.rs/topcoat/latest/topcoat/router/index.html): pages, layouts, and API routes; manual and auto-discovered.
@@ -256,7 +257,6 @@ Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](ht
 - [ ] `OpenAPI` endpoints
 - [ ] Docs for how to deploy Topcoat
 - [ ] Pre-rendering for static pages
-- [ ] Streaming SSR / Suspense
 - [ ] Client-side navigation + prefetching
 - [ ] `WebTransport`
 - [ ] Image optimization / resizing

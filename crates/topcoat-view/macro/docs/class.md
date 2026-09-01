@@ -79,6 +79,6 @@ A `class!` value takes its type from its entries. A list of literals always has 
 [`Class`]: struct.Class.html
 [`StaticClass`]: type.StaticClass.html
 [`ClassViewParts`]: trait.ClassViewParts.html
-[`AttributeValue`]: struct.AttributeValue.html
+[`AttributeValue`]: enum.AttributeValue.html
 [`class!`]: macro.class.html
 [`topcoat::view::Class`]: struct.Class.html

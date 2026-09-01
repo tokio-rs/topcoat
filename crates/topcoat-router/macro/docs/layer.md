@@ -10,7 +10,7 @@ When several layers wrap a handler, they nest from least specific (outermost) to
 
 # Handler signature
 
-The function is `async` and takes [`cx: &Cx`](../context/struct.Cx.html), the request [`body: Body`](struct.Body.html), and a [`next: Next<'_>`](struct.Next.html), returning `Result<T>` where `T` implements [`IntoResponse`](trait.IntoResponse.html). Call [`next.run(cx, body)`](struct.Next.html#method.run) to invoke the inner layers and ultimately the handler. Returning without calling `next.run` short-circuits the request: the layer's return value becomes the response.
+The function is `async` and takes [`cx: &Cx`](../context/struct.Cx.html), the request [`body: Body`](struct.Body.html), and a [`next: Next<'_>`](struct.Next.html), returning `Result<T>` where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html), which every [`IntoResponse`](response/trait.IntoResponse.html) type does. Call [`next.run(cx, body)`](struct.Next.html#method.run) to invoke the inner layers and ultimately the handler. Returning without calling `next.run` short-circuits the request: the layer's return value becomes the response.
 
 # Examples
 

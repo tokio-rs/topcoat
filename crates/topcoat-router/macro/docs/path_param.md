@@ -197,6 +197,6 @@ Filling a segment with nothing, `.`, or `..` panics. A browser resolves those ag
 
 - Parsed segment types must implement [`FromStr`](core::str::FromStr).
 - Parsed segment types must implement [`Display`](core::fmt::Display) to be filled into an [`href`](fn.href.html).
-- The parsed segment type and its `<T as FromStr>::Err` must be `Send + Sync + 'static` so the result can be [memoized](../topcoat_core_macro/attr.memoize.html).
+- The parsed segment type and its `<T as FromStr>::Err` must be `Send + Sync + 'static` so the result can be [memoized](../context/attr.memoize.html).
 - The parameter name in an explicit route must match the declaration.
 - A module can contain either one `path_param!` declaration or one manual `segment!` override.

@@ -7,7 +7,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, small sing
 `crates/topcoat` is the user-facing **facade** crate. It re-exports everything through feature-gated modules. Application code depends on this crate only; everything below is an implementation detail reached through it.
 
 - `topcoat-core`: foundations shared by the other crates: the `Error`/`Result` types and the request context (`Cx`, `app_context`, `request_context`). Its macro crate provides `#[memoize]`, and its grammar crate holds the pretty-printer backing `topcoat fmt`'s macro-body formatting.
-- `topcoat-view`: the `view!`, `attributes!`, and `class!` macros, the `#[component]` macro, and the runtime `View`/`Attributes`/`Class` types.
+- `topcoat-view`: the `view!`, `live!`, `emit!`, `attributes!`, and `class!` macros, the `#[component]` macro, and the runtime `View`/`Attributes`/`Class` types.
 - `topcoat-router`: `Router`, the `#[page]`/`#[layout]`/`#[route]` macros, `module_router!`, `path_param!`, and `#[query_params]`.
 - `topcoat-runtime`: the client-side interactive runtime (signals, event handlers, bind attributes, the `expr!` macro) and the injected browser script.
 - `topcoat-font`: the `font!` and `font_face!` macros and the Fontsource integration for bundling and serving web fonts.
@@ -51,7 +51,7 @@ Each crate's `docs/` directory holds the user-facing guides for that crate, embe
 - [`crates/topcoat-view/macro/docs/live.md`](crates/topcoat-view/macro/docs/live.md): The `live!` and `emit!` macros: live regions that stream replacement content into a page, and the `suspense`/`error_boundary` components built on them.
 - [`crates/topcoat-view/macro/docs/attributes.md`](crates/topcoat-view/macro/docs/attributes.md): The `attributes!` macro and the runtime `Attributes` value for building/forwarding attribute collections.
 - [`crates/topcoat-view/macro/docs/class.md`](crates/topcoat-view/macro/docs/class.md): The `class!` macro: assembling a space-separated class list from static and conditional entries.
-- [`crates/topcoat-view/macro/docs/props.md`](crates/topcoat-view/macro/docs/props.md): The `props!` macro for building a component's props value.
+- [`crates/topcoat-view/macro/docs/props.md`](crates/topcoat-view/macro/docs/props.md): The `Props` derive macro, which generates a props struct's typestate builder.
 
 ### UI components
 

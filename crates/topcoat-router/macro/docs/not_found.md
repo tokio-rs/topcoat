@@ -1,6 +1,6 @@
 Declares a catch-all page that resolves every URL it serves to a not-found error.
 
-The router answers a request matching no route with a bare 404: no layers run and no layout renders around it. This macro registers a catch-all page for those URLs instead, so they dispatch like any other request and an outer layout can catch the [`NotFoundError`](error/struct.NotFoundError.html) and replace it with a custom not-found view, as described in the [error guide](error/index.html).
+The router answers a request matching no route with a bare 404: no layers run and no layout renders around it. This macro registers a catch-all page for those URLs instead, so they dispatch like any other request and an error boundary in an outer layout can catch the [`NotFoundError`](error/struct.NotFoundError.html) and replace it with a custom not-found view, as described in the [error guide](error/index.html).
 
 With a path, the macro appends a `{*rest}` catch-all segment and expands to a page named `not_found` serving every method under that prefix. Register it like any other explicit-path page: pass `not_found` to [`RouterBuilder::page`](struct.RouterBuilder.html#method.page), or let [`discover`](trait.RouterBuilderDiscoverExt.html) collect it.
 

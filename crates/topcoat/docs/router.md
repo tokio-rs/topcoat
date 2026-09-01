@@ -212,7 +212,7 @@ See the [`error`](mod@error) module docs for how to raise, convert, and catch th
 
 # Status codes and headers
 
-A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. This pairs with error handling. A layout can catch a page's [`NotFoundError`](error::NotFoundError) and replace it with a branded not-found page:
+A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. This pairs with error handling. Wrapping the slot in an [`error_boundary`](crate::view::error_boundary) lets a layout catch a page's [`NotFoundError`](error::NotFoundError) and replace it with a branded not-found page:
 
 ```rust
 use topcoat::{
@@ -223,7 +223,7 @@ use topcoat::{
         error::{NotFoundError, RouterErrorExt},
         layout, page,
     },
-    view::{View, emit, live, view},
+    view::{View, error_boundary, view},
 };
 
 # struct Post { title: String }
@@ -239,22 +239,27 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <html>
             <body>
-                (live! {
-                    match emit! { (slot) } {
-                        Err(error) if error.downcast_ref::<NotFoundError>().is_some() => emit! {
+                error_boundary(
+                    fallback: |error| {
+                        if error.downcast_ref::<NotFoundError>().is_none() {
+                            // Any other error type is rethrown.
+                            return Err(error);
+                        }
+
+                        Ok(view! {
                             (StatusCode::NOT_FOUND)
                             <h1>"Page not found"</h1>
-                        },
-                        slot => slot,
-                    }
-                })
+                        })
+                    },
+                    (slot)
+                )
             </body>
         </html>
     })
 }
 ```
 
-See the [`view!`](crate::view::view!) macro docs for the full placement and precedence rules.
+See the [`view!`](crate::view::view!) macro docs for the full placement and precedence rules, and the [`error`](mod@error) module docs for catching errors.
 
 # Cross-origin requests
 

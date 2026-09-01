@@ -42,7 +42,7 @@ Implement [`FromRequest`](crate::request::FromRequest) yourself for request pars
 
 # Returning a response
 
-A route returns `Result<T>` for any `T` that implements [`IntoResponse`](crate::response::IntoResponse). The same wrappers work in return position, where they serialize the value and set the matching `Content-Type`; a string or byte buffer becomes the body as is.
+A route returns `Result<T>` for any `T` that implements [`IntoResponse`](crate::response::IntoResponse), or [`AsyncIntoResponse`](crate::response::AsyncIntoResponse) when building the response has to await first, as a view does. The same wrappers work in return position, where they serialize the value and set the matching `Content-Type`; a string or byte buffer becomes the body as is.
 
 A tuple builds a response from several parts. The last element is the body, a leading [`StatusCode`](crate::StatusCode) sets the status, and the elements in between attach headers or extensions:
 

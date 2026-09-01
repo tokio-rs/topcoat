@@ -12,11 +12,11 @@ A route registers like any other handler: pass the function name to [`RouterBuil
 
 # Handler signature
 
-The function is `async` and returns `Result<T>` where `T` implements [`IntoResponse`](trait.IntoResponse.html). It may take [`cx: &Cx`](../context/struct.Cx.html), one request body parameter implementing [`FromRequest`](trait.FromRequest.html), both, or neither. The body parameter may use a destructuring pattern such as `Json(input): Json<T>`, and the parameters may appear in either order.
+The function is `async` and returns `Result<T>` where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html), which every [`IntoResponse`](response/trait.IntoResponse.html) type does. It may take [`cx: &Cx`](../context/struct.Cx.html), one request body parameter implementing [`FromRequest`](request/trait.FromRequest.html), both, or neither. The body parameter may use a destructuring pattern such as `Json(input): Json<T>`, and the parameters may appear in either order.
 
 # Response conversion
 
-The macro converts the success value via [`IntoResponse::into_response`](trait.IntoResponse.html#tymethod.into_response). Strings, status codes, byte buffers, `(headers, body)` tuples, and [`Json<T>`](struct.Json.html) all work. A success value is not serialized as JSON automatically; wrap it in [`Json<T>`](struct.Json.html) to opt in.
+The macro converts the success value via [`AsyncIntoResponse::async_into_response`](response/trait.AsyncIntoResponse.html#tymethod.async_into_response). Strings, status codes, byte buffers, `(headers, body)` tuples, and [`Json<T>`](content/struct.Json.html) all work. A success value is not serialized as JSON automatically; wrap it in [`Json<T>`](content/struct.Json.html) to opt in.
 
 # Examples
 
