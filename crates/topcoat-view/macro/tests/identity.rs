@@ -182,3 +182,28 @@ async fn a_key_resolves_the_children_of_a_repeated_invocation() {
     let ids = ids(&rendered);
     assert_ne!(ids["a"], ids["b"]);
 }
+
+/// Invokes `probe` from its own template rather than as child content.
+#[component]
+async fn parent(label: &str) -> Result<impl View> {
+    Ok(view! { probe(label: label) })
+}
+
+#[tokio::test]
+async fn a_key_resolves_the_template_of_a_repeated_invocation() {
+    let cx = empty_cx();
+    let __cx = &cx;
+    let items = vec!["a", "b"];
+    let rendered = view! {
+        for item in items {
+            parent(key: item, label: item)
+        }
+    }
+    .single()
+    .await
+    .unwrap()
+    .render(__cx);
+
+    let ids = ids(&rendered);
+    assert_ne!(ids["a"], ids["b"]);
+}

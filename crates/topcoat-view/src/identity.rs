@@ -8,11 +8,12 @@
 //! the same chain of call sites hashes to the same value.
 //!
 //! The current identity travels down the tree through a thread local
-//! installed for exactly the duration of a component body. [`IdentityGuard`]
-//! installs one around a synchronous region, and [`IdentityFuture`] around
-//! every poll of a render future, so sibling futures interleaving on one
-//! task each see their own identity. [`Identity::current`] reads the
-//! installed identity from inside a component body.
+//! installed for exactly the duration of a component invocation.
+//! [`IdentityGuard`] installs one around a synchronous region, and
+//! [`IdentityView`] around every poll of an invocation's view, so sibling
+//! views interleaving on one task each see their own identity.
+//! [`Identity::current`] reads the installed identity from inside a
+//! component body.
 //!
 //! An invocation that repeats, for example inside a `for` body, shares one
 //! call site across all repetitions. A `key` argument mixes a caller-provided
@@ -23,26 +24,26 @@
 //! actually consumes the identity, naming the invocation that is missing its
 //! `key`.
 
-mod future;
 mod guard;
 mod key;
 mod site;
+mod view;
 
 use std::{cell::Cell, fmt};
 
-pub use future::*;
 pub use guard::*;
 pub use key::*;
 pub use site::*;
 use topcoat_core::fnv1a::Fnv1a;
+pub use view::*;
 
 thread_local! {
     /// The identity of the component body running on the current thread, if
     /// any.
     ///
     /// [`IdentityGuard`] installs an identity here for exactly the duration
-    /// of a synchronous region, and [`IdentityFuture`] for exactly the
-    /// duration of each of its polls, so futures that interleave on one task
+    /// of a synchronous region, and [`IdentityView`] for exactly the
+    /// duration of each of its polls, so views that interleave on one task
     /// never see each other's identity. An empty cell means the root: no
     /// component body is running.
     static CURRENT: Cell<Option<Identity>> = const { Cell::new(None) };

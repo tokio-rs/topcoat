@@ -431,7 +431,8 @@ mod tests {
         add_component(&mut builder, "solo");
         builder.str_unescaped("<hr>");
         let out = rendered(builder);
-        assert!(out.contains("let __expr0 = :: topcoat_view :: internal :: ThenView :: new"));
+        assert!(out.contains("let __expr0 = {"));
+        assert!(out.contains("IdentityView :: new (__identity , :: topcoat_view :: internal :: ThenView :: new (__future"));
         assert!(out.contains("Component :: render"));
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
     }

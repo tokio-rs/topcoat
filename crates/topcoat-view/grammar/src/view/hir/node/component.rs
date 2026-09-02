@@ -167,19 +167,23 @@ impl Emit for Component {
         let span = self.span;
 
         // The props are built under the invocation's identity, so a child
-        // view carries it too, and the future is polled at that same
-        // identity once the guard is gone.
+        // view carries it too. Once the guard is gone, the body future and
+        // the view it resolves to poll at that same identity, so the
+        // invocations in the body's template derive from it as well.
         let guard = self.identity_guard();
         let future = self.render_future();
 
         emitter.hoist(quote_spanned! {span=>
-            let #ident = #topcoat_view::internal::ThenView::new({
+            let #ident = {
                 let __guard = #guard;
                 let __identity = #topcoat_view::identity::IdentityGuard::identity(&__guard);
                 let __future = #future;
                 ::core::mem::drop(__guard);
-                #topcoat_view::identity::IdentityFuture::install(__identity, __future)
-            });
+                #topcoat_view::identity::IdentityView::new(
+                    __identity,
+                    #topcoat_view::internal::ThenView::new(__future),
+                )
+            };
         });
         emitter.unit(span, &ident);
     }
