@@ -8,6 +8,7 @@ mod move_view;
 mod node_classify;
 mod scope_view;
 mod then_view;
+mod yielder;
 
 pub use builder::*;
 pub use capture::*;

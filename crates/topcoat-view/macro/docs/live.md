@@ -46,6 +46,8 @@ Ok(view! {
 # async fn run_step() {}
 ```
 
+Emissions can also run concurrently, for example as `async` blocks under `join!`. Every one of them reaches the browser, but since they all replace the same region, the last to arrive is what stays visible. Emit concurrently when only the final emission matters, and sequence emissions when each one should be seen.
+
 # The Emit Token
 
 A live region has to emit at least once, so it never leaves a hole in the page. The body's return type is a safety net that reminds you of this: [`emit!`] evaluates to a [`Result`] carrying an [`EmitToken`], and the body returns one, so the natural way to finish is to end with an emission, as the examples above do. Intermediate emissions use a `?` to stop when one fails.

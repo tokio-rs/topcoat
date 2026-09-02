@@ -311,3 +311,76 @@ async fn single_panics_on_a_region_that_may_update() {
     .single()
     .await;
 }
+
+#[tokio::test]
+async fn joined_emissions_all_reach_the_region() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! {
+        cx =>
+        <main>
+            (live! {
+                let (a, b) = tokio::join!(
+                    async { emit! { <p>"a"</p> } },
+                    async { emit! { <p>"b"</p> } },
+                );
+                a?;
+                b
+            })
+        </main>
+    });
+
+    // Both emissions happen in the same poll of the body. One becomes the
+    // first content and the other waits its turn to swap it out.
+    let content = first(&mut view).await.unwrap();
+    assert!(content.live);
+    let swap = next_swap(&mut view).await.unwrap().unwrap();
+    let region = swap.region;
+    assert_eq!(
+        content.content.render(cx),
+        format!(
+            "<main><!--topcoat::region::start({region})--><p>a</p>\
+             <!--topcoat::region::end({region})--></main>"
+        )
+    );
+    assert_eq!(swap.replacement.render(cx), "<p>b</p>");
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn joined_emissions_deliver_the_swaps_of_a_nested_region() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! {
+        cx =>
+        <main>
+            (live! {
+                let (a, b) = tokio::join!(
+                    async {
+                        emit! {
+                            (live! {
+                                emit! { <i>"1"</i> }?;
+                                emit! { <i>"2"</i> }
+                            })
+                        }
+                    },
+                    async { emit! { <p>"b"</p> } },
+                );
+                a?;
+                b
+            })
+        </main>
+    });
+
+    let content = first(&mut view).await.unwrap();
+    assert!(content.live);
+    let html = content.content.render(cx);
+    assert!(html.contains("<i>1</i>"), "{html}");
+
+    // The nested region's swap and the sibling emission both get delivered,
+    // even though they compete for the same poll.
+    let mut swaps = Vec::new();
+    while let Some(swap) = next_swap(&mut view).await.unwrap() {
+        swaps.push(swap.replacement.render(cx));
+    }
+    swaps.sort();
+    assert_eq!(swaps, ["<i>2</i>", "<p>b</p>"]);
+}
