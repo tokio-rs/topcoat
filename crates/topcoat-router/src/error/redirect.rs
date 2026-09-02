@@ -1,13 +1,16 @@
+use std::borrow::Cow;
+
 use http::{HeaderValue, StatusCode, header::LOCATION};
+use percent_encoding::{CONTROLS, utf8_percent_encode};
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::response::{IntoResponse, Response};
 
 /// Builds a temporary (HTTP 307) redirect to `uri`.
 ///
-/// # Panics
-///
-/// Panics if `uri` is not a valid `Location` header value.
+/// Characters a URI cannot carry, like non-ASCII ones, are percent-encoded.
+/// Percent signs already in `uri` are left alone, so an encoded target is not
+/// encoded twice.
 ///
 /// # Examples
 ///
@@ -24,7 +27,6 @@ use crate::response::{IntoResponse, Response};
 /// }
 /// ```
 #[must_use]
-#[track_caller]
 pub fn redirect(uri: impl AsRef<str>) -> RedirectError {
     RedirectError::new(StatusCode::TEMPORARY_REDIRECT, uri.as_ref())
 }
@@ -32,11 +34,8 @@ pub fn redirect(uri: impl AsRef<str>) -> RedirectError {
 /// Builds a permanent (HTTP 308) redirect to `uri`.
 ///
 /// Use this for URLs that have moved for good; clients and search engines
-/// are allowed to cache the new location.
-///
-/// # Panics
-///
-/// Panics if `uri` is not a valid `Location` header value.
+/// are allowed to cache the new location. The target is percent-encoded like
+/// [`redirect`] does.
 ///
 /// # Examples
 ///
@@ -54,7 +53,6 @@ pub fn redirect(uri: impl AsRef<str>) -> RedirectError {
 /// }
 /// ```
 #[must_use]
-#[track_caller]
 pub fn redirect_permanent(uri: impl AsRef<str>) -> RedirectError {
     RedirectError::new(StatusCode::PERMANENT_REDIRECT, uri.as_ref())
 }
@@ -73,15 +71,10 @@ pub struct RedirectError {
 
 impl RedirectError {
     /// Builds a redirect with the given status code and target `uri`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `uri` is not a valid `Location` header value.
-    #[track_caller]
     fn new(status: StatusCode, uri: &str) -> Self {
         Self {
             status,
-            location: HeaderValue::try_from(uri).expect("redirect uri is not a valid header value"),
+            location: location(uri),
         }
     }
 
@@ -111,11 +104,7 @@ impl IntoResponse for RedirectError {
 /// method, a 303 tells the client to follow `uri` with a `GET`. Reply with it
 /// after a successful `POST`, `PUT`, or `DELETE` to land the browser on a page
 /// -- the Post/Redirect/Get pattern that keeps a reload from re-submitting the
-/// mutation.
-///
-/// # Panics
-///
-/// Panics if `uri` is not a valid `Location` header value.
+/// mutation. The target is percent-encoded like [`redirect`] does.
 ///
 /// # Examples
 ///
@@ -136,7 +125,6 @@ impl IntoResponse for RedirectError {
 /// }
 /// ```
 #[must_use]
-#[track_caller]
 pub fn see_other(uri: impl AsRef<str>) -> SeeOther {
     SeeOther::new(uri.as_ref())
 }
@@ -154,14 +142,9 @@ pub struct SeeOther {
 
 impl SeeOther {
     /// Builds a 303 redirect to `uri`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `uri` is not a valid `Location` header value.
-    #[track_caller]
     fn new(uri: &str) -> Self {
         Self {
-            location: HeaderValue::try_from(uri).expect("redirect uri is not a valid header value"),
+            location: location(uri),
         }
     }
 }
@@ -169,5 +152,57 @@ impl SeeOther {
 impl IntoResponse for SeeOther {
     fn into_response(self, cx: &Cx) -> Result<Response> {
         (StatusCode::SEE_OTHER, ([(LOCATION, self.location)], ())).into_response(cx)
+    }
+}
+
+/// Builds the `Location` header value pointing at `uri`.
+///
+/// Control and non-ASCII characters are percent-encoded, which leaves only
+/// the printable ASCII a header value and a URI both accept. That keeps the
+/// value convertible back to a `str`, which a redirect sent mid-stream relies
+/// on.
+fn location(uri: &str) -> HeaderValue {
+    let uri: Cow<'_, str> = utf8_percent_encode(uri, CONTROLS).into();
+    HeaderValue::try_from(&*uri).expect("percent-encoded uri is a valid header value")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ascii_targets_are_kept_as_is() {
+        assert_eq!(
+            redirect("/users?page=2#top").location(),
+            "/users?page=2#top"
+        );
+    }
+
+    #[test]
+    fn non_ascii_targets_are_percent_encoded() {
+        assert_eq!(redirect("/caf\u{e9}").location(), "/caf%C3%A9");
+        assert_eq!(
+            redirect_permanent("https://\u{4f8b}\u{3048}.jp/").location(),
+            "https://%E4%BE%8B%E3%81%88.jp/"
+        );
+        assert_eq!(see_other("/caf\u{e9}").location, "/caf%C3%A9");
+    }
+
+    #[test]
+    fn control_characters_are_percent_encoded() {
+        assert_eq!(redirect("/a\r\nb\x7f").location(), "/a%0D%0Ab%7F");
+    }
+
+    #[test]
+    fn encoded_targets_are_not_encoded_twice() {
+        assert_eq!(
+            redirect("/caf%C3%A9?q=a%20b").location(),
+            "/caf%C3%A9?q=a%20b"
+        );
+    }
+
+    #[test]
+    fn the_location_converts_back_to_a_str() {
+        assert!(redirect("/caf\u{e9} \u{4f8b}").location().to_str().is_ok());
     }
 }

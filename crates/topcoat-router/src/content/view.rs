@@ -112,8 +112,11 @@ window.topcoat ??= {
 /// redirect's target. `replace` keeps the partially streamed page out of the
 /// session history, so going back skips it.
 fn redirect_script(redirect: &RedirectError) -> String {
-    // The location was built from a `str`, so it converts back.
-    let uri = redirect.location().to_str().unwrap_or_default();
+    // The location is percent-encoded down to ASCII, so it converts back.
+    let uri = redirect
+        .location()
+        .to_str()
+        .expect("redirect location is ASCII");
     let mut location = String::with_capacity(uri.len());
     for c in uri.chars() {
         match c {
@@ -693,6 +696,15 @@ mod tests {
         assert_eq!(
             script,
             "<script>window.location.replace(\"/a\\\"b\\\\c\\x3Cd\")</script>"
+        );
+    }
+
+    #[test]
+    fn the_navigation_script_keeps_a_non_ascii_redirect_target() {
+        let script = redirect_script(&redirect("/caf\u{e9}"));
+        assert_eq!(
+            script,
+            "<script>window.location.replace(\"/caf%C3%A9\")</script>"
         );
     }
 }
