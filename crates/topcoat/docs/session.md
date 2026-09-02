@@ -18,6 +18,8 @@ The lifecycle is a handful of functions taking `cx: &Cx`:
 
 Within a request the presented token is read once and cached, and [`start`], [`stop`], and [`rotate`] update that cached view, so a page rendered after a login sees the new session immediately.
 
+Changing the session involves setting cookies, which is only possible if the response body has not begun streaming yet. The [cookie guide](crate::cookie#writes-must-happen-before-the-response) explains this in more detail.
+
 # Setup
 
 Register session support on the router with [`RouterBuilderSessionExt::sessions`]. The default [`SessionConfig`] carries the token in a session cookie, which needs cookie support installed as well:

@@ -64,6 +64,37 @@ jar.add(("theme", "dark"));
 # }
 ```
 
+# Writes must happen before the response
+
+Cookies are set as part of the response headers. It is therefore impossible to set cookies after the response body has already begun streaming. This might be the case when using WebSockets, [`live!`](crate::view::live) regions, or [`suspense`](crate::view::suspense). Trying to modify a cookie after the route handler already returned will result in a panic. Reading cookies always works.
+
+```rust
+use topcoat::{
+    Result,
+    context::Cx,
+    cookie::{Cookies, cookies},
+    router::page,
+    view::{View, suspense, view},
+};
+# use topcoat::view::component;
+# #[component]
+# async fn figures() -> Result<impl View> { Ok(view! { <p>"42"</p> }) }
+
+#[page("/report")]
+async fn report(cx: &Cx) -> Result<impl View> {
+    // Runs while the handler is still in charge of the response.
+    cookies(cx).add(("last_report", "sales"));
+
+    Ok(view! {
+        suspense(
+            fallback: view! { <p>"Loading..."</p> },
+            // Streams in later, so it must not touch the jar.
+            figures()
+        )
+    })
+}
+```
+
 # Building cookies with `cookie!`
 
 For cookies with several attributes, the [`cookie!`] macro is more compact than the builder. It mirrors the [`Set-Cookie`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie) header: the `name = value` pair first, then any number of `;`-separated attributes.
