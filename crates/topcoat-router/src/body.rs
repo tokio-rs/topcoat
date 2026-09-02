@@ -1,5 +1,8 @@
 use std::{
+    any::Any,
     convert::Infallible,
+    fmt,
+    panic::{AssertUnwindSafe, catch_unwind},
     pin::Pin,
     task::{Context, Poll},
 };
@@ -17,6 +20,9 @@ use crate::error::{bad_request, content_too_large};
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// The HTTP body type used for both requests and responses.
+///
+/// A panic while producing a frame ends the body with a [`BodyPanicError`]
+/// instead of unwinding into the connection serving it.
 #[must_use]
 pub struct Body(UnsyncBoxBody<Bytes, BoxError>);
 
@@ -100,7 +106,19 @@ impl http_body::Body for Body {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
-        Pin::new(&mut self.0).poll_frame(cx)
+        // A panic while producing a frame is caught here rather than in the
+        // connection task polling the body, which would take down the
+        // connection and every other request on it.
+        match catch_unwind(AssertUnwindSafe(|| Pin::new(&mut self.0).poll_frame(cx))) {
+            Ok(poll) => poll,
+            Err(payload) => {
+                // The body is poisoned: polling it again would panic again.
+                // Swapping in an ended body drops it and reports the end
+                // through `is_end_stream` and `size_hint` as well.
+                self.0 = Self::from(()).0;
+                Poll::Ready(Some(Err(BodyPanicError::new(payload).into())))
+            }
+        }
     }
 
     fn size_hint(&self) -> SizeHint {
@@ -112,11 +130,52 @@ impl http_body::Body for Body {
     }
 }
 
-impl std::fmt::Debug for Body {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Body {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Body").finish_non_exhaustive()
     }
 }
+
+/// The error a [`Body`] ends with when producing one of its frames panicked.
+///
+/// The panic is caught at the body, so the connection carrying it stays up
+/// and the stream terminates with this error instead. Carries the panic's
+/// message when it had one.
+#[derive(Debug)]
+pub struct BodyPanicError {
+    message: Option<Box<str>>,
+}
+
+impl BodyPanicError {
+    /// Builds the error from a caught panic's payload.
+    fn new(payload: Box<dyn Any + Send>) -> Self {
+        let message = match payload.downcast::<String>() {
+            Ok(message) => Some(message.into_boxed_str()),
+            Err(payload) => payload
+                .downcast::<&'static str>()
+                .ok()
+                .map(|message| Box::from(*message)),
+        };
+        Self { message }
+    }
+
+    /// The panic's message, if it carried one.
+    #[must_use]
+    pub fn message(&self) -> Option<&str> {
+        self.message.as_deref()
+    }
+}
+
+impl fmt::Display for BodyPanicError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.message {
+            Some(message) => write!(f, "the body panicked: {message}"),
+            None => f.write_str("the body panicked"),
+        }
+    }
+}
+
+impl std::error::Error for BodyPanicError {}
 
 /// A [`Stream`](futures_core::Stream) over the data frames of a [`Body`],
 /// yielding the raw [`Bytes`] of each frame.
@@ -173,6 +232,8 @@ pub async fn to_bytes(body: Body, limit: usize) -> Result<Bytes> {
 
 #[cfg(test)]
 mod tests {
+    use http_body::Body as _;
+
     use super::*;
     use crate::error::{BadRequestError, ContentTooLargeError};
 
@@ -192,6 +253,21 @@ mod tests {
         }
     }
 
+    /// A body that panics on its first frame.
+    struct PanickingBody;
+
+    impl http_body::Body for PanickingBody {
+        type Data = Bytes;
+        type Error = BoxError;
+
+        fn poll_frame(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Option<Result<Frame<Bytes>, BoxError>>> {
+            panic!("frame {}", 1);
+        }
+    }
+
     #[tokio::test]
     async fn a_body_within_the_limit_reads_in_full() {
         let bytes = to_bytes(Body::from("hello"), 1024).await.unwrap();
@@ -208,6 +284,24 @@ mod tests {
     async fn a_body_over_the_limit_is_content_too_large() {
         let error = to_bytes(Body::from("hello"), 4).await.unwrap_err();
         assert!(error.is::<ContentTooLargeError>());
+    }
+
+    #[tokio::test]
+    async fn a_panicking_body_ends_its_stream_with_an_error() {
+        let mut body = Body::new(PanickingBody);
+        assert!(!body.is_end_stream());
+
+        let error = body.frame().await.unwrap().unwrap_err();
+        let error = error
+            .downcast::<BodyPanicError>()
+            .expect("a panic ends the stream with its own error");
+        assert_eq!(error.message(), Some("frame 1"));
+        assert_eq!(error.to_string(), "the body panicked: frame 1");
+
+        // The panicked body is gone; the stream reports its end instead of
+        // polling it again.
+        assert!(body.is_end_stream());
+        assert!(body.frame().await.is_none());
     }
 
     #[tokio::test]

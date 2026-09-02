@@ -210,7 +210,10 @@ mod tests {
     use topcoat::view::{emit, live, view};
 
     use super::*;
-    use crate::{LayoutFn, Method, PageFn, Router, RouterBuilder, Slot, error::redirect, to_bytes};
+    use crate::{
+        BodyPanicError, LayoutFn, Method, PageFn, Router, RouterBuilder, Slot, error::redirect,
+        to_bytes,
+    };
 
     /// Dispatches a `GET` request for `path` through the router.
     async fn send(router: &Router, path: &str) -> Response {
@@ -359,6 +362,21 @@ mod tests {
                     emit! { <p>"first"</p> }?;
                     tokio::task::yield_now().await;
                     Err(io::Error::other("late").into())
+                })
+            </main>
+        }
+        .boxed()
+    }
+
+    /// A region that panics after its first emission, mid-stream.
+    fn render_late_panicking_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            cx =>
+            <main>
+                (live! {
+                    emit! { <p>"first"</p> }?;
+                    tokio::task::yield_now().await;
+                    panic!("late");
                 })
             </main>
         }
@@ -593,6 +611,32 @@ mod tests {
         assert_eq!(error.to_string(), "late");
         // The failure ends the stream; the view is not polled again.
         assert!(frames.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_panic_after_the_first_content_ends_the_stream_with_an_error() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::GET, "/p", render_late_panicking_page))
+            .page(PageFn::new(Method::GET, "/q", render_live_page))
+            .build();
+
+        let response = send(&router, "/p").await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // The panic is caught at the body, so it ends the stream like a
+        // failure does instead of unwinding into the connection.
+        let mut frames = response.into_body().into_data_stream();
+        let first = frames.next().await.unwrap().unwrap();
+        assert!(first.starts_with(b"<main><!--topcoat::region::start(1)-->"));
+        let error = frames.next().await.unwrap().unwrap_err();
+        let error = error.downcast::<BodyPanicError>().unwrap();
+        assert_eq!(error.message(), Some("late"));
+        assert!(frames.next().await.is_none());
+
+        // The router still serves other requests.
+        let response = send(&router, "/q").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(data_frames(response.into_body()).await.len(), 2);
     }
 
     /// A region that redirects before it produces any content.
