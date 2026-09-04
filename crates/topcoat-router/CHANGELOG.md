@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.6.2...topcoat-router-v0.7.0) - 2026-09-04
+
+### Added
+
+- [**breaking**] streaming SSR and `live!` + `emit!` regions ([#373](https://github.com/tokio-rs/topcoat/pull/373))
+- *(router)* implement `HrefTarget` for `&T: HrefTarget` to support dyn ([#370](https://github.com/tokio-rs/topcoat/pull/370))
+- *(router)* is_current methods for Href, routes, and pages ([#362](https://github.com/tokio-rs/topcoat/pull/362))
+
+### Other
+
+- upgrade to rust 1.98 ([#367](https://github.com/tokio-rs/topcoat/pull/367))
+
 ## [0.6.2](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.6.1...topcoat-router-v0.6.2) - 2026-08-18
 
 ### Added

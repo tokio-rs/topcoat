@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-grammar-v0.6.2...topcoat-core-grammar-v0.7.0) - 2026-09-04
+
+### Added
+
+- *(core)* add pretty printing impls for all `syn` types, remove `prettyplease` ([#372](https://github.com/tokio-rs/topcoat/pull/372))
+
+### Fixed
+
+- *(core)* memoize + borrowed async arg fails with AsyncFnOnce lifetime error ([#371](https://github.com/tokio-rs/topcoat/pull/371))
+
 ## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-grammar-v0.5.0...topcoat-core-grammar-v0.6.0) - 2026-08-17
 
 ### Added

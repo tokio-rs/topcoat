@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.6.2...topcoat-ui-registry-v0.7.0) - 2026-09-04
+
+### Added
+
+- [**breaking**] streaming SSR and `live!` + `emit!` regions ([#373](https://github.com/tokio-rs/topcoat/pull/373))
+- *(ui)* slightly adapt topcoat-ui default colors ([#379](https://github.com/tokio-rs/topcoat/pull/379))
+- *(ui)* switch from feather icons to lucide in topcoat-ui ([#378](https://github.com/tokio-rs/topcoat/pull/378))
+- *(core)* add pretty printing impls for all `syn` types, remove `prettyplease` ([#372](https://github.com/tokio-rs/topcoat/pull/372))
+
 ## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.5.0...topcoat-ui-registry-v0.6.0) - 2026-08-17
 
 ### Added

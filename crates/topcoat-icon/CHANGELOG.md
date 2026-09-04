@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-icon-v0.6.2...topcoat-icon-v0.7.0) - 2026-09-04
+
+### Added
+
+- [**breaking**] streaming SSR and `live!` + `emit!` regions ([#373](https://github.com/tokio-rs/topcoat/pull/373))
+
 ## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-icon-v0.1.3...topcoat-icon-v0.2.0) - 2026-07-19
 
 ### Other

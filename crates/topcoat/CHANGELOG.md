@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/tokio-rs/topcoat/compare/v0.6.2...v0.7.0) - 2026-09-04
+
+### Added
+
+- [**breaking**] streaming SSR and `live!` + `emit!` regions ([#373](https://github.com/tokio-rs/topcoat/pull/373))
+- *(cli)* port retry on dev server init ([#364](https://github.com/tokio-rs/topcoat/pull/364))
+- *(cli)* expose run method on `TopcoatCli` ([#363](https://github.com/tokio-rs/topcoat/pull/363))
+- *(core)* add pretty printing impls for all `syn` types, remove `prettyplease` ([#372](https://github.com/tokio-rs/topcoat/pull/372))
+- *(router)* implement `HrefTarget` for `&T: HrefTarget` to support dyn ([#370](https://github.com/tokio-rs/topcoat/pull/370))
+- *(router)* is_current methods for Href, routes, and pages ([#362](https://github.com/tokio-rs/topcoat/pull/362))
+- *(ui)* slightly adapt topcoat-ui default colors ([#379](https://github.com/tokio-rs/topcoat/pull/379))
+- *(ui)* switch from feather icons to lucide in topcoat-ui ([#378](https://github.com/tokio-rs/topcoat/pull/378))
+
+### Fixed
+
+- *(cli)* don't reload over in-flight navigations on reconnect ([#365](https://github.com/tokio-rs/topcoat/pull/365))
+- *(core)* memoize + borrowed async arg fails with AsyncFnOnce lifetime error ([#371](https://github.com/tokio-rs/topcoat/pull/371))
+- *(runtime)* preserve boolean procedure results ([#375](https://github.com/tokio-rs/topcoat/pull/375))
+
+### Other
+
+- upgrade to rust 1.98 ([#367](https://github.com/tokio-rs/topcoat/pull/367))
+- *(view)* remove `itoa` dependency in favor of `format_into` ([#366](https://github.com/tokio-rs/topcoat/pull/366))
+
 ## [0.6.2](https://github.com/tokio-rs/topcoat/compare/v0.6.1...v0.6.2) - 2026-08-18
 
 ### Added
