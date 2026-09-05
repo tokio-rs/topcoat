@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-macro-v0.7.0...topcoat-router-macro-v0.8.0) - 2026-09-05
+
+### Fixed
+
+- *(router)* treat an empty form or query value as None for Option<T> ([#383](https://github.com/tokio-rs/topcoat/pull/383))
+
 ## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-macro-v0.6.2...topcoat-router-macro-v0.7.0) - 2026-09-04
 
 ### Added
