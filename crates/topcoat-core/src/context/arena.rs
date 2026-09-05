@@ -31,8 +31,16 @@ impl RequestArena {
     where
         T: Any + Send + Sync,
     {
-        self.values
-            .push_get(Box::new(value))
+        Self::downcast(self.values.push_get(Box::new(value)))
+    }
+
+    /// Recovers the concrete type of a value the arena stores; the type
+    /// cannot change between storing and reading a value.
+    fn downcast<T>(value: &(dyn Any + Send + Sync)) -> &T
+    where
+        T: Any,
+    {
+        value
             .downcast_ref()
             .expect("a value keeps its type in the arena")
     }
