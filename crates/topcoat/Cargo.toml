@@ -198,7 +198,6 @@ topcoat-view-macro = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
 inventory = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
-serde_urlencoded.workspace = true
 tokio = { workspace = true, optional = true, features = ["macros", "net", "signal"] }
 tokio-tungstenite = { workspace = true, optional = true, features = ["connect"] }
 

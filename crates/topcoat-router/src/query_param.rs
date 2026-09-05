@@ -35,7 +35,7 @@ pub fn query_params<T: QueryParams>(cx: &Cx) -> T::Output<'_> {
 
 /// The error produced when the request's query string fails to deserialize,
 /// carrying the path of the key that failed.
-pub type QueryParamsError = serde_path_to_error::Error<serde_urlencoded::de::Error>;
+pub type QueryParamsError = serde_path_to_error::Error<serde::de::value::Error>;
 
 /// Deserializes the query string of the request `cx` belongs to into `T`.
 ///

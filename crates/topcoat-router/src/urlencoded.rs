@@ -5,13 +5,12 @@
 //! field. `serde_urlencoded` hands the empty string to `T` instead, so only
 //! `Option<String>` accepts a blank input.
 
-use std::borrow::Cow;
-use std::fmt::Display;
-use std::str::FromStr;
+use std::{borrow::Cow, fmt::Display, str::FromStr};
 
-use serde::de::value::MapDeserializer;
-use serde::de::{self, IntoDeserializer};
-use serde::forward_to_deserialize_any;
+use serde::{
+    de::{self, IntoDeserializer, value::MapDeserializer},
+    forward_to_deserialize_any,
+};
 
 /// The error type, the same one `serde_urlencoded` reports.
 pub(crate) type Error = serde::de::value::Error;

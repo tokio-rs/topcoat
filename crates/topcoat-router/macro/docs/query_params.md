@@ -12,7 +12,7 @@ struct PageQuery {
 
 # Reading the value
 
-[`query_params::<T>(cx)`](fn.query_params.html) parses the current request's query string with [`serde_urlencoded`](https://docs.rs/serde_urlencoded/latest/serde_urlencoded/) and returns `Result<&T, &QueryParamsError>`: a reference to the parsed struct, or to the [`QueryParamsError`](type.QueryParamsError.html) naming the key that failed. Unlike a path parameter, the struct is not tied to a route: any handler can read it. Parsing runs at most once per request; the result is then memoized.
+[`query_params::<T>(cx)`](fn.query_params.html) parses the current request's query string and returns `Result<&T, &QueryParamsError>`: a reference to the parsed struct, or to the [`QueryParamsError`](type.QueryParamsError.html) naming the key that failed. Unlike a path parameter, the struct is not tied to a route: any handler can read it. Parsing runs at most once per request; the result is then memoized.
 
 # Failing with an error response
 
@@ -60,5 +60,5 @@ This relies on every field being optional; a required key would still be missing
 
 # Requirements
 
-- Use `Option<T>` for optional keys. `serde_urlencoded` does not apply `#[serde(default)]`, so a missing key on a non-`Option` field is a parse error.
+- Use `Option<T>` for optional keys. A missing key and an empty value (`?page=`, as a browser sends for a blank input) both read as `None`. `#[serde(default)]` is not applied, so a missing key on a non-`Option` field is a parse error.
 - The struct must be `Send + Sync + 'static`, since it is memoized for the request.
