@@ -71,12 +71,15 @@ async fn hello(name: &str) -> Result<impl View> {
 Topcoat renders all markup on the server: components can be async and query the database directly, eliminating all the traditional boilerplate needed for a separate API layer. Interactivity does not have to cost a round-trip, though. A `$(...)` expression is ordinary type-checked Rust that Topcoat evaluates on the server for the initial render and also translates to JavaScript, so it re-runs instantly in the browser. No wasm bundle, no client build step:
 
 ```rust,ignore
-view! {
-    signal open = false;
+#[component]
+async fn faq(cx: &Cx) -> Result<impl View> {
+    let open = signal(cx, || false);
 
-    // Runs entirely in the browser; no server round-trip.
-    <button @click=$(|_e| open.set(!open.get()))>"What is Topcoat?"</button>
-    <p :hidden=$(!open.get())>"A full-stack Rust framework."</p>
+    Ok(view! {
+        // Runs entirely in the browser; no server round-trip.
+        <button @click=$(|_e| open.set(!open.get()))>"What is Topcoat?"</button>
+        <p :hidden=$(!open.get())>"A full-stack Rust framework."</p>
+    })
 }
 ```
 
@@ -84,10 +87,10 @@ When an update does need the server, like fresh search results, mark the compone
 
 ```rust,ignore
 #[component]
-async fn search() -> Result<impl View> {
-    Ok(view! {
-        signal query = String::new();
+async fn search(cx: &Cx) -> Result<impl View> {
+    let query = signal(cx, String::new);
 
+    Ok(view! {
         <input @input=$(|e: Event| query.set(e.target.value))>
 
         // Updates as the user types.

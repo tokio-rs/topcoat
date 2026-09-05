@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{error::RouterErrorExt, href, page, path_param},
-    runtime::{Event, procedure},
+    runtime::{Event, procedure, signal},
     view::{View, attributes, view},
 };
 
@@ -31,10 +31,10 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
     let name = drink.name.clone();
     let price = drink.price;
 
-    Ok(view! {
-        signal quantity = 1.0;
-        signal confirmation = String::new();
+    let quantity = signal(cx, || 1.0);
+    let confirmation = signal(cx, String::new);
 
+    Ok(view! {
         <a
             href=(href!(super::page))
             class="text-sm text-muted-foreground hover:text-foreground"

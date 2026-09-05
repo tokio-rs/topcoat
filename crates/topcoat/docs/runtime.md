@@ -61,21 +61,21 @@ So far the browser has no reason to run `1.0 + 2.0` a second time; the answer st
 
 # Signals
 
-A **signal** is a piece of state that lives in the browser. Declare one with a `signal` statement inside a [`view!`] body, and read it in a runtime expression with `.get()`:
+A **signal** is a piece of state that lives in the browser. Create one with [`signal`], passing the request context and a closure producing the initial value, and read it in a runtime expression with `.get()`:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, runtime::signal, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal count = 0.0;
+# async fn example(cx: &Cx) -> Result<impl View> {
+let count = signal(cx, || 0.0);
 
+Ok(view! {
     <p>"Count: " $(count.get())</p>
 })
 # }
 ```
 
-The signal's initial value is an ordinary Rust expression, evaluated once during the server render and serialized into the page; the browser picks it up as reactive state.
+The initial value is computed once during the server render and serialized into the page; the browser picks it up as reactive state. A signal belongs to the page, layout, component, or shard body that creates it and lives for the rest of the request, so it can be captured by any number of runtime expressions in that body's view and handed down to the components it renders.
 
 In the browser, a runtime expression re-runs whenever a signal it read changes -- the text above updates the moment `count` does, with no server round-trip. Inside an expression you work with a signal through its methods: `.get()` reads the current value and `.set(...)` replaces it. Nothing changes `count` yet, though; that is what event handlers are for.
 
@@ -84,12 +84,12 @@ In the browser, a runtime expression re-runs whenever a signal it read changes -
 An attribute starting with `@` attaches an event handler: `@click`, `@input`, or any other DOM event name. Its value is a runtime expression evaluating to a closure, which runs in the browser each time the event fires. Handlers are where signals change:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, runtime::signal, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal count = 0.0;
+# async fn example(cx: &Cx) -> Result<impl View> {
+let count = signal(cx, || 0.0);
 
+Ok(view! {
     <button @click=$(|_e| count.set(count.get() + 1.0))>"+1"</button>
     <p>"Count: " $(count.get())</p>
 })
@@ -101,12 +101,12 @@ Clicking the button runs the closure, the closure updates the signal, and the `$
 The closure receives an [`Event`] mirroring the DOM event: fields like `e.target.value`, `e.key`, and `e.client_x`, and methods like `e.prevent_default()`. A typical input handler forwards the element's value into a signal:
 
 ```rust
-# use topcoat::{Result, view::*, runtime::Event};
+# use topcoat::{Result, context::Cx, runtime::{Event, signal}, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal query = String::new();
+# async fn example(cx: &Cx) -> Result<impl View> {
+let query = signal(cx, String::new);
 
+Ok(view! {
     <input @input=$(|e: Event| query.set(e.target.value))>
 })
 # }
@@ -121,12 +121,12 @@ For the rare event logic the expression vocabulary cannot say, the value can als
 An attribute starting with `:` is a **bind attribute**: its value is a runtime expression, and the attribute is kept in sync with it. The server renders the initial value like a normal attribute; the browser re-applies it whenever a signal the expression reads changes:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, runtime::signal, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal open = false;
+# async fn example(cx: &Cx) -> Result<impl View> {
+let open = signal(cx, || false);
 
+Ok(view! {
     <button @click=$(|_e| open.set(!open.get()))>"What is Topcoat?"</button>
     <p :hidden=$(!open.get())>"A fullstack Rust framework."</p>
 })
@@ -136,12 +136,12 @@ Ok(view! {
 Combining a bind attribute with an event handler syncs an element and a signal in both directions: `:value` keeps the input showing the signal, and `@input` writes every keystroke back into it:
 
 ```rust
-# use topcoat::{Result, view::*, runtime::Event};
+# use topcoat::{Result, context::Cx, runtime::{Event, signal}, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal name = String::new();
+# async fn example(cx: &Cx) -> Result<impl View> {
+let name = signal(cx, String::new);
 
+Ok(view! {
     <input
         :value=$(name.get())
         @input=$(|e: Event| name.set(e.target.value))
@@ -157,17 +157,17 @@ Ok(view! {
 Runtime expressions run in the browser, so they cannot query the database or use Rust beyond the shared vocabulary. When an event handler needs the server, it calls a **procedure**: an async server function invoked from a runtime expression like any other async function:
 
 ```rust
-# use topcoat::{Result, view::*, runtime::procedure};
+# use topcoat::{Result, context::Cx, runtime::{procedure, signal}, view::*};
 #[procedure]
 async fn double(value: f64) -> Result<f64> {
     Ok(value * 2.0)
 }
 
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal count = 1.0;
+# async fn example(cx: &Cx) -> Result<impl View> {
+let count = signal(cx, || 1.0);
 
+Ok(view! {
     <button @click=$(async |_e| {
         let doubled = double(count.get()).await;
         count.set(doubled);
@@ -185,7 +185,7 @@ The call is an HTTP request under the hood: the arguments travel to the server, 
 When it is the markup itself that needs the server -- fresh search results as the user types -- use a **shard**: a component that re-renders on the server whenever one of its arguments changes. Arguments are runtime expressions; the browser sends their current values to the server and swaps the returned HTML in place:
 
 ```rust
-# use topcoat::{Result, context::Cx, view::*, runtime::{shard, Event}};
+# use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Event}};
 # async fn search_products(_cx: &Cx, _query: &str) -> Result<Vec<String>> { Ok(vec![]) }
 #[shard]
 async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
@@ -198,10 +198,10 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
 }
 
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal query = String::new();
+# async fn example(cx: &Cx) -> Result<impl View> {
+let query = signal(cx, String::new);
 
+Ok(view! {
     <input @input=$(|e: Event| query.set(e.target.value))>
 
     search_results(query: $(query.get()))
@@ -213,6 +213,7 @@ A shard body is ordinary server code, like any component. The re-renders are ser
 
 [`Event`]: struct.Event.html
 [`expr!`]: macro.expr.html
+[`signal`]: fn.signal.html
 [`view!`]: ../view/macro.view.html
 [procedure]: attr.procedure.html
 [shard]: attr.shard.html

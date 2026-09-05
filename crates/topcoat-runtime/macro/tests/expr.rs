@@ -1,29 +1,32 @@
 //! The signal write methods, checked through the macro that compiles them.
 //!
-//! Each case renders a view whose handler calls one of the methods and asserts
-//! that the name reaches the generated JavaScript unchanged. The name is the
-//! interface to the browser runtime: nothing maps it on the way out, so a
-//! rename on one side alone would fail only in the browser, at click time.
+//! Each case renders a component whose handler calls one of the methods and
+//! asserts that the name reaches the generated JavaScript unchanged. The name
+//! is the interface to the browser runtime: nothing maps it on the way out,
+//! so a rename on one side alone would fail only in the browser, at click
+//! time.
 
 use topcoat::{
+    Result,
     context::Cx,
-    runtime::procedure,
-    view::{ViewExt, view},
+    runtime::{procedure, signal},
+    view::{View, ViewExt, component, view},
 };
+
+#[component]
+async fn toggle_button(cx: &Cx) -> Result<impl View> {
+    let open = signal(cx, || false);
+    Ok(view! { <button @click=$(|_e| open.toggle())>"x"</button> })
+}
 
 #[tokio::test]
 async fn toggle_reaches_the_generated_javascript() {
     let cx = &Cx::default();
-    let html = view! {
-        cx =>
-        signal open = false;
-
-        <button @click=$(|_e| open.toggle())>"x"</button>
-    }
-    .single()
-    .await
-    .unwrap()
-    .render(cx);
+    let html = view! { cx => toggle_button() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
 
     assert!(html.contains(".toggle()"), "{html}");
 }
@@ -41,40 +44,71 @@ async fn bool_then_avoids_javascript_thenable_assimilation() {
     assert!(!html.contains(".then("), "{html}");
 }
 
+#[component]
+async fn counter_buttons(cx: &Cx) -> Result<impl View> {
+    let count = signal(cx, || 0.0);
+    Ok(view! {
+        <button @click=$(|_e| count.increment())>"+"</button>
+        <button @click=$(|_e| count.decrement())>"-"</button>
+    })
+}
+
 #[tokio::test]
 async fn increment_and_decrement_reach_the_generated_javascript() {
     let cx = &Cx::default();
-    let html = view! {
-        cx =>
-        signal count = 0.0;
-
-        <button @click=$(|_e| count.increment())>"+"</button>
-        <button @click=$(|_e| count.decrement())>"-"</button>
-    }
-    .single()
-    .await
-    .unwrap()
-    .render(cx);
+    let html = view! { cx => counter_buttons() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
 
     assert!(html.contains(".increment()"), "{html}");
     assert!(html.contains(".decrement()"), "{html}");
 }
 
+#[component]
+async fn push_str_button(cx: &Cx) -> Result<impl View> {
+    let name = signal(cx, String::new);
+    Ok(view! { <button @click=$(|_e| name.push_str("!"))>"x"</button> })
+}
+
 #[tokio::test]
 async fn push_str_reaches_the_generated_javascript_with_its_argument() {
     let cx = &Cx::default();
-    let html = view! {
-        cx =>
-        signal name = String::new();
-
-        <button @click=$(|_e| name.push_str("!"))>"x"</button>
-    }
-    .single()
-    .await
-    .unwrap()
-    .render(cx);
+    let html = view! { cx => push_str_button() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
 
     assert!(html.contains(".push_str("), "{html}");
+}
+
+/// A signal is created before the view and captured by any number of its
+/// expressions; its declaration renders ahead of the component's content.
+#[component]
+async fn counter_display(cx: &Cx) -> Result<impl View> {
+    let count = signal(cx, || 0.0);
+    Ok(view! {
+        <button @click=$(|_e| count.increment())>"+"</button>
+        <p>$(count.get())</p>
+    })
+}
+
+#[tokio::test]
+async fn a_signal_is_declared_once_ahead_of_every_capture() {
+    let cx = &Cx::default();
+    let html = view! { cx => counter_display() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+    let declaration = html.find("<!--::topcoat::signal(").expect(&html);
+    let first_capture = html.find("cx.hydrate(").expect(&html);
+    assert!(declaration < first_capture, "{html}");
+    assert_eq!(html.matches("::topcoat::signal(").count(), 1, "{html}");
+    assert_eq!(html.matches("cx.hydrate(").count(), 2, "{html}");
 }
 
 #[procedure]
@@ -138,21 +172,24 @@ async fn procedure_call_inside_block_is_an_async_func() {
 /// owned surrogate an event field yields. `Event::target.value` is a `String`,
 /// so this is the call the method mostly exists for; the test above passes a
 /// literal, which is borrowed and so never exercised the owned case.
-#[tokio::test]
-async fn push_str_accepts_the_owned_string_from_an_event() {
-    let cx = &Cx::default();
-    let html = view! {
-        cx =>
-        signal message = String::new();
-
+#[component]
+async fn push_str_input(cx: &Cx) -> Result<impl View> {
+    let message = signal(cx, String::new);
+    Ok(view! {
         <input
             @input=$(|e: topcoat::runtime::Event| { message.push_str(e.target.value) })
         >
-    }
-    .single()
-    .await
-    .unwrap()
-    .render(cx);
+    })
+}
+
+#[tokio::test]
+async fn push_str_accepts_the_owned_string_from_an_event() {
+    let cx = &Cx::default();
+    let html = view! { cx => push_str_input() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
 
     assert!(html.contains(".push_str("), "{html}");
 }
@@ -184,19 +221,20 @@ async fn a_captured_value_cannot_break_out_of_its_marker_comment() {
 
 /// A string literal reaches the handler attribute as a hydrated surrogate
 /// with every quote escaped, so it cannot terminate the attribute value.
+#[component]
+async fn quoted_push_str_button(cx: &Cx) -> Result<impl View> {
+    let name = signal(cx, String::new);
+    Ok(view! { <button @click=$(|_e| name.push_str("say \"hi\""))>"x"</button> })
+}
+
 #[tokio::test]
 async fn a_string_literal_with_quotes_stays_inside_the_handler_attribute() {
     let cx = &Cx::default();
-    let html = view! {
-        cx =>
-        signal name = String::new();
-
-        <button @click=$(|_e| name.push_str("say \"hi\""))>"x"</button>
-    }
-    .single()
-    .await
-    .unwrap()
-    .render(cx);
+    let html = view! { cx => quoted_push_str_button() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
 
     assert!(html.contains(r"say \&quot;hi\&quot;"), "{html}");
     assert!(!html.contains(r#"say \"hi"#), "{html}");

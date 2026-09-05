@@ -11,7 +11,7 @@ use crate::{
         TemplateForLoop, TemplateIf, TemplateLocal, TemplateMatch,
     },
     view::{
-        Component, DocumentType, Element, Nodes, SignalDeclaration,
+        Component, DocumentType, Element, Nodes,
         hir::{LowerView, ViewBuilder},
     },
 };
@@ -32,7 +32,6 @@ pub enum Node {
     Break(TemplateBreak),
     Match(TemplateMatch<Node>),
     Block(TemplateBlock<Nodes>),
-    SignalDecaration(SignalDeclaration),
 }
 
 impl Node {
@@ -67,7 +66,6 @@ impl LowerView for Node {
             Self::Break(inner) => inner.lower(builder),
             Self::Match(inner) => inner.lower(builder),
             Self::Block(inner) => inner.lower(builder),
-            Self::SignalDecaration(inner) => inner.lower(builder),
         }
     }
 }
@@ -98,8 +96,6 @@ impl Parse for Node {
             Self::Match(input.parse()?)
         } else if TemplateBlock::<Nodes>::peek(input) {
             Self::Block(input.parse()?)
-        } else if SignalDeclaration::peek(input) {
-            Self::SignalDecaration(input.parse()?)
         } else if Component::peek(input) {
             Self::Component(input.parse()?)
         } else {
@@ -137,7 +133,6 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Node {
             Self::Break(inner) => inner.pretty_print(printer),
             Self::Match(inner) => inner.pretty_print(printer),
             Self::Block(inner) => inner.pretty_print(printer),
-            Self::SignalDecaration(inner) => inner.pretty_print(printer),
         }
     }
 }

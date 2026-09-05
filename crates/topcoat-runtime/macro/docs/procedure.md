@@ -14,14 +14,14 @@ async fn double(value: f64) -> Result<f64> {
 Inside a runtime expression, call a procedure like an ordinary async function and `.await` its result:
 
 ```rust
-# use topcoat::{Result, view::*, runtime::procedure};
+# use topcoat::{Result, context::Cx, view::*, runtime::{procedure, signal}};
 # #[procedure]
 # async fn double(value: f64) -> Result<f64> { Ok(value * 2.0) }
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal count = 1.0;
+# async fn example(cx: &Cx) -> Result<impl View> {
+let count = signal(cx, || 1.0);
 
+Ok(view! {
     <button
         @click=$(async |_e| {
             let doubled = double(count.get()).await;

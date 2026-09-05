@@ -5,7 +5,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     context::Cx,
     router::{Router, RouterBuilderDiscoverExt, page},
-    runtime::{Event, shard},
+    runtime::{Event, shard, signal},
     view::{View, component, view},
 };
 
@@ -39,10 +39,10 @@ async fn home() -> Result<impl View> {
 }
 
 #[component]
-async fn combobox() -> Result<impl View> {
-    Ok(view! {
-        signal input = String::new();
+async fn combobox(cx: &Cx) -> Result<impl View> {
+    let input = signal(cx, String::new);
 
+    Ok(view! {
         <div>
             <input :value=$(input.get()) @input=$(|e: Event| input.set(e.target.value))>
 

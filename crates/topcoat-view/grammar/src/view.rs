@@ -7,7 +7,6 @@ pub(crate) mod hir;
 mod html_ident;
 mod node;
 mod nodes;
-mod signal_declaration;
 
 pub use component::*;
 pub use document_type::*;
@@ -19,7 +18,6 @@ pub use node::*;
 pub use nodes::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-pub use signal_declaration::*;
 use syn::parse::{Parse, ParseStream};
 use topcoat_core_grammar::{ParseOption, paths::topcoat_context};
 

@@ -1,4 +1,5 @@
 mod app_context;
+mod arena;
 mod id;
 mod request_context;
 mod tracking;
@@ -6,6 +7,7 @@ mod tracking;
 use std::{any::Any, sync::Arc};
 
 pub use app_context::*;
+pub use arena::*;
 pub use id::*;
 pub use request_context::*;
 pub(crate) use tracking::*;
@@ -53,6 +55,7 @@ impl Cx {
                 app_context,
                 memoize_cache: MemoizeCache::new(),
                 abort_store: AbortStore::new(),
+                arena: RequestArena::new(),
             }),
             request_context: Arc::new(request_context),
             tracker: None,
@@ -146,6 +149,7 @@ struct RequestShared {
     app_context: Arc<AppContext>,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
+    arena: RequestArena,
 }
 
 /// Assembles a [`Cx`] from scratch, for tests.
@@ -204,6 +208,13 @@ pub fn memoize_cache(cx: &Cx) -> &MemoizeCache {
 #[doc(hidden)]
 pub fn abort_store(cx: &Cx) -> &AbortStore {
     &cx.shared.abort_store
+}
+
+#[inline]
+#[must_use]
+#[doc(hidden)]
+pub fn request_arena(cx: &Cx) -> &RequestArena {
+    &cx.shared.arena
 }
 
 #[cfg(test)]

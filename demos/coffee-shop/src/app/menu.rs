@@ -6,7 +6,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{href, page},
-    runtime::{Event, shard},
+    runtime::{Event, shard, signal},
     view::{View, attributes, component, error_boundary, suspense, view},
 };
 
@@ -23,11 +23,11 @@ use crate::{
 
 // The `menu` module adds a URL segment: this page renders at /menu.
 #[page]
-pub async fn page() -> Result<impl View> {
-    Ok(view! {
-        // The signal lives in the browser; typing filters without a reload.
-        signal query = String::new();
+pub async fn page(cx: &Cx) -> Result<impl View> {
+    // The signal lives in the browser; typing filters without a reload.
+    let query = signal(cx, String::new);
 
+    Ok(view! {
         <h1 class="text-3xl font-bold tracking-tight">"The menu"</h1>
 
         <div class="mt-6 flex gap-2">

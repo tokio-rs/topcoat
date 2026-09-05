@@ -20,14 +20,14 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
 Inside a [`view!`] body, call a shard like a component, passing a runtime expression for each parameter:
 
 ```rust
-# use topcoat::{Result, view::*, runtime::{shard, Event}};
+# use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Event}};
 # #[shard]
 # async fn search_results(query: String) -> Result<impl View> { Ok(view! { (query) }) }
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal query = String::new();
+# async fn example(cx: &Cx) -> Result<impl View> {
+let query = signal(cx, String::new);
 
+Ok(view! {
     <input :value=$(query.get()) @input=$(|e: Event| query.set(e.target.value))>
 
     search_results(query: $(query.get()))
@@ -41,7 +41,7 @@ When the `query` signal changes, the current argument values are sent to the ser
 
 # Shard State
 
-A shard's content is a full view: it can declare signals, attach event handlers, and contain nested shards. A re-render replaces that content wholesale, though, so state declared inside the shard -- like a `signal` in its `view!` -- resets each time. State that must survive re-renders lives outside the shard and flows in through its arguments.
+A shard's content is a full view: the shard can create signals, attach event handlers, and contain nested shards. A re-render replaces that content wholesale, though, so state created inside the shard -- like a signal created in its body -- resets each time. State that must survive re-renders lives outside the shard and flows in through its arguments.
 
 # Guards
 

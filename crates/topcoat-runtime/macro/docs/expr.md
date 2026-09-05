@@ -3,12 +3,12 @@ The [`expr!`] macro compiles a single Rust expression twice: into ordinary Rust 
 Because every expression must behave identically in both languages, only a limited subset of Rust is supported: a small vocabulary of types and methods, and a restricted set of expression shapes. Both are listed below.
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, runtime::signal, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal show = false;
+# async fn example(cx: &Cx) -> Result<impl View> {
+let show = signal(cx, || false);
 
+Ok(view! {
     $(if show.get() { "shown" } else { "hidden" })
 })
 # }
@@ -23,12 +23,12 @@ An invocation expands to an [`Expr`] value bundling the server-evaluated result 
 An identifier that is not defined inside the expression is captured from the surrounding Rust scope:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, runtime::signal, view::*};
 # #[component]
-# async fn example(step: f64) -> Result<impl View> {
-Ok(view! {
-    signal count = 0.0;
+# async fn example(cx: &Cx, step: f64) -> Result<impl View> {
+let count = signal(cx, || 0.0);
 
+Ok(view! {
     $(count.get() + step)
 })
 # }
@@ -69,12 +69,12 @@ Anything else -- `match`, integer literals, struct expressions, multi-segment pa
 The `raw!` macro escapes to hand-written JavaScript for the parts of an expression the vocabulary does not cover. Its first argument is the JavaScript source; the optional second argument is the equivalent Rust, used when the server evaluates the expression:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, runtime::signal, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    signal name = String::new();
+# async fn example(cx: &Cx) -> Result<impl View> {
+let name = signal(cx, String::new);
 
+Ok(view! {
     $({
         let n = name.get();
         raw!("${n}.toUpperCase()", n.to_uppercase())
