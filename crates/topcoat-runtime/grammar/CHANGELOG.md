@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-grammar-v0.7.0...topcoat-runtime-grammar-v0.8.0) - 2026-09-05
+
+### Added
+
+- *(runtime)* [**breaking**] replace signal custom syntax with an ordinary rust function ([#384](https://github.com/tokio-rs/topcoat/pull/384))
+
 ## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-grammar-v0.6.2...topcoat-runtime-grammar-v0.7.0) - 2026-09-04
 
 ### Added
