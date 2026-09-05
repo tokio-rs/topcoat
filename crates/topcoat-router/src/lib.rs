@@ -27,6 +27,7 @@ mod router;
 mod service;
 #[cfg(feature = "tower")]
 pub mod tower;
+mod urlencoded;
 
 pub use body::*;
 pub use body_limit::*;

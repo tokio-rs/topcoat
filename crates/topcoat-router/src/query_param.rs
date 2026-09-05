@@ -49,7 +49,7 @@ pub type QueryParamsError = serde_path_to_error::Error<serde_urlencoded::de::Err
 pub fn parse_query_params<T: DeserializeOwned>(cx: &Cx) -> Result<T, QueryParamsError> {
     let query = uri(cx).query().unwrap_or("");
     let deserializer =
-        serde_urlencoded::Deserializer::new(form_urlencoded::parse(query.as_bytes()));
+        crate::urlencoded::Deserializer::new(form_urlencoded::parse(query.as_bytes()));
     serde_path_to_error::deserialize(deserializer)
 }
 
@@ -65,5 +65,45 @@ pub struct QueryParamsSealed(());
 impl QueryParamsSealed {
     pub(crate) fn new() -> Self {
         Self(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::Request;
+    use topcoat_core::context::CxTestBuilder;
+
+    use super::*;
+
+    #[derive(Debug, serde::Deserialize)]
+    struct Paging {
+        page: Option<f64>,
+    }
+
+    /// Builds a `Cx` carrying request `Parts` for a `GET` of `uri`.
+    fn cx(uri: &str) -> Cx {
+        let (parts, ()) = Request::builder()
+            .uri(uri)
+            .body(())
+            .expect("request should build")
+            .into_parts();
+
+        CxTestBuilder::new().request_context(parts).build()
+    }
+
+    #[test]
+    fn parse_query_params_reads_empty_optional_value_as_none() {
+        let paging: Paging =
+            parse_query_params(&cx("/items?page=")).expect("an empty optional value");
+
+        assert_eq!(paging.page, None);
+    }
+
+    #[test]
+    fn parse_query_params_reads_present_optional_value() {
+        let paging: Paging =
+            parse_query_params(&cx("/items?page=2")).expect("a valid optional value");
+
+        assert_eq!(paging.page, Some(2.0));
     }
 }

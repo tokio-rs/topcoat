@@ -116,9 +116,10 @@ where
     /// # Errors
     ///
     /// Returns a bad-request error when `bytes` are not valid URL-encoded form
-    /// data matching `T`.
+    /// data matching `T`. An empty value, as a browser sends for a blank input,
+    /// deserializes to `None` for an `Option<T>` field.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let deserializer = serde_urlencoded::Deserializer::new(form_urlencoded::parse(bytes));
+        let deserializer = crate::urlencoded::Deserializer::new(form_urlencoded::parse(bytes));
         let value = serde_path_to_error::deserialize(deserializer).map_err(|error| {
             bad_request_at(
                 error.path(),
@@ -399,5 +400,95 @@ mod tests {
         assert!(!form_content_type(None));
         assert!(!form_content_type(Some("application/json")));
         assert!(!form_content_type(Some("text/plain")));
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    struct Deadline {
+        due: Option<f64>,
+    }
+
+    #[test]
+    fn from_bytes_reads_empty_optional_value_as_none() {
+        let Form(deadline) =
+            Form::<Deadline>::from_bytes(b"due=").expect("an empty optional value");
+
+        assert_eq!(deadline.due, None);
+    }
+
+    #[test]
+    fn from_bytes_reads_present_optional_value() {
+        let Form(deadline) =
+            Form::<Deadline>::from_bytes(b"due=1.5").expect("a valid optional value");
+
+        assert_eq!(deadline.due, Some(1.5));
+    }
+
+    #[test]
+    fn from_bytes_reads_missing_optional_key_as_none() {
+        let Form(deadline) = Form::<Deadline>::from_bytes(b"").expect("no keys at all");
+
+        assert_eq!(deadline.due, None);
+    }
+
+    #[test]
+    fn from_bytes_keeps_empty_required_string() {
+        #[derive(Debug, serde::Deserialize)]
+        struct Named {
+            name: String,
+        }
+
+        let Form(named) = Form::<Named>::from_bytes(b"name=").expect("an empty string value");
+
+        assert_eq!(named.name, "");
+    }
+
+    #[test]
+    fn from_bytes_reads_empty_optional_string_as_none() {
+        #[derive(Debug, serde::Deserialize)]
+        struct Nickname {
+            nick: Option<String>,
+        }
+
+        let Form(nickname) =
+            Form::<Nickname>::from_bytes(b"nick=").expect("an empty optional string");
+
+        assert_eq!(nickname.nick, None);
+    }
+
+    #[test]
+    fn from_bytes_rejects_empty_required_number() {
+        #[derive(Debug, serde::Deserialize)]
+        struct Count {
+            #[allow(dead_code)]
+            n: f64,
+        }
+
+        let error = Form::<Count>::from_bytes(b"n=").expect_err("an empty required number");
+
+        assert!(error.to_string().contains("invalid form value"), "{error}");
+    }
+
+    #[derive(Debug, PartialEq, serde::Deserialize)]
+    enum Priority {
+        High,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    struct Task {
+        priority: Option<Priority>,
+    }
+
+    #[test]
+    fn from_bytes_reads_empty_optional_enum_as_none() {
+        let Form(task) = Form::<Task>::from_bytes(b"priority=").expect("an empty optional enum");
+
+        assert_eq!(task.priority, None);
+    }
+
+    #[test]
+    fn from_bytes_reads_present_optional_enum() {
+        let Form(task) = Form::<Task>::from_bytes(b"priority=High").expect("a valid optional enum");
+
+        assert_eq!(task.priority, Some(Priority::High));
     }
 }
