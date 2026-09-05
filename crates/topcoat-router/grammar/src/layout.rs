@@ -116,8 +116,10 @@ impl ToTokens for Layout {
                 let props = <#ident as #topcoat_view::Component>::props_builder()
                     .slot(slot)
                     .build();
-                ::std::boxed::Box::pin(#topcoat_view::internal::ThenView::new(
-                    <#ident as #topcoat_view::Component>::render(#ident, cx, props)
+                ::std::boxed::Box::pin(#topcoat_view::HoistView::new(
+                    #topcoat_view::internal::ThenView::new(
+                        <#ident as #topcoat_view::Component>::render(#ident, cx, props)
+                    )
                 ))
             }
         };

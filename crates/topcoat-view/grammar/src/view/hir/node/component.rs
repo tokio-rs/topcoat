@@ -169,7 +169,9 @@ impl Emit for Component {
         // The props are built under the invocation's identity, so a child
         // view carries it too. Once the guard is gone, the body future and
         // the view it resolves to poll at that same identity, so the
-        // invocations in the body's template derive from it as well.
+        // invocations in the body's template derive from it as well. The
+        // same polls collect what the body hoists, so hoisted parts land
+        // ahead of this invocation's content.
         let guard = self.identity_guard();
         let future = self.render_future();
 
@@ -181,7 +183,9 @@ impl Emit for Component {
                 ::core::mem::drop(__guard);
                 #topcoat_view::identity::IdentityView::new(
                     __identity,
-                    #topcoat_view::internal::ThenView::new(__future),
+                    #topcoat_view::HoistView::new(
+                        #topcoat_view::internal::ThenView::new(__future),
+                    ),
                 )
             };
         });

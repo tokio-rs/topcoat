@@ -134,7 +134,7 @@ impl ToTokens for Page {
                 cx: &'a #topcoat_context::Cx,
                 body: #topcoat_router::Body,
             ) -> #topcoat_view::BoxView<'a> {
-                ::std::boxed::Box::pin(
+                ::std::boxed::Box::pin(#topcoat_view::HoistView::new(
                     #topcoat_view::internal::ThenView::new(async move {
                         #parse_request
                         let props = <#ident as #topcoat_view::Component>::props_builder()
@@ -145,7 +145,7 @@ impl ToTokens for Page {
                         )
                         .await
                     })
-                )
+                ))
             }
         };
         let methods = attr.methods.as_ref().map_or_else(

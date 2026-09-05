@@ -103,6 +103,10 @@ impl ToTokens for Shard {
         // value usable directly in `router.shard(...)`. The function's doc
         // comments ride along on the face, so the component expansion carries
         // them onto the marker.
+        //
+        // The handler polls inside its own `HoistView` on both paths, so
+        // parts hoisted while the shard body runs land inside the scope
+        // markers, where the browser attributes them to the shard.
         let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
         let marker = quote! {
             #(#docs)*
@@ -112,7 +116,9 @@ impl ToTokens for Shard {
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
                 let __placeholder = #topcoat_view::ViewExt::single(
-                    #ident::handler(__cx, #(#call_args),*).await?,
+                    #topcoat_view::HoistView::new(#topcoat_view::internal::ThenView::new(
+                        #ident::handler(__cx, #(#call_args),*),
+                    )),
                 )
                 .await?;
                 let __scope = #topcoat_runtime::ReactiveScope::new(
@@ -163,7 +169,11 @@ impl ToTokens for Shard {
                             #topcoat_runtime::Surrogate::into_real(__args);
                         // The handler's view is the outermost view of this
                         // request's build, so its content is self-contained.
-                        let __view = #ident::handler(cx, #(#call_args),*).await?;
+                        let __view = #topcoat_view::HoistView::new(
+                            #topcoat_view::internal::ThenView::new(
+                                #ident::handler(cx, #(#call_args),*),
+                            ),
+                        );
                         let __view = #topcoat_view::internal::ScopeView::new(__view);
                         #topcoat_view::ViewExt::single(__view).await
                     })
