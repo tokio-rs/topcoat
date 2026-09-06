@@ -29,7 +29,7 @@ mod key;
 mod site;
 mod view;
 
-use std::{cell::Cell, fmt};
+use std::{cell::Cell, fmt, num::ParseIntError, str::FromStr};
 
 pub use guard::*;
 pub use key::*;
@@ -126,21 +126,6 @@ impl Identity {
         self.hash
     }
 
-    /// Rebuilds an identity from its hash.
-    ///
-    /// The result carries no ambiguity: a hash is only worth carrying
-    /// forward once its identity was consumed, which an ambiguous identity
-    /// refuses. This is the door for re-entering a subtree in another
-    /// request at an identity captured earlier, for example one a client
-    /// sends back.
-    #[must_use]
-    pub const fn from_hash(hash: u128) -> Self {
-        Self {
-            hash,
-            ambiguity: None,
-        }
-    }
-
     /// Derives the identity of a child invocation at `site`.
     ///
     /// An ambiguity on `self` carries over to the child.
@@ -204,6 +189,31 @@ impl Identity {
     }
 }
 
+/// Writes the identity's hash as 32 hex digits, the form it takes on the
+/// wire.
+impl fmt::Display for Identity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:032x}", self.hash)
+    }
+}
+
+/// Parses an identity from its hex hash, as written by `Display`.
+///
+/// The result carries no ambiguity: a hash is only worth carrying forward
+/// once its identity was consumed, which an ambiguous identity refuses.
+/// This is the door for re-entering a subtree in another request at an
+/// identity captured earlier, for example one a client sends back.
+impl FromStr for Identity {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            hash: u128::from_str_radix(s, 16)?,
+            ambiguity: None,
+        })
+    }
+}
+
 /// Error returned by [`Identity::try_current`] when the identity is
 /// poisoned by an invocation that repeats without a `key` argument.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -253,13 +263,16 @@ mod tests {
     }
 
     #[test]
-    fn a_hash_round_trips_through_from_hash() {
+    fn an_identity_round_trips_through_its_hex_form() {
         let identity = Identity::ROOT.child(SITE_A).keyed_child(SITE_B, 3);
-        assert_eq!(Identity::from_hash(identity.hash()), identity);
+        let hex = identity.to_string();
+        assert_eq!(hex.len(), 32);
+        assert_eq!(hex.parse::<Identity>().unwrap(), identity);
         assert_eq!(
-            Identity::from_hash(identity.hash()).child(SITE_A),
+            hex.parse::<Identity>().unwrap().child(SITE_A),
             identity.child(SITE_A),
         );
+        assert!("not hex".parse::<Identity>().is_err());
     }
 
     #[test]

@@ -195,7 +195,9 @@ where
     }
 
     fn from_value(value: &serde_json::Value) -> Option<Self> {
-        T::Surrogate::deserialize(value).ok().map(Surrogate::into_real)
+        T::Surrogate::deserialize(value)
+            .ok()
+            .map(Surrogate::into_real)
     }
 }
 
@@ -409,8 +411,12 @@ mod tests {
                 init_ran.store(true, Ordering::Relaxed);
                 1.0_f64
             });
-            out.set((signal.id(), *signal.read(), init_ran.load(Ordering::Relaxed)))
-                .unwrap();
+            out.set((
+                signal.id(),
+                *signal.read(),
+                init_ran.load(Ordering::Relaxed),
+            ))
+            .unwrap();
             Ok(view! { cx => <p></p> })
         }));
         block_on(view.single()).unwrap();

@@ -9,7 +9,7 @@
 use topcoat::{
     Result,
     context::{Cx, CxTestBuilder},
-    router::Body,
+    router::{Body, request::IDENTITY_HEADER},
     runtime::{Shard, shard, signal},
     view::{View, ViewExt, component, view},
 };
@@ -52,10 +52,12 @@ fn last_signal_id(html: &str) -> &str {
     &html[start..end]
 }
 
-/// Builds the context of a JSON request to the shard endpoint.
-fn endpoint_cx() -> Cx {
+/// Builds the context of a JSON request to the shard endpoint naming
+/// `identity` in the identity header.
+fn endpoint_cx(identity: &str) -> Cx {
     let (parts, ()) = http::Request::builder()
         .header("content-type", "application/json")
+        .header(IDENTITY_HEADER, identity)
         .body(())
         .unwrap()
         .into_parts();
@@ -65,10 +67,8 @@ fn endpoint_cx() -> Cx {
 /// Renders the shard through its endpoint at `identity`, carrying the JSON
 /// object `signals` of signal values.
 async fn rerender(identity: &str, signals: &str) -> String {
-    let cx = &endpoint_cx();
-    let body = Body::from(format!(
-        r#"{{"identity":"{identity}","args":["a"],"signals":{signals}}}"#
-    ));
+    let cx = &endpoint_cx(identity);
+    let body = Body::from(format!(r#"{{"args":["a"],"signals":{signals}}}"#));
     stateful.render(cx, body).await.unwrap().render(cx)
 }
 
@@ -122,7 +122,7 @@ async fn a_rerender_at_another_identity_derives_another_signal_id() {
 
 #[tokio::test]
 async fn a_malformed_identity_is_rejected() {
-    let cx = &endpoint_cx();
-    let body = Body::from(r#"{"identity":"not hex","args":["a"]}"#);
+    let cx = &endpoint_cx("not hex");
+    let body = Body::from(r#"{"args":["a"]}"#);
     assert!(stateful.render(cx, body).await.is_err());
 }

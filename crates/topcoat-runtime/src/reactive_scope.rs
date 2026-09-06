@@ -3,7 +3,7 @@ use topcoat_core::context::Cx;
 use topcoat_view::{NodeViewParts, PartsWriter, ViewHandle, identity::Identity};
 use uuid::Uuid;
 
-use crate::{Js, SHARD_ROUTE_PREFIX, ShardId, shard::identity_to_wire};
+use crate::{Js, SHARD_ROUTE_PREFIX, ShardId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
@@ -26,8 +26,9 @@ impl Default for ReactiveScopeId {
 
 pub struct ReactiveScope {
     id: ReactiveScopeId,
-    /// The identity of the shard invocation, which a re-run installs again
-    /// so the shard body derives the same identities as the inline render.
+    /// The identity of the shard invocation, which the browser sends back
+    /// with a re-render request so the shard body derives the same
+    /// identities as the inline render.
     identity: Identity,
     shard_id: ShardId,
     exprs: Vec<Js>,
@@ -72,9 +73,7 @@ impl NodeViewParts for ReactiveScope {
                     serde_json::to_string(&format!("{SHARD_ROUTE_PREFIX}/{shard_id}")).unwrap(),
                 )
                 .push_promoted_str_unescaped(&", ")
-                .push_string_unescaped(
-                    serde_json::to_string(&identity_to_wire(self.identity)).unwrap(),
-                )
+                .push_string_unescaped(serde_json::to_string(&self.identity.to_string()).unwrap())
                 .push_promoted_str_unescaped(&", [");
             let last = self.exprs.len().saturating_sub(1);
             for (index, expr) in self.exprs.iter().enumerate() {

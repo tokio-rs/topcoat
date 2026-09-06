@@ -6,6 +6,7 @@ use topcoat_core::{
     context::{Cx, request_context, try_request_context},
     error::Result,
 };
+use topcoat_view::identity::Identity;
 
 use crate::{Body, body_limit, error::bad_request, to_bytes};
 
@@ -326,4 +327,44 @@ pub fn content_type(cx: &Cx) -> Option<&str> {
 #[track_caller]
 pub fn extensions(cx: &Cx) -> &http::Extensions {
     &parts(cx).extensions
+}
+
+/// The header naming the identity a request's build starts at.
+pub const IDENTITY_HEADER: &str = "x-topcoat-identity";
+
+/// Returns the identity the current request's build starts at.
+///
+/// A client re-running part of a page names the identity of that part in
+/// the [`IDENTITY_HEADER`], so the server derives the same identities inside
+/// it as the render the client holds. A request without the header starts at
+/// [`Identity::ROOT`], like a page request.
+///
+/// # Errors
+///
+/// Errors with a `400 Bad Request` if the header is present but not an
+/// identity.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{
+///     Result, context::Cx, router::request::initial_identity, view::identity::Identity,
+/// };
+///
+/// async fn is_page_request(cx: &Cx) -> Result<bool> {
+///     Ok(initial_identity(cx)? == Identity::ROOT)
+/// }
+/// ```
+#[track_caller]
+pub fn initial_identity(cx: &Cx) -> Result<Identity> {
+    let Some(header) = headers(cx).get(IDENTITY_HEADER) else {
+        return Ok(Identity::ROOT);
+    };
+    header
+        .to_str()
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .ok_or_else(|| {
+            bad_request(format!("expected `{IDENTITY_HEADER}` to be an identity")).into()
+        })
 }

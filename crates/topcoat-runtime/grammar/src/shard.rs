@@ -109,9 +109,10 @@ impl ToTokens for Shard {
         // markers, where the browser attributes them to the shard.
         //
         // The invocation's identity travels to the browser on the scope
-        // marker and comes back with every re-render request, where the
-        // endpoint installs it again, so identities derived inside the
-        // shard body match between the inline render and a re-render.
+        // marker and comes back in the identity header of every re-render
+        // request, where the endpoint installs it again, so identities
+        // derived inside the shard body match between the inline render and
+        // a re-render.
         let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
         let marker = quote! {
             #(#docs)*
@@ -154,10 +155,10 @@ impl ToTokens for Shard {
         };
 
         // The trait implementation dispatching re-render requests to the
-        // handler: it deserializes the invocation identity, the surrogate
-        // argument tuple, and the signal values from the request body,
-        // installs the identity and the values, and forwards the arguments
-        // to the handler positionally.
+        // handler: it deserializes the surrogate argument tuple and the
+        // signal values from the request body, installs the values and the
+        // invocation identity from the request's identity header, and
+        // forwards the arguments to the handler positionally.
         let shard = quote! {
             impl #topcoat_runtime::Shard for #ident {
                 fn id(&self) -> #topcoat_runtime::ShardId {
@@ -175,7 +176,8 @@ impl ToTokens for Shard {
                         let #topcoat_router::content::Json(__request) =
                             <#topcoat_router::content::Json<#topcoat_runtime::ShardRequest<__Surrogate>> as #topcoat_router::request::FromRequest>
                                 ::from_request(cx, body).await?;
-                        let (__identity, __args, __signals) = __request.into_parts();
+                        let (__args, __signals) = __request.into_parts();
+                        let __identity = #topcoat_router::request::initial_identity(cx)?;
                         let (#(#value_idents,)*) =
                             #topcoat_runtime::Surrogate::into_real(__args);
                         // Signals created while the handler runs resume from

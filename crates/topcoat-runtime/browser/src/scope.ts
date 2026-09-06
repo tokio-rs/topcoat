@@ -172,8 +172,11 @@ export class ReactiveScope extends Scope {
 		try {
 			const res = await fetch(this.path, {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ identity: this.identity, args, signals }),
+				headers: {
+					"Content-Type": "application/json",
+					"X-Topcoat-Identity": this.identity,
+				},
+				body: JSON.stringify({ args, signals }),
 				signal: ac.signal,
 			});
 			if (!res.ok) {

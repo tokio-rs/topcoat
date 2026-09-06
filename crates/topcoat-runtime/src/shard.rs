@@ -1,52 +1,34 @@
 use std::{hash::Hash, pin::Pin};
 
-use serde::{Deserialize, Deserializer, de};
+use serde::Deserialize;
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
     Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId, RouterBuilder,
     response::IntoResponse,
 };
-use topcoat_view::{ViewHandle, identity::Identity};
+use topcoat_view::ViewHandle;
 
 use crate::SignalValues;
 
 pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/shards";
 
-/// Encodes an identity for the browser: its hash as fixed-width hex, which
-/// survives JSON where a 128 bit integer would not.
-pub(crate) fn identity_to_wire(identity: Identity) -> String {
-    format!("{:032x}", identity.hash())
-}
-
-/// Decodes an identity the browser sends back.
-fn identity_from_wire<'de, D>(deserializer: D) -> std::result::Result<Identity, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let hex = <&str>::deserialize(deserializer)?;
-    let hash = u128::from_str_radix(hex, 16)
-        .map_err(|_| de::Error::invalid_value(de::Unexpected::Str(hex), &"a hex identity"))?;
-    Ok(Identity::from_hash(hash))
-}
-
-/// The body of a request re-rendering a shard: the identity of the shard
-/// invocation being re-rendered, the current values of its arguments, and
-/// the current values of the signals its content created.
+/// The body of a request re-rendering a shard: the current values of its
+/// arguments and of the signals its content created.
+///
+/// The identity of the shard invocation travels separately, in the
+/// request's identity header.
 #[derive(Debug, Deserialize)]
 pub struct ShardRequest<A> {
-    #[serde(deserialize_with = "identity_from_wire")]
-    identity: Identity,
     args: A,
     #[serde(default)]
     signals: SignalValues,
 }
 
 impl<A> ShardRequest<A> {
-    /// Splits the request into the identity to install, the arguments to
-    /// hand the shard body, and the signal values to register on its
-    /// request context.
-    pub fn into_parts(self) -> (Identity, A, SignalValues) {
-        (self.identity, self.args, self.signals)
+    /// Splits the request into the arguments to hand the shard body and the
+    /// signal values to register on its request context.
+    pub fn into_parts(self) -> (A, SignalValues) {
+        (self.args, self.signals)
     }
 }
 

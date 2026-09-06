@@ -11,9 +11,9 @@ afterEach(() => {
 });
 
 function mount(status: number, statusText: string) {
-	let requestBody: string | undefined;
+	let request: RequestInit | undefined;
 	globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
-		requestBody = init?.body as string | undefined;
+		request = init;
 		return new Response("", { status, statusText });
 	}) as typeof fetch;
 
@@ -52,12 +52,12 @@ function mount(status: number, statusText: string) {
 		removed,
 		runtime,
 		scope,
-		requestBody: () => requestBody,
+		request: () => request,
 	};
 }
 
-it("sends the identity, the arguments, and the values of the signals its content owns", async () => {
-	const { fetchAndReplace, runtime, scope, requestBody } = mount(
+it("sends the identity in a header and the arguments and signal values in the body", async () => {
+	const { fetchAndReplace, runtime, scope, request } = mount(
 		500,
 		"Internal Server Error",
 	);
@@ -66,8 +66,9 @@ it("sends the identity, the arguments, and the values of the signals its content
 
 	await fetchAndReplace().catch(() => undefined);
 
-	expect(JSON.parse(requestBody() ?? "")).toEqual({
-		identity: "0",
+	const headers = request()?.headers as Record<string, string>;
+	expect(headers["X-Topcoat-Identity"]).toBe("0");
+	expect(JSON.parse(request()?.body as string)).toEqual({
 		args: [],
 		signals: { s1: 3 },
 	});
