@@ -1,13 +1,48 @@
 use std::{hash::Hash, pin::Pin};
 
+use serde::{Deserialize, Deserializer, de};
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
     Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId, RouterBuilder,
     response::IntoResponse,
 };
-use topcoat_view::ViewHandle;
+use topcoat_view::{ViewHandle, identity::Identity};
 
 pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/shards";
+
+/// Encodes an identity for the browser: its hash as fixed-width hex, which
+/// survives JSON where a 128 bit integer would not.
+pub(crate) fn identity_to_wire(identity: Identity) -> String {
+    format!("{:032x}", identity.hash())
+}
+
+/// Decodes an identity the browser sends back.
+fn identity_from_wire<'de, D>(deserializer: D) -> std::result::Result<Identity, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let hex = <&str>::deserialize(deserializer)?;
+    let hash = u128::from_str_radix(hex, 16)
+        .map_err(|_| de::Error::invalid_value(de::Unexpected::Str(hex), &"a hex identity"))?;
+    Ok(Identity::from_hash(hash))
+}
+
+/// The body of a request re-rendering a shard: the identity of the shard
+/// invocation being re-rendered and the current values of its arguments.
+#[derive(Debug, Deserialize)]
+pub struct ShardRequest<A> {
+    #[serde(deserialize_with = "identity_from_wire")]
+    identity: Identity,
+    args: A,
+}
+
+impl<A> ShardRequest<A> {
+    /// Splits the request into the identity to install and the arguments to
+    /// hand the shard body.
+    pub fn into_parts(self) -> (Identity, A) {
+        (self.identity, self.args)
+    }
+}
 
 /// The identity of a shard, stable across the server and the client runtime.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]

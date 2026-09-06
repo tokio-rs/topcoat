@@ -133,29 +133,38 @@ impl<T> Serialize for SignalSurrogate<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::panic::Location;
+
     use super::*;
+    use crate::SignalId;
+
+    /// Builds a signal surrogate around a fresh signal holding `value`.
+    #[track_caller]
+    fn surrogate<T>(value: T) -> SignalSurrogate<T> {
+        SignalSurrogate::new(Signal::new(SignalId::derive(Location::caller()), value))
+    }
 
     #[test]
     #[should_panic(expected = "cannot be run server-side")]
     fn toggle_panics_server_side() {
-        SignalSurrogate::new(Signal::new(false)).toggle();
+        surrogate(false).toggle();
     }
 
     #[test]
     #[should_panic(expected = "cannot be run server-side")]
     fn increment_panics_server_side() {
-        SignalSurrogate::new(Signal::new(0.0)).increment();
+        surrogate(0.0).increment();
     }
 
     #[test]
     #[should_panic(expected = "cannot be run server-side")]
     fn decrement_panics_server_side() {
-        SignalSurrogate::new(Signal::new(0.0)).decrement();
+        surrogate(0.0).decrement();
     }
 
     #[test]
     #[should_panic(expected = "cannot be run server-side")]
     fn push_str_panics_server_side() {
-        SignalSurrogate::new(Signal::new(String::new())).push_str(StrSurrogate::ref_cast(""));
+        surrogate(String::new()).push_str(StrSurrogate::ref_cast(""));
     }
 }

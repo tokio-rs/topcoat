@@ -126,6 +126,21 @@ impl Identity {
         self.hash
     }
 
+    /// Rebuilds an identity from its hash.
+    ///
+    /// The result carries no ambiguity: a hash is only worth carrying
+    /// forward once its identity was consumed, which an ambiguous identity
+    /// refuses. This is the door for re-entering a subtree in another
+    /// request at an identity captured earlier, for example one a client
+    /// sends back.
+    #[must_use]
+    pub const fn from_hash(hash: u128) -> Self {
+        Self {
+            hash,
+            ambiguity: None,
+        }
+    }
+
     /// Derives the identity of a child invocation at `site`.
     ///
     /// An ambiguity on `self` carries over to the child.
@@ -235,6 +250,16 @@ mod tests {
         assert_eq!(Identity::ROOT.child(SITE_A), Identity::ROOT.child(SITE_A));
         assert_ne!(Identity::ROOT.child(SITE_A), Identity::ROOT.child(SITE_B));
         assert_ne!(Identity::ROOT.child(SITE_A), Identity::ROOT);
+    }
+
+    #[test]
+    fn a_hash_round_trips_through_from_hash() {
+        let identity = Identity::ROOT.child(SITE_A).keyed_child(SITE_B, 3);
+        assert_eq!(Identity::from_hash(identity.hash()), identity);
+        assert_eq!(
+            Identity::from_hash(identity.hash()).child(SITE_A),
+            identity.child(SITE_A),
+        );
     }
 
     #[test]

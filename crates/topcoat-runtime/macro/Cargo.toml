@@ -25,8 +25,9 @@ quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["runtime", "view"] }
+topcoat = { workspace = true, features = ["router", "runtime", "view"] }
 
+http.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints]

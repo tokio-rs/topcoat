@@ -12,6 +12,12 @@ export type CommentMarker =
 			kind: "scope-start";
 			id: ReactiveScopeId;
 			path: string;
+			/**
+			 * The identity of the shard invocation, sent back with every
+			 * re-render request so the server derives the same identities
+			 * inside the shard as it did for the inline render.
+			 */
+			identity: string;
 			exprs: string[];
 	  }
 	| { kind: "scope-end"; id: ReactiveScopeId };
@@ -20,7 +26,7 @@ const SIGNAL_RE = /^\s*::topcoat::signal\(([\s\S]*)\)\s*$/;
 const EXPR_START_RE = /^\s*::topcoat::expr::start\("([^"]*)"\)\s*$/;
 const EXPR_END_RE = /^\s*::topcoat::expr::end\s*$/;
 const SCOPE_START_RE =
-	/^\s*::topcoat::scope::start\(("[^"]+"), ("[^"]*"), (\[[\s\S]*\])\)\s*$/;
+	/^\s*::topcoat::scope::start\(("[^"]+"), ("[^"]*"), ("[^"]*"), (\[[\s\S]*\])\)\s*$/;
 const SCOPE_END_RE = /^\s*::topcoat::scope::end\(("[^"]+")\)\s*$/;
 const QUOTED_RE = /"([^"]*)"/g;
 
@@ -64,15 +70,16 @@ export function parseComment(node: Comment): CommentMarker | null {
 	if (start) {
 		const exprs: string[] = [];
 		QUOTED_RE.lastIndex = 0;
-		let m: RegExpExecArray | null = QUOTED_RE.exec(start[3] ?? "");
+		let m: RegExpExecArray | null = QUOTED_RE.exec(start[4] ?? "");
 		while (m !== null) {
 			exprs.push(decodeHtml(m[1] ?? ""));
-			m = QUOTED_RE.exec(start[3] ?? "");
+			m = QUOTED_RE.exec(start[4] ?? "");
 		}
 		return {
 			kind: "scope-start",
 			id: JSON.parse(start[1] ?? "") as ReactiveScopeId,
 			path: JSON.parse(start[2] ?? "") as string,
+			identity: JSON.parse(start[3] ?? "") as string,
 			exprs,
 		};
 	}

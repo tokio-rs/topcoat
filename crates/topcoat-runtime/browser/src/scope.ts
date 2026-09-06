@@ -84,6 +84,7 @@ export class ReactiveScope extends Scope {
 		runtime: Runtime,
 		readonly scopeId: ReactiveScopeId,
 		readonly path: string,
+		readonly identity: string,
 		exprs: string[],
 		readonly startNode: Comment,
 	) {
@@ -150,7 +151,7 @@ export class ReactiveScope extends Scope {
 			const res = await fetch(this.path, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(args),
+				body: JSON.stringify({ identity: this.identity, args }),
 				signal: ac.signal,
 			});
 			if (!res.ok) {

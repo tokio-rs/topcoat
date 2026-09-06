@@ -1,32 +1,63 @@
-use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashSet,
+    panic::Location,
+    sync::{Mutex, PoisonError},
+};
+
+use serde::Serialize;
 use topcoat_core::context::{Cx, request_arena};
-use topcoat_view::hoist;
-use uuid::Uuid;
+use topcoat_view::{
+    hoist,
+    identity::{Identity, SiteKey},
+};
 
 use crate::Surrogated;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct SignalId(Uuid);
+/// The identity of a signal, shared by the server and the browser runtime.
+///
+/// An id is derived from the identity of the component body that created
+/// the signal and the location of the `signal` call inside it, so the same
+/// call reached through the same chain of invocations produces the same id
+/// on every render.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SignalId(u128);
 
 impl SignalId {
-    #[inline]
-    #[must_use]
-    pub fn new() -> Self {
-        Self(Uuid::new_v4())
-    }
-}
-
-impl Default for SignalId {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
+    /// Derives the id of the signal created at `location` inside the running
+    /// component body.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the running body's identity is ambiguous, meaning an
+    /// invocation on the chain above it repeats without a `key` argument.
+    #[track_caller]
+    pub(crate) fn derive(location: &Location<'_>) -> Self {
+        Self(
+            Identity::current()
+                .child(SiteKey::from_location(location))
+                .hash(),
+        )
     }
 }
 
 impl std::fmt::Display for SignalId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        write!(f, "{:032x}", self.0)
+    }
+}
+
+/// The ids of every signal created during one request, kept to catch a call
+/// site that runs more than once under the same identity.
+#[derive(Debug, Default)]
+struct SignalIds(Mutex<HashSet<SignalId>>);
+
+impl SignalIds {
+    /// Records `id`, returning whether it is new to this request.
+    fn insert(&self, id: SignalId) -> bool {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(id)
     }
 }
 
@@ -46,11 +77,8 @@ pub struct Signal<T> {
 
 impl<T> Signal<T> {
     #[inline]
-    pub(crate) fn new(value: T) -> Self {
-        Self {
-            id: SignalId::new(),
-            value,
-        }
+    pub(crate) fn new(id: SignalId, value: T) -> Self {
+        Self { id, value }
     }
 
     pub(crate) fn id(&self) -> SignalId {
@@ -151,16 +179,34 @@ where
 /// creates it, and is available to every runtime expression in that body's
 /// view, including the components it renders.
 ///
+/// A signal's identity comes from the body that creates it and the location
+/// of the call, so the same call reached the same way is the same signal on
+/// every render. A body that renders repeatedly, such as a component
+/// invoked in a `for` loop, needs a `key` argument on the invocation to tell
+/// the repetitions' signals apart, and one body must not create two signals
+/// from the same call site.
+///
 /// # Panics
 ///
 /// Panics when called outside a page, layout, component, or shard body,
-/// including from work such a body spawns onto another task.
+/// including from work such a body spawns onto another task; when the
+/// enclosing body's identity is ambiguous because an invocation above it
+/// repeats without a `key`; and when the same call site creates a second
+/// signal under the same identity within one request.
 #[track_caller]
 pub fn signal<T>(cx: &Cx, init: impl FnOnce() -> T) -> &Signal<T>
 where
     T: SignalValue + Send + Sync + 'static,
 {
-    let signal = request_arena(cx).alloc(Signal::new(init()));
+    let location = Location::caller();
+    let id = SignalId::derive(location);
+    let arena = request_arena(cx);
+    assert!(
+        arena.get_or_default::<SignalIds>().insert(id),
+        "the signal created at {location} already exists in this request; a call site that \
+         runs more than once needs a `key` on the component invocation enclosing it"
+    );
+    let signal = arena.alloc(Signal::new(id, init()));
     let declaration = signal.declaration();
     hoist(move |parts| {
         parts.push_comment(|comment| {
@@ -183,9 +229,17 @@ mod tests {
         task::{Context, Poll, Waker},
     };
 
-    use topcoat::view::{HoistView, ViewExt, internal::ThenView, view};
+    use topcoat::view::{
+        HoistView, ViewExt,
+        identity::{IdentityGuard, IdentityView},
+        internal::ThenView,
+        view,
+    };
 
     use super::*;
+
+    const SITE_A: SiteKey = SiteKey::new(file!(), line!(), column!(), 0);
+    const SITE_B: SiteKey = SiteKey::new(file!(), line!(), column!(), 0);
 
     /// Drives a future that never yields to completion.
     fn block_on<F: Future>(future: F) -> F::Output {
@@ -209,12 +263,80 @@ mod tests {
         block_on(view.single()).unwrap().render(cx)
     }
 
+    /// Renders a body creating one signal under the component identity at
+    /// `site`, returning the signal's id.
+    fn signal_id_at(site: SiteKey) -> SignalId {
+        let cx = &Cx::default();
+        let identity = IdentityGuard::enter(site).identity();
+        let view = IdentityView::new(
+            identity,
+            HoistView::new(ThenView::new(async move {
+                let signal = signal(cx, || 0.0_f64);
+                Ok(view! { cx => <p>(signal.id().to_string())</p> })
+            })),
+        );
+        let html = block_on(view.single()).unwrap().render(cx);
+        let start = html.find("<p>").unwrap() + 3;
+        let end = html.rfind("</p>").unwrap();
+        SignalId(u128::from_str_radix(&html[start..end], 16).unwrap())
+    }
+
     #[test]
     fn creating_a_signal_outside_a_body_panics() {
         let cx = Cx::default();
         let panic = catch_unwind(AssertUnwindSafe(|| signal(&cx, || 0.0_f64))).unwrap_err();
         let message = panic.downcast::<&str>().expect("panics with a message");
         assert!(message.contains("no view is collecting hoisted parts"));
+    }
+
+    #[test]
+    fn the_same_call_site_renders_the_same_id_every_time() {
+        assert_eq!(render_with_signal("x"), render_with_signal("x"));
+        assert_eq!(signal_id_at(SITE_A), signal_id_at(SITE_A));
+    }
+
+    #[test]
+    fn distinct_call_sites_render_distinct_ids() {
+        let cx = &Cx::default();
+        let view = HoistView::new(ThenView::new(async move {
+            let first = signal(cx, || 0.0_f64);
+            let second = signal(cx, || 0.0_f64);
+            assert_ne!(first.id(), second.id());
+            Ok(view! { cx => <p></p> })
+        }));
+        block_on(view.single()).unwrap();
+    }
+
+    #[test]
+    fn distinct_identities_render_distinct_ids() {
+        assert_ne!(signal_id_at(SITE_A), signal_id_at(SITE_B));
+    }
+
+    #[test]
+    fn a_call_site_that_repeats_within_a_request_panics() {
+        let cx = &Cx::default();
+        let view = HoistView::new(ThenView::new(async move {
+            for _ in 0..2 {
+                signal(cx, || 0.0_f64);
+            }
+            Ok(view! { cx => <p></p> })
+        }));
+        let panic = catch_unwind(AssertUnwindSafe(|| block_on(view.single()))).unwrap_err();
+        let message = panic.downcast::<String>().expect("panics with a message");
+        assert!(
+            message.contains("already exists in this request"),
+            "{message}"
+        );
+        assert!(message.contains(file!()), "{message}");
+    }
+
+    #[test]
+    fn an_ambiguous_identity_panics() {
+        let cx = Cx::default();
+        let _guard = IdentityGuard::enter_ambiguous(SITE_A, "`card` at src/a.rs:1");
+        let panic = catch_unwind(AssertUnwindSafe(|| signal(&cx, || 0.0_f64))).unwrap_err();
+        let message = panic.downcast::<String>().expect("panics with a message");
+        assert!(message.contains("`card` at src/a.rs:1"), "{message}");
     }
 
     #[test]

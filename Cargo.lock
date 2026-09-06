@@ -3183,6 +3183,7 @@ dependencies = [
 name = "topcoat-runtime-macro"
 version = "0.7.0"
 dependencies = [
+ "http",
  "quote",
  "syn",
  "tokio",

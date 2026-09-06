@@ -33,6 +33,7 @@ function mount(status: number, statusText: string) {
 		runtime,
 		"scope",
 		"/_topcoat/shards/1",
+		"0",
 		[],
 		start,
 	);
