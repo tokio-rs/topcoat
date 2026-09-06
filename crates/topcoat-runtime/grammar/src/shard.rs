@@ -154,9 +154,10 @@ impl ToTokens for Shard {
         };
 
         // The trait implementation dispatching re-render requests to the
-        // handler: it deserializes the invocation identity and the surrogate
-        // argument tuple from the request body, installs the identity, and
-        // forwards the arguments to the handler positionally.
+        // handler: it deserializes the invocation identity, the surrogate
+        // argument tuple, and the signal values from the request body,
+        // installs the identity and the values, and forwards the arguments
+        // to the handler positionally.
         let shard = quote! {
             impl #topcoat_runtime::Shard for #ident {
                 fn id(&self) -> #topcoat_runtime::ShardId {
@@ -174,9 +175,12 @@ impl ToTokens for Shard {
                         let #topcoat_router::content::Json(__request) =
                             <#topcoat_router::content::Json<#topcoat_runtime::ShardRequest<__Surrogate>> as #topcoat_router::request::FromRequest>
                                 ::from_request(cx, body).await?;
-                        let (__identity, __args) = __request.into_parts();
+                        let (__identity, __args, __signals) = __request.into_parts();
                         let (#(#value_idents,)*) =
                             #topcoat_runtime::Surrogate::into_real(__args);
+                        // Signals created while the handler runs resume from
+                        // the values the client sent.
+                        let cx = &cx.with(__signals);
                         // The handler's view is the outermost view of this
                         // request's build, so its content is self-contained.
                         let __view = #topcoat_view::HoistView::new(

@@ -1,24 +1,25 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     panic::Location,
     sync::{Mutex, PoisonError},
 };
 
-use serde::Serialize;
-use topcoat_core::context::{Cx, request_arena};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
+use topcoat_core::context::{Cx, request_arena, try_request_context};
 use topcoat_view::{
     hoist,
     identity::{Identity, SiteKey},
 };
 
-use crate::Surrogated;
+use crate::{Surrogate, Surrogated};
 
 /// The identity of a signal, shared by the server and the browser runtime.
 ///
 /// An id is derived from the identity of the component body that created
 /// the signal and the location of the `signal` call inside it, so the same
 /// call reached through the same chain of invocations produces the same id
-/// on every render.
+/// on every render. On the wire it is the hash as fixed-width hex, which
+/// survives JSON where a 128 bit integer would not.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SignalId(u128);
 
@@ -46,18 +47,51 @@ impl std::fmt::Display for SignalId {
     }
 }
 
+impl Serialize for SignalId {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for SignalId {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let hex = <&str>::deserialize(deserializer)?;
+        u128::from_str_radix(hex, 16).map(Self).map_err(|_| {
+            serde::de::Error::invalid_value(serde::de::Unexpected::Str(hex), &"a hex signal id")
+        })
+    }
+}
+
 /// The ids of every signal created during one request, kept to catch a call
 /// site that runs more than once under the same identity.
 #[derive(Debug, Default)]
-struct SignalIds(Mutex<HashSet<SignalId>>);
+struct CreatedSignals(Mutex<HashSet<SignalId>>);
 
-impl SignalIds {
+impl CreatedSignals {
     /// Records `id`, returning whether it is new to this request.
     fn insert(&self, id: SignalId) -> bool {
         self.0
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(id)
+    }
+}
+
+/// The current values of signals a client sends along with a run, keyed by
+/// signal id.
+///
+/// Registered on the request context of a run that resumes state, such as
+/// a shard re-render: [`signal`] picks up the value stored under its id
+/// instead of computing a fresh one. The values are chosen by the client,
+/// so a value that does not fit the signal's type is ignored.
+#[derive(Debug, Default, Deserialize)]
+#[serde(transparent)]
+pub struct SignalValues(HashMap<SignalId, serde_json::Value>);
+
+impl SignalValues {
+    /// The value carried for `id`, if any.
+    fn get(&self, id: SignalId) -> Option<&serde_json::Value> {
+        self.0.get(&id)
     }
 }
 
@@ -101,14 +135,14 @@ impl<T> Signal<T> {
             V: ?Sized,
         {
             t: &'static str,
-            id: std::string::String,
+            id: SignalId,
             v: &'a V,
         }
 
         let value = self.value.surrogate();
         let declaration = Declaration {
             t: "signal",
-            id: self.id.to_string(),
+            id: self.id,
             v: &value,
         };
         serde_json::to_string(&declaration).expect("failed to serialize signal declaration")
@@ -125,11 +159,12 @@ where
 }
 
 /// A value a signal can hold: one of the runtime's vocabulary types, which
-/// can be serialized into the page for the browser to pick up.
+/// can be serialized into the page for the browser to pick up and read back
+/// from what the browser sends.
 ///
-/// Implemented for every type whose reference has a serializable surrogate;
+/// Implemented for every type whose surrogate serializes and deserializes;
 /// there is nothing to implement by hand.
-pub trait SignalValue {
+pub trait SignalValue: Sized {
     /// The serializable surrogate of a borrowed value.
     type Surrogate<'a>: Serialize
     where
@@ -137,10 +172,16 @@ pub trait SignalValue {
 
     /// Borrows the value as its surrogate.
     fn surrogate(&self) -> Self::Surrogate<'_>;
+
+    /// Reads a value back from the surrogate a client sent, or `None` if
+    /// the surrogate does not fit this type.
+    fn from_value(value: &serde_json::Value) -> Option<Self>;
 }
 
 impl<T> SignalValue for T
 where
+    T: Surrogated,
+    T::Surrogate: DeserializeOwned,
     for<'a> &'a T: Surrogated,
     for<'a> <&'a T as Surrogated>::Surrogate: Serialize,
 {
@@ -152,6 +193,10 @@ where
     fn surrogate(&self) -> Self::Surrogate<'_> {
         self.into_surrogate()
     }
+
+    fn from_value(value: &serde_json::Value) -> Option<Self> {
+        T::Surrogate::deserialize(value).ok().map(Surrogate::into_real)
+    }
 }
 
 /// Creates a signal holding the value `init` returns.
@@ -160,6 +205,12 @@ where
 /// signal's initial state in the browser. The signal lives on the request,
 /// so the returned reference is valid for the rest of it: capture the signal
 /// in as many runtime expressions as needed, or pass it on to components.
+///
+/// A run that resumes state, such as a shard re-render, carries the current
+/// values of the signals the client holds. When one of them is this
+/// signal's, the signal starts from that value and `init` does not run, so
+/// state created inside a shard survives its re-renders. The client chooses
+/// those values: treat them as untrusted, like shard arguments.
 ///
 /// ```rust
 /// use topcoat::{Result, context::Cx, runtime::signal, view::*};
@@ -202,11 +253,15 @@ where
     let id = SignalId::derive(location);
     let arena = request_arena(cx);
     assert!(
-        arena.get_or_default::<SignalIds>().insert(id),
+        arena.get_or_default::<CreatedSignals>().insert(id),
         "the signal created at {location} already exists in this request; a call site that \
          runs more than once needs a `key` on the component invocation enclosing it"
     );
-    let signal = arena.alloc(Signal::new(id, init()));
+    let value = try_request_context::<SignalValues>(cx)
+        .and_then(|values| values.get(id))
+        .and_then(T::from_value)
+        .unwrap_or_else(init);
+    let signal = arena.alloc(Signal::new(id, value));
     let declaration = signal.declaration();
     hoist(move |parts| {
         parts.push_comment(|comment| {
@@ -226,6 +281,10 @@ mod tests {
     use std::{
         panic::{AssertUnwindSafe, catch_unwind},
         pin::pin,
+        sync::{
+            Arc, OnceLock,
+            atomic::{AtomicBool, Ordering},
+        },
         task::{Context, Poll, Waker},
     };
 
@@ -337,6 +396,56 @@ mod tests {
         let panic = catch_unwind(AssertUnwindSafe(|| signal(&cx, || 0.0_f64))).unwrap_err();
         let message = panic.downcast::<String>().expect("panics with a message");
         assert!(message.contains("`card` at src/a.rs:1"), "{message}");
+    }
+
+    /// Renders a body creating one number signal with an initial value of
+    /// one, returning the signal's id and value and whether `init` ran.
+    fn number_signal(cx: &Cx) -> (SignalId, f64, bool) {
+        let seen = Arc::new(OnceLock::new());
+        let out = Arc::clone(&seen);
+        let view = HoistView::new(ThenView::new(async move {
+            let init_ran = AtomicBool::new(false);
+            let signal = signal(cx, || {
+                init_ran.store(true, Ordering::Relaxed);
+                1.0_f64
+            });
+            out.set((signal.id(), *signal.read(), init_ran.load(Ordering::Relaxed)))
+                .unwrap();
+            Ok(view! { cx => <p></p> })
+        }));
+        block_on(view.single()).unwrap();
+        *seen.get().unwrap()
+    }
+
+    /// A context carrying `value` for the signal `id`.
+    fn cx_carrying(id: SignalId, value: serde_json::Value) -> Cx {
+        Cx::default().with(SignalValues(HashMap::from([(id, value)])))
+    }
+
+    #[test]
+    fn a_signal_resumes_from_the_value_the_request_carries() {
+        let (id, value, init_ran) = number_signal(&Cx::default());
+        assert_eq!((value, init_ran), (1.0, true));
+
+        let cx = cx_carrying(id, serde_json::json!(5.0));
+        assert_eq!(number_signal(&cx), (id, 5.0, false));
+    }
+
+    #[test]
+    fn a_value_that_does_not_fit_the_signal_is_ignored() {
+        let (id, ..) = number_signal(&Cx::default());
+
+        let cx = cx_carrying(id, serde_json::json!("five"));
+        assert_eq!(number_signal(&cx), (id, 1.0, true));
+    }
+
+    #[test]
+    fn an_id_round_trips_through_json_as_hex() {
+        let id = SignalId(0x1234_abcd);
+        let json = serde_json::to_string(&id).unwrap();
+        assert_eq!(json, format!("\"{:032x}\"", 0x1234_abcd_u128));
+        assert_eq!(serde_json::from_str::<SignalId>(&json).unwrap(), id);
+        assert!(serde_json::from_str::<SignalId>("\"zz\"").is_err());
     }
 
     #[test]

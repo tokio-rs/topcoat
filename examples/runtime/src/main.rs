@@ -1,4 +1,5 @@
 mod counter;
+mod shard_state;
 mod show;
 
 use topcoat::{
@@ -42,6 +43,8 @@ async fn layout(slot: Slot<'_>) -> Result<impl View> {
                     <a href=(href!(counter::page))>"counter"</a>
                     " | "
                     <a href=(href!(show::page))>"show"</a>
+                    " | "
+                    <a href=(href!(shard_state::page))>"shard state"</a>
                 </nav>
 
                 <hr>

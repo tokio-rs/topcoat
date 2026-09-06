@@ -8,6 +8,8 @@ use topcoat_router::{
 };
 use topcoat_view::{ViewHandle, identity::Identity};
 
+use crate::SignalValues;
+
 pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/shards";
 
 /// Encodes an identity for the browser: its hash as fixed-width hex, which
@@ -28,19 +30,23 @@ where
 }
 
 /// The body of a request re-rendering a shard: the identity of the shard
-/// invocation being re-rendered and the current values of its arguments.
+/// invocation being re-rendered, the current values of its arguments, and
+/// the current values of the signals its content created.
 #[derive(Debug, Deserialize)]
 pub struct ShardRequest<A> {
     #[serde(deserialize_with = "identity_from_wire")]
     identity: Identity,
     args: A,
+    #[serde(default)]
+    signals: SignalValues,
 }
 
 impl<A> ShardRequest<A> {
-    /// Splits the request into the identity to install and the arguments to
-    /// hand the shard body.
-    pub fn into_parts(self) -> (Identity, A) {
-        (self.identity, self.args)
+    /// Splits the request into the identity to install, the arguments to
+    /// hand the shard body, and the signal values to register on its
+    /// request context.
+    pub fn into_parts(self) -> (Identity, A, SignalValues) {
+        (self.identity, self.args, self.signals)
     }
 }
 

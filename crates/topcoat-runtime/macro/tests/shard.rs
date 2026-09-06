@@ -62,10 +62,13 @@ fn endpoint_cx() -> Cx {
     CxTestBuilder::new().request_context(parts).build()
 }
 
-/// Renders the shard through its endpoint at `identity`.
-async fn rerender(identity: &str) -> String {
+/// Renders the shard through its endpoint at `identity`, carrying the JSON
+/// object `signals` of signal values.
+async fn rerender(identity: &str, signals: &str) -> String {
     let cx = &endpoint_cx();
-    let body = Body::from(format!(r#"{{"identity":"{identity}","args":["a"]}}"#));
+    let body = Body::from(format!(
+        r#"{{"identity":"{identity}","args":["a"],"signals":{signals}}}"#
+    ));
     stateful.render(cx, body).await.unwrap().render(cx)
 }
 
@@ -80,7 +83,7 @@ async fn a_rerender_derives_the_same_signal_id_as_the_inline_render() {
         "{inline}"
     );
 
-    let rerendered = rerender(identity).await;
+    let rerendered = rerender(identity, "{}").await;
 
     assert_eq!(
         last_signal_id(&rerendered),
@@ -90,11 +93,25 @@ async fn a_rerender_derives_the_same_signal_id_as_the_inline_render() {
 }
 
 #[tokio::test]
+async fn a_rerender_resumes_signals_from_the_values_it_carries() {
+    let cx = &Cx::default();
+    let inline = view! { cx => host() }.single().await.unwrap().render(cx);
+    let (_, identity) = scope_marker(&inline);
+    let id = last_signal_id(&inline);
+    assert!(inline.contains("&quot;v&quot;:0.0"), "{inline}");
+
+    let rerendered = rerender(identity, &format!(r#"{{"{id}":7.0}}"#)).await;
+
+    assert!(rerendered.contains("&quot;v&quot;:7.0"), "{rerendered}");
+    assert!(rerendered.contains(" 7</p>"), "{rerendered}");
+}
+
+#[tokio::test]
 async fn a_rerender_at_another_identity_derives_another_signal_id() {
     let cx = &Cx::default();
     let inline = view! { cx => host() }.single().await.unwrap().render(cx);
 
-    let rerendered = rerender(&"0".repeat(32)).await;
+    let rerendered = rerender(&"0".repeat(32), "{}").await;
 
     assert_ne!(
         last_signal_id(&rerendered),

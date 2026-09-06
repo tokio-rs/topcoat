@@ -37,6 +37,25 @@ export class Scope {
 		return scoped(fn, this.mScope) as T;
 	}
 
+	/**
+	 * Collects the current values of the signals this scope and its
+	 * descendants own, dehydrated for the server, keyed by signal id.
+	 */
+	collectSignalValues(
+		into: Record<SignalId, unknown> = {},
+	): Record<SignalId, unknown> {
+		for (const id of this.signalIds) {
+			const value = this.runtime.registry.read(id) as
+				| { dehydrate?: () => unknown }
+				| undefined;
+			if (typeof value?.dehydrate === "function") {
+				into[id] = value.dehydrate();
+			}
+		}
+		for (const child of this.children) child.collectSignalValues(into);
+		return into;
+	}
+
 	dispose(): void {
 		if (this.disposed) return;
 		this.disposed = true;
@@ -140,18 +159,21 @@ export class ReactiveScope extends Scope {
 		this.abortController = ac;
 
 		const { context } = this.runtime;
-		const args = untrack(() =>
-			this.computes.map((compute) =>
+		// The signals the current content created travel with the request,
+		// so the server resumes them instead of starting them over.
+		const { args, signals } = untrack(() => ({
+			args: this.computes.map((compute) =>
 				(compute(context) as { dehydrate: () => unknown }).dehydrate(),
 			),
-		);
+			signals: this.contentScope.collectSignalValues(),
+		}));
 
 		let html: string;
 		try {
 			const res = await fetch(this.path, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ identity: this.identity, args }),
+				body: JSON.stringify({ identity: this.identity, args, signals }),
 				signal: ac.signal,
 			});
 			if (!res.ok) {
