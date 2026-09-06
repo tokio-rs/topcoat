@@ -29,8 +29,9 @@ mod key;
 mod site;
 mod view;
 
-use std::{cell::Cell, fmt, num::ParseIntError, str::FromStr};
+use std::{cell::Cell, fmt, str::FromStr};
 
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 pub use guard::*;
 pub use key::*;
 pub use site::*;
@@ -189,30 +190,45 @@ impl Identity {
     }
 }
 
-/// Writes the identity's hash as 32 hex digits, the form it takes on the
-/// wire.
+/// Writes the identity's hash as 22 characters of URL-safe base64, the form
+/// it takes on the wire.
 impl fmt::Display for Identity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:032x}", self.hash)
+        f.write_str(&URL_SAFE_NO_PAD.encode(self.hash.to_be_bytes()))
     }
 }
 
-/// Parses an identity from its hex hash, as written by `Display`.
+/// Parses an identity from its hash, as written by `Display`.
 ///
 /// The result carries no ambiguity: a hash is only worth carrying forward
 /// once its identity was consumed, which an ambiguous identity refuses.
 /// This is the door for re-entering a subtree in another request at an
 /// identity captured earlier, for example one a client sends back.
 impl FromStr for Identity {
-    type Err = ParseIntError;
+    type Err = ParseIdentityError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = URL_SAFE_NO_PAD.decode(s).map_err(|_| ParseIdentityError)?;
+        let hash = <[u8; 16]>::try_from(bytes).map_err(|_| ParseIdentityError)?;
         Ok(Self {
-            hash: u128::from_str_radix(s, 16)?,
+            hash: u128::from_be_bytes(hash),
             ambiguity: None,
         })
     }
 }
+
+/// Error returned when parsing an identity from a string that is not the
+/// wire form `Display` writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParseIdentityError;
+
+impl fmt::Display for ParseIdentityError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("expected an identity: 16 bytes of URL-safe base64 without padding")
+    }
+}
+
+impl std::error::Error for ParseIdentityError {}
 
 /// Error returned by [`Identity::try_current`] when the identity is
 /// poisoned by an invocation that repeats without a `key` argument.
@@ -263,16 +279,25 @@ mod tests {
     }
 
     #[test]
-    fn an_identity_round_trips_through_its_hex_form() {
+    fn an_identity_round_trips_through_its_wire_form() {
         let identity = Identity::ROOT.child(SITE_A).keyed_child(SITE_B, 3);
-        let hex = identity.to_string();
-        assert_eq!(hex.len(), 32);
-        assert_eq!(hex.parse::<Identity>().unwrap(), identity);
+        let wire = identity.to_string();
+        assert_eq!(wire.len(), 22);
+        assert!(
+            wire.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        );
+        assert_eq!(wire.parse::<Identity>().unwrap(), identity);
         assert_eq!(
-            hex.parse::<Identity>().unwrap().child(SITE_A),
+            wire.parse::<Identity>().unwrap().child(SITE_A),
             identity.child(SITE_A),
         );
-        assert!("not hex".parse::<Identity>().is_err());
+        assert_eq!(
+            Identity::ROOT.to_string().parse::<Identity>().unwrap(),
+            Identity::ROOT
+        );
+        assert_eq!("not base64".parse::<Identity>(), Err(ParseIdentityError));
+        assert_eq!("AAAA".parse::<Identity>(), Err(ParseIdentityError));
     }
 
     #[test]

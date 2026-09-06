@@ -18,6 +18,8 @@ http = [
 [dependencies]
 topcoat-core.workspace = true
 
+base64.workspace = true
+
 futures-core.workspace = true
 futures-util.workspace = true
 http = { workspace = true, optional = true }

@@ -2,7 +2,7 @@
 //! through its endpoint.
 //!
 //! The scope marker names the identity of the shard invocation, the browser
-//! posts it back with the arguments, and the endpoint installs it before
+//! sends it back in a header, and the endpoint installs it before
 //! running the shard body, so a signal created inside the body has the same
 //! id on both paths.
 
@@ -111,7 +111,7 @@ async fn a_rerender_at_another_identity_derives_another_signal_id() {
     let cx = &Cx::default();
     let inline = view! { cx => host() }.single().await.unwrap().render(cx);
 
-    let rerendered = rerender(&"0".repeat(32), "{}").await;
+    let rerendered = rerender(&"A".repeat(22), "{}").await;
 
     assert_ne!(
         last_signal_id(&rerendered),
@@ -122,7 +122,7 @@ async fn a_rerender_at_another_identity_derives_another_signal_id() {
 
 #[tokio::test]
 async fn a_malformed_identity_is_rejected() {
-    let cx = &endpoint_cx("not hex");
+    let cx = &endpoint_cx("not base64");
     let body = Body::from(r#"{"args":["a"]}"#);
     assert!(stateful.render(cx, body).await.is_err());
 }
