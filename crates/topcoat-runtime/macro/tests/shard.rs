@@ -103,7 +103,7 @@ async fn a_rerender_resumes_signals_from_the_values_it_carries() {
     let rerendered = rerender(identity, &format!(r#"{{"{id}":7.0}}"#)).await;
 
     assert!(rerendered.contains("&quot;v&quot;:7.0"), "{rerendered}");
-    assert!(rerendered.contains(" 7</p>"), "{rerendered}");
+    assert!(rerendered.contains("-->7<!--"), "{rerendered}");
 }
 
 #[tokio::test]
