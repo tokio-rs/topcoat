@@ -109,7 +109,34 @@ async fn dashboard(cx: &Cx) -> Result<impl View> {
 
 The rewritten dispatch keeps the request's method and headers and reads `body` as its request body; the path may carry a query string. Everything else starts over: the response built so far is discarded along with the request context, so per-request state like memoized values or response cookies staged by the abandoned dispatch does not leak into the new one. Layers run again too, including pathless ones.
 
-A handler reached through a rewrite sees the rewritten URI in [`uri`](crate::request::uri). To read the URL the client actually requested, for example as a form's post-back target, use [`original_uri`](crate::request::original_uri).
+The returned [`RewriteError`] has more configuration options. [`method`](RewriteError::method) dispatches the rewritten request with a different HTTP method than the one it arrived with. [`cx`](RewriteError::cx) sets the request context the rewritten dispatch starts from, and every later dispatch in the same chain; a handler uses it to hand values on to the target, since a dispatch otherwise starts from an empty context. A form handler can combine both to re-run the page it was posted from as a `GET` with a value telling the page what happened:
+
+```rust
+use topcoat::{Result, context::{Cx, try_request_context}, router::{Body, Method, error::rewrite, page, route}, view::{View, view}};
+
+struct Saved;
+
+#[route(POST "/settings")]
+async fn save_settings(cx: &Cx) -> Result<()> {
+    Err(rewrite("/settings", Body::empty())
+        .method(Method::GET)
+        .cx(cx.with(Saved))
+        .into())
+}
+
+#[page("/settings")]
+async fn settings(cx: &Cx) -> Result<impl View> {
+    let saved = try_request_context::<Saved>(cx).is_some();
+    Ok(view! {
+        if saved {
+            <p>"Settings saved."</p>
+        }
+        <form method="post"></form>
+    })
+}
+```
+
+A handler reached through a rewrite sees the rewritten request in [`parts`](crate::request::parts) and its field accessors. To read the request as the client actually sent it, for example the URL a form should post back to, use [`original_parts`](crate::request::original_parts) or a field accessor like [`original_uri`](crate::request::original_uri) and [`original_method`](crate::request::original_method).
 
 The router refuses a rewrite to a path the request was already dispatched under and stops any chain after 8 rewrites; both respond 500 without leaking the chain to the client.
 

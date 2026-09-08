@@ -55,6 +55,8 @@ fn request_id(cx: &Cx) -> Option<&str> {
 }
 ```
 
+A handler reached through a [rewrite](crate::router::error#rewrites) sees the rewritten request in all of the above. Each helper has an `original_` counterpart returning the request as the client sent it, from [`original_parts(cx)`](crate::router::request::original_parts) down to [`original_uri(cx)`](crate::router::request::original_uri); for a request that was never rewritten they agree with the plain helpers.
+
 # Path and query helpers
 
 The [`path_param!`](macro@crate::router::path_param) macro and [`#[query_params]`](macro@crate::router::query_params) attribute declare typed values that you read with the [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params) functions. Topcoat parses typed path parameters and query structs lazily and memoizes them for the request.

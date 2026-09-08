@@ -213,6 +213,57 @@ Ok(view! {
 
 A shard body is ordinary server code, like any component. The re-renders are served by an API endpoint exposed from your server, so a shard's arguments can be spoofed just like a procedure's and **must not be trusted**. See [`#[shard]`][shard] for the details: how re-renders behave, shard state, and registration.
 
+# Reading signals on the server
+
+A signal can also be read in plain Rust, outside any runtime expression, in the body that created it. `.get()` clones the current value and `.read()` borrows it. Both are **tracked reads**: they make the page depend on the signal, so when the signal changes in the browser, the page runs again on the server with the signal's current value and its content is replaced with the result:
+
+```rust
+# use topcoat::{Result, context::Cx, router::page, runtime::{Event, signal}, view::*};
+# async fn search_products(_cx: &Cx, _query: &str) -> Result<Vec<String>> { Ok(vec![]) }
+#[page("/search")]
+async fn search(cx: &Cx) -> Result<impl View> {
+    let query = signal(cx, String::new);
+    let products = search_products(cx, &query.get()).await?;
+
+    Ok(view! {
+        <input :value=$(query.get()) @input=$(|e: Event| query.set(e.target.value))>
+
+        for product in products {
+            <div>(product)</div>
+        }
+    })
+}
+```
+
+The input keeps working as a client-only binding, and the product list follows it through the server. On the re-run, [`signal`] starts from the value the browser sent instead of computing a fresh one, so the page picks up where the client left off. Reads inside a `$(...)` expression never make the page depend on a signal; they are the client-side path and stay in the browser.
+
+The whole page content is replaced, so a re-run keeps every signal's value but loses focus, scroll position, and anything else the browser holds.
+
+To avoid re-running the whole page, use a shard: a signal tracked inside a shard re-renders only that shard, not the entire page. The shard creates the signal, reads it, and hands the browser the handlers that change it:
+
+```rust
+# use topcoat::{Result, context::Cx, runtime::{shard, signal}, view::*};
+# async fn load_page(_cx: &Cx, _page: f64) -> Result<Vec<String>> { Ok(vec![]) }
+#[shard]
+async fn paginated(cx: &Cx) -> Result<impl View> {
+    let page = signal(cx, || 1.0);
+    let items = load_page(cx, page.get()).await?;
+
+    Ok(view! {
+        for item in items {
+            <div>(item)</div>
+        }
+
+        <button @click=$(|_e| page.decrement())>"previous"</button>
+        <button @click=$(|_e| page.increment())>"next"</button>
+    })
+}
+```
+
+Clicking a button changes `page` in the browser, and because the shard read it on the server, the shard runs again with the new value and swaps in the next page of items.
+
+`.get_untracked()` and `.read_untracked()` read a signal's value without making anything depend on it, for a body that wants the value a run started with but should not run again when it changes. **Every value read on the server was chosen by the client and can be spoofed: treat it as untrusted input, like a shard argument.**
+
 [`Event`]: struct.Event.html
 [`expr!`]: macro.expr.html
 [`signal`]: fn.signal.html
