@@ -45,6 +45,8 @@ async fn search(cx: &Cx) -> Result<impl View> {
 
     Ok(view! {
         <div>
+            // The input shows the signal, and every keystroke writes back
+            // into it. Both happen in the browser.
             <input :value=$(query.get()) @input=$(|e: Event| query.set(e.target.value))>
 
             // The shard renders again on the server whenever `query` changes.
@@ -60,12 +62,14 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
     // instead of starting over at five.
     let limit = signal(cx, || 5.0);
 
-    // The query and the limit come from the client, so a real application
-    // would validate them. Reading the limit on the server makes the shard
-    // depend on it: the button below changes it in the browser, and only the
-    // shard renders again, not the page around it.
+    // Reading the limit on the server makes the shard depend on it. When the
+    // button below changes it in the browser, only the shard renders again,
+    // not the page around it.
     let results = search_fruit(cx, &query).await;
-    let shown = limit.get() as usize;
+    // The limit comes from the client, so a real application would validate
+    // it. Clamping it keeps a bogus value from becoming a huge count.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let shown = limit.get().clamp(0.0, 100.0) as usize;
 
     Ok(view! {
         <div>
