@@ -34,12 +34,12 @@ function stubFetch(status: number, statusText: string, body = "") {
 
 /** Waits for scheduled effects and the fetches they queue to settle. */
 async function settle(): Promise<void> {
-	await tick();
+	tick();
 	// A fetch and the replacement it ends in span a number of microtasks
 	// that depends on how the platform reads the response body, so yield to
 	// a macrotask, which runs only once the microtask queue is empty.
 	await new Promise((resolve) => setTimeout(resolve, 0));
-	await tick();
+	tick();
 }
 
 /**
