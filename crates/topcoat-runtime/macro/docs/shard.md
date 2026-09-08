@@ -41,7 +41,7 @@ When the `query` signal changes, the current argument values are sent to the ser
 
 # Shard State
 
-A shard's content is a full view: the shard can create signals, attach event handlers, and contain nested shards. A re-render replaces that content wholesale, but the signals created in the shard body keep their values: their current values travel with every re-render request, and [`signal`] resumes from them instead of starting over.
+A shard's content is a full view: the shard can create signals, attach event handlers, and contain nested shards. A re-render replaces that content wholesale, but the signals created in the shard body keep their values: their current values travel with every re-render request, and [`signal`] resumes from them instead of starting over. Those values are user input and **must not be trusted**, like the shard's arguments.
 
 Reading one of those signals on the server with `.get()` or `.read()` makes the shard depend on it, so a change in the browser re-renders only that shard, not the entire page:
 

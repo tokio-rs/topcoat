@@ -91,8 +91,8 @@ impl SignalValues {
 /// change re-runs the page, or the innermost shard enclosing the read, with
 /// the signal's current value. [`get_untracked`](Self::get_untracked) and
 /// [`read_untracked`](Self::read_untracked) read the value without that
-/// dependency. Every value read this way was chosen by the client: treat
-/// it as untrusted, like a shard argument.
+/// dependency. **Every value read on the server is untrusted user input**,
+/// chosen by the client like a shard argument.
 #[derive(Debug)]
 pub struct Signal<T> {
     id: SignalId,
@@ -275,11 +275,14 @@ where
 /// ordinary value the body keeps: capture it in as many runtime expressions
 /// as needed, which clone it, or pass it on to components as `&Signal<T>`.
 ///
-/// A run that resumes state, such as a shard re-render, carries the current
-/// values of the signals the client holds. When one of them is this
+/// **A signal's value on the server is untrusted user input.** A run that
+/// resumes state, such as a shard re-render or a page re-run, carries the
+/// current values of the signals the client holds. When one of them is this
 /// signal's, the signal starts from that value and `init` does not run, so
 /// state created inside a shard survives its re-renders. The client chooses
-/// those values: treat them as untrusted, like shard arguments.
+/// those values and can send anything that fits the signal's type, so
+/// validate a value read on the server before acting on it, like a shard
+/// argument.
 ///
 /// ```rust
 /// use topcoat::{Result, context::Cx, runtime::signal, view::*};
