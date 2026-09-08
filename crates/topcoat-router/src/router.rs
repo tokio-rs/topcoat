@@ -12,7 +12,7 @@ use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
     RouteIndex, RouterBuilder, Routes, Terminal,
     error::{REWRITE_LIMIT, RewriteError, RewriteLoopError, internal_server_response, respond},
-    request::{OriginalUri, Request},
+    request::{OriginalParts, Request},
     response::Response,
 };
 
@@ -88,18 +88,26 @@ impl Router {
         // only once a rewrite happens; a request served in one dispatch never
         // touches it.
         let mut visited: Vec<String> = Vec::new();
-        // The URI of the first dispatch, carried on every rewritten dispatch's
-        // context so its handler can read the client-visible URL.
-        let mut original: Option<http::Uri> = None;
+        // The parts of the first dispatch, carried on every rewritten
+        // dispatch's context so its handler can read the request as the
+        // client sent it.
+        let mut original: Option<http::request::Parts> = None;
+        // The context a rewrite handed over for the dispatches after it, if
+        // any; a dispatch otherwise starts from an empty request context.
+        let mut base: Option<Cx> = None;
 
         let (cx, result) = loop {
             // The chain's terminal and the layer stack wrapping it: a matched
             // route carries its own precomputed stack, while a request that
             // matched no route resolves to a 404 or 405 through the layers
             // without a path, which wrap every request.
-            let cx = Cx::new(Arc::clone(&inner.app_context)).with(Arc::clone(&self.inner));
+            let cx = match &base {
+                Some(base) => base.clone(),
+                None => Cx::new(Arc::clone(&inner.app_context)),
+            };
+            let cx = cx.with(Arc::clone(&self.inner));
             let cx = match &original {
-                Some(uri) => cx.with(OriginalUri(uri.clone())),
+                Some(parts) => cx.with(OriginalParts(parts.clone())),
                 None => cx,
             };
             let (terminal, layer_stack, cx) = match inner.endpoints.at(parts.uri.path()) {
@@ -144,7 +152,8 @@ impl Router {
                     Err(error) => break (cx, Err(error)),
                 },
             };
-            let (target, rewrite_body) = rewrite.into_parts();
+            let rewrite = rewrite.into_parts();
+            let target = rewrite.path_and_query;
 
             let previous = try_request_context::<http::request::Parts>(&cx)
                 .expect("a dispatched request carries its parts");
@@ -158,18 +167,24 @@ impl Router {
                 break (cx, Err(error.into()));
             }
 
-            // The next dispatch keeps the method and headers, swapping only
-            // the path and query into the URI.
+            // The next dispatch keeps the headers, and the method unless the
+            // rewrite changes it, swapping the path and query into the URI.
             let mut next_parts = previous.clone();
             if original.is_none() {
-                original = Some(next_parts.uri.clone());
+                original = Some(previous.clone());
             }
             let mut uri_parts = std::mem::take(&mut next_parts.uri).into_parts();
             uri_parts.path_and_query = Some(target);
             next_parts.uri = http::Uri::from_parts(uri_parts)
                 .expect("replacing the path of a valid request uri keeps it valid");
+            if let Some(method) = rewrite.method {
+                next_parts.method = method;
+            }
+            if let Some(cx) = rewrite.cx {
+                base = Some(cx);
+            }
             parts = next_parts;
-            body = rewrite_body;
+            body = rewrite.body;
         };
         let response = respond(&cx, result);
 
@@ -361,7 +376,7 @@ mod tests {
         Path, Route, RouteFn, RouteFuture, Slot,
         error::rewrite,
         raw_path_params,
-        request::{Bytes, original_uri, uri},
+        request::{Bytes, method, original_method, original_uri, uri},
         response::IntoResponse,
         to_bytes,
     };
@@ -758,6 +773,41 @@ mod tests {
         Box::pin(async move { format!("{} {}", uri(cx), original_uri(cx)).into_response(cx) })
     }
 
+    fn rewrite_to_x_as_get(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(rewrite("/x", Body::empty()).method(Method::GET).into()) })
+    }
+
+    /// Echoes the dispatched and original methods, separated by a space.
+    fn echo_methods(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { format!("{} {}", method(cx), original_method(cx)).into_response(cx) })
+    }
+
+    /// A value a rewrite hands to the handler at its target.
+    struct Carried(&'static str);
+
+    /// Rewrites to `/carried`, handing over a context carrying a value.
+    fn rewrite_with_cx(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            Err(rewrite("/carried", Body::empty())
+                .cx(cx.with(Carried("handed over")))
+                .into())
+        })
+    }
+
+    /// Rewrites on to `/carried-again` without a context of its own.
+    fn rewrite_onward(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(rewrite("/carried-again", Body::empty()).into()) })
+    }
+
+    /// Echoes the carried value, or `none` when the context holds none.
+    fn echo_carried(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            try_request_context::<Carried>(cx)
+                .map_or("none", |carried| carried.0)
+                .into_response(cx)
+        })
+    }
+
     #[test]
     fn a_rewrite_serves_the_new_path() {
         let router = RouterBuilder::new()
@@ -826,6 +876,45 @@ mod tests {
         // The rewritten dispatch is still a `POST`, which `/x` does not serve.
         let (status, _, _) = send(&router, Method::POST, "/old");
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn a_rewrite_can_change_the_method_and_keeps_the_original_readable() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::POST,
+                path("/old"),
+                rewrite_to_x_as_get,
+            ))
+            .route(RouteFn::new(Method::GET, path("/x"), echo_methods))
+            .build();
+
+        let (status, _, body) = send(&router, Method::POST, "/old");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"GET POST");
+    }
+
+    #[test]
+    fn a_rewrite_carries_its_context_through_the_rest_of_the_chain() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/old"), rewrite_with_cx))
+            .route(RouteFn::new(Method::GET, path("/carried"), rewrite_onward))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/carried-again"),
+                echo_carried,
+            ))
+            .build();
+
+        // The value survives the rewrite that carried it and the plain
+        // rewrite after it.
+        let (_, _, body) = send(&router, Method::GET, "/old");
+        assert_eq!(&body[..], b"handed over");
+
+        // A dispatch that was not reached through the carrying rewrite
+        // starts from an empty context.
+        let (_, _, body) = send(&router, Method::GET, "/carried-again");
+        assert_eq!(&body[..], b"none");
     }
 
     #[test]

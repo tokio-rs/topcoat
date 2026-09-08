@@ -1,6 +1,7 @@
 use std::sync::Mutex;
 
-use http::uri::PathAndQuery;
+use http::{Method, uri::PathAndQuery};
+use topcoat_core::context::Cx;
 
 use crate::Body;
 
@@ -20,6 +21,11 @@ pub(crate) const REWRITE_LIMIT: usize = 8;
 ///
 /// The router refuses a rewrite to a path the request was already dispatched
 /// under, and stops a chain after 8 rewrites; either case responds 500.
+///
+/// The returned [`RewriteError`] has options for the rare cases where the
+/// rewritten dispatch should differ from the request in more than its path
+/// and body: another [`method`](RewriteError::method), or values carried on
+/// its [request context](RewriteError::cx).
 ///
 /// # Panics
 ///
@@ -51,6 +57,8 @@ pub fn rewrite(path: impl AsRef<str>, body: impl Into<Body>) -> RewriteError {
         path_and_query: PathAndQuery::try_from(path.as_ref())
             .expect("rewrite path is not a valid uri path and query"),
         body: Mutex::new(body.into()),
+        method: None,
+        cx: None,
     }
 }
 
@@ -65,18 +73,56 @@ pub struct RewriteError {
     /// makes the non-`Sync` [`Body`] shareable so the error can travel inside
     /// an [`Error`](topcoat_core::error::Error).
     body: Mutex<Body>,
+    method: Option<Method>,
+    cx: Option<Cx>,
 }
 
 impl RewriteError {
-    /// Splits the rewrite into the path to dispatch and the body to dispatch
-    /// it with.
-    pub(crate) fn into_parts(self) -> (PathAndQuery, Body) {
+    /// Dispatches the rewritten request with `method` instead of the method
+    /// the request arrived with.
+    #[must_use]
+    pub fn method(mut self, method: Method) -> Self {
+        self.method = Some(method);
+        self
+    }
+
+    /// Carries the request context values of `cx` into the rewritten
+    /// dispatch, and every dispatch after it in the same chain.
+    ///
+    /// A dispatch normally starts from an empty request context. With this
+    /// option it starts from the values on `cx`, so a handler can hand
+    /// values it computed to the handler at the target, typically through
+    /// [`Cx::with`]. The values the router installs for a dispatch, such as
+    /// the request parts and the path parameters, shadow any of the same
+    /// type carried over.
+    #[must_use]
+    pub fn cx(mut self, cx: Cx) -> Self {
+        self.cx = Some(cx);
+        self
+    }
+
+    /// Splits the rewrite into what the next dispatch needs.
+    pub(crate) fn into_parts(self) -> RewriteParts {
         let body = match self.body.into_inner() {
             Ok(body) => body,
             Err(poisoned) => poisoned.into_inner(),
         };
-        (self.path_and_query, body)
+        RewriteParts {
+            path_and_query: self.path_and_query,
+            body,
+            method: self.method,
+            cx: self.cx,
+        }
     }
+}
+
+/// The contents of a [`RewriteError`], taken apart for the router's rewrite
+/// loop.
+pub(crate) struct RewriteParts {
+    pub(crate) path_and_query: PathAndQuery,
+    pub(crate) body: Body,
+    pub(crate) method: Option<Method>,
+    pub(crate) cx: Option<Cx>,
 }
 
 impl std::fmt::Display for RewriteError {

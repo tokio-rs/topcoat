@@ -212,39 +212,6 @@ pub fn uri(cx: &Cx) -> &http::Uri {
     &parts(cx).uri
 }
 
-/// The URI a rewritten request originally arrived with, stored on the request
-/// context of every dispatch reached through a rewrite.
-#[derive(Debug, Clone)]
-pub(crate) struct OriginalUri(pub(crate) http::Uri);
-
-/// Returns the [`Uri`] the client actually requested, before any rewrite.
-///
-/// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
-/// rewritten URI in [`uri`]; this accessor returns the URI the request
-/// arrived with, for example to render a form that posts back to the visible
-/// URL. For a request that was never rewritten the two are the same.
-///
-/// [`Uri`]: http::Uri
-///
-/// # Examples
-///
-/// ```rust
-/// use topcoat::{context::Cx, router::request::original_uri};
-///
-/// async fn form_action(cx: &Cx) -> String {
-///     original_uri(cx).path().to_owned()
-/// }
-/// ```
-#[inline]
-#[must_use]
-#[track_caller]
-pub fn original_uri(cx: &Cx) -> &http::Uri {
-    match try_request_context::<OriginalUri>(cx) {
-        Some(original) => &original.0,
-        None => uri(cx),
-    }
-}
-
 /// Returns the HTTP [`Version`] of the current request.
 ///
 /// [`Version`]: http::Version
@@ -327,6 +294,146 @@ pub fn content_type(cx: &Cx) -> Option<&str> {
 #[track_caller]
 pub fn extensions(cx: &Cx) -> &http::Extensions {
     &parts(cx).extensions
+}
+
+/// The parts a rewritten request originally arrived with, stored on the
+/// request context of every dispatch reached through a rewrite.
+#[derive(Debug, Clone)]
+pub(crate) struct OriginalParts(pub(crate) Parts);
+
+/// Returns the [`Parts`] of the request as the client sent it, before any
+/// rewrite.
+///
+/// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
+/// rewritten request in [`parts`], which may differ in its URI and method;
+/// this accessor returns the parts the request arrived with. For a request
+/// that was never rewritten the two are the same.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::original_parts};
+///
+/// async fn arrived_with_header(cx: &Cx, name: &str) -> bool {
+///     original_parts(cx).headers.contains_key(name)
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn original_parts(cx: &Cx) -> &Parts {
+    match try_request_context::<OriginalParts>(cx) {
+        Some(original) => &original.0,
+        None => parts(cx),
+    }
+}
+
+/// Returns the HTTP [`Method`] the client actually requested with, before
+/// any rewrite.
+///
+/// A rewrite may dispatch the request with another method; this accessor
+/// returns the one the request arrived with. For a request that was never
+/// rewritten it is the same as [`method`].
+///
+/// [`Method`]: http::Method
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::original_method};
+///
+/// async fn arrived_as_post(cx: &Cx) -> bool {
+///     original_method(cx) == http::Method::POST
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn original_method(cx: &Cx) -> &http::Method {
+    &original_parts(cx).method
+}
+
+/// Returns the [`Uri`] the client actually requested, before any rewrite.
+///
+/// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
+/// rewritten URI in [`uri`]; this accessor returns the URI the request
+/// arrived with, for example to render a form that posts back to the visible
+/// URL. For a request that was never rewritten the two are the same.
+///
+/// [`Uri`]: http::Uri
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::original_uri};
+///
+/// async fn form_action(cx: &Cx) -> String {
+///     original_uri(cx).path().to_owned()
+/// }
+/// ```
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn original_uri(cx: &Cx) -> &http::Uri {
+    &original_parts(cx).uri
+}
+
+/// Returns the HTTP [`Version`] of the request as the client sent it, before
+/// any rewrite.
+///
+/// See [`original_parts`] for how a rewritten request differs from the one
+/// that arrived.
+///
+/// [`Version`]: http::Version
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn original_version(cx: &Cx) -> &http::Version {
+    &original_parts(cx).version
+}
+
+/// Returns the [`HeaderMap`] of the request as the client sent it, before
+/// any rewrite.
+///
+/// See [`original_parts`] for how a rewritten request differs from the one
+/// that arrived.
+///
+/// [`HeaderMap`]: http::HeaderMap
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn original_headers(cx: &Cx) -> &http::HeaderMap {
+    &original_parts(cx).headers
+}
+
+/// Returns the `Content-Type` header of the request as the client sent it,
+/// before any rewrite, as a string slice, or [`None`] when it is absent or
+/// not valid UTF-8.
+///
+/// See [`original_parts`] for how a rewritten request differs from the one
+/// that arrived.
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn original_content_type(cx: &Cx) -> Option<&str> {
+    original_headers(cx)
+        .get(http::header::CONTENT_TYPE)?
+        .to_str()
+        .ok()
+}
+
+/// Returns the [`Extensions`] of the request as the client sent it, before
+/// any rewrite.
+///
+/// See [`original_parts`] for how a rewritten request differs from the one
+/// that arrived.
+///
+/// [`Extensions`]: http::Extensions
+#[inline]
+#[must_use]
+#[track_caller]
+pub fn original_extensions(cx: &Cx) -> &http::Extensions {
+    &original_parts(cx).extensions
 }
 
 /// The header naming the identity a request's build starts at.
