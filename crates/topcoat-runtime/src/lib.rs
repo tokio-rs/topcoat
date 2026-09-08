@@ -5,6 +5,8 @@ mod event_handler;
 mod expr;
 mod js;
 #[cfg(feature = "router")]
+mod page;
+#[cfg(feature = "router")]
 mod procedure;
 #[cfg(feature = "router")]
 mod shard;
@@ -17,6 +19,8 @@ pub use bind_attribute::*;
 pub use event_handler::*;
 pub use expr::*;
 pub use js::*;
+#[cfg(feature = "router")]
+pub use page::*;
 #[cfg(feature = "router")]
 pub use procedure::*;
 #[cfg(feature = "router")]

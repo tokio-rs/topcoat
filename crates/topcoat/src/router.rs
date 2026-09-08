@@ -30,9 +30,12 @@ impl RouterBuilderDiscoverExt for RouterBuilder {
         }
         #[cfg(feature = "runtime")]
         {
-            use topcoat_runtime::{RouterBuilderProcedureExt, RouterBuilderShardExt};
+            use topcoat_runtime::{
+                RouterBuilderPageRerunExt, RouterBuilderProcedureExt, RouterBuilderShardExt,
+            };
             self = self.discover_procedures();
             self = self.discover_shards();
+            self = self.page_reruns();
         }
         self
     }

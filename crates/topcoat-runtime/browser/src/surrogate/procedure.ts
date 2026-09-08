@@ -10,7 +10,7 @@ export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 	call(...args: A): Future<R> {
 		return new Future(async () => {
 			const response = await fetch(
-				`/_topcoat/procedures/${encodeURIComponent(this.id)}`,
+				`/_topcoat/runtime/procedures/${encodeURIComponent(this.id)}`,
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },

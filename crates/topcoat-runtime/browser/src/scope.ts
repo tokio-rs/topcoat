@@ -352,7 +352,10 @@ export class PageUnit extends Unit {
 		// The page owns every signal in the document, directly or through a
 		// shard, so its values are the complete set the re-run resumes from.
 		const signals = untrack(() => this.contentScope.collectSignalValues());
-		return fetch(`${PAGE_ROUTE_PREFIX}${location.pathname}${location.search}`, {
+		// The root page is served at the bare prefix, since the route below
+		// it needs at least one path segment.
+		const path = location.pathname === "/" ? "" : location.pathname;
+		return fetch(`${PAGE_ROUTE_PREFIX}${path}${location.search}`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ signals }),

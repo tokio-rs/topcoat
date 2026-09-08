@@ -148,6 +148,19 @@ it("a page posts the values of every signal in the document to the pages route",
 	expect(String(error)).toContain("Page request failed");
 });
 
+it("the root page posts to the bare pages route", async () => {
+	const stub = stubFetch(500, "Internal Server Error");
+	globalThis.location = { pathname: "/", search: "" } as unknown as Location;
+
+	const runtime = new Runtime();
+	const fetchAndReplace = (
+		runtime.page as unknown as { fetchAndReplace(): Promise<void> }
+	).fetchAndReplace.bind(runtime.page);
+	await fetchAndReplace().catch(() => undefined);
+
+	expect(stub.url()).toBe(PAGE_ROUTE_PREFIX);
+});
+
 /**
  * A unit whose content is described by a script rather than a document:
  * each replacement declares the given signals and dependencies into the new

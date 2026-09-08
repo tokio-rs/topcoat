@@ -9,7 +9,7 @@ use topcoat_router::{
 
 use crate::{Surrogate, Surrogated};
 
-const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/procedures";
+const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/runtime/procedures";
 
 /// The identity of a procedure, stable across the server and the client
 /// runtime.
