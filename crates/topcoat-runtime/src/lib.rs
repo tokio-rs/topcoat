@@ -9,6 +9,8 @@ mod page;
 #[cfg(feature = "router")]
 mod procedure;
 #[cfg(feature = "router")]
+mod router;
+#[cfg(feature = "router")]
 mod shard;
 #[cfg(feature = "router")]
 mod shard_scope;
@@ -23,6 +25,8 @@ pub use js::*;
 pub use page::*;
 #[cfg(feature = "router")]
 pub use procedure::*;
+#[cfg(feature = "router")]
+pub use router::*;
 #[cfg(feature = "router")]
 pub use shard::*;
 #[cfg(feature = "router")]

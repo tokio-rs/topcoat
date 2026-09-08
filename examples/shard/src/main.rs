@@ -5,7 +5,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     context::Cx,
     router::{Router, RouterBuilderDiscoverExt, page},
-    runtime::{Event, shard, signal},
+    runtime::{Event, RouterBuilderRuntimeExt, shard, signal},
     view::{View, component, view},
 };
 
@@ -14,6 +14,7 @@ async fn main() {
     topcoat::start(
         Router::builder()
             .assets(AssetBundle::load().unwrap())
+            .runtime()
             .discover()
             .build(),
     )

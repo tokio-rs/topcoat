@@ -21,23 +21,25 @@ Ok(view! {
 # }
 ```
 
-The script is served as a Topcoat [asset](../asset/index.html), so the asset bundle must be loaded on the router:
+The runtime also needs the router set up for it. [`runtime()`](RouterBuilderRuntimeExt::runtime) mounts the routes the browser script talks to on its own, and the script is served as a Topcoat [asset](../asset/index.html), so the asset bundle must be loaded as well:
 
 ```rust,no_run
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     router::{Router, RouterBuilderDiscoverExt},
+    runtime::RouterBuilderRuntimeExt,
 };
 
 pub fn router() -> Router {
     Router::builder()
+        .runtime()
         .discover()
         .assets(AssetBundle::load().unwrap())
         .build()
 }
 ```
 
-`.discover()` also registers the server endpoints behind [procedures](#procedures) and [shards](#shards), covered later in this guide.
+`.runtime()` covers the runtime's own routes only. The endpoints behind your [procedures](#procedures) and [shards](#shards), covered later in this guide, are annotated items that `.discover()` registers like pages and layouts.
 
 # Runtime expressions
 

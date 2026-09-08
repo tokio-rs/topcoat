@@ -14,6 +14,7 @@ use topcoat::{
         error::{SeeOther, see_other},
         href, layout, module_router, page, route,
     },
+    runtime::RouterBuilderRuntimeExt,
     tailwind,
     view::{View, attributes, class, view},
 };
@@ -35,6 +36,7 @@ const GEIST: Font = fontsource_font!(GEIST, host: Asset);
 
 pub fn router(db: Db) -> Router {
     module_router!()
+        .runtime()
         // The font, the shard, and the procedure are collected at link time.
         .discover()
         .assets(AssetBundle::load().unwrap())

@@ -3,7 +3,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     context::Cx,
     router::{Router, RouterBuilderDiscoverExt, page},
-    runtime::{Event, procedure, signal},
+    runtime::{Event, RouterBuilderRuntimeExt, procedure, signal},
     view::{View, view},
 };
 
@@ -12,6 +12,7 @@ async fn main() {
     topcoat::start(
         Router::builder()
             .assets(AssetBundle::load().unwrap())
+            .runtime()
             .discover()
             .build(),
     )

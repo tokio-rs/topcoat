@@ -10,7 +10,7 @@ use topcoat::{
         request::{method, original_method, original_uri, uri},
         to_bytes,
     },
-    runtime::{RouterBuilderPageRerunExt, signal},
+    runtime::{RouterBuilderRuntimeExt, signal},
     view::{View, view},
 };
 
@@ -31,11 +31,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
 }
 
 fn router() -> Router {
-    Router::builder()
-        .page(search)
-        .page(home)
-        .page_reruns()
-        .build()
+    Router::builder().page(search).page(home).runtime().build()
 }
 
 /// Sends a request through the router, returning the status and body.

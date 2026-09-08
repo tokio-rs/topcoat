@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use topcoat_core::context::Cx;
 use topcoat_router::{
-    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId, RouterBuilder,
+    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId,
     content::Json,
     error::rewrite,
     request::{FromRequest, uri},
@@ -91,19 +91,5 @@ impl Route for PageRerunRoute {
                 .cx(cx.with(request.signals))
                 .into())
         })
-    }
-}
-
-/// Registers page re-runs on a [`RouterBuilder`].
-pub trait RouterBuilderPageRerunExt {
-    /// Mounts the routes the browser runtime re-runs pages through.
-    #[must_use]
-    fn page_reruns(self) -> Self;
-}
-
-impl RouterBuilderPageRerunExt for RouterBuilder {
-    fn page_reruns(self) -> Self {
-        self.route(PageRerunRoute::root())
-            .route(PageRerunRoute::nested())
     }
 }

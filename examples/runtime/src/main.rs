@@ -7,6 +7,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     context::Cx,
     router::{RouterBuilderDiscoverExt, Slot, error::redirect, href, layout, module_router, page},
+    runtime::RouterBuilderRuntimeExt,
     view::{View, view},
 };
 
@@ -15,6 +16,7 @@ async fn main() {
     topcoat::start(
         module_router!()
             .assets(AssetBundle::load().unwrap())
+            .runtime()
             .discover()
             .build(),
     )
