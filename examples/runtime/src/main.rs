@@ -1,6 +1,6 @@
 mod counter;
-mod shard_state;
 mod show;
+mod sort;
 
 use topcoat::{
     Result,
@@ -37,7 +37,8 @@ async fn layout(slot: Slot<'_>) -> Result<impl View> {
             <head>
                 topcoat::dev::script()
 
-                // Signals and event handlers need the browser runtime.
+                // Signals, event handlers, and page re-runs need the
+                // browser runtime.
                 topcoat::runtime::script()
             </head>
             <body>
@@ -46,7 +47,7 @@ async fn layout(slot: Slot<'_>) -> Result<impl View> {
                     " | "
                     <a href=(href!(show::page))>"show"</a>
                     " | "
-                    <a href=(href!(shard_state::page))>"shard state"</a>
+                    <a href=(href!(sort::page))>"sort"</a>
                 </nav>
 
                 <hr>

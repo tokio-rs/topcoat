@@ -19,15 +19,31 @@ async fn search(cx: &Cx) -> Result<impl View> {
     let query = signal(cx, || String::from("initial"));
     let current = query.get();
     Ok(view! {
-        <p>(method(cx).as_str()) " " (uri(cx).to_string())</p>
-        <p>(original_method(cx).as_str()) " " (original_uri(cx).to_string())</p>
-        <p>"query: " (current)</p>
+        <p>
+            (method(cx).as_str())
+            " "
+            (uri(cx).to_string())
+        </p>
+        <p>
+            (original_method(cx).as_str())
+            " "
+            (original_uri(cx).to_string())
+        </p>
+        <p>
+            "query: "
+            (current)
+        </p>
     })
 }
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result<impl View> {
-    Ok(view! { <p>"home " (method(cx).as_str())</p> })
+    Ok(view! {
+        <p>
+            "home "
+            (method(cx).as_str())
+        </p>
+    })
 }
 
 fn router() -> Router {
