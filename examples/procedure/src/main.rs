@@ -22,8 +22,6 @@ async fn main() {
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result<impl View> {
-    let input = signal(cx, String::new);
-
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -35,6 +33,8 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 topcoat::runtime::script()
             </head>
             <body>
+                let input = signal(cx, String::new);
+
                 // `:value` renders the signal, `@change` writes back to it.
                 <input
                     :value=$(input.get())
