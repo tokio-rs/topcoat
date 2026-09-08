@@ -1,9 +1,9 @@
-use std::{collections::HashMap, panic::Location, sync::Arc};
+use std::{any::TypeId, collections::HashMap, panic::Location, sync::Arc};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use topcoat_core::context::{Cx, try_request_context};
 use topcoat_view::{
-    hoist,
+    HoistKey, hoist, hoist_once,
     identity::{Identity, SiteKey},
 };
 
@@ -84,6 +84,15 @@ impl SignalValues {
 /// cheap to clone, and every clone is the same signal: runtime expressions
 /// clone the signals they capture, so any number of them can capture one,
 /// and a component takes one as a `&Signal<T>` prop.
+///
+/// A signal can also be read on the server, outside any runtime
+/// expression. [`get`](Self::get) and [`read`](Self::read) are tracked
+/// reads: they make the body's content depend on the signal, so that a
+/// change re-runs the page, or the innermost shard enclosing the read, with
+/// the signal's current value. [`get_untracked`](Self::get_untracked) and
+/// [`read_untracked`](Self::read_untracked) read the value without that
+/// dependency. Every value read this way was chosen by the client: treat
+/// it as untrusted, like a shard argument.
 #[derive(Debug)]
 pub struct Signal<T> {
     id: SignalId,
@@ -104,8 +113,50 @@ impl<T> Signal<T> {
         self.id
     }
 
-    pub(crate) fn read(&self) -> &T {
+    /// Borrows the current value, tracking the signal as a dependency of
+    /// the body reading it.
+    ///
+    /// The body's content is marked as depending on the signal, so the
+    /// browser runtime re-runs the page, or the innermost shard enclosing
+    /// the read, when the signal changes. Reading the same signal any number
+    /// of times in one body marks its content once.
+    ///
+    /// # Panics
+    ///
+    /// Panics when called outside a page, layout, component, or shard body,
+    /// like [`signal`].
+    #[must_use]
+    #[track_caller]
+    pub fn read(&self) -> &T {
+        self.track();
         &self.value
+    }
+
+    /// Borrows the current value without tracking the signal.
+    ///
+    /// A change to the signal does not re-run the body that read it this
+    /// way. It can be called anywhere, not just inside a body.
+    #[must_use]
+    pub fn read_untracked(&self) -> &T {
+        &self.value
+    }
+
+    /// Hoists the marker that makes the enclosing body's content depend on
+    /// this signal.
+    #[track_caller]
+    fn track(&self) {
+        let id = self.id;
+        hoist_once(
+            HoistKey::new((TypeId::of::<SignalId>(), id)),
+            move |parts| {
+                parts.push_comment(|comment| {
+                    comment
+                        .push_promoted_str_unescaped(&"::topcoat::dep(\"")
+                        .push_string_unescaped(id.to_string())
+                        .push_promoted_str_unescaped(&"\")");
+                });
+            },
+        );
     }
 
     /// Serializes the declaration the browser runtime creates the signal
@@ -138,7 +189,29 @@ impl<T> Signal<T>
 where
     T: Clone,
 {
-    pub(crate) fn get(&self) -> T {
+    /// Clones the current value, tracking the signal as a dependency of
+    /// the body reading it.
+    ///
+    /// This is [`read`](Self::read) for a value the body wants to own; the
+    /// same tracking rules apply.
+    ///
+    /// # Panics
+    ///
+    /// Panics when called outside a page, layout, component, or shard body,
+    /// like [`signal`].
+    #[must_use]
+    #[track_caller]
+    pub fn get(&self) -> T {
+        self.track();
+        T::clone(&self.value)
+    }
+
+    /// Clones the current value without tracking the signal.
+    ///
+    /// This is [`read_untracked`](Self::read_untracked) for a value the
+    /// body wants to own.
+    #[must_use]
+    pub fn get_untracked(&self) -> T {
         T::clone(&self.value)
     }
 }
@@ -305,9 +378,26 @@ mod tests {
         let cx = &Cx::default();
         let view = HoistView::new(ThenView::new(async move {
             let signal = signal(cx, || String::from(value));
-            Ok(view! { cx => <p>(signal.read())</p> })
+            Ok(view! { cx => <p>(signal.read_untracked())</p> })
         }));
         block_on(view.single()).unwrap().render(cx)
+    }
+
+    /// Renders a body creating one number signal and reading it with
+    /// `read`, returning the content and the signal's dependency marker.
+    fn render_reading(read: impl Fn(&Signal<String>) + Send + 'static) -> (String, String) {
+        let cx = &Cx::default();
+        let id = Arc::new(OnceLock::new());
+        let out = Arc::clone(&id);
+        let view = HoistView::new(ThenView::new(async move {
+            let signal = signal(cx, || String::from("x"));
+            read(&signal);
+            out.set(signal.id()).unwrap();
+            Ok(view! { cx => <p></p> })
+        }));
+        let html = block_on(view.single()).unwrap().render(cx);
+        let marker = format!("<!--::topcoat::dep(\"{}\")-->", id.get().unwrap());
+        (html, marker)
     }
 
     /// Renders a body creating one signal under the component identity at
@@ -381,7 +471,7 @@ mod tests {
             });
             out.set((
                 signal.id(),
-                *signal.read(),
+                *signal.read_untracked(),
                 init_ran.load(Ordering::Relaxed),
             ))
             .unwrap();
@@ -441,5 +531,58 @@ mod tests {
         assert!(html.contains("--&gt;"), "{html}");
         // The JSON's own quotes round-trip as entities the client decodes.
         assert!(html.contains("&quot;"), "{html}");
+    }
+
+    #[test]
+    fn a_tracked_read_renders_a_dependency_marker_after_the_declaration() {
+        let (html, marker) = render_reading(|signal| {
+            assert_eq!(signal.get(), "x");
+        });
+        assert!(html.starts_with("<!--::topcoat::signal("), "{html}");
+        assert!(html.ends_with(&format!("{marker}<p></p>")), "{html}");
+    }
+
+    #[test]
+    fn repeated_reads_render_one_dependency_marker() {
+        let (html, marker) = render_reading(|signal| {
+            let _ = signal.get();
+            let _ = signal.read();
+            let _ = signal.get();
+        });
+        assert_eq!(html.matches(&marker).count(), 1, "{html}");
+    }
+
+    #[test]
+    fn untracked_reads_render_no_dependency_marker() {
+        let (html, _) = render_reading(|signal| {
+            assert_eq!(signal.get_untracked(), "x");
+            assert_eq!(signal.read_untracked(), "x");
+        });
+        assert!(!html.contains("::topcoat::dep("), "{html}");
+    }
+
+    #[test]
+    fn a_read_in_a_runtime_expression_renders_no_dependency_marker() {
+        let (html, _) = render_reading(|signal| {
+            let surrogate = crate::SignalSurrogate::new(signal.clone());
+            let _ = surrogate.get();
+            let _ = surrogate.read();
+        });
+        assert!(!html.contains("::topcoat::dep("), "{html}");
+    }
+
+    #[test]
+    fn a_tracked_read_outside_a_body_panics() {
+        let signal = Signal::new(SignalId(1), String::from("x"));
+        let panic = catch_unwind(AssertUnwindSafe(|| signal.get())).unwrap_err();
+        let message = panic.downcast::<&str>().expect("panics with a message");
+        assert!(message.contains("no view is collecting hoisted parts"));
+    }
+
+    #[test]
+    fn untracked_reads_work_outside_a_body() {
+        let signal = Signal::new(SignalId(1), String::from("x"));
+        assert_eq!(signal.get_untracked(), "x");
+        assert_eq!(signal.read_untracked(), "x");
     }
 }

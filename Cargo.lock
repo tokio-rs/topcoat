@@ -3247,6 +3247,7 @@ dependencies = [
  "http",
  "memchr",
  "pin-project-lite",
+ "siphasher",
  "smallvec",
  "topcoat",
  "topcoat-core",

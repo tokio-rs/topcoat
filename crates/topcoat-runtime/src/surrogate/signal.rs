@@ -22,9 +22,14 @@ impl<T> SignalSurrogate<T>
 where
     for<'b> &'b T: Surrogated,
 {
+    /// Borrows the current value.
+    ///
+    /// Reads inside a runtime expression are the client-reactive path and
+    /// do not register a dependency on the server; the server-side
+    /// evaluation that produces the initial render reads untracked.
     #[must_use]
     pub fn read(&self) -> <&T as Surrogated>::Surrogate {
-        self.0.read().into_surrogate()
+        self.0.read_untracked().into_surrogate()
     }
 }
 
@@ -32,9 +37,13 @@ impl<T> SignalSurrogate<T>
 where
     T: Surrogated + Clone,
 {
+    /// Clones the current value.
+    ///
+    /// Like [`read`](Self::read), this does not register a dependency on
+    /// the server.
     #[must_use]
     pub fn get(&self) -> <T as Surrogated>::Surrogate {
-        self.0.get().into_surrogate()
+        self.0.get_untracked().into_surrogate()
     }
 }
 
