@@ -10,7 +10,7 @@ use topcoat_view::ViewHandle;
 
 use crate::SignalValues;
 
-pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/shards";
+pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/runtime/shards";
 
 /// The body of a request re-rendering a shard: the current values of its
 /// arguments and of the signals its content created.

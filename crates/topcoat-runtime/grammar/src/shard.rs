@@ -128,7 +128,7 @@ impl ToTokens for Shard {
                     )),
                 )
                 .await?;
-                let __scope = #topcoat_runtime::ReactiveScope::new(
+                let __scope = #topcoat_runtime::ShardScope::new(
                     __identity,
                     #topcoat_runtime::ShardId::new(#id),
                     ::std::vec![#(#js_idents),*],

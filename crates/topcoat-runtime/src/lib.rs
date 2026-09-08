@@ -7,9 +7,9 @@ mod js;
 #[cfg(feature = "router")]
 mod procedure;
 #[cfg(feature = "router")]
-mod reactive_scope;
-#[cfg(feature = "router")]
 mod shard;
+#[cfg(feature = "router")]
+mod shard_scope;
 mod signal;
 mod surrogate;
 
@@ -20,9 +20,9 @@ pub use js::*;
 #[cfg(feature = "router")]
 pub use procedure::*;
 #[cfg(feature = "router")]
-pub use reactive_scope::*;
-#[cfg(feature = "router")]
 pub use shard::*;
+#[cfg(feature = "router")]
+pub use shard_scope::*;
 pub use signal::*;
 pub use surrogate::*;
 use topcoat_asset::{Asset, asset};

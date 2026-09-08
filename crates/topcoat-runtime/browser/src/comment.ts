@@ -2,16 +2,26 @@ import { Context } from "./context";
 import { type SignalId, SignalRegistry } from "./signal";
 import type { DehydratedSurrogate } from "./surrogate";
 
-export type ReactiveScopeId = string;
+export type ShardScopeId = string;
 
 export type CommentMarker =
 	| { kind: "signal"; id: SignalId; value: unknown }
+	| {
+			/**
+			 * The content depends on a signal: the server read it while
+			 * rendering, so the innermost unit enclosing the marker re-runs
+			 * when the signal changes.
+			 */
+			kind: "dep";
+			id: SignalId;
+	  }
 	| { kind: "expr-start"; js: string }
 	| { kind: "expr-end" }
 	| {
-			kind: "scope-start";
-			id: ReactiveScopeId;
-			path: string;
+			kind: "shard-start";
+			id: ShardScopeId;
+			/** The id of the shard, which names its route. */
+			shard: string;
 			/**
 			 * The identity of the shard invocation, sent back with every
 			 * re-render request so the server derives the same identities
@@ -20,14 +30,15 @@ export type CommentMarker =
 			identity: string;
 			exprs: string[];
 	  }
-	| { kind: "scope-end"; id: ReactiveScopeId };
+	| { kind: "shard-end"; id: ShardScopeId };
 
 const SIGNAL_RE = /^\s*::topcoat::signal\(([\s\S]*)\)\s*$/;
+const DEP_RE = /^\s*::topcoat::dep\("([0-9a-f]+)"\)\s*$/;
 const EXPR_START_RE = /^\s*::topcoat::expr::start\("([^"]*)"\)\s*$/;
 const EXPR_END_RE = /^\s*::topcoat::expr::end\s*$/;
-const SCOPE_START_RE =
-	/^\s*::topcoat::scope::start\(("[^"]+"), ("[^"]*"), ("[^"]*"), (\[[\s\S]*\])\)\s*$/;
-const SCOPE_END_RE = /^\s*::topcoat::scope::end\(("[^"]+")\)\s*$/;
+const SHARD_START_RE =
+	/^\s*::topcoat::shard::start\(("[^"]+"), ("[^"]*"), ("[^"]*"), (\[[\s\S]*\])\)\s*$/;
+const SHARD_END_RE = /^\s*::topcoat::shard::end\(("[^"]+")\)\s*$/;
 const QUOTED_RE = /"([^"]*)"/g;
 
 export function parseComment(node: Comment): CommentMarker | null {
@@ -53,6 +64,11 @@ export function parseComment(node: Comment): CommentMarker | null {
 		};
 	}
 
+	const dep = DEP_RE.exec(text);
+	if (dep) {
+		return { kind: "dep", id: dep[1] ?? "" };
+	}
+
 	const exprStart = EXPR_START_RE.exec(text);
 	if (exprStart) {
 		const js = decodeHtml(exprStart[1] ?? "");
@@ -66,7 +82,7 @@ export function parseComment(node: Comment): CommentMarker | null {
 		return { kind: "expr-end" };
 	}
 
-	const start = SCOPE_START_RE.exec(text);
+	const start = SHARD_START_RE.exec(text);
 	if (start) {
 		const exprs: string[] = [];
 		QUOTED_RE.lastIndex = 0;
@@ -76,19 +92,19 @@ export function parseComment(node: Comment): CommentMarker | null {
 			m = QUOTED_RE.exec(start[4] ?? "");
 		}
 		return {
-			kind: "scope-start",
-			id: JSON.parse(start[1] ?? "") as ReactiveScopeId,
-			path: JSON.parse(start[2] ?? "") as string,
+			kind: "shard-start",
+			id: JSON.parse(start[1] ?? "") as ShardScopeId,
+			shard: JSON.parse(start[2] ?? "") as string,
 			identity: JSON.parse(start[3] ?? "") as string,
 			exprs,
 		};
 	}
 
-	const end = SCOPE_END_RE.exec(text);
+	const end = SHARD_END_RE.exec(text);
 	if (end) {
 		return {
-			kind: "scope-end",
-			id: JSON.parse(end[1] ?? "") as ReactiveScopeId,
+			kind: "shard-end",
+			id: JSON.parse(end[1] ?? "") as ShardScopeId,
 		};
 	}
 

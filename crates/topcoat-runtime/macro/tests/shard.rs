@@ -32,15 +32,15 @@ async fn host(cx: &Cx) -> Result<impl View> {
     Ok(view! { stateful(label: $(label.get())) })
 }
 
-/// The path and identity arguments of the scope start marker in `html`.
+/// The shard id and identity arguments of the scope start marker in `html`.
 fn scope_marker(html: &str) -> (&str, &str) {
-    let start = html.find("::topcoat::scope::start(").expect(html);
+    let start = html.find("::topcoat::shard::start(").expect(html);
     // The marker's quoted arguments alternate with the separators between
-    // them: the scope id, the path, then the identity.
+    // them: the scope id, the shard id, then the identity.
     let mut args = html[start..].split('"');
-    let path = args.nth(3).expect(html);
+    let shard = args.nth(3).expect(html);
     let identity = args.nth(1).expect(html);
-    (path, identity)
+    (shard, identity)
 }
 
 /// The id of the last signal declared in `html`.
@@ -76,12 +76,8 @@ async fn rerender(identity: &str, signals: &str) -> String {
 async fn a_rerender_derives_the_same_signal_id_as_the_inline_render() {
     let cx = &Cx::default();
     let inline = view! { cx => host() }.single().await.unwrap().render(cx);
-    let (path, identity) = scope_marker(&inline);
-    assert_eq!(
-        path,
-        format!("/_topcoat/shards/{}", stateful.id().as_str()),
-        "{inline}"
-    );
+    let (shard, identity) = scope_marker(&inline);
+    assert_eq!(shard, stateful.id().as_str(), "{inline}");
 
     let rerendered = rerender(identity, "{}").await;
 

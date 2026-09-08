@@ -3,13 +3,13 @@ use topcoat_core::context::Cx;
 use topcoat_view::{NodeViewParts, PartsWriter, ViewHandle, identity::Identity};
 use uuid::Uuid;
 
-use crate::{Js, SHARD_ROUTE_PREFIX, ShardId};
+use crate::{Js, ShardId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-pub struct ReactiveScopeId(Uuid);
+pub struct ShardScopeId(Uuid);
 
-impl ReactiveScopeId {
+impl ShardScopeId {
     #[inline]
     #[must_use]
     pub fn new() -> Self {
@@ -17,15 +17,15 @@ impl ReactiveScopeId {
     }
 }
 
-impl Default for ReactiveScopeId {
+impl Default for ShardScopeId {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-pub struct ReactiveScope {
-    id: ReactiveScopeId,
+pub struct ShardScope {
+    id: ShardScopeId,
     /// The identity of the shard invocation, which the browser sends back
     /// with a re-render request so the shard body derives the same
     /// identities as the inline render.
@@ -35,7 +35,7 @@ pub struct ReactiveScope {
     placeholder: ViewHandle,
 }
 
-impl ReactiveScope {
+impl ShardScope {
     #[inline]
     #[must_use]
     pub fn new(
@@ -45,7 +45,7 @@ impl ReactiveScope {
         placeholder: ViewHandle,
     ) -> Self {
         Self {
-            id: ReactiveScopeId::new(),
+            id: ShardScopeId::new(),
             identity,
             shard_id,
             exprs,
@@ -54,24 +54,23 @@ impl ReactiveScope {
     }
 }
 
-impl NodeViewParts for ReactiveScope {
+impl NodeViewParts for ShardScope {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         let shard_id = self.shard_id.as_str();
 
-        // <!-- ::topcoat::scope::start("<id>", "<path>", "<identity>", ["<js>", ...]) -->
+        // <!-- ::topcoat::shard::start("<id>", "<shard id>", "<identity>", ["<js>", ...]) -->
         //
-        // Each parameter's JavaScript source is wrapped in a quoted string.
-        // The source parts are sealed with the comment context, so any `"`
+        // The browser runtime derives the shard's route from its id. Each
+        // parameter's JavaScript source is wrapped in a quoted string. The
+        // source parts are sealed with the comment context, so any `"`
         // inside the source renders as `&quot;` and the quotes stay
         // unambiguous delimiters on the client.
         parts.push_comment(|comment| {
             comment
-                .push_promoted_str_unescaped(&"::topcoat::scope::start(")
+                .push_promoted_str_unescaped(&"::topcoat::shard::start(")
                 .push_string_unescaped(serde_json::to_string(&self.id).unwrap())
                 .push_promoted_str_unescaped(&", ")
-                .push_string_unescaped(
-                    serde_json::to_string(&format!("{SHARD_ROUTE_PREFIX}/{shard_id}")).unwrap(),
-                )
+                .push_string_unescaped(serde_json::to_string(shard_id).unwrap())
                 .push_promoted_str_unescaped(&", ")
                 .push_string_unescaped(serde_json::to_string(&self.identity.to_string()).unwrap())
                 .push_promoted_str_unescaped(&", [");
@@ -89,7 +88,7 @@ impl NodeViewParts for ReactiveScope {
         self.placeholder.into_view_parts(cx, parts);
         parts.push_comment(|comment| {
             comment
-                .push_promoted_str_unescaped(&"::topcoat::scope::end(")
+                .push_promoted_str_unescaped(&"::topcoat::shard::end(")
                 .push_string_unescaped(serde_json::to_string(&self.id).unwrap())
                 .push_promoted_str_unescaped(&")");
         });
