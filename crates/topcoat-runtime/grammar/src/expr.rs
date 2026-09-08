@@ -65,6 +65,11 @@ impl Expr {
         // captured from the surrounding Rust scope. Their values are encoded
         // into the JavaScript source at runtime as `const` bindings, declared
         // ahead of the returned expression.
+        //
+        // A capture is cloned into the expression, so the surrounding scope
+        // keeps its value and any number of expressions can capture the
+        // same one. Every vocabulary type is cheap to clone, and a signal
+        // shares its value between clones.
         let externals = names.externals();
 
         if externals.is_empty() {
@@ -75,7 +80,11 @@ impl Expr {
             let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
             let rust_external_values = externals.iter().map(|binding| {
                 let ident = &binding.original_ident;
-                quote! { #topcoat_runtime::Surrogated::into_surrogate(#ident) }
+                quote! {
+                    #topcoat_runtime::Surrogated::into_surrogate(
+                        ::core::clone::Clone::clone(&#ident),
+                    )
+                }
             });
 
             let mut js_head = "(() => { const [".to_owned();

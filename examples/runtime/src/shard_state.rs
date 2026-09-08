@@ -11,7 +11,9 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
     let label = signal(cx, || String::from("clicks"));
 
     Ok(view! {
-        <p>"Typing re-renders the card on the server; its own counter keeps counting."</p>
+        <p>
+            "Typing re-renders the card on the server; its own counter keeps counting."
+        </p>
 
         <input :value=$(label.get()) @input=$(|e: Event| label.set(e.target.value))>
 

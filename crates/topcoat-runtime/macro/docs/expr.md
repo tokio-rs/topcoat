@@ -34,7 +34,7 @@ Ok(view! {
 # }
 ```
 
-The captured value is serialized into the page during the render and becomes a constant in the generated JavaScript. It is a snapshot: the browser keeps the value from the render, and later changes on the server do not reach it. Captured values must belong to the shared vocabulary described next.
+The captured value is cloned into the expression, so the surrounding code keeps using it, then serialized into the page during the render and becomes a constant in the generated JavaScript. It is a snapshot: the browser keeps the value from the render, and later changes on the server do not reach it. Captured values must belong to the shared vocabulary described next, all of which is cheap to clone.
 
 # The shared vocabulary
 

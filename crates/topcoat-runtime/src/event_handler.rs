@@ -5,7 +5,7 @@ use crate::{Event, Expr};
 
 pub trait EventHandlerFn {}
 
-impl<T, R> EventHandlerFn for T where T: Fn(Event) -> R {}
+impl<T, R> EventHandlerFn for T where T: FnOnce(Event) -> R {}
 
 /// An event handler attribute. Emits a JavaScript closure expression into a
 /// `data-topcoat-on:<event>` attribute on the element. The browser scanner

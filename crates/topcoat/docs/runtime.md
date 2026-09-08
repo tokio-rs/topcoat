@@ -75,7 +75,7 @@ Ok(view! {
 # }
 ```
 
-The initial value is computed once during the server render and serialized into the page; the browser picks it up as reactive state. A signal belongs to the page, layout, component, or shard body that creates it and lives for the rest of the request, so it can be captured by any number of runtime expressions in that body's view and handed down to the components it renders.
+The initial value is computed once during the server render and serialized into the page; the browser picks it up as reactive state. A signal belongs to the page, layout, component, or shard body that creates it. It is an ordinary value that is cheap to clone, so it can be captured by any number of runtime expressions in that body's view and handed down to the components it renders as `&Signal<T>`.
 
 In the browser, a runtime expression re-runs whenever a signal it read changes -- the text above updates the moment `count` does, with no server round-trip. Inside an expression you work with a signal through its methods: `.get()` reads the current value and `.set(...)` replaces it. Nothing changes `count` yet, though; that is what event handlers are for.
 

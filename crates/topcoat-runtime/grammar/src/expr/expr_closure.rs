@@ -42,9 +42,8 @@ impl Expr {
         }
         names.pop_scope();
 
-        let capture = &closure.capture;
         let output = &closure.output;
-        quote! { #asyncness #capture |#(#inputs),*| #output #body }.to_tokens(rust);
+        quote! { #asyncness move |#(#inputs),*| #output #body }.to_tokens(rust);
         Ok(())
     }
 }

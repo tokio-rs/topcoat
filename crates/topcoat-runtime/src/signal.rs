@@ -1,11 +1,7 @@
-use std::{
-    collections::{HashMap, HashSet},
-    panic::Location,
-    sync::{Mutex, PoisonError},
-};
+use std::{collections::HashMap, panic::Location, sync::Arc};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
-use topcoat_core::context::{Cx, request_arena, try_request_context};
+use topcoat_core::context::{Cx, try_request_context};
 use topcoat_view::{
     hoist,
     identity::{Identity, SiteKey},
@@ -62,21 +58,6 @@ impl<'de> Deserialize<'de> for SignalId {
     }
 }
 
-/// The ids of every signal created during one request, kept to catch a call
-/// site that runs more than once under the same identity.
-#[derive(Debug, Default)]
-struct CreatedSignals(Mutex<HashSet<SignalId>>);
-
-impl CreatedSignals {
-    /// Records `id`, returning whether it is new to this request.
-    fn insert(&self, id: SignalId) -> bool {
-        self.0
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .insert(id)
-    }
-}
-
 /// The current values of signals a client sends along with a run, keyed by
 /// signal id.
 ///
@@ -100,19 +81,23 @@ impl SignalValues {
 /// A signal is created with [`signal`] during a server render and read or
 /// written in runtime expressions, where it is reactive: an expression
 /// re-runs in the browser whenever a signal it read changes. A signal is
-/// handled by reference, which lives for the whole request, so any number
-/// of runtime expressions can capture it and a component can take one as a
-/// `&Signal<T>` prop.
+/// cheap to clone, and every clone is the same signal: runtime expressions
+/// clone the signals they capture, so any number of them can capture one,
+/// and a component takes one as a `&Signal<T>` prop.
 #[derive(Debug)]
 pub struct Signal<T> {
     id: SignalId,
-    value: T,
+    /// Shared between clones, so capturing a signal never copies its value.
+    value: Arc<T>,
 }
 
 impl<T> Signal<T> {
     #[inline]
     pub(crate) fn new(id: SignalId, value: T) -> Self {
-        Self { id, value }
+        Self {
+            id,
+            value: Arc::new(value),
+        }
     }
 
     pub(crate) fn id(&self) -> SignalId {
@@ -154,7 +139,16 @@ where
     T: Clone,
 {
     pub(crate) fn get(&self) -> T {
-        self.value.clone()
+        T::clone(&self.value)
+    }
+}
+
+impl<T> Clone for Signal<T> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            value: Arc::clone(&self.value),
+        }
     }
 }
 
@@ -204,9 +198,9 @@ where
 /// Creates a signal holding the value `init` returns.
 ///
 /// The value is computed once, during the server render, and becomes the
-/// signal's initial state in the browser. The signal lives on the request,
-/// so the returned reference is valid for the rest of it: capture the signal
-/// in as many runtime expressions as needed, or pass it on to components.
+/// signal's initial state in the browser. The returned signal is an
+/// ordinary value the body keeps: capture it in as many runtime expressions
+/// as needed, which clone it, or pass it on to components as `&Signal<T>`.
 ///
 /// A run that resumes state, such as a shard re-render, carries the current
 /// values of the signals the client holds. When one of them is this
@@ -242,28 +236,20 @@ where
 /// # Panics
 ///
 /// Panics when called outside a page, layout, component, or shard body,
-/// including from work such a body spawns onto another task; when the
+/// including from work such a body spawns onto another task, and when the
 /// enclosing body's identity is ambiguous because an invocation above it
-/// repeats without a `key`; and when the same call site creates a second
-/// signal under the same identity within one request.
+/// repeats without a `key`.
 #[track_caller]
-pub fn signal<T>(cx: &Cx, init: impl FnOnce() -> T) -> &Signal<T>
+pub fn signal<T>(cx: &Cx, init: impl FnOnce() -> T) -> Signal<T>
 where
-    T: SignalValue + Send + Sync + 'static,
+    T: SignalValue,
 {
-    let location = Location::caller();
-    let id = SignalId::derive(location);
-    let arena = request_arena(cx);
-    assert!(
-        arena.get_or_default::<CreatedSignals>().insert(id),
-        "the signal created at {location} already exists in this request; a call site that \
-         runs more than once needs a `key` on the component invocation enclosing it"
-    );
+    let id = SignalId::derive(Location::caller());
     let value = try_request_context::<SignalValues>(cx)
         .and_then(|values| values.get(id))
         .and_then(T::from_value)
         .unwrap_or_else(init);
-    let signal = arena.alloc(Signal::new(id, value));
+    let signal = Signal::new(id, value);
     let declaration = signal.declaration();
     hoist(move |parts| {
         parts.push_comment(|comment| {
@@ -371,24 +357,6 @@ mod tests {
     #[test]
     fn distinct_identities_render_distinct_ids() {
         assert_ne!(signal_id_at(SITE_A), signal_id_at(SITE_B));
-    }
-
-    #[test]
-    fn a_call_site_that_repeats_within_a_request_panics() {
-        let cx = &Cx::default();
-        let view = HoistView::new(ThenView::new(async move {
-            for _ in 0..2 {
-                signal(cx, || 0.0_f64);
-            }
-            Ok(view! { cx => <p></p> })
-        }));
-        let panic = catch_unwind(AssertUnwindSafe(|| block_on(view.single()))).unwrap_err();
-        let message = panic.downcast::<String>().expect("panics with a message");
-        assert!(
-            message.contains("already exists in this request"),
-            "{message}"
-        );
-        assert!(message.contains(file!()), "{message}");
     }
 
     #[test]

@@ -22,6 +22,7 @@ impl<T> SignalSurrogate<T>
 where
     for<'b> &'b T: Surrogated,
 {
+    #[must_use]
     pub fn read(&self) -> <&T as Surrogated>::Surrogate {
         self.0.read().into_surrogate()
     }
@@ -31,6 +32,7 @@ impl<T> SignalSurrogate<T>
 where
     T: Surrogated + Clone,
 {
+    #[must_use]
     pub fn get(&self) -> <T as Surrogated>::Surrogate {
         self.0.get().into_surrogate()
     }
