@@ -96,7 +96,8 @@ impl SignalValues {
 /// re-runs in the browser whenever a signal it read changes. A signal is
 /// cheap to clone, and every clone is the same signal: runtime expressions
 /// clone the signals they capture, so any number of them can capture one,
-/// and a component takes one as a `&Signal<T>` prop.
+/// a component takes one as a `&Signal<T>` prop, and a shard takes one as
+/// a `Signal<T>` parameter passed as `$(signal)`.
 ///
 /// A signal can also be read on the server, outside any runtime
 /// expression. [`get`](Self::get) and [`read`](Self::read) are tracked

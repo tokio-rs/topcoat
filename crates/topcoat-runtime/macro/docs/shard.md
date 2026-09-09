@@ -98,6 +98,33 @@ Argument types must belong to the shared vocabulary of [`expr!`], since their va
 
 A parameter named `cx` borrowing [`Cx`] is special: just like in a component, it is filled from the request context on the server and does not take an argument at the call site.
 
+A signal can also be passed as an argument, to a parameter typed [`Signal<T>`]. The argument is the signal handle, which does not change when its value does, so the shard does not re-render on a change unless its body reads the signal tracked. This is how to pass an input the shard does not track directly:
+
+```rust
+# use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Signal}};
+# async fn search_products(_cx: &Cx, _query: &str, _limit: f64) -> Result<Vec<String>> { Ok(vec![]) }
+#[shard]
+async fn search_results(cx: &Cx, query: String, limit: Signal<f64>) -> Result<impl View> {
+    // A new limit takes effect on the next re-render, but does not cause one.
+    let products = search_products(cx, &query, limit.get_untracked()).await?;
+
+    Ok(view! {
+        for product in products {
+            <div>(product)</div>
+        }
+    })
+}
+
+# #[component]
+# async fn example(cx: &Cx) -> Result<impl View> {
+# let query = signal(cx, String::new);
+# let limit = signal(cx, || 10.0);
+# Ok(view! {
+search_results(query: $(query.get()), limit: $(limit))
+# })
+# }
+```
+
 # Registration
 
 Each shard is served by a route on the [`Router`]. `.discover()` registers every shard linked into the binary; alternatively, mount shards individually:
@@ -114,6 +141,7 @@ let router = Router::builder().shard(search_results).build();
 [`Result`]: ../type.Result.html
 [`Router`]: ../router/struct.Router.html
 [`signal`]: fn.signal.html
+[`Signal<T>`]: struct.Signal.html
 [`expr!`]: macro.expr.html
 [`view!`]: ../view/macro.view.html
 [`View`]: ../view/trait.View.html

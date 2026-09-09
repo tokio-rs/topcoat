@@ -264,6 +264,8 @@ async fn paginated(cx: &Cx) -> Result<impl View> {
 
 Clicking a button changes `page` in the browser, and because the shard read it on the server, the shard runs again with the new value and swaps in the next page of items.
 
+A shard can also take a signal from its caller, through a parameter typed `Signal<T>` and passed as `$(signal)`. The signal handle does not change when its value does, so whether a change re-renders the shard depends on how the shard body reads it. See [`#[shard]`][shard].
+
 `.get_untracked()` and `.read_untracked()` read a signal's value without making anything depend on it, for a body that wants the value a run started with but should not run again when it changes.
 
 [`Event`]: struct.Event.html
