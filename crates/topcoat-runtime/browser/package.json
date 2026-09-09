@@ -11,6 +11,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.15",
+		"happy-dom": "^20.14.0",
 		"tsup": "^8.5.1",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.10"

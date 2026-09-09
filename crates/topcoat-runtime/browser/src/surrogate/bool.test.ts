@@ -12,5 +12,10 @@ it("preserves a Bool when it crosses a Promise boundary", async () => {
 
 it("retains Rust bool::then behavior without becoming a JavaScript thenable", () => {
 	expect(new Bool(true).then_(() => "value").unwrap()).toBe("value");
-	expect(new Bool(false).then_(() => "value").is_none().dehydrate()).toBe(true);
+	expect(
+		new Bool(false)
+			.then_(() => "value")
+			.is_none()
+			.dehydrate(),
+	).toBe(true);
 });

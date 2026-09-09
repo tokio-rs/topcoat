@@ -8,6 +8,7 @@ import {
 
 import type { ShardScopeId } from "./comment";
 import type { Context } from "./context";
+import { morph } from "./morph";
 import type { Runtime } from "./runtime";
 import { scan } from "./scan";
 import type { SignalId } from "./signal";
@@ -34,6 +35,8 @@ export class Scope {
 	 */
 	readonly dependencies = new Set<SignalId>();
 	private readonly mScope: MaverickScope = createScope();
+	/** Aborted on release, removing every event listener added with it. */
+	private readonly listenerController = new AbortController();
 	private disposed = false;
 
 	constructor(
@@ -46,6 +49,14 @@ export class Scope {
 	/** Runs `fn` inside this scope so effects it creates attach for disposal. */
 	run<T>(fn: () => T): T {
 		return scoped(fn, this.mScope) as T;
+	}
+
+	/**
+	 * The signal to add event listeners with, so they are removed when the
+	 * scope is released.
+	 */
+	get listeners(): AbortSignal {
+		return this.listenerController.signal;
 	}
 
 	/**
@@ -82,6 +93,7 @@ export class Scope {
 		this.children.clear();
 
 		this.mScope.dispose();
+		this.listenerController.abort();
 
 		for (const id of this.signalIds) into.add(id);
 		this.signalIds.clear();
@@ -132,17 +144,17 @@ export abstract class Unit extends Scope {
 	protected abstract request(signal: AbortSignal): Promise<Response>;
 
 	/**
-	 * Parses `html` into the nodes replacing the content, or returns `null`
-	 * to keep the current content because nothing would change.
+	 * Parses `html` into the nodes the content becomes, or returns `null` to
+	 * keep the current content because the unit is no longer in the document.
 	 */
-	protected abstract prepare(html: string): DocumentFragment | null;
+	protected abstract prepare(html: string): Node[] | null;
 
 	/**
-	 * Swaps `fragment` into the document in place of the current content and
-	 * scans it into `scope`, adopting the signals in `adoptable` it declares.
+	 * Morphs the current content into `nodes` and scans the result into
+	 * `scope`, adopting the signals in `adoptable` it declares.
 	 */
 	protected abstract insert(
-		fragment: DocumentFragment,
+		nodes: Node[],
 		scope: Scope,
 		adoptable: Set<SignalId>,
 	): void;
@@ -213,21 +225,25 @@ export abstract class Unit extends Scope {
 
 	/**
 	 * Replaces the content with `html`, keeping the signals the new content
-	 * declares again.
+	 * declares again and every element the new content can be morphed into.
 	 *
-	 * The old content's effects are disposed first, so nothing reacts while
-	 * the document changes. Its signals stay registered, so an existing one
-	 * wins when the new content declares its id and a value the user changed
-	 * while the request was in flight survives. The signals the new content
-	 * no longer declares are deleted afterwards.
+	 * The old content's effects and listeners are disposed first, so nothing
+	 * reacts while the document changes. The new markup is then morphed into
+	 * the existing nodes rather than swapped in, so focus, scroll position,
+	 * and what the user is typing survive, and the result is scanned again
+	 * as if it were fresh content. The old signals stay registered
+	 * throughout, so an existing one wins when the new content declares its
+	 * id and a value the user changed while the request was in flight
+	 * survives. The signals the new content no longer declares are deleted
+	 * afterwards.
 	 */
 	replaceContent(html: string): void {
-		const fragment = this.prepare(html);
-		if (fragment === null) return;
+		const nodes = this.prepare(html);
+		if (nodes === null) return;
 
 		const orphans = this.contentScope.release();
 		this.contentScope = new Scope(this, this.runtime);
-		this.insert(fragment, this.contentScope, orphans);
+		this.insert(nodes, this.contentScope, orphans);
 		for (const id of orphans) this.runtime.registry.delete(id);
 
 		this.startWatching();
@@ -295,19 +311,16 @@ export class ShardUnit extends Unit {
 		});
 	}
 
-	protected prepare(html: string): DocumentFragment | null {
+	protected prepare(html: string): Node[] | null {
 		if (this.endNode === null || this.startNode.parentNode === null) {
 			return null;
 		}
 		const fragment = document.createRange().createContextualFragment(html);
-		if (markup(fragment.childNodes) === markup(this.contentNodes())) {
-			return null;
-		}
-		return fragment;
+		return Array.from(fragment.childNodes);
 	}
 
 	protected insert(
-		fragment: DocumentFragment,
+		nodes: Node[],
 		scope: Scope,
 		adoptable: Set<SignalId>,
 	): void {
@@ -315,29 +328,16 @@ export class ShardUnit extends Unit {
 		const end = this.endNode;
 		if (parent === null || end === null) return;
 
-		for (const node of this.contentNodes()) parent.removeChild(node);
-		parent.insertBefore(fragment, end);
-
+		morph(parent, this.startNode, end, nodes);
 		scan(parent, this.startNode, end, scope, adoptable);
-	}
-
-	/** The nodes between the shard's start and end markers. */
-	private contentNodes(): ChildNode[] {
-		const nodes: ChildNode[] = [];
-		let n: ChildNode | null = this.startNode.nextSibling;
-		while (n && n !== this.endNode) {
-			nodes.push(n);
-			n = n.nextSibling;
-		}
-		return nodes;
 	}
 }
 
 /**
  * The page: the outermost unit, whose content is the whole document and
  * whose inputs are its URL and its dependencies. A re-run is requested from
- * the pages route and arrives as a full document, whose body replaces the
- * children of `<body>`; the head is left alone.
+ * the pages route and arrives as a full document, whose body is morphed
+ * into the children of `<body>`; the head is left alone.
  */
 export class PageUnit extends Unit {
 	protected readonly label = "Page";
@@ -363,27 +363,19 @@ export class PageUnit extends Unit {
 		});
 	}
 
-	protected prepare(html: string): DocumentFragment | null {
+	protected prepare(html: string): Node[] | null {
 		const doc = new DOMParser().parseFromString(html, "text/html");
-		if (doc.body.innerHTML === document.body.innerHTML) return null;
-		const fragment = document.createDocumentFragment();
-		fragment.append(...Array.from(doc.body.childNodes));
-		return fragment;
+		return Array.from(doc.body.childNodes);
 	}
 
 	protected insert(
-		fragment: DocumentFragment,
+		nodes: Node[],
 		scope: Scope,
 		adoptable: Set<SignalId>,
 	): void {
-		document.body.replaceChildren(fragment);
+		morph(document.body, null, null, nodes);
+		// The whole document, so declarations outside the body are adopted
+		// again.
 		scan(document, null, null, scope, adoptable);
 	}
-}
-
-/** Serializes `nodes` the way the browser would, for comparing content. */
-function markup(nodes: Iterable<Node>): string {
-	const template = document.createElement("template");
-	for (const node of nodes) template.content.append(node.cloneNode(true));
-	return template.innerHTML;
 }
