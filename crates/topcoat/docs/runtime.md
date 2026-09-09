@@ -239,7 +239,7 @@ The input keeps working as a client-only binding, and the product list follows i
 
 **Every value read on the server is user input and must not be trusted.** The client holds the signal and can send anything that fits its type, so validate the value before acting on it, exactly like a shard argument.
 
-The whole page content is replaced, so a re-run keeps every signal's value but loses focus, scroll position, and anything else the browser holds.
+The result is morphed into the page rather than swapped in. Elements that still exist are updated in place, so focus, scroll position, and what the user is typing survive a re-run, and every signal keeps its value. Give the items of a list that can reorder an `id`, so the morph follows each item to its new position instead of rewriting the items in between.
 
 To avoid re-running the whole page, use a shard: a signal tracked inside a shard re-renders only that shard, not the entire page. The shard creates the signal, reads it, and hands the browser the handlers that change it:
 
