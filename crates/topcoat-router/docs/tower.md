@@ -4,20 +4,20 @@ The [tower](https://docs.rs/tower) ecosystem shares one service abstraction acro
 
 # Mounting a service as a route
 
-[`TowerRoute`] forwards its requests to a tower service (an axum router, a hyper service, a reverse proxy). Registered at a catch-all path with `Methods::Any`, it hands an entire URL subtree to the service. This is the typical setup when migrating an existing application to topcoat one route at a time. The service receives each request with its original URI; nothing is stripped or rewritten.
+[`TowerRoute`] forwards its requests to a tower service (an axum router, a hyper service, a reverse proxy). Registered with [`any`](TowerRoute::any) at a catch-all path, it hands an entire URL subtree to the service, which responds to every HTTP method. This is the typical setup when migrating an existing application to topcoat one route at a time. The service receives each request with its original URI; nothing is stripped or rewritten.
 
 ```rust,ignore
-use topcoat::router::{Methods, Router, tower::TowerRoute};
+use topcoat::router::{Router, tower::TowerRoute};
 
 // The pre-migration application, still serving everything under `/legacy`.
 let legacy: axum::Router = legacy_app();
 
 let router = Router::builder()
-    .route(TowerRoute::new(Methods::Any, "/legacy/{*rest}", legacy))
+    .route(TowerRoute::any("/legacy/{*rest}", legacy))
     .build();
 ```
 
-A catch-all segment does not match the bare prefix itself, so register a second `TowerRoute` for `/legacy` if the service also serves that URL.
+A catch-all segment does not match the bare prefix itself, so register a second `TowerRoute` for `/legacy` if the service also serves that URL. To restrict a mounted service to specific methods, use [`new`](TowerRoute::new) instead.
 
 # Running middleware as a layer
 

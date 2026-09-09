@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-macro-v0.7.0...topcoat-runtime-macro-v0.8.0) - 2026-09-09
+
+### Added
+
+- *(runtime)* allow passing signals as shard parameters ([#393](https://github.com/tokio-rs/topcoat/pull/393))
+- *(runtime)* [**breaking**] morph HTML after shard/page rerun instead of replacing it ([#392](https://github.com/tokio-rs/topcoat/pull/392))
+- *(runtime)* [**breaking**] track signals in shards / pages ([#391](https://github.com/tokio-rs/topcoat/pull/391))
+- *(runtime)* persistent signal identity and state ([#388](https://github.com/tokio-rs/topcoat/pull/388))
+- *(runtime)* [**breaking**] replace signal custom syntax with an ordinary rust function ([#384](https://github.com/tokio-rs/topcoat/pull/384))
+
 ## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-macro-v0.6.2...topcoat-runtime-macro-v0.7.0) - 2026-09-04
 
 ### Added

@@ -1,5 +1,6 @@
+// @vitest-environment happy-dom
 import { tick } from "@maverick-js/signals";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it } from "vitest";
 
 import { Runtime } from "./runtime";
 import {
@@ -14,6 +15,10 @@ import { F64 } from "./surrogate";
 
 const originalFetch = globalThis.fetch;
 const originalLocation = globalThis.location;
+
+beforeEach(() => {
+	document.body.innerHTML = "";
+});
 
 afterEach(() => {
 	globalThis.fetch = originalFetch;
@@ -42,76 +47,96 @@ async function settle(): Promise<void> {
 	tick();
 }
 
+/** Reaches the re-run a unit performs when an input changes. */
+function refetch(unit: Unit): () => Promise<void> {
+	return (
+		unit as unknown as { fetchAndReplace(): Promise<void> }
+	).fetchAndReplace.bind(unit);
+}
+
 /**
- * Mounts a shard between fake marker nodes, so the DOM removal the
- * replacement performs can be observed without a document.
+ * Mounts a shard with `content` between marker comments in the body and
+ * scans it, the way the runtime does on load.
  */
-function mountShard(stub: ReturnType<typeof stubFetch>) {
-	const removed: ChildNode[] = [];
-	const end = {} as Comment;
-	const content = { nextSibling: end } as unknown as ChildNode;
-	const parent = {
-		removeChild(node: ChildNode) {
-			removed.push(node);
-			return node;
-		},
-	} as unknown as ParentNode;
-	const start = {
-		parentNode: parent,
-		nextSibling: content,
-	} as unknown as Comment;
-
+function mountShard(content: string) {
+	document.body.innerHTML = `<p>outside</p><!--::topcoat::shard::start("1", "0", [])-->${content}<!--::topcoat::shard::end("0")-->`;
 	const runtime = new Runtime();
-	const shard = new ShardUnit(
-		runtime.page.contentScope,
-		runtime,
-		"scope",
-		"1",
-		"0",
-		[],
-		start,
-	);
-	shard.attachEnd(end);
-
-	const fetchAndReplace = (
-		shard as unknown as { fetchAndReplace(): Promise<void> }
-	).fetchAndReplace.bind(shard);
-
-	return { fetchAndReplace, removed, runtime, shard, ...stub };
+	runtime.start(document);
+	const [shard] = runtime.page.contentScope.children;
+	if (!(shard instanceof ShardUnit)) throw new Error("No shard was scanned");
+	return { runtime, shard, fetchAndReplace: refetch(shard) };
 }
 
 it("a shard sends the identity in a header and the arguments and signal values in the body", async () => {
-	const { fetchAndReplace, runtime, shard, url, request } = mountShard(
-		stubFetch(500, "Internal Server Error"),
-	);
+	const stub = stubFetch(500, "Internal Server Error");
+	const { fetchAndReplace, runtime, shard } = mountShard("");
 	runtime.registry.insert("s1", new F64(3));
 	shard.contentScope.signalIds.add("s1");
 
 	await fetchAndReplace().catch(() => undefined);
 
-	expect(url()).toBe(`${SHARD_ROUTE_PREFIX}/1`);
-	const headers = request()?.headers as Record<string, string>;
+	expect(stub.url()).toBe(`${SHARD_ROUTE_PREFIX}/1`);
+	const headers = stub.request()?.headers as Record<string, string>;
 	expect(headers["X-Topcoat-Identity"]).toBe("0");
-	expect(JSON.parse(request()?.body as string)).toEqual({
+	expect(JSON.parse(stub.request()?.body as string)).toEqual({
 		args: [],
 		signals: { s1: 3 },
 	});
 });
 
 it("a shard keeps the rendered content when the server responds with an error", async () => {
-	const { fetchAndReplace, removed } = mountShard(
-		stubFetch(405, "Method Not Allowed"),
-	);
+	stubFetch(405, "Method Not Allowed");
+	const { fetchAndReplace } = mountShard("<p>rendered</p>");
+	const before = document.body.innerHTML;
 
 	const error = await fetchAndReplace().then(
 		() => undefined,
 		(e: unknown) => e,
 	);
 
-	expect(removed).toEqual([]);
+	expect(document.body.innerHTML).toBe(before);
 	expect(String(error)).toContain(
 		"Shard request failed: 405 Method Not Allowed",
 	);
+});
+
+it("a shard re-run morphs its content, keeping a focused input and the markers", async () => {
+	stubFetch(200, "OK", `<input value="shoes"><ul><li>shoes</li></ul>`);
+	const { fetchAndReplace } = mountShard(
+		`<input value="sho"><ul><li>shoe</li><li>shorts</li></ul>`,
+	);
+	const input = document.querySelector("input") as HTMLInputElement;
+	input.focus();
+	input.value = "shoes";
+	const markers = Array.from(document.body.childNodes).filter(
+		(node) => node.nodeType === Node.COMMENT_NODE,
+	);
+
+	await fetchAndReplace();
+
+	expect(document.querySelector("input")).toBe(input);
+	expect(document.activeElement).toBe(input);
+	expect(input.value).toBe("shoes");
+	expect(
+		Array.from(document.body.childNodes).filter(
+			(node) => node.nodeType === Node.COMMENT_NODE,
+		),
+	).toEqual(markers);
+	expect(document.querySelector("ul")?.innerHTML).toBe(`<li>shoes</li>`);
+});
+
+it("a re-run attaches each event handler once", async () => {
+	const clicks = "globalThis.clicks = (globalThis.clicks ?? 0) + 1";
+	const button = `<button data-topcoat-on:click="() => { ${clicks}; }">go</button>`;
+	stubFetch(200, "OK", button);
+	const { fetchAndReplace } = mountShard(button);
+	const el = document.querySelector("button") as HTMLButtonElement;
+
+	await fetchAndReplace();
+	el.click();
+
+	expect(document.querySelector("button")).toBe(el);
+	expect((globalThis as { clicks?: number }).clicks).toBe(1);
 });
 
 it("a page posts the values of every signal in the document to the pages route", async () => {
@@ -128,7 +153,6 @@ it("a page posts the values of every signal in the document to the pages route",
 	const shard = new ShardUnit(
 		runtime.page.contentScope,
 		runtime,
-		"scope",
 		"1",
 		"0",
 		[],
@@ -137,10 +161,7 @@ it("a page posts the values of every signal in the document to the pages route",
 	runtime.registry.insert("s1", new F64(2));
 	shard.contentScope.signalIds.add("s1");
 
-	const fetchAndReplace = (
-		runtime.page as unknown as { fetchAndReplace(): Promise<void> }
-	).fetchAndReplace.bind(runtime.page);
-	const error = await fetchAndReplace().then(
+	const error = await refetch(runtime.page)().then(
 		() => undefined,
 		(e: unknown) => e,
 	);
@@ -157,12 +178,29 @@ it("the root page posts to the bare pages route", async () => {
 	globalThis.location = { pathname: "/", search: "" } as unknown as Location;
 
 	const runtime = new Runtime();
-	const fetchAndReplace = (
-		runtime.page as unknown as { fetchAndReplace(): Promise<void> }
-	).fetchAndReplace.bind(runtime.page);
-	await fetchAndReplace().catch(() => undefined);
+	await refetch(runtime.page)().catch(() => undefined);
 
 	expect(stub.url()).toBe(PAGE_ROUTE_PREFIX);
+});
+
+it("a page re-run morphs the body, keeping a focused input", async () => {
+	stubFetch(
+		200,
+		"OK",
+		`<!doctype html><html><head><title>t</title></head><body><input><p>2 results</p></body></html>`,
+	);
+	globalThis.location = { pathname: "/", search: "" } as unknown as Location;
+	document.body.innerHTML = `<input><p>1 result</p>`;
+	const runtime = new Runtime();
+	runtime.start(document);
+	const input = document.querySelector("input") as HTMLInputElement;
+	input.focus();
+
+	await refetch(runtime.page)();
+
+	expect(document.querySelector("input")).toBe(input);
+	expect(document.activeElement).toBe(input);
+	expect(document.body.innerHTML).toBe(`<input><p>2 results</p>`);
 });
 
 /**
@@ -187,12 +225,12 @@ class ScriptedUnit extends Unit {
 		return Promise.resolve(new Response("", { status: 200 }));
 	}
 
-	protected prepare(): DocumentFragment | null {
-		return {} as DocumentFragment;
+	protected prepare(): Node[] | null {
+		return [];
 	}
 
 	protected insert(
-		_fragment: DocumentFragment,
+		_nodes: Node[],
 		scope: Scope,
 		adoptable: Set<SignalId>,
 	): void {

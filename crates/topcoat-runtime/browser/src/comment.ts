@@ -2,8 +2,6 @@ import { Context } from "./context";
 import { type SignalId, SignalRegistry } from "./signal";
 import type { DehydratedSurrogate } from "./surrogate";
 
-export type ShardScopeId = string;
-
 export type CommentMarker =
 	| { kind: "signal"; id: SignalId; value: unknown }
 	| {
@@ -19,25 +17,25 @@ export type CommentMarker =
 	| { kind: "expr-end" }
 	| {
 			kind: "shard-start";
-			id: ShardScopeId;
 			/** The id of the shard, which names its route. */
 			shard: string;
 			/**
-			 * The identity of the shard invocation, sent back with every
+			 * The identity of the shard invocation, which pairs the start
+			 * marker with its end marker and is sent back with every
 			 * re-render request so the server derives the same identities
 			 * inside the shard as it did for the inline render.
 			 */
 			identity: string;
 			exprs: string[];
 	  }
-	| { kind: "shard-end"; id: ShardScopeId };
+	| { kind: "shard-end"; identity: string };
 
 const SIGNAL_RE = /^\s*::topcoat::signal\(([\s\S]*)\)\s*$/;
 const DEP_RE = /^\s*::topcoat::dep\("([0-9a-f]+)"\)\s*$/;
 const EXPR_START_RE = /^\s*::topcoat::expr::start\("([^"]*)"\)\s*$/;
 const EXPR_END_RE = /^\s*::topcoat::expr::end\s*$/;
 const SHARD_START_RE =
-	/^\s*::topcoat::shard::start\(("[^"]+"), ("[^"]*"), ("[^"]*"), (\[[\s\S]*\])\)\s*$/;
+	/^\s*::topcoat::shard::start\(("[^"]*"), ("[^"]*"), (\[[\s\S]*\])\)\s*$/;
 const SHARD_END_RE = /^\s*::topcoat::shard::end\(("[^"]+")\)\s*$/;
 const QUOTED_RE = /"([^"]*)"/g;
 
@@ -86,16 +84,15 @@ export function parseComment(node: Comment): CommentMarker | null {
 	if (start) {
 		const exprs: string[] = [];
 		QUOTED_RE.lastIndex = 0;
-		let m: RegExpExecArray | null = QUOTED_RE.exec(start[4] ?? "");
+		let m: RegExpExecArray | null = QUOTED_RE.exec(start[3] ?? "");
 		while (m !== null) {
 			exprs.push(decodeHtml(m[1] ?? ""));
-			m = QUOTED_RE.exec(start[4] ?? "");
+			m = QUOTED_RE.exec(start[3] ?? "");
 		}
 		return {
 			kind: "shard-start",
-			id: JSON.parse(start[1] ?? "") as ShardScopeId,
-			shard: JSON.parse(start[2] ?? "") as string,
-			identity: JSON.parse(start[3] ?? "") as string,
+			shard: JSON.parse(start[1] ?? "") as string,
+			identity: JSON.parse(start[2] ?? "") as string,
 			exprs,
 		};
 	}
@@ -104,7 +101,7 @@ export function parseComment(node: Comment): CommentMarker | null {
 	if (end) {
 		return {
 			kind: "shard-end",
-			id: JSON.parse(end[1] ?? "") as ShardScopeId,
+			identity: JSON.parse(end[1] ?? "") as string,
 		};
 	}
 

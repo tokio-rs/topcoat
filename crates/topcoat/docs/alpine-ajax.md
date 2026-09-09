@@ -7,7 +7,7 @@ Everything below is re-exported from `topcoat::alpine_ajax` and gated behind the
 ```toml
 # Cargo.toml
 [dependencies]
-topcoat = { version = "0.7.0", features = ["alpine-ajax"] }
+topcoat = { version = "0.8.0", features = ["alpine-ajax"] }
 ```
 
 # Loading the Alpine AJAX script

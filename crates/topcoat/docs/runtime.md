@@ -239,7 +239,7 @@ The input keeps working as a client-only binding, and the product list follows i
 
 **Every value read on the server is user input and must not be trusted.** The client holds the signal and can send anything that fits its type, so validate the value before acting on it, exactly like a shard argument.
 
-The whole page content is replaced, so a re-run keeps every signal's value but loses focus, scroll position, and anything else the browser holds.
+The result is morphed into the page rather than swapped in. Elements that still exist are updated in place, so focus, scroll position, and what the user is typing survive a re-run, and every signal keeps its value. Give the items of a list that can reorder an `id`, so the morph follows each item to its new position instead of rewriting the items in between.
 
 To avoid re-running the whole page, use a shard: a signal tracked inside a shard re-renders only that shard, not the entire page. The shard creates the signal, reads it, and hands the browser the handlers that change it:
 
@@ -263,6 +263,8 @@ async fn paginated(cx: &Cx) -> Result<impl View> {
 ```
 
 Clicking a button changes `page` in the browser, and because the shard read it on the server, the shard runs again with the new value and swaps in the next page of items.
+
+A shard can also take a signal from its caller, through a parameter typed `Signal<T>` and passed as `$(signal)`. The signal handle does not change when its value does, so whether a change re-renders the shard depends on how the shard body reads it. See [`#[shard]`][shard].
 
 `.get_untracked()` and `.read_untracked()` read a signal's value without making anything depend on it, for a body that wants the value a run started with but should not run again when it changes.
 

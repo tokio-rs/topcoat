@@ -121,7 +121,6 @@ function processMarker(
 			const shard = new ShardUnit(
 				current,
 				current.runtime,
-				marker.id,
 				marker.shard,
 				marker.identity,
 				marker.exprs,
@@ -136,12 +135,12 @@ function processMarker(
 			const shard = top?.parent;
 			if (!(shard instanceof ShardUnit)) {
 				throw new Error(
-					`Unbalanced shard: end marker ${marker.id} has no matching start`,
+					`Unbalanced shard: end marker ${marker.identity} has no matching start`,
 				);
 			}
-			if (shard.scopeId !== marker.id) {
+			if (shard.identity !== marker.identity) {
 				throw new Error(
-					`Mismatched shard: end ${marker.id} does not match start ${shard.scopeId}`,
+					`Mismatched shard: end ${marker.identity} does not match start ${shard.identity}`,
 				);
 			}
 			shard.attachEnd(node);

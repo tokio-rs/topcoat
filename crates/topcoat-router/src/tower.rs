@@ -30,7 +30,7 @@ use crate::{
 /// This adapter mounts a whole tower application (an axum router, a hyper
 /// service, a reverse proxy) as a route in a topcoat router, typically while
 /// migrating an existing application to topcoat one route at a time.
-/// Registered at a catch-all path with [`Methods::Any`], it hands an entire
+/// Registered with [`any`](Self::any) at a catch-all path, it hands an entire
 /// URL subtree to the service. The service receives each request with its
 /// original URI; nothing is stripped or rewritten. A catch-all segment does
 /// not match the bare prefix itself, so register a second `TowerRoute` for
@@ -52,9 +52,7 @@ use crate::{
 /// ```rust
 /// use std::convert::Infallible;
 ///
-/// use topcoat::router::{
-///     Body, Methods, Router, request::Request, response::Response, tower::TowerRoute,
-/// };
+/// use topcoat::router::{Body, Router, request::Request, response::Response, tower::TowerRoute};
 /// use tower::service_fn;
 ///
 /// // Stands in for a legacy tower application, like an axum router.
@@ -63,7 +61,7 @@ use crate::{
 /// });
 ///
 /// let router = Router::builder()
-///     .route(TowerRoute::new(Methods::Any, "/legacy/{*rest}", legacy))
+///     .route(TowerRoute::any("/legacy/{*rest}", legacy))
 ///     .build();
 /// ```
 pub struct TowerRoute<S> {
@@ -82,9 +80,9 @@ impl<S> TowerRoute<S> {
     ///
     /// The methods are anything convertible into [`OwnedMethods`]: a single
     /// [`Method`](crate::Method), a `&'static [Method]`, a `Vec<Method>`, or
-    /// [`Methods::Any`] to respond to every method. A route registered for a
-    /// specific method takes precedence over an any-method route at the same
-    /// path.
+    /// [`Methods::Any`] to respond to every method (see also
+    /// [`any`](Self::any)). A route registered for a specific method takes
+    /// precedence over an any-method route at the same path.
     ///
     /// # Panics
     ///
@@ -115,6 +113,20 @@ impl<S> TowerRoute<S> {
     }
     fn is_serve_dir() -> bool {
         std::any::type_name::<S>().contains("ServeDir")
+
+    /// Mounts `service` at `path`, responding to every HTTP method.
+    ///
+    /// This is the usual way to hand a URL subtree to a mounted application,
+    /// which dispatches on the method itself. A shorthand for
+    /// [`new`](Self::new) with [`Methods::Any`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `path` is a string that is not a well-formed route path.
+    #[must_use]
+    #[track_caller]
+    pub fn any(path: impl IntoPath, service: S) -> Self {
+        Self::new(Methods::Any, path, service)
     }
 }
 
@@ -1271,10 +1283,16 @@ mod tests {
     }
 
     #[test]
+    fn an_any_route_responds_to_every_method() {
+        let route = TowerRoute::any(Path::new("/legacy"), tower::service_fn(echo_service));
+        assert_eq!(route.methods(), Methods::Any);
+        assert_eq!(route.path(), Path::new("/legacy"));
+    }
+
+    #[test]
     fn mounts_a_service_at_a_catch_all_path() {
         let router = Router::builder()
-            .route(TowerRoute::new(
-                Methods::Any,
+            .route(TowerRoute::any(
                 Path::new("/legacy/{*rest}"),
                 tower::service_fn(echo_service),
             ))
@@ -1320,8 +1338,7 @@ mod tests {
     #[test]
     fn layers_wrap_a_mounted_service() {
         let router = Router::builder()
-            .route(TowerRoute::new(
-                Methods::Any,
+            .route(TowerRoute::any(
                 Path::new("/legacy/{*rest}"),
                 tower::service_fn(echo_service),
             ))
@@ -1346,7 +1363,7 @@ mod tests {
         let failing = tower::service_fn(|_request: Request| async {
             Err::<Response, _>(std::io::Error::other("legacy failure"))
         });
-        let route = TowerRoute::new(Methods::Any, Path::new("/legacy"), failing);
+        let route = TowerRoute::any(Path::new("/legacy"), failing);
         let cx = cx_for("/legacy");
 
         let error = block_on(route.handle(&cx, Body::empty())).unwrap_err();
