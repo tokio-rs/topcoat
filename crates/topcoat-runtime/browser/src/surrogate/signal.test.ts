@@ -41,6 +41,19 @@ it("push_str appends and leaves the previous value untouched", () => {
 	expect(before.dehydrate()).toBe("hi");
 });
 
+// A signal passed to a shard travels as its id and current value, so the
+// server can rebuild it: the value alone would lose the identity a tracked
+// read inside the shard depends on, and the id alone would leave the server
+// nothing to read.
+it("dehydrates to its id and current value", () => {
+	const s = new WriteSignal("abc", signal<unknown>(new String("shoes")));
+
+	expect(s.dehydrate()).toEqual({ t: "Signal", id: "abc", v: "shoes" });
+
+	s.set(new String("boots"));
+	expect(s.dehydrate()).toEqual({ t: "Signal", id: "abc", v: "boots" });
+});
+
 // Each write must construct a new value rather than mutate the stored one:
 // change detection is identity based, so a future refactor that mutates in
 // place would silently stop notifying subscribers.

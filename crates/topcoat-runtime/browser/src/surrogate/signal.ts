@@ -44,7 +44,13 @@ export class WriteSignal<T> {
 		this.inner.set((prev) => new String(`${prev}${s}`) as T);
 	}
 
-	dehydrate(): { t: "Signal"; id: SignalId } {
-		return { t: "Signal", id: this.id };
+	/**
+	 * The form the signal takes as an argument to a run on the server: its
+	 * id next to its current value, so the server can rebuild the signal
+	 * without holding the value itself.
+	 */
+	dehydrate(): { t: "Signal"; id: SignalId; v: unknown } {
+		const value = this.inner() as { dehydrate: () => unknown };
+		return { t: "Signal", id: this.id, v: value.dehydrate() };
 	}
 }

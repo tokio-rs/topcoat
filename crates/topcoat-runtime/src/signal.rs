@@ -51,10 +51,23 @@ impl Serialize for SignalId {
 
 impl<'de> Deserialize<'de> for SignalId {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let hex = <&str>::deserialize(deserializer)?;
-        u128::from_str_radix(hex, 16).map(Self).map_err(|_| {
-            serde::de::Error::invalid_value(serde::de::Unexpected::Str(hex), &"a hex signal id")
-        })
+        struct Visitor;
+
+        impl serde::de::Visitor<'_> for Visitor {
+            type Value = SignalId;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("a hex signal id")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, hex: &str) -> Result<Self::Value, E> {
+                u128::from_str_radix(hex, 16)
+                    .map(SignalId)
+                    .map_err(|_| E::invalid_value(serde::de::Unexpected::Str(hex), &self))
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
     }
 }
 

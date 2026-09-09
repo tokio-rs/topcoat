@@ -1,16 +1,17 @@
-//! The identity a shard carries between its inline render and a re-render
-//! through its endpoint.
+//! What a shard carries between its inline render and a re-render through
+//! its endpoint.
 //!
 //! The scope marker names the identity of the shard invocation, the browser
 //! sends it back in a header, and the endpoint installs it before
 //! running the shard body, so a signal created inside the body has the same
-//! id on both paths.
+//! id on both paths. A signal passed as an argument arrives as its id and
+//! current value, and the endpoint rebuilds it from them.
 
 use topcoat::{
     Result,
     context::{Cx, CxTestBuilder},
     router::{Body, request::IDENTITY_HEADER},
-    runtime::{Shard, shard, signal},
+    runtime::{Shard, Signal, shard, signal},
     view::{View, ViewExt, component, view},
 };
 
@@ -30,6 +31,17 @@ async fn stateful(cx: &Cx, label: String) -> Result<impl View> {
 async fn host(cx: &Cx) -> Result<impl View> {
     let label = signal(cx, || String::from("a"));
     Ok(view! { stateful(label: $(label.get())) })
+}
+
+#[shard]
+async fn by_signal(query: Signal<String>) -> Result<impl View> {
+    Ok(view! { <p>(query.get())</p> })
+}
+
+#[component]
+async fn signal_host(cx: &Cx) -> Result<impl View> {
+    let query = signal(cx, || String::from("shoes"));
+    Ok(view! { by_signal(query: $(query)) })
 }
 
 /// The shard id and identity arguments of the scope start marker in `html`.
@@ -64,12 +76,56 @@ fn endpoint_cx(identity: &str) -> Cx {
     CxTestBuilder::new().request_context(parts).build()
 }
 
-/// Renders the shard through its endpoint at `identity`, carrying the JSON
-/// object `signals` of signal values.
-async fn rerender(identity: &str, signals: &str) -> String {
+/// Renders `shard` through its endpoint at `identity`, carrying the JSON
+/// array `args` of arguments and the JSON object `signals` of signal values.
+async fn rerender_with(shard: &impl Shard, identity: &str, args: &str, signals: &str) -> String {
     let cx = &endpoint_cx(identity);
-    let body = Body::from(format!(r#"{{"args":["a"],"signals":{signals}}}"#));
-    stateful.render(cx, body).await.unwrap().render(cx)
+    let body = Body::from(format!(r#"{{"args":{args},"signals":{signals}}}"#));
+    shard.render(cx, body).await.unwrap().render(cx)
+}
+
+/// Renders the `stateful` shard through its endpoint at `identity`,
+/// carrying the JSON object `signals` of signal values.
+async fn rerender(identity: &str, signals: &str) -> String {
+    rerender_with(&stateful, identity, r#"["a"]"#, signals).await
+}
+
+#[tokio::test]
+async fn a_signal_argument_is_read_inline_and_rebuilt_from_its_value() {
+    let cx = &Cx::default();
+    let inline = view! { cx => signal_host() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    let (shard, identity) = scope_marker(&inline);
+    assert_eq!(shard, by_signal.id().as_str(), "{inline}");
+    assert!(inline.contains("<p>shoes</p>"), "{inline}");
+    // The tracked read inside the shard depends on the caller's signal.
+    let id = last_signal_id(&inline);
+    assert!(
+        inline.contains(&format!("::topcoat::dep(\"{id}\")")),
+        "{inline}"
+    );
+
+    let args = format!(r#"[{{"t":"Signal","id":"{id}","v":"boots"}}]"#);
+    let rerendered = rerender_with(&by_signal, identity, &args, "{}").await;
+
+    assert!(rerendered.contains("<p>boots</p>"), "{rerendered}");
+    assert!(
+        rerendered.contains(&format!("::topcoat::dep(\"{id}\")")),
+        "{rerendered}"
+    );
+}
+
+#[tokio::test]
+async fn a_signal_argument_without_a_value_is_rejected() {
+    let cx = &endpoint_cx(&"A".repeat(22));
+    let body = Body::from(format!(
+        r#"{{"args":[{{"t":"Signal","id":"{}"}}]}}"#,
+        "0".repeat(32)
+    ));
+    assert!(by_signal.render(cx, body).await.is_err());
 }
 
 #[tokio::test]

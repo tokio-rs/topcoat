@@ -1,13 +1,14 @@
 use std::ops::Deref;
 
 use ref_cast::RefCast;
-use serde::Serialize;
+use serde::{Deserialize, Serialize, de};
 
 use crate::{
-    Signal, StrSurrogate, Surrogated, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref,
+    Signal, SignalId, StrSurrogate, Surrogate, Surrogated, impl_surrogate, impl_surrogate_mut,
+    impl_surrogate_ref,
 };
 
-#[derive(RefCast)]
+#[derive(Debug, RefCast)]
 #[repr(transparent)]
 pub struct SignalSurrogate<T>(Signal<T>);
 
@@ -142,17 +143,134 @@ impl<T> Serialize for SignalSurrogate<T> {
     }
 }
 
+/// A signal sent by the client, as an argument to a run: its id next to its
+/// current value.
+///
+/// The value is required. A run cannot read a signal it has no value for,
+/// so a client that sends only the id is rejected the same way as one that
+/// sends a value of the wrong shape.
+impl<'de, T> Deserialize<'de> for SignalSurrogate<T>
+where
+    T: Surrogated,
+    T::Surrogate: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields, bound(deserialize = "V: Deserialize<'de>"))]
+        struct TaggedSignal<V> {
+            t: std::string::String,
+            id: SignalId,
+            v: V,
+        }
+
+        let tagged = TaggedSignal::<T::Surrogate>::deserialize(deserializer)?;
+        if tagged.t != "Signal" {
+            return Err(de::Error::invalid_value(
+                de::Unexpected::Str(&tagged.t),
+                &"Signal",
+            ));
+        }
+        Ok(Self(Signal::new(tagged.id, tagged.v.into_real())))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::panic::Location;
 
+    use serde_json::json;
+
     use super::*;
-    use crate::SignalId;
 
     /// Builds a signal surrogate around a fresh signal holding `value`.
     #[track_caller]
     fn surrogate<T>(value: T) -> SignalSurrogate<T> {
         SignalSurrogate::new(Signal::new(SignalId::derive(Location::caller()), value))
+    }
+
+    #[test]
+    fn serializes_as_its_id() {
+        let signal = surrogate(String::from("shoes"));
+
+        assert_eq!(
+            serde_json::to_value(&signal).unwrap(),
+            json!({ "t": "Signal", "id": signal.0.id().to_string() })
+        );
+    }
+
+    #[test]
+    fn deserializes_from_its_id_and_value() {
+        let id = SignalId::derive(Location::caller());
+
+        let signal: SignalSurrogate<String> =
+            serde_json::from_value(json!({ "t": "Signal", "id": id.to_string(), "v": "shoes" }))
+                .unwrap();
+
+        assert_eq!(signal.0.id(), id);
+        assert_eq!(*signal.0.read_untracked(), "shoes");
+    }
+
+    #[test]
+    fn deserializes_a_value_through_its_surrogate() {
+        let id = SignalId::derive(Location::caller());
+
+        let signal: SignalSurrogate<Option<f64>> = serde_json::from_value(json!({
+            "t": "Signal",
+            "id": id.to_string(),
+            "v": { "t": "Option", "v": 5.0 },
+        }))
+        .unwrap();
+
+        assert_eq!(*signal.0.read_untracked(), Some(5.0));
+    }
+
+    #[test]
+    fn rejects_another_tag() {
+        let id = SignalId::derive(Location::caller());
+
+        let error = serde_json::from_value::<SignalSurrogate<String>>(
+            json!({ "t": "Procedure", "id": id.to_string(), "v": "shoes" }),
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("expected Signal"), "{error}");
+    }
+
+    #[test]
+    fn rejects_a_missing_value() {
+        let id = SignalId::derive(Location::caller());
+
+        let error = serde_json::from_value::<SignalSurrogate<String>>(
+            json!({ "t": "Signal", "id": id.to_string() }),
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("missing field `v`"), "{error}");
+    }
+
+    #[test]
+    fn rejects_a_value_of_another_type() {
+        let id = SignalId::derive(Location::caller());
+
+        serde_json::from_value::<SignalSurrogate<f64>>(json!({
+            "t": "Signal",
+            "id": id.to_string(),
+            "v": "shoes",
+        }))
+        .unwrap_err();
+    }
+
+    #[test]
+    fn rejects_a_malformed_id() {
+        serde_json::from_value::<SignalSurrogate<String>>(json!({
+            "t": "Signal",
+            "id": "not hex",
+            "v": "shoes",
+        }))
+        .unwrap_err();
     }
 
     #[test]
