@@ -217,3 +217,5 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo-udeps.ignore]
 normal = ["topcoat-ui-registry"]
+# Used by a doctest in the context guide, which cargo-udeps cannot see.
+development = ["uuid"]

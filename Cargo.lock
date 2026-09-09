@@ -3145,7 +3145,6 @@ dependencies = [
  "tokio",
  "topcoat",
  "topcoat-router-grammar",
- "uuid",
 ]
 
 [[package]]
