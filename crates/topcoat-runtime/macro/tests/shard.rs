@@ -36,9 +36,9 @@ async fn host(cx: &Cx) -> Result<impl View> {
 fn scope_marker(html: &str) -> (&str, &str) {
     let start = html.find("::topcoat::shard::start(").expect(html);
     // The marker's quoted arguments alternate with the separators between
-    // them: the scope id, the shard id, then the identity.
+    // them: the shard id, then the identity.
     let mut args = html[start..].split('"');
-    let shard = args.nth(3).expect(html);
+    let shard = args.nth(1).expect(html);
     let identity = args.nth(1).expect(html);
     (shard, identity)
 }

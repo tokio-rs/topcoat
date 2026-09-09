@@ -59,7 +59,7 @@ function refetch(unit: Unit): () => Promise<void> {
  * scans it, the way the runtime does on load.
  */
 function mountShard(content: string) {
-	document.body.innerHTML = `<p>outside</p><!--::topcoat::shard::start("scope", "1", "0", [])-->${content}<!--::topcoat::shard::end("scope")-->`;
+	document.body.innerHTML = `<p>outside</p><!--::topcoat::shard::start("1", "0", [])-->${content}<!--::topcoat::shard::end("0")-->`;
 	const runtime = new Runtime();
 	runtime.start(document);
 	const [shard] = runtime.page.contentScope.children;
@@ -153,7 +153,6 @@ it("a page posts the values of every signal in the document to the pages route",
 	const shard = new ShardUnit(
 		runtime.page.contentScope,
 		runtime,
-		"scope",
 		"1",
 		"0",
 		[],

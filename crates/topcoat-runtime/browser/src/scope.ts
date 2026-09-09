@@ -6,7 +6,6 @@ import {
 	untrack,
 } from "@maverick-js/signals";
 
-import type { ShardScopeId } from "./comment";
 import type { Context } from "./context";
 import { morph } from "./morph";
 import type { Runtime } from "./runtime";
@@ -268,7 +267,6 @@ export class ShardUnit extends Unit {
 	constructor(
 		parent: Scope,
 		runtime: Runtime,
-		readonly scopeId: ShardScopeId,
 		readonly shard: string,
 		readonly identity: string,
 		exprs: string[],
