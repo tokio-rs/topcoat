@@ -2,7 +2,10 @@ use std::borrow::Cow;
 
 use http::{HeaderValue, StatusCode, header::LOCATION};
 use percent_encoding::{CONTROLS, utf8_percent_encode};
-use topcoat_core::{context::Cx, error::Result};
+use topcoat_core::{
+    context::Cx,
+    error::{Error, Result},
+};
 
 use crate::response::{IntoResponse, Response};
 
@@ -61,8 +64,8 @@ pub fn redirect_permanent(uri: impl AsRef<str>) -> RedirectError {
 ///
 /// Construct one with [`redirect`] or [`redirect_permanent`], or derive one
 /// from an `Option` / `Result` via [`RouterErrorExt`](crate::error::RouterErrorExt).
-/// For the Post/Redirect/Get pattern, where the redirect is a *successful*
-/// response returned through `Ok`, reach for [`see_other`] instead.
+/// For the Post/Redirect/Get pattern, which sends the browser on with a
+/// `GET`, reach for [`see_other`] instead.
 #[derive(Debug)]
 pub struct RedirectError {
     status: StatusCode,
@@ -79,6 +82,7 @@ impl RedirectError {
     }
 
     /// The target the redirect points at.
+    #[cfg(test)]
     pub(crate) fn location(&self) -> &HeaderValue {
         &self.location
     }
@@ -106,7 +110,12 @@ impl IntoResponse for RedirectError {
 /// -- the Post/Redirect/Get pattern that keeps a reload from re-submitting the
 /// mutation. The target is percent-encoded like [`redirect`] does.
 ///
+/// A route returns the redirect as its `Ok` value. A page renders a view, so
+/// it returns the redirect through `Err` instead, like the other redirects.
+///
 /// # Examples
+///
+/// From a route:
 ///
 /// ```rust
 /// use topcoat::{
@@ -124,6 +133,29 @@ impl IntoResponse for RedirectError {
 ///     Ok(see_other("/"))
 /// }
 /// ```
+///
+/// From a page:
+///
+/// ```rust
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{content::Form, error::see_other, page},
+///     view::{View, view},
+/// };
+/// # use serde::Deserialize;
+/// # #[derive(Deserialize)]
+/// # struct Signup { email: String }
+/// # async fn create_account(_cx: &Cx, _email: &str) -> Result<bool> { Ok(true) }
+///
+/// #[page(POST "/signup")]
+/// async fn signup(cx: &Cx, Form(input): Form<Signup>) -> Result<impl View> {
+///     if create_account(cx, &input.email).await? {
+///         return Err(see_other("/welcome").into());
+///     }
+///     Ok(view! { <p>"That email is already taken."</p> })
+/// }
+/// ```
 #[must_use]
 pub fn see_other(uri: impl AsRef<str>) -> SeeOther {
     SeeOther::new(uri.as_ref())
@@ -131,10 +163,13 @@ pub fn see_other(uri: impl AsRef<str>) -> SeeOther {
 
 /// A "see other" (HTTP 303) redirect response.
 ///
-/// Unlike [`RedirectError`], this is a successful response rather than an error,
-/// so return it from the `Ok` branch of a handler. It is the Post/Redirect/Get
-/// reply for a completed `POST`, `PUT`, or `DELETE`, sending the browser to a
-/// new location with a `GET`. Construct one with [`see_other`].
+/// It is the Post/Redirect/Get reply for a completed `POST`, `PUT`, or
+/// `DELETE`, sending the browser to a new location with a `GET`. Construct one
+/// with [`see_other`].
+///
+/// The redirect is both a response and an error, so a handler can return it
+/// either way: a route returns it through `Ok`, and a page, whose `Ok` value
+/// is a view, returns it through `Err`. Both produce the same 303 response.
 #[derive(Debug)]
 pub struct SeeOther {
     location: HeaderValue,
@@ -147,12 +182,42 @@ impl SeeOther {
             location: location(uri),
         }
     }
+
+    /// The target the redirect points at.
+    #[cfg(test)]
+    pub(crate) fn location(&self) -> &HeaderValue {
+        &self.location
+    }
 }
+
+impl std::fmt::Display for SeeOther {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("see other")
+    }
+}
+
+impl std::error::Error for SeeOther {}
 
 impl IntoResponse for SeeOther {
     fn into_response(self, cx: &Cx) -> Result<Response> {
         (StatusCode::SEE_OTHER, ([(LOCATION, self.location)], ())).into_response(cx)
     }
+}
+
+/// Extracts the target of a redirect carried as an error, handing any other
+/// error back unchanged.
+///
+/// # Errors
+///
+/// Returns `Err(error)` if the error is not a redirect.
+pub(crate) fn redirect_location(error: Error) -> Result<HeaderValue, Error> {
+    let error = match error.downcast::<RedirectError>() {
+        Ok(redirect) => return Ok(redirect.location),
+        Err(error) => error,
+    };
+    error
+        .downcast::<SeeOther>()
+        .map(|redirect| redirect.location)
 }
 
 /// Builds the `Location` header value pointing at `uri`.
@@ -185,7 +250,7 @@ mod tests {
             redirect_permanent("https://\u{4f8b}\u{3048}.jp/").location(),
             "https://%E4%BE%8B%E3%81%88.jp/"
         );
-        assert_eq!(see_other("/caf\u{e9}").location, "/caf%C3%A9");
+        assert_eq!(see_other("/caf\u{e9}").location(), "/caf%C3%A9");
     }
 
     #[test]
@@ -204,5 +269,23 @@ mod tests {
     #[test]
     fn the_location_converts_back_to_a_str() {
         assert!(redirect("/caf\u{e9} \u{4f8b}").location().to_str().is_ok());
+    }
+
+    #[test]
+    fn the_location_of_a_redirect_error_is_extracted() {
+        assert_eq!(
+            redirect_location(redirect("/target").into()).unwrap(),
+            "/target"
+        );
+        assert_eq!(
+            redirect_location(see_other("/target").into()).unwrap(),
+            "/target"
+        );
+    }
+
+    #[test]
+    fn other_errors_are_handed_back() {
+        let error = redirect_location(std::fmt::Error.into()).unwrap_err();
+        assert!(error.downcast_ref::<std::fmt::Error>().is_some());
     }
 }

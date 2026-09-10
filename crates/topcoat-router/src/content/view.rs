@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use futures_util::future::poll_fn;
-use http::{HeaderMap, StatusCode};
+use http::{HeaderMap, HeaderValue, StatusCode};
 use http_body::Frame;
 use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
@@ -15,7 +15,7 @@ use topcoat_view::{BoxView, Formatter, View, ViewExt, ViewHandle, internal::Move
 use crate::{
     Body, BoxError,
     content::Html,
-    error::RedirectError,
+    error::redirect_location,
     response::{AsyncIntoResponse, IntoResponse, Response},
 };
 
@@ -109,14 +109,11 @@ window.topcoat ??= {
 </script>";
 
 /// Builds the script a mid-stream redirect is sent as: a navigation to the
-/// redirect's target. `replace` keeps the partially streamed page out of the
-/// session history, so going back skips it.
-fn redirect_script(redirect: &RedirectError) -> String {
+/// redirect's `location`. `replace` keeps the partially streamed page out of
+/// the session history, so going back skips it.
+fn redirect_script(location: &HeaderValue) -> String {
     // The location is percent-encoded down to ASCII, so it converts back.
-    let uri = redirect
-        .location()
-        .to_str()
-        .expect("redirect location is ASCII");
+    let uri = location.to_str().expect("redirect location is ASCII");
     let mut location = String::with_capacity(uri.len());
     for c in uri.chars() {
         match c {
@@ -188,9 +185,9 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
                 // The response committed with the first content, so a
                 // redirect can no longer change the status line; it degrades
                 // to a client-side navigation instead.
-                match error.downcast::<RedirectError>() {
-                    Ok(redirect) => {
-                        Poll::Ready(Some(Ok(Frame::data(redirect_script(&redirect).into()))))
+                match redirect_location(error) {
+                    Ok(location) => {
+                        Poll::Ready(Some(Ok(Frame::data(redirect_script(&location).into()))))
                     }
                     Err(error) => Poll::Ready(Some(Err(error.into()))),
                 }
@@ -214,7 +211,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        BodyPanicError, LayoutFn, Method, PageFn, Router, RouterBuilder, Slot, error::redirect,
+        BodyPanicError, LayoutFn, Method, PageFn, Router, RouterBuilder, Slot,
+        error::{redirect, see_other},
         to_bytes,
     };
 
@@ -662,6 +660,26 @@ mod tests {
         .boxed()
     }
 
+    /// A page that answers with a "see other" before it produces any content.
+    fn render_see_other_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! { cx => <main>(live! { Err(see_other("/target").into()) })</main> }.boxed()
+    }
+
+    /// A page that answers with a "see other" after its first emission.
+    fn render_late_see_other_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            cx =>
+            <main>
+                (live! {
+                    emit! { <p>"first"</p> }?;
+                    tokio::task::yield_now().await;
+                    Err(see_other("/target").into())
+                })
+            </main>
+        }
+        .boxed()
+    }
+
     #[tokio::test]
     async fn a_redirect_before_the_first_content_is_a_real_redirect() {
         let response = send_page(render_redirecting_page).await;
@@ -690,9 +708,32 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn a_see_other_before_the_first_content_is_a_real_redirect() {
+        let response = send_page(render_see_other_page).await;
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(
+            response.headers().get(http::header::LOCATION).unwrap(),
+            "/target"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_see_other_after_the_first_content_streams_a_navigation_script() {
+        let response = send_page(render_late_see_other_page).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let frames = data_frames(response.into_body()).await;
+        assert_eq!(frames.len(), 2);
+        assert_eq!(
+            frames[1],
+            "<script>window.location.replace(\"/target\")</script>"
+        );
+    }
+
     #[test]
     fn the_navigation_script_escapes_the_redirect_target() {
-        let script = redirect_script(&redirect("/a\"b\\c<d"));
+        let script = redirect_script(redirect("/a\"b\\c<d").location());
         assert_eq!(
             script,
             "<script>window.location.replace(\"/a\\\"b\\\\c\\x3Cd\")</script>"
@@ -701,7 +742,7 @@ mod tests {
 
     #[test]
     fn the_navigation_script_keeps_a_non_ascii_redirect_target() {
-        let script = redirect_script(&redirect("/caf\u{e9}"));
+        let script = redirect_script(redirect("/caf\u{e9}").location());
         assert_eq!(
             script,
             "<script>window.location.replace(\"/caf%C3%A9\")</script>"
