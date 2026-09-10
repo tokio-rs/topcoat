@@ -45,6 +45,9 @@ pub mod router;
 #[cfg(feature = "view")]
 pub mod view;
 
+#[cfg(feature = "validation")]
+pub mod validation;
+
 #[cfg(feature = "serve")]
 pub use serve::{serve, serve_until, start};
 

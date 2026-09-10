@@ -60,6 +60,7 @@ members = [
     "examples/tailwind",
     "examples/toasty-todo",
     "examples/ui",
+    "examples/validation",
     "examples/websocket",
 
     "demos/coffee-shop",

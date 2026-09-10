@@ -3505,6 +3505,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "validation"
+version = "0.7.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"

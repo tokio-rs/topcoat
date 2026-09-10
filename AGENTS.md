@@ -72,6 +72,7 @@ Each crate's `docs/` directory holds the user-facing guides for that crate, embe
 - [`crates/topcoat/docs/functions_not_middlewares.md`](crates/topcoat/docs/functions_not_middlewares.md): The framework's philosophy: prefer composable `cx: &Cx` functions over middleware/extractors for auth and request-scoped data.
 - [`crates/topcoat/docs/cookie.md`](crates/topcoat/docs/cookie.md): Cookies: the request-scoped jar (`cookies(cx)`), the `cookie!` macro, attribute defaults, name prefixes, signed/private cookies, and typed `CookieStore<T>`.
 - [`crates/topcoat/docs/session.md`](crates/topcoat/docs/session.md): Sessions: bring-your-own-storage session authentication -- the token/hash model, the `start`/`stop` lifecycle, sliding expiration and rotation, and custom token stores.
+- [`crates/topcoat/docs/validation.md`](crates/topcoat/docs/validation.md): Validations: the `Validate` trait, field `rules`, the `Validated` extractor, 422 responses, and rendering errors in forms.
 
 ### Assets and styling
 
