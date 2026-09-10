@@ -93,6 +93,7 @@ tower = { workspace = true, features = ["buffer", "limit", "timeout", "util"] }
 tower-http = { workspace = true, features = [
 	"compression-gzip",
 	"cors",
+	"fs",
 	"set-header",
 	"timeout",
 	"trace",
