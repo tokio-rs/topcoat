@@ -17,6 +17,14 @@ pub trait ModuleRoute: Send + Sync + 'static {
     /// The module path where the route was declared, used to derive the URL.
     fn module_path(&self) -> &'static str;
 
+    /// The path below the module path, joined onto it to form the URL.
+    ///
+    /// Defaults to the root path, so the handler is served at the module path
+    /// itself.
+    fn relative_path(&self) -> &Path {
+        Path::ROOT
+    }
+
     /// Handles a request, producing a response.
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx>;
 }
@@ -32,6 +40,10 @@ impl<R: ModuleRoute + ?Sized> ModuleRoute for &'static R {
 
     fn module_path(&self) -> &'static str {
         (**self).module_path()
+    }
+
+    fn relative_path(&self) -> &Path {
+        (**self).relative_path()
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {

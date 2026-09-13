@@ -18,6 +18,14 @@ pub trait ModulePage: Send + Sync + 'static {
     /// The module path where the page was declared, used to derive the URL.
     fn module_path(&self) -> &'static str;
 
+    /// The path below the module path, joined onto it to form the URL.
+    ///
+    /// Defaults to the root path, so the handler is served at the module path
+    /// itself.
+    fn relative_path(&self) -> &Path {
+        Path::ROOT
+    }
+
     /// Renders the page [`View`] under `cx`.
     fn render<'a>(&'a self, cx: &'a Cx, body: Body) -> BoxView<'a>;
 
@@ -46,6 +54,10 @@ impl<P: ModulePage + ?Sized> ModulePage for &'static P {
 
     fn module_path(&self) -> &'static str {
         (**self).module_path()
+    }
+
+    fn relative_path(&self) -> &Path {
+        (**self).relative_path()
     }
 
     fn render<'a>(&'a self, cx: &'a Cx, body: Body) -> BoxView<'a> {
@@ -97,6 +109,14 @@ pub trait ModuleLayout: Send + Sync + 'static {
     /// The module path where the layout was declared, used to derive the URL.
     fn module_path(&self) -> &'static str;
 
+    /// The path below the module path, joined onto it to form the URL.
+    ///
+    /// Defaults to the root path, so the handler is served at the module path
+    /// itself.
+    fn relative_path(&self) -> &Path {
+        Path::ROOT
+    }
+
     /// Renders the layout, embedding the given child content [`Slot`],
     /// under `cx`.
     fn render<'a>(&'a self, cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a>;
@@ -105,6 +125,10 @@ pub trait ModuleLayout: Send + Sync + 'static {
 impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
     fn module_path(&self) -> &'static str {
         (**self).module_path()
+    }
+
+    fn relative_path(&self) -> &Path {
+        (**self).relative_path()
     }
 
     fn render<'a>(&'a self, cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a> {
