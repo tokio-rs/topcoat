@@ -60,25 +60,24 @@ impl TrailingSlash {
         if self == Self::Strict {
             return;
         }
-        let twins: Vec<(PathBuf, Endpoint)> = endpoints
-            .iter()
-            .filter_map(|endpoint| {
-                let path = twin(endpoint.path())?;
-                let twin = match self {
-                    Self::Serve => endpoint.with_path(&path),
-                    _ => Endpoint::new(&path),
-                };
-                Some((path, twin))
-            })
-            .collect();
-        for (path, twin) in twins {
-            let Ok(index) = endpoints.try_push(path.to_matchit_path(), twin) else {
+        // The indices are taken up front, so the twins pushed along the way
+        // are not visited themselves.
+        for index in endpoints.indices() {
+            let endpoint = &endpoints[index];
+            let Some(path) = twin(endpoint.path()) else {
+                continue;
+            };
+            let twin = match self {
+                Self::Serve => endpoint.with_path(&path),
+                _ => Endpoint::new(&path),
+            };
+            let Ok(twin_index) = endpoints.try_push(path.to_matchit_path(), twin) else {
                 continue;
             };
             if self == Self::Redirect {
                 let route = Box::new(RedirectRoute::new(path));
-                let route = routes.push(route, index, always_layers.into());
-                endpoints[index].insert_any(route);
+                let route = routes.push(route, twin_index, always_layers.into());
+                endpoints[twin_index].insert_any(route);
             }
         }
     }

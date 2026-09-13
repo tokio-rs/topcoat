@@ -195,9 +195,10 @@ impl Endpoints {
         }
     }
 
-    /// Iterates over the registered endpoints.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &Endpoint> {
-        self.endpoints.iter()
+    /// Iterates over the indices of the endpoints registered so far. The
+    /// iterator borrows nothing, so endpoints can be pushed while it runs.
+    pub(crate) fn indices(&self) -> impl Iterator<Item = EndpointIndex> + use<> {
+        (0..self.endpoints.len()).map(EndpointIndex)
     }
 
     /// Matches a request URL against the registered endpoints, returning the
