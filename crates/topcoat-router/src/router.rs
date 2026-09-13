@@ -147,7 +147,7 @@ impl Router {
             // the new path; any other outcome ends the loop.
             let rewrite = match result {
                 Ok(response) => break (cx, Ok(response)),
-                Err(error) => match error.downcast::<RewriteError>() {
+                Err(error) => match error.try_downcast::<RewriteError>() {
                     Ok(rewrite) => rewrite,
                     Err(error) => break (cx, Err(error)),
                 },
