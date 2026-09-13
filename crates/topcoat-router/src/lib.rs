@@ -27,6 +27,7 @@ mod router;
 mod service;
 #[cfg(feature = "tower")]
 pub mod tower;
+mod trailing_slash;
 mod urlencoded;
 
 pub use body::*;
@@ -51,3 +52,4 @@ pub use route::*;
 pub use router::*;
 #[cfg(feature = "serve")]
 pub use service::*;
+pub use trailing_slash::*;

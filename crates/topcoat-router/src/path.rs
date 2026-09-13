@@ -334,6 +334,23 @@ impl Path {
         &self.inner
     }
 
+    /// Returns `true` if this path ends in a `/`, which is to say its last
+    /// segment is empty. The root path does not.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use topcoat_router::Path;
+    ///
+    /// assert!(Path::new("/users/").has_trailing_slash());
+    /// assert!(!Path::new("/users").has_trailing_slash());
+    /// assert!(!Path::new("/").has_trailing_slash());
+    /// ```
+    #[must_use]
+    pub fn has_trailing_slash(&self) -> bool {
+        self.inner.ends_with('/')
+    }
+
     /// Returns the length of the string backing this path.
     ///
     /// This length is in bytes, not [`char`]s or graphemes. In other words,

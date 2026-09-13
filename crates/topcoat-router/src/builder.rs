@@ -10,7 +10,7 @@ use topcoat_core::{base_url::BaseUrl, context::AppContext};
 
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Layout, Methods, OriginLayer, OriginPolicy, Page,
-    PageWithLayouts, Path, Route, Router, RouterInner, Routes, layers_for_path,
+    PageWithLayouts, Path, Route, Router, RouterInner, Routes, TrailingSlash, layers_for_path,
 };
 
 /// Builds a [`Router`] for a Topcoat application.
@@ -51,6 +51,7 @@ pub struct RouterBuilder {
     layers: Vec<Arc<dyn Layer>>,
     context: AppContext,
     origin_policy: OriginPolicy,
+    trailing_slash: TrailingSlash,
     #[cfg(feature = "compression")]
     compression: crate::Compression,
 }
@@ -69,6 +70,7 @@ impl RouterBuilder {
             layers: Vec::new(),
             context,
             origin_policy: OriginPolicy::new(),
+            trailing_slash: TrailingSlash::default(),
             #[cfg(feature = "compression")]
             compression: crate::Compression::new(),
         }
@@ -239,6 +241,28 @@ impl RouterBuilder {
     #[must_use]
     pub fn compression(mut self, compression: crate::Compression) -> Self {
         self.compression = compression;
+        self
+    }
+
+    /// Configures how a request for the other trailing-slash form of a
+    /// route's path is handled.
+    ///
+    /// By default such a request is redirected to the form the route
+    /// declares: `/users/` to a page at `/users`, and `/users` to a page at
+    /// `/users/`. See [`TrailingSlash`] for the other policies.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use topcoat::router::{Router, TrailingSlash};
+    ///
+    /// let router = Router::builder()
+    ///     .trailing_slash(TrailingSlash::Serve)
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn trailing_slash(mut self, trailing_slash: TrailingSlash) -> Self {
+        self.trailing_slash = trailing_slash;
         self
     }
 
@@ -477,6 +501,7 @@ impl RouterBuilder {
             always_layers,
             app_context: Arc::new(self.context),
             origin: OriginLayer::new(self.origin_policy),
+            trailing_slash: self.trailing_slash,
             #[cfg(feature = "compression")]
             compression: self.compression,
         })
