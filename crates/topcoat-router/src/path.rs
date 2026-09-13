@@ -204,6 +204,27 @@ impl Path {
         self.segments().zip(other.segments()).all(|(a, b)| a == b)
     }
 
+    /// Returns a new path with the segments of `other` appended to this one.
+    ///
+    /// Joining the root path onto either side leaves the other path unchanged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use topcoat_router::Path;
+    ///
+    /// let base = Path::new("/settings");
+    /// assert_eq!(base.join(Path::new("/export")).as_str(), "/settings/export");
+    /// assert_eq!(base.join(Path::ROOT).as_str(), "/settings");
+    /// assert_eq!(Path::ROOT.join(base).as_str(), "/settings");
+    /// ```
+    #[must_use]
+    pub fn join(&self, other: &Path) -> PathBuf {
+        let mut buf = self.to_owned();
+        buf += other;
+        buf
+    }
+
     /// Returns `true` if `url`, a concrete URL path, matches this route path
     /// exactly.
     ///
@@ -446,7 +467,8 @@ impl std::error::Error for PathError {}
 /// An owned route path, similar to [`std::path::PathBuf`] but for URL paths.
 ///
 /// `PathBuf` is the owned counterpart of [`Path`]. It can be built incrementally
-/// by adding [`PathSegment`]s with `+=`, or collected from an iterator of segments.
+/// by adding [`PathSegment`]s or whole [`Path`]s with `+=`, or collected from an
+/// iterator of segments.
 ///
 /// # Examples
 ///
@@ -496,6 +518,14 @@ impl Deref for PathBuf {
 impl AddAssign<PathSegment<'_>> for PathBuf {
     fn add_assign(&mut self, rhs: PathSegment<'_>) {
         write!(self.inner, "/{rhs}").unwrap();
+    }
+}
+
+impl AddAssign<&Path> for PathBuf {
+    fn add_assign(&mut self, rhs: &Path) {
+        // Both sides hold a validated path whose root is the empty string, so
+        // appending the raw string yields a valid path again.
+        self.inner.push_str(&rhs.inner);
     }
 }
 
@@ -898,6 +928,32 @@ mod tests {
     fn path_to_matchit_no_groups() {
         let path = Path::new("/users/{id}");
         assert_eq!(path.to_matchit_path(), "/users/{id}");
+    }
+
+    // -- join --
+
+    #[test]
+    fn join_appends_segments() {
+        let joined = Path::new("/settings").join(Path::new("/(admin)/{id}"));
+        assert_eq!(joined.as_str(), "/settings/(admin)/{id}");
+        assert_eq!(joined.segments().count(), 3);
+    }
+
+    #[test]
+    fn join_root_on_either_side_is_identity() {
+        let path = Path::new("/settings");
+        assert_eq!(&*path.join(Path::ROOT), path);
+        assert_eq!(&*Path::ROOT.join(path), path);
+        assert!(Path::ROOT.join(Path::ROOT).is_empty());
+    }
+
+    #[test]
+    fn path_buf_add_assign_path() {
+        let mut buf = PathBuf::new();
+        buf += Path::new("/users");
+        buf += PathSegment::Param("id");
+        buf += Path::new("/posts");
+        assert_eq!(buf.as_str(), "/users/{id}/posts");
     }
 
     #[test]
