@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Manual re-publish of main, for when the release job failed after the
+  # release PR merged. release-plz is idempotent, so this is safe to repeat.
+  workflow_dispatch:
 
 # Cancel superseded PR runs, including release-plz's docs-version sync.
 # Give each main push its own group so newer pushes cannot discard a queued
@@ -26,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.repository == 'tokio-rs/topcoat'
-      && github.event_name == 'push'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
     permissions:
       pull-requests: read
@@ -38,6 +41,11 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            if (context.eventName === 'workflow_dispatch') {
+              core.setOutput('release', 'true');
+              core.info('Manual dispatch; publishing main.');
+              return;
+            }
             const prs = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
               ...context.repo,
               commit_sha: context.sha,
@@ -158,7 +166,7 @@ jobs:
     needs: [release-pr-merge, test, clippy, fmt, docs, features, wasm, runtime, udeps]
     if: >-
       github.repository == 'tokio-rs/topcoat'
-      && github.event_name == 'push'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
       && needs.release-pr-merge.outputs.release == 'true'
     permissions:
@@ -169,7 +177,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: true
           token: ${{ secrets.RELEASE_PLZ_TOKEN }}

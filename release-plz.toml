@@ -1,8 +1,10 @@
 [workspace]
+# The release job in ci.yml only runs for release PR merges and manual
+# dispatches, so release-plz itself does not need to check the commit.
 git_release_draft = true
 pr_draft = true
 pr_labels = ["release"]
-release_always = false
+release_always = true
 
 # Default to NOT releasing. Each publishable crate opts in with `release = true`
 # below. This is deliberate: release-plz's release-order pass runs over *all*

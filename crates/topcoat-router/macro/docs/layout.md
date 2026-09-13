@@ -1,6 +1,6 @@
 Declares a layout that wraps inner pages.
 
-A layout wraps every page whose URL begins with the layout's URL. The layout's URL is the path string given to the attribute (`#[layout("/settings")]`). When no path is given, it is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html).
+A layout wraps every page whose URL begins with the layout's URL. The layout's URL is the path string given to the attribute (`#[layout("/settings")]`). When no path is given, it is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). A path starting with `./` is joined onto that module-derived path: `#[layout("./admin")]` in `src/app/settings.rs` wraps the pages under `/settings/admin`.
 
 A layout registers like any other handler: pass the function name to [`RouterBuilder::layout`](struct.RouterBuilder.html#method.layout), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
 
@@ -40,6 +40,21 @@ async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <section>
             <nav>"Settings nav"</nav>
+            (slot)
+        </section>
+    })
+}
+```
+
+Path below the module (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings/admin`):
+
+```rust
+# use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
+#[layout("./admin")]
+async fn admin_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
+        <section>
+            <nav>"Admin nav"</nav>
             (slot)
         </section>
     })

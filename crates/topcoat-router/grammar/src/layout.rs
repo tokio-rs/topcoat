@@ -1,22 +1,25 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    FnArg, ItemFn, LitStr, Pat, ReturnType,
+    FnArg, ItemFn, Pat, ReturnType,
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::paths::{
-    topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro,
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro},
 };
 
+use super::common::HandlerPath;
+
 pub struct LayoutAttr {
-    path: Option<LitStr>,
+    path: Option<HandlerPath>,
 }
 
 impl Parse for LayoutAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            path: input.peek(LitStr).then(|| input.parse()).transpose()?,
+            path: input.call(HandlerPath::parse_option)?,
         })
     }
 }
@@ -123,30 +126,37 @@ impl ToTokens for Layout {
                 ))
             }
         };
-        let (layout, submit_as) = if let Some(path) = attr.path.as_ref() {
-            let layout = quote! {
-                impl #topcoat_router::Layout for #ident {
-                    fn path(&self) -> &#topcoat_router::Path {
-                        const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
-                        PATH
-                    }
+        let (layout, submit_as) =
+            if let Some(path) = attr.path.as_ref().and_then(HandlerPath::absolute) {
+                let layout = quote! {
+                    impl #topcoat_router::Layout for #ident {
+                        fn path(&self) -> &#topcoat_router::Path {
+                            const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
+                            PATH
+                        }
 
-                    #render
-                }
-            };
-            (layout, quote! { #topcoat_router::Layout })
-        } else {
-            let layout = quote! {
-                impl #topcoat_router::ModuleLayout for #ident {
-                    fn module_path(&self) -> &'static str {
-                        ::core::module_path!()
+                        #render
                     }
+                };
+                (layout, quote! { #topcoat_router::Layout })
+            } else {
+                let relative_path = attr
+                    .path
+                    .as_ref()
+                    .and_then(HandlerPath::relative_path_method);
+                let layout = quote! {
+                    impl #topcoat_router::ModuleLayout for #ident {
+                        fn module_path(&self) -> &'static str {
+                            ::core::module_path!()
+                        }
 
-                    #render
-                }
+                        #relative_path
+
+                        #render
+                    }
+                };
+                (layout, quote! { #topcoat_router::ModuleLayout })
             };
-            (layout, quote! { #topcoat_router::ModuleLayout })
-        };
 
         // Discovery collects the marker erased behind its trait.
         let submit = cfg!(feature = "discover").then(|| {

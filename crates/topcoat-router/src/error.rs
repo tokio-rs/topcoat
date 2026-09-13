@@ -68,6 +68,7 @@ fn error_into_response(cx: &Cx, error: Error) -> Response {
     let error = try_downcast!(error as NotFoundError);
     let error = try_downcast!(error as MethodNotAllowedError);
     let error = try_downcast!(error as RedirectError);
+    let error = try_downcast!(error as SeeOther);
     let error = try_downcast!(error as UnauthorizedError);
     let error = try_downcast!(error as ServiceUnavailableError);
     let error = try_downcast!(error as TooManyRequestsError);

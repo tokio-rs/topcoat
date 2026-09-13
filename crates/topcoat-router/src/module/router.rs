@@ -8,7 +8,7 @@ use super::{
     route::ResolvedRoute,
 };
 use crate::{
-    ModuleLayer, ModuleLayout, ModulePage, ModuleRoute, PathBuf, PathSegment, RouterBuilder,
+    ModuleLayer, ModuleLayout, ModulePage, ModuleRoute, Path, PathBuf, PathSegment, RouterBuilder,
     Segment, SegmentKind, Segments,
 };
 
@@ -29,6 +29,7 @@ use crate::{
 /// 3. Apply default kind (`_` prefix -> `Group`, otherwise `Static`)
 /// 4. Kebab-case static segment names, leave others as-is
 /// 5. Collect into a [`PathBuf`]
+/// 6. Append the handler's relative path, if it declares one
 #[doc(hidden)]
 pub struct ModuleRouterBuilder {
     inner: RouterBuilder,
@@ -140,6 +141,14 @@ impl ModuleRouterBuilder {
         path_buf
     }
 
+    /// Computes the route path of a handler declared in `module_path` with
+    /// `relative_path` below it.
+    fn resolve_path(&self, module_path: &'static str, relative_path: &Path) -> PathBuf {
+        let mut path = self.module_path_to_path(module_path);
+        path += relative_path;
+        path
+    }
+
     /// Registers a [`ModulePage`], computing its route path from the module path.
     ///
     /// # Panics
@@ -147,7 +156,7 @@ impl ModuleRouterBuilder {
     /// Panics if a page has already been registered for the same path.
     #[must_use]
     pub fn page(mut self, page: impl ModulePage) -> Self {
-        let path = self.module_path_to_path(page.module_path());
+        let path = self.resolve_path(page.module_path(), page.relative_path());
         self.inner = self.inner.page(ResolvedPage::new(page, path));
         self
     }
@@ -159,7 +168,7 @@ impl ModuleRouterBuilder {
     /// Panics if a layout has already been registered for the same path.
     #[must_use]
     pub fn layout(mut self, layout: impl ModuleLayout) -> Self {
-        let path = self.module_path_to_path(layout.module_path());
+        let path = self.resolve_path(layout.module_path(), layout.relative_path());
         self.inner = self.inner.layout(ResolvedLayout::new(layout, path));
         self
     }
@@ -171,7 +180,7 @@ impl ModuleRouterBuilder {
     /// Panics if a route has already been registered for the same path.
     #[must_use]
     pub fn route(mut self, route: impl ModuleRoute) -> Self {
-        let path = self.module_path_to_path(route.module_path());
+        let path = self.resolve_path(route.module_path(), route.relative_path());
         self.inner = self.inner.route(ResolvedRoute::new(route, path));
         self
     }
@@ -179,7 +188,7 @@ impl ModuleRouterBuilder {
     /// Registers a [`ModuleLayer`], computing its path prefix from the module path.
     #[must_use]
     pub fn layer(mut self, layer: impl ModuleLayer) -> Self {
-        let path = self.module_path_to_path(layer.module_path());
+        let path = self.resolve_path(layer.module_path(), layer.relative_path());
         self.inner = self.inner.layer(ResolvedLayer::new(layer, path));
         self
     }
@@ -226,10 +235,10 @@ impl ModuleRouterBuilder {
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
         for &layout in inventory::iter::<&'static dyn ModuleLayout>() {
+            let path = self.resolve_path(layout.module_path(), layout.relative_path());
             assert!(
-                seen.insert(self.module_path_to_path(layout.module_path())),
-                "multiple discovered layouts registered for the same path \"{}\"",
-                self.module_path_to_path(layout.module_path())
+                seen.insert(path.clone()),
+                "multiple discovered layouts registered for the same path \"{path}\"",
             );
             self = self.layout(layout);
         }
@@ -266,10 +275,10 @@ impl ModuleRouterBuilder {
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
         for &layer in inventory::iter::<&'static dyn ModuleLayer>() {
+            let path = self.resolve_path(layer.module_path(), layer.relative_path());
             assert!(
-                seen.insert(self.module_path_to_path(layer.module_path())),
-                "multiple discovered layers registered for the same path \"{}\"",
-                self.module_path_to_path(layer.module_path())
+                seen.insert(path.clone()),
+                "multiple discovered layers registered for the same path \"{path}\"",
             );
             self = self.layer(layer);
         }
@@ -316,6 +325,7 @@ mod tests {
     struct PageAt {
         id: RouteId,
         module_path: &'static str,
+        relative_path: &'static Path,
     }
 
     impl ModulePage for PageAt {
@@ -331,15 +341,24 @@ mod tests {
             self.module_path
         }
 
+        fn relative_path(&self) -> &Path {
+            self.relative_path
+        }
+
         fn render<'a>(&'a self, _cx: &'a Cx, _body: Body) -> BoxView<'a> {
             unreachable!("test render function is never called")
         }
     }
 
     fn page_at(module_path: &'static str) -> PageAt {
+        page_below(module_path, Path::ROOT)
+    }
+
+    fn page_below(module_path: &'static str, relative_path: &'static Path) -> PageAt {
         PageAt {
             id: RouteId::new(),
             module_path,
+            relative_path,
         }
     }
 
@@ -485,6 +504,62 @@ mod tests {
             builder.module_path_to_path("app::users::posts").to_string(),
             "/{users}/posts"
         );
+    }
+
+    // -- resolve_path --
+
+    fn resolved_path(page: &PageAt) -> String {
+        builder()
+            .resolve_path(page.module_path(), page.relative_path())
+            .to_string()
+    }
+
+    #[test]
+    fn resolve_path_without_relative_path_is_module_path() {
+        assert_eq!(resolved_path(&page_at("app::settings")), "/settings");
+    }
+
+    #[test]
+    fn resolve_path_appends_relative_path() {
+        assert_eq!(
+            resolved_path(&page_below("app::settings", Path::new("/export"))),
+            "/settings/export"
+        );
+        assert_eq!(
+            resolved_path(&page_below("app::users", Path::new("/{id}/posts"))),
+            "/users/{id}/posts"
+        );
+    }
+
+    #[test]
+    fn resolve_path_at_root_module() {
+        assert_eq!(
+            resolved_path(&page_below("app", Path::new("/about"))),
+            "/about"
+        );
+    }
+
+    #[test]
+    fn resolve_path_applies_segment_overrides_before_relative_path() {
+        let builder = builder_with(Segment::new("app::users", Some(SegmentKind::Param), None));
+        assert_eq!(
+            builder
+                .resolve_path("app::users", Path::new("/edit"))
+                .to_string(),
+            "/{users}/edit"
+        );
+    }
+
+    #[test]
+    fn pages_in_one_module_with_distinct_relative_paths_both_register() {
+        // Two pages at the same path would panic, so distinct relative paths
+        // must keep them apart.
+        let inner = RouterBuilder::from(
+            builder()
+                .page(page_at("app::settings"))
+                .page(page_below("app::settings", Path::new("/export"))),
+        );
+        assert!(!inner.is_empty());
     }
 
     // -- segment registration --
