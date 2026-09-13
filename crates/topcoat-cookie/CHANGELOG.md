@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1](https://github.com/tokio-rs/topcoat/compare/topcoat-cookie-v0.8.0...topcoat-cookie-v0.8.1) - 2026-09-13
+
+### Fixed
+
+- *(cookie)* cookies not being applied when responding with an error ([#408](https://github.com/tokio-rs/topcoat/pull/408))
+
 ## [0.6.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cookie-v0.5.0...topcoat-cookie-v0.6.0) - 2026-08-17
 
 ### Added
