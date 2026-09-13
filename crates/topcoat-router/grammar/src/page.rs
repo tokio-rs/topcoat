@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    FnArg, ItemFn, LitStr, Pat, ReturnType,
+    FnArg, ItemFn, Pat, ReturnType,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
@@ -12,21 +12,21 @@ use topcoat_core_grammar::{
 };
 
 use super::{
-    common::{HandlerArg, HandlerArgs},
+    common::{HandlerArg, HandlerArgs, HandlerPath},
     method::Methods,
 };
 
 pub struct PageAttr {
     /// The declared HTTP methods; the page serves `GET` when omitted.
     methods: Option<Methods>,
-    path: Option<LitStr>,
+    path: Option<HandlerPath>,
 }
 
 impl Parse for PageAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             methods: Methods::parse_option(input)?,
-            path: input.peek(LitStr).then(|| input.parse()).transpose()?,
+            path: input.call(HandlerPath::parse_option)?,
         })
     }
 }
@@ -163,38 +163,45 @@ impl ToTokens for Page {
                 METHODS
             }
         };
-        let (page, submit_as) = if let Some(path) = attr.path.as_ref() {
-            let page = quote! {
-                impl #topcoat_router::Page for #ident {
-                    #id
+        let (page, submit_as) =
+            if let Some(path) = attr.path.as_ref().and_then(HandlerPath::absolute) {
+                let page = quote! {
+                    impl #topcoat_router::Page for #ident {
+                        #id
 
-                    #methods
+                        #methods
 
-                    fn path(&self) -> &#topcoat_router::Path {
-                        const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
-                        PATH
+                        fn path(&self) -> &#topcoat_router::Path {
+                            const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
+                            PATH
+                        }
+
+                        #render
                     }
+                };
+                (page, quote! { #topcoat_router::Page })
+            } else {
+                let relative_path = attr
+                    .path
+                    .as_ref()
+                    .and_then(HandlerPath::relative_path_method);
+                let page = quote! {
+                    impl #topcoat_router::ModulePage for #ident {
+                        #id
 
-                    #render
-                }
-            };
-            (page, quote! { #topcoat_router::Page })
-        } else {
-            let page = quote! {
-                impl #topcoat_router::ModulePage for #ident {
-                    #id
+                        #methods
 
-                    #methods
+                        fn module_path(&self) -> &'static str {
+                            ::core::module_path!()
+                        }
 
-                    fn module_path(&self) -> &'static str {
-                        ::core::module_path!()
+                        #relative_path
+
+                        #render
                     }
-
-                    #render
-                }
+                };
+                (page, quote! { #topcoat_router::ModulePage })
             };
-            (page, quote! { #topcoat_router::ModulePage })
-        };
 
         // href! resolves the marker to the URL path it is served at, through
         // the router that dispatched the current request.

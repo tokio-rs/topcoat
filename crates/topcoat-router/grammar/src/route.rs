@@ -1,28 +1,31 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    ItemFn, LitStr, ReturnType, Visibility,
+    ItemFn, ReturnType, Visibility,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
 };
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_inventory, topcoat_router};
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_context, topcoat_inventory, topcoat_router},
+};
 
 use super::{
-    common::{HandlerArg, HandlerArgs, request_ident},
+    common::{HandlerArg, HandlerArgs, HandlerPath, request_ident},
     method::Methods,
 };
 
 pub struct RouteAttr {
     methods: Methods,
-    path: Option<LitStr>,
+    path: Option<HandlerPath>,
 }
 
 impl Parse for RouteAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             methods: input.parse()?,
-            path: input.peek(LitStr).then(|| input.parse()).transpose()?,
+            path: input.call(HandlerPath::parse_option)?,
         })
     }
 }
@@ -168,38 +171,45 @@ impl ToTokens for Route {
                 })
             }
         };
-        let (route, submit_as) = if let Some(path) = attr.path.as_ref() {
-            let route = quote! {
-                impl #topcoat_router::Route for #ident {
-                    #id
+        let (route, submit_as) =
+            if let Some(path) = attr.path.as_ref().and_then(HandlerPath::absolute) {
+                let route = quote! {
+                    impl #topcoat_router::Route for #ident {
+                        #id
 
-                    #methods
+                        #methods
 
-                    fn path(&self) -> &#topcoat_router::Path {
-                        const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
-                        PATH
+                        fn path(&self) -> &#topcoat_router::Path {
+                            const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
+                            PATH
+                        }
+
+                        #handle
                     }
+                };
+                (route, quote! { #topcoat_router::Route })
+            } else {
+                let relative_path = attr
+                    .path
+                    .as_ref()
+                    .and_then(HandlerPath::relative_path_method);
+                let route = quote! {
+                    impl #topcoat_router::ModuleRoute for #ident {
+                        #id
 
-                    #handle
-                }
-            };
-            (route, quote! { #topcoat_router::Route })
-        } else {
-            let route = quote! {
-                impl #topcoat_router::ModuleRoute for #ident {
-                    #id
+                        #methods
 
-                    #methods
+                        fn module_path(&self) -> &'static str {
+                            ::core::module_path!()
+                        }
 
-                    fn module_path(&self) -> &'static str {
-                        ::core::module_path!()
+                        #relative_path
+
+                        #handle
                     }
-
-                    #handle
-                }
+                };
+                (route, quote! { #topcoat_router::ModuleRoute })
             };
-            (route, quote! { #topcoat_router::ModuleRoute })
-        };
 
         // href! resolves the marker to the URL path it is served at, through
         // the router that dispatched the current request. It names the marker
