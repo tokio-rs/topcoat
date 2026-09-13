@@ -4,14 +4,16 @@ Handlers register in two ways: **manually**, listing each item on the builder, o
 
 # Paths
 
-Explicit route paths use Topcoat's [`Path`] syntax:
+Explicit route paths use Topcoat's [`Path`] syntax. A path is made of `/`-separated segments, and each segment is one of four kinds.
 
-- `/users` for static segments.
-- `/users/{id}` for a dynamic parameter that matches one non-empty segment.
-- `/docs/{*path}` for a catch-all parameter that matches one or more remaining segments.
-- `/(marketing)/pricing` for groups. Groups participate in layout and layer matching but are stripped from the served URL, so this example serves `/pricing`.
+- `/users` is a static segment.
+- `/{id}` is a dynamic parameter that matches one non-empty segment.
+- `/{*path}` is a catch-all parameter that matches one or more remaining segments.
+- `/(marketing)` is a group. Groups take part in layout and layer matching but are stripped from the served URL.
 
-The root path is `/`. Non-root paths must start with `/` and may not contain empty segments. Parameter and group names must start with an ASCII letter or `_` and contain only ASCII letters, digits, and underscores.
+The root path is `/`. Every other path starts with `/` and has no empty segments, except that it may end in a `/`. Parameter and group names start with an ASCII letter or `_` and contain only ASCII letters, digits, and underscores.
+
+A trailing slash is part of the path. A page at `/users/` is served at `/users/`, and a page at `/users` is served at `/users`. A request for the other form is redirected to the declared one by default. Use [`RouterBuilder::trailing_slash`] to configure this behavior.
 
 # Pages
 

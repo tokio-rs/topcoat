@@ -148,11 +148,7 @@ impl ModuleRouterBuilder {
     /// # Panics
     ///
     /// Panics if the trailing slash is asked of the root path, which has none.
-    fn resolve_path(
-        &self,
-        module_path: &'static str,
-        relative_path: Option<&Path>,
-    ) -> PathBuf {
+    fn resolve_path(&self, module_path: &'static str, relative_path: Option<&Path>) -> PathBuf {
         let mut path = self.module_path_to_path(module_path);
         match relative_path {
             None => {}

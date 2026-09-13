@@ -230,7 +230,10 @@ impl Path {
     /// assert_eq!(base.join(Path::new("/export")).as_str(), "/settings/export");
     /// assert_eq!(base.join(Path::ROOT).as_str(), "/settings");
     /// assert_eq!(Path::ROOT.join(base).as_str(), "/settings");
-    /// assert_eq!(Path::new("/settings/").join(Path::new("/export")).as_str(), "/settings/export");
+    /// assert_eq!(
+    ///     Path::new("/settings/").join(Path::new("/export")).as_str(),
+    ///     "/settings/export"
+    /// );
     /// ```
     #[must_use]
     pub fn join(&self, other: &Path) -> PathBuf {
@@ -1008,7 +1011,10 @@ mod tests {
     #[test]
     fn path_to_matchit_keeps_trailing_slash() {
         assert_eq!(Path::new("/users/").to_matchit_path(), "/users/");
-        assert_eq!(Path::new("/(auth)/users/{id}/").to_matchit_path(), "/users/{id}/");
+        assert_eq!(
+            Path::new("/(auth)/users/{id}/").to_matchit_path(),
+            "/users/{id}/"
+        );
         // A trailing slash after nothing but groups still addresses the root.
         assert_eq!(Path::new("/(marketing)/").to_matchit_path(), "/");
     }
@@ -1043,7 +1049,10 @@ mod tests {
     fn join_drops_a_trailing_slash_when_segments_follow() {
         let base = Path::new("/settings/");
         assert_eq!(base.join(Path::new("/export")).as_str(), "/settings/export");
-        assert_eq!(base.join(Path::new("/export/")).as_str(), "/settings/export/");
+        assert_eq!(
+            base.join(Path::new("/export/")).as_str(),
+            "/settings/export/"
+        );
         let mut buf = base.to_owned();
         buf += PathSegment::Param("id");
         assert_eq!(buf.as_str(), "/settings/{id}");

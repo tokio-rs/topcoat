@@ -148,6 +148,23 @@ async fn export() -> Result<impl View> {
 }
 ```
 
+This can also be used to add a trailing slash to the end of your module path. A bare `./` serves the module path itself with a trailing slash, and a relative path ending in a slash keeps it.
+
+```rust
+# use topcoat::{Result, router::page, view::{View, view}};
+// src/app/settings.rs: GET /settings/
+#[page("./")]
+async fn settings() -> Result<impl View> {
+    Ok(view! { <h1>"Settings"</h1> })
+}
+
+// src/app/settings.rs: GET /settings/export/
+#[page("./export/")]
+async fn export() -> Result<impl View> {
+    Ok(view! { <h1>"Export"</h1> })
+}
+```
+
 The same form works for `#[layout]`, `#[layer]`, and `#[route]`.
 
 # Dynamic path parameters

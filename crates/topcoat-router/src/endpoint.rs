@@ -172,7 +172,9 @@ impl Endpoints {
     pub(crate) fn push(&mut self, path: Cow<'static, str>, endpoint: Endpoint) -> EndpointIndex {
         match self.try_push(path, endpoint) {
             Ok(index) => index,
-            Err(with) => panic!("failed to register route: conflicts with registered route `{with}`"),
+            Err(with) => {
+                panic!("failed to register route: conflicts with registered route `{with}`")
+            }
         }
     }
 

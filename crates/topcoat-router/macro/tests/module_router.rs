@@ -69,7 +69,10 @@ mod posts {
         #[page]
         async fn post(cx: &Cx) -> Result<impl View> {
             let id = path_param::<PostId>(cx)?;
-            Ok(view! { "post " (id) })
+            Ok(view! {
+                "post "
+                (id)
+            })
         }
     }
 }

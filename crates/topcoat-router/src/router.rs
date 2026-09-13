@@ -1450,7 +1450,11 @@ mod tests {
             .route(RouteFn::new(Method::GET, path("/bare"), say_route))
             .route(RouteFn::new(Method::GET, path("/slashed/"), say_route))
             .route(RouteFn::new(Method::GET, path("/users/{id}"), echo_params))
-            .route(RouteFn::new(Method::GET, path("/files/{*rest}"), echo_params))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/files/{*rest}"),
+                echo_params,
+            ))
             .route(RouteFn::new(Method::POST, path("/echo-body"), echo_body))
             .trailing_slash(policy)
             .build()
@@ -1458,7 +1462,11 @@ mod tests {
 
     #[test]
     fn the_declared_form_is_served() {
-        for policy in [TrailingSlash::Redirect, TrailingSlash::Serve, TrailingSlash::Strict] {
+        for policy in [
+            TrailingSlash::Redirect,
+            TrailingSlash::Serve,
+            TrailingSlash::Strict,
+        ] {
             let router = trailing_slash_router(policy);
             for requested in ["/", "/bare", "/slashed/", "/users/42", "/files/a/b"] {
                 let (status, _, _) = send(&router, Method::GET, requested);
