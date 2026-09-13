@@ -373,7 +373,7 @@ mod tests {
     use super::*;
     use crate::{
         Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn,
-        Path, Route, RouteFn, RouteFuture, Slot,
+        Path, Route, RouteFn, RouteFuture, Slot, TrailingSlash,
         error::rewrite,
         raw_path_params,
         request::{Bytes, method, original_method, original_uri, uri},
@@ -1288,9 +1288,8 @@ mod tests {
                 .layer(LayerFn::new(Some(path("/admin")), trace_admin)),
         );
 
-        // A trailing slash is a different URL: the route does not match, and
-        // no route means no path layers, the root path included.
-        let (status, _, _) = send(&router, Method::GET, "/admin/x/");
+        // No route means no path layers, the root path included.
+        let (status, _, _) = send(&router, Method::GET, "/admin/missing");
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert!(trace.lock().unwrap().is_empty());
     }
@@ -1439,6 +1438,140 @@ mod tests {
         let (status, _, _) = send(&router, Method::POST, "/x");
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
         assert_eq!(*trace.lock().unwrap(), vec!["always"]);
+    }
+
+    // -- Router::handle: trailing slash --
+
+    /// A router with routes at a slash-less path, a slashed path, a
+    /// parameter path, a catch-all, and the root, under `policy`.
+    fn trailing_slash_router(policy: TrailingSlash) -> Router {
+        RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/"), say_route))
+            .route(RouteFn::new(Method::GET, path("/bare"), say_route))
+            .route(RouteFn::new(Method::GET, path("/slashed/"), say_route))
+            .route(RouteFn::new(Method::GET, path("/users/{id}"), echo_params))
+            .route(RouteFn::new(Method::GET, path("/files/{*rest}"), echo_params))
+            .route(RouteFn::new(Method::POST, path("/echo-body"), echo_body))
+            .trailing_slash(policy)
+            .build()
+    }
+
+    #[test]
+    fn the_declared_form_is_served() {
+        for policy in [TrailingSlash::Redirect, TrailingSlash::Serve, TrailingSlash::Strict] {
+            let router = trailing_slash_router(policy);
+            for requested in ["/", "/bare", "/slashed/", "/users/42", "/files/a/b"] {
+                let (status, _, _) = send(&router, Method::GET, requested);
+                assert_eq!(status, StatusCode::OK, "for `{requested}` under {policy:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn redirect_sends_the_other_form_to_the_declared_form() {
+        let router = trailing_slash_router(TrailingSlash::Redirect);
+        for (requested, declared) in [
+            ("/bare/", "/bare"),
+            ("/slashed", "/slashed/"),
+            ("/users/42/", "/users/42"),
+            ("/bare/?a=1&b=2", "/bare?a=1&b=2"),
+            ("/slashed?a=1", "/slashed/?a=1"),
+        ] {
+            let (status, headers, _) = send(&router, Method::GET, requested);
+            assert_eq!(status, StatusCode::PERMANENT_REDIRECT, "for `{requested}`");
+            assert_eq!(headers["location"], declared, "for `{requested}`");
+        }
+    }
+
+    #[test]
+    fn redirect_applies_to_every_method() {
+        // The 308 tells the client to resubmit with the same method and body,
+        // so the method is not checked before redirecting.
+        let router = trailing_slash_router(TrailingSlash::Redirect);
+        let (status, headers, _) = send(&router, Method::POST, "/echo-body/");
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(headers["location"], "/echo-body");
+        let (status, _, _) = send(&router, Method::DELETE, "/bare/");
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+    }
+
+    #[test]
+    fn a_catch_all_captures_the_trailing_slash_itself() {
+        let router = trailing_slash_router(TrailingSlash::Redirect);
+        let (status, _, body) = send(&router, Method::GET, "/files/a/");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"rest=a/");
+    }
+
+    #[test]
+    fn redirect_runs_the_pathless_layers_only() {
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
+                .layer(LayerFn::new(None::<&Path>, trace_always))
+                .layer(LayerFn::new(Some(path("/admin")), trace_admin)),
+        );
+        let (status, _, _) = send(&router, Method::GET, "/admin/x/");
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(*trace.lock().unwrap(), vec!["always"]);
+    }
+
+    #[test]
+    fn serve_handles_both_forms() {
+        let router = trailing_slash_router(TrailingSlash::Serve);
+        for (requested, expected) in [
+            ("/bare/", "route"),
+            ("/slashed", "route"),
+            ("/users/42/", "id=42"),
+        ] {
+            let (status, _, body) = send(&router, Method::GET, requested);
+            assert_eq!(status, StatusCode::OK, "for `{requested}`");
+            assert_eq!(&body[..], expected.as_bytes(), "for `{requested}`");
+        }
+    }
+
+    #[test]
+    fn serve_keeps_the_requested_uri() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), echo_uris))
+            .route(RouteFn::new(Method::GET, path("/y"), echo_endpoint_path))
+            .trailing_slash(TrailingSlash::Serve)
+            .build();
+        let (_, _, body) = send(&router, Method::GET, "/x/");
+        assert_eq!(&body[..], b"/x/ /x/");
+        // The endpoint is the one registered for the other form.
+        let (_, _, body) = send(&router, Method::GET, "/y/");
+        assert_eq!(&body[..], b"/y/");
+    }
+
+    #[test]
+    fn serve_checks_the_method_on_the_other_form() {
+        let router = trailing_slash_router(TrailingSlash::Serve);
+        let (status, _, _) = send(&router, Method::POST, "/bare/");
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn strict_leaves_the_other_form_unmatched() {
+        let router = trailing_slash_router(TrailingSlash::Strict);
+        for requested in ["/bare/", "/slashed", "/users/42/"] {
+            let (status, _, _) = send(&router, Method::GET, requested);
+            assert_eq!(status, StatusCode::NOT_FOUND, "for `{requested}`");
+        }
+    }
+
+    #[test]
+    fn routes_at_both_forms_are_left_alone() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), echo_endpoint_path))
+            .route(RouteFn::new(Method::GET, path("/x/"), echo_endpoint_path))
+            .build();
+        let (status, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"/x");
+        let (status, _, body) = send(&router, Method::GET, "/x/");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"/x/");
     }
 
     // -- Router::handle: pages and layouts --
