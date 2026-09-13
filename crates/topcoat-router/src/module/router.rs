@@ -142,10 +142,30 @@ impl ModuleRouterBuilder {
     }
 
     /// Computes the route path of a handler declared in `module_path` with
-    /// `relative_path` below it.
-    fn resolve_path(&self, module_path: &'static str, relative_path: &Path) -> PathBuf {
+    /// `relative_path` below it. The root relative path stands for the module
+    /// path with a trailing slash.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the trailing slash is asked of the root path, which has none.
+    fn resolve_path(
+        &self,
+        module_path: &'static str,
+        relative_path: Option<&Path>,
+    ) -> PathBuf {
         let mut path = self.module_path_to_path(module_path);
-        path += relative_path;
+        match relative_path {
+            None => {}
+            Some(relative_path) if relative_path.is_empty() => {
+                assert!(
+                    !path.is_empty(),
+                    "the root path has no trailing slash form; `./` cannot be used in the \
+                     module router's root module"
+                );
+                path += PathSegment::Static("");
+            }
+            Some(relative_path) => path += relative_path,
+        }
         path
     }
 
@@ -325,7 +345,7 @@ mod tests {
     struct PageAt {
         id: RouteId,
         module_path: &'static str,
-        relative_path: &'static Path,
+        relative_path: Option<&'static Path>,
     }
 
     impl ModulePage for PageAt {
@@ -341,7 +361,7 @@ mod tests {
             self.module_path
         }
 
-        fn relative_path(&self) -> &Path {
+        fn relative_path(&self) -> Option<&Path> {
             self.relative_path
         }
 
@@ -351,14 +371,18 @@ mod tests {
     }
 
     fn page_at(module_path: &'static str) -> PageAt {
-        page_below(module_path, Path::ROOT)
+        PageAt {
+            id: RouteId::new(),
+            module_path,
+            relative_path: None,
+        }
     }
 
     fn page_below(module_path: &'static str, relative_path: &'static Path) -> PageAt {
         PageAt {
             id: RouteId::new(),
             module_path,
-            relative_path,
+            relative_path: Some(relative_path),
         }
     }
 
@@ -540,11 +564,37 @@ mod tests {
     }
 
     #[test]
+    fn resolve_path_root_relative_path_adds_a_trailing_slash() {
+        assert_eq!(
+            resolved_path(&page_below("app::settings", Path::ROOT)),
+            "/settings/"
+        );
+        assert_eq!(
+            resolved_path(&page_below("app::users::posts", Path::ROOT)),
+            "/users/posts/"
+        );
+    }
+
+    #[test]
+    fn resolve_path_keeps_a_relative_trailing_slash() {
+        assert_eq!(
+            resolved_path(&page_below("app::settings", Path::new("/export/"))),
+            "/settings/export/"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "the root path has no trailing slash form")]
+    fn resolve_path_rejects_a_trailing_slash_at_the_root_module() {
+        resolved_path(&page_below("app", Path::ROOT));
+    }
+
+    #[test]
     fn resolve_path_applies_segment_overrides_before_relative_path() {
         let builder = builder_with(Segment::new("app::users", Some(SegmentKind::Param), None));
         assert_eq!(
             builder
-                .resolve_path("app::users", Path::new("/edit"))
+                .resolve_path("app::users", Some(Path::new("/edit")))
                 .to_string(),
             "/{users}/edit"
         );

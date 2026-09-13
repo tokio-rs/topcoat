@@ -11,12 +11,14 @@ pub trait ModuleLayer: Send + Sync + 'static {
     /// The module path where the layer was declared, used to derive the URL.
     fn module_path(&self) -> &'static str;
 
-    /// The path below the module path, joined onto it to form the URL prefix.
+    /// The path below the module path, joined onto it to form the URL prefix,
+    /// as declared with a `./` path. The root path stands for the module path
+    /// with a trailing slash.
     ///
-    /// Defaults to the root path, so the handler is served at the module path
+    /// Defaults to `None`, so the handler is served at the module path
     /// itself.
-    fn relative_path(&self) -> &Path {
-        Path::ROOT
+    fn relative_path(&self) -> Option<&Path> {
+        None
     }
 
     /// Handles a request, calling `next` to continue down the chain.
@@ -28,7 +30,7 @@ impl<L: ModuleLayer + ?Sized> ModuleLayer for &'static L {
         (**self).module_path()
     }
 
-    fn relative_path(&self) -> &Path {
+    fn relative_path(&self) -> Option<&Path> {
         (**self).relative_path()
     }
 

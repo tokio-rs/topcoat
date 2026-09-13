@@ -11,7 +11,8 @@ use topcoat_core_grammar::{ParseOption, paths::topcoat_router};
 ///
 /// An absolute literal starts with `/` and is the path the handler is served
 /// at. A relative literal starts with `./` and names a path below the
-/// handler's module path, which the module router joins onto it.
+/// handler's module path, which the module router joins onto it. The bare
+/// `./` serves the module path itself with a trailing slash.
 pub struct HandlerPath {
     pub lit: LitStr,
 }
@@ -46,9 +47,9 @@ impl HandlerPath {
     pub fn relative_path_method(&self) -> Option<TokenStream> {
         let path = self.relative()?;
         Some(quote! {
-            fn relative_path(&self) -> &#topcoat_router::Path {
+            fn relative_path(&self) -> ::core::option::Option<&#topcoat_router::Path> {
                 const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
-                PATH
+                ::core::option::Option::Some(PATH)
             }
         })
     }
@@ -62,11 +63,10 @@ impl Parse for HandlerPath {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let lit: LitStr = input.parse()?;
         let value = lit.value();
-        if value == "." || value == Self::RELATIVE_PREFIX {
+        if value == "." {
             return Err(syn::Error::new(
                 lit.span(),
-                "a relative path must name a path below the module path; \
-                 drop the path to serve the module path itself",
+                "a relative path must start with `./`",
             ));
         }
         if value.starts_with("..") {
@@ -132,9 +132,16 @@ mod tests {
     }
 
     #[test]
-    fn rejects_the_module_path_itself() {
-        assert!(parse_err(r#"".""#).contains("drop the path"));
-        assert!(parse_err(r#""./""#).contains("drop the path"));
+    fn dot_slash_is_the_root_relative_path() {
+        let path = parse(r#""./""#);
+        assert!(path.absolute().is_none());
+        assert_eq!(path.relative().unwrap().value(), "/");
+        assert!(path.relative_path_method().is_some());
+    }
+
+    #[test]
+    fn rejects_a_bare_dot() {
+        assert!(parse_err(r#"".""#).contains("must start with `./`"));
     }
 
     #[test]
