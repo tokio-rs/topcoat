@@ -41,7 +41,7 @@ pub fn service_unavailable(retry_after_secs: u64) -> ServiceUnavailableError {
 /// `Result`.
 ///
 /// Construct one with [`service_unavailable`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ServiceUnavailableError {
     retry_after_secs: u64,
 }

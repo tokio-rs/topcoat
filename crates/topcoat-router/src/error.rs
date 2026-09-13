@@ -55,7 +55,7 @@ pub(crate) fn internal_server_response() -> Response {
 fn error_into_response(cx: &Cx, error: Error) -> Response {
     macro_rules! try_downcast {
         ($ident:ident as $ty:ty) => {
-            match $ident.downcast::<$ty>() {
+            match $ident.downcast_cloned::<$ty>() {
                 Ok(error) => return into_response_or_500(cx, error),
                 Err(error) => error,
             }
@@ -315,5 +315,20 @@ mod tests {
         let response = error_into_response(&Cx::default(), error);
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    /// A memoized loader keeps its error in the request cache while the
+    /// handler returns a clone, so the mapping must recover the status from
+    /// a shared error too. A cached "not found" answered as "broken" is the
+    /// failure this guards.
+    #[test]
+    fn a_shared_error_still_maps_to_its_status() {
+        let error: Error = not_found().into();
+        let cached = error.clone();
+
+        let response = error_into_response(&Cx::default(), error);
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        drop(cached);
     }
 }

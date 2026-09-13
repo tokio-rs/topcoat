@@ -63,7 +63,7 @@ pub fn redirect_permanent(uri: impl AsRef<str>) -> RedirectError {
 /// from an `Option` / `Result` via [`RouterErrorExt`](crate::error::RouterErrorExt).
 /// For the Post/Redirect/Get pattern, where the redirect is a *successful*
 /// response returned through `Ok`, reach for [`see_other`] instead.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RedirectError {
     status: StatusCode,
     location: HeaderValue,

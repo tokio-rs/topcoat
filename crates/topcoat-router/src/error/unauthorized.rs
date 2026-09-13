@@ -30,7 +30,7 @@ pub fn unauthorized() -> UnauthorizedError {
 ///
 /// Construct one with [`unauthorized`], or derive one from an `Option` /
 /// `Result` via [`RouterErrorExt`](crate::error::RouterErrorExt).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnauthorizedError {
     _priv: (),
 }

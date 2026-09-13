@@ -32,7 +32,7 @@ pub fn internal_server_error(error: impl Into<Error>) -> InternalServerError {
 /// An internal-server-error response carried as the `Err` variant of a handler `Result`.
 ///
 /// Construct one with [`internal_server_error`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InternalServerError {
     _inner: Error,
 }

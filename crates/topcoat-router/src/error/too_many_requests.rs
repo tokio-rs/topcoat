@@ -40,7 +40,7 @@ pub fn too_many_requests(retry_after_secs: u64) -> TooManyRequestsError {
 /// `Result`.
 ///
 /// Construct one with [`too_many_requests`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TooManyRequestsError {
     retry_after_secs: u64,
 }
