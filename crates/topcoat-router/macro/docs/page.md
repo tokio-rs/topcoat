@@ -1,6 +1,6 @@
 Declares a page handler.
 
-The page's URL is the path string given to the attribute (`#[page("/about")]`). When no path is given, the URL is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). Both forms register into the same router, so explicit and module-derived paths can be mixed freely in one app.
+The page's URL is the path string given to the attribute (`#[page("/about")]`). When no path is given, the URL is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). A path starting with `./` is joined onto that module-derived path: `#[page("./export")]` in `src/app/settings.rs` serves `/settings/export`. All forms register into the same router, so explicit and module-derived paths can be mixed freely in one app.
 
 A page serves `GET` by default. To serve other methods, name them before the path, using the same forms as [`#[route]`](attr.route.html): a single method (`#[page(POST "/signup")]`), a bracketed list (`[GET, POST]`), or `*` for every method.
 
@@ -31,6 +31,16 @@ Module-derived path (in `src/app/about.rs` under `module_router!()`, this serves
 #[page]
 async fn about() -> Result<impl View> {
     Ok(view! { <h1>"About"</h1> })
+}
+```
+
+Path below the module (in `src/app/settings.rs` under `module_router!()`, this serves `/settings/export`):
+
+```rust
+# use topcoat::{Result, router::page, view::{View, view}};
+#[page("./export")]
+async fn export() -> Result<impl View> {
+    Ok(view! { <h1>"Export"</h1> })
 }
 ```
 

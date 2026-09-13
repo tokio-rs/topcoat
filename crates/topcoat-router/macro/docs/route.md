@@ -6,7 +6,7 @@ A route always declares its HTTP methods as the first argument:
 - a bracketed list (`[GET, POST]`) responding to each listed method, or
 - `*`, responding to every method. A route declaring a specific method takes precedence over a `*` route at the same path.
 
-An optional path string follows the methods (`#[route(GET "/api/health")]`); when omitted, the URL is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). Both forms register into the same router and can be mixed.
+An optional path string follows the methods (`#[route(GET "/api/health")]`); when omitted, the URL is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). A path starting with `./` is joined onto that module-derived path: `#[route(GET "./health")]` in `src/app/api.rs` serves `/api/health`. All forms register into the same router and can be mixed.
 
 A route registers like any other handler: pass the function name to [`RouterBuilder::route`](struct.RouterBuilder.html#method.route), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
 
@@ -45,6 +45,16 @@ Module-derived path (in `src/app/api/health.rs` under `module_router!()`, this s
 ```rust
 # use topcoat::{Result, router::route};
 #[route(GET)]
+async fn health() -> Result<&'static str> {
+    Ok("ok")
+}
+```
+
+Path below the module (in `src/app/api.rs` under `module_router!()`, this serves `GET /api/health` without a module for it):
+
+```rust
+# use topcoat::{Result, router::route};
+#[route(GET "./health")]
 async fn health() -> Result<&'static str> {
     Ok("ok")
 }
