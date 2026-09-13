@@ -1,3 +1,12 @@
+use std::sync::Arc;
+
+use topcoat_core::context::Cx;
+
+use crate::{
+    Body, Endpoint, Endpoints, Layer, Methods, Path, PathBuf, PathSegment, Route, RouteFuture,
+    RouteId, Routes, error::redirect_permanent, request::uri,
+};
+
 /// How the router treats a request for the other trailing-slash form of a
 /// route's path.
 ///
@@ -32,4 +41,140 @@ pub enum TrailingSlash {
     /// Serves the route under its declared form only; the other form matches
     /// nothing and responds 404.
     Strict,
+}
+
+impl TrailingSlash {
+    /// Registers the other trailing-slash form of every endpoint's path, so a
+    /// request for it is handled under this policy: by the endpoint's own
+    /// routes, or by a route redirecting to the declared form, which runs
+    /// inside `always_layers` like a request that matched no route. A form a
+    /// route claims for itself is left to that route.
+    ///
+    /// Call this once every route is registered.
+    pub(crate) fn register_twins(
+        self,
+        endpoints: &mut Endpoints,
+        routes: &mut Routes,
+        always_layers: &[Arc<dyn Layer>],
+    ) {
+        if self == Self::Strict {
+            return;
+        }
+        let twins: Vec<(PathBuf, Endpoint)> = endpoints
+            .iter()
+            .filter_map(|endpoint| {
+                let path = twin(endpoint.path())?;
+                let twin = match self {
+                    Self::Serve => endpoint.with_path(&path),
+                    _ => Endpoint::new(&path),
+                };
+                Some((path, twin))
+            })
+            .collect();
+        for (path, twin) in twins {
+            let Ok(index) = endpoints.try_push(path.to_matchit_path(), twin) else {
+                continue;
+            };
+            if self == Self::Redirect {
+                let route = Box::new(RedirectRoute::new(path));
+                let route = routes.push(route, index, always_layers.into());
+                endpoints[index].insert_any(route);
+            }
+        }
+    }
+}
+
+/// Returns the other trailing-slash form of `path`: `/users/` for `/users`,
+/// and the other way around. The root and a path ending in a catch-all
+/// parameter have no other form.
+fn twin(path: &Path) -> Option<PathBuf> {
+    let mut segments = path.segments();
+    match segments.next_back()? {
+        PathSegment::CatchAll(_) => None,
+        PathSegment::Static("") => Some(segments.collect()),
+        _ => {
+            let mut twin = path.to_owned();
+            twin += PathSegment::Static("");
+            Some(twin)
+        }
+    }
+}
+
+/// The route serving the other trailing-slash form of an endpoint's path
+/// under [`TrailingSlash::Redirect`], redirecting to the declared form.
+struct RedirectRoute {
+    id: RouteId,
+    /// The other form, which this route is registered at.
+    path: PathBuf,
+}
+
+impl RedirectRoute {
+    fn new(path: PathBuf) -> Self {
+        Self {
+            id: RouteId::new(),
+            path,
+        }
+    }
+}
+
+impl Route for RedirectRoute {
+    fn id(&self) -> RouteId {
+        self.id
+    }
+
+    fn methods(&self) -> Methods<'_> {
+        Methods::Any
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
+        // The request path matched this route's path, so it has a trailing
+        // slash exactly when the declared form does not.
+        let request = uri(cx);
+        let mut target = request.path().to_owned();
+        if self.path.has_trailing_slash() {
+            target.pop();
+        } else {
+            target.push('/');
+        }
+        if let Some(query) = request.query() {
+            target.push('?');
+            target.push_str(query);
+        }
+        Box::pin(async move { Err(redirect_permanent(target).into()) })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn twin_of(path: &'static str) -> Option<String> {
+        twin(Path::new(path)).map(|twin| twin.to_string())
+    }
+
+    #[test]
+    fn twin_adds_a_trailing_slash() {
+        assert_eq!(twin_of("/users").as_deref(), Some("/users/"));
+        assert_eq!(twin_of("/users/{id}").as_deref(), Some("/users/{id}/"));
+    }
+
+    #[test]
+    fn twin_removes_a_trailing_slash() {
+        assert_eq!(twin_of("/users/").as_deref(), Some("/users"));
+        assert_eq!(twin_of("/users/{id}/").as_deref(), Some("/users/{id}"));
+    }
+
+    #[test]
+    fn the_root_has_no_twin() {
+        assert_eq!(twin_of("/"), None);
+    }
+
+    #[test]
+    fn a_catch_all_has_no_twin() {
+        assert_eq!(twin_of("/files/{*rest}"), None);
+    }
 }

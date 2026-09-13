@@ -495,13 +495,15 @@ impl RouterBuilder {
             .cloned()
             .collect();
 
+        self.trailing_slash
+            .register_twins(&mut endpoints, &mut routes, &always_layers);
+
         Router::new(RouterInner {
             routes,
             endpoints,
             always_layers,
             app_context: Arc::new(self.context),
             origin: OriginLayer::new(self.origin_policy),
-            trailing_slash: self.trailing_slash,
             #[cfg(feature = "compression")]
             compression: self.compression,
         })

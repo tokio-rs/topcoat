@@ -10,7 +10,7 @@ use topcoat_core::context::{AppContext, Cx, try_request_context};
 
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
-    RouteIndex, RouterBuilder, Routes, Terminal, TrailingSlash,
+    RouteIndex, RouterBuilder, Routes, Terminal,
     error::{REWRITE_LIMIT, RewriteError, RewriteLoopError, internal_server_response, respond},
     request::{OriginalParts, Request},
     response::Response,
@@ -221,9 +221,6 @@ pub(crate) struct RouterInner {
     pub(crate) app_context: Arc<AppContext>,
     /// The origin policy wrapping every request as the outermost layer.
     pub(crate) origin: OriginLayer,
-    /// How a request for the other trailing-slash form of a route's path is
-    /// handled.
-    pub(crate) trailing_slash: TrailingSlash,
     /// The compression applied to responses on their way out.
     #[cfg(feature = "compression")]
     pub(crate) compression: crate::Compression,

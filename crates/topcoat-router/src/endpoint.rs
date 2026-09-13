@@ -74,6 +74,16 @@ impl Endpoint {
         }
     }
 
+    /// Returns a copy of this endpoint's method table serving `path` instead.
+    pub(crate) fn with_path(&self, path: &Path) -> Self {
+        Self {
+            standard: self.standard,
+            other: self.other.clone(),
+            any: self.any,
+            path: path.as_str().into(),
+        }
+    }
+
     /// Returns the URL path this endpoint serves.
     ///
     /// This is the path pattern the endpoint was registered under rather than
@@ -160,12 +170,34 @@ impl Endpoints {
     /// Panics if `path` conflicts with an already registered one.
     #[track_caller]
     pub(crate) fn push(&mut self, path: Cow<'static, str>, endpoint: Endpoint) -> EndpointIndex {
-        let index = EndpointIndex(self.endpoints.len());
-        if let Err(error) = self.matcher.insert(path, index) {
-            panic!("failed to register route: {error}");
+        match self.try_push(path, endpoint) {
+            Ok(index) => index,
+            Err(with) => panic!("failed to register route: conflicts with registered route `{with}`"),
         }
-        self.endpoints.push(endpoint);
-        index
+    }
+
+    /// Registers `endpoint` under the matcher path `path`, returning the
+    /// [`EndpointIndex`] that now identifies it, or the registered path that
+    /// `path` conflicts with.
+    pub(crate) fn try_push(
+        &mut self,
+        path: Cow<'static, str>,
+        endpoint: Endpoint,
+    ) -> Result<EndpointIndex, String> {
+        let index = EndpointIndex(self.endpoints.len());
+        match self.matcher.insert(path, index) {
+            Ok(()) => {
+                self.endpoints.push(endpoint);
+                Ok(index)
+            }
+            Err(matchit::InsertError::Conflict { with }) => Err(with),
+            Err(error) => panic!("failed to register route: {error}"),
+        }
+    }
+
+    /// Iterates over the registered endpoints.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &Endpoint> {
+        self.endpoints.iter()
     }
 
     /// Matches a request URL against the registered endpoints, returning the
