@@ -1,3 +1,5 @@
+mod headers;
+
 use std::{borrow::Cow, convert::Infallible, future::ready};
 
 use bytes::{Bytes, BytesMut};
@@ -12,6 +14,8 @@ use topcoat_core::{
 };
 
 use crate::{Body, BoxError};
+
+pub use headers::*;
 
 pub type Response<T = Body> = http::Response<T>;
 

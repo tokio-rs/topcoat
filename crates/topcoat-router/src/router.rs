@@ -13,7 +13,7 @@ use crate::{
     RouteIndex, RouterBuilder, Routes, Terminal,
     error::{REWRITE_LIMIT, RewriteError, RewriteLoopError, internal_server_response, respond},
     request::{OriginalParts, Request},
-    response::Response,
+    response::{Response, ResponseHeaders, response_headers},
 };
 
 /// A finalized Topcoat routing table.
@@ -105,7 +105,9 @@ impl Router {
                 Some(base) => base.clone(),
                 None => Cx::new(Arc::clone(&inner.app_context)),
             };
-            let cx = cx.with(Arc::clone(&self.inner));
+            // Every dispatch gets its own slot for deferred response headers,
+            // so a rewrite drops whatever the discarded dispatch queued.
+            let cx = cx.with_many((Arc::clone(&self.inner), ResponseHeaders::new()));
             let cx = match &original {
                 Some(parts) => cx.with(OriginalParts(parts.clone())),
                 None => cx,
@@ -186,7 +188,8 @@ impl Router {
             parts = next_parts;
             body = rewrite.body;
         };
-        let response = respond(&cx, result);
+        let mut response = respond(&cx, result);
+        response_headers(&cx).apply(response.headers_mut());
 
         // Compression runs outside every layer, so layers see uncompressed
         // bodies. The negotiation reads the request headers as the layers
@@ -1315,6 +1318,44 @@ mod tests {
         let (status, _, body) = send(&router, Method::GET, "/missing");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"replaced");
+    }
+
+    /// A pathless layer that defers a header onto whatever response the
+    /// request ends with, before it knows whether the chain will succeed.
+    fn tag_response<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        Box::pin(async move {
+            response_headers(cx).append(
+                http::HeaderName::from_static("x-tag"),
+                http::HeaderValue::from_static("layer"),
+            );
+            next.run(cx, body).await
+        })
+    }
+
+    #[test]
+    fn deferred_headers_land_on_a_success_response() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .layer(LayerFn::new(None::<&Path>, tag_response))
+            .build();
+
+        let (status, headers, _) = send(&router, Method::GET, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers.get("x-tag").unwrap(), "layer");
+    }
+
+    /// The error's response is built after every layer has returned, which is
+    /// too late for a layer to set a header on it directly.
+    #[test]
+    fn deferred_headers_land_on_an_error_response() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .layer(LayerFn::new(None::<&Path>, tag_response))
+            .build();
+
+        let (status, headers, _) = send(&router, Method::GET, "/missing");
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(headers.get("x-tag").unwrap(), "layer");
     }
 
     #[test]

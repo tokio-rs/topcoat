@@ -25,7 +25,9 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// the chain. A layer typically derives a child context carrying
 /// request-scoped values with [`Cx::with`], passes it to [`Next::run`] to
 /// invoke the inner layers and ultimately the route, then inspects or modifies
-/// the [`Response`].
+/// the [`Response`]. Headers meant for the response of an error coming back
+/// up the chain go through [`response_headers`](crate::response::response_headers),
+/// since that response is only built once the error leaves the chain.
 ///
 /// When several layers match a route they nest from least-specific (outermost)
 /// to most-specific (innermost), like layouts; a layer without a path runs

@@ -1,4 +1,4 @@
-Topcoat reads and writes cookies through a request-scoped **cookie jar**. Install cookie support on your router with `.cookies()`, then call `cookies(cx)` from any handler to get the jar, read incoming cookies, and queue changes. Anything you add or remove during the request is serialized into `Set-Cookie` response headers automatically once the handler returns. You don't need to touch headers yourself.
+Topcoat reads and writes cookies through a request-scoped **cookie jar**. Install cookie support on your router with `.cookies()`, then call `cookies(cx)` from any handler to get the jar, read incoming cookies, and queue changes. Anything you add or remove during the request is serialized into `Set-Cookie` response headers automatically once the handler returns, whether it returns a response or an error like a redirect. You don't need to touch headers yourself.
 
 Cookies are part of the default feature set, and everything below is re-exported from `topcoat::cookie`. Topcoat builds on the `cookie` crate: a cookie is a [`Cookie`], and signing and encryption use its [`Key`].
 
