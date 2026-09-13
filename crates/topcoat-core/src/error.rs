@@ -71,54 +71,52 @@ impl Error {
         self.downcast_ref::<E>().is_some()
     }
 
+    /// Attempt to move the concrete error out of this error object, looking
+    /// through [`context`](Self::context) layers and discarding their
+    /// messages.
+    ///
+    /// This never clones the stored error, so it only succeeds while this is
+    /// the sole handle to it. To fall back to a clone instead, use
+    /// [`downcast_cloned`](Self::downcast_cloned).
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`DowncastError`] carrying the original error back, and
+    /// saying whether the stored error is not an instance of `E` or a clone
+    /// of it is still alive.
+    pub fn downcast<E>(self) -> Result<E, DowncastError>
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        if !self.is::<E>() {
+            return Err(DowncastError::new(DowncastFailure::Mismatch, self));
+        }
+        self.unwrap::<E>()
+    }
+
     /// Attempt to downcast the error object to a concrete type, looking
     /// through [`context`](Self::context) layers.
     ///
     /// The stored error is moved out when this is the sole handle to it and
-    /// cloned otherwise. To move it out without ever cloning, use
-    /// [`try_downcast`](Self::try_downcast).
+    /// cloned otherwise.
     ///
     /// # Errors
     ///
     /// Returns `Err(Self)` if the stored error is not an instance of `E`,
     /// handing back the original error unchanged.
-    pub fn downcast<E>(self) -> Result<E, Self>
+    pub fn downcast_cloned<E>(self) -> Result<E, Self>
     where
         E: std::error::Error + Send + Sync + Clone + 'static,
     {
-        match self.try_downcast::<E>() {
+        match self.downcast::<E>() {
             Ok(error) => Ok(error),
-            Err(error) => match error.downcast_ref::<E>() {
-                Some(inner) => Ok(inner.clone()),
-                None => Err(error),
-            },
-        }
-    }
-
-    /// Attempt to move the concrete error out of this error object.
-    ///
-    /// This never clones the stored error, so it only succeeds while this is
-    /// the sole handle to it, and only for an error stored directly rather
-    /// than behind a [`context`](Self::context) layer.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err(Self)` if the stored error is not an instance of `E`, or
-    /// if a clone of this error is still alive, handing back the original
-    /// error unchanged.
-    pub fn try_downcast<E>(self) -> Result<E, Self>
-    where
-        E: std::error::Error + Send + Sync + 'static,
-    {
-        if self.0.error().downcast_ref::<E>().is_none() {
-            return Err(self);
-        }
-        match self.0.into_any().downcast::<Object<E>>() {
-            Ok(object) => match Arc::try_unwrap(object) {
-                Ok(object) => Ok(object.error),
-                Err(shared) => Err(Self(shared)),
-            },
-            Err(_) => unreachable!("the stored error was checked to be an `Object<E>`"),
+            Err(failed) => {
+                let error = failed.into_error();
+                match error.downcast_ref::<E>() {
+                    Some(error) => Ok(error.clone()),
+                    None => Err(error),
+                }
+            }
         }
     }
 
@@ -138,17 +136,81 @@ impl Error {
         }
     }
 
-    /// Downcast this error object by mutable reference.
+    /// Downcast this error object by mutable reference, looking through
+    /// [`context`](Self::context) layers.
     ///
-    /// Returns `None` if the stored error is not an instance of `E`, or if a
-    /// clone of this error is still alive: shared contents cannot be handed
-    /// out mutably.
-    #[must_use]
-    pub fn downcast_mut<E>(&mut self) -> Option<&mut E>
+    /// # Errors
+    ///
+    /// Returns a [`DowncastFailure`] saying whether the stored error is not
+    /// an instance of `E` or a clone of it is still alive: shared contents
+    /// cannot be handed out mutably.
+    pub fn downcast_mut<E>(&mut self) -> Result<&mut E, DowncastFailure>
     where
         E: std::error::Error + Send + Sync + 'static,
     {
-        Arc::get_mut(&mut self.0)?.error_mut().downcast_mut::<E>()
+        if !self.is::<E>() {
+            return Err(DowncastFailure::Mismatch);
+        }
+        self.unwrap_mut::<E>()
+    }
+
+    /// Moves the stored error out of an error known to hold an `E`, either
+    /// directly or behind context layers.
+    fn unwrap<E>(self) -> Result<E, DowncastError>
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let any = match self.0.into_any().downcast::<Object<E>>() {
+            Ok(object) => {
+                return match Arc::try_unwrap(object) {
+                    Ok(object) => Ok(object.error),
+                    Err(shared) => Err(DowncastError::new(DowncastFailure::Shared, Self(shared))),
+                };
+            }
+            Err(any) => any,
+        };
+        let Ok(object) = any.downcast::<Object<WithContext>>() else {
+            unreachable!("an error holding an `E` is an `Object<E>` or a context layer");
+        };
+        match Arc::try_unwrap(object) {
+            Ok(object) => {
+                let WithContext { context, error } = object.error;
+                error.unwrap::<E>().map_err(|failed| {
+                    // Put the layer back so the original error is handed back
+                    // intact, backtrace included.
+                    let error = Self(Arc::new(Object {
+                        error: WithContext {
+                            context,
+                            error: failed.error,
+                        },
+                        backtrace: object.backtrace,
+                    }));
+                    DowncastError::new(failed.failure, error)
+                })
+            }
+            Err(shared) => Err(DowncastError::new(DowncastFailure::Shared, Self(shared))),
+        }
+    }
+
+    /// Borrows the stored error of an error known to hold an `E`, either
+    /// directly or behind context layers.
+    fn unwrap_mut<E>(&mut self) -> Result<&mut E, DowncastFailure>
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let error = Arc::get_mut(&mut self.0)
+            .ok_or(DowncastFailure::Shared)?
+            .error_mut();
+        if error.is::<E>() {
+            return Ok(error
+                .downcast_mut::<E>()
+                .expect("the stored error was checked to be an `E`"));
+        }
+        error
+            .downcast_mut::<WithContext>()
+            .expect("an error holding an `E` is an `E` or a context layer")
+            .error
+            .unwrap_mut::<E>()
     }
 
     /// The backtrace captured when the error was built. Capture follows the
@@ -224,6 +286,62 @@ where
 impl From<Error> for Box<dyn std::error::Error + Send + Sync + 'static> {
     fn from(error: Error) -> Self {
         Box::new(BoxedError(error))
+    }
+}
+
+/// Why a downcast could not hand out the stored error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DowncastFailure {
+    /// The stored error is not an instance of the requested type.
+    Mismatch,
+    /// A clone of the error is still alive, so its contents can neither be
+    /// moved out nor borrowed mutably.
+    Shared,
+}
+
+impl Display for DowncastFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Mismatch => f.write_str("the error is not an instance of the requested type"),
+            Self::Shared => f.write_str("the error is still shared with a clone"),
+        }
+    }
+}
+
+impl std::error::Error for DowncastFailure {}
+
+/// A failed [`Error::downcast`], carrying the original error back.
+///
+/// Deliberately not an error type itself: the only way past it is
+/// [`into_error`](Self::into_error), so the original error cannot be
+/// replaced by a shell describing the failure through `?` or `.into()`.
+#[derive(Debug)]
+pub struct DowncastError {
+    failure: DowncastFailure,
+    error: Error,
+}
+
+impl DowncastError {
+    fn new(failure: DowncastFailure, error: Error) -> Self {
+        Self { failure, error }
+    }
+
+    /// Why the downcast failed.
+    #[must_use]
+    pub fn failure(&self) -> DowncastFailure {
+        self.failure
+    }
+
+    /// The error the downcast was attempted on.
+    #[must_use]
+    pub fn error(&self) -> &Error {
+        &self.error
+    }
+
+    /// Hands the original error back.
+    #[must_use]
+    pub fn into_error(self) -> Error {
+        self.error
     }
 }
 
@@ -433,52 +551,75 @@ mod tests {
     }
 
     #[test]
-    fn downcast_clones_a_shared_error() {
+    fn downcast_reports_a_mismatch() {
+        let error = Error::from(std::io::Error::other("boom"));
+        let failed = error.downcast::<Failure>().unwrap_err();
+        assert_eq!(failed.failure(), DowncastFailure::Mismatch);
+        assert_eq!(failed.into_error().to_string(), "boom");
+    }
+
+    #[test]
+    fn downcast_reports_a_shared_error() {
         let error = Error::from(Failure("boom"));
         let clone = error.clone();
 
+        let failed = error.downcast::<Failure>().unwrap_err();
+        assert_eq!(failed.failure(), DowncastFailure::Shared);
+        let error = failed.into_error();
+        assert_eq!(error.to_string(), "boom");
+
+        // Dropping the share makes the error unique again.
+        drop(clone);
         let failure = error.downcast::<Failure>().unwrap();
         assert_eq!(failure.0, "boom");
-        assert_eq!(clone.to_string(), "boom");
     }
 
     #[test]
-    fn downcast_keeps_a_non_matching_error() {
-        let error = Error::from(std::io::Error::other("boom"));
-        let clone = error.clone();
-
-        let error = error.downcast::<Failure>().unwrap_err();
-        assert_eq!(error.to_string(), "boom");
-        drop(clone);
+    fn downcast_moves_out_of_a_context_layer() {
+        let error = Error::from(Failure("boom")).context("loading");
+        let failure = error.downcast::<Failure>().unwrap();
+        assert_eq!(failure.0, "boom");
     }
 
     #[test]
-    fn try_downcast_extracts_a_unique_error() {
+    fn downcast_hands_a_context_layer_back_intact() {
+        let inner = Error::from(Failure("boom"));
+        let shared = inner.clone();
+        let error = inner.context("loading");
+
+        let failed = error.downcast::<Failure>().unwrap_err();
+        assert_eq!(failed.failure(), DowncastFailure::Shared);
+        let error = failed.into_error();
+        assert_eq!(format!("{error:#}"), "loading: boom");
+        drop(shared);
+    }
+
+    #[test]
+    fn downcast_cloned_extracts_a_unique_error() {
         let failure = Error::from(Failure("boom"))
-            .try_downcast::<Failure>()
+            .downcast_cloned::<Failure>()
             .unwrap();
         assert_eq!(failure.0, "boom");
     }
 
     #[test]
-    fn try_downcast_keeps_a_non_matching_error() {
-        let error = Error::from(std::io::Error::other("boom"));
-        let error = error.try_downcast::<Failure>().unwrap_err();
-        assert_eq!(error.to_string(), "boom");
-    }
-
-    #[test]
-    fn try_downcast_fails_while_the_error_is_shared() {
+    fn downcast_cloned_clones_a_shared_error() {
         let error = Error::from(Failure("boom"));
         let clone = error.clone();
 
-        let error = error.try_downcast::<Failure>().unwrap_err();
-        assert_eq!(error.to_string(), "boom");
-
-        // Dropping the share makes the error unique again.
-        drop(clone);
-        let failure = error.try_downcast::<Failure>().unwrap();
+        let failure = error.downcast_cloned::<Failure>().unwrap();
         assert_eq!(failure.0, "boom");
+        assert_eq!(clone.to_string(), "boom");
+    }
+
+    #[test]
+    fn downcast_cloned_keeps_a_non_matching_error() {
+        let error = Error::from(std::io::Error::other("boom"));
+        let clone = error.clone();
+
+        let error = error.downcast_cloned::<Failure>().unwrap_err();
+        assert_eq!(error.to_string(), "boom");
+        drop(clone);
     }
 
     #[test]
@@ -489,14 +630,33 @@ mod tests {
     }
 
     #[test]
-    fn downcast_mut_fails_while_the_error_is_shared() {
+    fn downcast_mut_mutates_through_a_context_layer() {
+        let mut error = Error::from(Failure("boom")).context("loading");
+        error.downcast_mut::<Failure>().unwrap().0 = "bang";
+        assert_eq!(format!("{error:#}"), "loading: bang");
+    }
+
+    #[test]
+    fn downcast_mut_reports_a_mismatch() {
+        let mut error = Error::from(std::io::Error::other("boom"));
+        assert_eq!(
+            error.downcast_mut::<Failure>().unwrap_err(),
+            DowncastFailure::Mismatch
+        );
+    }
+
+    #[test]
+    fn downcast_mut_reports_a_shared_error() {
         let mut error = Error::from(Failure("boom"));
         let clone = error.clone();
 
-        assert!(error.downcast_mut::<Failure>().is_none());
+        assert_eq!(
+            error.downcast_mut::<Failure>().unwrap_err(),
+            DowncastFailure::Shared
+        );
 
         drop(clone);
-        assert!(error.downcast_mut::<Failure>().is_some());
+        assert!(error.downcast_mut::<Failure>().is_ok());
     }
 
     #[test]
@@ -507,8 +667,7 @@ mod tests {
         assert_eq!(format!("{error:#}"), "loading: boom");
         assert_eq!(error.chain().count(), 2);
         assert!(error.is::<Failure>());
-        assert!(error.clone().try_downcast::<Failure>().is_err());
-        assert_eq!(error.downcast::<Failure>().unwrap().0, "boom");
+        assert_eq!(error.downcast_cloned::<Failure>().unwrap().0, "boom");
     }
 
     #[test]

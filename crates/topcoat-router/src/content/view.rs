@@ -188,7 +188,7 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
                 // The response committed with the first content, so a
                 // redirect can no longer change the status line; it degrades
                 // to a client-side navigation instead.
-                match error.downcast::<RedirectError>() {
+                match error.downcast_cloned::<RedirectError>() {
                     Ok(redirect) => {
                         Poll::Ready(Some(Ok(Frame::data(redirect_script(&redirect).into()))))
                     }

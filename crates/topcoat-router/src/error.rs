@@ -55,7 +55,7 @@ pub(crate) fn internal_server_response() -> Response {
 fn error_into_response(cx: &Cx, error: Error) -> Response {
     macro_rules! try_downcast {
         ($ident:ident as $ty:ty) => {
-            match $ident.downcast::<$ty>() {
+            match $ident.downcast_cloned::<$ty>() {
                 Ok(error) => return into_response_or_500(cx, error),
                 Err(error) => error,
             }
