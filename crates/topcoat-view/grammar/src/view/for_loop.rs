@@ -19,6 +19,12 @@ pub struct ForLoop {
 
 impl ForLoop {
     /// Returns the expression identifying each iteration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the attributes were modified to contain an invalid key
+    /// after parsing.
+    #[must_use]
     pub fn key(&self) -> Option<Expr> {
         self.template
             .attributes

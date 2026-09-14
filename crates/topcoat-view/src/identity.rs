@@ -115,7 +115,9 @@ impl Identity {
 
     /// Reads the installed identity without checking for ambiguity, falling
     /// back to [`ROOT`](Self::ROOT) when none is installed.
-    fn current_raw() -> Self {
+    #[doc(hidden)]
+    #[must_use]
+    pub fn current_raw() -> Self {
         CURRENT.get().unwrap_or(Self::ROOT)
     }
 

@@ -139,7 +139,7 @@ impl ViewBuilder {
         self.nodes.push(Node::ForLoop(ForLoop {
             pat: pat.clone(),
             expr: Box::new(expr.clone()),
-            key,
+            key: key.map(Box::new),
             ordinal,
             body: body.finish(),
         }));

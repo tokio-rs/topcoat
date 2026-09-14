@@ -108,28 +108,36 @@ impl Scope {
             return self.emit_inert();
         }
 
+        self.emit_captured_with(bindings, |scope| {
+            scope.emit_inner(|view| {
+                quote! {
+                    #topcoat_view::internal::MoveView::drive(#view).await
+                }
+            })
+        })
+    }
+
+    /// Emits a body after restoring its captured bindings. The callback
+    /// controls how the scope is built and driven within those bindings.
+    pub(crate) fn emit_captured_with(
+        &self,
+        bindings: &Bindings,
+        emit: impl FnOnce(&Self) -> TokenStream,
+    ) -> TokenStream {
         let idents = bindings.idents();
         let rebinds = bindings.rebinds();
-
-        let inner = self.emit_inner(|view| {
-            quote! {
-                #topcoat_view::internal::MoveView::drive(#view).await
-            }
-        });
+        let inner = emit(self);
 
         quote! {{
             let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
             #topcoat_view::internal::MoveView::new(async {
-                // A loop binding may only be used by its key expression,
-                // evaluated before the body captures it.
-                #[allow(unused_variables)]
                 let (#(#rebinds,)*) = __captured.take();
                 #inner
             })
         }}
     }
 
-    fn emit_inner(&self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
+    pub(crate) fn emit_inner(&self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
         let mut emitter = Emitter::new(false);
         for node in &self.nodes {
             node.emit(&mut emitter);
@@ -499,9 +507,9 @@ mod tests {
             |body| add_component(body, "card"),
         );
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter_keyed"));
+        assert!(out.contains(". keyed_child ("));
         assert!(out.contains("item . id"));
-        assert!(!out.contains("IdentityGuard :: enter_ambiguous"));
+        assert!(!out.contains(". ambiguous_child ("));
     }
 
     #[test]
@@ -516,7 +524,7 @@ mod tests {
             },
         );
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter_ambiguous"));
+        assert!(out.contains(". ambiguous_child ("));
         assert!(out.contains("\"`for` loop at \""));
     }
 
@@ -532,7 +540,7 @@ mod tests {
             },
         );
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter_ambiguous"));
+        assert!(out.contains(". ambiguous_child ("));
     }
 
     #[test]
@@ -549,7 +557,7 @@ mod tests {
             },
         );
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter_ambiguous"));
+        assert!(out.contains(". ambiguous_child ("));
     }
 
     #[test]
@@ -565,7 +573,7 @@ mod tests {
         );
         let out = rendered(builder);
         // The loop introduces ambiguity; both components derive normally.
-        assert_eq!(out.matches("IdentityGuard :: enter_ambiguous").count(), 1);
+        assert_eq!(out.matches(". ambiguous_child (").count(), 1);
         assert_eq!(out.matches("IdentityGuard :: enter (").count(), 2);
     }
 

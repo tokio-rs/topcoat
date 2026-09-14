@@ -12,14 +12,14 @@ use crate::view::hir::{
 pub(crate) struct ForLoop {
     pub pat: Pat,
     pub expr: Box<Expr>,
-    pub key: Option<Expr>,
+    pub key: Option<Box<Expr>>,
     pub ordinal: u32,
     pub body: Scope,
 }
 
 impl ForLoop {
-    /// Builds and polls the iteration body under its identity.
-    fn identity_body(&self, body: TokenStream, is_async: bool) -> TokenStream {
+    /// Derives this iteration's identity without installing it.
+    fn identity(&self) -> TokenStream {
         let ordinal = self.ordinal;
         let site = quote! {
             const {
@@ -31,32 +31,21 @@ impl ForLoop {
                 )
             }
         };
-        let guard = match &self.key {
-            Some(key) => quote! {
-                #topcoat_view::identity::IdentityGuard::enter_keyed(#site, &(#key))
-            },
-            None => quote! {
-                #topcoat_view::identity::IdentityGuard::enter_ambiguous(
+        if let Some(key) = &self.key {
+            quote! {
+                #topcoat_view::identity::Identity::current_raw().keyed_child(#site, &(#key))
+            }
+        } else {
+            quote! {
+                #topcoat_view::identity::Identity::current_raw().ambiguous_child(
                     #site,
                     ::core::concat!(
                         "`for` loop at ",
                         ::core::file!(), ":", ::core::line!(), ":", ::core::column!(),
                     ),
                 )
-            },
-        };
-        let view = if is_async {
-            quote! { #topcoat_view::identity::IdentityView::new(__identity, __view) }
-        } else {
-            quote! { __view }
-        };
-        quote! {{
-            let __guard = #guard;
-            let __identity = #topcoat_view::identity::IdentityGuard::identity(&__guard);
-            let __view = #body;
-            ::core::mem::drop(__guard);
-            #view
-        }}
+            }
+        }
     }
 }
 
@@ -74,8 +63,23 @@ impl Emit for ForLoop {
             // inside the iteration and takes the pattern's bindings with
             // it. The views share one type, and pinning each on the heap
             // lets the loop hold them in a plain `Vec`.
-            let body = body.emit_captured(&Bindings::of_pattern(pat));
-            let body = self.identity_body(body, true);
+            let body = body.emit_captured_with(&Bindings::of_pattern(pat), |scope| {
+                let identity = self.identity();
+                let inner = scope.emit_inner(|view| {
+                    quote! {
+                        #topcoat_view::internal::MoveView::drive(#view).await
+                    }
+                });
+                quote! {
+                    let __identity = #identity;
+                    #topcoat_view::internal::MoveView::drive(
+                        #topcoat_view::identity::IdentityView::new(
+                            __identity,
+                            #topcoat_view::internal::MoveView::new(async { #inner }),
+                        ),
+                    ).await
+                }
+            });
             emitter.hoist(quote! {
                 let #ident = {
                     let mut __iterations = ::std::vec::Vec::new();
@@ -91,7 +95,11 @@ impl Emit for ForLoop {
             // where the pattern's bindings are alive; the burst splices the
             // handles in iteration order.
             let body = body.emit_block();
-            let body = self.identity_body(body, false);
+            let identity = self.identity();
+            let body = quote! {{
+                let __guard = #topcoat_view::identity::IdentityGuard::install(#identity);
+                #body
+            }};
             emitter.hoist(quote! {
                 let #ident = {
                     let mut __views = ::std::vec::Vec::new();
