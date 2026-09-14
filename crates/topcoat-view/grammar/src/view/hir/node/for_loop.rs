@@ -4,8 +4,8 @@ use syn::{Expr, Pat};
 use topcoat_core_grammar::paths::{topcoat_context, topcoat_core, topcoat_view};
 
 use crate::view::hir::{
-    Bindings, Scope,
     emit::{Emit, Emitter},
+    Bindings, Scope,
 };
 
 /// A `for` loop whose body is lowered into a nested scope.
@@ -57,7 +57,7 @@ impl Emit for ForLoop {
         } = self;
         let identity = self.identity();
         let context = quote! {
-            let __cx = &#topcoat_context::with_identity(__cx.clone(), #identity);
+            #topcoat_context::with_identity(__cx.clone(), #identity)
         };
 
         if body.is_async() {
@@ -65,7 +65,7 @@ impl Emit for ForLoop {
             // finishes. LoopView drives them concurrently in source order.
             let inner = body.emit_driven();
             let body = Bindings::of_pattern(pat).emit_capture(quote! {
-                #context
+                let __cx = &#context;
                 #inner
             });
             emitter.hoist(quote! {
@@ -83,12 +83,25 @@ impl Emit for ForLoop {
             // where the pattern's bindings are alive; the burst splices the
             // handles in iteration order.
             let body = body.emit_block();
+            // Unkeyed iterations share one ambiguous context. Keep the
+            // iterator expression in the enclosing context's scope.
+            let shared_context = self.key.is_none().then(|| {
+                quote! {
+                    let __loop_cx = #context;
+                }
+            });
+            let iteration_context = if self.key.is_some() {
+                quote! { &#context }
+            } else {
+                quote! { &__loop_cx }
+            };
             emitter.hoist(quote! {
                 let #ident = {
+                    #shared_context
                     let mut __views = ::std::vec::Vec::new();
                     for #pat in #expr {
                         __views.push({
-                            #context
+                            let __cx = #iteration_context;
                             #body
                         });
                     }
