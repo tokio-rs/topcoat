@@ -401,9 +401,9 @@ A view that captures a reference borrows whatever it points at, so it cannot out
 
 The components inside a [`view!`] render concurrently. Sibling components, the iterations of a `for` loop, the taken branch of an `if` or `match` all start at the same time. A component waiting on a database query or an HTTP request therefore does not hold up the rest of the view, which avoids request waterfalls.
 
-The rendered markup always appears in source order, no matter which component finishes first. What is unspecified is the order in which component bodies run, and that order can change between renders. Treat a [`view!`] body as a set of functions without side effects: a component takes its props, reads the request context, and returns markup. Do not rely on another component in the same view having run first, and do not communicate between components through shared mutable state.
+The rendered markup always appears in source order, no matter which component finishes first. The order in which component bodies and template expressions run is unspecified and can change between renders.
 
-Plain Rust in the view, such as interpolated expressions, `let` bindings, loop iterators, and branch conditions, still runs in source order. Only the components render concurrently.
+Treat component bodies and template expressions as computations without side effects. Do not rely on another component or expression in the same view having run first, and do not communicate through shared mutable state. If work needs to happen in a particular order, perform it before constructing the view and interpolate the resulting values.
 
 # Boolean And Conditional Attributes
 
