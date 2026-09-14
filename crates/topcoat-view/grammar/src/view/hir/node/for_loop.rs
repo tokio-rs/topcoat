@@ -64,7 +64,7 @@ impl Emit for ForLoop {
             // Each iteration owns its bindings and context until its view
             // finishes. LoopView drives them concurrently in source order.
             let inner = body.emit_driven();
-            let body = Bindings::of_pattern(pat).emit_capture(quote! {
+            let body = Bindings::of_pattern(pat).emit_capture(&quote! {
                 let __cx = &#context;
                 #inner
             });

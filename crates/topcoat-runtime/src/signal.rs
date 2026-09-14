@@ -11,11 +11,9 @@ use crate::{Surrogate, Surrogated};
 
 /// The identity of a signal, shared by the server and the browser runtime.
 ///
-/// An id is derived from the context's identity and the location of the
-/// `signal` call, so the same
-/// call reached through the same chain of invocations produces the same id
-/// on every render. On the wire it is the hash as fixed-width hex, which
-/// survives JSON where a 128 bit integer would not.
+/// An id is derived from the context's identity and the location of the `signal` call, so the same
+/// call reached through the same chain of invocations produces the same id on every render. On the
+/// wire it is the hash as fixed-width hex, which survives JSON where a 128 bit integer would not.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SignalId(u128);
 
