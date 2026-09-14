@@ -111,6 +111,6 @@ mod tests {
         let panic = catch_unwind(|| Identity::current()).unwrap_err();
         let message = panic.downcast::<String>().expect("panics with a message");
         assert!(message.contains("`card` at src/a.rs:1"));
-        assert!(message.contains("`key`"));
+        assert!(message.contains("#[key(...)]"));
     }
 }

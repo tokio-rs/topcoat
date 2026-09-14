@@ -120,6 +120,9 @@ impl Scope {
         quote! {{
             let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
             #topcoat_view::internal::MoveView::new(async {
+                // A loop binding may only be used by its key expression,
+                // evaluated before the body captures it.
+                #[allow(unused_variables)]
                 let (#(#rebinds,)*) = __captured.take();
                 #inner
             })
@@ -150,11 +153,10 @@ fn borrow_cx(owns_cx: bool) -> TokenStream {
 mod tests {
     use proc_macro2::Span;
     use quote::quote;
-    use syn::Expr;
 
     use super::*;
     use crate::view::{
-        NamedArg, NamedArgValue, Nodes,
+        Nodes,
         hir::{ExprKind, ViewBuilder},
     };
 
@@ -168,23 +170,7 @@ mod tests {
 
     fn add_component_with_children(builder: &mut ViewBuilder, name: &str, children: &Nodes) {
         let path = syn::parse_str(name).unwrap();
-        builder.component(&path, Vec::new(), None, children, Span::call_site());
-    }
-
-    fn add_keyed_component(builder: &mut ViewBuilder, name: &str, key: &Expr) {
-        let path = syn::parse_str(name).unwrap();
-        let key = NamedArg {
-            ident: syn::parse_quote!(key),
-            colon: syn::token::Colon::default(),
-            value: NamedArgValue::Expr(key.clone()),
-        };
-        builder.component(
-            &path,
-            Vec::new(),
-            Some(&key),
-            &syn::parse_quote!(),
-            Span::call_site(),
-        );
+        builder.component(&path, Vec::new(), children, Span::call_site());
     }
 
     #[test]
@@ -345,11 +331,16 @@ mod tests {
     #[test]
     fn for_loop_without_node_positions_builds_each_iteration_in_place() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.str_unescaped("<b");
-            body.expr(ExprKind::AttributeUnescaped, quote! { ("id", x) });
-            body.str_unescaped("></b>");
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                body.str_unescaped("<b");
+                body.expr(ExprKind::AttributeUnescaped, quote! { ("id", x) });
+                body.str_unescaped("></b>");
+            },
+        );
         let out = rendered(builder);
         assert!(out.contains("for x in xs"), "{out}");
         assert!(out.contains("__views . push ("), "{out}");
@@ -366,9 +357,14 @@ mod tests {
     #[test]
     fn a_node_position_in_a_for_body_keeps_the_loop_joined() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.expr(ExprKind::Node, quote! { x });
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                body.expr(ExprKind::Node, quote! { x });
+            },
+        );
         let out = rendered(builder);
         assert!(out.contains("LoopView :: new (__iterations)"), "{out}");
         assert!(out.contains("NodeClassify :: classify (x)"), "{out}");
@@ -378,13 +374,18 @@ mod tests {
     #[test]
     fn control_flow_inside_a_plain_for_body_builds_in_place() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.str_unescaped("<b");
-            body.if_else(&syn::parse_quote!(x.ok), |then_branch, _| {
-                then_branch.expr(ExprKind::AttributeUnescaped, quote! { ("id", x.name) });
-            });
-            body.str_unescaped("></b>");
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                body.str_unescaped("<b");
+                body.if_else(&syn::parse_quote!(x.ok), |then_branch, _| {
+                    then_branch.expr(ExprKind::AttributeUnescaped, quote! { ("id", x.name) });
+                });
+                body.str_unescaped("></b>");
+            },
+        );
         let out = rendered(builder);
         assert!(out.contains("let __expr0 = if x . ok"), "{out}");
         assert!(out.contains("__b . attribute_unescaped (__expr0)"), "{out}");
@@ -489,44 +490,64 @@ mod tests {
     }
 
     #[test]
-    fn a_keyed_component_mixes_the_key_into_its_identity() {
+    fn a_keyed_loop_mixes_the_key_into_its_identity() {
         let mut builder = ViewBuilder::new();
-        add_keyed_component(&mut builder, "card", &syn::parse_quote!(item.id));
+        builder.for_loop(
+            &syn::parse_quote!(item),
+            &syn::parse_quote!(items),
+            Some(syn::parse_quote!(item.id)),
+            |body| add_component(body, "card"),
+        );
         let out = rendered(builder);
         assert!(out.contains("IdentityGuard :: enter_keyed"));
         assert!(out.contains("item . id"));
+        assert!(!out.contains("IdentityGuard :: enter_ambiguous"));
     }
 
     #[test]
-    fn an_unkeyed_component_in_a_for_body_is_ambiguous() {
+    fn an_unkeyed_loop_enters_an_ambiguous_identity() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            add_component(body, "card");
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                add_component(body, "card");
+            },
+        );
         let out = rendered(builder);
         assert!(out.contains("IdentityGuard :: enter_ambiguous"));
-        assert!(out.contains("\"`card`\""));
+        assert!(out.contains("\"`for` loop at \""));
     }
 
     #[test]
-    fn a_keyed_component_in_a_for_body_is_not_ambiguous() {
+    fn an_unkeyed_loop_without_components_is_ambiguous() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            add_keyed_component(body, "card", &syn::parse_quote!(x));
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                body.str_unescaped("<br>");
+            },
+        );
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter_keyed"));
-        assert!(!out.contains("IdentityGuard :: enter_ambiguous"));
+        assert!(out.contains("IdentityGuard :: enter_ambiguous"));
     }
 
     #[test]
     fn branches_inside_a_for_body_still_repeat() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.if_else(&syn::parse_quote!(cond), |then_branch, _| {
-                add_component(then_branch, "card");
-            });
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                body.if_else(&syn::parse_quote!(cond), |then_branch, _| {
+                    add_component(then_branch, "card");
+                });
+            },
+        );
         let out = rendered(builder);
         assert!(out.contains("IdentityGuard :: enter_ambiguous"));
     }
@@ -534,23 +555,31 @@ mod tests {
     #[test]
     fn children_derive_below_their_component_instead_of_repeating() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            add_component_with_children(body, "wrapper", &syn::parse_quote!(inner()));
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                add_component_with_children(body, "wrapper", &syn::parse_quote!(inner()));
+            },
+        );
         let out = rendered(builder);
-        // The wrapper repeats unkeyed, but its child does not repeat
-        // relative to it; the wrapper's ambiguity poisons the child at
-        // runtime instead.
+        // The loop introduces ambiguity; both components derive normally.
         assert_eq!(out.matches("IdentityGuard :: enter_ambiguous").count(), 1);
-        assert_eq!(out.matches("IdentityGuard :: enter (").count(), 1);
+        assert_eq!(out.matches("IdentityGuard :: enter (").count(), 2);
     }
 
     #[test]
     fn for_loop_with_component_body_pins_each_iteration() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            add_component(body, "item");
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                add_component(body, "item");
+            },
+        );
         let out = rendered(builder);
         assert!(
             out.contains("__iterations . push (:: std :: boxed :: Box :: pin ("),
@@ -564,9 +593,14 @@ mod tests {
     #[test]
     fn a_for_loop_body_borrows_everything_but_its_bindings() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            add_component(body, "item");
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                add_component(body, "item");
+            },
+        );
         let out = rendered(builder);
         // Only the root stream owns its captures; the iteration streams
         // borrow their environment, apart from the captured bindings.

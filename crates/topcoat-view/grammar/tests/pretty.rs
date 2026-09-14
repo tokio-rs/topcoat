@@ -110,6 +110,7 @@ fixture_test!(inline_expressions);
 fixture_test!(if_else);
 fixture_test!(if_else_if_else);
 fixture_test!(for_loop);
+fixture_test!(keyed_for_loop);
 fixture_test!(match_expr);
 
 // -- Components --------------------------------------------------------------

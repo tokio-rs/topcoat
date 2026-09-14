@@ -347,7 +347,7 @@ See how to define components in the [`component`] macro guide.
 
 ## Keys
 
-Each component invocation has a stable identity derived from the chain of invocation sites leading down to it in code, the same from one render to the next. The framework attaches per-invocation data such as state to it. Inside a `for` body one component invocation renders many times, and the site alone cannot tell the repetitions apart. Use the reserved `key` property on component to distinguish individual calls inside of the loop:
+Each component invocation has a stable identity derived from the chain of sites leading down to it in code, the same from one render to the next. The framework attaches per-invocation data such as state to it. A `for` loop repeats its body at the same site. Use `#[key(expr)]` on the loop to give each iteration its own identity, inherited by everything inside its body:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -358,16 +358,17 @@ Each component invocation has a stable identity derived from the chain of invoca
 # async fn example() -> Result<impl View> {
 # let posts = vec![Post { id: 1, title: "A" }];
 Ok(view! {
+    #[key(post.id)]
     for post in posts {
-        post_card(key: post.id, title: post.title)
+        post_card(title: post.title)
     }
 })
 # }
 ```
 
-Key the invocation with a value that identifies the item behind it, such as its database id, not the loop index: the identity then follows the item when the list reorders. Any value implementing [`IdentityKey`] works as a key. A `key:` is also allowed outside a loop, for an invocation that repeats in ways the macro cannot see.
+The key expression is evaluated once per iteration and can use the loop's bindings. Choose a value that identifies the item, such as its database id, so identity follows the item when the list reorders. Any value implementing [`IdentityKey`] works as a key.
 
-A repeated invocation without a `key:` still renders, but its identity is ambiguous. Consuming an ambiguous identity, in the component itself or anywhere nested below it, errors with the location of the invocation that is missing its key.
+The attribute is optional. An unkeyed loop still renders, but its iteration identity is ambiguous. Consuming that identity anywhere inside the body errors with the location of the loop missing its key. Nested keyed loops inherit ambiguity from an unkeyed outer loop.
 
 # Views Are Lazy
 

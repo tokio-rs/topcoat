@@ -37,8 +37,6 @@ Ok(view! {
 # }
 ```
 
-The name `key` is reserved: a `key:` argument keys the invocation's identity instead of setting a prop, so a component cannot declare a `key` parameter. See the keys section of the [`view!`] guide.
-
 # Child Content
 
 If a component accepts a parameter named `child` with type [`Child`], any extra view nodes in the call are collected and passed as that child view. Give it `#[default]` so the component can also be called without children.

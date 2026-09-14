@@ -15,14 +15,13 @@
 //! [`Identity::current`] reads the installed identity from inside a
 //! component body.
 //!
-//! An invocation that repeats, for example inside a `for` body, shares one
-//! call site across all repetitions. A `key` argument mixes a caller-provided
-//! [`IdentityKey`] value into the identity to tell the repetitions apart.
+//! A `for` loop shares one site across all iterations. A `#[key(expr)]`
+//! attribute mixes an [`IdentityKey`] value into the iteration's identity
+//! to tell the repetitions apart.
 //! Without one the identity is ambiguous: derivation still succeeds and
 //! rendering proceeds, but the ambiguity is recorded, poisons every identity
 //! derived below it, and [`Identity::current`] panics if a descendant
-//! actually consumes the identity, naming the invocation that is missing its
-//! `key`.
+//! actually consumes the identity, naming the loop that is missing its key.
 
 mod guard;
 mod key;
@@ -77,15 +76,15 @@ impl Identity {
         ambiguity: None,
     };
 
-    /// Returns the identity of the running component body.
+    /// Returns the identity of the running view scope.
     ///
-    /// Outside any component body this is [`ROOT`](Self::ROOT).
+    /// Outside any identity scope this is [`ROOT`](Self::ROOT).
     ///
     /// # Panics
     ///
-    /// Panics if the identity is ambiguous, meaning an invocation on the
-    /// chain repeats without a `key` argument. The message names that
-    /// invocation. Consumers that can work without an identity use
+    /// Panics if the identity is ambiguous, meaning an enclosing loop has
+    /// no key attribute. The message names that loop.
+    /// Consumers that can work without an identity use
     /// [`try_current`](Self::try_current) instead.
     #[must_use]
     #[track_caller]
@@ -96,7 +95,7 @@ impl Identity {
         }
     }
 
-    /// Returns the identity of the running component body, or the ambiguity
+    /// Returns the identity of the running view scope, or the ambiguity
     /// poisoning it.
     ///
     /// The tolerant counterpart of [`current`](Self::current), for consumers
@@ -104,9 +103,8 @@ impl Identity {
     ///
     /// # Errors
     ///
-    /// Errors if the identity is ambiguous, meaning an invocation on the
-    /// chain repeats without a `key` argument. The error names that
-    /// invocation.
+    /// Errors if the identity is ambiguous, meaning an enclosing loop has
+    /// no key attribute. The error names that loop.
     pub fn try_current() -> Result<Self, AmbiguousIdentityError> {
         let identity = Self::current_raw();
         match identity.ambiguity {
@@ -159,8 +157,8 @@ impl Identity {
     /// Derives the identity of a child invocation at `site` whose
     /// repetitions cannot be told apart, recording `label` as the ambiguity.
     ///
-    /// The `view!` macro derives this for an invocation that sits in a loop
-    /// body without a `key` argument; `label` names that invocation. The
+    /// The `view!` macro derives this for an unkeyed loop iteration;
+    /// `label` names that loop. The
     /// hash is still derived and rendering proceeds, but the ambiguity
     /// poisons this identity and every identity derived from it, keyed or
     /// not, so consuming one through [`current`](Self::current) panics. An
@@ -231,14 +229,14 @@ impl fmt::Display for ParseIdentityError {
 impl std::error::Error for ParseIdentityError {}
 
 /// Error returned by [`Identity::try_current`] when the identity is
-/// poisoned by an invocation that repeats without a `key` argument.
+/// poisoned by a loop without a key attribute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AmbiguousIdentityError {
     label: &'static str,
 }
 
 impl AmbiguousIdentityError {
-    /// Names the invocation that is missing its `key` argument.
+    /// Names the loop that is missing its key attribute.
     #[must_use]
     pub const fn label(&self) -> &'static str {
         self.label
@@ -249,8 +247,8 @@ impl fmt::Display for AmbiguousIdentityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "ambiguous component identity: {} repeats without a `key` argument; \
-             pass `key:` to give each repetition its own identity",
+            "ambiguous identity: {} repeats without a key attribute; \
+             add `#[key(...)]` to give each iteration its own identity",
             self.label,
         )
     }
