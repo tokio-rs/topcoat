@@ -160,8 +160,7 @@ impl IdentityKey for () {
 
 impl IdentityKey for Location<'_> {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
-        (self.file(), self.line(), self.column())
-            .write(KeyHasher(hasher.0.write(&[TAG_LOCATION])))
+        (self.file(), self.line(), self.column()).write(KeyHasher(hasher.0.write(&[TAG_LOCATION])))
     }
 }
 
@@ -333,6 +332,9 @@ mod tests {
         let first = Location::caller();
         let second = Location::caller();
         assert_ne!(hash(first), hash(second));
-        assert_ne!(hash(first), hash((first.file(), first.line(), first.column())));
+        assert_ne!(
+            hash(first),
+            hash((first.file(), first.line(), first.column()))
+        );
     }
 }

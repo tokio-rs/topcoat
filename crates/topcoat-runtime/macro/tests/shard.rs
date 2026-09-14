@@ -79,7 +79,12 @@ async fn endpoint(shard: &'static impl Shard, identity: &str, body: Body) -> Res
 
 /// Renders `shard` through its endpoint at `identity`, carrying the JSON
 /// array `args` of arguments and the JSON object `signals` of signal values.
-async fn rerender_with(shard: &'static impl Shard, identity: &str, args: &str, signals: &str) -> String {
+async fn rerender_with(
+    shard: &'static impl Shard,
+    identity: &str,
+    args: &str,
+    signals: &str,
+) -> String {
     let body = Body::from(format!(r#"{{"args":{args},"signals":{signals}}}"#));
     let response = endpoint(shard, identity, body).await;
     assert_eq!(response.status(), http::StatusCode::OK);
@@ -133,7 +138,7 @@ async fn a_signal_argument_without_a_value_is_rejected() {
 
 #[tokio::test]
 async fn a_rerender_derives_the_same_signal_id_as_the_inline_render() {
-    let cx = &Cx::default();
+    let cx = &Cx::default().keyed("host");
     let inline = view! { cx => host() }.single().await.unwrap().render(cx);
     let (shard, identity) = scope_marker(&inline);
     assert_eq!(shard, stateful.id().as_str(), "{inline}");
@@ -149,7 +154,7 @@ async fn a_rerender_derives_the_same_signal_id_as_the_inline_render() {
 
 #[tokio::test]
 async fn a_rerender_resumes_signals_from_the_values_it_carries() {
-    let cx = &Cx::default();
+    let cx = &Cx::default().keyed("host");
     let inline = view! { cx => host() }.single().await.unwrap().render(cx);
     let (_, identity) = scope_marker(&inline);
     let id = last_signal_id(&inline);

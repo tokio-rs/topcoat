@@ -189,7 +189,10 @@ mod tests {
     /// Builds a signal surrogate around a fresh signal holding `value`.
     #[track_caller]
     fn surrogate<T>(value: T) -> SignalSurrogate<T> {
-        SignalSurrogate::new(Signal::new(SignalId::derive(Identity::ROOT, Location::caller()), value))
+        SignalSurrogate::new(Signal::new(
+            SignalId::derive(Identity::ROOT, Location::caller()),
+            value,
+        ))
     }
 
     #[test]

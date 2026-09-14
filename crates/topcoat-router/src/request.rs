@@ -455,7 +455,7 @@ pub const IDENTITY_HEADER: &str = "x-topcoat-identity";
 ///
 /// ```rust
 /// use topcoat::{
-///     Result, context::Cx, router::request::initial_identity, core::identity::Identity,
+///     Result, context::Cx, core::identity::Identity, router::request::initial_identity,
 /// };
 ///
 /// async fn is_page_request(cx: &Cx) -> Result<bool> {

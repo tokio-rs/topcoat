@@ -8,7 +8,7 @@ pub mod context;
 pub mod cursor;
 pub mod error;
 pub mod fnv1a;
-pub mod internal;
 pub mod identity;
+pub mod internal;
 pub mod memoize;
 pub mod url_form;

@@ -54,7 +54,6 @@ impl Component {
             }
         }
     }
-
 }
 
 impl Emit for Component {

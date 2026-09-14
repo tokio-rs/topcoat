@@ -441,9 +441,9 @@ mod tests {
         builder.str_unescaped("<hr>");
         let out = rendered(builder);
         assert!(out.contains("let __expr0 = {"));
-        assert!(out.contains(
-            "HoistView :: new (:: topcoat_view :: internal :: MoveView :: new (async"
-        ));
+        assert!(
+            out.contains("HoistView :: new (:: topcoat_view :: internal :: MoveView :: new (async")
+        );
         assert!(out.contains("Component :: render"));
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
     }

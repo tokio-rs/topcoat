@@ -523,16 +523,18 @@ mod tests {
     #[should_panic(expected = "signals cannot be created inside memoized functions")]
     fn memoized_functions_cannot_create_signals() {
         let cx = Cx::default();
-        topcoat_core::context::memoize_cache(&cx).memoize(&cx, (), (), |cx, ()| {
-            signal(&cx.keyed(()), || 0.0)
-        });
+        topcoat_core::context::memoize_cache(&cx)
+            .memoize(&cx, (), (), |cx, ()| signal(&cx.keyed(()), || 0.0));
     }
 
     #[test]
     fn memoized_contexts_reject_signals_after_suspension() {
         let cx = Cx::default();
         let mut future = pin!(topcoat_core::context::memoize_cache(&cx).memoize_async(
-            &cx, (), (), |cx, ()| async move {
+            &cx,
+            (),
+            (),
+            |cx, ()| async move {
                 let mut first = true;
                 std::future::poll_fn(|task| {
                     if std::mem::take(&mut first) {
@@ -541,7 +543,8 @@ mod tests {
                     } else {
                         Poll::Ready(())
                     }
-                }).await;
+                })
+                .await;
                 signal(&cx, || 0.0)
             },
         ));
