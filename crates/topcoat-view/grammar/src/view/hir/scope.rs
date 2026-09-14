@@ -104,7 +104,7 @@ impl Scope {
             return self.emit_inert();
         }
 
-        bindings.emit_capture(self.emit_driven())
+        bindings.emit_capture(&self.emit_driven())
     }
 
     /// Builds and drives the view in the same block, keeping its borrows alive.

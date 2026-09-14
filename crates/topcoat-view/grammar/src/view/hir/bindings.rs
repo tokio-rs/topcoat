@@ -49,7 +49,7 @@ impl Bindings {
     }
 
     /// Emits a view that owns these bindings and runs `body` with them in scope.
-    pub(crate) fn emit_capture(&self, body: TokenStream) -> TokenStream {
+    pub(crate) fn emit_capture(&self, body: &TokenStream) -> TokenStream {
         let idents = self.idents();
         let rebinds = self.rebinds();
         quote! {{
