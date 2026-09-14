@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 
-use super::{CURRENT, Identity, IdentityKey, SiteKey};
+use topcoat_core::key::Key;
+
+use super::{CURRENT, Identity, SiteKey};
 
 /// Installs an identity for exactly the duration of a synchronous region.
 ///
@@ -25,7 +27,7 @@ impl IdentityGuard {
     }
 
     /// Enters a keyed child invocation at `site`.
-    pub fn enter_keyed(site: SiteKey, key: impl IdentityKey) -> Self {
+    pub fn enter_keyed(site: SiteKey, key: impl Key) -> Self {
         Self::install(Identity::current_raw().keyed_child(site, key))
     }
 

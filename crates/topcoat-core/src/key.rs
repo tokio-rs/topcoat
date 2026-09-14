@@ -1,6 +1,8 @@
-use topcoat_core::fnv1a::Fnv1a;
+use std::panic::Location;
 
-/// A value that tells repetitions of one component invocation site apart.
+use crate::fnv1a::Fnv1a;
+
+/// A value that distinguishes identities at one source location.
 ///
 /// A key folds itself into the identity hash through the tagged writes on
 /// [`KeyHasher`]. Two keys derive the same identity exactly when they
@@ -9,23 +11,24 @@ use topcoat_core::fnv1a::Fnv1a;
 /// be distinct at one site write distinct sequences.
 ///
 /// Implementations exist for the integer primitives, `bool`, `char`,
-/// strings, byte slices, references, and tuples of keys. Integers hash by
+/// strings, byte slices, references, source locations, unit, and tuples of
+/// keys. Integers hash by
 /// mathematical value, so the same id used at a different width stays the
 /// same key. A custom id type implements the trait by writing its
 /// identifying parts in order:
 ///
 /// ```
-/// use topcoat_view::identity::{IdentityKey, KeyHasher};
+/// use topcoat_core::key::{Key, KeyHasher};
 ///
 /// struct UserId(u64);
 ///
-/// impl IdentityKey for UserId {
+/// impl Key for UserId {
 ///     fn write(&self, hasher: KeyHasher) -> KeyHasher {
 ///         hasher.write_u128(u128::from(self.0))
 ///     }
 /// }
 /// ```
-pub trait IdentityKey {
+pub trait Key {
     /// Folds this key into the running identity hash.
     #[must_use]
     fn write(&self, hasher: KeyHasher) -> KeyHasher;
@@ -45,6 +48,8 @@ const TAG_STR: u8 = b's';
 const TAG_BYTES: u8 = b'x';
 /// Tag byte starting a tuple frame.
 const TAG_TUPLE: u8 = b'(';
+/// Tag byte starting a source location.
+const TAG_LOCATION: u8 = b'l';
 
 /// Terminator ending a string write.
 ///
@@ -52,7 +57,7 @@ const TAG_TUPLE: u8 = b'(';
 /// string without escaping.
 const STR_END: u8 = 0xFF;
 
-/// The hasher an [`IdentityKey`] folds itself into.
+/// The hasher a [`Key`] folds itself into.
 ///
 /// Wraps the running identity hash during key derivation. Every write is
 /// tagged with the kind of data written and is self-delimiting, so keys of
@@ -60,16 +65,21 @@ const STR_END: u8 = 0xFF;
 /// cannot collide by concatenation. The hasher moves through every write,
 /// threading through a chain of calls, and only the derivation that created
 /// it can take the final value out.
+#[derive(Default)]
 pub struct KeyHasher(Fnv1a<u128>);
 
 impl KeyHasher {
     /// Wraps the running hash of a keyed derivation.
-    pub(super) fn new(hash: Fnv1a<u128>) -> Self {
+    #[doc(hidden)]
+    #[must_use]
+    pub fn new(hash: Fnv1a<u128>) -> Self {
         Self(hash)
     }
 
     /// Takes the derived hash value out.
-    pub(super) fn finish(self) -> u128 {
+    #[doc(hidden)]
+    #[must_use]
+    pub fn finish(self) -> u128 {
         self.0.finish()
     }
 
@@ -136,16 +146,29 @@ impl KeyHasher {
     }
 }
 
-impl<K: IdentityKey + ?Sized> IdentityKey for &K {
+impl<K: Key + ?Sized> Key for &K {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         (**self).write(hasher)
+    }
+}
+
+impl Key for () {
+    fn write(&self, hasher: KeyHasher) -> KeyHasher {
+        hasher.tuple(0)
+    }
+}
+
+impl Key for Location<'_> {
+    fn write(&self, hasher: KeyHasher) -> KeyHasher {
+        (self.file(), self.line(), self.column())
+            .write(KeyHasher(hasher.0.write(&[TAG_LOCATION])))
     }
 }
 
 /// Implements the key trait for unsigned integer primitives.
 macro_rules! unsigned_key_impl {
     ($($ty:ty),*) => {$(
-        impl IdentityKey for $ty {
+        impl Key for $ty {
             fn write(&self, hasher: KeyHasher) -> KeyHasher {
                 hasher.write_u128(u128::from(*self))
             }
@@ -155,7 +178,7 @@ macro_rules! unsigned_key_impl {
 
 unsigned_key_impl!(u8, u16, u32, u64, u128);
 
-impl IdentityKey for usize {
+impl Key for usize {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_u128(*self as u128)
     }
@@ -164,7 +187,7 @@ impl IdentityKey for usize {
 /// Implements the key trait for signed integer primitives.
 macro_rules! signed_key_impl {
     ($($ty:ty),*) => {$(
-        impl IdentityKey for $ty {
+        impl Key for $ty {
             fn write(&self, hasher: KeyHasher) -> KeyHasher {
                 hasher.write_i128(i128::from(*self))
             }
@@ -174,49 +197,49 @@ macro_rules! signed_key_impl {
 
 signed_key_impl!(i8, i16, i32, i64, i128);
 
-impl IdentityKey for isize {
+impl Key for isize {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_i128(*self as i128)
     }
 }
 
-impl IdentityKey for bool {
+impl Key for bool {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_bool(*self)
     }
 }
 
-impl IdentityKey for char {
+impl Key for char {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_char(*self)
     }
 }
 
-impl IdentityKey for str {
+impl Key for str {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_str(self)
     }
 }
 
-impl IdentityKey for String {
+impl Key for String {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_str(self)
     }
 }
 
-impl IdentityKey for [u8] {
+impl Key for [u8] {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_bytes(self)
     }
 }
 
-impl<const N: usize> IdentityKey for [u8; N] {
+impl<const N: usize> Key for [u8; N] {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_bytes(self)
     }
 }
 
-impl IdentityKey for Vec<u8> {
+impl Key for Vec<u8> {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_bytes(self)
     }
@@ -225,7 +248,7 @@ impl IdentityKey for Vec<u8> {
 /// Implements the key trait for one tuple arity.
 macro_rules! tuple_key_impl {
     ($len:literal: $(($name:ident, $idx:tt)),+) => {
-        impl<$($name: IdentityKey),+> IdentityKey for ($($name,)+) {
+        impl<$($name: Key),+> Key for ($($name,)+) {
             fn write(&self, hasher: KeyHasher) -> KeyHasher {
                 let hasher = hasher.tuple($len);
                 $(let hasher = self.$idx.write(hasher);)+
@@ -253,7 +276,7 @@ mod tests {
     use super::*;
 
     /// Hashes a key standalone, outside any derivation.
-    fn hash(key: impl IdentityKey) -> u128 {
+    fn hash(key: impl Key) -> u128 {
         key.write(KeyHasher::new(Fnv1a::<u128>::new())).finish()
     }
 
@@ -291,10 +314,25 @@ mod tests {
 
     #[test]
     fn tuples_frame_their_elements() {
+        assert_ne!(hash(()), hash(((),)));
+        assert_ne!(hash(()), hash(0));
         assert_eq!(hash((1, "a")), hash((1, "a")));
         assert_ne!(hash((1, 2)), hash((2, 1)));
         assert_ne!(hash((1, (2, 3))), hash((1, 2, 3)));
         assert_ne!(hash(("ab", "c")), hash(("a", "bc")));
         assert_ne!(hash((1,)), hash(1));
+    }
+
+    #[test]
+    fn locations_are_stable_and_distinguish_call_sites() {
+        fn location() -> &'static Location<'static> {
+            Location::caller()
+        }
+
+        assert_eq!(hash(location()), hash(location()));
+        let first = Location::caller();
+        let second = Location::caller();
+        assert_ne!(hash(first), hash(second));
+        assert_ne!(hash(first), hash((first.file(), first.line(), first.column())));
     }
 }

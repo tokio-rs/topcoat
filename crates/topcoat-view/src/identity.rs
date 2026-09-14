@@ -16,7 +16,7 @@
 //! component body.
 //!
 //! A `for` loop shares one site across all iterations. A `#[key(expr)]`
-//! attribute mixes an [`IdentityKey`] value into the iteration's identity
+//! attribute mixes a [`Key`] value into the iteration's identity
 //! to tell the repetitions apart.
 //! Without one the identity is ambiguous: derivation still succeeds and
 //! rendering proceeds, but the ambiguity is recorded, poisons every identity
@@ -24,7 +24,6 @@
 //! actually consumes the identity, naming the loop that is missing its key.
 
 mod guard;
-mod key;
 mod site;
 mod view;
 
@@ -32,9 +31,9 @@ use std::{cell::Cell, fmt, str::FromStr};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 pub use guard::*;
-pub use key::*;
 pub use site::*;
 use topcoat_core::fnv1a::Fnv1a;
+use topcoat_core::key::{Key, KeyHasher};
 pub use view::*;
 
 thread_local! {
@@ -147,7 +146,7 @@ impl Identity {
     /// to the child; a key resolves repetition at its own site, not on the
     /// chain above it.
     #[must_use]
-    pub fn keyed_child(self, site: SiteKey, key: impl IdentityKey) -> Self {
+    pub fn keyed_child(self, site: SiteKey, key: impl Key) -> Self {
         Self {
             hash: key
                 .write(KeyHasher::new(self.derive(TAG_KEYED, site)))

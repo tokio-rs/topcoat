@@ -9,5 +9,6 @@ pub mod cursor;
 pub mod error;
 pub mod fnv1a;
 pub mod internal;
+pub mod key;
 pub mod memoize;
 pub mod url_form;

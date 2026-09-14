@@ -3,7 +3,7 @@ mod id;
 mod request_context;
 mod tracking;
 
-use std::{any::Any, sync::Arc};
+use std::{any::Any, panic::Location, sync::Arc};
 
 pub use app_context::*;
 pub use id::*;
@@ -11,7 +11,11 @@ pub use request_context::*;
 pub(crate) use tracking::*;
 
 pub use crate::memoize::MemoizeAsRef;
-use crate::{abort::AbortStore, memoize::MemoizeCache};
+use crate::{
+    abort::AbortStore,
+    key::{Key, KeyHasher},
+    memoize::MemoizeCache,
+};
 
 /// The request context.
 ///
@@ -35,6 +39,8 @@ pub struct Cx {
     request_context: Arc<RequestContext>,
     /// The tracker recording this handle's request context reads, if any.
     tracker: Option<Arc<ContextTracker>>,
+    /// The namespace mixed into identities created through this handle.
+    identity_namespace: u128,
 }
 
 impl Cx {
@@ -56,6 +62,7 @@ impl Cx {
             }),
             request_context: Arc::new(request_context),
             tracker: None,
+            identity_namespace: 0,
         }
     }
 
@@ -64,6 +71,38 @@ impl Cx {
     #[must_use]
     pub fn id(&self) -> CxId {
         self.shared.id
+    }
+
+    /// Returns a child context with a key derived from the parent's key,
+    /// this call's source location, and `key`.
+    ///
+    /// Use `()` to distinguish separate call locations, or an item key to
+    /// distinguish repeated calls at one location:
+    ///
+    /// ```
+    /// # use topcoat_core::context::Cx;
+    /// # let cx = Cx::default();
+    /// let first = cx.keyed(());
+    /// let second = cx.keyed(());
+    ///
+    /// for id in [1, 2, 3] {
+    ///     let child = cx.keyed(id);
+    /// }
+    /// ```
+    ///
+    /// The same inputs produce the same key. Moving the call in source
+    /// changes it. The child shares the parent's request state and context
+    /// values.
+    #[must_use]
+    #[track_caller]
+    pub fn keyed(&self, key: impl Key) -> Self {
+        let identity_namespace = (self.identity_namespace, Location::caller(), key)
+            .write(KeyHasher::default())
+            .finish();
+        Self {
+            identity_namespace,
+            ..self.clone()
+        }
     }
 
     /// Returns the request context visible to this handle's scope.
@@ -118,6 +157,7 @@ impl Cx {
             shared: Arc::clone(&self.shared),
             request_context: Arc::new(request_context),
             tracker: self.tracker.clone(),
+            identity_namespace: self.identity_namespace,
         }
     }
 
@@ -134,6 +174,7 @@ impl Cx {
             shared: Arc::clone(&self.shared),
             request_context: Arc::clone(&self.request_context),
             tracker: Some(Arc::clone(&tracker)),
+            identity_namespace: self.identity_namespace,
         };
         (child, tracker)
     }
@@ -199,6 +240,13 @@ pub fn memoize_cache(cx: &Cx) -> &MemoizeCache {
     &cx.shared.memoize_cache
 }
 
+/// Returns the namespace for identities created through this context.
+#[doc(hidden)]
+#[must_use]
+pub fn identity_namespace(cx: &Cx) -> u128 {
+    cx.identity_namespace
+}
+
 #[inline]
 #[must_use]
 #[doc(hidden)]
@@ -221,6 +269,35 @@ mod tests {
         let first = Cx::new(Arc::new(AppContext::new()));
         let second = Cx::new(Arc::new(AppContext::new()));
         assert_ne!(first.id(), second.id());
+    }
+
+    #[test]
+    fn keys_distinguish_locations_and_repetitions() {
+        fn child(cx: &Cx, key: u32) -> Cx {
+            cx.keyed(key)
+        }
+
+        let cx = Cx::default();
+        assert_ne!(identity_namespace(&cx.keyed(())), identity_namespace(&cx.keyed(())));
+        assert_eq!(identity_namespace(&child(&cx, 1)), identity_namespace(&child(&Cx::default(), 1)));
+        assert_ne!(identity_namespace(&child(&cx, 1)), identity_namespace(&child(&cx, 2)));
+        assert_ne!(identity_namespace(&child(&child(&cx, 1), 2)), identity_namespace(&child(&cx, 2)));
+        assert_eq!(identity_namespace(&cx), 0);
+    }
+
+    #[test]
+    fn keyed_contexts_share_request_state_and_preserve_their_scope() {
+        let cx = Cx::default().with(Marker(7));
+        let child = cx.keyed("child");
+        assert_eq!(child.id(), cx.id());
+        assert!(std::ptr::eq(memoize_cache(&child), memoize_cache(&cx)));
+        assert!(std::ptr::eq(request_context::<Marker>(&child), request_context::<Marker>(&cx)));
+
+        let namespace = identity_namespace(&child);
+        assert_eq!(identity_namespace(&child.clone()), namespace);
+        assert_eq!(identity_namespace(&child.with(Other("value"))), namespace);
+        assert_eq!(identity_namespace(&child.with_many((Other("value"),))), namespace);
+        assert_eq!(identity_namespace(&child.track().0), namespace);
     }
 
     #[test]

@@ -1,7 +1,7 @@
 use std::{any::TypeId, collections::HashMap, panic::Location, sync::Arc};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
-use topcoat_core::context::{Cx, try_request_context};
+use topcoat_core::context::{Cx, identity_namespace, try_request_context};
 use topcoat_view::{
     HoistKey, hoist, hoist_once,
     identity::{Identity, SiteKey},
@@ -11,8 +11,8 @@ use crate::{Surrogate, Surrogated};
 
 /// The identity of a signal, shared by the server and the browser runtime.
 ///
-/// An id is derived from the identity of the component body that created
-/// the signal and the location of the `signal` call inside it, so the same
+/// An id is derived from the identity of the component body, the context's
+/// key scope, and the location of the `signal` call inside it, so the same
 /// call reached through the same chain of invocations produces the same id
 /// on every render. On the wire it is the hash as fixed-width hex, which
 /// survives JSON where a 128 bit integer would not.
@@ -20,18 +20,18 @@ use crate::{Surrogate, Surrogated};
 pub struct SignalId(u128);
 
 impl SignalId {
-    /// Derives the id of the signal created at `location` inside the running
-    /// component body.
+    /// Derives the id at `location` under the context's `namespace` and the
+    /// running view identity.
     ///
     /// # Panics
     ///
     /// Panics if the running body's identity is ambiguous, meaning an
-    /// invocation on the chain above it repeats without a `key` argument.
+    /// loop on the chain above it has no `#[key(...)]` attribute.
     #[track_caller]
-    pub(crate) fn derive(location: &Location<'_>) -> Self {
+    pub(crate) fn derive(namespace: u128, location: &Location<'_>) -> Self {
         Self(
             Identity::current()
-                .child(SiteKey::from_location(location))
+                .keyed_child(SiteKey::from_location(location), namespace)
                 .hash(),
         )
     }
@@ -334,7 +334,11 @@ pub fn signal<T>(cx: &Cx, init: impl FnOnce() -> T) -> Signal<T>
 where
     T: SignalValue,
 {
-    let id = SignalId::derive(Location::caller());
+    assert!(
+        !topcoat_core::memoize::is_memoizing(),
+        "signals cannot be created inside memoized functions"
+    );
+    let id = SignalId::derive(identity_namespace(cx), Location::caller());
     let value = try_request_context::<SignalValues>(cx)
         .and_then(|values| values.get(id))
         .and_then(T::from_value)
