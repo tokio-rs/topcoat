@@ -245,8 +245,8 @@ impl CxTestBuilder {
 ///
 /// # Panics
 ///
-/// Panics if an enclosing scope introduced ambiguity. Use [`try_identity`]
-/// when an identity is optional.
+/// Panics if `cx` belongs to a memoized call or an enclosing scope introduced
+/// ambiguity. Use [`try_identity`] when an identity may be ambiguous.
 #[must_use]
 #[track_caller]
 pub fn identity(cx: &Cx) -> Identity {
@@ -261,7 +261,17 @@ pub fn identity(cx: &Cx) -> Identity {
 /// # Errors
 ///
 /// Returns an error naming the scope that introduced ambiguity.
+///
+/// # Panics
+///
+/// Panics if `cx` belongs to a memoized call. To memoize a value that depends
+/// on identity, read the identity before the call and pass it as an argument.
+#[track_caller]
 pub fn try_identity(cx: &Cx) -> Result<Identity, AmbiguousIdentityError> {
+    assert!(
+        cx.state.tracker.is_none(),
+        "identity cannot be read inside memoized functions"
+    );
     cx.identity.checked()
 }
 
@@ -284,13 +294,6 @@ pub fn with_identity(cx: Cx, identity: Identity) -> Cx {
 #[doc(hidden)]
 pub fn memoize_cache(cx: &Cx) -> &MemoizeCache {
     &cx.state.shared.memoize_cache
-}
-
-/// Whether this context carries a memoized call's tracker.
-#[doc(hidden)]
-#[must_use]
-pub fn is_memoizing(cx: &Cx) -> bool {
-    cx.state.tracker.is_some()
 }
 
 #[inline]
@@ -353,7 +356,35 @@ mod tests {
         assert_eq!(identity(&child.clone()), expected);
         assert_eq!(identity(&child.with(Other("value"))), expected);
         assert_eq!(identity(&child.with_many((Other("value"),))), expected);
-        assert_eq!(identity(&child.track().0), expected);
+        assert_eq!(identity_raw(&child.track().0), expected);
+    }
+
+    #[test]
+    #[should_panic(expected = "identity cannot be read inside memoized functions")]
+    fn memoized_functions_cannot_read_identity() {
+        let cx = Cx::default();
+        memoize_cache(&cx).memoize(&cx, (), (), |cx, ()| {
+            identity(&cx.keyed(()).with(Marker(7)))
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "identity cannot be read inside memoized functions")]
+    fn memoized_functions_cannot_try_identity() {
+        let cx = Cx::default();
+        memoize_cache(&cx).memoize(&cx, (), (), |cx, ()| try_identity(&cx));
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "identity cannot be read inside memoized functions")]
+    async fn memoized_functions_cannot_read_identity_after_suspension() {
+        let cx = Cx::default();
+        memoize_cache(&cx)
+            .memoize_async(&cx, (), (), |cx, ()| async move {
+                tokio::task::yield_now().await;
+                identity(&cx)
+            })
+            .await;
     }
 
     #[test]

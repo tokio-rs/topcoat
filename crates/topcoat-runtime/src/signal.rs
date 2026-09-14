@@ -315,7 +315,7 @@ where
 ///
 /// # Panics
 ///
-/// Panics if `cx` carries a memoization tracker or an ambiguous identity,
+/// Panics if `cx` belongs to a memoized call or carries an ambiguous identity,
 /// or if no view is collecting signal declarations. A spawned task must
 /// establish its own rendering scope before creating signals.
 #[track_caller]
@@ -323,10 +323,6 @@ pub fn signal<T>(cx: &Cx, init: impl FnOnce() -> T) -> Signal<T>
 where
     T: SignalValue,
 {
-    assert!(
-        !topcoat_core::context::is_memoizing(cx),
-        "signals cannot be created inside memoized functions"
-    );
     let id = SignalId::derive(identity(cx), Location::caller());
     let value = try_request_context::<SignalValues>(cx)
         .and_then(|values| values.get(id))
@@ -518,41 +514,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "signals cannot be created inside memoized functions")]
+    #[should_panic(expected = "identity cannot be read inside memoized functions")]
     fn memoized_functions_cannot_create_signals() {
         let cx = Cx::default();
         topcoat_core::context::memoize_cache(&cx)
             .memoize(&cx, (), (), |cx, ()| signal(&cx.keyed(()), || 0.0));
-    }
-
-    #[test]
-    fn memoized_contexts_reject_signals_after_suspension() {
-        let cx = Cx::default();
-        let mut future = pin!(topcoat_core::context::memoize_cache(&cx).memoize_async(
-            &cx,
-            (),
-            (),
-            |cx, ()| async move {
-                let mut first = true;
-                std::future::poll_fn(|task| {
-                    if std::mem::take(&mut first) {
-                        task.waker().wake_by_ref();
-                        Poll::Pending
-                    } else {
-                        Poll::Ready(())
-                    }
-                })
-                .await;
-                signal(&cx, || 0.0)
-            },
-        ));
-        let mut task = Context::from_waker(Waker::noop());
-        assert!(future.as_mut().poll(&mut task).is_pending());
-        number_signal(&cx);
-        let panic = catch_unwind(AssertUnwindSafe(|| block_on(future.as_mut()))).unwrap_err();
-        let message = panic.downcast::<&str>().unwrap();
-        assert!(message.contains("signals cannot be created inside memoized functions"));
-        number_signal(&cx);
     }
 
     #[test]
