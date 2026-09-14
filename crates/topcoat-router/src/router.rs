@@ -6,7 +6,7 @@ use std::{
     task::Poll,
 };
 
-use topcoat_core::context::{AppContext, Cx, try_request_context};
+use topcoat_core::context::{AppContext, Cx, try_request_context, with_identity};
 
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
@@ -137,6 +137,15 @@ impl Router {
                     )
                 }
                 None => (Terminal::NotFound, &*inner.always_layers, cx.with(parts)),
+            };
+
+            let cx = if base.is_none() {
+                match crate::request::initial_identity(&cx) {
+                    Ok(identity) => with_identity(cx, identity),
+                    Err(error) => break (cx, Err(error)),
+                }
+            } else {
+                cx
             };
 
             // The origin layer wraps the whole chain, denying untrusted

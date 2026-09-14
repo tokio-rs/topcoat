@@ -19,6 +19,7 @@ build = []
 [dependencies]
 anyhow = { workspace = true, optional = true }
 anymap3.workspace = true
+base64.workspace = true
 elsa.workspace = true
 http.workspace = true
 pin-project-lite.workspace = true

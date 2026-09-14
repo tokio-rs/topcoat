@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{Expr, Pat};
-use topcoat_core_grammar::paths::topcoat_view;
+use topcoat_core_grammar::paths::{topcoat_context, topcoat_core, topcoat_view};
 
 use crate::view::hir::{
     Bindings, Scope,
@@ -18,12 +18,12 @@ pub(crate) struct ForLoop {
 }
 
 impl ForLoop {
-    /// Derives this iteration's identity without installing it.
+    /// Derives this iteration's identity from the enclosing context.
     fn identity(&self) -> TokenStream {
         let ordinal = self.ordinal;
         let site = quote! {
             const {
-                #topcoat_view::identity::SiteKey::new(
+                #topcoat_core::identity::SiteKey::new(
                     ::core::file!(),
                     ::core::line!(),
                     ::core::column!(),
@@ -33,11 +33,11 @@ impl ForLoop {
         };
         if let Some(key) = &self.key {
             quote! {
-                #topcoat_view::identity::Identity::current_raw().keyed_child(#site, &(#key))
+                #topcoat_context::identity_raw(__cx).keyed_child(#site, &(#key))
             }
         } else {
             quote! {
-                #topcoat_view::identity::Identity::current_raw().ambiguous_child(
+                #topcoat_context::identity_raw(__cx).ambiguous_child(
                     #site,
                     ::core::concat!(
                         "`for` loop at ",
@@ -71,13 +71,8 @@ impl Emit for ForLoop {
                     }
                 });
                 quote! {
-                    let __identity = #identity;
-                    #topcoat_view::internal::MoveView::drive(
-                        #topcoat_view::identity::IdentityView::new(
-                            __identity,
-                            #topcoat_view::internal::MoveView::new(async { #inner }),
-                        ),
-                    ).await
+                    let __cx = &#topcoat_context::with_identity(__cx.clone(), #identity);
+                    #inner
                 }
             });
             emitter.hoist(quote! {
@@ -97,7 +92,7 @@ impl Emit for ForLoop {
             let body = body.emit_block();
             let identity = self.identity();
             let body = quote! {{
-                let __guard = #topcoat_view::identity::IdentityGuard::install(#identity);
+                let __cx = &#topcoat_context::with_identity(__cx.clone(), #identity);
                 #body
             }};
             emitter.hoist(quote! {

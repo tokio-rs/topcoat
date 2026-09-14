@@ -2916,6 +2916,7 @@ version = "0.8.1"
 dependencies = [
  "anyhow",
  "anymap3",
+ "base64",
  "elsa",
  "http",
  "pin-project-lite",
@@ -3238,7 +3239,6 @@ dependencies = [
 name = "topcoat-view"
 version = "0.8.1"
 dependencies = [
- "base64",
  "criterion",
  "futures-core",
  "futures-util",

@@ -147,6 +147,10 @@ pub const topcoat_asset: Crate = Crate::new("asset", "topcoat-asset", "");
 #[allow(non_upper_case_globals)]
 pub const topcoat_context: Crate = Crate::new("context", "topcoat-core", "context");
 
+/// Shared core types.
+#[allow(non_upper_case_globals)]
+pub const topcoat_core: Crate = Crate::new("core", "topcoat-core", "");
+
 /// The `memoize` macro: `::topcoat::context`, or `topcoat_core_macro` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_context_macro: Crate = Crate::new("context", "topcoat-core-macro", "");

@@ -1,14 +1,11 @@
 use std::panic::Location;
 
-use topcoat_core::fnv1a::Fnv1a;
+use crate::fnv1a::Fnv1a;
 
 /// A key for one source location that derives an identity.
 ///
-/// The `view!` macro builds one per component invocation, as
-/// `const { SiteKey::new(file!(), line!(), column!(), ordinal) }`. The
-/// macro's spans all resolve to the position of the invocation itself, so
-/// `file`, `line`, and `column` alone cannot tell two components in one
-/// macro body apart; the `ordinal` numbers them in emission order.
+/// Generated code can combine `file!()`, `line!()`, and `column!()` with an
+/// ordinal to distinguish multiple sites within one macro invocation.
 ///
 /// A function that derives an identity for its caller builds one from the
 /// caller's [`Location`] with [`from_location`](Self::from_location)

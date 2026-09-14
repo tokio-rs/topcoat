@@ -1,19 +1,10 @@
 use std::{
-    cell::Cell,
     ptr,
     sync::atomic::{AtomicPtr, Ordering},
 };
 
 // Its address identifies the synchronous call stack or async poll currently running on a thread.
 thread_local!(static TOKEN: u8 = const { 0 });
-thread_local!(static ACTIVE: Cell<bool> = const { Cell::new(false) });
-
-/// Whether the current call stack is executing a memoized initializer.
-#[doc(hidden)]
-#[must_use]
-pub fn is_memoizing() -> bool {
-    ACTIVE.get()
-}
 
 /// Detects reentry into an initializer from the call stack or poll already running it.
 ///
@@ -55,10 +46,7 @@ impl Guard {
             debug_assert!(self.owner.load(Ordering::Relaxed).is_null());
             self.owner
                 .store(ptr::from_ref(token).cast_mut(), Ordering::Relaxed);
-            let _scope = Scope {
-                owner: &self.owner,
-                previous_active: ACTIVE.replace(true),
-            };
+            let _scope = Scope { owner: &self.owner };
             f()
         })
     }
@@ -75,14 +63,12 @@ impl Guard {
 /// unwind, so a panicking initializer can be retried.
 struct Scope<'a> {
     owner: &'a AtomicPtr<u8>,
-    previous_active: bool,
 }
 
 impl Drop for Scope<'_> {
     #[inline]
     fn drop(&mut self) {
         self.owner.store(ptr::null_mut(), Ordering::Relaxed);
-        ACTIVE.set(self.previous_active);
     }
 }
 
@@ -96,23 +82,9 @@ mod tests {
     fn scope_is_released_after_it_ends() {
         let guard = Guard::default();
 
-        assert!(!is_memoizing());
-        guard.scope(|| assert!(is_memoizing()));
-        assert!(!is_memoizing());
+        guard.scope(|| {});
 
         guard.assert_not_recursive::<fn()>();
-    }
-
-    #[test]
-    fn nested_scopes_restore_the_active_initializer_after_a_panic() {
-        let outer = Guard::default();
-        let inner = Guard::default();
-        outer.scope(|| {
-            let panic = std::panic::catch_unwind(|| inner.scope(|| panic!("failed")));
-            assert!(panic.is_err());
-            assert!(is_memoizing());
-        });
-        assert!(!is_memoizing());
     }
 
     #[test]

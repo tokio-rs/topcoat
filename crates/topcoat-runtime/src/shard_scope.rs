@@ -1,5 +1,5 @@
-use topcoat_core::context::Cx;
-use topcoat_view::{NodeViewParts, PartsWriter, ViewHandle, identity::Identity};
+use topcoat_core::{context::Cx, identity::Identity};
+use topcoat_view::{NodeViewParts, PartsWriter, ViewHandle};
 
 use crate::{Js, ShardId};
 

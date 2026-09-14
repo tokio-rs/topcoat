@@ -35,8 +35,8 @@ pub fn try_request_context<T>(cx: &Cx) -> Option<&T>
 where
     T: Any + Send + Sync,
 {
-    let binding = cx.request_context.lookup::<T>();
-    if let Some(tracker) = &cx.tracker {
+    let binding = cx.state.request_context.lookup::<T>();
+    if let Some(tracker) = &cx.state.tracker {
         tracker.record(ContextRead::new::<T>(binding.map(|(id, _)| id)));
     }
     binding.map(|(_, value)| value)

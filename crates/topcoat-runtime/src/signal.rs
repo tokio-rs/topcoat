@@ -1,18 +1,18 @@
 use std::{any::TypeId, collections::HashMap, panic::Location, sync::Arc};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
-use topcoat_core::context::{Cx, identity_namespace, try_request_context};
-use topcoat_view::{
-    HoistKey, hoist, hoist_once,
+use topcoat_core::{
+    context::{Cx, identity, try_request_context},
     identity::{Identity, SiteKey},
 };
+use topcoat_view::{HoistKey, hoist, hoist_once};
 
 use crate::{Surrogate, Surrogated};
 
 /// The identity of a signal, shared by the server and the browser runtime.
 ///
-/// An id is derived from the identity of the component body, the context's
-/// key scope, and the location of the `signal` call inside it, so the same
+/// An id is derived from the context's identity and the location of the
+/// `signal` call, so the same
 /// call reached through the same chain of invocations produces the same id
 /// on every render. On the wire it is the hash as fixed-width hex, which
 /// survives JSON where a 128 bit integer would not.
@@ -20,20 +20,9 @@ use crate::{Surrogate, Surrogated};
 pub struct SignalId(u128);
 
 impl SignalId {
-    /// Derives the id at `location` under the context's `namespace` and the
-    /// running view identity.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the running body's identity is ambiguous, meaning an
-    /// loop on the chain above it has no `#[key(...)]` attribute.
-    #[track_caller]
-    pub(crate) fn derive(namespace: u128, location: &Location<'_>) -> Self {
-        Self(
-            Identity::current()
-                .keyed_child(SiteKey::from_location(location), namespace)
-                .hash(),
-        )
+    /// Derives the id at `location` below the context's checked identity.
+    pub(crate) fn derive(identity: Identity, location: &Location<'_>) -> Self {
+        Self(identity.child(SiteKey::from_location(location)).hash())
     }
 }
 
@@ -316,29 +305,31 @@ where
 /// creates it, and is available to every runtime expression in that body's
 /// view, including the components it renders.
 ///
-/// A signal's identity comes from the body that creates it and the location
-/// of the call, so the same call reached the same way is the same signal on
-/// every render. A body that renders repeatedly, such as a component
-/// invoked in a `for` loop, needs a `key` argument on the invocation to tell
-/// the repetitions' signals apart, and one body must not create two signals
-/// from the same call site.
+/// A signal's identity comes from `cx` and the location of this call.
+/// Components receive their invocation's context automatically. Components
+/// inside a template loop need `#[key(...)]` on that loop to distinguish
+/// their signals.
+///
+/// For ordinary helpers called more than once, pass a context derived with
+/// [`Cx::keyed`]. Separate `cx.keyed(())` calls distinguish source locations;
+/// repeated calls at one location need distinct keys. Template loops do not
+/// rebind context variables used in ordinary Rust expressions.
 ///
 /// # Panics
 ///
-/// Panics when called outside a page, layout, component, or shard body,
-/// including from work such a body spawns onto another task, and when the
-/// enclosing body's identity is ambiguous because an invocation above it
-/// repeats without a `key`.
+/// Panics if `cx` carries a memoization tracker or an ambiguous identity,
+/// or if no view is collecting signal declarations. A spawned task must
+/// establish its own rendering scope before creating signals.
 #[track_caller]
 pub fn signal<T>(cx: &Cx, init: impl FnOnce() -> T) -> Signal<T>
 where
     T: SignalValue,
 {
     assert!(
-        !topcoat_core::memoize::is_memoizing(),
+        !topcoat_core::context::is_memoizing(cx),
         "signals cannot be created inside memoized functions"
     );
-    let id = SignalId::derive(identity_namespace(cx), Location::caller());
+    let id = SignalId::derive(identity(cx), Location::caller());
     let value = try_request_context::<SignalValues>(cx)
         .and_then(|values| values.get(id))
         .and_then(T::from_value)
@@ -370,12 +361,8 @@ mod tests {
         task::{Context, Poll, Waker},
     };
 
-    use topcoat::view::{
-        HoistView, ViewExt,
-        identity::{IdentityGuard, IdentityView},
-        internal::ThenView,
-        view,
-    };
+    use topcoat::view::{HoistView, ViewExt, internal::ThenView, view};
+    use topcoat_core::context::with_identity;
 
     use super::*;
 
@@ -424,15 +411,11 @@ mod tests {
     /// Renders a body creating one signal under the component identity at
     /// `site`, returning the signal's id.
     fn signal_id_at(site: SiteKey) -> SignalId {
-        let cx = &Cx::default();
-        let identity = IdentityGuard::enter(site).identity();
-        let view = IdentityView::new(
-            identity,
-            HoistView::new(ThenView::new(async move {
-                let signal = signal(cx, || 0.0_f64);
-                Ok(view! { cx => <p>(signal.id().to_string())</p> })
-            })),
-        );
+        let cx = &with_identity(Cx::default(), Identity::ROOT.child(site));
+        let view = HoistView::new(ThenView::new(async move {
+            let signal = signal(cx, || 0.0_f64);
+            Ok(view! { cx => <p>(signal.id().to_string())</p> })
+        }));
         let html = block_on(view.single()).unwrap().render(cx);
         let start = html.find("<p>").unwrap() + 3;
         let end = html.rfind("</p>").unwrap();
@@ -472,8 +455,10 @@ mod tests {
 
     #[test]
     fn an_ambiguous_identity_panics() {
-        let cx = Cx::default();
-        let _guard = IdentityGuard::enter_ambiguous(SITE_A, "`card` at src/a.rs:1");
+        let cx = with_identity(
+            Cx::default(),
+            Identity::ROOT.ambiguous_child(SITE_A, "`card` at src/a.rs:1"),
+        );
         let panic = catch_unwind(AssertUnwindSafe(|| signal(&cx, || 0.0_f64))).unwrap_err();
         let message = panic.downcast::<String>().expect("panics with a message");
         assert!(message.contains("`card` at src/a.rs:1"), "{message}");
@@ -514,6 +499,59 @@ mod tests {
 
         let cx = cx_carrying(id, serde_json::json!(5.0));
         assert_eq!(number_signal(&cx), (id, 5.0, false));
+    }
+
+    #[test]
+    fn context_keys_distinguish_repeated_helper_calls() {
+        fn keyed_number(key: u32) -> SignalId {
+            number_signal(&Cx::default().keyed(key)).0
+        }
+
+        let first = keyed_number(1);
+        let second = keyed_number(2);
+        assert_ne!(first, second);
+        assert_eq!(keyed_number(2), second);
+        assert_eq!(keyed_number(1), first);
+
+        let cx = Cx::default();
+        let first = number_signal(&cx.keyed(())).0;
+        let second = number_signal(&cx.keyed(())).0;
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    #[should_panic(expected = "signals cannot be created inside memoized functions")]
+    fn memoized_functions_cannot_create_signals() {
+        let cx = Cx::default();
+        topcoat_core::context::memoize_cache(&cx).memoize(&cx, (), (), |cx, ()| {
+            signal(&cx.keyed(()), || 0.0)
+        });
+    }
+
+    #[test]
+    fn memoized_contexts_reject_signals_after_suspension() {
+        let cx = Cx::default();
+        let mut future = pin!(topcoat_core::context::memoize_cache(&cx).memoize_async(
+            &cx, (), (), |cx, ()| async move {
+                let mut first = true;
+                std::future::poll_fn(|task| {
+                    if std::mem::take(&mut first) {
+                        task.waker().wake_by_ref();
+                        Poll::Pending
+                    } else {
+                        Poll::Ready(())
+                    }
+                }).await;
+                signal(&cx, || 0.0)
+            },
+        ));
+        let mut task = Context::from_waker(Waker::noop());
+        assert!(future.as_mut().poll(&mut task).is_pending());
+        number_signal(&cx);
+        let panic = catch_unwind(AssertUnwindSafe(|| block_on(future.as_mut()))).unwrap_err();
+        let message = panic.downcast::<&str>().unwrap();
+        assert!(message.contains("signals cannot be created inside memoized functions"));
+        number_signal(&cx);
     }
 
     #[test]

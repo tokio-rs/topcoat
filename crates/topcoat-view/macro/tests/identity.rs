@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use topcoat::{
     Result,
-    context::Cx,
-    view::{Child, View, ViewExt, component, identity::Identity, view},
+    context::{Cx, identity, try_identity},
+    view::{Child, View, ViewExt, component, view},
 };
 
 fn empty_cx() -> Cx {
@@ -13,15 +13,17 @@ fn empty_cx() -> Cx {
 /// Renders its own identity hash as `label=hash;` for the assertions to
 /// parse back out.
 #[component]
-async fn probe(label: &str) -> Result<impl View> {
-    let id = Identity::current().hash();
+async fn probe(cx: &Cx, label: &str) -> Result<impl View> {
+    let id = identity(cx).hash();
+    tokio::task::yield_now().await;
+    assert_eq!(identity(cx).hash(), id);
     Ok(view! { (format!("{label}={id:x};")) })
 }
 
 /// Renders the ambiguity error of its identity, or `ok` when there is none.
 #[component]
-async fn ambiguity() -> Result<impl View> {
-    let identity = Identity::try_current();
+async fn ambiguity(cx: &Cx) -> Result<impl View> {
+    let identity = try_identity(cx);
     Ok(view! {
         match identity {
             Ok(_) => "ok",
@@ -217,19 +219,20 @@ async fn a_key_resolves_the_template_of_a_repeated_invocation() {
 }
 
 #[tokio::test]
-async fn an_unkeyed_loop_is_ambiguous_without_a_component() {
+async fn an_explicit_context_inside_a_loop_keeps_its_own_identity() {
     let cx = empty_cx();
     let __cx = &cx;
+    let outer = __cx;
     let rendered = view! {
         for _ in [0] {
-            (Identity::try_current().unwrap_err().to_string())
+            (identity(outer).to_string())
         }
     }
     .single()
     .await
     .unwrap()
     .render(__cx);
-    assert!(rendered.contains("`for` loop"));
+    assert_eq!(rendered, identity(__cx).to_string());
 }
 
 #[tokio::test]

@@ -182,13 +182,14 @@ mod tests {
     use std::panic::Location;
 
     use serde_json::json;
+    use topcoat_core::identity::Identity;
 
     use super::*;
 
     /// Builds a signal surrogate around a fresh signal holding `value`.
     #[track_caller]
     fn surrogate<T>(value: T) -> SignalSurrogate<T> {
-        SignalSurrogate::new(Signal::new(SignalId::derive(0, Location::caller()), value))
+        SignalSurrogate::new(Signal::new(SignalId::derive(Identity::ROOT, Location::caller()), value))
     }
 
     #[test]
@@ -203,7 +204,7 @@ mod tests {
 
     #[test]
     fn deserializes_from_its_id_and_value() {
-        let id = SignalId::derive(0, Location::caller());
+        let id = SignalId::derive(Identity::ROOT, Location::caller());
 
         let signal: SignalSurrogate<String> =
             serde_json::from_value(json!({ "t": "Signal", "id": id.to_string(), "v": "shoes" }))
@@ -215,7 +216,7 @@ mod tests {
 
     #[test]
     fn deserializes_a_value_through_its_surrogate() {
-        let id = SignalId::derive(0, Location::caller());
+        let id = SignalId::derive(Identity::ROOT, Location::caller());
 
         let signal: SignalSurrogate<Option<f64>> = serde_json::from_value(json!({
             "t": "Signal",
@@ -229,7 +230,7 @@ mod tests {
 
     #[test]
     fn rejects_another_tag() {
-        let id = SignalId::derive(0, Location::caller());
+        let id = SignalId::derive(Identity::ROOT, Location::caller());
 
         let error = serde_json::from_value::<SignalSurrogate<String>>(
             json!({ "t": "Procedure", "id": id.to_string(), "v": "shoes" }),
@@ -241,7 +242,7 @@ mod tests {
 
     #[test]
     fn rejects_a_missing_value() {
-        let id = SignalId::derive(0, Location::caller());
+        let id = SignalId::derive(Identity::ROOT, Location::caller());
 
         let error = serde_json::from_value::<SignalSurrogate<String>>(
             json!({ "t": "Signal", "id": id.to_string() }),
@@ -253,7 +254,7 @@ mod tests {
 
     #[test]
     fn rejects_a_value_of_another_type() {
-        let id = SignalId::derive(0, Location::caller());
+        let id = SignalId::derive(Identity::ROOT, Location::caller());
 
         serde_json::from_value::<SignalSurrogate<f64>>(json!({
             "t": "Signal",

@@ -442,7 +442,7 @@ mod tests {
         let out = rendered(builder);
         assert!(out.contains("let __expr0 = {"));
         assert!(out.contains(
-            "IdentityView :: new (__identity , :: topcoat_view :: HoistView :: new (:: topcoat_view :: internal :: ThenView :: new (__future"
+            "HoistView :: new (:: topcoat_view :: internal :: MoveView :: new (async"
         ));
         assert!(out.contains("Component :: render"));
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
@@ -478,7 +478,7 @@ mod tests {
         let mut builder = ViewBuilder::new();
         add_component(&mut builder, "solo");
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter ("));
+        assert!(out.contains("identity_raw (__cx) . child ("));
         assert!(out.contains("SiteKey :: new"));
         assert!(out.contains("file ! ()"));
     }
@@ -574,7 +574,7 @@ mod tests {
         let out = rendered(builder);
         // The loop introduces ambiguity; both components derive normally.
         assert_eq!(out.matches(". ambiguous_child (").count(), 1);
-        assert_eq!(out.matches("IdentityGuard :: enter (").count(), 2);
+        assert_eq!(out.matches("identity_raw (__cx) . child (").count(), 2);
     }
 
     #[test]
@@ -594,7 +594,7 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LoopView :: new (__iterations)"), "{out}");
-        assert!(out.contains("ThenView :: new"), "{out}");
+        assert!(out.contains("MoveView :: new"), "{out}");
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"), "{out}");
     }
 
@@ -640,7 +640,7 @@ mod tests {
             add_component(then_branch, "conditional");
         });
         let out = rendered(builder);
-        assert!(!out.contains("Capture"));
+        assert_eq!(out.matches("Capture (").count(), 2);
     }
 
     #[test]
@@ -658,7 +658,7 @@ mod tests {
         let out = rendered(builder);
         assert!(out.contains("Capture ((status ,))"));
         // The binding-free arm needs no capture.
-        assert_eq!(out.matches("Capture (").count(), 1);
+        assert_eq!(out.matches("Capture (").count(), 4);
     }
 
     #[test]

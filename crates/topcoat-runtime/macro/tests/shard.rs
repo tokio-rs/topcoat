@@ -9,9 +9,9 @@
 
 use topcoat::{
     Result,
-    context::{Cx, CxTestBuilder},
-    router::{Body, request::IDENTITY_HEADER},
-    runtime::{Shard, Signal, shard, signal},
+    context::Cx,
+    router::{Body, Route, Router, request::IDENTITY_HEADER, response::Response, to_bytes},
+    runtime::{Shard, ShardRoute, Signal, shard, signal},
     view::{View, ViewExt, component, view},
 };
 
@@ -64,24 +64,27 @@ fn last_signal_id(html: &str) -> &str {
     &html[start..end]
 }
 
-/// Builds the context of a JSON request to the shard endpoint naming
-/// `identity` in the identity header.
-fn endpoint_cx(identity: &str) -> Cx {
-    let (parts, ()) = http::Request::builder()
+/// Sends a JSON request through the router, which installs its identity.
+async fn endpoint(shard: &'static impl Shard, identity: &str, body: Body) -> Response {
+    let route = ShardRoute::new(shard);
+    let request = http::Request::builder()
+        .method("POST")
+        .uri(route.path().as_str())
         .header("content-type", "application/json")
         .header(IDENTITY_HEADER, identity)
-        .body(())
-        .unwrap()
-        .into_parts();
-    CxTestBuilder::new().request_context(parts).build()
+        .body(body)
+        .unwrap();
+    Router::builder().route(route).build().handle(request).await
 }
 
 /// Renders `shard` through its endpoint at `identity`, carrying the JSON
 /// array `args` of arguments and the JSON object `signals` of signal values.
-async fn rerender_with(shard: &impl Shard, identity: &str, args: &str, signals: &str) -> String {
-    let cx = &endpoint_cx(identity);
+async fn rerender_with(shard: &'static impl Shard, identity: &str, args: &str, signals: &str) -> String {
     let body = Body::from(format!(r#"{{"args":{args},"signals":{signals}}}"#));
-    shard.render(cx, body).await.unwrap().render(cx)
+    let response = endpoint(shard, identity, body).await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    String::from_utf8(bytes.to_vec()).unwrap()
 }
 
 /// Renders the `stateful` shard through its endpoint at `identity`,
@@ -120,12 +123,12 @@ async fn a_signal_argument_is_read_inline_and_rebuilt_from_its_value() {
 
 #[tokio::test]
 async fn a_signal_argument_without_a_value_is_rejected() {
-    let cx = &endpoint_cx(&"A".repeat(22));
     let body = Body::from(format!(
         r#"{{"args":[{{"t":"Signal","id":"{}"}}]}}"#,
         "0".repeat(32)
     ));
-    assert!(by_signal.render(cx, body).await.is_err());
+    let response = endpoint(&by_signal, &"A".repeat(22), body).await;
+    assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
@@ -174,7 +177,7 @@ async fn a_rerender_at_another_identity_derives_another_signal_id() {
 
 #[tokio::test]
 async fn a_malformed_identity_is_rejected() {
-    let cx = &endpoint_cx("not base64");
     let body = Body::from(r#"{"args":["a"]}"#);
-    assert!(stateful.render(cx, body).await.is_err());
+    let response = endpoint(&stateful, "not base64", body).await;
+    assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
 }

@@ -18,17 +18,17 @@ use crate::fnv1a::Fnv1a;
 /// identifying parts in order:
 ///
 /// ```
-/// use topcoat_core::key::{Key, KeyHasher};
+/// use topcoat_core::identity::{IdentityKey, KeyHasher};
 ///
 /// struct UserId(u64);
 ///
-/// impl Key for UserId {
+/// impl IdentityKey for UserId {
 ///     fn write(&self, hasher: KeyHasher) -> KeyHasher {
 ///         hasher.write_u128(u128::from(self.0))
 ///     }
 /// }
 /// ```
-pub trait Key {
+pub trait IdentityKey {
     /// Folds this key into the running identity hash.
     #[must_use]
     fn write(&self, hasher: KeyHasher) -> KeyHasher;
@@ -57,7 +57,7 @@ const TAG_LOCATION: u8 = b'l';
 /// string without escaping.
 const STR_END: u8 = 0xFF;
 
-/// The hasher a [`Key`] folds itself into.
+/// The hasher a [`IdentityKey`] folds itself into.
 ///
 /// Wraps the running identity hash during key derivation. Every write is
 /// tagged with the kind of data written and is self-delimiting, so keys of
@@ -146,19 +146,19 @@ impl KeyHasher {
     }
 }
 
-impl<K: Key + ?Sized> Key for &K {
+impl<K: IdentityKey + ?Sized> IdentityKey for &K {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         (**self).write(hasher)
     }
 }
 
-impl Key for () {
+impl IdentityKey for () {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.tuple(0)
     }
 }
 
-impl Key for Location<'_> {
+impl IdentityKey for Location<'_> {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         (self.file(), self.line(), self.column())
             .write(KeyHasher(hasher.0.write(&[TAG_LOCATION])))
@@ -168,7 +168,7 @@ impl Key for Location<'_> {
 /// Implements the key trait for unsigned integer primitives.
 macro_rules! unsigned_key_impl {
     ($($ty:ty),*) => {$(
-        impl Key for $ty {
+        impl IdentityKey for $ty {
             fn write(&self, hasher: KeyHasher) -> KeyHasher {
                 hasher.write_u128(u128::from(*self))
             }
@@ -178,7 +178,7 @@ macro_rules! unsigned_key_impl {
 
 unsigned_key_impl!(u8, u16, u32, u64, u128);
 
-impl Key for usize {
+impl IdentityKey for usize {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_u128(*self as u128)
     }
@@ -187,7 +187,7 @@ impl Key for usize {
 /// Implements the key trait for signed integer primitives.
 macro_rules! signed_key_impl {
     ($($ty:ty),*) => {$(
-        impl Key for $ty {
+        impl IdentityKey for $ty {
             fn write(&self, hasher: KeyHasher) -> KeyHasher {
                 hasher.write_i128(i128::from(*self))
             }
@@ -197,49 +197,49 @@ macro_rules! signed_key_impl {
 
 signed_key_impl!(i8, i16, i32, i64, i128);
 
-impl Key for isize {
+impl IdentityKey for isize {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_i128(*self as i128)
     }
 }
 
-impl Key for bool {
+impl IdentityKey for bool {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_bool(*self)
     }
 }
 
-impl Key for char {
+impl IdentityKey for char {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_char(*self)
     }
 }
 
-impl Key for str {
+impl IdentityKey for str {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_str(self)
     }
 }
 
-impl Key for String {
+impl IdentityKey for String {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_str(self)
     }
 }
 
-impl Key for [u8] {
+impl IdentityKey for [u8] {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_bytes(self)
     }
 }
 
-impl<const N: usize> Key for [u8; N] {
+impl<const N: usize> IdentityKey for [u8; N] {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_bytes(self)
     }
 }
 
-impl Key for Vec<u8> {
+impl IdentityKey for Vec<u8> {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
         hasher.write_bytes(self)
     }
@@ -248,7 +248,7 @@ impl Key for Vec<u8> {
 /// Implements the key trait for one tuple arity.
 macro_rules! tuple_key_impl {
     ($len:literal: $(($name:ident, $idx:tt)),+) => {
-        impl<$($name: Key),+> Key for ($($name,)+) {
+        impl<$($name: IdentityKey),+> IdentityKey for ($($name,)+) {
             fn write(&self, hasher: KeyHasher) -> KeyHasher {
                 let hasher = hasher.tuple($len);
                 $(let hasher = self.$idx.write(hasher);)+
@@ -276,7 +276,7 @@ mod tests {
     use super::*;
 
     /// Hashes a key standalone, outside any derivation.
-    fn hash(key: impl Key) -> u128 {
+    fn hash(key: impl IdentityKey) -> u128 {
         key.write(KeyHasher::new(Fnv1a::<u128>::new())).finish()
     }
 

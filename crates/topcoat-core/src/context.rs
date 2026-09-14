@@ -13,7 +13,7 @@ pub(crate) use tracking::*;
 pub use crate::memoize::MemoizeAsRef;
 use crate::{
     abort::AbortStore,
-    key::{Key, KeyHasher},
+    identity::{AmbiguousIdentityError, Identity, IdentityKey, SiteKey},
     memoize::MemoizeCache,
 };
 
@@ -33,14 +33,10 @@ use crate::{
 /// the work.
 #[derive(Debug, Default, Clone)]
 pub struct Cx {
-    /// The state shared by every handle serving this request.
-    shared: Arc<RequestShared>,
-    /// The request context visible to this handle's scope.
-    request_context: Arc<RequestContext>,
-    /// The tracker recording this handle's request context reads, if any.
-    tracker: Option<Arc<ContextTracker>>,
-    /// The namespace mixed into identities created through this handle.
-    identity_namespace: u128,
+    /// The state shared by handles in the same context scope.
+    state: Arc<CxState>,
+    /// The identity of this handle's scope.
+    identity: Identity,
 }
 
 impl Cx {
@@ -54,15 +50,17 @@ impl Cx {
     /// Creates a `Cx` from the given app and request contexts.
     fn from_parts(app_context: Arc<AppContext>, request_context: RequestContext) -> Self {
         Self {
-            shared: Arc::new(RequestShared {
-                id: CxId::new(),
-                app_context,
-                memoize_cache: MemoizeCache::new(),
-                abort_store: AbortStore::new(),
+            state: Arc::new(CxState {
+                shared: Arc::new(RequestShared {
+                    id: CxId::new(),
+                    app_context,
+                    memoize_cache: MemoizeCache::new(),
+                    abort_store: AbortStore::new(),
+                }),
+                request_context: Arc::new(request_context),
+                tracker: None,
             }),
-            request_context: Arc::new(request_context),
-            tracker: None,
-            identity_namespace: 0,
+            identity: Identity::ROOT,
         }
     }
 
@@ -70,7 +68,7 @@ impl Cx {
     #[inline]
     #[must_use]
     pub fn id(&self) -> CxId {
-        self.shared.id
+        self.state.shared.id
     }
 
     /// Returns a child context with a key derived from the parent's key,
@@ -95,12 +93,10 @@ impl Cx {
     /// values.
     #[must_use]
     #[track_caller]
-    pub fn keyed(&self, key: impl Key) -> Self {
-        let identity_namespace = (self.identity_namespace, Location::caller(), key)
-            .write(KeyHasher::default())
-            .finish();
+    pub fn keyed(&self, key: impl IdentityKey) -> Self {
+        let site = SiteKey::from_location(Location::caller());
         Self {
-            identity_namespace,
+            identity: self.identity.keyed_child(site, key),
             ..self.clone()
         }
     }
@@ -108,14 +104,14 @@ impl Cx {
     /// Returns the request context visible to this handle's scope.
     #[inline]
     pub(crate) fn request_context(&self) -> &RequestContext {
-        &self.request_context
+        &self.state.request_context
     }
 
     /// Returns the tracker recording this handle's request context reads, if
     /// one is installed.
     #[inline]
     pub(crate) fn tracker(&self) -> Option<&ContextTracker> {
-        self.tracker.as_deref()
+        self.state.tracker.as_deref()
     }
 
     /// Returns a child handle whose request context also holds `value`.
@@ -130,7 +126,7 @@ impl Cx {
     where
         T: Any + Send + Sync,
     {
-        let mut request_context = (*self.request_context).clone();
+        let mut request_context = (*self.state.request_context).clone();
         request_context.insert(value);
         self.scope(request_context)
     }
@@ -145,7 +141,7 @@ impl Cx {
     where
         V: ContextValues,
     {
-        let mut request_context = (*self.request_context).clone();
+        let mut request_context = (*self.state.request_context).clone();
         values.install(&mut request_context);
         self.scope(request_context)
     }
@@ -154,10 +150,12 @@ impl Cx {
     /// request's state.
     fn scope(&self, request_context: RequestContext) -> Cx {
         Cx {
-            shared: Arc::clone(&self.shared),
-            request_context: Arc::new(request_context),
-            tracker: self.tracker.clone(),
-            identity_namespace: self.identity_namespace,
+            state: Arc::new(CxState {
+                shared: Arc::clone(&self.state.shared),
+                request_context: Arc::new(request_context),
+                tracker: self.state.tracker.clone(),
+            }),
+            identity: self.identity,
         }
     }
 
@@ -169,15 +167,25 @@ impl Cx {
     /// call is replaced, not stacked: reads made through the child and its
     /// descendants are recorded by the new tracker only.
     pub(crate) fn track(&self) -> (Cx, Arc<ContextTracker>) {
-        let tracker = Arc::new(ContextTracker::new(Arc::clone(&self.request_context)));
+        let tracker = Arc::new(ContextTracker::new(Arc::clone(&self.state.request_context)));
         let child = Cx {
-            shared: Arc::clone(&self.shared),
-            request_context: Arc::clone(&self.request_context),
-            tracker: Some(Arc::clone(&tracker)),
-            identity_namespace: self.identity_namespace,
+            state: Arc::new(CxState {
+                shared: Arc::clone(&self.state.shared),
+                request_context: Arc::clone(&self.state.request_context),
+                tracker: Some(Arc::clone(&tracker)),
+            }),
+            identity: self.identity,
         };
         (child, tracker)
     }
+}
+
+/// The bindings and tracker shared by handles in one context scope.
+#[derive(Debug, Default)]
+struct CxState {
+    shared: Arc<RequestShared>,
+    request_context: Arc<RequestContext>,
+    tracker: Option<Arc<ContextTracker>>,
 }
 
 /// The state shared by every handle to one request's [`Cx`].
@@ -233,25 +241,63 @@ impl CxTestBuilder {
     }
 }
 
+/// Returns the identity of this context's scope.
+///
+/// # Panics
+///
+/// Panics if an enclosing scope introduced ambiguity. Use [`try_identity`]
+/// when an identity is optional.
+#[must_use]
+#[track_caller]
+pub fn identity(cx: &Cx) -> Identity {
+    match try_identity(cx) {
+        Ok(identity) => identity,
+        Err(error) => panic!("{error}"),
+    }
+}
+
+/// Returns this context's identity, or the ambiguity inherited by it.
+///
+/// # Errors
+///
+/// Returns an error naming the scope that introduced ambiguity.
+pub fn try_identity(cx: &Cx) -> Result<Identity, AmbiguousIdentityError> {
+    cx.identity.checked()
+}
+
+/// Reads the identity for derivation without checking ambiguity.
+#[doc(hidden)]
+#[must_use]
+pub fn identity_raw(cx: &Cx) -> Identity {
+    cx.identity
+}
+
+/// Sets the identity of an owned context.
+#[doc(hidden)]
+#[must_use]
+pub fn with_identity(cx: Cx, identity: Identity) -> Cx {
+    Cx { identity, ..cx }
+}
+
 #[inline]
 #[must_use]
 #[doc(hidden)]
 pub fn memoize_cache(cx: &Cx) -> &MemoizeCache {
-    &cx.shared.memoize_cache
+    &cx.state.shared.memoize_cache
 }
 
-/// Returns the namespace for identities created through this context.
+/// Whether this context carries a memoized call's tracker.
 #[doc(hidden)]
 #[must_use]
-pub fn identity_namespace(cx: &Cx) -> u128 {
-    cx.identity_namespace
+pub fn is_memoizing(cx: &Cx) -> bool {
+    cx.state.tracker.is_some()
 }
 
 #[inline]
 #[must_use]
 #[doc(hidden)]
 pub fn abort_store(cx: &Cx) -> &AbortStore {
-    &cx.shared.abort_store
+    &cx.state.shared.abort_store
 }
 
 #[cfg(test)]
@@ -278,26 +324,36 @@ mod tests {
         }
 
         let cx = Cx::default();
-        assert_ne!(identity_namespace(&cx.keyed(())), identity_namespace(&cx.keyed(())));
-        assert_eq!(identity_namespace(&child(&cx, 1)), identity_namespace(&child(&Cx::default(), 1)));
-        assert_ne!(identity_namespace(&child(&cx, 1)), identity_namespace(&child(&cx, 2)));
-        assert_ne!(identity_namespace(&child(&child(&cx, 1), 2)), identity_namespace(&child(&cx, 2)));
-        assert_eq!(identity_namespace(&cx), 0);
+        assert_ne!(identity(&cx.keyed(())), identity(&cx.keyed(())));
+        assert_eq!(
+            identity(&child(&cx, 1)),
+            identity(&child(&Cx::default(), 1))
+        );
+        assert_ne!(identity(&child(&cx, 1)), identity(&child(&cx, 2)));
+        assert_ne!(
+            identity(&child(&child(&cx, 1), 2)),
+            identity(&child(&cx, 2))
+        );
+        assert_eq!(identity(&cx), Identity::ROOT);
     }
 
     #[test]
     fn keyed_contexts_share_request_state_and_preserve_their_scope() {
         let cx = Cx::default().with(Marker(7));
         let child = cx.keyed("child");
+        assert!(Arc::ptr_eq(&child.state, &cx.state));
         assert_eq!(child.id(), cx.id());
         assert!(std::ptr::eq(memoize_cache(&child), memoize_cache(&cx)));
-        assert!(std::ptr::eq(request_context::<Marker>(&child), request_context::<Marker>(&cx)));
+        assert!(std::ptr::eq(
+            request_context::<Marker>(&child),
+            request_context::<Marker>(&cx)
+        ));
 
-        let namespace = identity_namespace(&child);
-        assert_eq!(identity_namespace(&child.clone()), namespace);
-        assert_eq!(identity_namespace(&child.with(Other("value"))), namespace);
-        assert_eq!(identity_namespace(&child.with_many((Other("value"),))), namespace);
-        assert_eq!(identity_namespace(&child.track().0), namespace);
+        let expected = identity(&child);
+        assert_eq!(identity(&child.clone()), expected);
+        assert_eq!(identity(&child.with(Other("value"))), expected);
+        assert_eq!(identity(&child.with_many((Other("value"),))), expected);
+        assert_eq!(identity(&child.track().0), expected);
     }
 
     #[test]

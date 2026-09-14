@@ -347,7 +347,7 @@ See how to define components in the [`component`] macro guide.
 
 ## Keys
 
-Each component invocation has a stable identity derived from the chain of sites leading down to it in code, the same from one render to the next. The framework attaches per-invocation data such as state to it. A `for` loop repeats its body at the same site. Use `#[key(expr)]` on the loop to give each iteration its own identity, inherited by everything inside its body:
+Each component invocation receives a context with a stable identity derived from the chain of sites leading down to it in code, the same from one render to the next. The framework attaches per-invocation data such as state to it. A `for` loop repeats its body at the same site. Use `#[key(expr)]` on the loop to give each iteration its own identity, inherited by the components it invokes:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -368,7 +368,9 @@ Ok(view! {
 
 The key expression is evaluated once per iteration and can use the loop's bindings. Choose a value that identifies the item, such as its database id, so identity follows the item when the list reorders. Any value implementing [`IdentityKey`] works as a key.
 
-The attribute is optional. An unkeyed loop still renders, but its iteration identity is ambiguous. Consuming that identity anywhere inside the body errors with the location of the loop missing its key. Nested keyed loops inherit ambiguity from an unkeyed outer loop.
+The attribute is optional. An unkeyed loop still renders, but its iteration identity is ambiguous. Consuming that identity through a component's context errors with the location of the loop missing its key. Nested keyed loops inherit ambiguity from an unkeyed outer loop.
+
+Ordinary Rust expressions use the context explicitly passed to them. The macro does not rebind context variables inside loops. If a helper needs a distinct identity for each call, pass a context derived with [`Cx::keyed`](../context/struct.Cx.html#method.keyed), such as `helper(&cx.keyed(item.id))`.
 
 # Views Are Lazy
 
@@ -609,8 +611,7 @@ Ok(view! {
 [`topcoat::view::Class`]: struct.Class.html
 [`view!`]: macro.view.html
 [`View`]: trait.View.html
-[`Identity`]: identity/struct.Identity.html
-[`Identity::current`]: identity/struct.Identity.html#method.current
-[`IdentityKey`]: identity/trait.IdentityKey.html
+[`Identity`]: ../core/identity/struct.Identity.html
+[`IdentityKey`]: ../core/identity/trait.IdentityKey.html
 [`StatusCode`]: https://docs.rs/http/latest/http/status/struct.StatusCode.html
 [`HeaderMap`]: https://docs.rs/http/latest/http/header/struct.HeaderMap.html

@@ -1,66 +1,26 @@
-//! Component identity: a stable id for each component invocation, derived
-//! from the chain of call sites leading down to it.
-//!
-//! An [`Identity`] is a 128-bit hash mixing the identity of the enclosing
-//! component body with a [`SiteKey`] naming the invocation's location in
-//! source. Because derivation depends only on where a component is invoked,
-//! an identity is stable across renders: the same invocation reached through
-//! the same chain of call sites hashes to the same value.
-//!
-//! The current identity travels down the tree through a thread local
-//! installed for exactly the duration of a component invocation.
-//! [`IdentityGuard`] installs one around a synchronous region, and
-//! [`IdentityView`] around every poll of an invocation's view, so sibling
-//! views interleaving on one task each see their own identity.
-//! [`Identity::current`] reads the installed identity from inside a
-//! component body.
-//!
-//! A `for` loop shares one site across all iterations. A `#[key(expr)]`
-//! attribute mixes a [`Key`] value into the iteration's identity
-//! to tell the repetitions apart.
-//! Without one the identity is ambiguous: derivation still succeeds and
-//! rendering proceeds, but the ambiguity is recorded, poisons every identity
-//! derived below it, and [`Identity::current`] panics if a descendant
-//! actually consumes the identity, naming the loop that is missing its key.
+//! Stable identities derived from parent identities, source locations, and keys.
 
-mod guard;
+mod key;
 mod site;
-mod view;
 
-use std::{cell::Cell, fmt, str::FromStr};
+use std::{fmt, str::FromStr};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-pub use guard::*;
+pub use key::*;
 pub use site::*;
-use topcoat_core::fnv1a::Fnv1a;
-use topcoat_core::key::{Key, KeyHasher};
-pub use view::*;
 
-thread_local! {
-    /// The identity of the component body running on the current thread, if
-    /// any.
-    ///
-    /// [`IdentityGuard`] installs an identity here for exactly the duration
-    /// of a synchronous region, and [`IdentityView`] for exactly the
-    /// duration of each of its polls, so views that interleave on one task
-    /// never see each other's identity. An empty cell means the root: no
-    /// component body is running.
-    static CURRENT: Cell<Option<Identity>> = const { Cell::new(None) };
-}
+use crate::fnv1a::Fnv1a;
 
 /// Tag byte separating the parent hash from an unkeyed site.
 const TAG_SITE: u8 = 0;
 /// Tag byte separating the parent hash from a keyed site.
 const TAG_KEYED: u8 = 1;
 
-/// The identity of a component invocation: a hash of the chain of call
-/// sites from the root of the tree down to it.
+/// A stable identity derived from a chain of source locations and keys.
 ///
-/// Identities form a tree. [`child`](Self::child) and
-/// [`keyed_child`](Self::keyed_child) derive the identity one level down,
-/// and [`current`](Self::current) reads the identity installed for the
-/// running component body. An identity is a plain `Copy` value; holding one
-/// does not keep anything installed.
+/// Child identities inherit any ambiguity from their parent. Derivation
+/// succeeds even when ambiguous, so callers can defer checking until an
+/// identity is needed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Identity {
     hash: u128,
@@ -69,55 +29,18 @@ pub struct Identity {
 }
 
 impl Identity {
-    /// The identity at the root of the tree, outside any component body.
+    /// The identity at the root of the tree.
     pub const ROOT: Self = Self {
         hash: 0,
         ambiguity: None,
     };
 
-    /// Returns the identity of the running view scope.
-    ///
-    /// Outside any identity scope this is [`ROOT`](Self::ROOT).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the identity is ambiguous, meaning an enclosing loop has
-    /// no key attribute. The message names that loop.
-    /// Consumers that can work without an identity use
-    /// [`try_current`](Self::try_current) instead.
-    #[must_use]
-    #[track_caller]
-    pub fn current() -> Self {
-        match Self::try_current() {
-            Ok(identity) => identity,
-            Err(error) => panic!("{error}"),
-        }
-    }
-
-    /// Returns the identity of the running view scope, or the ambiguity
-    /// poisoning it.
-    ///
-    /// The tolerant counterpart of [`current`](Self::current), for consumers
-    /// that can fall back to working without an identity.
-    ///
-    /// # Errors
-    ///
-    /// Errors if the identity is ambiguous, meaning an enclosing loop has
-    /// no key attribute. The error names that loop.
-    pub fn try_current() -> Result<Self, AmbiguousIdentityError> {
-        let identity = Self::current_raw();
-        match identity.ambiguity {
-            None => Ok(identity),
+    /// Checks whether this identity can be consumed.
+    pub(crate) fn checked(self) -> Result<Self, AmbiguousIdentityError> {
+        match self.ambiguity {
+            None => Ok(self),
             Some(label) => Err(AmbiguousIdentityError { label }),
         }
-    }
-
-    /// Reads the installed identity without checking for ambiguity, falling
-    /// back to [`ROOT`](Self::ROOT) when none is installed.
-    #[doc(hidden)]
-    #[must_use]
-    pub fn current_raw() -> Self {
-        CURRENT.get().unwrap_or(Self::ROOT)
     }
 
     /// The hash value of this identity.
@@ -146,7 +69,7 @@ impl Identity {
     /// to the child; a key resolves repetition at its own site, not on the
     /// chain above it.
     #[must_use]
-    pub fn keyed_child(self, site: SiteKey, key: impl Key) -> Self {
+    pub fn keyed_child(self, site: SiteKey, key: impl IdentityKey) -> Self {
         Self {
             hash: key
                 .write(KeyHasher::new(self.derive(TAG_KEYED, site)))
@@ -158,13 +81,8 @@ impl Identity {
     /// Derives the identity of a child invocation at `site` whose
     /// repetitions cannot be told apart, recording `label` as the ambiguity.
     ///
-    /// The `view!` macro derives this for an unkeyed loop iteration;
-    /// `label` names that loop. The
-    /// hash is still derived and rendering proceeds, but the ambiguity
-    /// poisons this identity and every identity derived from it, keyed or
-    /// not, so consuming one through [`current`](Self::current) panics. An
-    /// ambiguity already on `self` wins: the outermost missing key is the
-    /// one to fix first.
+    /// Derivation succeeds, but checking this identity or any descendant
+    /// reports the ambiguity. An ambiguity already on the parent wins.
     #[must_use]
     pub const fn ambiguous_child(self, site: SiteKey, label: &'static str) -> Self {
         Self {
@@ -186,6 +104,12 @@ impl Identity {
             .write(&self.hash.to_le_bytes())
             .write(&[tag])
             .write(&site.0.to_le_bytes())
+    }
+}
+
+impl Default for Identity {
+    fn default() -> Self {
+        Self::ROOT
     }
 }
 
@@ -229,15 +153,14 @@ impl fmt::Display for ParseIdentityError {
 
 impl std::error::Error for ParseIdentityError {}
 
-/// Error returned by [`Identity::try_current`] when the identity is
-/// poisoned by a loop without a key attribute.
+/// Error returned when an identity cannot distinguish repeated scopes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AmbiguousIdentityError {
     label: &'static str,
 }
 
 impl AmbiguousIdentityError {
-    /// Names the loop that is missing its key attribute.
+    /// Names the scope that introduced ambiguity.
     #[must_use]
     pub const fn label(&self) -> &'static str {
         self.label
@@ -265,9 +188,9 @@ mod tests {
     const SITE_B: SiteKey = SiteKey::new(file!(), line!(), column!(), 0);
 
     #[test]
-    fn current_is_root_outside_any_component() {
-        assert_eq!(Identity::current(), Identity::ROOT);
-        assert_eq!(Identity::try_current(), Ok(Identity::ROOT));
+    fn default_is_root() {
+        assert_eq!(Identity::default(), Identity::ROOT);
+        assert_eq!(Identity::ROOT.checked(), Ok(Identity::ROOT));
     }
 
     #[test]

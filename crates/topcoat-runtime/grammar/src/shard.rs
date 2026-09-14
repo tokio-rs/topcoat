@@ -110,7 +110,7 @@ impl ToTokens for Shard {
         //
         // The invocation's identity travels to the browser on the scope
         // marker and comes back in the identity header of every re-render
-        // request, where the endpoint installs it again, so identities
+        // request, where the router installs it on the context, so identities
         // derived inside the shard body match between the inline render and
         // a re-render.
         let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
@@ -118,7 +118,7 @@ impl ToTokens for Shard {
             #(#docs)*
             #[#topcoat_view_macro::component]
             #vis async fn #ident(#component_params) -> #topcoat_error::Result<impl #topcoat_view::View> {
-                let __identity = #topcoat_view::identity::Identity::current();
+                let __identity = #topcoat_context::identity(__cx);
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
@@ -156,8 +156,7 @@ impl ToTokens for Shard {
 
         // The trait implementation dispatching re-render requests to the
         // handler: it deserializes the surrogate argument tuple and the
-        // signal values from the request body, installs the values and the
-        // invocation identity from the request's identity header, and
+        // signal values from the request body, installs the values, and
         // forwards the arguments to the handler positionally.
         let shard = quote! {
             impl #topcoat_runtime::Shard for #ident {
@@ -177,7 +176,6 @@ impl ToTokens for Shard {
                             <#topcoat_router::content::Json<#topcoat_runtime::ShardRequest<__Surrogate>> as #topcoat_router::request::FromRequest>
                                 ::from_request(cx, body).await?;
                         let (__args, __signals) = __request.into_parts();
-                        let __identity = #topcoat_router::request::initial_identity(cx)?;
                         let (#(#value_idents,)*) =
                             #topcoat_runtime::Surrogate::into_real(__args);
                         // Signals created while the handler runs resume from
@@ -190,7 +188,6 @@ impl ToTokens for Shard {
                                 #ident::handler(cx, #(#call_args),*),
                             ),
                         );
-                        let __view = #topcoat_view::identity::IdentityView::new(__identity, __view);
                         let __view = #topcoat_view::internal::ScopeView::new(__view);
                         #topcoat_view::ViewExt::single(__view).await
                     })

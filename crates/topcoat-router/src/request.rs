@@ -5,8 +5,8 @@ use http::request::Parts;
 use topcoat_core::{
     context::{Cx, request_context, try_request_context},
     error::Result,
+    identity::Identity,
 };
-use topcoat_view::identity::Identity;
 
 use crate::{Body, body_limit, error::bad_request, to_bytes};
 
@@ -436,7 +436,7 @@ pub fn original_extensions(cx: &Cx) -> &http::Extensions {
     &original_parts(cx).extensions
 }
 
-/// The header naming the identity a request's build starts at.
+/// The header naming the identity the router installs on a request's context.
 pub const IDENTITY_HEADER: &str = "x-topcoat-identity";
 
 /// Returns the identity the current request's build starts at.
@@ -455,7 +455,7 @@ pub const IDENTITY_HEADER: &str = "x-topcoat-identity";
 ///
 /// ```rust
 /// use topcoat::{
-///     Result, context::Cx, router::request::initial_identity, view::identity::Identity,
+///     Result, context::Cx, router::request::initial_identity, core::identity::Identity,
 /// };
 ///
 /// async fn is_page_request(cx: &Cx) -> Result<bool> {
