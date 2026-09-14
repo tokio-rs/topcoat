@@ -4,8 +4,8 @@ use syn::{Expr, Pat};
 use topcoat_core_grammar::paths::{topcoat_context, topcoat_core, topcoat_view};
 
 use crate::view::hir::{
-    emit::{Emit, Emitter},
     Bindings, Scope,
+    emit::{Emit, Emitter},
 };
 
 /// A `for` loop whose body is lowered into a nested scope.
