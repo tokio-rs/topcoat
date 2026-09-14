@@ -55,25 +55,18 @@ impl Emit for ForLoop {
         let Self {
             pat, expr, body, ..
         } = self;
+        let identity = self.identity();
+        let context = quote! {
+            let __cx = &#topcoat_context::with_identity(__cx.clone(), #identity);
+        };
 
         if body.is_async() {
-            // The iterations become one `LoopView`, driven as one unit of
-            // the enclosing template, so all iterations render concurrently
-            // and splice in iteration order. Each iteration's view is built
-            // inside the iteration and takes the pattern's bindings with
-            // it. The views share one type, and pinning each on the heap
-            // lets the loop hold them in a plain `Vec`.
-            let body = body.emit_captured_with(&Bindings::of_pattern(pat), |scope| {
-                let identity = self.identity();
-                let inner = scope.emit_inner(|view| {
-                    quote! {
-                        #topcoat_view::internal::MoveView::drive(#view).await
-                    }
-                });
-                quote! {
-                    let __cx = &#topcoat_context::with_identity(__cx.clone(), #identity);
-                    #inner
-                }
+            // Each iteration owns its bindings and context until its view
+            // finishes. LoopView drives them concurrently in source order.
+            let inner = body.emit_driven();
+            let body = Bindings::of_pattern(pat).emit_capture(quote! {
+                #context
+                #inner
             });
             emitter.hoist(quote! {
                 let #ident = {
@@ -90,16 +83,14 @@ impl Emit for ForLoop {
             // where the pattern's bindings are alive; the burst splices the
             // handles in iteration order.
             let body = body.emit_block();
-            let identity = self.identity();
-            let body = quote! {{
-                let __cx = &#topcoat_context::with_identity(__cx.clone(), #identity);
-                #body
-            }};
             emitter.hoist(quote! {
                 let #ident = {
                     let mut __views = ::std::vec::Vec::new();
                     for #pat in #expr {
-                        __views.push(#body);
+                        __views.push({
+                            #context
+                            #body
+                        });
                     }
                     __views
                 };

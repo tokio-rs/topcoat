@@ -53,11 +53,7 @@ impl Scope {
     /// does not borrow the caller's context.
     pub fn emit_view(&self, owns_cx: bool) -> TokenStream {
         let prologue = borrow_cx(owns_cx);
-        let inner = self.emit_inner(|view| {
-            quote! {
-                #topcoat_view::internal::MoveView::drive(#view).await
-            }
-        });
+        let inner = self.emit_driven();
         quote! {
             #topcoat_view::internal::ScopeView::new(
                 #topcoat_view::internal::MoveView::new(async move {
@@ -108,36 +104,19 @@ impl Scope {
             return self.emit_inert();
         }
 
-        self.emit_captured_with(bindings, |scope| {
-            scope.emit_inner(|view| {
-                quote! {
-                    #topcoat_view::internal::MoveView::drive(#view).await
-                }
-            })
+        bindings.emit_capture(self.emit_driven())
+    }
+
+    /// Builds and drives the view in the same block, keeping its borrows alive.
+    pub(crate) fn emit_driven(&self) -> TokenStream {
+        self.emit_inner(|view| {
+            quote! {
+                #topcoat_view::internal::MoveView::drive(#view).await
+            }
         })
     }
 
-    /// Emits a body after restoring its captured bindings. The callback
-    /// controls how the scope is built and driven within those bindings.
-    pub(crate) fn emit_captured_with(
-        &self,
-        bindings: &Bindings,
-        emit: impl FnOnce(&Self) -> TokenStream,
-    ) -> TokenStream {
-        let idents = bindings.idents();
-        let rebinds = bindings.rebinds();
-        let inner = emit(self);
-
-        quote! {{
-            let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
-            #topcoat_view::internal::MoveView::new(async {
-                let (#(#rebinds,)*) = __captured.take();
-                #inner
-            })
-        }}
-    }
-
-    pub(crate) fn emit_inner(&self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
+    fn emit_inner(&self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
         let mut emitter = Emitter::new(false);
         for node in &self.nodes {
             node.emit(&mut emitter);
