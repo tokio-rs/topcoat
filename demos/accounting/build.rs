@@ -1,6 +1,6 @@
 fn main() {
     topcoat::tailwind::BuildConfig::new()
-        .input("styles.css")
+        .input("app.css")
         .render()
         .unwrap();
 }

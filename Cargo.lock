@@ -10,6 +10,7 @@ dependencies = [
  "toasty",
  "tokio",
  "topcoat",
+ "topcoat-ui",
  "uuid",
 ]
 
