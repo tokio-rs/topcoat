@@ -62,7 +62,7 @@ let value = f64::NAN;
 coherent!(known "captured_nan" => value);
 ```
 
-These cases execute on every run. A changed outcome fails, and an unexpected pass fails with an instruction to remove the baseline. Execution errors cannot be accepted as known value mismatches.
+These cases execute on every run. A changed outcome fails, and an unexpected pass fails with an instruction to remove the baseline. A baseline can also record an exact JavaScript compilation error. Unexpected runtime exceptions and timeouts always fail.
 
 # Coverage boundaries
 

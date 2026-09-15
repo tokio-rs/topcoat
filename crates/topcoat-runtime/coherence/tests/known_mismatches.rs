@@ -21,3 +21,49 @@ fn some_unit() {
 fn return_inside_if() {
     coherent!(known "return_inside_if" => { if true { return 1.0; } 2.0 });
 }
+
+#[test]
+fn break_inside_if_inside_loop() {
+    coherent!(known "break_inside_if" => {
+        loop {
+            if true { break; }
+            break;
+        }
+        3.0
+    });
+}
+
+#[test]
+fn break_inside_if_inside_while() {
+    coherent!(known "break_inside_if" => {
+        while true {
+            if true { break; }
+            break;
+        }
+        3.0
+    });
+}
+
+#[test]
+fn continue_inside_if_inside_loop() {
+    // The branch is untaken so Rust terminates. JavaScript rejects the jump
+    // during compilation, regardless of the condition's value.
+    coherent!(known "continue_inside_if" => {
+        loop {
+            if false { continue; }
+            break;
+        }
+        3.0
+    });
+}
+
+#[test]
+fn continue_inside_if_inside_while() {
+    coherent!(known "continue_inside_if" => {
+        while true {
+            if false { continue; }
+            break;
+        }
+        3.0
+    });
+}
