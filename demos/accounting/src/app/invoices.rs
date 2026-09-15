@@ -14,6 +14,7 @@ use crate::{
         badge::{BadgeVariant, badge},
         button::{ButtonSize, ButtonVariant, button, button_variants},
         input::input,
+        select::select,
         table::{table, table_body, table_cell, table_head, table_header, table_row},
     },
     models::{Invoice, invoices, money},
@@ -25,13 +26,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
     let status = signal(cx, || "All".to_owned());
     Ok(view! {
         <div class="page-heading">
-            <div>
-                <p class="eyebrow">"KEEP BUSINESS MOVING"</p>
-                <h1>"Invoices"</h1>
-                <p class="mt-2 text-muted-foreground">
-                    "Every invoice, from first draft to paid."
-                </p>
-            </div>
+            <div><h1>"Invoices"</h1></div>
             <a
                 href=(href!(new::page))
                 class=(button_variants(ButtonVariant::Primary, ButtonSize::Md))
@@ -39,7 +34,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                 "+ New invoice"
             </a>
         </div>
-        <section class="panel">
+        <section>
             <div class="mb-6 flex flex-wrap gap-3">
                 input(
                     attrs: attributes! {
@@ -51,17 +46,18 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                         @input=$(|e: Event| query.set(e.target.value))
                     }
                 )
-                <select
-                    class="select-control w-auto"
-                    aria-label="Invoice status"
-                    :value=$(status.get())
-                    @change=$(|e: Event| status.set(e.target.value))
-                >
+                select(
+                    attrs: attributes! {
+                        class="w-40 max-w-full shrink-0"
+                        aria-label="Invoice status"
+                        :value=$(status.get())
+                        @change=$(|e: Event| status.set(e.target.value))
+                    },
                     <option>"All"</option>
                     <option>"Outstanding"</option>
                     <option>"Overdue"</option>
                     <option>"Paid"</option>
-                </select>
+                )
                 button(
                     variant: ButtonVariant::Ghost,
                     attrs: attributes! {
@@ -119,7 +115,7 @@ pub async fn invoice_table(invoices: &[Invoice]) -> Result<impl View> {
                         attrs: attributes! { id=(format!("invoice-{}", invoice.id)) },
                         table_cell(
                             <a
-                                class="font-medium text-teal-800 hover:underline"
+                                class="font-medium text-foreground hover:underline"
                                 href=(href!(detail::page, detail::InvoiceId(&invoice.id)))
                             >
                                 (number(&invoice.id))

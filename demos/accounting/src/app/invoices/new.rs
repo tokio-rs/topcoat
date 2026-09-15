@@ -84,15 +84,7 @@ async fn editor(
         >
             "Back to invoices"
         </a>
-        <div class="page-heading mt-5">
-            <div>
-                <p class="eyebrow">"LET'S MAKE IT OFFICIAL"</p>
-                <h1>"New invoice"</h1>
-                <p class="mt-2 text-muted-foreground">
-                    "Clear details. Smoother payments."
-                </p>
-            </div>
-        </div>
+        <div class="page-heading mt-5"><div><h1>"New invoice"</h1></div></div>
         if let Some(error) = error {
             <p
                 role="alert"
@@ -103,7 +95,7 @@ async fn editor(
         }
         <form method="post" action=(href!(create)) class="space-y-6">
             <section class="panel">
-                <h2 class="text-lg font-semibold">"Invoice details"</h2>
+                <h2 class="text-sm font-semibold">"Invoice details"</h2>
                 <p class="mt-1 text-sm text-muted-foreground">
                     "From Studio Collective to "
                     $(if customer.get().is_empty() {
@@ -212,17 +204,15 @@ async fn field(
     required: bool,
 ) -> Result<impl View> {
     let value = signal(cx, || initial);
-    Ok(
-        view! {
-            text_field(
-                name: name,
-                title: title,
-                kind: kind,
-                value: &value,
-                required: required
-            )
-        },
-    )
+    Ok(view! {
+        text_field(
+            name: name,
+            title: title,
+            kind: kind,
+            value: &value,
+            required: required
+        )
+    })
 }
 
 #[component]

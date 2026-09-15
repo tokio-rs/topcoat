@@ -9,7 +9,7 @@ use topcoat::{
 use crate::{
     components::{
         button::{ButtonSize, ButtonVariant, button_variants},
-        card::{card, card_content},
+        select::select,
     },
     models::{invoices, money},
 };
@@ -41,13 +41,7 @@ pub async fn overview(cx: &Cx) -> Result<impl View> {
 
     Ok(view! {
         <div class="page-heading">
-            <div>
-                <p class="eyebrow">"YOUR BUSINESS AT A GLANCE"</p>
-                <h1>"Overview"</h1>
-                <p class="mt-2 text-muted-foreground">
-                    "A little clarity for your working day."
-                </p>
-            </div>
+            <div><h1>"Overview"</h1></div>
             <a
                 href=(href!(super::invoices::new::page))
                 class=(button_variants(ButtonVariant::Primary, ButtonSize::Md))
@@ -55,19 +49,20 @@ pub async fn overview(cx: &Cx) -> Result<impl View> {
                 "+ New invoice"
             </a>
         </div>
-        <div class="mb-6 flex items-center justify-between gap-4">
-            <h2 class="text-lg font-semibold">"Financial snapshot"</h2>
-            <select
-                aria-label="Reporting period"
-                class="select-control w-auto"
-                :value=$(period.get())
-                @change=$(|e: Event| period.set(e.target.value))
-            >
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-sm font-medium">"Financial summary"</h2>
+            select(
+                attrs: attributes! {
+                    aria-label="Reporting period"
+                    class="w-60 max-w-full shrink-0"
+                    :value=$(period.get())
+                    @change=$(|e: Event| period.set(e.target.value))
+                },
                 <option value="all">"All invoices"</option>
                 <option value="month">"Issued in the last 30 days"</option>
-            </select>
+            )
         </div>
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="metrics">
             metric(
                 title: "Total invoiced",
                 value: money(billed),
@@ -89,12 +84,12 @@ pub async fn overview(cx: &Cx) -> Result<impl View> {
                 note: "Past their due date".to_owned()
             )
         </div>
-        <div class="mt-8 grid gap-6 lg:grid-cols-3">
-            <section class="panel lg:col-span-2">
+        <div class="mt-10 grid gap-8 lg:grid-cols-3">
+            <section class="min-w-0 lg:col-span-2">
                 <div class="mb-6 flex items-center justify-between">
-                    <h2 class="text-lg font-semibold">"Recent invoices"</h2>
+                    <h2 class="text-sm font-semibold">"Recent invoices"</h2>
                     <a
-                        class="text-sm font-medium text-teal-700"
+                        class="text-xs text-muted-foreground hover:text-foreground hover:underline"
                         href=(href!(super::invoices::page))
                     >
                         "View all invoices"
@@ -104,9 +99,11 @@ pub async fn overview(cx: &Cx) -> Result<impl View> {
                     invoices: &invoices[..invoices.len().min(5)]
                 )
             </section>
-            <section class="panel">
-                <h2 class="text-lg font-semibold">"Collection progress"</h2>
-                <p class="mt-8 text-5xl font-semibold tracking-tight">
+            <section
+                class="border-t border-border pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8"
+            >
+                <h2 class="text-sm font-semibold">"Collection progress"</h2>
+                <p class="mt-6 text-4xl font-semibold tracking-tight tabular-nums">
                     (collection)
                     "%"
                 </p>
@@ -114,7 +111,7 @@ pub async fn overview(cx: &Cx) -> Result<impl View> {
                     "of invoiced value has been paid"
                 </p>
                 <div
-                    class="my-6 h-3 overflow-hidden rounded-full bg-stone-100"
+                    class="my-5 h-1.5 overflow-hidden rounded-full bg-zinc-100"
                     role="progressbar"
                     aria-label="Invoice collection"
                     aria-valuenow=(collection)
@@ -122,7 +119,7 @@ pub async fn overview(cx: &Cx) -> Result<impl View> {
                     aria-valuemax="100"
                 >
                     <div
-                        class="h-full rounded-full bg-teal-600"
+                        class="h-full rounded-full bg-primary"
                         style=(format!("width: {collection}%"))
                     ></div>
                 </div>
@@ -144,13 +141,12 @@ pub async fn overview(cx: &Cx) -> Result<impl View> {
 #[component]
 async fn metric(title: &'static str, value: String, note: String) -> Result<impl View> {
     Ok(view! {
-        card(
-            attrs: attributes! { class="bg-white" },
-            card_content(
-                <p class="text-sm text-muted-foreground">(title)</p>
-                <p class="mt-3 text-3xl font-semibold tracking-tight">(value)</p>
-                <p class="mt-3 text-xs text-muted-foreground">(note)</p>
-            )
-        )
+        <div class="metric">
+            <p class="text-xs font-medium text-muted-foreground">(title)</p>
+            <p class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
+                (value)
+            </p>
+            <p class="mt-2 text-xs text-muted-foreground">(note)</p>
+        </div>
     })
 }

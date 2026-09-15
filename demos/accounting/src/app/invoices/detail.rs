@@ -46,10 +46,7 @@ async fn invoice_detail(cx: &Cx, id: String) -> Result<impl View> {
             "Back to invoices"
         </a>
         <div class="page-heading mt-5">
-            <div>
-                <p class="eyebrow">"INVOICE DETAILS"</p>
-                <h1>(super::number(&id))</h1>
-            </div>
+            <div><h1>(super::number(&id))</h1></div>
             if !invoice.paid {
                 button(
                     attrs: attributes! {
@@ -88,7 +85,7 @@ async fn invoice_detail(cx: &Cx, id: String) -> Result<impl View> {
             </div>
             <div class="my-8 grid gap-8 sm:grid-cols-2">
                 <div>
-                    <p class="eyebrow">"BILL TO"</p>
+                    <p class="eyebrow">"Bill to"</p>
                     <h3 class="mt-3 font-semibold">(&invoice.customer)</h3>
                     <p class="mt-1 text-sm">(&invoice.email)</p>
                     <p class="mt-2 whitespace-pre-line text-sm text-muted-foreground">

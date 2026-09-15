@@ -132,7 +132,7 @@ pub async fn line_items(
     Ok(view! {
         <section class="panel">
             <div class="mb-6 flex items-center justify-between">
-                <h2 class="text-lg font-semibold">"Line items"</h2>
+                <h2 class="text-sm font-semibold">"Line items"</h2>
                 <span class="text-xs text-muted-foreground">
                     (rows.len())
                     " / 20 lines"
