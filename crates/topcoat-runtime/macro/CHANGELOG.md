@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-macro-v0.8.1...topcoat-runtime-macro-v0.9.0) - 2026-09-15
+
+### Added
+
+- *(runtime)* support Vec, slices and arrays ([#416](https://github.com/tokio-rs/topcoat/pull/416))
+- *(runtime)* integer support ([#415](https://github.com/tokio-rs/topcoat/pull/415))
+- *(view)* [**breaking**] new way to specify identities (`#[key(...)]` and `cx.keyed(...)`) ([#410](https://github.com/tokio-rs/topcoat/pull/410))
+
 ## [0.8.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-macro-v0.7.0...topcoat-runtime-macro-v0.8.0) - 2026-09-09
 
 ### Added

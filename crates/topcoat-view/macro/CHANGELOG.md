@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-macro-v0.8.1...topcoat-view-macro-v0.9.0) - 2026-09-15
+
+### Added
+
+- *(view)* [**breaking**] new way to specify identities (`#[key(...)]` and `cx.keyed(...)`) ([#410](https://github.com/tokio-rs/topcoat/pull/410))
+
 ## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-macro-v0.6.2...topcoat-view-macro-v0.7.0) - 2026-09-04
 
 ### Added
