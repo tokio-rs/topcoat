@@ -1,10 +1,6 @@
-import {
-	createScope,
-	type Scope as MaverickScope,
-	scoped,
-} from "@maverick-js/signals";
 import { dehydrate } from "./expression/dehydrate";
 import type { DehydratedSurrogate } from "./expression/serialized";
+import { Effect } from "./reactivity";
 import type { Runtime } from "./runtime";
 import type { SignalId } from "./signal-registry";
 
@@ -21,7 +17,7 @@ export class Scope {
 	 * while rendering it, so a change to one re-runs the enclosing unit.
 	 */
 	readonly dependencies = new Set<SignalId>();
-	private readonly mScope: MaverickScope = createScope();
+	private readonly effects = new Set<Effect>();
 	/** Aborted on release, removing listeners and cancelling owned requests. */
 	private readonly listenerController = new AbortController();
 	private disposed = false;
@@ -33,9 +29,18 @@ export class Scope {
 		parent?.children.add(this);
 	}
 
-	/** Runs `fn` inside this scope so effects it creates attach for disposal. */
-	run<T>(fn: () => T): T {
-		return scoped(fn, this.mScope) as T;
+	/** Runs a reaction immediately and owns its subscriptions until release. */
+	effect(fn: () => void): void {
+		if (this.disposed) return;
+		const effect = new Effect(fn);
+		this.effects.add(effect);
+		try {
+			effect.run();
+		} catch (error) {
+			effect.dispose();
+			this.effects.delete(effect);
+			throw error;
+		}
 	}
 
 	/**
@@ -74,7 +79,8 @@ export class Scope {
 		for (const child of this.children) child.release(into);
 		this.children.clear();
 
-		this.mScope.dispose();
+		for (const effect of this.effects) effect.dispose();
+		this.effects.clear();
 		this.listenerController.abort();
 
 		for (const id of this.signalIds) into.add(id);

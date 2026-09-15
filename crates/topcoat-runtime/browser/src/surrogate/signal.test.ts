@@ -1,6 +1,6 @@
-import { effect, root, signal, tick } from "@maverick-js/signals";
 import { expect, it } from "vitest";
 
+import { Effect, flushEffects, signal } from "../reactivity";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
 import { WriteSignal } from "./signal";
@@ -58,26 +58,26 @@ it("dehydrates to its id and current value", () => {
 // change detection is identity based, so a future refactor that mutates in
 // place would silently stop notifying subscribers.
 it("each write notifies subscribers exactly once", () => {
-	root((dispose) => {
-		const inner = signal<unknown>(new F64(0));
-		const s = new WriteSignal("test", inner);
+	const inner = signal<unknown>(new F64(0));
+	const s = new WriteSignal("test", inner);
 
-		let runs = 0;
-		effect(() => {
-			inner();
-			runs += 1;
-		});
-		tick();
+	let runs = 0;
+	const effect = new Effect(() => {
+		inner();
+		runs += 1;
+	});
+	try {
+		effect.run();
 		expect(runs).toBe(1);
 
 		s.increment();
-		tick();
+		flushEffects();
 		expect(runs).toBe(2);
 
 		s.decrement();
-		tick();
+		flushEffects();
 		expect(runs).toBe(3);
-
-		dispose();
-	});
+	} finally {
+		effect.dispose();
+	}
 });

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-import { tick } from "@maverick-js/signals";
+
 import { afterEach, expect, it, vi } from "vitest";
+import { flushEffects } from "../reactivity";
 import { Runtime } from "../runtime";
 import { F64, WriteSignal } from "../surrogate";
 import { parseComment } from "./markers";
@@ -42,6 +43,45 @@ it("hydrates signal references using the runtime registry", () => {
 	}
 });
 
+it("updates bindings and text after events, then stops both on disposal", async () => {
+	document.body.innerHTML = `
+		<!--::topcoat::signal({"t":"signal","id":"a","v":1})-->
+		<button data-topcoat-on:click="() => cx.signal('a').increment()">add</button>
+		<input data-topcoat-bind:value="cx.signal('a').get()">
+		<p><!--::topcoat::expr::start("cx.signal('a').get()")-->1<!--::topcoat::expr::end--></p>
+	`;
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		const button = document.querySelector("button");
+		const input = document.querySelector("input");
+		const text = document.querySelector("p");
+		if (!button || !input || !text) throw new Error("Missing fixture elements");
+		expect(input.value).toBe("1");
+		expect(text.textContent).toBe("1");
+		const count = runtime.context.signal("a");
+		button.click();
+		button.click();
+		expect(input.value).toBe("1");
+		expect(text.textContent).toBe("1");
+		await Promise.resolve();
+		expect(input.value).toBe("3");
+		expect(text.textContent).toBe("3");
+
+		button.click();
+		runtime.page.dispose();
+		await Promise.resolve();
+		button.click();
+		expect((count.get() as F64).dehydrate()).toBe(4);
+		count.set(new F64(5));
+		await Promise.resolve();
+		expect(input.value).toBe("3");
+		expect(text.textContent).toBe("3");
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
 it("a page replacement releases nested shards and adopts surviving signals", async () => {
 	document.body.innerHTML = `
 		<!--::topcoat::signal({"t":"signal","id":"a","v":1})-->
@@ -75,7 +115,7 @@ it("a page replacement releases nested shards and adopts surviving signals", asy
 		runtime.start(document);
 		runtime.context.signal("a").set(new F64(7));
 		runtime.context.signal("b").set(new F64(1));
-		tick();
+		flushEffects();
 		await Promise.resolve();
 
 		expect(fetch).toHaveBeenCalledTimes(1);

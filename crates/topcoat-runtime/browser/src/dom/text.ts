@@ -1,5 +1,3 @@
-import { effect } from "@maverick-js/signals";
-
 import { compile } from "../expression/compile";
 import type { Scope } from "../scope";
 import { isNodeViewParts } from "./view";
@@ -14,15 +12,13 @@ export function setupTextExpression(
 	const { context } = scope.runtime;
 
 	let first = true;
-	scope.run(() => {
-		effect(() => {
-			const value = compute(context);
-			if (first) {
-				first = false;
-				return;
-			}
-			write(start, end, value);
-		});
+	scope.effect(() => {
+		const value = compute(context);
+		if (first) {
+			first = false;
+			return;
+		}
+		write(start, end, value);
 	});
 }
 

@@ -1,7 +1,6 @@
-import type { WriteSignal as MaverickWriteSignal } from "@maverick-js/signals";
-
 import { dehydrate } from "../expression/dehydrate";
 import type { DehydratedSurrogate } from "../expression/serialized";
+import type { WriteSignal as SignalHandle } from "../reactivity";
 import type { SignalId } from "../signal-registry";
 import type { Bool } from "./bool";
 import { F64 } from "./f64";
@@ -11,7 +10,7 @@ import { String as RuntimeString, type Str } from "./string";
 export class WriteSignal<T> {
 	constructor(
 		private readonly id: SignalId,
-		private readonly inner: MaverickWriteSignal<T>,
+		private readonly inner: SignalHandle<T>,
 	) {}
 
 	read(): Ref<T> {

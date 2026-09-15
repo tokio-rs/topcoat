@@ -1,4 +1,4 @@
-import { signal, type WriteSignal } from "@maverick-js/signals";
+import { signal, type WriteSignal } from "./reactivity";
 
 export type SignalId = string;
 
@@ -29,7 +29,7 @@ export class SignalRegistry {
 
 	/**
 	 * Returns the signal handle for the given id. Calling the handle reads the
-	 * current value and participates in maverick tracking. Throws if unknown.
+	 * current value and participates in dependency tracking. Throws if unknown.
 	 */
 	handle(id: SignalId): WriteSignal<unknown> {
 		const s = this.signals.get(id);
@@ -38,7 +38,7 @@ export class SignalRegistry {
 	}
 
 	/**
-	 * Reads the current value of a signal, participating in maverick tracking
+	 * Reads the current value of a signal, participating in dependency tracking
 	 * when called from inside an effect. Throws if the id is unknown.
 	 */
 	read(id: SignalId): unknown {

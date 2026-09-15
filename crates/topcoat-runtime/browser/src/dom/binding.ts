@@ -1,5 +1,3 @@
-import { effect } from "@maverick-js/signals";
-
 import { compile } from "../expression/compile";
 import type { Scope } from "../scope";
 import { isAttributeValueViewParts } from "./view";
@@ -25,10 +23,8 @@ export function setupBinding(el: Element, attr: Attr, scope: Scope): void {
 	const compute = compile(attr.value, `binding :${name}`);
 
 	const { context } = scope.runtime;
-	scope.run(() => {
-		effect(() => {
-			write(el, name, compute(context));
-		});
+	scope.effect(() => {
+		write(el, name, compute(context));
 	});
 }
 

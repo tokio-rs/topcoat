@@ -1,6 +1,5 @@
-import { untrack } from "@maverick-js/signals";
-
 import { morph } from "../dom/morph";
+import { untrack } from "../reactivity";
 import type { Runtime } from "../runtime";
 import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";

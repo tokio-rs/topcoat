@@ -1,5 +1,3 @@
-import { effect } from "@maverick-js/signals";
-
 import type { Runtime } from "../runtime";
 import { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
@@ -77,16 +75,14 @@ export abstract class RenderUnit {
 		const { registry } = this.runtime;
 		const scope = this.contentScope;
 		let first = true;
-		scope.run(() => {
-			effect(() => {
-				this.readInputs();
-				for (const id of scope.dependencies) registry.read(id);
-				if (first) {
-					first = false;
-					return;
-				}
-				this.requestController.schedule(() => this.refresh());
-			});
+		scope.effect(() => {
+			this.readInputs();
+			for (const id of scope.dependencies) registry.read(id);
+			if (first) {
+				first = false;
+				return;
+			}
+			this.requestController.schedule(() => this.refresh());
 		});
 	}
 
