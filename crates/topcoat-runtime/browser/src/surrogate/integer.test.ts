@@ -7,10 +7,22 @@ import { Integer, integerType } from "./integer";
 import { Panic } from "./panic";
 
 const types: [IntegerKind, number][] = [
-	["u8", 8], ["u16", 16], ["u32", 32], ["u64", 64], ["u128", 128],
-	["i8", 8], ["i16", 16], ["i32", 32], ["i64", 64], ["i128", 128],
-	["usize", 16], ["usize", 32], ["usize", 64],
-	["isize", 16], ["isize", 32], ["isize", 64],
+	["u8", 8],
+	["u16", 16],
+	["u32", 32],
+	["u64", 64],
+	["u128", 128],
+	["i8", 8],
+	["i16", 16],
+	["i32", 32],
+	["i64", 64],
+	["i128", 128],
+	["usize", 16],
+	["usize", 32],
+	["usize", 64],
+	["isize", 16],
+	["isize", 32],
+	["isize", 64],
 ];
 
 for (const [kind, bits] of types) {
@@ -59,7 +71,11 @@ for (const [kind, bits] of types) {
 		registry.insert("count", new Integer(0n, type));
 		const signal = new Context(registry).signal("count");
 		signal.increment();
-		expect((signal.get() as Integer).dehydrate()).toEqual({ t: kind, bits, v: "1" });
+		expect((signal.get() as Integer).dehydrate()).toEqual({
+			t: kind,
+			bits,
+			v: "1",
+		});
 		signal.decrement();
 		expect((signal.get() as Integer).toString()).toBe("0");
 		if (type.signed) {
@@ -99,13 +115,17 @@ it("rejects malformed payloads and mismatched types", () => {
 
 it("updates integer signals without losing precision", () => {
 	const registry = new SignalRegistry();
-	registry.insert("count", new Integer(9007199254740993n, integerType("usize", 64)));
+	registry.insert(
+		"count",
+		new Integer(9007199254740993n, integerType("usize", 64)),
+	);
 	const cx = new Context(registry);
 	const signal = cx.signal("count");
 	const value = signal.get() as Integer;
 	signal.set(value.add(new Integer(1n, integerType("usize", 64))));
 	expect(dehydrate(signal)).toEqual({
-		t: "Signal", id: "count",
+		t: "Signal",
+		id: "count",
 		v: { t: "usize", bits: 64, v: "9007199254740994" },
 	});
 });

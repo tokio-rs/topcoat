@@ -35,14 +35,20 @@ export class WriteSignal<T> {
 	}
 
 	increment(): void {
-		this.inner.set((prev) =>
-			(prev instanceof Integer ? prev.increment() : (prev as F64).add(new F64(1))) as T,
+		this.inner.set(
+			(prev) =>
+				(prev instanceof Integer
+					? prev.increment()
+					: (prev as F64).add(new F64(1))) as T,
 		);
 	}
 
 	decrement(): void {
-		this.inner.set((prev) =>
-			(prev instanceof Integer ? prev.decrement() : (prev as F64).sub(new F64(1))) as T,
+		this.inner.set(
+			(prev) =>
+				(prev instanceof Integer
+					? prev.decrement()
+					: (prev as F64).sub(new F64(1))) as T,
 		);
 	}
 
