@@ -12,14 +12,15 @@ impl Expr {
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         let mut base = TokenStream::new();
+        js.push('(');
         Self::dispatch(&index.expr, &mut base, js, names)?;
 
-        js.push('[');
+        js.push_str(").index(");
         let mut subscript = TokenStream::new();
         Self::dispatch(&index.index, &mut subscript, js, names)?;
-        js.push(']');
+        js.push_str(").deref()");
 
-        quote! { (#base)[#subscript] }.to_tokens(rust);
+        quote! { (*(#base).index(#subscript)) }.to_tokens(rust);
         Ok(())
     }
 }
