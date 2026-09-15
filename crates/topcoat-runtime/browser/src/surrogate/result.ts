@@ -1,3 +1,5 @@
+import { dehydrate } from "../expression/dehydrate";
+import type { DehydratedSurrogate } from "../expression/serialized";
 import { Bool } from "./bool";
 import { Option } from "./option";
 import { Panic } from "./panic";
@@ -77,11 +79,14 @@ export class Result<T, E> {
 			: Result.from_err<T, E>(value as E);
 	}
 
-	dehydrate(): { t: "Result" } & ({ ok: unknown } | { err: unknown }) {
-		return {
-			t: "Result",
-			...(this.kind === "ok" ? { ok: this.value } : { err: this.value }),
-		};
+	dehydrate(): { t: "Result" } & (
+		| { ok: DehydratedSurrogate }
+		| { err: DehydratedSurrogate }
+	) {
+		const value = dehydrate(this.value);
+		return this.kind === "ok"
+			? { t: "Result", ok: value }
+			: { t: "Result", err: value };
 	}
 }
 

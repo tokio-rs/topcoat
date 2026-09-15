@@ -1,7 +1,8 @@
-import { Context } from "./context";
-import { scan } from "./scan";
-import { PageUnit } from "./scope";
-import { SignalRegistry } from "./signal";
+import { hydrate as hydrateDom } from "./dom/hydrate";
+import { Context } from "./expression/context";
+import { PageUnit } from "./render/page";
+import type { Scope } from "./scope";
+import { type SignalId, SignalRegistry } from "./signal-registry";
 
 export class Runtime {
 	readonly registry = new SignalRegistry();
@@ -10,7 +11,22 @@ export class Runtime {
 	readonly page: PageUnit = new PageUnit(this);
 
 	start(root: ParentNode): void {
-		scan(root, null, null, this.page.contentScope);
+		this.hydrate(root, null, null, this.page.contentScope);
 		this.page.startWatching();
+	}
+
+	reportError(error: unknown): void {
+		console.error("[topcoat]", error);
+	}
+
+	/** Attaches the markup's resources to its owning scope. */
+	hydrate(
+		root: Node,
+		from: Node | null,
+		to: Node | null,
+		scope: Scope,
+		adoptable: Set<SignalId> = new Set(),
+	): void {
+		hydrateDom(root, from, to, scope, adoptable);
 	}
 }

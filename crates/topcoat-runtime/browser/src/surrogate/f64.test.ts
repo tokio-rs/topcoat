@@ -41,9 +41,11 @@ it("keeps the sign of negative zero", () => {
 // short strings are exactly as close to the value, ECMAScript picks the even
 // final digit and Rust the one further from zero.
 it("breaks an exact digit tie away from zero", () => {
-	expect(text(1690060720831323.25)).toBe("1690060720831323.3");
-	expect(text(-1006567402717677.25)).toBe("-1006567402717677.3");
-	expect(text(233115890514796.125)).toBe("233115890514796.13");
+	// Build the exact values from integers and binary fractions, whose
+	// shortest decimal spelling differs from their full decimal expansion.
+	expect(text(1690060720831323 + 0.25)).toBe("1690060720831323.3");
+	expect(text(-(1006567402717677 + 0.25))).toBe("-1006567402717677.3");
+	expect(text(233115890514796 + 0.125)).toBe("233115890514796.13");
 });
 
 it("leaves values with no tie alone", () => {

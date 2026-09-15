@@ -2,16 +2,13 @@
 import { tick } from "@maverick-js/signals";
 import { afterEach, beforeEach, expect, it } from "vitest";
 
-import { Runtime } from "./runtime";
-import {
-	PAGE_ROUTE_PREFIX,
-	type Scope,
-	SHARD_ROUTE_PREFIX,
-	ShardUnit,
-	Unit,
-} from "./scope";
-import type { SignalId } from "./signal";
-import { F64 } from "./surrogate";
+import { Runtime } from "../runtime";
+import type { Scope } from "../scope";
+import type { SignalId } from "../signal-registry";
+import { F64 } from "../surrogate";
+import { PAGE_ROUTE_PREFIX } from "./page";
+import { SHARD_ROUTE_PREFIX, ShardUnit } from "./shard";
+import { RenderUnit } from "./unit";
 
 const originalFetch = globalThis.fetch;
 const originalLocation = globalThis.location;
@@ -48,22 +45,30 @@ async function settle(): Promise<void> {
 }
 
 /** Reaches the re-run a unit performs when an input changes. */
-function refetch(unit: Unit): () => Promise<void> {
-	return (
-		unit as unknown as { fetchAndReplace(): Promise<void> }
-	).fetchAndReplace.bind(unit);
+function refetch(unit: RenderUnit): () => Promise<void> {
+	return () => unit.refresh();
 }
 
 /**
  * Mounts a shard with `content` between marker comments in the body and
- * scans it, the way the runtime does on load.
+ * hydrates its content and starts watching its inputs.
  */
 function mountShard(content: string) {
 	document.body.innerHTML = `<p>outside</p><!--::topcoat::shard::start("1", "0", [])-->${content}<!--::topcoat::shard::end("0")-->`;
 	const runtime = new Runtime();
-	runtime.start(document);
-	const [shard] = runtime.page.contentScope.children;
-	if (!(shard instanceof ShardUnit)) throw new Error("No shard was scanned");
+	const start = document.body.childNodes[1] as Comment;
+	const end = document.body.lastChild as Comment;
+	const shard = new ShardUnit(
+		runtime.page.contentScope,
+		runtime,
+		"1",
+		"0",
+		[],
+		start,
+	);
+	shard.attachEnd(end);
+	runtime.hydrate(document.body, start, end, shard.contentScope);
+	shard.startWatching();
 	return { runtime, shard, fetchAndReplace: refetch(shard) };
 }
 
@@ -208,7 +213,7 @@ it("a page re-run morphs the body, keeping a focused input", async () => {
  * each replacement declares the given signals and dependencies into the new
  * content scope, the way a scan of real markup would.
  */
-class ScriptedUnit extends Unit {
+class ScriptedUnit extends RenderUnit {
 	protected readonly label = "Scripted";
 	readonly requests: number[] = [];
 	/** The content each successive replacement scans. */

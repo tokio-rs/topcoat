@@ -1,4 +1,4 @@
-import { Context } from "../../src/context";
+import { Context } from "../../src/expression/context";
 import { Future } from "../../src/surrogate/future";
 import { Panic } from "../../src/surrogate/panic";
 

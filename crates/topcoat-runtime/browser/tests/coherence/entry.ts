@@ -1,5 +1,5 @@
-import type { Context } from "../../src/context";
-import { SignalRegistry } from "../../src/signal";
+import type { Context } from "../../src/expression/context";
+import { SignalRegistry } from "../../src/signal-registry";
 import { Panic } from "../../src/surrogate/panic";
 import { FixtureContext } from "./fixture";
 import { observe } from "./observe";

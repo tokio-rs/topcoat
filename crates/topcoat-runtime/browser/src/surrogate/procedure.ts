@@ -1,4 +1,5 @@
-import type { Context } from "../context";
+import type { Context } from "../expression/context";
+import { dehydrate } from "../expression/dehydrate";
 import { Future } from "./future";
 
 export class Procedure<A extends unknown[] = unknown[], R = unknown> {
@@ -14,13 +15,7 @@ export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(
-						args.length === 0
-							? null
-							: args.map((arg) =>
-									(arg as { dehydrate: () => unknown }).dehydrate(),
-								),
-					),
+					body: JSON.stringify(args.length === 0 ? null : args.map(dehydrate)),
 				},
 			);
 			if (!response.ok) {

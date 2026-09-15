@@ -1,10 +1,12 @@
 import type { WriteSignal as MaverickWriteSignal } from "@maverick-js/signals";
 
-import type { SignalId } from "../signal";
-import { Bool } from "./bool";
+import { dehydrate } from "../expression/dehydrate";
+import type { DehydratedSurrogate } from "../expression/serialized";
+import type { SignalId } from "../signal-registry";
+import type { Bool } from "./bool";
 import { F64 } from "./f64";
 import { Ref } from "./ref";
-import { String, type Str } from "./string";
+import { String as RuntimeString, type Str } from "./string";
 
 export class WriteSignal<T> {
 	constructor(
@@ -41,7 +43,7 @@ export class WriteSignal<T> {
 	}
 
 	push_str(s: Str): void {
-		this.inner.set((prev) => new String(`${prev}${s}`) as T);
+		this.inner.set((prev) => new RuntimeString(`${prev}${s}`) as T);
 	}
 
 	/**
@@ -49,8 +51,7 @@ export class WriteSignal<T> {
 	 * id next to its current value, so the server can rebuild the signal
 	 * without holding the value itself.
 	 */
-	dehydrate(): { t: "Signal"; id: SignalId; v: unknown } {
-		const value = this.inner() as { dehydrate: () => unknown };
-		return { t: "Signal", id: this.id, v: value.dehydrate() };
+	dehydrate(): { t: "Signal"; id: SignalId; v: DehydratedSurrogate } {
+		return { t: "Signal", id: this.id, v: dehydrate(this.inner()) };
 	}
 }

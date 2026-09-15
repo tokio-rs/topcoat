@@ -1,4 +1,4 @@
-import type { AttributeValueViewParts, NodeViewParts } from "../view";
+import type { AttributeValueViewParts, NodeViewParts } from "../dom/view";
 import { Bool } from "./bool";
 
 const BITS = new DataView(new ArrayBuffer(8));

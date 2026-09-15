@@ -1,9 +1,8 @@
-import { Context } from "./context";
-import { type SignalId, SignalRegistry } from "./signal";
-import type { DehydratedSurrogate } from "./surrogate";
+import type { DehydratedSurrogate } from "../expression/serialized";
+import type { SignalId } from "../signal-registry";
 
 export type CommentMarker =
-	| { kind: "signal"; id: SignalId; value: unknown }
+	| { kind: "signal"; id: SignalId; value: DehydratedSurrogate }
 	| {
 			/**
 			 * The content depends on a signal: the server read it while
@@ -54,11 +53,10 @@ export function parseComment(node: Comment): CommentMarker | null {
 		if (payload.t !== "signal" || typeof payload.id !== "string") {
 			throw new Error("Invalid signal marker");
 		}
-		const value = new Context(new SignalRegistry()).hydrate(payload.v);
 		return {
 			kind: "signal",
 			id: payload.id,
-			value,
+			value: payload.v,
 		};
 	}
 

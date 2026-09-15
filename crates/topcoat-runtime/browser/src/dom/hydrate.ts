@@ -1,14 +1,20 @@
+import { ShardUnit } from "../render/shard";
+import type { Scope } from "../scope";
+import type { SignalId } from "../signal-registry";
 import { setupBinding } from "./binding";
-import { type CommentMarker, parseComment } from "./comment";
 import { setupEventHandler } from "./event";
-import { type Scope, ShardUnit } from "./scope";
-import type { SignalId } from "./signal";
+import { type CommentMarker, parseComment } from "./markers";
 import { setupTextExpression } from "./text";
 
 type PendingTextExpression = {
 	start: Comment;
 	js: string;
 	scope: Scope;
+};
+
+type Frame = {
+	scope: Scope;
+	shard: ShardUnit | null;
 };
 
 /**
@@ -25,7 +31,7 @@ type PendingTextExpression = {
  *   moves it into the scanning scope, removing it from the set; whatever is
  *   left in the set afterwards was not declared again.
  */
-export function scan(
+export function hydrate(
 	root: Node,
 	from: Node | null,
 	to: Node | null,
@@ -38,13 +44,13 @@ export function scan(
 	);
 	if (from) walker.currentNode = from;
 
-	const stack: Scope[] = [initialScope];
+	const stack: Frame[] = [{ scope: initialScope, shard: null }];
 	const textExpressions: PendingTextExpression[] = [];
 
 	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
 		if (to && node === to) break;
 
-		const current = stack[stack.length - 1];
+		const current = stack[stack.length - 1]?.scope;
 		if (current === undefined) throw new Error("Stack was empty");
 
 		if (node.nodeType === Node.ELEMENT_NODE) {
@@ -70,13 +76,13 @@ function processElement(el: Element, scope: Scope): void {
 function processMarker(
 	marker: CommentMarker,
 	node: Comment,
-	stack: Scope[],
+	stack: Frame[],
 	textExpressions: PendingTextExpression[],
 	adoptable: Set<SignalId>,
 ): void {
 	// Every scope on the stack is the content scope of a unit, so the top is
 	// the innermost unit enclosing the marker.
-	const current = stack[stack.length - 1];
+	const current = stack[stack.length - 1]?.scope;
 	if (current === undefined) throw new Error("Stack was empty");
 
 	switch (marker.kind) {
@@ -84,9 +90,9 @@ function processMarker(
 			// An existing signal wins over the declaration's value, and the
 			// scanning scope takes it over when it comes from replaced
 			// content; a signal another live scope owns stays theirs.
-			const { registry } = current.runtime;
+			const { context, registry } = current.runtime;
 			if (
-				registry.insert(marker.id, marker.value) ||
+				registry.insert(marker.id, context.hydrate(marker.value)) ||
 				adoptable.delete(marker.id)
 			) {
 				current.signalIds.add(marker.id);
@@ -126,14 +132,13 @@ function processMarker(
 				marker.exprs,
 				node,
 			);
-			stack.push(shard.contentScope);
+			stack.push({ scope: shard.contentScope, shard });
 			break;
 		}
 
 		case "shard-end": {
-			const top = stack.pop();
-			const shard = top?.parent;
-			if (!(shard instanceof ShardUnit)) {
+			const shard = stack[stack.length - 1]?.shard;
+			if (!shard) {
 				throw new Error(
 					`Unbalanced shard: end marker ${marker.identity} has no matching start`,
 				);
@@ -144,6 +149,7 @@ function processMarker(
 				);
 			}
 			shard.attachEnd(node);
+			stack.pop();
 			shard.startWatching();
 			break;
 		}

@@ -1,4 +1,4 @@
-import type { AttributeValueViewParts, NodeViewParts } from "../view";
+import type { AttributeValueViewParts, NodeViewParts } from "../dom/view";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
 

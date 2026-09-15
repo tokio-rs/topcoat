@@ -1,4 +1,4 @@
-import type { AttributeValueViewParts, NodeViewParts } from "../view";
+import type { AttributeValueViewParts, NodeViewParts } from "../dom/view";
 import { Option } from "./option";
 
 export class Bool implements AttributeValueViewParts, NodeViewParts {

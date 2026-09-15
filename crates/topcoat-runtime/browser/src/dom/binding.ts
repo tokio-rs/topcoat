@@ -1,7 +1,7 @@
 import { effect } from "@maverick-js/signals";
 
-import type { Context } from "./context";
-import type { Scope } from "./scope";
+import { compile } from "../expression/compile";
+import type { Scope } from "../scope";
 import { isAttributeValueViewParts } from "./view";
 
 export const BIND_PREFIX = "data-topcoat-bind:";
@@ -18,13 +18,11 @@ const PROPERTY_NAMES = new Set([
 	"indeterminate",
 ]);
 
-type Compute = (ctx: Context) => unknown;
-
 export function setupBinding(el: Element, attr: Attr, scope: Scope): void {
 	if (!attr.name.startsWith(BIND_PREFIX)) return;
 
 	const name = attr.name.substring(BIND_PREFIX.length);
-	const compute = new Function("cx", `return ${attr.value};`) as Compute;
+	const compute = compile(attr.value, `binding :${name}`);
 
 	const { context } = scope.runtime;
 	scope.run(() => {

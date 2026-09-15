@@ -1,6 +1,7 @@
 {
 	"name": "@topcoat-rs/runtime",
 	"version": "0.0.1",
+	"license": "MIT",
 	"type": "module",
 	"scripts": {
 		"build": "tsup && tsup --config tsup.coherence.config.ts && tsc",
