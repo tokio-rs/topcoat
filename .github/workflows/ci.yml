@@ -138,10 +138,9 @@ jobs:
           cache: yarn
           cache-dependency-path: crates/topcoat-runtime/browser/yarn.lock
       - run: yarn install --frozen-lockfile
-      # Rebuild the bundle and fail if it drifts from the committed
-      # `dist/index.js` that the runtime crate serves via `asset!`.
+      # Rebuild the browser and coherence bundles and reject stale artifacts.
       - run: yarn build
-      - run: git diff --exit-code -- dist/index.js
+      - run: git diff --exit-code -- dist/index.js dist/coherence.js
       - run: yarn test
 
   udeps:

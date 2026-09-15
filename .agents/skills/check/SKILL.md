@@ -29,7 +29,7 @@ cargo +nightly udeps --workspace --all-targets --all-features --locked
 
 ## Runtime browser bundle
 
-Only when you touched `crates/topcoat-runtime/browser`. The crate serves a prebuilt `dist/index.js` via `asset!`, and CI fails if it drifts from source (`git diff --exit-code -- dist/index.js`). Rebuild it and stage the regenerated `dist/index.js` alongside your source change:
+Only when you touched `crates/topcoat-runtime/browser`. The runtime serves a prebuilt `dist/index.js` via `asset!`, and the coherence crate embeds `dist/coherence.js`. CI rejects drift in either bundle (`git diff --exit-code -- dist/index.js dist/coherence.js`). Rebuild them and stage any regenerated bundles alongside your source change:
 
 ```
 cd crates/topcoat-runtime/browser

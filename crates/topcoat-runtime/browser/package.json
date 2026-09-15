@@ -3,7 +3,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"build": "tsup && tsc",
+		"build": "tsup && tsup --config tsup.coherence.config.ts && tsc",
 		"test": "vitest run"
 	},
 	"dependencies": {

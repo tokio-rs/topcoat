@@ -1,0 +1,23 @@
+[[mismatch]]
+id = "captured_nan"
+reason = "A captured nonfinite float serializes as null and hydrates as unit."
+rust = { kind = "Return", value = { type = "F64", value = "nan" } }
+javascript = { kind = "Return", value = { type = "Unit" } }
+
+[[mismatch]]
+id = "captured_infinity"
+reason = "A captured nonfinite float serializes as null and hydrates as unit."
+rust = { kind = "Return", value = { type = "F64", value = "7ff0000000000000" } }
+javascript = { kind = "Return", value = { type = "Unit" } }
+
+[[mismatch]]
+id = "some_unit"
+reason = "The JavaScript option uses undefined for both None and a unit payload."
+rust = { kind = "Return", value = { type = "Bool", value = true } }
+javascript = { kind = "Return", value = { type = "Bool", value = false } }
+
+[[mismatch]]
+id = "return_inside_if"
+reason = "The JavaScript return exits the conditional's generated function instead of the outer closure."
+rust = { kind = "Return", value = { type = "F64", value = "3ff0000000000000" } }
+javascript = { kind = "Return", value = { type = "F64", value = "4000000000000000" } }

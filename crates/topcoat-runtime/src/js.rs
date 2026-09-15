@@ -43,6 +43,27 @@ impl Js {
         JsBuilder { parts: Vec::new() }
     }
 
+    /// Returns executable JavaScript, including serialized captured values.
+    ///
+    /// The source expects the runtime context to be available as `cx`. It is
+    /// not escaped for embedding in HTML.
+    #[must_use]
+    pub fn to_source(&self) -> String {
+        let mut source = String::new();
+        for part in &self.parts {
+            match part {
+                JsPart::Source(js) => source.push_str(js),
+                JsPart::Raw(js) => source.push_str(js),
+                JsPart::Surrogate(json) => {
+                    source.push_str("cx.hydrate(");
+                    source.push_str(json);
+                    source.push(')');
+                }
+            }
+        }
+        source
+    }
+
     /// Writes the source through `parts`, sealed for the writer's current
     /// context: a marker comment's body or a double-quoted attribute value.
     pub(crate) fn write(&self, parts: &mut PartsWriter<'_>) {
@@ -120,5 +141,24 @@ impl JsBuilder {
     #[must_use]
     pub fn build(self) -> Js {
         Js { parts: self.parts }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn executable_source_preserves_javascript_and_capture_escaping() {
+        let js = Js::builder()
+            .raw("(() => { const value = ")
+            .surrogate(&"\"<>&\n")
+            .source("; return value; })()")
+            .build();
+
+        assert_eq!(
+            js.to_source(),
+            r#"(() => { const value = cx.hydrate("\"<>&\n"); return value; })()"#,
+        );
     }
 }

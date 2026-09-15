@@ -71,7 +71,12 @@ impl Engine {
         let scope = std::pin::pin!(v8::TryCatch::new(scope));
         let scope = &mut scope.init();
 
-        let source = v8::String::new(scope, source).context("JavaScript source is too large")?;
+        Self::install_text_encoder(scope)?;
+        let source = format!(
+            "globalThis.TextEncoder = class {{ encode(input = '') {{ \
+             return __coherence_encode_utf8(String(input)); }} }};\n{source}"
+        );
+        let source = v8::String::new(scope, &source).context("JavaScript source is too large")?;
         let result = v8::Script::compile(scope, source, None).and_then(|script| script.run(scope));
         let Some(result) = result else {
             let exception = scope
@@ -83,6 +88,38 @@ impl Engine {
         let result = v8::Local::<v8::String>::try_from(result)
             .map_err(|_| anyhow::anyhow!("JavaScript script must return a string"))?;
         Ok(result.to_rust_string_lossy(scope))
+    }
+
+    fn install_text_encoder(scope: &mut v8::PinScope<'_, '_>) -> Result<()> {
+        // TextEncoder is a host API, not part of V8. Only its encode method is
+        // needed by the runtime. String conversion replaces lone surrogates,
+        // matching the Web API's conversion to Unicode scalar values.
+        let encode = v8::Function::new(
+            scope,
+            |scope: &mut v8::PinScope,
+             args: v8::FunctionCallbackArguments,
+             mut result: v8::ReturnValue| {
+                let Some(text) = args.get(0).to_string(scope) else {
+                    return;
+                };
+                let bytes = text.to_rust_string_lossy(scope).into_bytes();
+                let length = bytes.len();
+                let store = v8::ArrayBuffer::new_backing_store_from_vec(bytes).make_shared();
+                let buffer = v8::ArrayBuffer::with_backing_store(scope, &store);
+                if let Some(array) = v8::Uint8Array::new(scope, buffer, 0, length) {
+                    result.set(array.into());
+                }
+            },
+        )
+        .context("failed to create UTF-8 host function")?;
+        let name = v8::String::new(scope, "__coherence_encode_utf8")
+            .context("failed to name UTF-8 host function")?;
+        let global = scope.get_current_context().global(scope);
+        anyhow::ensure!(
+            global.set(scope, name.into(), encode.into()) == Some(true),
+            "failed to install UTF-8 host function"
+        );
+        Ok(())
     }
 }
 
@@ -99,10 +136,19 @@ mod tests {
     #[test]
     fn reports_syntax_errors_and_exceptions() {
         let mut engine = Engine::new(Duration::from_secs(5));
-        assert!(engine.evaluate("const =").unwrap_err().to_string().contains("SyntaxError"));
         assert!(
-            engine.evaluate("throw new TypeError('broken')")
-                .unwrap_err().to_string().contains("TypeError: broken")
+            engine
+                .evaluate("const =")
+                .unwrap_err()
+                .to_string()
+                .contains("SyntaxError")
+        );
+        assert!(
+            engine
+                .evaluate("throw new TypeError('broken')")
+                .unwrap_err()
+                .to_string()
+                .contains("TypeError: broken")
         );
         assert!(engine.evaluate("42").is_err());
     }
@@ -115,9 +161,26 @@ mod tests {
     }
 
     #[test]
+    fn text_encoder_handles_unicode_and_lone_surrogates() {
+        let mut engine = Engine::new(Duration::from_secs(5));
+        assert_eq!(
+            engine
+                .evaluate(r"String(new TextEncoder().encode('\u{1f980}\ud800'))")
+                .unwrap(),
+            "240,159,166,128,239,191,189",
+        );
+    }
+
+    #[test]
     fn terminates_infinite_loops_and_recovers() {
         let mut engine = Engine::new(Duration::from_millis(100));
-        assert!(engine.evaluate("for (;;) {}").unwrap_err().to_string().contains("exceeded"));
+        assert!(
+            engine
+                .evaluate("for (;;) {}")
+                .unwrap_err()
+                .to_string()
+                .contains("exceeded")
+        );
         assert_eq!(engine.evaluate("'recovered'").unwrap(), "recovered");
     }
 }
