@@ -13,6 +13,7 @@ use crate::{
     components::{
         badge::{BadgeVariant, badge},
         button::{ButtonSize, ButtonVariant, button, button_variants},
+        card::{card, card_content},
         input::input,
         select::select,
         table::{table, table_body, table_cell, table_head, table_header, table_row},
@@ -34,44 +35,48 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                 "+ New invoice"
             </a>
         </div>
-        <section>
-            <div class="mb-6 flex flex-wrap gap-3">
-                input(
-                    attrs: attributes! {
-                        type="search"
-                        aria-label="Search invoices"
-                        placeholder="Search customer or invoice..."
-                        class="max-w-sm"
-                        :value=$(query.get())
-                        @input=$(|e: Event| query.set(e.target.value))
-                    }
-                )
-                select(
-                    attrs: attributes! {
-                        class="w-40 max-w-full shrink-0"
-                        aria-label="Invoice status"
-                        :value=$(status.get())
-                        @change=$(|e: Event| status.set(e.target.value))
-                    },
-                    <option>"All"</option>
-                    <option>"Outstanding"</option>
-                    <option>"Overdue"</option>
-                    <option>"Paid"</option>
-                )
-                button(
-                    variant: ButtonVariant::Ghost,
-                    attrs: attributes! {
-                        type="button"
-                        @click=$(|_e: Event| {
-                            query.set("".to_owned());
-                            status.set("All".to_owned());
-                        })
-                    },
-                    "Reset"
-                )
-            </div>
-            results(query: $(query.get()), status: $(status.get()))
-        </section>
+        card(
+            card_content(
+                <section>
+                    <div class="mb-6 flex flex-wrap gap-3">
+                        input(
+                            attrs: attributes! {
+                                type="search"
+                                aria-label="Search invoices"
+                                placeholder="Search customer or invoice..."
+                                class="max-w-sm"
+                                :value=$(query.get())
+                                @input=$(|e: Event| query.set(e.target.value))
+                            }
+                        )
+                        select(
+                            attrs: attributes! {
+                                class="w-40 max-w-full shrink-0"
+                                aria-label="Invoice status"
+                                :value=$(status.get())
+                                @change=$(|e: Event| status.set(e.target.value))
+                            },
+                            <option>"All"</option>
+                            <option>"Outstanding"</option>
+                            <option>"Overdue"</option>
+                            <option>"Paid"</option>
+                        )
+                        button(
+                            variant: ButtonVariant::Ghost,
+                            attrs: attributes! {
+                                type="button"
+                                @click=$(|_e: Event| {
+                                    query.set("".to_owned());
+                                    status.set("All".to_owned());
+                                })
+                            },
+                            "Reset"
+                        )
+                    </div>
+                    results(query: $(query.get()), status: $(status.get()))
+                </section>
+            )
+        )
     })
 }
 
@@ -112,10 +117,15 @@ pub async fn invoice_table(invoices: &[Invoice]) -> Result<impl View> {
                 #[key(invoice.id.clone())]
                 for invoice in invoices {
                     table_row(
-                        attrs: attributes! { id=(format!("invoice-{}", invoice.id)) },
+                        attrs: attributes! {
+                            id=(format!("invoice-{}", invoice.id))
+                            class="relative focus-within:bg-foreground/5"
+                        },
                         table_cell(
+                            // Stretch the link over the row, preserving keyboard
+                            // navigation and the browser's open-in-new-tab actions.
                             <a
-                                class="font-medium text-foreground hover:underline"
+                                class="font-medium text-foreground after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
                                 href=(href!(detail::page, detail::InvoiceId(&invoice.id)))
                             >
                                 (number(&invoice.id))

@@ -10,6 +10,7 @@ use topcoat::{
 use crate::{
     components::{
         button::{ButtonSize, ButtonVariant, button},
+        card::{card, card_content},
         input::input,
         label::label,
     },
@@ -130,162 +131,172 @@ pub async fn line_items(
         .collect::<Vec<_>>()
         .join(",");
     Ok(view! {
-        <section class="panel">
-            <div class="mb-6 flex items-center justify-between">
-                <h2 class="text-sm font-semibold">"Line items"</h2>
-                <span class="text-xs text-muted-foreground">
-                    (rows.len())
-                    " / 20 lines"
-                </span>
-            </div>
-            <input type="hidden" name="line-keys" value=(key_list)>
-            <div class="space-y-4">
-                #[key(row.key)]
-                for row in &rows {
-                    let key = row.key;
-                    let description = &row.description;
-                    let quantity = &row.quantity;
-                    let price = &row.price;
-                    <div id=(format!("line-{key}")) class="line-row">
-                        <div class="space-y-2">
-                            label(
-                                attrs: attributes! { for=(format!("description-{key}")) },
-                                "Description"
-                            )
-                            input(
-                                attrs: attributes! {
-                                    id=(format!("description-{key}"))
-                                    name=(format!("description-{key}"))
-                                    placeholder="Service or product"
-                                    required=""
-                                    maxlength="300"
-                                    :value=$(description.get())
-                                    @input=$(|e: Event| description.set(e.target.value))
-                                }
-                            )
-                        </div>
-                        <div class="space-y-2">
-                            label(
-                                attrs: attributes! { for=(format!("quantity-{key}")) },
-                                "Qty"
-                            )
-                            input(
-                                attrs: attributes! {
-                                    id=(format!("quantity-{key}"))
-                                    name=(format!("quantity-{key}"))
-                                    type="number"
-                                    min="1"
-                                    max="10000"
-                                    step="1"
-                                    required=""
-                                    :value=$(quantity.get())
-                                    @input=$(|e: Event| quantity.set(e.target.value))
-                                }
-                            )
-                        </div>
-                        <div class="space-y-2">
-                            label(
-                                attrs: attributes! { for=(format!("price-{key}")) },
-                                "Unit price ($)"
-                            )
-                            input(
-                                attrs: attributes! {
-                                    id=(format!("price-{key}"))
-                                    name=(format!("price-{key}"))
-                                    type="number"
-                                    min="0"
-                                    max="1000000"
-                                    step="0.01"
-                                    required=""
-                                    :value=$(price.get())
-                                    @input=$(|e: Event| price.set(e.target.value))
-                                }
-                            )
-                        </div>
-                        <div class="pb-2 text-right text-sm font-medium tabular-nums">
-                            (row
-                                .total
-                                .as_ref()
-                                .map_or_else(
-                                    |_| "Check values".to_owned(),
-                                    |total| money(*total),
-                                ))
-                        </div>
+        card(
+            card_content(
+                <section>
+                    <div class="mb-6 flex items-center justify-between">
+                        <h2 class="text-sm font-semibold">"Line items"</h2>
+                        <span class="text-xs text-muted-foreground">
+                            (rows.len())
+                            " / 20 lines"
+                        </span>
+                    </div>
+                    <input type="hidden" name="line-keys" value=(key_list)>
+                    <div class="space-y-4">
+                        #[key(row.key)]
+                        for row in &rows {
+                            let key = row.key;
+                            let description = &row.description;
+                            let quantity = &row.quantity;
+                            let price = &row.price;
+                            <div id=(format!("line-{key}")) class="line-row">
+                                <div class="space-y-2">
+                                    label(
+                                        attrs: attributes! { for=(format!("description-{key}")) },
+                                        "Description"
+                                    )
+                                    input(
+                                        attrs: attributes! {
+                                            id=(format!("description-{key}"))
+                                            name=(format!("description-{key}"))
+                                            placeholder="Service or product"
+                                            required=""
+                                            maxlength="300"
+                                            :value=$(description.get())
+                                            @input=$(|e: Event| description.set(e.target.value))
+                                        }
+                                    )
+                                </div>
+                                <div class="space-y-2">
+                                    label(
+                                        attrs: attributes! { for=(format!("quantity-{key}")) },
+                                        "Qty"
+                                    )
+                                    input(
+                                        attrs: attributes! {
+                                            id=(format!("quantity-{key}"))
+                                            name=(format!("quantity-{key}"))
+                                            type="number"
+                                            min="1"
+                                            max="10000"
+                                            step="1"
+                                            required=""
+                                            :value=$(quantity.get())
+                                            @input=$(|e: Event| quantity.set(e.target.value))
+                                        }
+                                    )
+                                </div>
+                                <div class="space-y-2">
+                                    label(
+                                        attrs: attributes! { for=(format!("price-{key}")) },
+                                        "Unit price ($)"
+                                    )
+                                    input(
+                                        attrs: attributes! {
+                                            id=(format!("price-{key}"))
+                                            name=(format!("price-{key}"))
+                                            type="number"
+                                            min="0"
+                                            max="1000000"
+                                            step="0.01"
+                                            required=""
+                                            :value=$(price.get())
+                                            @input=$(|e: Event| price.set(e.target.value))
+                                        }
+                                    )
+                                </div>
+                                <div
+                                    class="pb-2 text-right text-sm font-medium tabular-nums"
+                                >
+                                    (row
+                                        .total
+                                        .as_ref()
+                                        .map_or_else(
+                                            |_| "Check values".to_owned(),
+                                            |total| money(*total),
+                                        ))
+                                </div>
+                                button(
+                                    variant: ButtonVariant::Ghost,
+                                    size: ButtonSize::Sm,
+                                    attrs: attributes! {
+                                        type="button"
+                                        aria-label=(format!("Remove line {}", key + 1))
+                                        :disabled=$(if busy.get() {
+                                            true
+                                        } else {
+                                            keys.get().len() <= 1
+                                        })
+                                        @click=$(async move |_e: Event| {
+                                            busy.set(true);
+                                            let updated = change_lines(keys.get(), key, true).await;
+                                            keys.set(updated);
+                                            busy.set(false);
+                                        })
+                                    },
+                                    "Remove"
+                                )
+                            </div>
+                        }
+                    </div>
+                    <div
+                        class="mt-6 flex flex-wrap items-start justify-between gap-8 border-t border-border pt-6"
+                    >
                         button(
-                            variant: ButtonVariant::Ghost,
-                            size: ButtonSize::Sm,
+                            variant: ButtonVariant::Outline,
                             attrs: attributes! {
                                 type="button"
-                                aria-label=(format!("Remove line {}", key + 1))
                                 :disabled=$(if busy.get() {
                                     true
                                 } else {
-                                    keys.get().len() <= 1
+                                    keys.get().len() >= 20
                                 })
                                 @click=$(async move |_e: Event| {
                                     busy.set(true);
-                                    let updated = change_lines(keys.get(), key, true).await;
+                                    let updated = change_lines(
+                                        keys.get(),
+                                        next_key.get(),
+                                        false,
+                                    ).await;
+                                    next_key.increment();
                                     keys.set(updated);
                                     busy.set(false);
                                 })
                             },
-                            "Remove"
+                            "+ Add line"
                         )
+                        <div class="w-full max-w-xs" aria-live="polite">
+                            if let (Some(subtotal), Some(percent)) = (subtotal, percent) {
+                                <dl class="space-y-3 text-sm">
+                                    <div class="flex justify-between">
+                                        <dt>"Subtotal"</dt>
+                                        <dd>(money(subtotal))</dd>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <dt>
+                                            "Tax ("
+                                            (percent)
+                                            "%)"
+                                        </dt>
+                                        <dd>(money(invoice_tax(subtotal, percent)))</dd>
+                                    </div>
+                                    <div
+                                        class="flex justify-between border-t border-border pt-3 text-lg font-semibold"
+                                    >
+                                        <dt>"Total USD"</dt>
+                                        <dd>(money(subtotal + invoice_tax(subtotal, percent)))</dd>
+                                    </div>
+                                </dl>
+                            } else {
+                                <p class="text-sm text-rose-700">
+                                    "Check quantities, prices, and tax to see the total."
+                                </p>
+                            }
+                        </div>
                     </div>
-                }
-            </div>
-            <div
-                class="mt-6 flex flex-wrap items-start justify-between gap-8 border-t border-border pt-6"
-            >
-                button(
-                    variant: ButtonVariant::Outline,
-                    attrs: attributes! {
-                        type="button"
-                        :disabled=$(if busy.get() {
-                            true
-                        } else {
-                            keys.get().len() >= 20
-                        })
-                        @click=$(async move |_e: Event| {
-                            busy.set(true);
-                            let updated = change_lines(keys.get(), next_key.get(), false).await;
-                            next_key.increment();
-                            keys.set(updated);
-                            busy.set(false);
-                        })
-                    },
-                    "+ Add line"
-                )
-                <div class="w-full max-w-xs" aria-live="polite">
-                    if let (Some(subtotal), Some(percent)) = (subtotal, percent) {
-                        <dl class="space-y-3 text-sm">
-                            <div class="flex justify-between">
-                                <dt>"Subtotal"</dt>
-                                <dd>(money(subtotal))</dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt>
-                                    "Tax ("
-                                    (percent)
-                                    "%)"
-                                </dt>
-                                <dd>(money(invoice_tax(subtotal, percent)))</dd>
-                            </div>
-                            <div
-                                class="flex justify-between border-t border-border pt-3 text-lg font-semibold"
-                            >
-                                <dt>"Total USD"</dt>
-                                <dd>(money(subtotal + invoice_tax(subtotal, percent)))</dd>
-                            </div>
-                        </dl>
-                    } else {
-                        <p class="text-sm text-rose-700">
-                            "Check quantities, prices, and tax to see the total."
-                        </p>
-                    }
-                </div>
-            </div>
-        </section>
+                </section>
+            )
+        )
     })
 }
 

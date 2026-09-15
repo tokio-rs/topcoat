@@ -13,6 +13,7 @@ use topcoat::{
 use crate::{
     components::{
         button::{ButtonSize, ButtonVariant, button, button_variants},
+        card::{card, card_content},
         input::input,
         label::label,
         textarea::textarea,
@@ -94,54 +95,61 @@ async fn editor(
             </p>
         }
         <form method="post" action=(href!(create)) class="space-y-6">
-            <section class="panel">
-                <h2 class="text-sm font-semibold">"Invoice details"</h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                    "From Studio Collective to "
-                    $(if customer.get().is_empty() {
-                        "your customer".to_owned()
-                    } else {
-                        customer.get()
-                    })
-                </p>
-                <div class="mt-6 grid gap-5 sm:grid-cols-2">
-                    text_field(
-                        name: "customer",
-                        title: "Customer / company",
-                        kind: "text",
-                        value: &customer,
-                        required: true
-                    )
-                    field(
-                        name: "email",
-                        title: "Billing email",
-                        kind: "email",
-                        initial: value("email", ""),
-                        required: true
-                    )
-                    field(
-                        name: "issued",
-                        title: "Issue date",
-                        kind: "date",
-                        initial: value("issued", &today()),
-                        required: true
-                    )
-                    field(
-                        name: "due",
-                        title: "Due date",
-                        kind: "date",
-                        initial: value("due", &due),
-                        required: true
-                    )
-                    <div class="space-y-2 sm:col-span-2">
-                        label(attrs: attributes! { for="address" }, "Billing address")
-                        textarea(
-                            attrs: attributes! { id="address" name="address" rows="2" maxlength="1000" },
-                            (value("address", ""))
-                        )
-                    </div>
-                </div>
-            </section>
+            card(
+                card_content(
+                    <section>
+                        <h2 class="text-sm font-semibold">"Invoice details"</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                            "From Studio Collective to "
+                            $(if customer.get().is_empty() {
+                                "your customer".to_owned()
+                            } else {
+                                customer.get()
+                            })
+                        </p>
+                        <div class="mt-6 grid gap-5 sm:grid-cols-2">
+                            text_field(
+                                name: "customer",
+                                title: "Customer / company",
+                                kind: "text",
+                                value: &customer,
+                                required: true
+                            )
+                            field(
+                                name: "email",
+                                title: "Billing email",
+                                kind: "email",
+                                initial: value("email", ""),
+                                required: true
+                            )
+                            field(
+                                name: "issued",
+                                title: "Issue date",
+                                kind: "date",
+                                initial: value("issued", &today()),
+                                required: true
+                            )
+                            field(
+                                name: "due",
+                                title: "Due date",
+                                kind: "date",
+                                initial: value("due", &due),
+                                required: true
+                            )
+                            <div class="space-y-2 sm:col-span-2">
+                                label(
+                                    attrs: attributes! { for="address" },
+                                    "Billing address"
+                                )
+                                textarea(
+                                    attrs: attributes! { id="address" name="address" rows="2" maxlength="1000" },
+                                    (value("address", ""))
+                                )
+                            </div>
+                        </div>
+                    </section>
+                )
+            )
             lines::line_items(
                 initial_keys: $(initial_keys),
                 descriptions: $(descriptions),
@@ -150,34 +158,41 @@ async fn editor(
                 tax: $(tax),
                 busy: $(busy)
             )
-            <section class="panel grid gap-6 sm:grid-cols-3">
-                <div class="space-y-2 sm:col-span-2">
-                    label(attrs: attributes! { for="notes" }, "Notes & payment terms")
-                    textarea(
-                        attrs: attributes! { id="notes" name="notes" rows="3" maxlength="2000" },
-                        (value(
-                            "notes",
-                            "Thank you for your business. Payment is due within 30 days.",
-                        ))
-                    )
-                </div>
-                <div class="space-y-2">
-                    label(attrs: attributes! { for="tax" }, "Tax (%)")
-                    input(
-                        attrs: attributes! {
-                            id="tax"
-                            name="tax"
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="1"
-                            required=""
-                            :value=$(tax.get())
-                            @input=$(|e: Event| tax.set(e.target.value))
-                        }
-                    )
-                </div>
-            </section>
+            card(
+                card_content(
+                    <section class="grid gap-6 sm:grid-cols-3">
+                        <div class="space-y-2 sm:col-span-2">
+                            label(
+                                attrs: attributes! { for="notes" },
+                                "Notes & payment terms"
+                            )
+                            textarea(
+                                attrs: attributes! { id="notes" name="notes" rows="3" maxlength="2000" },
+                                (value(
+                                    "notes",
+                                    "Thank you for your business. Payment is due within 30 days.",
+                                ))
+                            )
+                        </div>
+                        <div class="space-y-2">
+                            label(attrs: attributes! { for="tax" }, "Tax (%)")
+                            input(
+                                attrs: attributes! {
+                                    id="tax"
+                                    name="tax"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    required=""
+                                    :value=$(tax.get())
+                                    @input=$(|e: Event| tax.set(e.target.value))
+                                }
+                            )
+                        </div>
+                    </section>
+                )
+            )
             <div class="flex items-center justify-end gap-3">
                 <a
                     href=(href!(super::page))

@@ -9,6 +9,7 @@ use topcoat::{
 use crate::{
     components::{
         button::{ButtonSize, ButtonVariant, button_variants},
+        card::{card, card_content},
         select::select,
     },
     models::{invoices, money},
@@ -62,7 +63,7 @@ pub async fn overview(cx: &Cx) -> Result<impl View> {
                 <option value="month">"Issued in the last 30 days"</option>
             )
         </div>
-        <div class="metrics">
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             metric(
                 title: "Total invoiced",
                 value: money(billed),
@@ -84,56 +85,66 @@ pub async fn overview(cx: &Cx) -> Result<impl View> {
                 note: "Past their due date".to_owned()
             )
         </div>
-        <div class="mt-10 grid gap-8 lg:grid-cols-3">
-            <section class="min-w-0 lg:col-span-2">
-                <div class="mb-6 flex items-center justify-between">
-                    <h2 class="text-sm font-semibold">"Recent invoices"</h2>
-                    <a
-                        class="text-xs text-muted-foreground hover:text-foreground hover:underline"
-                        href=(href!(super::invoices::page))
-                    >
-                        "View all invoices"
-                    </a>
-                </div>
-                super::invoices::invoice_table(
-                    invoices: &invoices[..invoices.len().min(5)]
+        <div class="mt-8 grid items-start gap-6 lg:grid-cols-3">
+            card(
+                attrs: attributes! { class="min-w-0 lg:col-span-2" },
+                card_content(
+                    <section>
+                        <div class="mb-6 flex items-center justify-between">
+                            <h2 class="text-sm font-semibold">"Recent invoices"</h2>
+                            <a
+                                class="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                                href=(href!(super::invoices::page))
+                            >
+                                "View all invoices"
+                            </a>
+                        </div>
+                        super::invoices::invoice_table(
+                            invoices: &invoices[..invoices.len().min(5)]
+                        )
+                    </section>
                 )
-            </section>
-            <section
-                class="border-t border-border pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8"
-            >
-                <h2 class="text-sm font-semibold">"Collection progress"</h2>
-                <p class="mt-6 text-4xl font-semibold tracking-tight tabular-nums">
-                    (collection)
-                    "%"
-                </p>
-                <p class="mt-2 text-sm text-muted-foreground">
-                    "of invoiced value has been paid"
-                </p>
-                <div
-                    class="my-5 h-1.5 overflow-hidden rounded-full bg-zinc-100"
-                    role="progressbar"
-                    aria-label="Invoice collection"
-                    aria-valuenow=(collection)
-                    aria-valuemin="0"
-                    aria-valuemax="100"
-                >
-                    <div
-                        class="h-full rounded-full bg-primary"
-                        style=(format!("width: {collection}%"))
-                    ></div>
-                </div>
-                <dl class="space-y-4 text-sm">
-                    <div class="flex justify-between">
-                        <dt>"Collected"</dt>
-                        <dd class="font-medium">(money(paid))</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt>"Still to collect"</dt>
-                        <dd class="font-medium">(money(billed - paid))</dd>
-                    </div>
-                </dl>
-            </section>
+            )
+            card(
+                attrs: attributes! { class="min-w-0" },
+                card_content(
+                    <section>
+                        <h2 class="text-sm font-semibold">"Collection progress"</h2>
+                        <p
+                            class="mt-6 text-4xl font-semibold tracking-tight tabular-nums"
+                        >
+                            (collection)
+                            "%"
+                        </p>
+                        <p class="mt-2 text-sm text-muted-foreground">
+                            "of invoiced value has been paid"
+                        </p>
+                        <div
+                            class="my-5 h-1.5 overflow-hidden rounded-full bg-zinc-100"
+                            role="progressbar"
+                            aria-label="Invoice collection"
+                            aria-valuenow=(collection)
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        >
+                            <div
+                                class="h-full rounded-full bg-primary"
+                                style=(format!("width: {collection}%"))
+                            ></div>
+                        </div>
+                        <dl class="space-y-4 text-sm">
+                            <div class="flex justify-between">
+                                <dt>"Collected"</dt>
+                                <dd class="font-medium">(money(paid))</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt>"Still to collect"</dt>
+                                <dd class="font-medium">(money(billed - paid))</dd>
+                            </div>
+                        </dl>
+                    </section>
+                )
+            )
         </div>
     })
 }
@@ -141,12 +152,14 @@ pub async fn overview(cx: &Cx) -> Result<impl View> {
 #[component]
 async fn metric(title: &'static str, value: String, note: String) -> Result<impl View> {
     Ok(view! {
-        <div class="metric">
-            <p class="text-xs font-medium text-muted-foreground">(title)</p>
-            <p class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
-                (value)
-            </p>
-            <p class="mt-2 text-xs text-muted-foreground">(note)</p>
-        </div>
+        card(
+            card_content(
+                <p class="text-xs font-medium text-muted-foreground">(title)</p>
+                <p class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
+                    (value)
+                </p>
+                <p class="mt-2 text-xs text-muted-foreground">(note)</p>
+            )
+        )
     })
 }

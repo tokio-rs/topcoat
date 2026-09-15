@@ -9,6 +9,7 @@ use topcoat::{
 use crate::{
     components::{
         button::button,
+        card::{card, card_content},
         table::{table, table_body, table_cell, table_head, table_header, table_row},
     },
     models::{Invoice, InvoiceLine, db, money, tax},
@@ -71,89 +72,101 @@ async fn invoice_detail(cx: &Cx, id: String) -> Result<impl View> {
         <p role="status" class="mb-4 text-sm" :hidden=$(message.get().is_empty())>
             $(message.get())
         </p>
-        <article class="panel mx-auto max-w-4xl p-8 lg:p-12">
-            <div
-                class="flex flex-wrap items-start justify-between gap-8 border-b border-border pb-8"
-            >
-                <div>
-                    <h2 class="text-2xl font-semibold">"Studio Collective"</h2>
-                    <p class="mt-2 text-sm text-muted-foreground">
-                        "Independent design & development"
-                    </p>
-                </div>
-                super::status_badge(status: invoice.status())
-            </div>
-            <div class="my-8 grid gap-8 sm:grid-cols-2">
-                <div>
-                    <p class="eyebrow">"Bill to"</p>
-                    <h3 class="mt-3 font-semibold">(&invoice.customer)</h3>
-                    <p class="mt-1 text-sm">(&invoice.email)</p>
-                    <p class="mt-2 whitespace-pre-line text-sm text-muted-foreground">
-                        (&invoice.address)
-                    </p>
-                </div>
-                <dl class="space-y-3 text-sm sm:text-right">
-                    <div>
-                        <dt class="text-muted-foreground">"Issued"</dt>
-                        <dd class="mt-1">(&invoice.issued)</dd>
+        card(
+            attrs: attributes! { class="mx-auto max-w-4xl" },
+            card_content(
+                <article class="sm:p-2 lg:p-6">
+                    <div
+                        class="flex flex-wrap items-start justify-between gap-8 border-b border-border pb-8"
+                    >
+                        <div>
+                            <h2 class="text-2xl font-semibold">"Studio Collective"</h2>
+                            <p class="mt-2 text-sm text-muted-foreground">
+                                "Independent design & development"
+                            </p>
+                        </div>
+                        super::status_badge(status: invoice.status())
                     </div>
-                    <div>
-                        <dt class="text-muted-foreground">"Due date"</dt>
-                        <dd class="mt-1">(&invoice.due)</dd>
+                    <div class="my-8 grid gap-8 sm:grid-cols-2">
+                        <div>
+                            <p class="eyebrow">"Bill to"</p>
+                            <h3 class="mt-3 font-semibold">(&invoice.customer)</h3>
+                            <p class="mt-1 text-sm">(&invoice.email)</p>
+                            <p
+                                class="mt-2 whitespace-pre-line text-sm text-muted-foreground"
+                            >
+                                (&invoice.address)
+                            </p>
+                        </div>
+                        <dl class="space-y-3 text-sm sm:text-right">
+                            <div>
+                                <dt class="text-muted-foreground">"Issued"</dt>
+                                <dd class="mt-1">(&invoice.issued)</dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">"Due date"</dt>
+                                <dd class="mt-1">(&invoice.due)</dd>
+                            </div>
+                        </dl>
                     </div>
-                </dl>
-            </div>
-            table(
-                table_header(
-                    table_row(
-                        table_head("Description")
-                        table_head("Qty")
-                        table_head("Unit price")
-                        table_head(attrs: attributes! { class="text-right" }, "Amount")
-                    )
-                )
-                table_body(
-                    #[key(line.id)]
-                    for line in &lines {
-                        table_row(
-                            table_cell((&line.description))
-                            table_cell((line.quantity))
-                            table_cell((money(line.unit_price)))
-                            table_cell(
-                                attrs: attributes! { class="text-right" },
-                                (money(line.quantity * line.unit_price))
+                    table(
+                        table_header(
+                            table_row(
+                                table_head("Description")
+                                table_head("Qty")
+                                table_head("Unit price")
+                                table_head(
+                                    attrs: attributes! { class="text-right" },
+                                    "Amount"
+                                )
                             )
                         )
-                    }
-                )
+                        table_body(
+                            #[key(line.id)]
+                            for line in &lines {
+                                table_row(
+                                    table_cell((&line.description))
+                                    table_cell((line.quantity))
+                                    table_cell((money(line.unit_price)))
+                                    table_cell(
+                                        attrs: attributes! { class="text-right" },
+                                        (money(line.quantity * line.unit_price))
+                                    )
+                                )
+                            }
+                        )
+                    )
+                    <dl class="ml-auto mt-8 max-w-xs space-y-3 text-sm">
+                        <div class="flex justify-between">
+                            <dt>"Subtotal"</dt>
+                            <dd>(money(invoice.subtotal))</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt>
+                                "Tax ("
+                                (invoice.tax_percent)
+                                "%)"
+                            </dt>
+                            <dd>(money(tax(invoice.subtotal, invoice.tax_percent)))</dd>
+                        </div>
+                        <div
+                            class="flex justify-between border-t border-border pt-4 text-lg font-semibold"
+                        >
+                            <dt>"Total USD"</dt>
+                            <dd>(money(invoice.total()))</dd>
+                        </div>
+                    </dl>
+                    <div class="mt-10 border-t border-border pt-6">
+                        <h3 class="text-sm font-medium">"Notes & payment terms"</h3>
+                        <p
+                            class="mt-2 whitespace-pre-line text-sm text-muted-foreground"
+                        >
+                            (&invoice.notes)
+                        </p>
+                    </div>
+                </article>
             )
-            <dl class="ml-auto mt-8 max-w-xs space-y-3 text-sm">
-                <div class="flex justify-between">
-                    <dt>"Subtotal"</dt>
-                    <dd>(money(invoice.subtotal))</dd>
-                </div>
-                <div class="flex justify-between">
-                    <dt>
-                        "Tax ("
-                        (invoice.tax_percent)
-                        "%)"
-                    </dt>
-                    <dd>(money(tax(invoice.subtotal, invoice.tax_percent)))</dd>
-                </div>
-                <div
-                    class="flex justify-between border-t border-border pt-4 text-lg font-semibold"
-                >
-                    <dt>"Total USD"</dt>
-                    <dd>(money(invoice.total()))</dd>
-                </div>
-            </dl>
-            <div class="mt-10 border-t border-border pt-6">
-                <h3 class="text-sm font-medium">"Notes & payment terms"</h3>
-                <p class="mt-2 whitespace-pre-line text-sm text-muted-foreground">
-                    (&invoice.notes)
-                </p>
-            </div>
-        </article>
+        )
     })
 }
 

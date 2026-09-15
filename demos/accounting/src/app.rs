@@ -39,7 +39,7 @@ async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
                 topcoat::font::link(font: GEIST)
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
             </head>
-            <body>
+            <body class="bg-zinc-50">
                 <button
                     class="m-4 rounded-lg border px-4 py-2 md:hidden"
                     @click=$(|_e| menu_open.toggle())

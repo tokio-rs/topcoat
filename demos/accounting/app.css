@@ -8,13 +8,11 @@
   --primary: oklch(0.22 0 0);
   --border: oklch(0.91 0 0);
   --ring: oklch(0.65 0 0);
-  --shadow-xs: none;
-  --shadow-sm: none;
 }
 
 @layer components {
   .sidebar {
-    @apply fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-zinc-50 p-4 text-foreground md:flex;
+    @apply fixed inset-y-0 left-0 z-30 hidden w-56 flex-col bg-zinc-50 p-4 text-foreground md:flex;
   }
   .sidebar[data-open="true"] {
     @apply flex;
@@ -36,21 +34,6 @@
   }
   .eyebrow {
     @apply text-xs font-medium text-muted-foreground;
-  }
-  .panel {
-    @apply rounded-lg border border-border bg-background p-5;
-  }
-  .metrics {
-    @apply grid grid-cols-1 border-y border-border py-2 sm:grid-cols-2 xl:grid-cols-4;
-  }
-  .metric {
-    @apply px-5 py-5;
-    @media (width >= 40rem) {
-      &:nth-child(even) { border-left: 1px solid var(--border); }
-    }
-    @media (width >= 80rem) {
-      & + & { border-left: 1px solid var(--border); }
-    }
   }
   .line-row {
     @apply grid items-end gap-3 border-b border-border pb-4 sm:grid-cols-2;
