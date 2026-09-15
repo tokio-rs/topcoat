@@ -100,6 +100,14 @@ export class Integer implements AttributeValueViewParts, NodeViewParts {
 		return new Integer(-this.v, this.type);
 	}
 
+	increment(): Integer {
+		return new Integer(this.v + 1n, this.type);
+	}
+
+	decrement(): Integer {
+		return new Integer(this.v - 1n, this.type);
+	}
+
 	eq(other: Integer): Bool {
 		return new Bool(this.v === this.operand(other));
 	}

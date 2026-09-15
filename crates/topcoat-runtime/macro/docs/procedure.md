@@ -4,8 +4,8 @@ A procedure is an async server function that the browser can call from inside a 
 use topcoat::{Result, runtime::procedure};
 
 #[procedure]
-async fn double(value: f64) -> Result<f64> {
-    Ok(value * 2.0)
+async fn double(value: usize) -> Result<usize> {
+    Ok(value * 2)
 }
 ```
 
@@ -16,10 +16,10 @@ Inside a runtime expression, call a procedure like an ordinary async function an
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{procedure, signal}};
 # #[procedure]
-# async fn double(value: f64) -> Result<f64> { Ok(value * 2.0) }
+# async fn double(value: usize) -> Result<usize> { Ok(value * 2) }
 # #[component]
 # async fn example(cx: &Cx) -> Result<impl View> {
-let count = signal(cx, || 1.0);
+let count = signal(cx, || 1usize);
 
 Ok(view! {
     <button
@@ -68,7 +68,7 @@ Each procedure is served by a route on the [`Router`]. `.discover()` registers e
 ```rust
 # use topcoat::{Result, router::Router, runtime::{procedure, RouterBuilderProcedureExt}};
 # #[procedure]
-# async fn double(value: f64) -> Result<f64> { Ok(value * 2.0) }
+# async fn double(value: usize) -> Result<usize> { Ok(value * 2) }
 let router = Router::builder().procedure(double).build();
 ```
 

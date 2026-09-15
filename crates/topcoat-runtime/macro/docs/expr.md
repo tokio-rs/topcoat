@@ -25,8 +25,8 @@ An identifier that is not defined inside the expression is captured from the sur
 ```rust
 # use topcoat::{Result, context::Cx, runtime::signal, view::*};
 # #[component]
-# async fn example(cx: &Cx, step: f64) -> Result<impl View> {
-let count = signal(cx, || 0.0);
+# async fn example(cx: &Cx, step: usize) -> Result<impl View> {
+let count = signal(cx, || 0usize);
 
 Ok(view! {
     $(count.get() + step)
@@ -47,7 +47,7 @@ Expressions operate on a fixed vocabulary of types that exist on both sides, eac
 - `Option<T>`: `is_some`, `is_none`, `unwrap`, and `expect`.
 - `Result<T, E>`: `is_ok`, `is_err`, `ok`, `err`, `unwrap`, `expect`, `unwrap_err`, and `expect_err`.
 - Tuples of vocabulary types.
-- [`Signal`]: `get` and `set`, plus a shorter spelling for common writes: `toggle` on a `bool` signal, `increment` and `decrement` on an `f64` signal, and `push_str` on a `String` signal.
+- [`Signal`]: `get` and `set`, plus a shorter spelling for common writes: `toggle` on a `bool` signal, `increment` and `decrement` on a numeric signal, and `push_str` on a `String` signal.
 
 An expression is evaluated twice, once per side, so a member has to mean the same thing in both. Rust's behavior is the definition and the JavaScript matches it, including where that costs a departure from the JavaScript norm: `len` counts UTF-8 bytes rather than UTF-16 code units, comparisons order by code point rather than by UTF-16 code unit, and `trim` and its siblings strip the Unicode `White_Space` set rather than the ECMAScript one, so U+FEFF is kept and U+0085 is removed.
 

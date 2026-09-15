@@ -1,5 +1,9 @@
 use topcoat_runtime_coherence::coherent;
 
+fn representable<T: TryFrom<u128>>(value: u128) -> Option<T> {
+    T::try_from(value).ok()
+}
+
 #[test]
 fn literals() {
     coherent!(direct => 42);
@@ -70,7 +74,7 @@ macro_rules! integer_cases {
                     9_007_199_254_740_993,
                     18_446_744_073_709_551_617,
                 ] {
-                    if let Ok(value) = $integer::try_from(value) {
+                    if let Some(value) = representable::<$integer>(value) {
                         let one: $integer = 1;
                         coherent!(direct => value);
                         coherent!((value + one) - value);
@@ -101,7 +105,15 @@ macro_rules! signed_cases {
         fn $test() {
             let negative_one: $integer = -1;
             let three: $integer = 3;
-            for value in [$integer::MIN, $integer::MIN + 1, -7, -1, 0, 1, $integer::MAX] {
+            for value in [
+                $integer::MIN,
+                $integer::MIN + 1,
+                -7,
+                -1,
+                0,
+                1,
+                $integer::MAX,
+            ] {
                 coherent!(-value);
                 coherent!(value / negative_one);
                 coherent!(value % negative_one);

@@ -290,7 +290,7 @@ where
 ///
 /// #[component]
 /// async fn counter(cx: &Cx) -> Result<impl View> {
-///     let count = signal(cx, || 0.0);
+///     let count = signal(cx, || 0usize);
 ///
 ///     Ok(view! {
 ///         <button @click=$(|_e| count.increment())>"+1"</button>

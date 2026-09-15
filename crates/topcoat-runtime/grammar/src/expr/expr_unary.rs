@@ -16,7 +16,11 @@ impl Expr {
             while let syn::Expr::Paren(paren) = inner {
                 inner = &paren.expr;
             }
-            if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Int(literal), .. }) = inner {
+            if let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Int(literal),
+                ..
+            }) = inner
+            {
                 return Self::integer_literal(literal, true, rust, js, names);
             }
         }

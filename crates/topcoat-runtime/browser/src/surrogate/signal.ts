@@ -4,6 +4,7 @@ import type { WriteSignal as SignalHandle } from "../reactivity";
 import type { SignalId } from "../signal-registry";
 import type { Bool } from "./bool";
 import { F64 } from "./f64";
+import { Integer } from "./integer";
 import { Ref } from "./ref";
 import { String as RuntimeString, type Str } from "./string";
 
@@ -34,11 +35,15 @@ export class WriteSignal<T> {
 	}
 
 	increment(): void {
-		this.inner.set((prev) => (prev as F64).add(new F64(1)) as T);
+		this.inner.set((prev) =>
+			(prev instanceof Integer ? prev.increment() : (prev as F64).add(new F64(1))) as T,
+		);
 	}
 
 	decrement(): void {
-		this.inner.set((prev) => (prev as F64).sub(new F64(1)) as T);
+		this.inner.set((prev) =>
+			(prev instanceof Integer ? prev.decrement() : (prev as F64).sub(new F64(1))) as T,
+		);
 	}
 
 	push_str(s: Str): void {

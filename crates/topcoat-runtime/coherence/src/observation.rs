@@ -7,7 +7,11 @@ pub enum Value {
     Unit,
     Bool(bool),
     F64(String),
-    Integer { kind: String, bits: u32, digits: String },
+    Integer {
+        kind: String,
+        bits: u32,
+        digits: String,
+    },
     String(String),
     None,
     Some(Box<Value>),
@@ -80,7 +84,9 @@ macro_rules! observe_integer {
     };
 }
 
-observe_integer!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
+observe_integer!(
+    u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
+);
 
 impl Observe for str {
     fn observe(&self) -> Value {

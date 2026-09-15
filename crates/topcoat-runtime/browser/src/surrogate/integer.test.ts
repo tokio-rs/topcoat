@@ -52,6 +52,27 @@ for (const [kind, bits] of types) {
 			expect(value(7n).rem(value(-3n)).toString()).toBe("1");
 		}
 	});
+
+	it(`${kind}/${bits} signal updates preserve type and reject overflow`, () => {
+		const type = integerType(kind, bits);
+		const registry = new SignalRegistry();
+		registry.insert("count", new Integer(0n, type));
+		const signal = new Context(registry).signal("count");
+		signal.increment();
+		expect((signal.get() as Integer).dehydrate()).toEqual({ t: kind, bits, v: "1" });
+		signal.decrement();
+		expect((signal.get() as Integer).toString()).toBe("0");
+		if (type.signed) {
+			signal.decrement();
+			expect((signal.get() as Integer).toString()).toBe("-1");
+		}
+		signal.set(new Integer(type.max, type));
+		expect(() => signal.increment()).toThrow(Panic);
+		expect((signal.get() as Integer).toString()).toBe(type.max.toString());
+		signal.set(new Integer(type.min, type));
+		expect(() => signal.decrement()).toThrow(Panic);
+		expect((signal.get() as Integer).toString()).toBe(type.min.toString());
+	});
 }
 
 it("preserves adjacent integers above Number precision", () => {

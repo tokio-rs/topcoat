@@ -46,7 +46,7 @@ async fn bool_then_avoids_javascript_thenable_assimilation() {
 
 #[component]
 async fn counter_buttons(cx: &Cx) -> Result<impl View> {
-    let count = signal(cx, || 0.0);
+    let count = signal(cx, || 0i32);
     Ok(view! {
         <button @click=$(|_e| count.increment())>"+"</button>
         <button @click=$(|_e| count.decrement())>"-"</button>

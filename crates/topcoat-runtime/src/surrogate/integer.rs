@@ -19,9 +19,11 @@ macro_rules! integer_op {
             #[inline]
             #[track_caller]
             fn $method(self, rhs: Self) -> Self {
-                Self(self.0.$checked(rhs.0).expect(concat!(
-                    "invalid integer ", stringify!($method),
-                )))
+                Self(
+                    self.0
+                        .$checked(rhs.0)
+                        .expect(concat!("invalid integer ", stringify!($method),)),
+                )
             }
         }
     };

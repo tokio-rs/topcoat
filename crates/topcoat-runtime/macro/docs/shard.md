@@ -50,7 +50,7 @@ use topcoat::{Result, context::Cx, runtime::{shard, signal}, view::{View, view}}
 
 #[shard]
 async fn paginated(cx: &Cx) -> Result<impl View> {
-    let page = signal(cx, || 1.0);
+    let page = signal(cx, || 1usize);
     let items = load_page(cx, page.get()).await?;
 
     Ok(view! {
@@ -58,11 +58,15 @@ async fn paginated(cx: &Cx) -> Result<impl View> {
             <div>(item)</div>
         }
 
-        <button @click=$(|_e| page.decrement())>"previous"</button>
+        <button @click=$(|_e| {
+            if page.get() > 1 {
+                page.decrement()
+            }
+        })>"previous"</button>
         <button @click=$(|_e| page.increment())>"next"</button>
     })
 }
-# async fn load_page(_cx: &Cx, _page: f64) -> Result<Vec<String>> { Ok(vec![]) }
+# async fn load_page(_cx: &Cx, _page: usize) -> Result<Vec<String>> { Ok(vec![]) }
 ```
 
 The [runtime guide](../runtime/index.html#reading-signals-on-the-server) covers server-side reads in full, including the untracked variants and what a read outside any shard does to the page.
@@ -102,9 +106,9 @@ A signal can also be passed as an argument, to a parameter typed [`Signal<T>`]. 
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Signal}};
-# async fn search_products(_cx: &Cx, _query: &str, _limit: f64) -> Result<Vec<String>> { Ok(vec![]) }
+# async fn search_products(_cx: &Cx, _query: &str, _limit: usize) -> Result<Vec<String>> { Ok(vec![]) }
 #[shard]
-async fn search_results(cx: &Cx, query: String, limit: Signal<f64>) -> Result<impl View> {
+async fn search_results(cx: &Cx, query: String, limit: Signal<usize>) -> Result<impl View> {
     // A new limit takes effect on the next re-render, but does not cause one.
     let products = search_products(cx, &query, limit.get_untracked()).await?;
 
@@ -118,7 +122,7 @@ async fn search_results(cx: &Cx, query: String, limit: Signal<f64>) -> Result<im
 # #[component]
 # async fn example(cx: &Cx) -> Result<impl View> {
 # let query = signal(cx, String::new);
-# let limit = signal(cx, || 10.0);
+# let limit = signal(cx, || 10usize);
 # Ok(view! {
 search_results(query: $(query.get()), limit: $(limit))
 # })

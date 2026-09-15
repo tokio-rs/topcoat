@@ -44,9 +44,14 @@ impl Expr {
     ) -> syn::Result<()> {
         let suffix = match literal.suffix() {
             "" => "usize",
-            suffix @ ("u8" | "u16" | "u32" | "u64" | "u128" | "usize"
-                | "i8" | "i16" | "i32" | "i64" | "i128" | "isize") => suffix,
-            _ => return Err(syn::Error::new_spanned(literal, "unsupported integer suffix")),
+            suffix @ ("u8" | "u16" | "u32" | "u64" | "u128" | "usize" | "i8" | "i16" | "i32"
+            | "i64" | "i128" | "isize") => suffix,
+            _ => {
+                return Err(syn::Error::new_spanned(
+                    literal,
+                    "unsupported integer suffix",
+                ));
+            }
         };
         if negative && suffix.starts_with('u') {
             return Err(syn::Error::new_spanned(

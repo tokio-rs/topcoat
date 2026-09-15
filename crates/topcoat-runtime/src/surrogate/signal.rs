@@ -75,27 +75,35 @@ impl SignalSurrogate<bool> {
     }
 }
 
-impl SignalSurrogate<f64> {
-    /// Adds one to the value.
-    ///
-    /// # Panics
-    ///
-    /// Always panics; signal writes can only occur in client-side expressions.
-    #[track_caller]
-    pub fn increment(&self) {
-        write_in_browser_only();
-    }
+macro_rules! numeric_signal {
+    ($($number:ty),+ $(,)?) => {
+        $(impl SignalSurrogate<$number> {
+            /// Adds one to the value.
+            ///
+            /// # Panics
+            ///
+            /// Always panics on the server. Integer overflow panics in the browser.
+            #[track_caller]
+            pub fn increment(&self) {
+                write_in_browser_only();
+            }
 
-    /// Subtracts one from the value.
-    ///
-    /// # Panics
-    ///
-    /// Always panics; signal writes can only occur in client-side expressions.
-    #[track_caller]
-    pub fn decrement(&self) {
-        write_in_browser_only();
-    }
+            /// Subtracts one from the value.
+            ///
+            /// # Panics
+            ///
+            /// Always panics on the server. Integer overflow panics in the browser.
+            #[track_caller]
+            pub fn decrement(&self) {
+                write_in_browser_only();
+            }
+        })+
+    };
 }
+
+numeric_signal!(
+    f64, u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
+);
 
 impl SignalSurrogate<String> {
     /// Appends a string to the end of the value.
