@@ -32,6 +32,7 @@ pub use unauthorized::*;
 use crate::{
     Body,
     response::{IntoResponse, Response},
+    validation::ValidationErrors,
 };
 
 /// Renders any [`IntoResponse`] value into a [`Response`], falling back to the
@@ -72,6 +73,7 @@ fn error_into_response(cx: &Cx, error: Error) -> Response {
     let error = try_downcast!(error as UnauthorizedError);
     let error = try_downcast!(error as ServiceUnavailableError);
     let error = try_downcast!(error as TooManyRequestsError);
+    let error = try_downcast!(error as ValidationErrors);
 
     into_response_or_500(cx, internal_server_error(error))
 }
@@ -307,6 +309,17 @@ mod tests {
                 .map(http::HeaderValue::as_bytes),
             Some(&b"60"[..])
         );
+    }
+
+    #[test]
+    fn validation_errors_map_to_422_not_500() {
+        let mut errors = ValidationErrors::new();
+        errors.add("email", "email is required");
+        let error: Error = errors.into();
+
+        let response = error_into_response(&Cx::default(), error);
+
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     #[test]
