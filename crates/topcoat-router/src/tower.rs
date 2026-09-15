@@ -1279,6 +1279,28 @@ mod tests {
     }
 
     #[test]
+    fn a_strip_prefix_layer_rewrites_the_uri_a_tower_route_sees() {
+        let router = Router::builder()
+            .route(TowerRoute::new(
+                Methods::Any,
+                Path::new("/legacy/{*rest}"),
+                tower::service_fn(echo_service),
+            ))
+            .layer(crate::StripPrefix::new("/legacy"))
+            .build();
+
+        let request = http::Request::builder()
+            .method(Method::POST)
+            .uri("/legacy/users/7?page=2")
+            .body(Body::from("payload"))
+            .unwrap();
+        let response = block_on(router.handle(request));
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(&body_bytes(response)[..], b"POST /users/7?page=2 payload");
+    }
+
+    #[test]
     fn a_tower_route_serves_only_its_declared_methods() {
         let router = Router::builder()
             .route(TowerRoute::new(

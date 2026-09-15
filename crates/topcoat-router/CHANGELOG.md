@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- *(router)* `StripPrefix` layer and `ServeDir` route for serving files under a URL prefix
+
 ## [0.8.1](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.8.0...topcoat-router-v0.8.1) - 2026-09-13
 
 ### Added

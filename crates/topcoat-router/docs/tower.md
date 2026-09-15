@@ -19,6 +19,18 @@ let router = Router::builder()
 
 A catch-all segment does not match the bare prefix itself, so register a second `TowerRoute` for `/legacy` if the service also serves that URL. To restrict a mounted service to specific methods, use [`new`](TowerRoute::new) instead.
 
+To strip a mount prefix so a nested service sees paths relative to that prefix, wrap the route with [`StripPrefix`](crate::StripPrefix):
+
+```rust,ignore
+use topcoat::router::{Router, StripPrefix, tower::TowerRoute};
+use tower_http::services::ServeDir;
+
+let router = Router::builder()
+    .route(TowerRoute::any("/res/{*path}", ServeDir::new("res")))
+    .layer(StripPrefix::new("/res"))
+    .build();
+```
+
 # Running middleware as a layer
 
 [`TowerLayer`] wraps routes in the middleware a `tower::Layer` builds (a timeout, a rate limit, CORS, compression) and registers like any other layer. It wraps every route by default; scope it to the routes under a path prefix with [`at`](TowerLayer::at):

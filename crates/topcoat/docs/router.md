@@ -87,7 +87,7 @@ async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 ```
 
-Layers follow the same prefix rule as layouts and nest from least specific (outermost) to most specific (innermost). A layer whose [`path`](Layer::path) is `None` wraps every request, including one that matches no route: the 404 or 405 error comes back through it as the `Err` returned by `next.run`. See [`#[layer]`](layer) for the exact matching and ordering rules.
+Layers follow the same prefix rule as layouts and nest from least specific (outermost) to most specific (innermost). A layer whose [`path`](Layer::path) is `None` wraps every request, including one that matches no route: the 404 or 405 error comes back through it as the `Err` returned by `next.run`. See [`#[layer]`](layer) for the exact matching and ordering rules. [`StripPrefix`](StripPrefix) rewrites the request URI for inner layers and the route; [`ServeDir`](ServeDir) serves files from a directory and strips its own route prefix.
 
 # API routes
 
