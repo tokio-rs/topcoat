@@ -44,7 +44,13 @@ fn nested_indexes_and_expression_precedence() {
     coherent!(nested[0][1] * nested[1][0] + 1);
     coherent!((nested[1][1] + 1) * 2);
     coherent!(nested[0][nested[0].len() - 1]);
-    coherent!((if true { nested.clone() } else { nested.to_vec() })[1][0]);
+    coherent!(
+        (if true {
+            nested.clone()
+        } else {
+            nested.to_vec()
+        })[1][0]
+    );
     coherent!(nested.to_vec()[1][0]);
     let arrays = [[1usize, 2], [3, 4]];
     coherent!(arrays[1]);
