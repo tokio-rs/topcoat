@@ -127,7 +127,7 @@ mod tests {
         assert_eq!(surrogate.len().into_real(), 2);
         assert!(!surrogate.is_empty().into_real());
         let first = surrogate.first().into_real().unwrap();
-        assert!(std::ptr::eq(first, &surrogate.0[0]));
+        assert!(std::ptr::eq(first, surrogate.0.first().unwrap()));
         assert_eq!(surrogate.last().into_real(), Some(&surrogate.0[1]));
         assert!(surrogate.get(2usize.into_surrogate()).into_real().is_none());
         assert!(
