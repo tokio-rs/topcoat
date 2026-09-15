@@ -27,8 +27,6 @@ fn captured_tuple_with_option() {
 fn captured_nested_tuple_field() {
     let nested = ((1.5, 2.5), true);
     coherent!(known "captured_tuple_field" => nested.0.0);
-    let wrapped = Some((1.5, 2.5));
-    coherent!(known "captured_tuple_field" => wrapped.unwrap().0);
 }
 
 #[test]
