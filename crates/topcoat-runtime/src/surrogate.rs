@@ -6,8 +6,10 @@ mod integer;
 mod option;
 mod result;
 mod signal;
+mod slice;
 mod string;
 mod tuple;
+mod vec;
 
 pub use _bool::*;
 pub use _f64::*;
@@ -18,7 +20,9 @@ pub use option::*;
 pub use result::*;
 use serde::{Deserialize, Serialize, de};
 pub use signal::*;
+pub use slice::*;
 pub use string::*;
+pub use vec::*;
 
 pub trait Surrogated {
     type Surrogate: Surrogate<Real = Self>;

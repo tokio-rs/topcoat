@@ -20,8 +20,15 @@ export interface SerializedInteger {
 	v: string;
 }
 
+export interface SerializedSequence {
+	t: "Vec" | "Slice";
+	bits: number;
+	v: DehydratedSurrogate[];
+}
+
 export type DehydratedSurrogate =
 	| SerializedInteger
+	| SerializedSequence
 	| null
 	| boolean
 	| number

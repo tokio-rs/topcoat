@@ -3,6 +3,7 @@ import type { DehydratedSurrogate } from "../expression/serialized";
 import { Bool } from "./bool";
 import { Option } from "./option";
 import { Panic } from "./panic";
+import { cloneValue } from "./ref";
 
 type ResultKind = "ok" | "err";
 
@@ -71,9 +72,7 @@ export class Result<T, E> {
 	}
 
 	clone(): Result<T, E> {
-		const inner = this.value as { clone?: () => T | E };
-		const value =
-			typeof inner?.clone === "function" ? inner.clone() : this.value;
+		const value = cloneValue(this.value);
 		return this.kind === "ok"
 			? Result.from_ok<T, E>(value as T)
 			: Result.from_err<T, E>(value as E);

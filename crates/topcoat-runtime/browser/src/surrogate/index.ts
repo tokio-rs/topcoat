@@ -7,4 +7,5 @@ export * from "./panic";
 export * from "./procedure";
 export * from "./ref";
 export * from "./result";
+export * from "./sequence";
 export * from "./signal";

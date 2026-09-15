@@ -1,9 +1,11 @@
 import { Bool } from "../surrogate/bool";
 import { F64 } from "../surrogate/f64";
-import { Integer } from "../surrogate/integer";
+import { Integer, integerType } from "../surrogate/integer";
 import { Option } from "../surrogate/option";
 import { Procedure } from "../surrogate/procedure";
 import { Result } from "../surrogate/result";
+import { Ref } from "../surrogate/ref";
+import { Slice, Vec } from "../surrogate/sequence";
 import { String as RuntimeString, Str } from "../surrogate/string";
 import type { Context } from "./context";
 import type { DehydratedSurrogate } from "./serialized";
@@ -48,6 +50,20 @@ export function hydrate(value: DehydratedSurrogate, cx: Context): unknown {
 					return "ok" in value
 						? Result.from_ok(hydrate(value.ok, cx))
 						: Result.from_err(hydrate(value.err, cx));
+				case "Vec":
+				case "Slice": {
+					if (
+						!Array.isArray(value.v) ||
+						Object.keys(value).some((key) => !["t", "bits", "v"].includes(key))
+					) {
+						throw new Error("Invalid collection payload");
+					}
+					const type = integerType("usize", value.bits);
+					const items = value.v.map((item) => hydrate(item, cx));
+					if (value.t === "Vec") return new Vec(items, type);
+					const slice = new Slice(items, type);
+					return Ref.shared(() => slice);
+				}
 				case "Signal":
 					return cx.signal(value.id);
 				case "Procedure":

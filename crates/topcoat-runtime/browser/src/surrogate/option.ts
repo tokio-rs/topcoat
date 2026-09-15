@@ -3,6 +3,7 @@ import { dehydrate } from "../expression/dehydrate";
 import type { DehydratedSurrogate } from "../expression/serialized";
 import { Bool } from "./bool";
 import { Panic } from "./panic";
+import { cloneValue } from "./ref";
 
 export class Option<T> implements AttributeValueViewParts, NodeViewParts {
 	constructor(private readonly value: T | undefined) {}
@@ -39,10 +40,7 @@ export class Option<T> implements AttributeValueViewParts, NodeViewParts {
 
 	clone(): Option<T> {
 		if (this.value === undefined) return Option.none<T>();
-		const inner = this.value as { clone?: () => T };
-		return Option.some<T>(
-			typeof inner?.clone === "function" ? inner.clone() : this.value,
-		);
+		return Option.some(cloneValue(this.value));
 	}
 
 	isAttributePresent(): boolean {

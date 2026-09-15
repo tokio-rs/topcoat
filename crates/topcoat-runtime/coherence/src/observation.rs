@@ -18,6 +18,7 @@ pub enum Value {
     Ok(Box<Value>),
     Err(Box<Value>),
     Tuple(Vec<Value>),
+    Sequence(Vec<Value>),
 }
 
 /// An expression's value, language panic, or JavaScript error.
@@ -103,6 +104,18 @@ impl Observe for String {
 impl<T: Observe + ?Sized> Observe for &T {
     fn observe(&self) -> Value {
         (**self).observe()
+    }
+}
+
+impl<T: Observe> Observe for [T] {
+    fn observe(&self) -> Value {
+        Value::Sequence(self.iter().map(Observe::observe).collect())
+    }
+}
+
+impl<T: Observe> Observe for Vec<T> {
+    fn observe(&self) -> Value {
+        self.as_slice().observe()
     }
 }
 

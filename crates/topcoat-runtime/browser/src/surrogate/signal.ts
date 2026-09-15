@@ -5,7 +5,7 @@ import type { SignalId } from "../signal-registry";
 import type { Bool } from "./bool";
 import { F64 } from "./f64";
 import { Integer } from "./integer";
-import { Ref } from "./ref";
+import { cloneValue, Ref } from "./ref";
 import { String as RuntimeString, type Str } from "./string";
 
 export class WriteSignal<T> {
@@ -22,8 +22,7 @@ export class WriteSignal<T> {
 	}
 
 	get(): T {
-		const value = this.read().deref() as { clone?: () => T };
-		return typeof value?.clone === "function" ? value.clone() : (value as T);
+		return cloneValue(this.read().deref());
 	}
 
 	set(v: T): void {

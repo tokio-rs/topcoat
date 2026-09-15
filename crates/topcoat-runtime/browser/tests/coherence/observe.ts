@@ -4,6 +4,7 @@ import { Integer } from "../../src/surrogate/integer";
 import { Option } from "../../src/surrogate/option";
 import { Ref } from "../../src/surrogate/ref";
 import { Result } from "../../src/surrogate/result";
+import { Slice } from "../../src/surrogate/sequence";
 import { Str } from "../../src/surrogate/string";
 
 export type Value =
@@ -12,7 +13,7 @@ export type Value =
 	| { type: "F64" | "String"; value: string }
 	| { type: "Integer"; value: { kind: string; bits: number; digits: string } }
 	| { type: "Some" | "Ok" | "Err"; value: Value }
-	| { type: "Tuple"; value: Value[] };
+	| { type: "Tuple" | "Sequence"; value: Value[] };
 
 /**
  * Reads surrogate storage independently of production dehydration and display.
@@ -22,6 +23,22 @@ export type Value =
 export function observe(value: unknown): Value {
 	if (value === undefined) return { type: "Unit" };
 	if (value instanceof Ref) return observe(value.deref());
+	if (value instanceof Slice) {
+		const items: unknown = Reflect.get(value, "items");
+		const start: unknown = Reflect.get(value, "start");
+		const end: unknown = Reflect.get(value, "end");
+		if (
+			!Array.isArray(items) ||
+			typeof start !== "number" ||
+			typeof end !== "number" ||
+			!Number.isInteger(start) ||
+			!Number.isInteger(end) ||
+			start < 0 || end < start || end > items.length
+		) {
+			throw new Error("Invalid Slice storage");
+		}
+		return { type: "Sequence", value: items.slice(start, end).map(observe) };
+	}
 	if (value instanceof Bool) {
 		const stored: unknown = Reflect.get(value, "v");
 		if (typeof stored !== "boolean") throw new Error("Invalid Bool storage");
