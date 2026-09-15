@@ -61,5 +61,7 @@ export function observe(value: unknown): Value {
 	if (Array.isArray(value)) {
 		return { type: "Tuple", value: value.map(observe) };
 	}
-	throw new Error(`Unsupported coherence value: ${Object.prototype.toString.call(value)}`);
+	throw new Error(
+		`Unsupported coherence value: ${Object.prototype.toString.call(value)}`,
+	);
 }

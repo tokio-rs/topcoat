@@ -8,7 +8,9 @@ export function execute(source: string, invoke: boolean): string {
 	const cx = new Context(new SignalRegistry());
 	let compute: (cx: Context) => unknown;
 	try {
-		compute = new Function("cx", `return (${source});`) as (cx: Context) => unknown;
+		compute = new Function("cx", `return (${source});`) as (
+			cx: Context,
+		) => unknown;
 	} catch (error) {
 		if (error instanceof SyntaxError) {
 			return JSON.stringify({ kind: "CompileError", value: error.toString() });
