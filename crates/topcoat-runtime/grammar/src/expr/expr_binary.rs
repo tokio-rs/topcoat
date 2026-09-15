@@ -21,6 +21,7 @@ impl Expr {
             BinOp::Sub(_) => ("sub", OpKind::Arithmetic),
             BinOp::Mul(_) => ("mul", OpKind::Arithmetic),
             BinOp::Div(_) => ("div", OpKind::Arithmetic),
+            BinOp::Rem(_) => ("rem", OpKind::Arithmetic),
             BinOp::Eq(_) => ("eq", OpKind::Cmp),
             BinOp::Ne(_) => ("ne", OpKind::Cmp),
             BinOp::Lt(_) => ("lt", OpKind::Cmp),

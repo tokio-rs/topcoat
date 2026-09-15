@@ -7,6 +7,7 @@ pub enum Value {
     Unit,
     Bool(bool),
     F64(String),
+    Integer { kind: String, bits: u32, digits: String },
     String(String),
     None,
     Some(Box<Value>),
@@ -64,6 +65,22 @@ impl Observe for f64 {
         })
     }
 }
+
+macro_rules! observe_integer {
+    ($($integer:ident),+ $(,)?) => {
+        $(impl Observe for $integer {
+            fn observe(&self) -> Value {
+                Value::Integer {
+                    kind: stringify!($integer).to_owned(),
+                    bits: $integer::BITS,
+                    digits: self.to_string(),
+                }
+            }
+        })+
+    };
+}
+
+observe_integer!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
 
 impl Observe for str {
     fn observe(&self) -> Value {

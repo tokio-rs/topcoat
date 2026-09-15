@@ -1,5 +1,6 @@
 import { Bool } from "../surrogate/bool";
 import { F64 } from "../surrogate/f64";
+import { Integer } from "../surrogate/integer";
 import { Option } from "../surrogate/option";
 import { Procedure } from "../surrogate/procedure";
 import { Result } from "../surrogate/result";
@@ -24,6 +25,19 @@ export function hydrate(value: DehydratedSurrogate, cx: Context): unknown {
 			throw new Error(`Unknown surrogate type: ${typeof value}`);
 		case "object":
 			switch (value.t) {
+				case "u8":
+				case "u16":
+				case "u32":
+				case "u64":
+				case "u128":
+				case "usize":
+				case "i8":
+				case "i16":
+				case "i32":
+				case "i64":
+				case "i128":
+				case "isize":
+					return Integer.hydrate(value);
 				case "str":
 					return new Str(value.v);
 				case "Option":

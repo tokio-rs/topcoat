@@ -78,14 +78,7 @@ impl Expr {
             })
         } else {
             let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
-            let rust_external_values = externals.iter().map(|binding| {
-                let ident = &binding.original_ident;
-                quote! {
-                    #topcoat_runtime::Surrogated::into_surrogate(
-                        ::core::clone::Clone::clone(&#ident),
-                    )
-                }
-            });
+            let rust_external_values = externals.iter().map(|binding| &binding.value);
 
             let mut js_head = "(() => { const [".to_owned();
             for (index, binding) in externals.iter().enumerate() {
@@ -131,7 +124,7 @@ impl Expr {
     ) -> syn::Result<()> {
         match expr {
             syn::Expr::Await(inner) => Self::expr_await(inner, rust, js, names)?,
-            syn::Expr::Lit(inner) => Self::expr_lit(inner, rust, js)?,
+            syn::Expr::Lit(inner) => Self::expr_lit(inner, rust, js, names)?,
             syn::Expr::Paren(inner) => Self::expr_paren(inner, rust, js, names)?,
             syn::Expr::Binary(inner) => Self::expr_binary(inner, rust, js, names)?,
             syn::Expr::Unary(inner) => Self::expr_unary(inner, rust, js, names)?,

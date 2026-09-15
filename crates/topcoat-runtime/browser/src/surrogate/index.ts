@@ -1,6 +1,7 @@
 export * from "./bool";
 export * from "./event";
 export * from "./f64";
+export * from "./integer";
 export * from "./option";
 export * from "./panic";
 export * from "./procedure";

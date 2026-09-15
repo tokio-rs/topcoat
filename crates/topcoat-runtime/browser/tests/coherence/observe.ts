@@ -1,5 +1,6 @@
 import { Bool } from "../../src/surrogate/bool";
 import { F64 } from "../../src/surrogate/f64";
+import { Integer } from "../../src/surrogate/integer";
 import { Option } from "../../src/surrogate/option";
 import { Ref } from "../../src/surrogate/ref";
 import { Result } from "../../src/surrogate/result";
@@ -9,6 +10,7 @@ export type Value =
 	| { type: "Unit" | "None" }
 	| { type: "Bool"; value: boolean }
 	| { type: "F64" | "String"; value: string }
+	| { type: "Integer"; value: { kind: string; bits: number; digits: string } }
 	| { type: "Some" | "Ok" | "Err"; value: Value }
 	| { type: "Tuple"; value: Value[] };
 
@@ -41,6 +43,21 @@ export function observe(value: unknown): Value {
 		const stored: unknown = Reflect.get(value, "v");
 		if (typeof stored !== "string") throw new Error("Invalid Str storage");
 		return { type: "String", value: stored };
+	}
+	if (value instanceof Integer) {
+		const stored: unknown = Reflect.get(value, "v");
+		const type = Reflect.get(value, "type");
+		if (
+			typeof stored !== "bigint" ||
+			typeof type?.kind !== "string" ||
+			typeof type?.bits !== "number"
+		) {
+			throw new Error("Invalid Integer storage");
+		}
+		return {
+			type: "Integer",
+			value: { kind: type.kind, bits: type.bits, digits: stored.toString() },
+		};
 	}
 	if (value instanceof Option) {
 		const stored: unknown = Reflect.get(value, "value");

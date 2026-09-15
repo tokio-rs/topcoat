@@ -40,7 +40,8 @@ The captured value is cloned into the expression, so the surrounding code keeps 
 
 Expressions operate on a fixed vocabulary of types that exist on both sides, each exposing a subset of its Rust API. The members you reach for most:
 
-- `f64`: arithmetic (`+`, `-`, `*`, `/`), comparisons, and negation. All numbers are `f64`, matching JavaScript; integer literals are not accepted, so write `1.0` rather than `1`. Rendered text follows Rust's `Display`, so it is always positional, however large or small: `inf`, `-inf`, and `-0` are spelled the Rust way rather than the JavaScript way.
+- `f64`: arithmetic (`+`, `-`, `*`, `/`), comparisons, and negation. Floating-point literals are `f64`. Rendered text follows Rust's `Display`, so it is always positional, however large or small: `inf`, `-inf`, and `-0` are spelled the Rust way rather than the JavaScript way.
+- Rust integer types: arithmetic (`+`, `-`, `*`, `/`, `%`), comparisons, and negation for signed types. Unsuffixed integer literals are `usize`; use a suffix for another type, such as `42u64` or `-1i32`. Operands must have the same type. Values retain their full precision in the browser, including 128-bit integers, and pointer-sized integers use the server target's width. Arithmetic panics on overflow, division by zero, or remainder by zero in both debug and release builds. Signed `MIN / -1`, `MIN % -1`, and negating `MIN` also panic.
 - `bool`: `!`, equality comparisons, `then`, and `then_some`.
 - `String` and `&str`: `len`, `is_empty`, `trim`, `trim_start`, `trim_end`, `starts_with`, `ends_with`, `contains`, `to_owned`, and comparisons.
 - `Option<T>`: `is_some`, `is_none`, `unwrap`, and `expect`.
@@ -54,7 +55,7 @@ An expression is evaluated twice, once per side, so a member has to mean the sam
 
 Expressions use a subset of Rust's syntax:
 
-- String, `f64`, and `bool` literals.
+- String, integer, `f64`, and `bool` literals.
 - The unary and binary operators listed above.
 - Method calls, field access, and indexing.
 - Blocks, with `let` bindings of plain identifiers; the trailing expression is the block's value.
@@ -62,7 +63,7 @@ Expressions use a subset of Rust's syntax:
 - Closures, optionally `async`, and `.await`.
 - `loop`, `while`, `break`, `continue`, and `return`.
 
-Anything else -- `match`, integer literals, struct expressions, multi-segment paths -- is rejected with a compile error pointing at the unsupported expression.
+Anything else -- `match`, struct expressions, multi-segment paths -- is rejected with a compile error pointing at the unsupported expression.
 
 # Embedding JavaScript
 

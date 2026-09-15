@@ -11,6 +11,16 @@ impl Expr {
         js: &mut String,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
+        if matches!(unary.op, UnOp::Neg(_)) {
+            let mut inner = &*unary.expr;
+            while let syn::Expr::Paren(paren) = inner {
+                inner = &paren.expr;
+            }
+            if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Int(literal), .. }) = inner {
+                return Self::integer_literal(literal, true, rust, js, names);
+            }
+        }
+
         let op = match unary.op {
             UnOp::Deref(_) => "deref",
             UnOp::Not(_) => "not",
