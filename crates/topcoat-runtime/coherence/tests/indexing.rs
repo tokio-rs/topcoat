@@ -59,19 +59,20 @@ fn nested_indexes_and_expression_precedence() {
 fn evaluates_base_then_index_exactly_once() {
     let trace = Cell::new(0u32);
     let values = vec![10usize, 20];
-    let index = 1usize;
     coherent!({
+        let source = values.clone();
+        let offset = 1;
         let selected = raw!(
-            "((globalThis.__indexTrace = (globalThis.__indexTrace ?? 0) * 10 + 1), ${values})",
+            "((globalThis.__indexTrace = (globalThis.__indexTrace ?? 0) * 10 + 1), ${source})",
             {
                 trace.set(trace.get() * 10 + 1);
-                values.clone()
+                source
             }
         )[raw!(
-            "((globalThis.__indexTrace = globalThis.__indexTrace * 10 + 2), ${index})",
+            "((globalThis.__indexTrace = globalThis.__indexTrace * 10 + 2), ${offset})",
             {
                 trace.set(trace.get() * 10 + 2);
-                index
+                offset
             }
         )];
         raw!(
