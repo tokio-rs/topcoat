@@ -45,6 +45,10 @@ export class Slice<T> {
 		return this.get(new Integer(0n, this.usizeType));
 	}
 
+	index(index: Integer): Ref<T> & T {
+		return this.get(index).unwrap();
+	}
+
 	last(): Option<Ref<T> & T> {
 		return this.start === this.end
 			? Option.none()

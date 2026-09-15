@@ -32,6 +32,9 @@ for (const bits of [16, 32, 64]) {
 				).toBe(true);
 				expect(value.get(index(type.max)).is_none().dehydrate()).toBe(true);
 				if (elements.length > 0) {
+					expect(value.index(index(0n)).to_owned().toString()).toBe(
+						elements[0],
+					);
 					const first = value.first().unwrap();
 					expect(first).toBeInstanceOf(Ref);
 					expect(first.deref().toString()).toBe(elements[0]);
@@ -41,6 +44,10 @@ for (const bits of [16, 32, 64]) {
 					expect(() => value.first().unwrap()).toThrow(Panic);
 					expect(value.last().is_none().dehydrate()).toBe(true);
 				}
+				expect(() => value.index(index(BigInt(elements.length)))).toThrow(
+					Panic,
+				);
+				expect(() => value.index(index(type.max))).toThrow(Panic);
 				expect(dehydrate(value.to_vec())).toEqual({
 					t: "Vec",
 					bits,

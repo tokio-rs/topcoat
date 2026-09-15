@@ -27,6 +27,20 @@ impl<T> SliceSurrogate<T> {
         OptionSurrogate::new(self.0.get(index.into_real()))
     }
 
+    /// Borrows the element at `index`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` is out of bounds.
+    #[must_use]
+    #[track_caller]
+    pub fn index<'a>(&'a self, index: UsizeSurrogate) -> <&'a T as Surrogated>::Surrogate
+    where
+        &'a T: Surrogated,
+    {
+        (&self.0[index.into_real()]).into_surrogate()
+    }
+
     #[must_use]
     pub fn first(&self) -> OptionSurrogate<&T> {
         OptionSurrogate::new(self.0.first())

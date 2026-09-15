@@ -32,7 +32,10 @@ fn vectors_and_slices() {
             coherent!(values.get(index).is_none());
             coherent!(*values.get(index).unwrap());
             coherent!(values.get(index).unwrap().clone());
+            coherent!(*values.index(index));
+            coherent!(values.index(index).clone());
             coherent!(slice.get(index).expect("missing").clone());
+            coherent!(*slice.index(index));
             coherent!(direct => slice.get(index));
         }
     }
@@ -48,6 +51,7 @@ fn borrowed_strings() {
     coherent!(direct => values);
     coherent!(values.get(1).unwrap().to_owned());
     coherent!(values.get(1).unwrap().clone());
+    coherent!(values.index(1).to_owned());
     coherent!(values.last().unwrap().len());
     coherent!(values.first().unwrap().is_empty());
     coherent!(values.get(1).clone().unwrap().to_owned());
@@ -72,6 +76,7 @@ fn nested_collections_and_options() {
     coherent!(values.get(1).unwrap().get(1).unwrap().clone());
     coherent!(values.get(1).unwrap().last().unwrap().clone().unwrap());
     coherent!(values.get(1).unwrap().clone());
+    coherent!(values.index(1).index(0).clone());
     let optional = Some(values);
     coherent!(optional.clone().unwrap());
 }
@@ -96,6 +101,9 @@ fn arrays() {
         coherent!(values.as_slice().to_vec());
         coherent!(values.first().is_some());
         coherent!(*values.last().unwrap());
+        coherent!(*values.index(0));
+        let out_of_bounds = N;
+        coherent!(*values.index(out_of_bounds));
         let borrowed = &values;
         coherent!(direct => borrowed);
         coherent!(borrowed.get(0).unwrap().clone());
