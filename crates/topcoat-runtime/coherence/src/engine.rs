@@ -23,7 +23,7 @@ impl Engine {
         });
 
         Self {
-            isolate: v8::Isolate::new(Default::default()),
+            isolate: v8::Isolate::new(v8::CreateParams::default()),
             timeout,
         }
     }
@@ -66,7 +66,7 @@ impl Engine {
     fn run(&mut self, source: &str) -> Result<String> {
         let scope = std::pin::pin!(v8::HandleScope::new(&mut self.isolate));
         let scope = &mut scope.init();
-        let context = v8::Context::new(scope, Default::default());
+        let context = v8::Context::new(scope, v8::ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
         let scope = std::pin::pin!(v8::TryCatch::new(scope));
         let scope = &mut scope.init();
@@ -79,10 +79,10 @@ impl Engine {
         let source = v8::String::new(scope, &source).context("JavaScript source is too large")?;
         let result = v8::Script::compile(scope, source, None).and_then(|script| script.run(scope));
         let Some(result) = result else {
-            let exception = scope
-                .exception()
-                .map(|exception| exception.to_rust_string_lossy(scope))
-                .unwrap_or_else(|| "execution terminated without an exception".to_owned());
+            let exception = scope.exception().map_or_else(
+                || "execution terminated without an exception".to_owned(),
+                |exception| exception.to_rust_string_lossy(scope),
+            );
             bail!("JavaScript execution failed: {exception}");
         };
         let result = v8::Local::<v8::String>::try_from(result)
