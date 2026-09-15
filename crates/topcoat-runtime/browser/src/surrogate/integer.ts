@@ -139,7 +139,9 @@ export class Integer implements AttributeValueViewParts, NodeViewParts {
 	/** Checks a usize index before converting it to a JavaScript array index. */
 	toIndex(length: number, bits: number): number | undefined {
 		if (this.type.kind !== "usize" || this.type.bits !== bits) {
-			throw new Error("Index must be a usize with the collection's target width");
+			throw new Error(
+				"Index must be a usize with the collection's target width",
+			);
 		}
 		return this.v < BigInt(length) ? Number(this.v) : undefined;
 	}

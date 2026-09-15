@@ -34,7 +34,7 @@ Ok(view! {
 # }
 ```
 
-The captured value is cloned into the expression, so the surrounding code keeps using it, then serialized into the page during the render and becomes a constant in the generated JavaScript. It is a snapshot: the browser keeps the value from the render, and later changes on the server do not reach it. Captured values must belong to the shared vocabulary described next, all of which is cheap to clone.
+The captured value is cloned into the expression, so the surrounding code keeps using it, then serialized into the page during the render and becomes a constant in the generated JavaScript. It is a snapshot: the browser keeps the value from the render, and later changes on the server do not reach it. Captured values must belong to the shared vocabulary described next. Cloning an owned collection clones its elements; capturing a slice borrows the Rust elements but still serializes a snapshot for the browser.
 
 # The shared vocabulary
 
@@ -46,6 +46,7 @@ Expressions operate on a fixed vocabulary of types that exist on both sides, eac
 - `String` and `&str`: `len`, `is_empty`, `trim`, `trim_start`, `trim_end`, `starts_with`, `ends_with`, `contains`, `to_owned`, and comparisons.
 - `Option<T>`: `is_some`, `is_none`, `unwrap`, and `expect`.
 - `Result<T, E>`: `is_ok`, `is_err`, `ok`, `err`, `unwrap`, `expect`, `unwrap_err`, and `expect_err`.
+- `Vec<T>`, `[T; N]`, and slices: `len`, `is_empty`, `get`, `first`, `last`, `to_vec`, and `to_owned`. Vectors and arrays also support `as_slice` and `clone`. Elements must belong to the shared vocabulary.
 - Tuples of vocabulary types.
 - [`Signal`]: `get` and `set`, plus a shorter spelling for common writes: `toggle` on a `bool` signal, `increment` and `decrement` on a numeric signal, and `push_str` on a `String` signal.
 

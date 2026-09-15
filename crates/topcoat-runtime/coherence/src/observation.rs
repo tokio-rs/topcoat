@@ -119,6 +119,12 @@ impl<T: Observe> Observe for Vec<T> {
     }
 }
 
+impl<T: Observe, const N: usize> Observe for [T; N] {
+    fn observe(&self) -> Value {
+        self.as_slice().observe()
+    }
+}
+
 impl<T: Observe> Observe for Option<T> {
     fn observe(&self) -> Value {
         match self {

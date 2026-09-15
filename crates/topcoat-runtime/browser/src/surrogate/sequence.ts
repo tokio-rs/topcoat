@@ -48,7 +48,9 @@ export class Slice<T> {
 	last(): Option<Ref<T> & T> {
 		return this.start === this.end
 			? Option.none()
-			: this.get(new Integer(BigInt(this.end - this.start - 1), this.usizeType));
+			: this.get(
+					new Integer(BigInt(this.end - this.start - 1), this.usizeType),
+				);
 	}
 
 	to_vec(): Vec<T> {
@@ -85,6 +87,38 @@ export class Vec<T> extends Slice<T> {
 	dehydrate(): SerializedSequence {
 		return {
 			t: "Vec",
+			bits: this.usizeType.bits,
+			v: this.items.map(dehydrate),
+		};
+	}
+}
+
+/** A fixed-size owned sequence with the same read methods as a slice. */
+export class FixedArray<T> extends Slice<T> {
+	constructor(items: readonly T[], usizeType: IntegerType) {
+		super(items, usizeType);
+	}
+
+	as_slice(): Ref<Slice<T>> & Slice<T> {
+		const slice = this.deref();
+		return Ref.shared(() => slice);
+	}
+
+	deref(): Slice<T> {
+		return new Slice(this.items, this.usizeType, this.start, this.end);
+	}
+
+	clone(): FixedArray<T> {
+		return new FixedArray(this.items.map(cloneValue), this.usizeType);
+	}
+
+	to_owned(): FixedArray<T> {
+		return this.clone();
+	}
+
+	dehydrate(): SerializedSequence {
+		return {
+			t: "Array",
 			bits: this.usizeType.bits,
 			v: this.items.map(dehydrate),
 		};

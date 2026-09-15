@@ -33,7 +33,9 @@ export function observe(value: unknown): Value {
 			typeof end !== "number" ||
 			!Number.isInteger(start) ||
 			!Number.isInteger(end) ||
-			start < 0 || end < start || end > items.length
+			start < 0 ||
+			end < start ||
+			end > items.length
 		) {
 			throw new Error("Invalid Slice storage");
 		}

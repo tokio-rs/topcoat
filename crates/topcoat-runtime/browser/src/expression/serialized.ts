@@ -21,7 +21,7 @@ export interface SerializedInteger {
 }
 
 export interface SerializedSequence {
-	t: "Vec" | "Slice";
+	t: "Vec" | "Slice" | "Array";
 	bits: number;
 	v: DehydratedSurrogate[];
 }

@@ -71,8 +71,8 @@ where
     }
 }
 
-impl_surrogate_ref!({T} [T], SliceSurrogate<T>);
-impl_surrogate_mut!({T} [T], SliceSurrogate<T>);
+impl_surrogate_ref!({ T }[T], SliceSurrogate<T>);
+impl_surrogate_mut!({ T }[T], SliceSurrogate<T>);
 
 impl<T> serde::Serialize for SliceSurrogate<T>
 where

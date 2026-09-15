@@ -40,7 +40,11 @@ fn vectors_and_slices() {
 
 #[test]
 fn borrowed_strings() {
-    let values = vec![String::new(), String::from("hello"), String::from("\u{1f980}")];
+    let values = vec![
+        String::new(),
+        String::from("hello"),
+        String::from("\u{1f980}"),
+    ];
     coherent!(direct => values);
     coherent!(values.get(1).unwrap().to_owned());
     coherent!(values.get(1).unwrap().clone());
@@ -56,7 +60,10 @@ fn borrowed_strings() {
 
 #[test]
 fn nested_collections_and_options() {
-    let values = vec![vec![], vec![Some(u128::MAX), None, Some(9_007_199_254_740_993)]];
+    let values = vec![
+        vec![],
+        vec![Some(u128::MAX), None, Some(9_007_199_254_740_993)],
+    ];
     coherent!(direct => values);
     coherent!(values.clone());
     coherent!(values.as_slice().to_owned());
@@ -76,4 +83,33 @@ fn asynchronous_reads() {
     coherent!(async => values.to_vec());
     let slice = values.as_slice();
     coherent!(async => slice.first());
+}
+
+#[test]
+fn arrays() {
+    fn check<const N: usize>(values: [u128; N]) {
+        coherent!(direct => values);
+        coherent!(values.len());
+        coherent!(values.is_empty());
+        coherent!(values.to_vec());
+        coherent!(values.to_owned());
+        coherent!(values.as_slice().to_vec());
+        coherent!(values.first().is_some());
+        coherent!(*values.last().unwrap());
+        let borrowed = &values;
+        coherent!(direct => borrowed);
+        coherent!(borrowed.get(0).unwrap().clone());
+        let slice = values.as_slice();
+        coherent!(direct => slice);
+    }
+    check([]);
+    check([u128::MAX]);
+    check([9_007_199_254_740_993; 64]);
+    let values = [String::from("first"), String::from("last")];
+    coherent!(values.clone());
+    coherent!(values.to_owned());
+    coherent!(values.last().unwrap().to_owned());
+    let nested = [[true, false], [false, true]];
+    coherent!(direct => nested);
+    coherent!(*nested.last().unwrap().first().unwrap());
 }

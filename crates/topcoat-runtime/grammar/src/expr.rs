@@ -68,7 +68,7 @@ impl Expr {
         //
         // A capture is cloned into the expression, so the surrounding scope
         // keeps its value and any number of expressions can capture the
-        // same one. Every vocabulary type is cheap to clone, and a signal
+        // same one. Owned collections clone their elements, while a signal
         // shares its value between clones.
         let externals = names.externals();
 
