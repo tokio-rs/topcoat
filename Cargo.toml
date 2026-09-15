@@ -24,6 +24,7 @@ members = [
     "crates/topcoat-router/grammar",
     "crates/topcoat-router/macro",
     "crates/topcoat-runtime",
+    "crates/topcoat-runtime/coherence",
     "crates/topcoat-runtime/grammar",
     "crates/topcoat-runtime/macro",
     "crates/topcoat-session",
@@ -204,4 +205,5 @@ tower = "0.5"
 tower-http = "0.7"
 ureq = "3.3"
 uuid = "1.23"
+v8 = "152.0.0"
 web-time = "1.1"
