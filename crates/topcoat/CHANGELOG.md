@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tokio-rs/topcoat/compare/v0.8.1...v0.9.0) - 2026-09-15
+
+### Added
+
+- *(runtime)* integer support ([#415](https://github.com/tokio-rs/topcoat/pull/415))
+- *(view)* [**breaking**] new way to specify identities (`#[key(...)]` and `cx.keyed(...)`) ([#410](https://github.com/tokio-rs/topcoat/pull/410))
+- *(core)* [**breaking**] make Error cheap to clone ([#396](https://github.com/tokio-rs/topcoat/pull/396))
+- *(runtime)* support Vec, slices and arrays ([#416](https://github.com/tokio-rs/topcoat/pull/416))
+
+### Other
+
+- update Cargo.lock dependencies
+- *(runtime)* get rid of maverick-js dependency ([#414](https://github.com/tokio-rs/topcoat/pull/414))
+- *(runtime)* [**breaking**] refactor browser runtime ([#413](https://github.com/tokio-rs/topcoat/pull/413))
+- *(runtime)* add Rust vs. JavaScript cross-compiler coherence tests ([#412](https://github.com/tokio-rs/topcoat/pull/412))
+
 ## [0.8.1](https://github.com/tokio-rs/topcoat/compare/v0.8.0...v0.8.1) - 2026-09-13
 
 ### Added
