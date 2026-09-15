@@ -22,6 +22,10 @@ git_tag_enable = false
 git_release_enable = false
 
 [[package]]
+name = "accounting"
+release = false
+
+[[package]]
 name = "topcoat"
 release = true
 version_group = "topcoat"

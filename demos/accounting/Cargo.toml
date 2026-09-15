@@ -1,0 +1,18 @@
+[package]
+name = "accounting"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+toasty = { workspace = true, features = ["sqlite"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+topcoat = { workspace = true, features = ["font-fontsource", "tailwind", "ui"] }
+uuid = { workspace = true, features = ["v4"] }
+time = { workspace = true, features = ["formatting", "parsing", "macros"] }
+
+[build-dependencies]
+topcoat = { path = "../../crates/topcoat", default-features = false, features = ["tailwind"] }
+
+[lints]
+workspace = true

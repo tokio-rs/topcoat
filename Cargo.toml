@@ -63,6 +63,7 @@ members = [
     "examples/ui",
     "examples/websocket",
 
+    "demos/accounting",
     "demos/coffee-shop",
 
     "benchmarks/topcoat",

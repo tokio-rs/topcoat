@@ -3,6 +3,17 @@
 version = 4
 
 [[package]]
+name = "accounting"
+version = "0.8.1"
+dependencies = [
+ "time",
+ "toasty",
+ "tokio",
+ "topcoat",
+ "uuid",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
