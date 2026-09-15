@@ -1,4 +1,22 @@
 [[mismatch]]
+id = "captured_tuple_field"
+reason = "Captured tuples serialize as arrays, which JavaScript hydration does not recognize."
+rust = { kind = "Return", value = { type = "F64", value = "3ff8000000000000" } }
+javascript = { kind = "Exception", value = "Error: Unknown surrogate type: undefined" }
+
+[[mismatch]]
+id = "captured_tuple_value"
+reason = "Returning a captured tuple fails during JavaScript hydration before it can be observed."
+rust = { kind = "Return", value = { type = "Tuple", value = [{ type = "F64", value = "3ff8000000000000" }, { type = "F64", value = "4004000000000000" }] } }
+javascript = { kind = "Exception", value = "Error: Unknown surrogate type: undefined" }
+
+[[mismatch]]
+id = "captured_tuple_with_option"
+reason = "Tuples containing tagged surrogates also require recursive array hydration."
+rust = { kind = "Return", value = { type = "Tuple", value = [{ type = "F64", value = "3ff0000000000000" }, { type = "Some", value = { type = "F64", value = "4000000000000000" } }] } }
+javascript = { kind = "Exception", value = "Error: Unknown surrogate type: undefined" }
+
+[[mismatch]]
 id = "captured_nan"
 reason = "A captured nonfinite float serializes as null and hydrates as unit."
 rust = { kind = "Return", value = { type = "F64", value = "nan" } }

@@ -15,13 +15,14 @@ pub enum Value {
     Tuple(Vec<Value>),
 }
 
-/// An expression's value, language panic, or JavaScript compilation error.
+/// An expression's value, language panic, or JavaScript error.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", deny_unknown_fields)]
 pub enum Outcome {
     Return(Value),
     Panic(String),
     CompileError(String),
+    Exception(String),
 }
 
 impl Outcome {

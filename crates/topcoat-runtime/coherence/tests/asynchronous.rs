@@ -103,6 +103,7 @@ fn awaited_conditions_and_branches() {
 }
 
 #[test]
+#[allow(clippy::no_effect_underscore_binding)] // Dropping an unpolled future must have no effect.
 fn unused_futures_and_untaken_branches_are_lazy() {
     let failure = Awaitable::<f64>::panicking("must not be polled").after_yield();
     coherent!(async => {

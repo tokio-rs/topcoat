@@ -80,7 +80,7 @@ let value = f64::NAN;
 coherent!(known "captured_nan" => value);
 ```
 
-These cases execute on every run. A changed outcome fails, and an unexpected pass fails with an instruction to remove the baseline. A baseline can also record an exact JavaScript compilation error. Unexpected runtime exceptions and timeouts always fail.
+These cases execute on every run. A changed outcome fails, and an unexpected pass fails with an instruction to remove the baseline. A baseline can also record an exact JavaScript compilation error or exception from evaluating the expression. Exceptions never count as coherent outcomes, even when Rust panics. Errors from the observer, stalled promises, and timeouts always fail and cannot be accepted by a baseline.
 
 # Coverage boundaries
 

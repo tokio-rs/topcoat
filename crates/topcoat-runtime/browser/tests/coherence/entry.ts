@@ -22,6 +22,9 @@ export function execute(source: string, invoke: boolean): string {
 		if (error instanceof Panic) {
 			return JSON.stringify({ kind: "Panic", value: error.message });
 		}
+		if (error instanceof Error) {
+			return JSON.stringify({ kind: "Exception", value: error.toString() });
+		}
 		throw error;
 	}
 	return JSON.stringify({ kind: "Return", value: observe(value) });
@@ -46,6 +49,9 @@ export async function executeAsync(source: string): Promise<string> {
 	} catch (error) {
 		if (error instanceof Panic) {
 			return JSON.stringify({ kind: "Panic", value: error.message });
+		}
+		if (error instanceof Error) {
+			return JSON.stringify({ kind: "Exception", value: error.toString() });
 		}
 		throw error;
 	}

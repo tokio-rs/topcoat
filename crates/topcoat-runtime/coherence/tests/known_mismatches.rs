@@ -1,4 +1,35 @@
-use topcoat_runtime_coherence::coherent;
+use topcoat::runtime::expr;
+use topcoat_runtime_coherence::{Case, coherent};
+
+#[test]
+fn captured_tuple_field() {
+    let pair = (1.5, 2.5);
+    Case::evaluated("pair.0", expr!(pair.0)).assert_known("captured_tuple_field");
+    coherent!(known "captured_tuple_field" => pair.0);
+    coherent!(async known "captured_tuple_field" => pair.0);
+}
+
+#[test]
+fn captured_tuple_value() {
+    let pair = (1.5, 2.5);
+    Case::evaluated("pair", expr!(pair)).assert_known("captured_tuple_value");
+    coherent!(known "captured_tuple_value" => pair);
+    coherent!(async known "captured_tuple_value" => pair);
+}
+
+#[test]
+fn captured_tuple_with_option() {
+    let pair = (1.0, Some(2.0));
+    coherent!(known "captured_tuple_with_option" => pair);
+}
+
+#[test]
+fn captured_nested_tuple_field() {
+    let nested = ((1.5, 2.5), true);
+    coherent!(known "captured_tuple_field" => nested.0.0);
+    let wrapped = Some((1.5, 2.5));
+    coherent!(known "captured_tuple_field" => wrapped.unwrap().0);
+}
 
 #[test]
 fn captured_nan() {

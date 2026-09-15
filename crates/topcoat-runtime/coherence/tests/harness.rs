@@ -88,6 +88,20 @@ fn missing_baseline_is_an_error() {
 }
 
 #[test]
+fn exception_baselines_require_exact_outcomes() {
+    for (value, source, expected) in [
+        (1.5, "cx.hydrate(1.5)", "now passes"),
+        (1.5, "(() => { throw new TypeError('Unknown surrogate type: undefined'); })()", "changed"),
+        (2.5, "(() => { throw new Error('Unknown surrogate type: undefined'); })()", "changed"),
+        (1.5, "({ unexpected: true })", "Unsupported coherence value"),
+    ] {
+        let case = Case::evaluated("changed tuple failure", Expr::new(value, Js::source(source)));
+        let report = format!("{:#}", case.check_known("captured_tuple_field").unwrap_err());
+        assert!(report.contains(expected));
+    }
+}
+
+#[test]
 fn different_async_values_fail_with_both_outcomes() {
     let case = Case::asynchronous(
         "deliberately unequal async values",
@@ -121,13 +135,16 @@ fn javascript_rejection_does_not_match_a_rust_panic() {
 
 #[test]
 fn async_cases_require_a_promise_and_observable_value() {
-    for source in ["() => cx.hydrate(1)", "async () => ({ unexpected: true })"] {
+    for (source, expected) in [
+        ("() => cx.hydrate(1)", "Compiled async closure must return a promise"),
+        ("async () => ({ unexpected: true })", "Unsupported coherence value"),
+    ] {
         let case = Case::asynchronous(
             "invalid async result",
             Expr::new(async || 1.0.into_surrogate(), Js::source(source)),
         )
         .unwrap();
         let report = case.check().unwrap_err().to_string();
-        assert!(report.contains("JavaScript execution failed"));
+        assert!(report.contains(expected));
     }
 }
