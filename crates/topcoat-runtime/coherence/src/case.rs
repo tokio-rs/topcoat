@@ -1,5 +1,7 @@
 use std::{
+    any::Any,
     cell::RefCell,
+    ops::AsyncFnOnce,
     panic::{AssertUnwindSafe, catch_unwind},
     time::Duration,
 };
@@ -16,6 +18,7 @@ pub struct Case {
     source: String,
     rust: Outcome,
     invoke: bool,
+    asynchronous: bool,
 }
 
 impl Case {
@@ -27,6 +30,7 @@ impl Case {
             source: js.to_source(),
             rust: Outcome::Return(value.observe()),
             invoke: false,
+            asynchronous: false,
         }
     }
 
@@ -41,21 +45,77 @@ impl Case {
         let source = js.to_source();
         let rust = match catch_unwind(AssertUnwindSafe(run)) {
             Ok(value) => Outcome::Return(value.into_real().observe()),
-            Err(payload) => {
-                let message = payload.downcast_ref::<String>().cloned().or_else(|| {
-                    payload
-                        .downcast_ref::<&str>()
-                        .map(|message| (*message).to_owned())
-                });
-                Outcome::Panic(message.unwrap_or_else(|| "non-string panic payload".to_owned()))
-            }
+            Err(payload) => Self::panic_outcome(&*payload),
         };
         Self {
             expression,
             source,
             rust,
             invoke: true,
+            asynchronous: false,
         }
+    }
+
+    /// Runs a compiled async closure to completion from a synchronous test.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if called inside a Tokio runtime, if the executor
+    /// cannot start, or if the future exceeds five seconds.
+    pub fn asynchronous<F, S>(expression: &'static str, compiled: Expr<F>) -> Result<Self>
+    where
+        F: AsyncFnOnce() -> S,
+        S: Surrogate,
+        S::Real: Observe,
+    {
+        Self::asynchronous_with_timeout(expression, compiled, Duration::from_secs(5))
+    }
+
+    fn asynchronous_with_timeout<F, S>(
+        expression: &'static str,
+        compiled: Expr<F>,
+        timeout: Duration,
+    ) -> Result<Self>
+    where
+        F: AsyncFnOnce() -> S,
+        S: Surrogate,
+        S::Real: Observe,
+    {
+        anyhow::ensure!(
+            tokio::runtime::Handle::try_current().is_err(),
+            "async coherence cases must run in synchronous tests"
+        );
+        let (run, js) = compiled.into_evaluated_and_js();
+        let source = js.to_source();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()?;
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            runtime.block_on(async { tokio::time::timeout(timeout, async { run().await }).await })
+        }));
+        let rust = match result {
+            Ok(Ok(value)) => Outcome::Return(value.into_real().observe()),
+            Ok(Err(_)) => bail!(
+                "Rust future exceeded {timeout:?}: {expression}\ngenerated JavaScript:\n{source}"
+            ),
+            Err(payload) => Self::panic_outcome(&*payload),
+        };
+        Ok(Self {
+            expression,
+            source,
+            rust,
+            invoke: true,
+            asynchronous: true,
+        })
+    }
+
+    fn panic_outcome(payload: &(dyn Any + Send)) -> Outcome {
+        let message = payload.downcast_ref::<String>().cloned().or_else(|| {
+            payload
+                .downcast_ref::<&str>()
+                .map(|message| (*message).to_owned())
+        });
+        Outcome::Panic(message.unwrap_or_else(|| "non-string panic payload".to_owned()))
     }
 
     /// Executes JavaScript and compares its outcome with Rust's.
@@ -87,12 +147,23 @@ impl Case {
         }
 
         let source = serde_json::to_string(&self.source)?;
+        let call = if self.asynchronous {
+            format!("TopcoatCoherence.executeAsync({source})")
+        } else {
+            format!("TopcoatCoherence.execute({source}, {})", self.invoke)
+        };
         let script = format!(
-            "{}\nTopcoatCoherence.execute({source}, {});",
-            include_str!("../../browser/dist/coherence.js"),
-            self.invoke,
+            "{}\n{call};",
+            include_str!("../../browser/dist/coherence.js")
         );
-        let json = ENGINE.with(|engine| engine.borrow_mut().evaluate(&script))?;
+        let json = ENGINE.with(|engine| {
+            let mut engine = engine.borrow_mut();
+            if self.asynchronous {
+                engine.evaluate_async(&script)
+            } else {
+                engine.evaluate(&script)
+            }
+        })?;
         serde_json::from_str(&json).context("invalid JavaScript observation")
     }
 
@@ -178,8 +249,18 @@ struct KnownMismatch {
 ///
 /// The default form wraps the expression in a closure to capture panics. Use
 /// `coherent!(direct => expression)` to exercise direct expression lowering.
+/// Use `coherent!(async => expression)` to await an async closure in a
+/// synchronous test. Both closure forms support `known "id" => expression`.
 #[macro_export]
 macro_rules! coherent {
+    (async known $id:literal => $($expression:tt)+) => {
+        $crate::Case::asynchronous(stringify!($($expression)+), $crate::compile!(async || $($expression)+))
+            .expect("async coherence execution failed").assert_known($id)
+    };
+    (async => $($expression:tt)+) => {
+        $crate::Case::asynchronous(stringify!($($expression)+), $crate::compile!(async || $($expression)+))
+            .expect("async coherence execution failed").assert()
+    };
     (known $id:literal => $($expression:tt)+) => {
         $crate::Case::deferred(stringify!($($expression)+), $crate::compile!(|| $($expression)+)).assert_known($id)
     };
@@ -189,4 +270,23 @@ macro_rules! coherent {
     ($($expression:tt)+) => {
         $crate::Case::deferred(stringify!($($expression)+), $crate::compile!(|| $($expression)+)).assert()
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use topcoat::runtime::{Js, Surrogated};
+
+    use super::*;
+
+    #[test]
+    fn a_stalled_rust_future_is_an_execution_failure() {
+        let compiled = Expr::new(
+            async || std::future::pending::<<f64 as Surrogated>::Surrogate>().await,
+            Js::source("async () => new Promise(() => {})"),
+        );
+        let result =
+            Case::asynchronous_with_timeout("pending forever", compiled, Duration::from_millis(10));
+        let error = result.err().expect("a stalled future must fail");
+        assert!(error.to_string().contains("Rust future exceeded"));
+    }
 }

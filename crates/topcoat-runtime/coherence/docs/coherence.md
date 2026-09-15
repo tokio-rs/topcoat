@@ -45,6 +45,24 @@ coherent!(direct => 1.0 + 2.0);
 
 Direct cases must return normally on the Rust side. A panic during capture serialization or closure construction is a setup failure, not an expression outcome.
 
+# Async expressions
+
+Use `async =>` in an ordinary synchronous test. The harness runs the compiled async closure with Tokio on the Rust side and drains promise continuations in V8 on the JavaScript side, then compares the completed values.
+
+```rust
+use topcoat_runtime_coherence::{Awaitable, coherent};
+
+let value = Awaitable::ready(3.0).after_yield();
+coherent!(async => {
+    let number = value.await;
+    number + 1.0
+});
+```
+
+[`Awaitable`] supplies deterministic futures that return a captured value or panic when awaited. `after_yield()` makes Rust return `Pending` once and wake the executor, and adds a promise continuation in JavaScript. This exercises suspension without network requests or timers. The fixture is lazy on both sides and uses the production JavaScript `Future` surrogate. Only its fixture hydration is added by the test bundle.
+
+Async cases compare final outcomes, not polling counts or scheduling order. JavaScript runtime `Panic` rejections count as panics; other rejections fail execution. `coherent!(async known "id" => expression)` checks an async expression against a recorded mismatch.
+
 # Comparing outcomes
 
 [`Observe`] converts Rust values into a tagged representation. The JavaScript adapter reads the surrogate's stored value independently of production serialization and rendering. Values compare exactly, including float bits and negative zero. All NaN payloads compare as one NaN value. Options, results, tuples, and unit retain their structural distinctions.
@@ -53,7 +71,7 @@ A Rust panic agrees with a JavaScript runtime `Panic`, regardless of message wor
 
 # Known mismatches
 
-A known discrepancy has a named case in `tests/known_mismatches.rs` and exact Rust and JavaScript outcomes in `known-mismatches.toml`:
+A known discrepancy has a named case and exact Rust and JavaScript outcomes in `known-mismatches.toml`:
 
 ```rust
 use topcoat_runtime_coherence::coherent;
@@ -66,8 +84,10 @@ These cases execute on every run. A changed outcome fails, and an unexpected pas
 
 # Coverage boundaries
 
-The harness evaluates synchronous expressions and closures without arguments. It does not yet initialize signal fixtures, compare side effects or rendered output, drive async procedures, or generate expression source. Its observer can represent tuples, but expression support still depends on the production compiler and hydration code.
+The harness evaluates synchronous expressions and synchronous or async closures without arguments. It does not yet initialize signal fixtures, compare side effects or rendered output, drive real procedure requests, or generate expression source. Its observer can represent tuples, but expression support still depends on the production compiler and hydration code.
 
-V8 gets a fresh global context and runtime context for each evaluation, with a five-second deadline. The host supplies the `TextEncoder.encode` operation used by the runtime. Rust evaluation runs in the test process and has no deadline, so test expressions must terminate. Process isolation is needed before adding potentially unbounded Rust programs.
+V8 gets a fresh global context, runtime context, and microtask queue for each evaluation, with a five-second deadline. An unsettled promise with no runnable microtasks fails immediately. The host supplies the `TextEncoder.encode` operation used by the runtime, but no browser timers or networking.
+
+Rust evaluation runs in the test process. Async cases have a five-second cooperative timeout, which can stop a pending future but cannot interrupt a poll that never returns. Synchronous cases have no deadline. Test expressions must terminate; process isolation is needed before adding potentially unbounded Rust programs.
 
 Both sides use the compiler's surrogate vocabulary. Agreement establishes server/client coherence; it does not independently prove agreement with every operation in ordinary Rust.

@@ -39,6 +39,24 @@ impl Engine {
     ///
     /// Panics if the watchdog thread panics.
     pub fn evaluate(&mut self, source: &str) -> Result<String> {
+        self.evaluate_inner(source, false)
+    }
+
+    /// Evaluates a script returning a promise of a string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for rejection, a pending promise with no runnable
+    /// microtasks, an exceeded deadline, or an unexpected result type.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the watchdog thread panics.
+    pub fn evaluate_async(&mut self, source: &str) -> Result<String> {
+        self.evaluate_inner(source, true)
+    }
+
+    fn evaluate_inner(&mut self, source: &str, asynchronous: bool) -> Result<String> {
         let handle = self.isolate.thread_safe_handle();
         let timeout = self.timeout;
         let (done, receiver) = mpsc::channel();
@@ -51,7 +69,7 @@ impl Engine {
             }
         });
 
-        let result = self.run(source);
+        let result = self.run(source, asynchronous);
         let _ = done.send(());
         let timed_out = watchdog.join().expect("JavaScript watchdog panicked");
         // Join before resetting termination so a late watchdog cannot interrupt
@@ -63,10 +81,12 @@ impl Engine {
         result
     }
 
-    fn run(&mut self, source: &str) -> Result<String> {
+    fn run(&mut self, source: &str, asynchronous: bool) -> Result<String> {
+        let microtasks = v8::MicrotaskQueue::new(&mut self.isolate, v8::MicrotasksPolicy::Explicit);
         let scope = std::pin::pin!(v8::HandleScope::new(&mut self.isolate));
         let scope = &mut scope.init();
         let context = v8::Context::new(scope, v8::ContextOptions::default());
+        context.set_microtask_queue(&microtasks);
         let scope = &mut v8::ContextScope::new(scope, context);
         let scope = std::pin::pin!(v8::TryCatch::new(scope));
         let scope = &mut scope.init();
@@ -84,6 +104,30 @@ impl Engine {
                 |exception| exception.to_rust_string_lossy(scope),
             );
             bail!("JavaScript execution failed: {exception}");
+        };
+        let result = if asynchronous {
+            let promise = v8::Local::<v8::Promise>::try_from(result)
+                .map_err(|_| anyhow::anyhow!("async JavaScript script must return a promise"))?;
+            promise.mark_as_handled();
+            // A checkpoint drains chained promise continuations too. The
+            // watchdog remains active if that chain never yields an empty queue.
+            microtasks.perform_checkpoint(scope);
+            anyhow::ensure!(
+                !scope.is_execution_terminating(),
+                "JavaScript execution terminated"
+            );
+            match promise.state() {
+                v8::PromiseState::Fulfilled => promise.result(scope),
+                v8::PromiseState::Rejected => {
+                    let rejection = promise.result(scope).to_rust_string_lossy(scope);
+                    bail!("JavaScript promise rejected: {rejection}");
+                }
+                v8::PromiseState::Pending => {
+                    bail!("JavaScript promise stalled with no runnable microtasks");
+                }
+            }
+        } else {
+            result
         };
         let result = v8::Local::<v8::String>::try_from(result)
             .map_err(|_| anyhow::anyhow!("JavaScript script must return a string"))?;
@@ -182,5 +226,67 @@ mod tests {
                 .contains("exceeded")
         );
         assert_eq!(engine.evaluate("'recovered'").unwrap(), "recovered");
+    }
+
+    #[test]
+    fn drives_chained_promises() {
+        let mut engine = Engine::new(Duration::from_secs(5));
+        assert_eq!(
+            engine
+                .evaluate_async(
+                    "Promise.resolve(3).then(value => Promise.resolve(value + 1)).then(String)"
+                )
+                .unwrap(),
+            "4",
+        );
+        assert!(engine.evaluate("Promise.resolve('unexpected')").is_err());
+        assert!(engine.evaluate_async("'not a promise'").is_err());
+    }
+
+    #[test]
+    fn reports_rejected_and_stalled_promises() {
+        let mut engine = Engine::new(Duration::from_secs(5));
+        assert!(
+            engine
+                .evaluate_async("Promise.reject(new TypeError('broken'))")
+                .unwrap_err()
+                .to_string()
+                .contains("TypeError: broken")
+        );
+        assert!(
+            engine
+                .evaluate_async("new Promise(() => {})")
+                .unwrap_err()
+                .to_string()
+                .contains("stalled")
+        );
+    }
+
+    #[test]
+    fn terminates_endless_microtasks_and_recovers() {
+        let mut engine = Engine::new(Duration::from_millis(100));
+        let error = engine
+            .evaluate_async("(async () => { while (true) { await Promise.resolve(); } })()")
+            .unwrap_err();
+        assert!(error.to_string().contains("exceeded"));
+        engine.timeout = Duration::from_secs(5);
+        assert_eq!(
+            engine
+                .evaluate_async("Promise.resolve('recovered')")
+                .unwrap(),
+            "recovered"
+        );
+    }
+
+    #[test]
+    fn pending_microtasks_do_not_leak_between_contexts() {
+        let mut engine = Engine::new(Duration::from_secs(5));
+        engine
+            .evaluate("Promise.resolve().then(() => { for (;;) {} }); ''")
+            .unwrap();
+        assert_eq!(
+            engine.evaluate_async("Promise.resolve('fresh')").unwrap(),
+            "fresh"
+        );
     }
 }
