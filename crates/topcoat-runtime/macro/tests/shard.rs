@@ -46,7 +46,19 @@ async fn signal_host(cx: &Cx) -> Result<impl View> {
 
 #[shard]
 async fn search_results(query: String, limit: usize) -> Result<impl View> {
-    Ok(view! { <p>(query) " " (limit)</p> })
+    Ok(view! {
+        <p>
+            (query)
+            " "
+            (limit)
+        </p>
+    })
+}
+
+#[component]
+async fn search_host(cx: &Cx) -> Result<impl View> {
+    let query = signal(cx, || String::from("shoes"));
+    Ok(view! { search_results(query: $(query.get()), limit: 20) })
 }
 
 #[shard]
@@ -178,8 +190,7 @@ async fn a_static_argument_keeps_its_javascript_for_rerenders() {
 #[tokio::test]
 async fn fixed_and_reactive_arguments_render_together() {
     let cx = &Cx::default();
-    let query = signal(cx, || String::from("shoes"));
-    let inline = view! { cx => search_results(query: $(query.get()), limit: 20) }
+    let inline = view! { cx => search_host() }
         .single()
         .await
         .unwrap()

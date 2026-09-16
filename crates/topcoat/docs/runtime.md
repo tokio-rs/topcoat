@@ -184,7 +184,7 @@ The call is an HTTP request under the hood: the arguments travel to the server, 
 
 # Shards
 
-When it is the markup itself that needs the server -- fresh search results as the user types -- use a **shard**: a component that re-renders on the server whenever one of its arguments changes. Arguments are runtime expressions; the browser sends their current values to the server and swaps the returned HTML in place:
+When it is the markup itself that needs the server -- fresh search results as the user types -- use a **shard**: a component that re-renders on the server whenever one of its arguments changes. Arguments accept fixed values or runtime expressions; the browser sends their current values to the server and swaps the returned HTML in place:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Event}};
@@ -268,7 +268,7 @@ async fn paginated(cx: &Cx) -> Result<impl View> {
 
 Clicking a button changes `page` in the browser, and because the shard read it on the server, the shard runs again with the new value and swaps in the next page of items.
 
-A shard can also take a signal from its caller, through a parameter typed `Signal<T>` and passed as `$(signal)`. The signal handle does not change when its value does, so whether a change re-renders the shard depends on how the shard body reads it. See [`#[shard]`][shard].
+A shard can also take a signal from its caller, through a parameter typed `Signal<T>` and passed directly as `signal`. The signal handle does not change when its value does, so whether a change re-renders the shard depends on how the shard body reads it. See [`#[shard]`][shard].
 
 `.get_untracked()` and `.read_untracked()` read a signal's value without making anything depend on it, for a body that wants the value a run started with but should not run again when it changes.
 
