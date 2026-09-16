@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, expect, it } from "vitest";
 
-import { morph } from "./morph";
+import { morph } from "../../../../topcoat-core/browser/morph";
 
 beforeEach(() => {
 	document.body.innerHTML = "";

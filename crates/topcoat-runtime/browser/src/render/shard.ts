@@ -1,4 +1,4 @@
-import { morph } from "../dom/morph";
+import { morph } from "../../../../topcoat-core/browser/morph";
 import { compile, type Expression } from "../expression/compile";
 import { dehydrate } from "../expression/dehydrate";
 import { untrack } from "../reactivity";

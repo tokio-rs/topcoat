@@ -3,6 +3,7 @@
 // pill in the meantime.
 (() => {
   const script = document.currentScript;
+  if (!(script instanceof HTMLScriptElement)) return;
 
   // The dev server's WebSocket endpoint lives on the same origin as this
   // script.
@@ -53,7 +54,7 @@
   }
 
   // Lucide icons (https://lucide.dev), inheriting the surrounding color.
-  const lucide = (paths) =>
+  const lucide = (paths: string) =>
     '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"' +
     ' viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"' +
     ` stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
@@ -143,23 +144,23 @@
     <button class="dismiss" aria-label="Dismiss">${X_ICON}</button>
   `;
 
-  let pill = null;
-  let statusEl = null;
-  let spinnerEl = null;
+  let pill: ReturnType<typeof createPill> | undefined;
 
   function createPill() {
-    pill = document.createElement("topcoat-dev-status");
-    pill.style.cssText = HOST_STYLE;
+    const host = document.createElement("topcoat-dev-status");
+    host.style.cssText = HOST_STYLE;
 
-    const shadow = pill.attachShadow({ mode: "open" });
+    const shadow = host.attachShadow({ mode: "open" });
     shadow.innerHTML = SHADOW_HTML;
 
-    statusEl = shadow.querySelector("b");
-    spinnerEl = shadow.querySelector(".spinner");
-    shadow.querySelector("button").onclick = hideStatus;
+    const statusEl = shadow.querySelector("b") as HTMLElement;
+    const spinnerEl = shadow.querySelector(".spinner") as HTMLElement;
+    const dismiss = shadow.querySelector("button") as HTMLButtonElement;
+    dismiss.onclick = hideStatus;
+    return { host, statusEl, spinnerEl };
   }
 
-  function showStatus(label, isError) {
+  function showStatus(label: string, isError: boolean) {
     if (!enabled) return;
     if (!document.body) {
       // The script can run from <head> before the body exists; the pill can
@@ -171,7 +172,8 @@
       );
       return;
     }
-    if (!pill) createPill();
+    pill ??= createPill();
+    const { host, statusEl, spinnerEl } = pill;
 
     statusEl.textContent = label;
     statusEl.className = isError ? "error" : "busy";
@@ -179,16 +181,16 @@
     spinnerEl.style.display = isError ? "none" : "";
 
     // Re-attach even if previously dismissed: each event is news.
-    if (!pill.isConnected) document.body.append(pill);
+    if (!host.isConnected) document.body.append(host);
   }
 
   function hideStatus() {
-    pill?.remove();
+    pill?.host.remove();
   }
 
   // --- Dev server connection ------------------------------------------------
 
-  const MESSAGES = {
+  const MESSAGES: Record<string, () => void> = {
     "reload": () => window.location.reload(),
     "rebuilding": () => showStatus("rebuilding", false),
     "build-failed": () => showStatus("build failed", true),

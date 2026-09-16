@@ -20,7 +20,7 @@ use topcoat_router::{
 const PORT_START: u16 = 59039;
 const PORT_RANGE: u16 = 100;
 
-const DEV_JS: &str = include_str!("dev.js");
+const DEV_JS: &str = include_str!("../../browser/dist/index.js");
 
 /// An event pushed to every browser connected to the broadcast server.
 #[derive(Clone, Copy)]

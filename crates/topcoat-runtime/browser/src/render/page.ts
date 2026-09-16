@@ -1,4 +1,4 @@
-import { morph } from "../dom/morph";
+import { morph } from "../../../../topcoat-core/browser/morph";
 import { untrack } from "../reactivity";
 import type { Runtime } from "../runtime";
 import type { Scope } from "../scope";
