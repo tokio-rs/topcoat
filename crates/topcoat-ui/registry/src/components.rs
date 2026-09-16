@@ -9,6 +9,7 @@ pub mod card;
 pub mod checkbox;
 pub mod dialog;
 pub mod dropdown_menu;
+pub mod field;
 pub mod hover_card;
 pub mod input;
 pub mod kbd;

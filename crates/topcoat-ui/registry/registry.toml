@@ -43,6 +43,10 @@ source = "src/components/dialog.rs"
 [components.dropdown_menu]
 source = "src/components/dropdown_menu.rs"
 
+[components.field]
+source = "src/components/field.rs"
+dependencies = ["label"]
+
 [components.hover_card]
 source = "src/components/hover_card.rs"
 
