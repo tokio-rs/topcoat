@@ -82,7 +82,7 @@ impl ToTokens for Shard {
             .chain(value_idents.iter().map(|id| quote!(#id)));
         let call_args: Vec<_> = call_args.collect();
 
-        // The component face takes each value parameter as an `Expr<T>`.
+        // The component face accepts a value or expression for each parameter.
         let cx_param = has_cx.then(|| quote!(cx: &#topcoat_context::Cx,));
         // Bound to a local because it is interpolated inside the `#(...)*`
         // repetition below, where a bare `#topcoat_runtime` would expand to a
@@ -90,7 +90,7 @@ impl ToTokens for Shard {
         let expr_ty = quote!(#topcoat_runtime::Expr);
         let component_params = quote! {
             #cx_param
-            #(#value_idents: #expr_ty<#value_tys>,)*
+            #(#[into] #value_idents: #expr_ty<#value_tys>,)*
         };
 
         let id = Uuid::new_v4().to_string();

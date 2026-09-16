@@ -41,7 +41,12 @@ async fn by_signal(query: Signal<String>) -> Result<impl View> {
 #[component]
 async fn signal_host(cx: &Cx) -> Result<impl View> {
     let query = signal(cx, || String::from("shoes"));
-    Ok(view! { by_signal(query: $(query)) })
+    Ok(view! { by_signal(query: query) })
+}
+
+#[shard]
+async fn search_results(query: String, limit: usize) -> Result<impl View> {
+    Ok(view! { <p>(query) " " (limit)</p> })
 }
 
 #[shard]
@@ -153,7 +158,7 @@ async fn a_signal_argument_is_read_inline_and_rebuilt_from_its_value() {
 #[tokio::test]
 async fn a_static_argument_keeps_its_javascript_for_rerenders() {
     let cx = &Cx::default();
-    let inline = view! { cx => stateful(label: String::from("constant").into()) }
+    let inline = view! { cx => stateful(label: String::from("constant")) }
         .single()
         .await
         .unwrap()
@@ -168,6 +173,29 @@ async fn a_static_argument_keeps_its_javascript_for_rerenders() {
 
     let rerendered = rerender_with(&stateful, identity, r#"["constant"]"#, "{}").await;
     assert!(rerendered.contains("<p>constant "), "{rerendered}");
+}
+
+#[tokio::test]
+async fn fixed_and_reactive_arguments_render_together() {
+    let cx = &Cx::default();
+    let query = signal(cx, || String::from("shoes"));
+    let inline = view! { cx => search_results(query: $(query.get()), limit: 20) }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    let (_, identity) = scope_marker(&inline);
+
+    assert!(inline.contains("<p>shoes 20</p>"), "{inline}");
+    assert!(inline.contains(".get()"), "{inline}");
+    assert!(inline.contains("&quot;v&quot;:&quot;20&quot;"), "{inline}");
+
+    let args = format!(
+        r#"["boots",{{"t":"usize","bits":{},"v":"20"}}]"#,
+        usize::BITS,
+    );
+    let rerendered = rerender_with(&search_results, identity, &args, "{}").await;
+    assert!(rerendered.contains("<p>boots 20</p>"), "{rerendered}");
 }
 
 #[tokio::test]
