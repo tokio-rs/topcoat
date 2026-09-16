@@ -108,8 +108,8 @@ use components::button::button;
 use components::card::{
     card, card_content, card_description, card_footer, card_header, card_title,
 };
+use components::field::{field, field_description, field_group, field_label};
 use components::input::input;
-use components::label::label;
 use topcoat::{Result, view::{View, attributes, component, view}};
 
 #[component]
@@ -121,14 +121,33 @@ async fn sign_in() -> Result<impl View> {
                 card_description("Use your work email to continue.")
             )
             card_content(
-                <form class="flex flex-col gap-2">
-                    label(attrs: attributes! { for="email" }, "Email")
-                    input(
-                        attrs: attributes! { id="email" type="email" placeholder="you@example.com" }
+                <form id="sign-in" method="post" action="/login">
+                    field_group(
+                        field(
+                            field_label(attrs: attributes! { for="email" }, "Email")
+                            input(
+                                attrs: attributes! {
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    placeholder="you@example.com"
+                                    aria-describedby="email-description"
+                                }
+                            )
+                            field_description(
+                                attrs: attributes! { id="email-description" },
+                                "Use the email address associated with your account."
+                            )
+                        )
                     )
                 </form>
             )
-            card_footer(button(attrs: attributes! { class="w-full" }, "Sign in"))
+            card_footer(
+                button(
+                    attrs: attributes! { class="w-full" type="submit" form="sign-in" },
+                    "Sign in"
+                )
+            )
         )
     })
 }
