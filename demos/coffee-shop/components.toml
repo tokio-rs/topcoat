@@ -25,7 +25,7 @@ hash = "sha256:a2c94942999ae16bba591554f7a242192e43d9ce2648ade3e67f69bfe0f82828"
 file = "src/components/input.rs"
 
 [registries.topcoat.components.label]
-hash = "sha256:9d31d6ff7de757d823f3c304c1b49cc9dad56ca24676505f4f4eda4826c7de22"
+hash = "sha256:11bf66efb11267ac530d66ac438c46289084c0fbbe3895079eb716c0a92caed4"
 file = "src/components/label.rs"
 
 [registries.topcoat.components.skeleton]
