@@ -1,5 +1,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+mod arguments;
 mod bind_attribute;
 mod event_handler;
 mod expr;
@@ -16,6 +17,7 @@ mod shard_scope;
 mod signal;
 mod surrogate;
 
+pub use arguments::*;
 pub use bind_attribute::*;
 pub use event_handler::*;
 pub use expr::*;

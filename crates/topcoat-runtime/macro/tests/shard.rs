@@ -44,6 +44,12 @@ async fn signal_host(cx: &Cx) -> Result<impl View> {
     Ok(view! { by_signal(query: $(query)) })
 }
 
+#[shard]
+async fn without_arguments(cx: &Cx) -> Result<impl View> {
+    let page = signal(cx, || 1usize);
+    Ok(view! { <p>(page.get())</p> })
+}
+
 /// The shard id and identity arguments of the scope start marker in `html`.
 fn scope_marker(html: &str) -> (&str, &str) {
     let start = html.find("::topcoat::shard::start(").expect(html);
@@ -96,6 +102,24 @@ async fn rerender_with(
 /// carrying the JSON object `signals` of signal values.
 async fn rerender(identity: &str, signals: &str) -> String {
     rerender_with(&stateful, identity, r#"["a"]"#, signals).await
+}
+
+#[tokio::test]
+async fn a_shard_without_arguments_accepts_the_browser_request() {
+    let cx = &Cx::default();
+    let inline = view! { cx => without_arguments() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    let (_, identity) = scope_marker(&inline);
+    let id = last_signal_id(&inline);
+    let signals = format!(
+        r#"{{"{id}":{{"t":"usize","bits":{},"v":"2"}}}}"#,
+        usize::BITS,
+    );
+    let rerendered = rerender_with(&without_arguments, identity, "[]", &signals).await;
+    assert!(rerendered.contains("<p>2</p>"), "{rerendered}");
 }
 
 #[tokio::test]

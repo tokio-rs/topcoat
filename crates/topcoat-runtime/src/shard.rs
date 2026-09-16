@@ -8,7 +8,7 @@ use topcoat_router::{
 };
 use topcoat_view::ViewHandle;
 
-use crate::SignalValues;
+use crate::{Arguments, SignalValues};
 
 pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/runtime/shards";
 
@@ -18,8 +18,9 @@ pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/runtime/shards";
 /// The identity of the shard invocation travels separately, in the
 /// request's identity header.
 #[derive(Debug, Deserialize)]
+#[serde(bound(deserialize = "Arguments<A>: Deserialize<'de>"))]
 pub struct ShardRequest<A> {
-    args: A,
+    args: Arguments<A>,
     #[serde(default)]
     signals: SignalValues,
 }
@@ -28,7 +29,7 @@ impl<A> ShardRequest<A> {
     /// Splits the request into the arguments to hand the shard body and the
     /// signal values to register on its request context.
     pub fn into_parts(self) -> (A, SignalValues) {
-        (self.args, self.signals)
+        (self.args.0, self.signals)
     }
 }
 

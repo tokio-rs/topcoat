@@ -53,7 +53,7 @@ use topcoat::{
     font::fontsource::fontsource_font,
     icon::{icon, iconify::iconify_icon},
     router::{Router, RouterBuilderDiscoverExt, page, query_params},
-    runtime::{Event, RouterBuilderRuntimeExt, expr, signal},
+    runtime::{Event, RouterBuilderRuntimeExt, expr, shard, signal},
     tailwind,
     view::{Child, View, attributes, class, component, view},
 };
@@ -87,7 +87,6 @@ async fn main() {
 #[query_params(error = redirect("?"))]
 struct HomeQuery {
     tab: Option<String>,
-    page: Option<usize>,
 }
 
 /// The page's state: its query string read back as the values the page has
@@ -99,8 +98,6 @@ struct HomeQuery {
 struct State {
     /// The panel the project card shows.
     tab: &'static str,
-    /// The page of the deployments table.
-    page: usize,
 }
 
 impl State {
@@ -114,7 +111,6 @@ impl State {
 
         Ok(Self {
             tab: one_of(query.tab.as_deref(), &TABS.map(|(value, _)| value)).unwrap_or(TABS[0].0),
-            page: query.page.unwrap_or(1).max(1),
         })
     }
 
@@ -126,18 +122,12 @@ impl State {
         if self.tab != TABS[0].0 {
             params.push(("tab", self.tab.to_owned()));
         }
-        if self.page > 1 {
-            params.push(("page", self.page.to_string()));
-        }
 
         params
     }
 
     /// The page's URL with `key` set to `value`, or dropped for `None`, and
     /// the rest of the state left as it is.
-    ///
-    /// Links preserve the other query parameters, so pagination and tabs
-    /// keep their independent state.
     fn href(&self, key: &'static str, value: Option<&str>) -> String {
         let mut params = self.params();
         params.retain(|(name, _)| *name != key);
@@ -152,16 +142,6 @@ impl State {
 
         format!("?{}", query.join("&"))
     }
-
-    /// The URL of page `number` of the deployments table.
-    fn page_href(&self, number: usize) -> String {
-        if number > 1 {
-            self.href("page", Some(&number.to_string()))
-        } else {
-            self.href("page", None)
-        }
-    }
-
 }
 
 /// The entry of `values` that `value` names, if it names one at all.
@@ -315,7 +295,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                         demo(share_card())
                         demo(dialogs_card())
                         demo(sheet_card())
-                        demo(deployments_card(state: &state))
+                        demo(deployments_card())
                         demo(docs_card())
                         demo(pending_card())
                     </div>
@@ -1239,17 +1219,18 @@ const DEPLOYMENTS: [(&str, &str, &str); 12] = [
 ];
 
 /// A table of deployments with pagination underneath.
-#[component]
-async fn deployments_card(state: &State) -> Result<impl View> {
+#[shard]
+async fn deployments_card(cx: &Cx) -> Result<impl View> {
+    let page = signal(cx, || 1usize);
     let rows = &DEPLOYMENTS;
     let pages = rows.len().div_ceil(PER_PAGE).max(1);
     // Clamp the requested page to the available rows.
-    let page = state.page.min(pages);
-    let previous = state.page_href(page.saturating_sub(1).max(1));
-    let next = state.page_href((page + 1).min(pages));
+    let current = page.get().clamp(1, pages);
+    let previous = current.saturating_sub(1).max(1);
+    let next = (current + 1).min(pages);
 
     Ok(view! {
-        let shown = rows.chunks(PER_PAGE).nth(page - 1).unwrap_or_default();
+        let shown = rows.chunks(PER_PAGE).nth(current - 1).unwrap_or_default();
 
         card(
             card_header(
@@ -1261,9 +1242,7 @@ async fn deployments_card(state: &State) -> Result<impl View> {
             // with the sections above and below it.
             table(
                 attrs: attributes! { class="px-3" },
-                table_caption(
-                    "Stand-in rows, so the table has something to page through."
-                )
+                table_caption("Deployments")
                 table_header(
                     table_row(
                         table_head("Commit")
@@ -1295,25 +1274,47 @@ async fn deployments_card(state: &State) -> Result<impl View> {
                 pagination(
                     pagination_content(
                         pagination_item(
-                            pagination_previous(attrs: attributes! { href=(previous) })
+                            pagination_previous(
+                                attrs: attributes! {
+                                    href="#"
+                                    @click=$(|e: Event| {
+                                        e.prevent_default();
+                                        page.set(previous);
+                                    })
+                                }
+                            )
                         )
                         for number in 1..=pages {
-                            if listed(number, page, pages) {
+                            if listed(number, current, pages) {
                                 pagination_item(
                                     pagination_link(
-                                        active: number == page,
-                                        attrs: attributes! { href=(state.page_href(number)) },
+                                        active: number == current,
+                                        attrs: attributes! {
+                                            href="#"
+                                            @click=$(|e: Event| {
+                                                e.prevent_default();
+                                                page.set(number);
+                                            })
+                                        },
                                         (number)
                                     )
                                 )
-                            } else if listed(number - 1, page, pages) {
+                            } else if listed(number - 1, current, pages) {
                                 // The first page left out of a run stands for
                                 // the whole run.
                                 pagination_item(pagination_ellipsis())
                             }
                         }
                         pagination_item(
-                            pagination_next(attrs: attributes! { href=(next) })
+                            pagination_next(
+                                attrs: attributes! {
+                                    href="#"
+                                    @click=$(|e: Event| {
+                                        e.prevent_default();
+                                        page.set(next);
+                                    })
+                                }
+                            )
                         )
                     )
                 )

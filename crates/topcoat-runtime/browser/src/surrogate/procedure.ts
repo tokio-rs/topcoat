@@ -15,7 +15,7 @@ export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(args.length === 0 ? null : args.map(dehydrate)),
+					body: JSON.stringify(args.map(dehydrate)),
 				},
 			);
 			if (!response.ok) {
