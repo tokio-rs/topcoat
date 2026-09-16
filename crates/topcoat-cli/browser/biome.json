@@ -1,7 +1,7 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
 	"files": {
-		"includes": ["**", "!dist"]
+		"includes": ["**", "!dist", "!node_modules"]
 	},
 	"formatter": {
 		"indentStyle": "tab"

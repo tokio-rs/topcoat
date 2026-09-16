@@ -5,6 +5,7 @@
 	"license": "MIT",
 	"type": "module",
 	"scripts": {
+		"lint": "biome ci --config-path . . ../../topcoat-core/browser",
 		"build": "tsup && tsc",
 		"test": "vitest run"
 	},

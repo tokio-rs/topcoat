@@ -138,6 +138,7 @@ jobs:
           cache: yarn
           cache-dependency-path: crates/topcoat-runtime/browser/yarn.lock
       - run: yarn install --frozen-lockfile
+      - run: yarn lint
       # Rebuild the browser and coherence bundles and reject stale artifacts.
       - run: yarn build
       - run: git diff --exit-code -- dist/index.js dist/coherence.js
@@ -157,6 +158,7 @@ jobs:
           cache: yarn
           cache-dependency-path: crates/topcoat-cli/browser/yarn.lock
       - run: yarn install --frozen-lockfile
+      - run: yarn lint
       # The CLI embeds this bundle, so reject stale artifacts.
       - run: yarn build
       - run: git diff --exit-code -- dist/index.js

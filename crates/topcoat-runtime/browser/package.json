@@ -4,6 +4,7 @@
 	"license": "MIT",
 	"type": "module",
 	"scripts": {
+		"lint": "biome ci --config-path . . ../../topcoat-core/browser",
 		"build": "tsup && tsup --config tsup.coherence.config.ts && tsc",
 		"test": "vitest run"
 	},
