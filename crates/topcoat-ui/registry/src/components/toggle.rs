@@ -147,8 +147,7 @@ pub async fn toggle_group(
     Ok(view! {
         <div
             class=(class!(
-                "inline-flex w-fit items-center gap-1 rounded-lg border border-border p-1 \
-                 shadow-xs",
+                "inline-flex w-fit items-center gap-1 rounded-lg border border-border p-1",
                 attrs.remove("class"),
             ))
             (attrs)

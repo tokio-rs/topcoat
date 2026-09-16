@@ -47,12 +47,12 @@ pub async fn radio_group(
 ///
 /// The native glyph is suppressed with `appearance-none` so the component can
 /// draw its own dot, which keeps the control looking the same across
-/// browsers. The circle matches the input control's border and shadow, and
+/// browsers. The circle matches the input control's border, and
 /// picking it recolors the ring rather than filling it, which leaves room for
 /// the dot inside.
 const RADIO: StaticClass = class!(
     "peer size-4 shrink-0 appearance-none rounded-full border border-border \
-     bg-background shadow-xs transition-colors outline-none checked:border-primary \
+     bg-background transition-colors outline-none checked:border-primary \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
      focus-visible:ring-offset-background disabled:pointer-events-none",
 );

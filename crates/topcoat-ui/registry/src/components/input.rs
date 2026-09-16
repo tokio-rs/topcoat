@@ -5,12 +5,12 @@ use topcoat::{
 
 /// The classes for the [`input`] control.
 ///
-/// The height, text size, radius, shadow, and focus ring match the `Md`
+/// The height, text size, radius, and focus ring match the `Md`
 /// button, so an input and a button sit flush in a row. File inputs restyle
 /// the browser's upload button into quiet, borderless text.
 const INPUT: StaticClass = class!(
     "h-9 w-full min-w-0 rounded-lg border border-border bg-background px-3 \
-     text-sm shadow-xs transition-colors outline-none \
+     text-sm transition-colors outline-none \
      placeholder:text-muted-foreground \
      file:mr-3 file:h-full file:border-0 file:bg-transparent file:text-sm file:font-medium \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \

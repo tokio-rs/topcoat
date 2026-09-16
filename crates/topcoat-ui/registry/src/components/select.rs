@@ -13,7 +13,7 @@ use topcoat::{
 /// space.
 const SELECT: StaticClass = class!(
     "h-9 w-full appearance-none items-center rounded-lg border border-border \
-     bg-background pr-8 pl-3 text-left text-sm shadow-xs transition-colors outline-none \
+     bg-background pr-8 pl-3 text-left text-sm transition-colors outline-none \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
      focus-visible:ring-offset-background disabled:pointer-events-none",
 );

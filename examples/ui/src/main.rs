@@ -380,7 +380,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                                 href=(DOCS)
                                 class=(button_variants(
                                     ButtonVariant::Primary,
-                                    ButtonSize::Lg,
+                                    ButtonSize::Md,
                                 ))
                             >
                                 "Read the docs"
@@ -390,7 +390,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                                 href=(REPOSITORY)
                                 class=(button_variants(
                                     ButtonVariant::Outline,
-                                    ButtonSize::Lg,
+                                    ButtonSize::Md,
                                 ))
                             >
                                 "View on GitHub"
@@ -1068,7 +1068,7 @@ async fn toolbar_card() -> Result<impl View> {
                         </div>
                     </div>
                     toggle(
-                        size: ToggleSize::Lg,
+                        size: ToggleSize::Md,
                         attrs: attributes! { name="live" checked="" },
                         icon(data: iconify_icon!("lucide:activity"))
                         "Live updates"

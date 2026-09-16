@@ -9,11 +9,11 @@ use topcoat::{
 ///
 /// The native glyph is suppressed with `appearance-none` so the component can
 /// draw its own checkmark, which keeps the control looking the same across
-/// browsers. The unchecked box matches the input control's border and shadow;
+/// browsers. The unchecked box matches the input control's border;
 /// checking it fills the box with the primary color.
 const CHECKBOX: StaticClass = class!(
     "peer size-4 shrink-0 appearance-none rounded-[4px] border border-border \
-     bg-background shadow-xs transition-colors outline-none \
+     bg-background transition-colors outline-none \
      checked:border-primary checked:bg-primary \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
      focus-visible:ring-offset-background disabled:pointer-events-none",

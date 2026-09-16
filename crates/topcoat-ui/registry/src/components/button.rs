@@ -27,9 +27,8 @@ impl ButtonVariant {
     ///
     /// Hover and press states apply the fill or foreground color at reduced
     /// opacity, so they hold up in both color schemes without `dark:`
-    /// overrides. Every variant with a resting fill or border casts the
-    /// theme's control shadow; `Ghost` is flat until hovered, so it casts
-    /// none.
+    /// overrides. Variants with a resting fill cast the theme's control
+    /// shadow. Outline and ghost buttons have no shadow.
     ///
     /// Each variant sets its own border color rather than inheriting a
     /// transparent one from [`BASE`]: with two border-color classes on the
@@ -46,7 +45,7 @@ impl ButtonVariant {
                  hover:bg-foreground/10 active:bg-foreground/15",
             ),
             Self::Outline => class!(
-                "border-border text-foreground shadow-xs hover:bg-foreground/5 \
+                "border-border text-foreground hover:bg-foreground/5 \
                  active:bg-foreground/10",
             ),
             Self::Ghost => class!(
