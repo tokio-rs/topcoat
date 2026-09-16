@@ -30,7 +30,15 @@ export function setupBinding(el: Element, attr: Attr, scope: Scope): void {
 
 function write(el: Element, name: string, value: unknown): void {
 	if (PROPERTY_NAMES.has(name)) {
-		(el as Element & Record<string, unknown>)[name] = value;
+		let propertyValue = value;
+		if (isAttributeValueViewParts(value)) {
+			const present = value.isAttributePresent();
+			// DOM boolean properties need a primitive, not a truthy surrogate.
+			propertyValue = name === "value"
+				? (present ? value.toAttributeValue() : "")
+				: present;
+		}
+		(el as Element & Record<string, unknown>)[name] = propertyValue;
 	}
 	if (isAttributeValueViewParts(value)) {
 		if (!value.isAttributePresent()) {

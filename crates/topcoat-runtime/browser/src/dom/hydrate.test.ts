@@ -135,3 +135,86 @@ it("a page replacement releases nested shards and adopts surviving signals", asy
 		runtime.page.dispose();
 	}
 });
+
+it("keeps checkbox signals in sync through repeated clicks", () => {
+	document.body.innerHTML = `
+		<!--::topcoat::signal({"t":"signal","id":"checked","v":false})-->
+		<input type="checkbox"
+			data-topcoat-bind:checked="cx.signal('checked').get()"
+			data-topcoat-on:change="e => cx.signal('checked').set(e.target.checked)">
+	`;
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		const input = document.querySelector("input");
+		if (!input) throw new Error("Missing checkbox");
+		expect(input.checked).toBe(false);
+
+		for (const checked of [true, false, true, false]) {
+			input.click();
+			flushEffects();
+			expect(input.checked).toBe(checked);
+			expect(input.hasAttribute("checked")).toBe(checked);
+			expect(runtime.context.signal("checked").get()).toEqual(
+				runtime.context.hydrate(checked),
+			);
+		}
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("selects only the radio matching the signal after each click", () => {
+	document.body.innerHTML = `
+		<!--::topcoat::signal({"t":"signal","id":"range","v":"week"})-->
+		${["day", "week", "month"].map((value) => `
+			<input type="radio" name="range" value="${value}"
+				data-topcoat-bind:checked="cx.signal('range').get().eq(cx.hydrate('${value}'))"
+				data-topcoat-on:change="e => cx.signal('range').set(e.target.value)">
+		`).join("")}
+	`;
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		const inputs = Array.from(document.querySelectorAll("input"));
+		expect(inputs.map((input) => input.checked)).toEqual([false, true, false]);
+
+		for (const index of [0, 2, 1]) {
+			inputs[index]?.click();
+			flushEffects();
+			expect(inputs.map((input) => input.checked)).toEqual(
+				inputs.map((_, candidate) => candidate === index),
+			);
+		}
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("clears the live input value and removes its attribute for an absent value", () => {
+	document.body.innerHTML = `
+		<!--::topcoat::signal({"t":"signal","id":"value","v":{"t":"Option","v":"initial"}})-->
+		<input value="initial" data-topcoat-bind:value="cx.signal('value').get()">
+	`;
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		const input = document.querySelector("input");
+		if (!input) throw new Error("Missing input");
+		expect(input.value).toBe("initial");
+		input.value = "edited";
+
+		const value = runtime.context.signal("value");
+		value.set(runtime.context.none());
+		flushEffects();
+		expect(input.value).toBe("");
+		expect(input.hasAttribute("value")).toBe(false);
+
+		value.set(runtime.context.some(runtime.context.hydrate("restored")));
+		flushEffects();
+		expect(input.value).toBe("restored");
+		expect(input.getAttribute("value")).toBe("restored");
+	} finally {
+		runtime.page.dispose();
+	}
+});

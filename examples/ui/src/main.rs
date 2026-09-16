@@ -92,7 +92,6 @@ struct HomeQuery {
     name: Option<String>,
     env: Option<String>,
     status: Option<String>,
-    branch: Option<String>,
     overlay: Option<String>,
     side: Option<String>,
 }
@@ -116,8 +115,6 @@ struct State {
     env: Option<&'static str>,
     /// The status the deployments table is filtered to.
     status: Option<&'static str>,
-    /// The branch the preview builds from.
-    branch: &'static str,
     /// The overlay covering the page.
     overlay: Option<&'static str>,
     /// The edge the sheet comes in from.
@@ -132,7 +129,6 @@ impl State {
     /// to render.
     fn read(cx: &Cx) -> Result<Self> {
         let query = query_params::<HomeQuery>(cx)?;
-        let branch = query.branch.as_deref();
 
         Ok(Self {
             tab: one_of(query.tab.as_deref(), &TABS.map(|(value, _)| value)).unwrap_or(TABS[0].0),
@@ -141,9 +137,6 @@ impl State {
             name: project_name(query.name.clone()),
             env: one_of(query.env.as_deref(), &ENVIRONMENTS),
             status: query.status.as_deref().and_then(status_label),
-            branch: one_of(branch, &BRANCHES)
-                .or(one_of(branch, &TAGS))
-                .unwrap_or(BRANCHES[0]),
             overlay: one_of(query.overlay.as_deref(), &OVERLAYS.map(|(value, _)| value)),
             side: one_of(query.side.as_deref(), &SIDES.map(|(value, ..)| value))
                 .unwrap_or(SIDES[0].0),
@@ -172,9 +165,6 @@ impl State {
         }
         if let Some(status) = self.status {
             params.push(("status", status.to_lowercase()));
-        }
-        if self.branch != BRANCHES[0] {
-            params.push(("branch", self.branch.to_owned()));
         }
         if let Some(overlay) = self.overlay {
             params.push(("overlay", overlay.to_owned()));
@@ -454,7 +444,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                         demo(overlays_card(state: &state))
                         demo(overview_card(state: &state))
                         demo(faq_card())
-                        demo(branches_card(state: &state))
+                        demo(branches_card())
                         demo(toolbar_card())
                         demo(share_card())
                         demo(rename_card(state: &state))
@@ -697,10 +687,13 @@ async fn status_card() -> Result<impl View> {
 
 /// The form controls, each with the label naming it.
 ///
-/// Nothing is submitted here: the fields are the demo, and "Reset" is the one
-/// control that acts, which the browser does on its own.
+/// The fields keep their values in signals. Reset restores their initial values.
 #[component]
-async fn form_card() -> Result<impl View> {
+async fn form_card(cx: &Cx) -> Result<impl View> {
+    let name = signal(cx, String::new);
+    let region = signal(cx, || String::from("eu-central-1"));
+    let summary = signal(cx, String::new);
+
     Ok(view! {
         card(
             card_header(
@@ -708,17 +701,35 @@ async fn form_card() -> Result<impl View> {
                 card_description("An input, a select, a textarea, and a label each.")
             )
             card_content(
-                <form class="flex flex-col gap-4">
+                <form
+                    class="flex flex-col gap-4"
+                    @submit=$(|e: Event| e.prevent_default())
+                    @reset=$(|e: Event| {
+                        e.prevent_default();
+                        name.set("".to_owned());
+                        region.set("eu-central-1".to_owned());
+                        summary.set("".to_owned());
+                    })
+                >
                     <div class="flex flex-col gap-2">
                         label(attrs: attributes! { for="project-name" }, "Name")
                         input(
-                            attrs: attributes! { id="project-name" placeholder="my-app" }
+                            attrs: attributes! {
+                                id="project-name"
+                                placeholder="my-app"
+                                :value=$(name.get())
+                                @input=$(|e: Event| name.set(e.target.value))
+                            }
                         )
                     </div>
                     <div class="flex flex-col gap-2">
                         label(attrs: attributes! { for="region" }, "Region")
                         select(
-                            attrs: attributes! { id="region" },
+                            attrs: attributes! {
+                                id="region"
+                                :value=$(region.get())
+                                @change=$(|e: Event| region.set(e.target.value))
+                            },
                             <optgroup label="Europe">
                                 <option>"eu-central-1"</option>
                                 <option>"eu-west-2"</option>
@@ -732,7 +743,12 @@ async fn form_card() -> Result<impl View> {
                     <div class="flex flex-col gap-2">
                         label(attrs: attributes! { for="summary" }, "Summary")
                         textarea(
-                            attrs: attributes! { id="summary" placeholder="What this project is for." }
+                            attrs: attributes! {
+                                id="summary"
+                                placeholder="What this project is for."
+                                :value=$(summary.get())
+                                @input=$(|e: Event| summary.set(e.target.value))
+                            }
                         )
                     </div>
                     <div class="flex flex-col gap-2">
@@ -774,10 +790,22 @@ const SWITCHES: [(&str, &str, bool, bool); 3] = [
 
 /// The checkbox and the switch, in each of the states they can be in.
 ///
-/// Nothing behind them keeps a value, so every row says which state it stands
-/// in rather than naming a setting the page does not have.
+/// Each control keeps its own signal, starting in the state its row names.
 #[component]
-async fn checks_card() -> Result<impl View> {
+async fn checks_card(cx: &Cx) -> Result<impl View> {
+    let checks: Vec<_> = CHECKS
+        .into_iter()
+        .map(|(id, text, checked, disabled)| {
+            (id, text, signal(&cx.keyed(id), || checked), disabled)
+        })
+        .collect();
+    let switches: Vec<_> = SWITCHES
+        .into_iter()
+        .map(|(id, text, checked, disabled)| {
+            (id, text, signal(&cx.keyed(id), || checked), disabled)
+        })
+        .collect();
+
     Ok(view! {
         card(
             card_header(
@@ -786,10 +814,15 @@ async fn checks_card() -> Result<impl View> {
             )
             card_content(
                 <div class="flex flex-col gap-3">
-                    for (id, text, checked, disabled) in CHECKS {
+                    for (id, text, checked, disabled) in checks {
                         <div class="flex items-center gap-2">
                             checkbox(
-                                attrs: attributes! { id=(id) checked=(checked) disabled=(disabled) }
+                                attrs: attributes! {
+                                    id=(id)
+                                    :checked=$(checked.get())
+                                    @change=$(|e: Event| checked.set(e.target.checked))
+                                    disabled=(disabled)
+                                }
                             )
                             label(
                                 attrs: attributes! { for=(id) class=(class!("opacity-50" if disabled)) },
@@ -800,14 +833,19 @@ async fn checks_card() -> Result<impl View> {
                 </div>
                 separator(attrs: attributes! { class="my-4" })
                 <div class="flex flex-col gap-3">
-                    for (id, text, checked, disabled) in SWITCHES {
+                    for (id, text, checked, disabled) in switches {
                         <div class="flex items-center justify-between gap-4">
                             label(
                                 attrs: attributes! { for=(id) class=(class!("opacity-50" if disabled)) },
                                 (text)
                             )
                             switch(
-                                attrs: attributes! { id=(id) checked=(checked) disabled=(disabled) }
+                                attrs: attributes! {
+                                    id=(id)
+                                    :checked=$(checked.get())
+                                    @change=$(|e: Event| checked.set(e.target.checked))
+                                    disabled=(disabled)
+                                }
                             )
                         </div>
                     }
@@ -992,65 +1030,88 @@ async fn faq_card() -> Result<impl View> {
     })
 }
 
-/// A branch switcher: a menu whose items reach the server, since a menu item
-/// is a button and a form around it is all it takes.
+/// A branch switcher that updates its label and closes the menu locally.
 #[component]
-async fn branches_card(state: &State) -> Result<impl View> {
+async fn branches_card(cx: &Cx) -> Result<impl View> {
+    let selected = signal(cx, || BRANCHES[0].to_owned());
+    let open = signal(cx, || false);
+    let tags_open = signal(cx, || false);
+
     Ok(view! {
         card(
             card_header(
                 card_title("Dropdown menu")
-                card_description(
-                    "Picking an item submits the form around it, so the choice \
-                     lands in the URL."
-                )
+                card_description("Pick a branch or tag to update the selection.")
             )
             card_content(
-                // The form carries the rest of the page's state along, and the
-                // item that was clicked adds the branch it stands for; the
-                // page comes back built from that branch.
-                <form>
-                    state_fields(state: state, sets: "branch")
-                    dropdown_menu(
-                        // The trigger takes any content; this one borrows the
-                        // outline button's looks and adds a flipping chevron.
-                        dropdown_menu_trigger(
-                            attrs: attributes! {
-                                class=(button_variants(
-                                    ButtonVariant::Outline,
-                                    ButtonSize::Sm,
-                                ))
-                            },
-                            (state.branch)
-                            icon(
-                                data: iconify_icon!("lucide:chevron-down"),
-                                attrs: attributes! { class="transition-transform group-open:rotate-180" }
-                            )
+                dropdown_menu(
+                    attrs: attributes! { :open=$(open.get()) },
+                    // The trigger takes any content; this one borrows the
+                    // outline button's looks and adds a flipping chevron.
+                    dropdown_menu_trigger(
+                        attrs: attributes! {
+                            class=(button_variants(
+                                ButtonVariant::Outline,
+                                ButtonSize::Sm,
+                            ))
+                            @click=$(|e: Event| {
+                                e.prevent_default();
+                                open.toggle();
+                                tags_open.set(false);
+                            })
+                        },
+                        $(selected.get())
+                        icon(
+                            data: iconify_icon!("lucide:chevron-down"),
+                            attrs: attributes! { class="transition-transform group-open:rotate-180" }
                         )
-                        dropdown_menu_content(
-                            dropdown_menu_label("Switch branch")
-                            for branch in BRANCHES {
-                                dropdown_menu_item(
-                                    attrs: attributes! { name="branch" value=(branch) },
-                                    (branch)
-                                )
-                            }
-                            dropdown_menu_separator()
-                            // A submenu opens its own panel beside this row.
-                            dropdown_menu_sub(
-                                dropdown_menu_sub_trigger("Checkout tag")
-                                dropdown_menu_sub_content(
-                                    for tag in TAGS {
-                                        dropdown_menu_item(
-                                            attrs: attributes! { name="branch" value=(tag) },
-                                            (tag)
-                                        )
-                                    }
-                                )
+                    )
+                    dropdown_menu_content(
+                        dropdown_menu_label("Switch branch")
+                        for branch in BRANCHES {
+                            dropdown_menu_item(
+                                attrs: attributes! {
+                                    type="button"
+                                    @click=$(|_e: Event| {
+                                        selected.set(branch.to_owned());
+                                        open.set(false);
+                                        tags_open.set(false);
+                                    })
+                                },
+                                (branch)
+                            )
+                        }
+                        dropdown_menu_separator()
+                        // A submenu opens its own panel beside this row.
+                        dropdown_menu_sub(
+                            attrs: attributes! { :open=$(tags_open.get()) },
+                            dropdown_menu_sub_trigger(
+                                attrs: attributes! {
+                                    @click=$(|e: Event| {
+                                        e.prevent_default();
+                                        tags_open.toggle();
+                                    })
+                                },
+                                "Checkout tag"
+                            )
+                            dropdown_menu_sub_content(
+                                for tag in TAGS {
+                                    dropdown_menu_item(
+                                        attrs: attributes! {
+                                            type="button"
+                                            @click=$(|_e: Event| {
+                                                selected.set(tag.to_owned());
+                                                open.set(false);
+                                                tags_open.set(false);
+                                            })
+                                        },
+                                        (tag)
+                                    )
+                                }
                             )
                         )
                     )
-                </form>
+                )
             )
         )
     })
@@ -1059,7 +1120,13 @@ async fn branches_card(state: &State) -> Result<impl View> {
 /// A toolbar of toggles: a segmented control where picking one lets go of the
 /// rest, and toggles that press on their own.
 #[component]
-async fn toolbar_card() -> Result<impl View> {
+async fn toolbar_card(cx: &Cx) -> Result<impl View> {
+    let range = signal(cx, || String::from("week"));
+    let bold = signal(cx, || true);
+    let italic = signal(cx, || false);
+    let underline = signal(cx, || false);
+    let live = signal(cx, || true);
+
     Ok(view! {
         card(
             card_header(
@@ -1076,15 +1143,20 @@ async fn toolbar_card() -> Result<impl View> {
                     // rule its own.
                     <div class="flex h-9 items-center gap-2">
                         toggle_group(
-                            for (value, text, picked) in [
-                                ("day", "Day", false),
-                                ("week", "Week", true),
-                                ("month", "Month", false),
+                            for (value, text) in [
+                                ("day", "Day"),
+                                ("week", "Week"),
+                                ("month", "Month"),
                             ] {
                                 toggle(
                                     kind: ToggleKind::Exclusive,
                                     size: ToggleSize::Sm,
-                                    attrs: attributes! { name="range" value=(value) checked=(picked) },
+                                    attrs: attributes! {
+                                        name="range"
+                                        value=(value)
+                                        :checked=$(range.get() == value)
+                                        @change=$(|_e: Event| range.set(value.to_owned()))
+                                    },
                                     (text)
                                 )
                             }
@@ -1092,17 +1164,21 @@ async fn toolbar_card() -> Result<impl View> {
                         separator(orientation: SeparatorOrientation::Vertical)
                         <div class="flex items-center gap-1">
                             for (name, data, text, pressed) in [
-                                ("bold", iconify_icon!("lucide:bold"), "Bold", true),
-                                ("italic", iconify_icon!("lucide:italic"), "Italic", false),
+                                ("bold", iconify_icon!("lucide:bold"), "Bold", &bold),
+                                ("italic", iconify_icon!("lucide:italic"), "Italic", &italic),
                                 (
                                     "underline",
                                     iconify_icon!("lucide:underline"),
                                     "Underline",
-                                    false,
+                                    &underline,
                                 ),
                             ] {
                                 toggle(
-                                    attrs: attributes! { name=(name) checked=(pressed) },
+                                    attrs: attributes! {
+                                        name=(name)
+                                        :checked=$(pressed.get())
+                                        @change=$(|e: Event| pressed.set(e.target.checked))
+                                    },
                                     icon(data: data, label: text)
                                 )
                             }
@@ -1110,7 +1186,11 @@ async fn toolbar_card() -> Result<impl View> {
                     </div>
                     toggle(
                         size: ToggleSize::Md,
-                        attrs: attributes! { name="live" checked="" },
+                        attrs: attributes! {
+                            name="live"
+                            :checked=$(live.get())
+                            @change=$(|e: Event| live.set(e.target.checked))
+                        },
                         icon(data: iconify_icon!("lucide:activity"))
                         "Live updates"
                     )
