@@ -4,6 +4,26 @@ use topcoat::{
     view::{BoxView, Child, View, ViewExt, component, view},
 };
 
+// Compile-only coverage for unused components with many named props.
+#[deny(dead_code, clippy::too_many_arguments)]
+mod lint_regressions {
+    use super::*;
+
+    #[component]
+    pub async fn unused_component(
+        a: u8,
+        b: u8,
+        c: u8,
+        d: u8,
+        e: u8,
+        f: u8,
+        g: u8,
+        h: u8,
+    ) -> Result<impl View> {
+        Ok(view! { <span>(a)(b)(c)(d)(e)(f)(g)(h)</span> })
+    }
+}
+
 // `view!` lowers component calls to expressions that reference `__cx`. In
 // real code that name is supplied by `#[page]`, `#[layout]`, and
 // `#[component]`. These tests stand in for those wrappers by binding it by
