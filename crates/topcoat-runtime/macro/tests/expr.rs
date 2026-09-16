@@ -58,7 +58,10 @@ fn capturing_an_expression_reuses_its_server_value() {
         7.0
     }));
     let doubled = expr!(value + value);
-    assert_eq!(doubled.into_evaluated_and_js().0.to_bits(), 14.0f64.to_bits());
+    assert_eq!(
+        doubled.into_evaluated_and_js().0.to_bits(),
+        14.0f64.to_bits()
+    );
     assert_eq!(evaluations.get(), 1);
 }
 
