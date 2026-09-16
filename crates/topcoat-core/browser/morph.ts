@@ -16,8 +16,15 @@
  * is left alone, so a morph never disturbs what the user is typing.
  */
 
+export interface MorphOptions {
+	/** Keeps the live state of matching form controls, including their defaults. */
+	preserveFormState?: boolean;
+}
+
 /** The ids present in both the old and the new content. */
 type Ctx = {
+	options: MorphOptions;
+	preservedSelects: WeakSet<HTMLSelectElement>;
 	persistent: Set<string>;
 	/**
 	 * The persistent ids in each element's subtree, itself included, for the
@@ -44,10 +51,11 @@ export function morph(
 	start: ChildNode | null,
 	end: ChildNode | null,
 	content: Iterable<Node>,
+	options: MorphOptions = {},
 ): void {
 	const newNodes = Array.from(content);
 	const oldNodes = rangeNodes(parent, start, end);
-	const ctx = createContext(parent, oldNodes, newNodes);
+	const ctx = createContext(parent, oldNodes, newNodes, options);
 	morphChildren(
 		ctx,
 		parent,
@@ -75,6 +83,7 @@ function createContext(
 	parent: ParentNode,
 	oldNodes: Node[],
 	newNodes: Node[],
+	options: MorphOptions,
 ): Ctx {
 	const oldIds = new Map<string, Element>();
 	for (const node of oldNodes) {
@@ -118,6 +127,8 @@ function createContext(
 	}
 
 	return {
+		options,
+		preservedSelects: new WeakSet(),
 		persistent,
 		idSets,
 		oldById,
@@ -146,6 +157,20 @@ function morphChildren(
 ): void {
 	let cursor = insertionPoint;
 	for (const newNode of newNodes) {
+		// A newly inserted selected option would clear the user's selection
+		// even if every existing option's properties were left alone.
+		if (parent instanceof Element && newNode instanceof Element) {
+			const select = parent.closest("select");
+			if (select && ctx.preservedSelects.has(select)) {
+				const options = newNode instanceof HTMLOptionElement
+					? [newNode]
+					: Array.from(newNode.querySelectorAll("option"));
+				for (const option of options) {
+					option.removeAttribute("selected");
+					option.selected = false;
+				}
+			}
+		}
 		if (cursor && cursor !== end) {
 			const match = findBestMatch(ctx, newNode, cursor, end);
 			if (match) {
@@ -275,17 +300,21 @@ function removeNodesBetween(from: ChildNode, to: ChildNode): void {
 function morphNode(ctx: Ctx, oldNode: ChildNode, newNode: Node): ChildNode {
 	if (oldNode instanceof Element && newNode instanceof Element) {
 		if (oldNode.tagName === newNode.tagName) {
-			const isActive = oldNode === ctx.active;
-			syncAttributes(oldNode, newNode, isActive);
-			morphChildren(
-				ctx,
-				oldNode,
-				oldNode.firstChild,
-				null,
-				Array.from(newNode.childNodes),
-			);
+			const preserve = preservedProperties(ctx, oldNode);
+			syncAttributes(oldNode, newNode, preserve);
+			// A textarea's children are its default value. Leave them alone
+			// when preserving its value, including its caret and selection.
+			if (!(ctx.options.preserveFormState && oldNode instanceof HTMLTextAreaElement)) {
+				morphChildren(
+					ctx,
+					oldNode,
+					oldNode.firstChild,
+					null,
+					Array.from(newNode.childNodes),
+				);
+			}
 			// After the children, so a select sees its morphed options.
-			syncProperties(oldNode, newNode, isActive);
+			syncProperties(oldNode, newNode, preserve);
 			return oldNode;
 		}
 	} else if (oldNode.nodeType === newNode.nodeType) {
@@ -346,20 +375,37 @@ function moveBefore(
 	parent.insertBefore(node, before);
 }
 
-/**
- * Syncs the attributes of `oldEl` to those of `newEl`. The value attribute
- * of the focused element is left alone, like its value property.
- */
+/** Decides what to leave alone before attributes can change live state. */
+function preservedProperties(ctx: Ctx, el: Element): Set<string> {
+	const preserve = new Set<string>();
+	if (el === ctx.active) preserve.add("value");
+	if (!ctx.options.preserveFormState) return preserve;
+	if (el instanceof HTMLInputElement) {
+		preserve.add("value");
+		preserve.add("checked");
+	} else if (el instanceof HTMLTextAreaElement) {
+		preserve.add("value");
+	} else if (el instanceof HTMLSelectElement) {
+		ctx.preservedSelects.add(el);
+		preserve.add("value");
+	} else if (el instanceof HTMLOptionElement) {
+		const select = el.closest("select");
+		if (select && ctx.preservedSelects.has(select)) preserve.add("selected");
+	}
+	return preserve;
+}
+
+/** Syncs attributes except those whose live state is being preserved. */
 function syncAttributes(
 	oldEl: Element,
 	newEl: Element,
-	isActive: boolean,
+	preserve: Set<string>,
 ): void {
 	// An attribute without a namespace goes through the plain API: the
 	// namespaced one rejects a name with a colon in it, like the runtime's
 	// own `data-topcoat-on:click`, when no namespace is given.
 	for (const attr of Array.from(newEl.attributes)) {
-		if (isActive && attr.name === "value") continue;
+		if (preserve.has(attr.name)) continue;
 		if (attr.namespaceURI === null) {
 			if (oldEl.getAttribute(attr.name) !== attr.value) {
 				oldEl.setAttribute(attr.name, attr.value);
@@ -371,7 +417,7 @@ function syncAttributes(
 		}
 	}
 	for (const attr of Array.from(oldEl.attributes)) {
-		if (isActive && attr.name === "value") continue;
+		if (preserve.has(attr.name)) continue;
 		if (attr.namespaceURI === null) {
 			if (!newEl.hasAttribute(attr.name)) oldEl.removeAttribute(attr.name);
 		} else if (!newEl.hasAttributeNS(attr.namespaceURI, attr.localName)) {
@@ -388,25 +434,25 @@ function syncAttributes(
 function syncProperties(
 	oldEl: Element,
 	newEl: Element,
-	isActive: boolean,
+	preserve: Set<string>,
 ): void {
 	if (oldEl instanceof HTMLInputElement && newEl instanceof HTMLInputElement) {
-		if (oldEl.checked !== newEl.checked) oldEl.checked = newEl.checked;
-		if (!isActive && oldEl.value !== newEl.value) oldEl.value = newEl.value;
+		if (!preserve.has("checked") && oldEl.checked !== newEl.checked) oldEl.checked = newEl.checked;
+		if (!preserve.has("value") && oldEl.value !== newEl.value) oldEl.value = newEl.value;
 	} else if (
 		oldEl instanceof HTMLTextAreaElement &&
 		newEl instanceof HTMLTextAreaElement
 	) {
-		if (!isActive && oldEl.value !== newEl.value) oldEl.value = newEl.value;
+		if (!preserve.has("value") && oldEl.value !== newEl.value) oldEl.value = newEl.value;
 	} else if (
 		oldEl instanceof HTMLOptionElement &&
 		newEl instanceof HTMLOptionElement
 	) {
-		if (oldEl.selected !== newEl.selected) oldEl.selected = newEl.selected;
+		if (!preserve.has("selected") && oldEl.selected !== newEl.selected) oldEl.selected = newEl.selected;
 	} else if (
 		oldEl instanceof HTMLSelectElement &&
 		newEl instanceof HTMLSelectElement
 	) {
-		if (!isActive && oldEl.value !== newEl.value) oldEl.value = newEl.value;
+		if (!preserve.has("value") && oldEl.value !== newEl.value) oldEl.value = newEl.value;
 	}
 }
