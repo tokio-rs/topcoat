@@ -53,6 +53,7 @@ members = [
     "examples/path-query-params",
     "examples/procedure",
     "examples/request-response",
+    "examples/routerless",
     "examples/runtime",
     "examples/session",
     "examples/shard",

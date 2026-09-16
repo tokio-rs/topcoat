@@ -1,0 +1,13 @@
+[package]
+name = "routerless"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+# We cannot use `workspace = true` with `default-features = false`.
+topcoat = { path = "../../crates/topcoat", default-features = false, features = ["view"] }
+
+[lints]
+workspace = true

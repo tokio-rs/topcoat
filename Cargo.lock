@@ -2337,6 +2337,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "routerless"
+version = "0.8.1"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "rsqlite-vfs"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
