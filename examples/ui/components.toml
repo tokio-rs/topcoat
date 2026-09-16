@@ -93,7 +93,7 @@ hash = "sha256:7286fc577fb10cca6420654f7bea067988e0992137eea5573cabdeb89f0e6f15"
 file = "src/components/sheet.rs"
 
 [registries.topcoat.components.sidebar]
-hash = "sha256:ee693ecb20bfb8786b21d8f25db8285d495b0ca77e16ba4daddf2cb237941a7e"
+hash = "sha256:924396f1a1358ed883a2624998d6b89511a0035b518f00276b17aec3d6f0f767"
 file = "src/components/sidebar.rs"
 
 [registries.topcoat.components.skeleton]

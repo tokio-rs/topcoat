@@ -368,6 +368,10 @@ pub async fn sidebar_group_label(
     })
 }
 
+const ACTION: StaticClass = class!(
+    "absolute flex size-6 items-center justify-center rounded-md text-sidebar-foreground/70 outline-none hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50 md:group-data-[collapsible=icon]/sidebar:hidden [&_svg]:size-4",
+);
+
 /// An icon button beside the group label. Give it an accessible label.
 #[component]
 pub async fn sidebar_group_action(
@@ -379,7 +383,8 @@ pub async fn sidebar_group_action(
             type="button"
             data-sidebar="group-action"
             class=(class!(
-                "absolute top-3 right-3 flex size-6 items-center justify-center rounded-md text-sidebar-foreground/70 outline-none hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50 md:group-data-[collapsible=icon]/sidebar:hidden [&_svg]:size-4",
+                ACTION,
+                "top-3 right-3",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -575,7 +580,8 @@ pub async fn sidebar_menu_action(
             type="button"
             data-sidebar="menu-action"
             class=(class!(
-                "absolute top-1 right-1 flex size-6 items-center justify-center rounded-md text-sidebar-foreground/70 outline-none hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50 md:group-data-[collapsible=icon]/sidebar:hidden [&_svg]:size-4",
+                ACTION,
+                "top-1 right-1",
                 if show_on_hover {
                     "md:opacity-0 md:group-hover/menu-item:opacity-100 md:group-focus-within/menu-item:opacity-100"
                 } else {
