@@ -22,7 +22,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	if (fontsDescriptor) Object.defineProperty(document, "fonts", fontsDescriptor);
+	if (fontsDescriptor)
+		Object.defineProperty(document, "fonts", fontsDescriptor);
 	else Reflect.deleteProperty(document, "fonts");
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
