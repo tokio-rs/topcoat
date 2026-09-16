@@ -380,7 +380,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                                 href=(DOCS)
                                 class=(button_variants(
                                     ButtonVariant::Primary,
-                                    ButtonSize::Md,
+                                    ButtonSize::Lg,
                                 ))
                             >
                                 "Read the docs"
@@ -390,7 +390,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                                 href=(REPOSITORY)
                                 class=(button_variants(
                                     ButtonVariant::Outline,
-                                    ButtonSize::Md,
+                                    ButtonSize::Lg,
                                 ))
                             >
                                 "View on GitHub"
@@ -1137,7 +1137,7 @@ async fn share_card() -> Result<impl View> {
                                     </p>
                                 </div>
                             </div>
-                            <p class="text-xs text-muted-foreground">
+                            <p class="text-sm text-muted-foreground">
                                 "A hover card holds a view, where a tooltip \
                                  holds a few words."
                             </p>

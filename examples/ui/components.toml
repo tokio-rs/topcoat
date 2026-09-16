@@ -33,11 +33,11 @@ hash = "sha256:a049f067bc8663ef954b4a1621c9ec1800d1135ef5ddda32cc9fedc98213f14f"
 file = "src/components/breadcrumb.rs"
 
 [registries.topcoat.components.button]
-hash = "sha256:f48b7f63ed3566a0b7b7ba770310a740405662d220ab380b3825183b29677681"
+hash = "sha256:ed5a5e6f6bd075f784851de3232d443f246520eb7bb9926116375b49e2eb7788"
 file = "src/components/button.rs"
 
 [registries.topcoat.components.card]
-hash = "sha256:177dd58b0c02121b070686c94964ebc20e7ef7ad026e05ca88f02808ec34f998"
+hash = "sha256:ae1f3742ce22032fd1e0cf6918282a02417324f3fa99580aa72ac108048bd576"
 file = "src/components/card.rs"
 
 [registries.topcoat.components.checkbox]
@@ -117,7 +117,7 @@ hash = "sha256:eab86236d670272641da462c78d9aa50ad548dcdc1b8dce44d7741000864776c"
 file = "src/components/textarea.rs"
 
 [registries.topcoat.components.toggle]
-hash = "sha256:d4963322006404d17a006409ea03df56bb728daf899375990cfff6a25af0a4cf"
+hash = "sha256:135831af05bb1b5c7f478ee7316b15f04a3e8062b107d3ac5a39b0be6ca40d4f"
 file = "src/components/toggle.rs"
 
 [registries.topcoat.components.tooltip]

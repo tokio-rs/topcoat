@@ -79,14 +79,14 @@ pub enum ButtonSize {
 impl ButtonSize {
     /// The Tailwind classes for this size.
     ///
-    /// Each size sets a text size, which also scales any icons inside: the
-    /// `icon` component is `1em` square by default.
+    /// Sizes change the control's dimensions while keeping the text size
+    /// consistent.
     fn classes(self) -> StaticClass {
         match self {
-            Self::Sm => class!("h-8 gap-1.5 rounded-md px-3 text-xs"),
-            Self::Md => class!("h-9 gap-2 rounded-lg px-4 text-sm"),
-            Self::Lg => class!("h-10 gap-2 rounded-lg px-5 text-base"),
-            Self::Icon => class!("size-9 rounded-lg text-base"),
+            Self::Sm => class!("h-8 gap-1.5 rounded-md px-3"),
+            Self::Md => class!("h-9 gap-2 rounded-lg px-4"),
+            Self::Lg => class!("h-10 gap-2 rounded-lg px-5"),
+            Self::Icon => class!("size-9 rounded-lg"),
         }
     }
 }
@@ -97,7 +97,7 @@ impl ButtonSize {
 /// variant, which only recolors it, does not change the button's dimensions.
 const BASE: StaticClass = class!(
     "inline-flex shrink-0 items-center justify-center border \
-     font-medium whitespace-nowrap transition-colors outline-none select-none \
+     text-sm font-medium whitespace-nowrap transition-colors outline-none select-none \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
      focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
 );

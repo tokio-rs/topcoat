@@ -51,9 +51,9 @@ impl ToggleSize {
     /// buttons without standing out.
     fn classes(self) -> StaticClass {
         match self {
-            Self::Sm => class!("h-8 gap-1.5 rounded-md px-2 text-xs"),
-            Self::Md => class!("h-9 gap-2 rounded-lg px-3 text-sm"),
-            Self::Lg => class!("h-10 gap-2 rounded-lg px-4 text-base"),
+            Self::Sm => class!("h-8 gap-1.5 rounded-md px-2"),
+            Self::Md => class!("h-9 gap-2 rounded-lg px-3"),
+            Self::Lg => class!("h-10 gap-2 rounded-lg px-4"),
         }
     }
 }
@@ -65,7 +65,7 @@ impl ToggleSize {
 /// while the control has keyboard focus, and faded while it is disabled.
 const BASE: StaticClass = class!(
     "inline-flex shrink-0 cursor-pointer items-center justify-center border \
-     border-transparent font-medium whitespace-nowrap transition-colors select-none \
+     border-transparent text-sm font-medium whitespace-nowrap transition-colors select-none \
      text-muted-foreground hover:bg-foreground/5 hover:text-foreground \
      has-[:checked]:bg-foreground/10 has-[:checked]:text-foreground \
      has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring \
