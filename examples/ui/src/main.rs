@@ -35,11 +35,11 @@ use components::{
     separator::{SeparatorOrientation, separator},
     sheet::{sheet, sheet_content},
     sidebar::{
-        SidebarCollapsible, SidebarMenuButtonSize, sidebar, sidebar_content,
-        sidebar_footer, sidebar_group, sidebar_group_action, sidebar_group_content,
-        sidebar_group_label, sidebar_header, sidebar_inset, sidebar_menu, sidebar_menu_badge,
-        sidebar_menu_button, sidebar_menu_item, sidebar_menu_sub, sidebar_menu_sub_button,
-        sidebar_menu_sub_item, sidebar_provider, sidebar_separator, sidebar_trigger,
+        SidebarCollapsible, SidebarMenuButtonSize, sidebar, sidebar_content, sidebar_footer,
+        sidebar_group, sidebar_group_action, sidebar_group_content, sidebar_group_label,
+        sidebar_header, sidebar_inset, sidebar_menu, sidebar_menu_badge, sidebar_menu_button,
+        sidebar_menu_item, sidebar_menu_sub, sidebar_menu_sub_button, sidebar_menu_sub_item,
+        sidebar_provider, sidebar_separator, sidebar_trigger,
     },
     skeleton::skeleton,
     spinner::spinner,
@@ -171,6 +171,34 @@ async fn home(cx: &Cx) -> Result<impl View> {
                             )
                             separator(orientation: SeparatorOrientation::Vertical)
                             <span class="text-sm font-medium">"Component library"</span>
+
+                            let theme_label = expr!(
+                                if dark.get() {
+                                    "Switch to light theme"
+                                } else {
+                                    "Switch to dark theme"
+                                },
+                            );
+
+                            button(
+                                variant: ButtonVariant::Primary,
+                                size: ButtonSize::Md,
+                                attrs: attributes! {
+                                    type="button"
+                                    class="ml-auto"
+                                    @click=$(|_e: Event| dark.toggle())
+                                    :aria-label=(theme_label.clone())
+                                    :title=(theme_label)
+                                },
+                                <span class="contents" :hidden=$(!dark.get())>
+                                    "Light theme"
+                                    icon(data: iconify_icon!("lucide:sun"))
+                                </span>
+                                <span class="contents" :hidden=$(dark.get())>
+                                    "Dark theme"
+                                    icon(data: iconify_icon!("lucide:moon"))
+                                </span>
+                            )
                         )
                         <div
                             id="overview"
@@ -214,33 +242,6 @@ async fn home(cx: &Cx) -> Result<impl View> {
                                         </a>
                                     </div>
                                 </header>
-
-                                let theme_label = expr!(
-                                    if dark.get() {
-                                        "Switch to light theme"
-                                    } else {
-                                        "Switch to dark theme"
-                                    },
-                                );
-
-                                button(
-                                    size: ButtonSize::Lg,
-                                    attrs: attributes! {
-                                        type="button"
-                                        class="self-end sm:self-start"
-                                        @click=$(|_e: Event| dark.toggle())
-                                        :aria-label=(theme_label.clone())
-                                        :title=(theme_label)
-                                    },
-                                    <span class="contents" :hidden=$(!dark.get())>
-                                        "Light theme"
-                                        icon(data: iconify_icon!("lucide:sun"))
-                                    </span>
-                                    <span class="contents" :hidden=$(dark.get())>
-                                        "Dark theme"
-                                        icon(data: iconify_icon!("lucide:moon"))
-                                    </span>
-                                )
                             </div>
 
                             // A masonry of small, self-contained demos, each built
