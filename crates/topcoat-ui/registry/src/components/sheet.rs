@@ -152,8 +152,8 @@ impl SheetSide {
 /// scrolls within itself once there is more in it than the edge it lies
 /// against is long.
 const CONTENT: StaticClass = class!(
-    "flex flex-col gap-4 overflow-y-auto border-border bg-background p-6 \
-     text-foreground shadow-sm [transition:translate_200ms_ease-out]",
+    "flex flex-col gap-4 overflow-y-auto border-border bg-card p-6 \
+     text-card-foreground shadow-sm [transition:translate_200ms_ease-out]",
 );
 
 /// The panel of a [`sheet`], holding its sections.

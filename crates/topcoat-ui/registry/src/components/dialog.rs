@@ -106,7 +106,7 @@ pub async fn dialog(
 /// its corners.
 const CONTENT: StaticClass = class!(
     "relative my-auto flex w-full max-w-lg flex-col gap-4 rounded-xl \
-     border border-border bg-background p-6 text-foreground shadow-sm",
+     border border-border bg-card p-6 text-card-foreground shadow-sm",
 );
 
 /// The classes bringing the panel in behind the veil.

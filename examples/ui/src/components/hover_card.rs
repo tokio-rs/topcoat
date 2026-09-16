@@ -56,7 +56,7 @@ pub async fn hover_card(
 /// work, as `all` does not carry the visibility along.
 const PANEL: StaticClass = class!(
     "invisible absolute top-full left-0 z-50 mt-2 w-64 rounded-lg border \
-     border-border bg-background p-4 text-foreground opacity-0 shadow-sm \
+     border-border bg-popover p-4 text-popover-foreground opacity-0 shadow-sm \
      [transition:opacity_150ms_ease-out_300ms,visibility_150ms_allow-discrete_300ms] \
      group-hover:visible group-hover:opacity-100 \
      group-focus-within:visible group-focus-within:opacity-100",

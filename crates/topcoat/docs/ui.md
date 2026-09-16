@@ -155,6 +155,8 @@ Beyond that, each component documents itself: the source now lives in your proje
 
 A theme is a small set of design tokens: CSS variables for the page background, text colors, the primary and destructive accents, borders, the focus ring, and control shadows, defined on `:root` and, for dark mode, on `.dark`. Components refer to tokens only (`bg-primary`, `text-muted-foreground`, `border-border`, ...), never to raw colors, so the whole component set restyles itself when you edit the values in `styles.css`.
 
+`--background` is the page color. `--card` and `--card-foreground` set the background and text for cards and panels; `--popover` and `--popover-foreground` do the same for floating menus and popovers. The neutral theme makes these surfaces slightly lighter than the page. Their colors can be adjusted independently.
+
 Dark mode is opt-in: putting the `dark` class on an ancestor (typically `<html>`, or any subtree) switches everything inside it to the dark values. Hover and press states have no tokens of their own; components derive them by applying the fill color at reduced opacity, which adapts to both color schemes automatically.
 
 `styles.css` is installed once by `init` and never touched again; it is yours to edit like any other project file.

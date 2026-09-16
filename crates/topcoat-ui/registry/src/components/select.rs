@@ -13,7 +13,7 @@ use topcoat::{
 /// space.
 const SELECT: StaticClass = class!(
     "h-9 w-full appearance-none items-center rounded-lg border border-border \
-     bg-background pr-8 pl-3 text-left text-sm transition-colors outline-none \
+     bg-transparent pr-8 pl-3 text-left text-sm transition-colors outline-none \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
      focus-visible:ring-offset-background disabled:pointer-events-none",
 );
@@ -33,8 +33,8 @@ const PICKER: StaticClass = class!(
     "[&::picker(select)]:[appearance:base-select] \
      [&::picker(select)]:mt-1 [&::picker(select)]:rounded-lg \
      [&::picker(select)]:border [&::picker(select)]:border-border \
-     [&::picker(select)]:bg-background [&::picker(select)]:p-1 \
-     [&::picker(select)]:text-foreground [&::picker(select)]:shadow-sm \
+     [&::picker(select)]:bg-popover [&::picker(select)]:p-1 \
+     [&::picker(select)]:text-popover-foreground [&::picker(select)]:shadow-sm \
      [&::picker-icon]:hidden \
      [&_option]:flex [&_option]:items-center [&_option]:gap-2 [&_option]:rounded-md \
      [&_option]:px-2 [&_option]:py-1.5 [&_option]:text-sm [&_option]:outline-none \

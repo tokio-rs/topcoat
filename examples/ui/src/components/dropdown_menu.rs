@@ -88,8 +88,8 @@ pub async fn dropdown_menu_trigger(
 /// `z-50` lifts it over later content. It sets its own background and text
 /// color, so it reads the same on any ancestor.
 const PANEL: StaticClass = class!(
-    "absolute z-50 min-w-40 rounded-lg border border-border bg-background p-1 \
-     text-foreground shadow-sm",
+    "absolute z-50 min-w-40 rounded-lg border border-border bg-popover p-1 \
+     text-popover-foreground shadow-sm",
 );
 
 /// The floating panel of a [`dropdown_menu`], holding the menu's items.

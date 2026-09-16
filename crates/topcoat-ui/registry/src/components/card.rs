@@ -11,8 +11,8 @@ use topcoat::{
 /// casts the theme's raised-surface shadow and sets its own background and
 /// text color, so it reads as a card on any ancestor.
 const CARD: StaticClass = class!(
-    "flex flex-col gap-5 rounded-xl border border-border bg-background py-6 \
-     text-foreground shadow-sm",
+    "flex flex-col gap-5 rounded-xl border border-border bg-card py-6 \
+     text-card-foreground shadow-sm",
 );
 
 /// A card component: a bordered, raised surface grouping related content.

@@ -9,7 +9,7 @@ use topcoat::{
 /// button, so an input and a button sit flush in a row. File inputs restyle
 /// the browser's upload button into quiet, borderless text.
 const INPUT: StaticClass = class!(
-    "h-9 w-full min-w-0 rounded-lg border border-border bg-background px-3 \
+    "h-9 w-full min-w-0 rounded-lg border border-border bg-transparent px-3 \
      text-sm transition-colors outline-none \
      placeholder:text-muted-foreground \
      file:mr-3 file:h-full file:border-0 file:bg-transparent file:text-sm file:font-medium \

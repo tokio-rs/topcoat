@@ -6,6 +6,10 @@
 
      --background              the page background
      --foreground              text and iconography on the background
+     --card                    cards and panel backgrounds
+     --card-foreground         text and iconography on cards and panels
+     --popover                 floating menu and popover backgrounds
+     --popover-foreground      text and iconography on floating surfaces
      --muted-foreground        secondary text: captions, descriptions, placeholders
      --primary                 the emphasis color: primary actions, selection, highlights
      --primary-foreground      text on a primary-filled surface
@@ -13,7 +17,7 @@
      --destructive-foreground  text on a destructive-filled surface
      --border                  hairline borders and dividers
      --ring                    the focus ring
-     --shadow-xs               a subtle shadow for controls: buttons, inputs
+     --shadow-xs               a subtle shadow for raised controls
      --shadow-sm               a shadow for raised surfaces: cards, menus
 
    Interactive states (hover, press) have no tokens of their own: components
@@ -39,6 +43,10 @@
   --font-sans: "Geist", sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-muted-foreground: var(--muted-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
@@ -51,8 +59,12 @@
 }
 
 :root {
-  --background: oklch(0.995 0.003 260);
+  --background: oklch(0.9875 0.003 260);
   --foreground: oklch(0.24 0.012 260);
+  --card: oklch(0.995 0.003 260);
+  --card-foreground: oklch(0.24 0.012 260);
+  --popover: oklch(0.995 0.003 260);
+  --popover-foreground: oklch(0.24 0.012 260);
   --muted-foreground: oklch(0.51 0.014 260);
   --primary: oklch(0.21 0.02 260);
   --primary-foreground: oklch(0.985 0.003 260);
@@ -69,6 +81,10 @@
 .dark {
   --background: oklch(0.17 0.012 260);
   --foreground: oklch(0.93 0.006 260);
+  --card: oklch(0.22 0.012 260);
+  --card-foreground: oklch(0.93 0.006 260);
+  --popover: oklch(0.22 0.012 260);
+  --popover-foreground: oklch(0.93 0.006 260);
   --muted-foreground: oklch(0.68 0.012 260);
   --primary: oklch(0.92 0.008 260);
   --primary-foreground: oklch(0.21 0.015 260);

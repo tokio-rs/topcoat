@@ -11,7 +11,7 @@ use topcoat::{
 /// and scroll.
 const TEXTAREA: StaticClass = class!(
     "field-sizing-content min-h-16 w-full rounded-lg border border-border \
-     bg-background px-3 py-2 text-sm transition-colors outline-none \
+     bg-transparent px-3 py-2 text-sm transition-colors outline-none \
      placeholder:text-muted-foreground \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
      focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
