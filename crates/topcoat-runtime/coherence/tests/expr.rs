@@ -2,7 +2,7 @@ use serde::Serialize;
 use topcoat::runtime::{Expr, Surrogated};
 use topcoat_runtime_coherence::{Case, Observe};
 
-fn check<T>(value: T)
+fn check_conversion<T>(value: T)
 where
     T: Surrogated + Observe,
     T::Surrogate: Serialize,
@@ -15,7 +15,7 @@ where
 }
 
 #[test]
-fn primitive_values() {
+fn conversion_preserves_primitive_values() {
     check(());
     check(false);
     check(true);
@@ -27,7 +27,7 @@ fn primitive_values() {
 }
 
 #[test]
-fn integer_values_preserve_their_type_and_precision() {
+fn conversion_preserves_integer_types_and_precision() {
     macro_rules! integers {
         ($($ty:ty),* $(,)?) => {
             $(
@@ -43,7 +43,7 @@ fn integer_values_preserve_their_type_and_precision() {
 }
 
 #[test]
-fn compound_values() {
+fn conversion_preserves_compound_values() {
     check(None::<String>);
     check(Some(Some(String::from("nested"))));
     check(Ok::<_, String>(u128::MAX));
@@ -53,7 +53,7 @@ fn compound_values() {
 }
 
 #[test]
-fn borrowed_values() {
+fn conversion_preserves_borrowed_values() {
     let text = String::from("borrowed");
     let numbers = vec![1u128, u128::MAX];
     check(&text);

@@ -1,4 +1,4 @@
-//! The signal write methods, checked through the macro that compiles them.
+//! Expression rendering, value conversions, and compiled signal handlers.
 //!
 //! Each case renders a component whose handler calls one of the methods and
 //! asserts that the name reaches the generated JavaScript unchanged. The name
@@ -9,8 +9,8 @@
 use topcoat::{
     Result,
     context::Cx,
-    runtime::{procedure, signal},
-    view::{View, ViewExt, component, view},
+    runtime::{Expr, expr, procedure, signal},
+    view::{View, ViewExt, attributes, component, view},
 };
 
 #[component]
@@ -238,4 +238,109 @@ async fn a_string_literal_with_quotes_stays_inside_the_handler_attribute() {
 
     assert!(html.contains(r"say \&quot;hi\&quot;"), "{html}");
     assert!(!html.contains(r#"say \"hi"#), "{html}");
+}
+
+#[component]
+async fn panel(#[into] open: Expr<bool>) -> Result<impl View> {
+    Ok(view! { <dialog :open=(open)></dialog> })
+}
+
+#[tokio::test]
+async fn value_conversion_renders_props_as_ordinary_attributes() {
+    let cx = &Cx::default();
+    let html = view! {
+        cx =>
+        panel(open: true)
+        panel(open: false)
+    }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+    assert_eq!(html, "<dialog open=\"\"></dialog><dialog></dialog>");
+}
+
+#[component]
+async fn interactive_panel(cx: &Cx) -> Result<impl View> {
+    let open = signal(cx, || false);
+    Ok(view! { panel(open: $(open.get())) })
+}
+
+#[tokio::test]
+async fn expression_conversion_preserves_runtime_prop_bindings() {
+    let cx = &Cx::default();
+    let html = view! { cx => interactive_panel() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+    assert!(html.contains("data-topcoat-bind:open="), "{html}");
+    assert!(html.contains(".get()"), "{html}");
+}
+
+#[tokio::test]
+async fn value_conversion_renders_nodes_without_markers_and_escapes_html() {
+    let cx = &Cx::default();
+    let text = Expr::from("<b>&");
+    let html = view! { cx => <p>(text)</p> }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+    assert_eq!(html, "<p>&lt;b&gt;&amp;</p>");
+}
+
+#[tokio::test]
+async fn explicit_runtime_constants_are_not_value_conversions() {
+    let cx = &Cx::default();
+    assert!(!expr!(true).is_static());
+    let html = view! { cx => <p>$("constant")</p> }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+    assert!(html.contains("::topcoat::expr::start("), "{html}");
+    assert!(html.contains("::topcoat::expr::end"), "{html}");
+}
+
+#[tokio::test]
+async fn forwarded_value_conversions_replace_dynamic_bindings() {
+    let cx = &Cx::default();
+    let previous = attributes! { cx => :value=$("old") :disabled=$(true) };
+    let attrs = attributes! {
+        cx =>
+        (previous)
+        :value=(Expr::from("\"<&"))
+        :disabled=(Expr::from(false))
+        :required=(Expr::from(true))
+    };
+    let html = view! { cx => <input (attrs)> }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+    assert!(html.contains("value=\"&quot;<&amp;\""), "{html}");
+    assert!(html.contains(" required"), "{html}");
+    assert!(!html.contains("disabled"), "{html}");
+    assert!(!html.contains("data-topcoat-bind:"), "{html}");
+}
+
+#[tokio::test]
+async fn forwarded_dynamic_bindings_replace_value_conversions() {
+    let cx = &Cx::default();
+    let previous = attributes! { cx => :value=(Expr::from("old")) };
+    let attrs = attributes! { cx => (previous) :value=$("new") };
+    let html = view! { cx => <input (attrs)> }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+    assert!(html.contains("value=\"new\""), "{html}");
+    assert!(html.contains("data-topcoat-bind:value="), "{html}");
 }
