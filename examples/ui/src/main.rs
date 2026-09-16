@@ -74,7 +74,6 @@ const PORTRAIT: Asset = asset!("./portrait.svg");
 
 /// The pages this one links out to: the framework's documentation, its
 /// source, and the registry the components here were added from.
-const CRATE: &str = "https://crates.io/crates/topcoat";
 const DOCS: &str = "https://docs.rs/topcoat";
 const REPOSITORY: &str = "https://github.com/tokio-rs/topcoat";
 const REGISTRY: &str = "https://github.com/tokio-rs/topcoat/tree/main/crates/topcoat-ui/registry";
@@ -90,16 +89,6 @@ async fn main() {
     topcoat::start(router).await.unwrap();
 }
 
-/// The tab values and labels. The first is selected when the page opens.
-const TABS: [(&str, &str); 3] = [
-    ("overview", "Overview"),
-    ("activity", "Activity"),
-    ("settings", "Settings"),
-];
-
-/// How many rows one page of the deployments table holds.
-const PER_PAGE: usize = 3;
-
 /// The statuses a deployment can be in, and the badge variant each shows in.
 const STATUSES: [(&str, BadgeVariant); 4] = [
     ("Live", BadgeVariant::Primary),
@@ -107,13 +96,6 @@ const STATUSES: [(&str, BadgeVariant); 4] = [
     ("Queued", BadgeVariant::Outline),
     ("Failed", BadgeVariant::Destructive),
 ];
-
-/// The branches a preview can build from. The first is the one it builds from
-/// until another is picked.
-const BRANCHES: [&str; 3] = ["main", "feature/showcase", "feature/dark-mode"];
-
-/// The tags a preview can build from instead of a branch.
-const TAGS: [&str; 3] = ["v1.2.0", "v1.1.0", "v1.0.0"];
 
 /// The badge variant the deployment status `status` shows in.
 fn status_variant(status: &str) -> BadgeVariant {
@@ -439,6 +421,8 @@ async fn team_card() -> Result<impl View> {
 /// The badge variants with example deployment counts.
 #[component]
 async fn status_card() -> Result<impl View> {
+    const CRATE: &str = "https://crates.io/crates/topcoat";
+
     Ok(view! {
         card(
             card_header(
@@ -680,27 +664,19 @@ async fn form_card(cx: &Cx) -> Result<impl View> {
     })
 }
 
-/// The states a checkbox is shown in: the id it goes by, the word for the
-/// state, whether it is checked, and whether it is disabled.
-const CHECKS: [(&str, &str, bool, bool); 4] = [
-    ("check-on", "Checked", true, false),
-    ("check-off", "Unchecked", false, false),
-    ("check-on-off", "Checked and disabled", true, true),
-    ("check-off-off", "Unchecked and disabled", false, true),
-];
-
-/// The same states, shown on a switch.
-const SWITCHES: [(&str, &str, bool, bool); 3] = [
-    ("switch-on", "On", true, false),
-    ("switch-off", "Off", false, false),
-    ("switch-off-off", "Off and disabled", false, true),
-];
-
 /// Checkboxes in their checked, unchecked, and disabled states.
 ///
 /// Each control keeps its own signal, starting in the state its row names.
 #[component]
 async fn checks_card(cx: &Cx) -> Result<impl View> {
+    // The id, label, checked state, and disabled state of each checkbox.
+    const CHECKS: [(&str, &str, bool, bool); 4] = [
+        ("check-on", "Checked", true, false),
+        ("check-off", "Unchecked", false, false),
+        ("check-on-off", "Checked and disabled", true, true),
+        ("check-off-off", "Unchecked and disabled", false, true),
+    ];
+
     let checks: Vec<_> = CHECKS
         .into_iter()
         .map(|(id, text, checked, disabled)| {
@@ -740,6 +716,13 @@ async fn checks_card(cx: &Cx) -> Result<impl View> {
 /// Switches with an independent signal for each control.
 #[component]
 async fn switches_card(cx: &Cx) -> Result<impl View> {
+    // The id, label, checked state, and disabled state of each switch.
+    const SWITCHES: [(&str, &str, bool, bool); 3] = [
+        ("switch-on", "On", true, false),
+        ("switch-off", "Off", false, false),
+        ("switch-off-off", "Off and disabled", false, true),
+    ];
+
     let switches: Vec<_> = SWITCHES
         .into_iter()
         .map(|(id, text, checked, disabled)| {
@@ -821,6 +804,13 @@ async fn radios_card() -> Result<impl View> {
 /// A card that switches panels in the browser.
 #[component]
 async fn overview_card(cx: &Cx) -> Result<impl View> {
+    // The tab values and labels. The first is selected when the page opens.
+    const TABS: [(&str, &str); 3] = [
+        ("overview", "Overview"),
+        ("activity", "Activity"),
+        ("settings", "Settings"),
+    ];
+
     let selected = signal(cx, || TABS[0].0.to_owned());
 
     Ok(view! {
@@ -912,6 +902,10 @@ async fn faq_card() -> Result<impl View> {
 /// A branch switcher that updates its label and closes the menu locally.
 #[component]
 async fn branches_card(cx: &Cx) -> Result<impl View> {
+    // The first branch is selected until another branch or tag is picked.
+    const BRANCHES: [&str; 3] = ["main", "feature/showcase", "feature/dark-mode"];
+    const TAGS: [&str; 3] = ["v1.2.0", "v1.1.0", "v1.0.0"];
+
     let selected = signal(cx, || BRANCHES[0].to_owned());
     let open = signal(cx, || false);
     let tags_open = signal(cx, || false);
@@ -1307,6 +1301,8 @@ const DEPLOYMENTS: [(&str, &str, &str); 12] = [
 /// A table of deployments with pagination underneath.
 #[shard]
 async fn deployments_card(cx: &Cx) -> Result<impl View> {
+    const PER_PAGE: usize = 3;
+
     let page = signal(cx, || 1usize);
     let rows = &DEPLOYMENTS;
     let pages = rows.len().div_ceil(PER_PAGE).max(1);
@@ -1421,14 +1417,6 @@ fn listed(number: usize, page: usize, pages: usize) -> bool {
     number == 1 || number == pages || number == page
 }
 
-/// The keys that move through a form, and what each one does. They are the
-/// browser's own, so they work on this page as they read here.
-const KEYS: [(&str, &[&str]); 3] = [
-    ("Move to the next control", &["Tab"]),
-    ("Move back to the one before", &["Shift", "Tab"]),
-    ("Submit the form", &["Enter"]),
-];
-
 /// A breadcrumb trail with a collapsed middle section.
 #[component]
 async fn breadcrumbs_card() -> Result<impl View> {
@@ -1466,6 +1454,13 @@ async fn breadcrumbs_card() -> Result<impl View> {
 /// Individual keys and key combinations.
 #[component]
 async fn keyboard_card() -> Result<impl View> {
+    // The browser's own keys for moving through a form.
+    const KEYS: [(&str, &[&str]); 3] = [
+        ("Move to the next control", &["Tab"]),
+        ("Move back to the one before", &["Shift", "Tab"]),
+        ("Submit the form", &["Enter"]),
+    ];
+
     Ok(view! {
         card(
             card_header(
