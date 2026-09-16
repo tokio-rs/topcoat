@@ -35,7 +35,7 @@ use components::{
     separator::{SeparatorOrientation, separator},
     sheet::{sheet, sheet_content},
     sidebar::{
-        SidebarCollapsible, SidebarMenuButtonSize, SidebarVariant, sidebar, sidebar_content,
+        SidebarCollapsible, SidebarMenuButtonSize, sidebar, sidebar_content,
         sidebar_footer, sidebar_group, sidebar_group_action, sidebar_group_content,
         sidebar_group_label, sidebar_header, sidebar_inset, sidebar_menu, sidebar_menu_badge,
         sidebar_menu_button, sidebar_menu_item, sidebar_menu_sub, sidebar_menu_sub_button,
@@ -152,9 +152,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 sidebar_provider(
                     app_sidebar(open: &sidebar_open, mobile_open: &mobile_open)
                     sidebar_inset(
-                        <div
-                            class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm md:top-2"
-                        >
+                        sidebar_header(
                             sidebar_trigger(
                                 open: $(sidebar_open.get()),
                                 attrs: attributes! {
@@ -171,12 +169,9 @@ async fn home(cx: &Cx) -> Result<impl View> {
                                     @click=$(|_e: Event| mobile_open.toggle())
                                 }
                             )
-                            separator(
-                                orientation: SeparatorOrientation::Vertical,
-                                attrs: attributes! { class="[&]:h-4" }
-                            )
+                            separator(orientation: SeparatorOrientation::Vertical)
                             <span class="text-sm font-medium">"Component library"</span>
-                        </div>
+                        )
                         <div
                             id="overview"
                             class="mx-auto w-full max-w-6xl scroll-mt-20 px-6 py-12"
@@ -1532,7 +1527,6 @@ async fn app_sidebar(
         sidebar(
             open: $(open.get()),
             mobile_open: $(mobile_open.get()),
-            variant: SidebarVariant::Inset,
             collapsible: SidebarCollapsible::Icon,
             sheet_attrs: attributes! {
                 id="showcase-sidebar"
@@ -1549,8 +1543,7 @@ async fn app_sidebar(
                 })
             },
             sidebar_header(
-                attrs: attributes! { class="h-16 [&]:pt-4" },
-                <div class="flex h-full items-center gap-1">
+                <div class="flex items-center gap-1">
                     sidebar_menu(
                         attrs: attributes! { class="flex-1" },
                         sidebar_menu_item(
@@ -1587,7 +1580,6 @@ async fn app_sidebar(
                     )
                 </div>
             )
-            sidebar_separator()
             sidebar_content(
                 sidebar_group(
                     sidebar_group_label("Workspace")

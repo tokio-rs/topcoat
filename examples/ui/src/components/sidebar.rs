@@ -234,7 +234,10 @@ pub async fn sidebar_rail(
     })
 }
 
-/// The page content beside an inset sidebar.
+/// The page content beside a sidebar.
+///
+/// An immediate [`sidebar_header`] child becomes a sticky toolbar. Its height
+/// and bottom border match the sidebar header without extra classes.
 #[component]
 pub async fn sidebar_inset(
     #[default] mut attrs: Attributes,
@@ -244,7 +247,7 @@ pub async fn sidebar_inset(
         <main
             data-sidebar="inset"
             class=(class!(
-                "relative flex min-w-0 flex-1 flex-col bg-background md:in-[[data-sidebar=provider]:has([data-variant=inset])]:m-2 md:in-[[data-sidebar=provider]:has([data-variant=inset])]:rounded-xl md:in-[[data-sidebar=provider]:has([data-variant=inset])]:shadow-sm",
+                "relative flex min-w-0 flex-1 flex-col bg-background [&>[data-sidebar=header]]:sticky [&>[data-sidebar=header]]:top-0 [&>[data-sidebar=header]]:z-20 [&>[data-sidebar=header]]:flex-row [&>[data-sidebar=header]]:items-center [&>[data-sidebar=header]]:justify-start [&>[data-sidebar=header]]:gap-3 [&>[data-sidebar=header]]:bg-background [&>[data-sidebar=header]]:px-4 [&>[data-sidebar=header]>[aria-orientation=vertical]]:h-4 md:in-[[data-sidebar=provider]:has([data-variant=inset])]:m-2 md:in-[[data-sidebar=provider]:has([data-variant=inset][data-side=left])]:ml-0 md:in-[[data-sidebar=provider]:has([data-variant=inset][data-side=right])]:mr-0 md:in-[[data-sidebar=provider]:has([data-variant=inset])]:rounded-xl md:in-[[data-sidebar=provider]:has([data-variant=inset])]:shadow-sm",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -254,7 +257,10 @@ pub async fn sidebar_inset(
     })
 }
 
-/// The fixed header above the sidebar's scrolling content.
+/// A header for the sidebar or its page content.
+///
+/// Its height and divider stay fixed when menu buttons collapse to icons.
+/// Inside [`sidebar_inset`], it lays out its children as a sticky toolbar.
 #[component]
 pub async fn sidebar_header(
     #[default] mut attrs: Attributes,
@@ -263,7 +269,7 @@ pub async fn sidebar_header(
     Ok(view! {
         <div
             data-sidebar="header"
-            class=(class!("flex shrink-0 flex-col gap-2 p-2", attrs.remove("class")))
+class=(class!("flex h-14 shrink-0 flex-col justify-center gap-2 border-b border-border px-2", attrs.remove("class")))
             (attrs)
         >
             (child)
