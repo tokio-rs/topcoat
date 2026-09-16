@@ -167,11 +167,15 @@ it("keeps checkbox signals in sync through repeated clicks", () => {
 it("selects only the radio matching the signal after each click", () => {
 	document.body.innerHTML = `
 		<!--::topcoat::signal({"t":"signal","id":"range","v":"week"})-->
-		${["day", "week", "month"].map((value) => `
+		${["day", "week", "month"]
+			.map(
+				(value) => `
 			<input type="radio" name="range" value="${value}"
 				data-topcoat-bind:checked="cx.signal('range').get().eq(cx.hydrate('${value}'))"
 				data-topcoat-on:change="e => cx.signal('range').set(e.target.value)">
-		`).join("")}
+		`,
+			)
+			.join("")}
 	`;
 	const runtime = new Runtime();
 	try {
@@ -208,12 +212,15 @@ it("clears the live input value and removes its attribute for an absent value", 
 		value.set(runtime.context.none());
 		flushEffects();
 		expect(input.value).toBe("");
-		expect(input.hasAttribute("value")).toBe(false);
+		// happy-dom's named lookup becomes stale alongside data-topcoat-bind:value.
+		expect(input.getAttributeNames()).not.toContain("value");
 
 		value.set(runtime.context.some(runtime.context.hydrate("restored")));
 		flushEffects();
 		expect(input.value).toBe("restored");
-		expect(input.getAttribute("value")).toBe("restored");
+		expect(
+			Array.from(input.attributes).find((attr) => attr.name === "value")?.value,
+		).toBe("restored");
 	} finally {
 		runtime.page.dispose();
 	}

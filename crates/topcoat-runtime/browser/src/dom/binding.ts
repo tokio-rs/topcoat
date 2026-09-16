@@ -34,9 +34,8 @@ function write(el: Element, name: string, value: unknown): void {
 		if (isAttributeValueViewParts(value)) {
 			const present = value.isAttributePresent();
 			// DOM boolean properties need a primitive, not a truthy surrogate.
-			propertyValue = name === "value"
-				? (present ? value.toAttributeValue() : "")
-				: present;
+			propertyValue =
+				name === "value" ? (present ? value.toAttributeValue() : "") : present;
 		}
 		(el as Element & Record<string, unknown>)[name] = propertyValue;
 	}
