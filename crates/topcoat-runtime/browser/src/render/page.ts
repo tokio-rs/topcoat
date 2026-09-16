@@ -1,3 +1,7 @@
+import {
+	DEV_RUNTIME_EVENT,
+	type DevRuntimeDetail,
+} from "../../../../topcoat-core/browser/dev";
 import { morph } from "../../../../topcoat-core/browser/morph";
 import { untrack } from "../reactivity";
 import type { Runtime } from "../runtime";
@@ -23,6 +27,26 @@ export class PageUnit extends RenderUnit {
 
 	protected readInputs(): void {}
 
+	/** Lets a dev refresh update the whole document with this page's state. */
+	listenForDevRefresh(): void {
+		window.addEventListener(
+			DEV_RUNTIME_EVENT,
+			(event) => {
+				const { detail } = event as CustomEvent<DevRuntimeDetail>;
+				detail.runtime = {
+					request: (signal) => this.request(signal),
+					replace: (update) => {
+						this.replace((scope, adoptable) => {
+							update();
+							this.runtime.hydrate(document, null, null, scope, adoptable);
+						});
+					},
+				};
+			},
+			{ signal: this.lifetime.abortSignal },
+		);
+	}
+
 	protected request(signal: AbortSignal): Promise<Response> {
 		// The page owns every signal in the document, directly or through a
 		// shard, so its values are the complete set the re-run resumes from.
@@ -32,6 +56,7 @@ export class PageUnit extends RenderUnit {
 		const path = location.pathname === "/" ? "" : location.pathname;
 		return fetch(`${PAGE_ROUTE_PREFIX}${path}${location.search}`, {
 			method: "POST",
+			cache: "no-store",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ signals }),
 			signal,

@@ -113,11 +113,17 @@ export abstract class RenderUnit {
 		if (this.isDisposed) return;
 		const nodes = this.prepare(html);
 		if (nodes === null) return;
+		this.replace((scope, orphans) => this.insert(nodes, scope, orphans));
+	}
+
+	/** Rebuilds the content's resources around a DOM update. */
+	protected replace(insert: (scope: Scope, orphans: Set<SignalId>) => void): void {
+		if (this.isDisposed) return;
 		this.requestController.cancel();
 
 		const orphans = this.contentScope.release();
 		this.contentScope = new Scope(this.lifetime, this.runtime);
-		this.insert(nodes, this.contentScope, orphans);
+		insert(this.contentScope, orphans);
 		for (const id of orphans) this.runtime.registry.delete(id);
 
 		this.startWatching();
