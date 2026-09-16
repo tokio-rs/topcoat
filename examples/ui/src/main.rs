@@ -84,6 +84,7 @@ async fn main() {
 /// page without one rather than failing the request.
 #[query_params(error = redirect("?"))]
 struct HomeQuery {
+    theme: Option<String>,
     tab: Option<String>,
     page: Option<usize>,
     per_page: Option<usize>,
@@ -102,6 +103,8 @@ struct HomeQuery {
 /// form sets one part of the state, the page comes back rendered for it, and
 /// the state survives a reload and can be shared as it stands.
 struct State {
+    /// Whether the page uses the dark theme.
+    dark: bool,
     /// The panel the project card shows.
     tab: &'static str,
     /// The page of the deployments table.
@@ -133,6 +136,7 @@ impl State {
         let branch = query.branch.as_deref();
 
         Ok(Self {
+            dark: query.theme.as_deref() == Some("dark"),
             tab: one_of(query.tab.as_deref(), &TABS.map(|(value, _)| value)).unwrap_or(TABS[0].0),
             page: query.page.unwrap_or(1).max(1),
             per_page: one_of_numbers(query.per_page, &PER_PAGE).unwrap_or(PER_PAGE[0]),
@@ -153,6 +157,9 @@ impl State {
     fn params(&self) -> Vec<(&'static str, String)> {
         let mut params = Vec::new();
 
+        if self.dark {
+            params.push(("theme", String::from("dark")));
+        }
         if self.tab != TABS[0].0 {
             params.push(("tab", self.tab.to_owned()));
         }
@@ -351,7 +358,10 @@ async fn home(cx: &Cx) -> Result<impl View> {
 
     Ok(view! {
         <!DOCTYPE html>
-        <html>
+        <html
+            class=(class!("dark" if state.dark))
+            style=(if state.dark { "color-scheme: dark" } else { "color-scheme: light" })
+        >
             <head>
                 <title>"Topcoat UI"</title>
                 topcoat::dev::script()
@@ -362,41 +372,70 @@ async fn home(cx: &Cx) -> Result<impl View> {
             // theme's base layer in styles.css; nothing to set up here.
             <body>
                 <main class="mx-auto max-w-6xl px-6 py-16">
-                    <header class="max-w-2xl">
-                        <h1 class="text-4xl font-bold tracking-tight">
-                            "Build your component library"
-                        </h1>
-                        <p class="mt-3 text-muted-foreground">
-                            "Accessible, themeable components vendored into your \
-                             project with "
-                            <code class="text-foreground">"topcoat ui add"</code>
-                            ". Yours to restyle, rewrite, and ship."
-                        </p>
-                        // Anything can borrow a button's looks:
-                        // `button_variants` returns the class string for a
-                        // variant and size.
-                        <div class="mt-6 flex flex-wrap items-center gap-3">
-                            <a
-                                href=(DOCS)
-                                class=(button_variants(
-                                    ButtonVariant::Primary,
-                                    ButtonSize::Lg,
-                                ))
-                            >
-                                "Read the docs"
-                                icon(data: iconify_icon!("lucide:arrow-right"))
-                            </a>
-                            <a
-                                href=(REPOSITORY)
-                                class=(button_variants(
-                                    ButtonVariant::Outline,
-                                    ButtonSize::Lg,
-                                ))
-                            >
-                                "View on GitHub"
-                            </a>
-                        </div>
-                    </header>
+                    <div
+                        class="flex flex-col-reverse items-start justify-between gap-6 sm:flex-row"
+                    >
+                        <header class="max-w-2xl">
+                            <h1 class="text-4xl font-bold tracking-tight">
+                                "Build your component library"
+                            </h1>
+                            <p class="mt-3 text-muted-foreground">
+                                "Accessible, themeable components vendored into your \
+                                 project with "
+                                <code class="text-foreground">"topcoat ui add"</code>
+                                ". Yours to restyle, rewrite, and ship."
+                            </p>
+                            // Anything can borrow a button's looks:
+                            // `button_variants` returns the class string for a
+                            // variant and size.
+                            <div class="mt-6 flex flex-wrap items-center gap-3">
+                                <a
+                                    href=(DOCS)
+                                    class=(button_variants(
+                                        ButtonVariant::Primary,
+                                        ButtonSize::Lg,
+                                    ))
+                                >
+                                    "Read the docs"
+                                    icon(data: iconify_icon!("lucide:arrow-right"))
+                                </a>
+                                <a
+                                    href=(REPOSITORY)
+                                    class=(button_variants(
+                                        ButtonVariant::Outline,
+                                        ButtonSize::Lg,
+                                    ))
+                                >
+                                    "View on GitHub"
+                                </a>
+                            </div>
+                        </header>
+                        <a
+                            href=(state.href("theme", (!state.dark).then_some("dark")))
+                            class=(class!(
+                                button_variants(ButtonVariant::Primary, ButtonSize::Lg),
+                                "self-end sm:self-start",
+                            ))
+                            aria-label=(if state.dark {
+                                "Switch to light theme"
+                            } else {
+                                "Switch to dark theme"
+                            })
+                            title=(if state.dark {
+                                "Switch to light theme"
+                            } else {
+                                "Switch to dark theme"
+                            })
+                        >
+                            if state.dark {
+                                "Light theme"
+                                icon(data: iconify_icon!("lucide:sun"))
+                            } else {
+                                "Dark theme"
+                                icon(data: iconify_icon!("lucide:moon"))
+                            }
+                        </a>
+                    </div>
 
                     // A masonry of small, self-contained demos, each built
                     // from the installed components. They run from the plainest
@@ -419,7 +458,6 @@ async fn home(cx: &Cx) -> Result<impl View> {
                         demo(deployments_card(state: &state))
                         demo(docs_card())
                         demo(pending_card())
-                        demo(deploy_card())
                     </div>
                 </main>
 
@@ -1432,29 +1470,6 @@ async fn pending_card() -> Result<impl View> {
     })
 }
 
-/// A dark-scheme demo: the `dark` class on the wrapper restyles everything
-/// inside it, because components reference theme tokens instead of raw colors.
-#[component]
-async fn deploy_card() -> Result<impl View> {
-    Ok(view! {
-        <div class="dark">
-            card(
-                card_header(
-                    card_title("Dark scheme")
-                    card_description(
-                        "The same components, on a wrapper that carries the \
-                         `dark` class."
-                    )
-                )
-                card_footer(
-                    button(size: ButtonSize::Sm, "Primary")
-                    button(size: ButtonSize::Sm, variant: ButtonVariant::Ghost, "Ghost")
-                )
-            )
-        </div>
-    })
-}
-
 /// The dialog over the page, shown while the URL names it.
 ///
 /// Closing it is navigating back to the page that renders it closed, which the
@@ -1520,8 +1535,7 @@ async fn rename_dialog(state: &State) -> Result<impl View> {
 /// The alert dialog behind the reset action: it asks the question and offers
 /// nothing but the two answers to it.
 ///
-/// Resetting is a link to the page without a query string, which is the page
-/// with every choice on it back at its default.
+/// Resetting clears the page's choices while keeping its theme.
 #[component]
 async fn reset_dialog(state: &State) -> Result<impl View> {
     // Bound out here rather than inline: a hyphenated attribute name inside an
@@ -1555,7 +1569,7 @@ async fn reset_dialog(state: &State) -> Result<impl View> {
                         "Leave it as it is"
                     </a>
                     <a
-                        href="?"
+                        href=(if state.dark { "?theme=dark" } else { "?" })
                         class=(button_variants(
                             ButtonVariant::Destructive,
                             ButtonSize::Md,
