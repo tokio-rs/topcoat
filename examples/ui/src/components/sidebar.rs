@@ -208,7 +208,9 @@ pub async fn sidebar_trigger(
     })
 }
 
-/// A desktop edge control. Pass its signal update as an `@click` attribute.
+/// A desktop edge button that toggles the sidebar on click.
+///
+/// Pass its signal update as an `@click` attribute.
 #[component]
 pub async fn sidebar_rail(
     #[into]
@@ -221,9 +223,10 @@ pub async fn sidebar_rail(
             type="button"
             data-sidebar="rail"
             aria-label="Toggle sidebar"
+            title="Toggle sidebar"
             :aria-expanded=$(if open { "true" } else { "false" })
             class=(class!(
-                "absolute inset-y-0 z-10 hidden w-2 cursor-ew-resize outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px hover:after:bg-border focus-visible:after:bg-ring md:block group-data-[side=left]/sidebar:right-0 group-data-[side=right]/sidebar:left-0",
+                "absolute inset-y-0 z-10 hidden w-2 cursor-pointer outline-none after:absolute after:inset-y-0 after:w-px hover:after:bg-border focus-visible:after:bg-ring md:block group-data-[side=left]/sidebar:right-0 group-data-[side=left]/sidebar:after:right-0 group-data-[side=right]/sidebar:left-0 group-data-[side=right]/sidebar:after:left-0",
                 attrs.remove("class"),
             ))
             (attrs)

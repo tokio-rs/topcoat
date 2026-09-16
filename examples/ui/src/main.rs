@@ -39,7 +39,7 @@ use components::{
         sidebar_footer, sidebar_group, sidebar_group_action, sidebar_group_content,
         sidebar_group_label, sidebar_header, sidebar_inset, sidebar_menu, sidebar_menu_badge,
         sidebar_menu_button, sidebar_menu_item, sidebar_menu_sub, sidebar_menu_sub_button,
-        sidebar_menu_sub_item, sidebar_provider, sidebar_rail, sidebar_separator, sidebar_trigger,
+        sidebar_menu_sub_item, sidebar_provider, sidebar_separator, sidebar_trigger,
     },
     skeleton::skeleton,
     spinner::spinner,
@@ -158,7 +158,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                             sidebar_trigger(
                                 open: $(sidebar_open.get()),
                                 attrs: attributes! {
-                                    class="hidden md:inline-flex"
+                                    class="max-md:hidden"
                                     aria-controls="showcase-sidebar"
                                     @click=$(|_e: Event| sidebar_open.toggle())
                                 }
@@ -1549,7 +1549,8 @@ async fn app_sidebar(
                 })
             },
             sidebar_header(
-                <div class="flex items-center gap-1">
+                attrs: attributes! { class="h-16 [&]:pt-4" },
+                <div class="flex h-full items-center gap-1">
                     sidebar_menu(
                         attrs: attributes! { class="flex-1" },
                         sidebar_menu_item(
@@ -1689,13 +1690,6 @@ async fn app_sidebar(
                 >
                     "Built with Topcoat. Yours to make your own."
                 </p>
-            )
-            sidebar_rail(
-                open: $(open.get()),
-                attrs: attributes! {
-                    aria-controls="showcase-sidebar"
-                    @click=$(|_e: Event| open.toggle())
-                }
             )
         )
     })
