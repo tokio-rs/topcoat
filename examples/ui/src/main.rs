@@ -213,19 +213,24 @@ async fn home(cx: &Cx) -> Result<impl View> {
                         demo(notices())
                         demo(team_card())
                         demo(status_card())
+                        demo(progress_card())
                         demo(form_card())
                         demo(checks_card())
+                        demo(switches_card())
                         demo(radios_card())
                         demo(overview_card())
                         demo(faq_card())
                         demo(branches_card())
                         demo(toolbar_card())
-                        demo(share_card())
+                        demo(tooltip_card())
+                        demo(hover_card_demo())
                         demo(dialogs_card())
                         demo(sheet_card())
                         demo(deployments_card())
-                        demo(docs_card())
-                        demo(pending_card())
+                        demo(breadcrumbs_card())
+                        demo(keyboard_card())
+                        demo(skeletons_card())
+                        demo(spinner_card())
                     </div>
                 </main>
             </body>
@@ -233,7 +238,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
     })
 }
 
-/// A masonry cell: keeps a demo from splitting across columns.
+/// A masonry cell that keeps a demo from splitting across columns.
 #[component]
 async fn demo(child: Child<'_>) -> Result<impl View> {
     Ok(view! { <div class="mb-4 break-inside-avoid">(child)</div> })
@@ -384,20 +389,14 @@ async fn team_card() -> Result<impl View> {
     })
 }
 
-/// Environment statuses told through the badge variants, and a rollout told
-/// through the progress bar.
+/// The badge variants with example deployment counts.
 #[component]
-async fn status_card(cx: &Cx) -> Result<impl View> {
-    let completed = signal(cx, || 62usize);
-
+async fn status_card() -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
                 card_title("Badges")
-                card_description(
-                    "Every variant, counting the rows of the table below, and \
-                     a progress bar under them."
-                )
+                card_description("Status badges in every variant.")
             )
             card_content(
                 <div class="flex flex-col gap-3">
@@ -415,7 +414,33 @@ async fn status_card(cx: &Cx) -> Result<impl View> {
                         </div>
                     }
                 </div>
-                separator(attrs: attributes! { class="my-4" })
+            )
+            card_footer(
+                <p class="text-sm text-muted-foreground">"Built with Topcoat"</p>
+                // Anything can borrow a badge's looks: `badge_variants`
+                // returns the class string for a variant.
+                <a href=(CRATE) class=(badge_variants(BadgeVariant::Outline))>
+                    (format!("v{}", env!("CARGO_PKG_VERSION")))
+                </a>
+            )
+        )
+    })
+}
+
+/// Determinate and indeterminate progress bars.
+#[component]
+async fn progress_card(cx: &Cx) -> Result<impl View> {
+    let completed = signal(cx, || 62usize);
+
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Progress")
+                card_description(
+                    "With a known value or an indeterminate amount of work."
+                )
+            )
+            card_content(
                 <div class="flex flex-col gap-2">
                     <div class="flex items-center justify-between gap-4">
                         <p class="text-sm text-muted-foreground">
@@ -450,14 +475,11 @@ async fn status_card(cx: &Cx) -> Result<impl View> {
                         )
                     </div>
                 </div>
-            )
-            card_footer(
-                <p class="text-sm text-muted-foreground">"Built with Topcoat"</p>
-                // Anything can borrow a badge's looks: `badge_variants`
-                // returns the class string for a variant.
-                <a href=(CRATE) class=(badge_variants(BadgeVariant::Outline))>
-                    (format!("v{}", env!("CARGO_PKG_VERSION")))
-                </a>
+                separator(attrs: attributes! { class="my-4" })
+                <div class="flex flex-col gap-2">
+                    <p class="text-sm text-muted-foreground">"Indeterminate"</p>
+                    progress(attrs: attributes! { aria-label="Indeterminate progress" })
+                </div>
             )
         )
     })
@@ -568,7 +590,7 @@ const SWITCHES: [(&str, &str, bool, bool); 3] = [
     ("switch-off-off", "Off and disabled", false, true),
 ];
 
-/// The checkbox and the switch, in each of the states they can be in.
+/// Checkboxes in their checked, unchecked, and disabled states.
 ///
 /// Each control keeps its own signal, starting in the state its row names.
 #[component]
@@ -579,18 +601,12 @@ async fn checks_card(cx: &Cx) -> Result<impl View> {
             (id, text, signal(&cx.keyed(id), || checked), disabled)
         })
         .collect();
-    let switches: Vec<_> = SWITCHES
-        .into_iter()
-        .map(|(id, text, checked, disabled)| {
-            (id, text, signal(&cx.keyed(id), || checked), disabled)
-        })
-        .collect();
 
     Ok(view! {
         card(
             card_header(
-                card_title("Checkboxes and switches")
-                card_description("Each one in the states it can be in.")
+                card_title("Checkboxes")
+                card_description("Checked, unchecked, and disabled.")
             )
             card_content(
                 <div class="flex flex-col gap-3">
@@ -611,7 +627,28 @@ async fn checks_card(cx: &Cx) -> Result<impl View> {
                         </div>
                     }
                 </div>
-                separator(attrs: attributes! { class="my-4" })
+            )
+        )
+    })
+}
+
+/// Switches with an independent signal for each control.
+#[component]
+async fn switches_card(cx: &Cx) -> Result<impl View> {
+    let switches: Vec<_> = SWITCHES
+        .into_iter()
+        .map(|(id, text, checked, disabled)| {
+            (id, text, signal(&cx.keyed(id), || checked), disabled)
+        })
+        .collect();
+
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Switches")
+                card_description("On, off, and disabled.")
+            )
+            card_content(
                 <div class="flex flex-col gap-3">
                     for (id, text, checked, disabled) in switches {
                         <div class="flex items-center justify-between gap-4">
@@ -939,21 +976,14 @@ async fn toolbar_card(cx: &Cx) -> Result<impl View> {
     })
 }
 
-/// The two things that show on hover: a tooltip carrying a few words, and a
-/// hover card carrying a view.
-///
-/// Both triggers are the browser's own hover and focus, so nothing here needs
-/// scripting. The tooltip's trigger is a link that goes where the hint says,
-/// since a hint is only a hint.
+/// A short hint shown on hover or focus.
 #[component]
-async fn share_card() -> Result<impl View> {
+async fn tooltip_card() -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
-                card_title("Tooltip and hover card")
-                card_description(
-                    "What comes up on hover: a few words, or a whole view."
-                )
+                card_title("Tooltip")
+                card_description("A short hint on hover or focus.")
             )
             card_content(
                 <div class="flex items-center justify-between gap-4">
@@ -974,7 +1004,21 @@ async fn share_card() -> Result<impl View> {
                         tooltip_content("Read the docs")
                     )
                 </div>
-                separator(attrs: attributes! { class="my-4" })
+            )
+        )
+    })
+}
+
+/// A preview with richer content, shown on hover or focus.
+#[component]
+async fn hover_card_demo() -> Result<impl View> {
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Hover card")
+                card_description("A preview on hover or focus.")
+            )
+            card_content(
                 <div class="flex items-center gap-2 text-sm">
                     <p class="text-muted-foreground">"Hover the name"</p>
                     hover_card(
@@ -1277,12 +1321,16 @@ const KEYS: [(&str, &[&str]); 3] = [
     ("Submit the form", &["Enter"]),
 ];
 
-/// A documentation page header: the trail to it, and the keys it documents.
+/// A breadcrumb trail with a collapsed middle section.
 #[component]
-async fn docs_card() -> Result<impl View> {
+async fn breadcrumbs_card() -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
+                card_title("Breadcrumbs")
+                card_description("A trail of links to the current page.")
+            )
+            card_content(
                 breadcrumb(
                     breadcrumb_list(
                         breadcrumb_item(
@@ -1299,17 +1347,25 @@ async fn docs_card() -> Result<impl View> {
                             )
                         )
                         breadcrumb_separator()
-                        breadcrumb_item(breadcrumb_page("Dialog"))
+                        breadcrumb_item(breadcrumb_page("Breadcrumbs"))
                     )
                 )
-                card_title("Dialog")
-                card_description("A panel over the page for a single task.")
+            )
+        )
+    })
+}
+
+/// Individual keys and key combinations.
+#[component]
+async fn keyboard_card() -> Result<impl View> {
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Keyboard keys")
+                card_description("Keys shown individually or in a group.")
             )
             card_content(
-                // The section a docs page ends on: how the dialog's form is
-                // worked from the keyboard.
-                <h3 class="text-sm font-medium">"Keyboard"</h3>
-                <div class="mt-3 flex flex-col gap-3">
+                <div class="flex flex-col gap-3">
                     for (action, keys) in KEYS {
                         <div class="flex items-center justify-between gap-4">
                             <p class="text-sm text-muted-foreground">(action)</p>
@@ -1326,17 +1382,16 @@ async fn docs_card() -> Result<impl View> {
     })
 }
 
-/// The shapes a page takes while it waits: the roster before it arrives, and
-/// the two ways of saying that work is under way.
+/// Skeleton placeholders that can be replaced with loaded content.
 #[component]
-async fn pending_card(cx: &Cx) -> Result<impl View> {
+async fn skeletons_card(cx: &Cx) -> Result<impl View> {
     let loading = signal(cx, || true);
 
     Ok(view! {
         card(
             card_header(
-                card_title("Skeletons and spinners")
-                card_description("The shapes a page takes while it waits.")
+                card_title("Skeletons")
+                card_description("Placeholders while content loads.")
             )
             card_content(
                 // The skeletons take the size of what they stand in for, so
@@ -1367,24 +1422,38 @@ async fn pending_card(cx: &Cx) -> Result<impl View> {
                         </div>
                     }
                 </div>
-                separator(attrs: attributes! { class="my-4" })
+            )
+            card_footer(
+                button(
+                    variant: ButtonVariant::Outline,
+                    size: ButtonSize::Sm,
+                    attrs: attributes! { type="button" @click=$(|_e: Event| loading.toggle()) },
+                    $(if loading.get() { "Show content" } else { "Show skeletons" })
+                )
+            )
+        )
+    })
+}
+
+/// A spinner accompanying a loading message.
+#[component]
+async fn spinner_card(cx: &Cx) -> Result<impl View> {
+    let loading = signal(cx, || true);
+
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Spinner")
+                card_description("An indicator while work is in progress.")
+            )
+            card_content(
                 <div class="flex flex-col gap-2">
                     <p class="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <span class="contents" :hidden=$(!loading.get())>
                             spinner()
                         </span>
-                        $(if loading.get() {
-                            "Loading the roster"
-                        } else {
-                            "Roster loaded"
-                        })
+                        $(if loading.get() { "Loading" } else { "Complete" })
                     </p>
-                    // Without a value the bar reads as work whose extent is
-                    // not known yet.
-                    progress(
-                        attrs: attributes! { aria-label="Loading roster" :hidden=$(!loading.get()) }
-                    )
-                    <br>
                     button(
                         variant: ButtonVariant::Outline,
                         size: ButtonSize::Sm,
