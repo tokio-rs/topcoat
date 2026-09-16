@@ -368,6 +368,7 @@ pub async fn sidebar_group_label(
     })
 }
 
+// Shared button styles for group and menu actions. Each sets its own position.
 const ACTION: StaticClass = class!(
     "absolute flex size-6 items-center justify-center rounded-md text-sidebar-foreground/70 outline-none hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50 md:group-data-[collapsible=icon]/sidebar:hidden [&_svg]:size-4",
 );
@@ -582,11 +583,7 @@ pub async fn sidebar_menu_action(
             class=(class!(
                 ACTION,
                 "top-1 right-1",
-                if show_on_hover {
-                    "md:opacity-0 md:group-hover/menu-item:opacity-100 md:group-focus-within/menu-item:opacity-100"
-                } else {
-                    ""
-                },
+                "md:opacity-0 md:group-hover/menu-item:opacity-100 md:group-focus-within/menu-item:opacity-100" if show_on_hover,
                 attrs.remove("class"),
             ))
             (attrs)
