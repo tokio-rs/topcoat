@@ -10,20 +10,20 @@ where
     let expression = Expr::from(value);
     assert!(expression.is_static());
     Case::evaluated("converted value", expression)
-        .check()
+        .check_conversion()
         .unwrap();
 }
 
 #[test]
 fn conversion_preserves_primitive_values() {
-    check(());
-    check(false);
-    check(true);
-    check(-0.0);
-    check(42.5);
-    check("");
-    check("\"<>&\n\u{1f980}");
-    check(String::from("owned"));
+    check_conversion(());
+    check_conversion(false);
+    check_conversion(true);
+    check_conversion(-0.0);
+    check_conversion(42.5);
+    check_conversion("");
+    check_conversion("\"<>&\n\u{1f980}");
+    check_conversion(String::from("owned"));
 }
 
 #[test]
@@ -31,8 +31,8 @@ fn conversion_preserves_integer_types_and_precision() {
     macro_rules! integers {
         ($($ty:ty),* $(,)?) => {
             $(
-                check(<$ty>::MIN);
-                check(<$ty>::MAX);
+                check_conversion(<$ty>::MIN);
+                check_conversion(<$ty>::MAX);
             )*
         };
     }
@@ -44,21 +44,21 @@ fn conversion_preserves_integer_types_and_precision() {
 
 #[test]
 fn conversion_preserves_compound_values() {
-    check(None::<String>);
-    check(Some(Some(String::from("nested"))));
-    check(Ok::<_, String>(u128::MAX));
-    check(Err::<bool, _>(String::from("error")));
-    check(vec![1i64, i64::MAX]);
-    check([true, false]);
+    check_conversion(None::<String>);
+    check_conversion(Some(Some(String::from("nested"))));
+    check_conversion(Ok::<_, String>(u128::MAX));
+    check_conversion(Err::<bool, _>(String::from("error")));
+    check_conversion(vec![1i64, i64::MAX]);
+    check_conversion([true, false]);
 }
 
 #[test]
 fn conversion_preserves_borrowed_values() {
     let text = String::from("borrowed");
     let numbers = vec![1u128, u128::MAX];
-    check(&text);
-    check(&numbers);
-    check(numbers.as_slice());
+    check_conversion(&text);
+    check_conversion(&numbers);
+    check_conversion(numbers.as_slice());
 }
 
 #[test]
