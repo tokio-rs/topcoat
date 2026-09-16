@@ -75,6 +75,10 @@ source = "src/components/separator.rs"
 source = "src/components/sheet.rs"
 dependencies = ["dialog"]
 
+[components.sidebar]
+source = "src/components/sidebar.rs"
+dependencies = ["button", "input", "separator", "sheet", "skeleton"]
+
 [components.skeleton]
 source = "src/components/skeleton.rs"
 

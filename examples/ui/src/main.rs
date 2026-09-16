@@ -34,6 +34,13 @@ use components::{
     select::select,
     separator::{SeparatorOrientation, separator},
     sheet::{sheet, sheet_content},
+    sidebar::{
+        SidebarCollapsible, SidebarMenuButtonSize, SidebarVariant, sidebar, sidebar_content,
+        sidebar_footer, sidebar_group, sidebar_group_action, sidebar_group_content,
+        sidebar_group_label, sidebar_header, sidebar_inset, sidebar_menu, sidebar_menu_badge,
+        sidebar_menu_button, sidebar_menu_item, sidebar_menu_sub, sidebar_menu_sub_button,
+        sidebar_menu_sub_item, sidebar_provider, sidebar_rail, sidebar_separator, sidebar_trigger,
+    },
     skeleton::skeleton,
     spinner::spinner,
     switch::switch,
@@ -53,7 +60,7 @@ use topcoat::{
     font::fontsource::fontsource_font,
     icon::{icon, iconify::iconify_icon},
     router::{Router, RouterBuilderDiscoverExt, page},
-    runtime::{Event, RouterBuilderRuntimeExt, expr, shard, signal},
+    runtime::{Event, RouterBuilderRuntimeExt, Signal, expr, shard, signal},
     tailwind,
     view::{Child, View, attributes, class, component, view},
 };
@@ -116,6 +123,8 @@ fn status_variant(status: &str) -> BadgeVariant {
 #[page("/")]
 async fn home(cx: &Cx) -> Result<impl View> {
     let dark = signal(cx, || false);
+    let sidebar_open = signal(cx, || true);
+    let mobile_open = signal(cx, || false);
 
     Ok(view! {
         <!DOCTYPE html>
@@ -129,6 +138,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
         >
             <head>
                 <title>"Topcoat UI"</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
                 topcoat::dev::script()
                 topcoat::runtime::script()
                 topcoat::font::link(font: fontsource_font!(GEIST, host: Asset))
@@ -136,103 +146,141 @@ async fn home(cx: &Cx) -> Result<impl View> {
             </head>
             // The body's background, text color, and font come from the
             // theme's base layer in styles.css; nothing to set up here.
-            <body>
-                <main class="mx-auto max-w-6xl px-6 py-16">
-                    <div
-                        class="flex flex-col-reverse items-start justify-between gap-6 sm:flex-row"
-                    >
-                        <header class="max-w-2xl">
-                            <h1 class="text-4xl font-bold tracking-tight">
-                                "Build your component library"
-                            </h1>
-                            <p class="mt-3 text-muted-foreground">
-                                "Accessible, themeable components vendored into your \
+            <body
+                :class=$(if mobile_open.get() { "max-md:overflow-hidden" } else { "" })
+            >
+                sidebar_provider(
+                    app_sidebar(open: &sidebar_open, mobile_open: &mobile_open)
+                    sidebar_inset(
+                        <div
+                            class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm"
+                        >
+                            sidebar_trigger(
+                                open: $(sidebar_open.get()),
+                                attrs: attributes! {
+                                    class="hidden md:inline-flex"
+                                    aria-controls="showcase-sidebar"
+                                    @click=$(|_e: Event| sidebar_open.toggle())
+                                }
+                            )
+                            sidebar_trigger(
+                                open: $(mobile_open.get()),
+                                attrs: attributes! {
+                                    class="md:hidden"
+                                    aria-controls="showcase-sidebar"
+                                    @click=$(|_e: Event| mobile_open.toggle())
+                                }
+                            )
+                            separator(
+                                orientation: SeparatorOrientation::Vertical,
+                                attrs: attributes! { class="[&]:h-4" }
+                            )
+                            <span class="text-sm font-medium">"Component library"</span>
+                        </div>
+                        <div
+                            id="overview"
+                            class="mx-auto w-full max-w-6xl scroll-mt-20 px-6 py-12"
+                        >
+                            <div
+                                class="flex flex-col-reverse items-start justify-between gap-6 sm:flex-row"
+                            >
+                                <header class="max-w-2xl">
+                                    <h1 class="text-4xl font-bold tracking-tight">
+                                        "Build your component library"
+                                    </h1>
+                                    <p class="mt-3 text-muted-foreground">
+                                        "Accessible, themeable components vendored into your \
                                  project with "
-                                <code class="text-foreground">"topcoat ui add"</code>
-                                ". Yours to restyle, rewrite, and ship."
-                            </p>
-                            // Anything can borrow a button's looks:
-                            // `button_variants` returns the class string for a
-                            // variant and size.
-                            <div class="mt-6 flex flex-wrap items-center gap-3">
-                                <a
-                                    href=(DOCS)
-                                    class=(button_variants(
-                                        ButtonVariant::Primary,
-                                        ButtonSize::Lg,
-                                    ))
-                                >
-                                    "Read the docs"
-                                    icon(data: iconify_icon!("lucide:arrow-right"))
-                                </a>
-                                <a
-                                    href=(REPOSITORY)
-                                    class=(button_variants(
-                                        ButtonVariant::Outline,
-                                        ButtonSize::Lg,
-                                    ))
-                                >
-                                    "View on GitHub"
-                                </a>
+                                        <code class="text-foreground">"topcoat ui add"</code>
+                                        ". Yours to restyle, rewrite, and ship."
+                                    </p>
+                                    // Anything can borrow a button's looks:
+                                    // `button_variants` returns the class string for a
+                                    // variant and size.
+                                    <div class="mt-6 flex flex-wrap items-center gap-3">
+                                        <a
+                                            href=(DOCS)
+                                            class=(button_variants(
+                                                ButtonVariant::Primary,
+                                                ButtonSize::Lg,
+                                            ))
+                                        >
+                                            "Read the docs"
+                                            icon(data: iconify_icon!("lucide:arrow-right"))
+                                        </a>
+                                        <a
+                                            href=(REPOSITORY)
+                                            class=(button_variants(
+                                                ButtonVariant::Outline,
+                                                ButtonSize::Lg,
+                                            ))
+                                        >
+                                            "View on GitHub"
+                                        </a>
+                                    </div>
+                                </header>
+
+                                let theme_label = expr!(
+                                    if dark.get() {
+                                        "Switch to light theme"
+                                    } else {
+                                        "Switch to dark theme"
+                                    },
+                                );
+
+                                button(
+                                    size: ButtonSize::Lg,
+                                    attrs: attributes! {
+                                        type="button"
+                                        class="self-end sm:self-start"
+                                        @click=$(|_e: Event| dark.toggle())
+                                        :aria-label=(theme_label.clone())
+                                        :title=(theme_label)
+                                    },
+                                    <span class="contents" :hidden=$(!dark.get())>
+                                        "Light theme"
+                                        icon(data: iconify_icon!("lucide:sun"))
+                                    </span>
+                                    <span class="contents" :hidden=$(dark.get())>
+                                        "Dark theme"
+                                        icon(data: iconify_icon!("lucide:moon"))
+                                    </span>
+                                )
                             </div>
-                        </header>
 
-                        let theme_label = expr!(
-                            if dark.get() {
-                                "Switch to light theme"
-                            } else {
-                                "Switch to dark theme"
-                            },
-                        );
-
-                        button(
-                            size: ButtonSize::Lg,
-                            attrs: attributes! {
-                                type="button"
-                                class="self-end sm:self-start"
-                                @click=$(|_e: Event| dark.toggle())
-                                :aria-label=(theme_label.clone())
-                                :title=(theme_label)
-                            },
-                            <span class="contents" :hidden=$(!dark.get())>
-                                "Light theme"
-                                icon(data: iconify_icon!("lucide:sun"))
-                            </span>
-                            <span class="contents" :hidden=$(dark.get())>
-                                "Dark theme"
-                                icon(data: iconify_icon!("lucide:moon"))
-                            </span>
-                        )
-                    </div>
-
-                    // A masonry of small, self-contained demos, each built
-                    // from the installed components. They run from the plainest
-                    // components to the ones assembled out of them.
-                    <div class="mt-14 columns-1 gap-4 sm:columns-2 xl:columns-3">
-                        demo(buttons_card())
-                        demo(notices())
-                        demo(team_card())
-                        demo(status_card())
-                        demo(progress_card())
-                        demo(form_card())
-                        demo(checks_card())
-                        demo(switches_card())
-                        demo(radios_card())
-                        demo(overview_card())
-                        demo(faq_card())
-                        demo(branches_card())
-                        demo(toolbar_card())
-                        demo(tooltip_card())
-                        demo(hover_card_demo())
-                        demo(dialogs_card())
-                        demo(sheet_card())
-                        demo(deployments_card())
-                        demo(breadcrumbs_card())
-                        demo(keyboard_card())
-                        demo(skeletons_card())
-                        demo(spinner_card())
-                    </div>
-                </main>
+                            // A masonry of small, self-contained demos, each built
+                            // from the installed components. They run from the plainest
+                            // components to the ones assembled out of them.
+                            <div
+                                id="components"
+                                class="mt-14 scroll-mt-20 columns-1 gap-4 lg:columns-2 2xl:columns-3"
+                            >
+                                demo(buttons_card())
+                                demo(notices())
+                                demo(team_card())
+                                demo(status_card())
+                                demo(progress_card())
+                                demo(id: Some("forms"), form_card())
+                                demo(checks_card())
+                                demo(switches_card())
+                                demo(radios_card())
+                                demo(overview_card())
+                                demo(faq_card())
+                                demo(branches_card())
+                                demo(toolbar_card())
+                                demo(tooltip_card())
+                                demo(hover_card_demo())
+                                demo(id: Some("overlays"), dialogs_card())
+                                demo(sheet_card())
+                                demo(deployments_card())
+                                demo(breadcrumbs_card())
+                                demo(keyboard_card())
+                                demo(skeletons_card())
+                                demo(spinner_card())
+                            </div>
+                        </div>
+                    )
+                )
             </body>
         </html>
     })
@@ -240,8 +288,8 @@ async fn home(cx: &Cx) -> Result<impl View> {
 
 /// A masonry cell that keeps a demo from splitting across columns.
 #[component]
-async fn demo(child: Child<'_>) -> Result<impl View> {
-    Ok(view! { <div class="mb-4 break-inside-avoid">(child)</div> })
+async fn demo(#[default] id: Option<&str>, child: Child<'_>) -> Result<impl View> {
+    Ok(view! { <div id=(id) class="mb-4 scroll-mt-20 break-inside-avoid">(child)</div> })
 }
 
 /// The button family: variants, sizes, and states at a glance.
@@ -1465,6 +1513,189 @@ async fn spinner_card(cx: &Cx) -> Result<impl View> {
                         $(if loading.get() { "Finish loading" } else { "Load again" })
                     )
                 </div>
+            )
+        )
+    })
+}
+
+/// The showcase navigation, with independent desktop and mobile controls.
+#[component]
+async fn app_sidebar(
+    cx: &Cx,
+    open: &Signal<bool>,
+    mobile_open: &Signal<bool>,
+) -> Result<impl View> {
+    let selected = signal(cx, || "#overview".to_owned());
+    let sections = signal(cx, || true);
+
+    Ok(view! {
+        sidebar(
+            open: $(open.get()),
+            mobile_open: $(mobile_open.get()),
+            variant: SidebarVariant::Inset,
+            collapsible: SidebarCollapsible::Icon,
+            sheet_attrs: attributes! {
+                id="showcase-sidebar"
+                aria-label="Component library navigation"
+                @keydown=$(|e: Event| {
+                    if e.key == "Escape" {
+                        mobile_open.set(false);
+                    }
+                })
+                @click=$(|e: Event| {
+                    if e.target.id == "showcase-sidebar" {
+                        mobile_open.set(false);
+                    }
+                })
+            },
+            sidebar_header(
+                <div class="flex items-center gap-1">
+                    sidebar_menu(
+                        attrs: attributes! { class="flex-1" },
+                        sidebar_menu_item(
+                            sidebar_menu_button(
+                                size: SidebarMenuButtonSize::Lg,
+                                href: Some("#overview"),
+                                tooltip: Some("Topcoat UI"),
+                                attrs: attributes! {
+                                    @click=$(|_e: Event| {
+                                        selected.set("#overview".to_owned());
+                                        mobile_open.set(false);
+                                    })
+                                },
+                                icon(data: iconify_icon!("lucide:layers"))
+                                <span class="flex min-w-0 flex-col text-left">
+                                    <span class="font-semibold">"Topcoat UI"</span>
+                                    <span class="text-xs text-muted-foreground">
+                                        "Your component library"
+                                    </span>
+                                </span>
+                            )
+                        )
+                    )
+                    button(
+                        variant: ButtonVariant::Ghost,
+                        size: ButtonSize::Icon,
+                        attrs: attributes! {
+                            type="button"
+                            class="md:hidden"
+                            aria-label="Close sidebar"
+                            @click=$(|_e: Event| mobile_open.set(false))
+                        },
+                        icon(data: iconify_icon!("lucide:x"))
+                    )
+                </div>
+            )
+            sidebar_separator()
+            sidebar_content(
+                sidebar_group(
+                    sidebar_group_label("Workspace")
+                    sidebar_group_action(
+                        attrs: attributes! {
+                            aria-label="Toggle section links"
+                            aria-controls="sidebar-section-links"
+                            :aria-expanded=$(if sections.get() {
+                                "true"
+                            } else {
+                                "false"
+                            })
+                            @click=$(|_e: Event| sections.toggle())
+                        },
+                        icon(data: iconify_icon!("lucide:chevrons-up-down"))
+                    )
+                    sidebar_group_content(
+                        sidebar_menu(
+                            sidebar_menu_item(
+                                sidebar_menu_button(
+                                    href: Some("#overview"),
+                                    tooltip: Some("Overview"),
+                                    active: $(selected.get() == "#overview"),
+                                    attrs: attributes! {
+                                        @click=$(|_e: Event| {
+                                            selected.set("#overview".to_owned());
+                                            mobile_open.set(false);
+                                        })
+                                    },
+                                    icon(data: iconify_icon!("lucide:house"))
+                                    <span>"Overview"</span>
+                                )
+                            )
+                            sidebar_menu_item(
+                                sidebar_menu_button(
+                                    href: Some("#components"),
+                                    tooltip: Some("Components"),
+                                    active: $(selected.get() == "#components"),
+                                    attrs: attributes! {
+                                        @click=$(|_e: Event| {
+                                            selected.set("#components".to_owned());
+                                            mobile_open.set(false);
+                                        })
+                                    },
+                                    icon(data: iconify_icon!("lucide:layout-grid"))
+                                    <span>"Components"</span>
+                                )
+                                sidebar_menu_badge("22")
+                                sidebar_menu_sub(
+                                    attrs: attributes! { id="sidebar-section-links" :hidden=$(!sections.get()) },
+                                    for (href, text) in [
+                                        ("#forms", "Forms"),
+                                        ("#overlays", "Overlays"),
+                                    ] {
+                                        sidebar_menu_sub_item(
+                                            sidebar_menu_sub_button(
+                                                active: $(selected.get() == href),
+                                                attrs: attributes! {
+                                                    href=(href)
+                                                    @click=$(|_e: Event| {
+                                                        selected.set(href.to_owned());
+                                                        mobile_open.set(false);
+                                                    })
+                                                },
+                                                <span>(text)</span>
+                                            )
+                                        )
+                                    }
+                                )
+                            )
+                        )
+                    )
+                )
+                sidebar_group(
+                    sidebar_group_label("Resources")
+                    sidebar_group_content(
+                        sidebar_menu(
+                            for (href, text, data) in [
+                                (DOCS, "Documentation", iconify_icon!("lucide:book-open")),
+                                (REGISTRY, "Registry", iconify_icon!("lucide:blocks")),
+                                (REPOSITORY, "Source code", iconify_icon!("lucide:github")),
+                            ] {
+                                sidebar_menu_item(
+                                    sidebar_menu_button(
+                                        href: Some(href),
+                                        tooltip: Some(text),
+                                        icon(data: data)
+                                        <span>(text)</span>
+                                    )
+                                )
+                            }
+                        )
+                    )
+                )
+            )
+            sidebar_separator()
+            sidebar_footer(
+                <p
+                    class="px-2 py-1 text-xs text-muted-foreground md:group-data-[collapsible=icon]/sidebar:hidden"
+                >
+                    "Built with Topcoat. Yours to make your own."
+                </p>
+            )
+            sidebar_rail(
+                open: $(open.get()),
+                attrs: attributes! {
+                    aria-controls="showcase-sidebar"
+                    @click=$(|_e: Event| open.toggle())
+                }
             )
         )
     })
