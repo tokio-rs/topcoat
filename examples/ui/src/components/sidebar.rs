@@ -165,8 +165,12 @@ pub async fn sidebar(
             :data-state=$(if open { "expanded" } else { "collapsed" })
             :data-collapsible=$(if open { "" } else { collapse })
             class=(class!(
-                "group/sidebar relative w-0 shrink-0 text-sidebar-foreground md:sticky md:top-0 md:h-svh md:w-(--sidebar-width) md:self-start md:transition-[width] md:duration-200 md:data-[collapsible=offcanvas]:w-0 md:data-[collapsible=icon]:w-(--sidebar-width-icon) motion-reduce:transition-none",
-                "md:p-2" if variant == SidebarVariant::Floating,
+                "group/sidebar relative w-0 shrink-0 text-sidebar-foreground md:sticky md:top-0 md:h-svh md:w-(--sidebar-width) md:self-start md:transition-[width] md:duration-200 md:data-[collapsible=offcanvas]:w-0 motion-reduce:transition-none",
+                if variant == SidebarVariant::Floating {
+                    "md:p-2 md:data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+1rem+2px)] md:data-[collapsible=offcanvas]:px-0"
+                } else {
+                    "md:data-[collapsible=icon]:w-(--sidebar-width-icon)"
+                },
                 attrs.remove("class"),
             ))
             (attrs)
@@ -292,7 +296,10 @@ pub async fn sidebar_header(
     Ok(view! {
         <div
             data-sidebar="header"
-class=(class!("flex h-14 shrink-0 flex-col justify-center gap-2 border-b border-border px-2", attrs.remove("class")))
+            class=(class!(
+                "flex h-14 shrink-0 flex-col justify-center gap-2 border-b border-border px-2",
+                attrs.remove("class"),
+            ))
             (attrs)
         >
             (child)
@@ -392,11 +399,7 @@ pub async fn sidebar_group_action(
         <button
             type="button"
             data-sidebar="group-action"
-            class=(class!(
-                ACTION,
-                "top-3 right-3",
-                attrs.remove("class"),
-            ))
+            class=(class!(ACTION, "top-3 right-3", attrs.remove("class")))
             (attrs)
         >
             (child)
@@ -475,14 +478,7 @@ pub async fn sidebar_input(#[default] mut attrs: Attributes) -> Result<impl View
 /// A rule between sidebar sections.
 #[component]
 pub async fn sidebar_separator(#[default] attrs: Attributes) -> Result<impl View> {
-    Ok(view! {
-        separator(
-            attrs: attributes! {
-                data-sidebar="separator"
-                (attrs)
-            }
-        )
-    })
+    Ok(view! { separator(attrs: attributes! { data-sidebar="separator" (attrs) }) })
 }
 
 /// The visual style of a sidebar menu button.

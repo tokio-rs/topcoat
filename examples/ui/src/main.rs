@@ -35,11 +35,11 @@ use components::{
     separator::{SeparatorOrientation, separator},
     sheet::{sheet, sheet_content},
     sidebar::{
-        SidebarCollapsible, SidebarMenuButtonSize, sidebar, sidebar_content, sidebar_footer,
-        sidebar_group, sidebar_group_action, sidebar_group_content, sidebar_group_label,
-        sidebar_header, sidebar_inset, sidebar_menu, sidebar_menu_badge, sidebar_menu_button,
-        sidebar_menu_item, sidebar_menu_sub, sidebar_menu_sub_button, sidebar_menu_sub_item,
-        sidebar_provider, sidebar_separator, sidebar_trigger,
+        SidebarCollapsible, SidebarMenuButtonSize, SidebarVariant, sidebar, sidebar_content,
+        sidebar_footer, sidebar_group, sidebar_group_action, sidebar_group_content,
+        sidebar_group_label, sidebar_header, sidebar_inset, sidebar_menu, sidebar_menu_badge,
+        sidebar_menu_button, sidebar_menu_item, sidebar_menu_sub, sidebar_menu_sub_button,
+        sidebar_menu_sub_item, sidebar_provider, sidebar_separator, sidebar_trigger,
     },
     skeleton::skeleton,
     spinner::spinner,
@@ -150,7 +150,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 :class=$(if mobile_open.get() { "max-md:overflow-hidden" } else { "" })
             >
                 sidebar_provider(
-                    app_sidebar(open: &sidebar_open, mobile_open: &mobile_open)
+                    app_sidebar(open: $(sidebar_open), mobile_open: $(mobile_open))
                     sidebar_inset(
                         sidebar_header(
                             sidebar_trigger(
@@ -1515,19 +1515,22 @@ async fn spinner_card(cx: &Cx) -> Result<impl View> {
 }
 
 /// The showcase navigation, with independent desktop and mobile controls.
-#[component]
-async fn app_sidebar(
-    cx: &Cx,
-    open: &Signal<bool>,
-    mobile_open: &Signal<bool>,
-) -> Result<impl View> {
+#[shard]
+async fn app_sidebar(cx: &Cx, open: Signal<bool>, mobile_open: Signal<bool>) -> Result<impl View> {
     let selected = signal(cx, || "#overview".to_owned());
     let sections = signal(cx, || true);
+    let variant = signal(cx, || "sidebar".to_owned());
+    let sidebar_variant = match variant.get().as_str() {
+        "floating" => SidebarVariant::Floating,
+        "inset" => SidebarVariant::Inset,
+        _ => SidebarVariant::Sidebar,
+    };
 
     Ok(view! {
         sidebar(
             open: $(open.get()),
             mobile_open: $(mobile_open.get()),
+            variant: sidebar_variant,
             collapsible: SidebarCollapsible::Icon,
             sheet_attrs: attributes! {
                 id="showcase-sidebar"
@@ -1678,6 +1681,31 @@ async fn app_sidebar(
             )
             sidebar_separator()
             sidebar_footer(
+                <div class="md:group-data-[collapsible=icon]/sidebar:hidden">
+                    toggle_group(
+                        attrs: attributes! {
+                            role="radiogroup"
+                            aria-labelledby="sidebar-variant-label"
+                        },
+                        for (value, text) in [
+                            ("sidebar", "Sidebar"),
+                            ("floating", "Floating"),
+                            ("inset", "Inset"),
+                        ] {
+                            toggle(
+                                kind: ToggleKind::Exclusive,
+                                size: ToggleSize::Sm,
+                                attrs: attributes! {
+                                    name="sidebar-variant"
+                                    value=(value)
+                                    :checked=$(variant.get() == value)
+                                    @change=$(|e: Event| variant.set(e.target.value))
+                                },
+                                (text)
+                            )
+                        }
+                    )
+                </div>
                 <p
                     class="px-2 py-1 text-xs text-muted-foreground md:group-data-[collapsible=icon]/sidebar:hidden"
                 >
