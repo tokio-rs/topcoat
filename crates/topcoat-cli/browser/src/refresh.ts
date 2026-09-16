@@ -26,7 +26,9 @@ export class PageRefresh {
 		this.controller = controller;
 		const url = location.href;
 		const current = () =>
-			this.controller === controller && !this.navigating() && location.href === url;
+			this.controller === controller &&
+			!this.navigating() &&
+			location.href === url;
 		try {
 			// Deferred module scripts (including the runtime) start before this.
 			await ready(controller.signal);
@@ -44,8 +46,14 @@ export class PageRefresh {
 				location.assign(response.url);
 				return;
 			}
-			if (!response.ok) throw new Error(`Refresh failed: ${response.status} ${response.statusText}`);
-			if (response.headers.get("Content-Type")?.split(";")[0]?.trim() !== "text/html") {
+			if (!response.ok)
+				throw new Error(
+					`Refresh failed: ${response.status} ${response.statusText}`,
+				);
+			if (
+				response.headers.get("Content-Type")?.split(";")[0]?.trim() !==
+				"text/html"
+			) {
 				location.reload();
 				return;
 			}
@@ -70,7 +78,8 @@ export class PageRefresh {
 
 /** Waits for initial markup and deferred scripts, or cancellation. */
 function ready(signal: AbortSignal): Promise<void> {
-	if (document.readyState !== "loading" || signal.aborted) return Promise.resolve();
+	if (document.readyState !== "loading" || signal.aborted)
+		return Promise.resolve();
 	return new Promise((resolve) => {
 		const finish = () => {
 			document.removeEventListener("DOMContentLoaded", finish);

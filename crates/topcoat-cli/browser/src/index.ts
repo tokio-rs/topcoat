@@ -3,10 +3,14 @@ import { PageRefresh } from "./refresh";
 import { StatusIndicator } from "./status";
 
 function start(script: HTMLScriptElement): void {
-	const status = new StatusIndicator(script.dataset.statusIndicator !== "false");
+	const status = new StatusIndicator(
+		script.dataset.statusIndicator !== "false",
+	);
 	const connection = new DevConnection(script.src, {
 		event: (event) => events[event](),
-		reconnected: () => { void refresh.refresh(); },
+		reconnected: () => {
+			void refresh.refresh();
+		},
 		navigating: () => refresh.cancel(),
 	});
 	const refresh = new PageRefresh(
@@ -18,7 +22,9 @@ function start(script: HTMLScriptElement): void {
 		},
 	);
 	const events: Record<DevEvent, () => void> = {
-		reload: () => { void refresh.refresh(); },
+		reload: () => {
+			void refresh.refresh();
+		},
 		rebuilding: () => {
 			refresh.cancel();
 			status.show("rebuilding");

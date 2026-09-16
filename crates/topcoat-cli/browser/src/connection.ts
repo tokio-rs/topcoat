@@ -1,4 +1,9 @@
-export type DevEvent = "reload" | "rebuilding" | "build-failed" | "app-exited" | "up-to-date";
+export type DevEvent =
+	| "reload"
+	| "rebuilding"
+	| "build-failed"
+	| "app-exited"
+	| "up-to-date";
 
 interface Handlers {
 	event: (event: DevEvent) => void;
@@ -14,7 +19,10 @@ export class DevConnection {
 	private retry: ReturnType<typeof setTimeout> | undefined;
 	private navigating = false;
 
-	constructor(scriptUrl: string, private readonly handlers: Handlers) {
+	constructor(
+		scriptUrl: string,
+		private readonly handlers: Handlers,
+	) {
 		const url = new URL(scriptUrl);
 		url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
 		url.pathname = "/ws";
@@ -36,9 +44,21 @@ export class DevConnection {
 		// Firefox closes the socket at navigation start, Chrome at commit.
 		window.navigation?.addEventListener("navigate", navigating, options);
 		window.addEventListener("pagehide", navigating, options);
-		window.navigation?.addEventListener("navigateerror", () => { this.navigating = false; }, options);
+		window.navigation?.addEventListener(
+			"navigateerror",
+			() => {
+				this.navigating = false;
+			},
+			options,
+		);
 		// Restoring a page from the back/forward cache resumes reconnects.
-		window.addEventListener("pageshow", () => { this.navigating = false; }, options);
+		window.addEventListener(
+			"pageshow",
+			() => {
+				this.navigating = false;
+			},
+			options,
+		);
 		this.connect(false);
 	}
 

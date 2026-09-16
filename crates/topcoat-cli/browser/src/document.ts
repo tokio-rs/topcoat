@@ -11,7 +11,8 @@ export function canMorph(next: Document): boolean {
 	return (
 		scripts(document) === scripts(next) &&
 		doctype(document) === doctype(next) &&
-		document.querySelector("base")?.outerHTML === next.querySelector("base")?.outerHTML
+		document.querySelector("base")?.outerHTML ===
+			next.querySelector("base")?.outerHTML
 	);
 }
 

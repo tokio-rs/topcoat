@@ -1,22 +1,27 @@
 /** The floating build status, isolated from page styles in a shadow tree. */
 export class StatusIndicator {
-	private pill: { host: HTMLElement; label: HTMLElement; spinner: HTMLElement } | null = null;
+	private pill: {
+		host: HTMLElement;
+		label: HTMLElement;
+		spinner: HTMLElement;
+	} | null = null;
 	private current: { label: string; isError: boolean } | null = null;
 
 	constructor(private readonly enabled: boolean) {
 		if (!enabled) return;
-		document.addEventListener("DOMContentLoaded", () => this.render(), { once: true });
-	  for (const weight of ["400", "600"]) {
-	    const font = new FontFace(
-	      FONT,
-	      `url(${FONT_URL}${weight}-normal.woff2) format("woff2")`,
-	      { weight, display: "swap" }
-	    );
-	    document.fonts.add(font);
-	    // Offline is fine: the pill falls back to the system font.
-	    font.load().catch(() => {});
-	  }
-	
+		document.addEventListener("DOMContentLoaded", () => this.render(), {
+			once: true,
+		});
+		for (const weight of ["400", "600"]) {
+			const font = new FontFace(
+				FONT,
+				`url(${FONT_URL}${weight}-normal.woff2) format("woff2")`,
+				{ weight, display: "swap" },
+			);
+			document.fonts.add(font);
+			// Offline is fine: the pill falls back to the system font.
+			font.load().catch(() => {});
+		}
 	}
 
 	show(label: string, isError = false): void {
@@ -64,12 +69,12 @@ const ERROR = "#fca5a5";
 // eagerly lets the pill render in its final font the moment it appears.
 const FONT = "Topcoat Dev";
 const FONT_URL =
-  "https://cdn.jsdelivr.net/fontsource/fonts/lexend-deca@latest/latin-";
+	"https://cdn.jsdelivr.net/fontsource/fonts/lexend-deca@latest/latin-";
 // Lucide icons (https://lucide.dev), inheriting the surrounding color.
 const lucide = (paths: string) =>
-  '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"' +
-  ' viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"' +
-  ` stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+	'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"' +
+	' viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"' +
+	` stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
 
 const X_ICON = lucide('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>');
 const SPINNER_ICON = lucide('<path d="M21 12a9 9 0 1 1-6.219-8.56"/>');
