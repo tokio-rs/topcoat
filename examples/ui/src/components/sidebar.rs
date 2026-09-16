@@ -444,7 +444,7 @@ pub async fn sidebar_separator(#[default] mut attrs: Attributes) -> Result<impl 
         separator(
             attrs: attributes! {
                 data-sidebar="separator"
-                class=(class!("mx-2 [&]:w-auto", attrs.remove("class")))
+                class=(attrs.remove("class"))
                 (attrs)
             }
         )

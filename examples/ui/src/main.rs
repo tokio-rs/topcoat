@@ -153,7 +153,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                     app_sidebar(open: &sidebar_open, mobile_open: &mobile_open)
                     sidebar_inset(
                         <div
-                            class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm"
+                            class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm md:top-2"
                         >
                             sidebar_trigger(
                                 open: $(sidebar_open.get()),
