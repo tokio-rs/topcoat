@@ -86,6 +86,8 @@ impl SidebarCollapsible {
 
 /// The flex layout surrounding a sidebar and the page content.
 ///
+/// On desktop, the page content scrolls within the viewport-height layout.
+///
 /// Set `--sidebar-width`, `--sidebar-width-mobile` and `--sidebar-width-icon`
 /// through `attrs` to customize the widths. Place a right sidebar after the
 /// page content. State belongs to the caller, which passes expressions to
@@ -99,7 +101,7 @@ pub async fn sidebar_provider(
         <div
             data-sidebar="provider"
             class=(class!(
-                "flex min-h-svh w-full [--sidebar-width:16rem] [--sidebar-width-mobile:18rem] [--sidebar-width-icon:3rem] has-[[data-variant=inset]]:bg-sidebar",
+                "flex min-h-svh w-full md:h-svh md:overflow-hidden [--sidebar-width:16rem] [--sidebar-width-mobile:18rem] [--sidebar-width-icon:3rem] md:has-[[data-variant=inset]]:bg-sidebar-accent/50",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -171,6 +173,7 @@ pub async fn sidebar(
                 } else {
                     "md:data-[collapsible=icon]:w-(--sidebar-width-icon)"
                 },
+                "md:py-2" if variant == SidebarVariant::Inset,
                 attrs.remove("class"),
             ))
             (attrs)
@@ -196,7 +199,7 @@ pub async fn sidebar(
                             match variant {
                                 SidebarVariant::Sidebar => "md:shadow-none",
                                 SidebarVariant::Floating => "md:rounded-xl md:border md:shadow-sm",
-                                SidebarVariant::Inset => "md:border-0 md:shadow-none",
+                                SidebarVariant::Inset => "md:border-0 md:bg-transparent md:shadow-none",
                             },
                         ))
                     },
@@ -261,7 +264,7 @@ pub async fn sidebar_rail(
     })
 }
 
-/// The page content beside a sidebar.
+/// The page content beside a sidebar, scrollable independently on desktop.
 ///
 /// An immediate [`sidebar_header`] child becomes a sticky toolbar. Its height
 /// and bottom border match the sidebar header without extra classes.
@@ -274,7 +277,7 @@ pub async fn sidebar_inset(
         <main
             data-sidebar="inset"
             class=(class!(
-                "relative flex min-w-0 flex-1 flex-col bg-background [&>[data-sidebar=header]]:sticky [&>[data-sidebar=header]]:top-0 [&>[data-sidebar=header]]:z-20 [&>[data-sidebar=header]]:flex-row [&>[data-sidebar=header]]:items-center [&>[data-sidebar=header]]:justify-start [&>[data-sidebar=header]]:gap-3 [&>[data-sidebar=header]]:bg-background [&>[data-sidebar=header]]:px-4 [&>[data-sidebar=header]>[aria-orientation=vertical]]:h-4 md:in-[[data-sidebar=provider]:has([data-variant=inset])]:m-2 md:in-[[data-sidebar=provider]:has([data-variant=inset][data-side=left])]:ml-0 md:in-[[data-sidebar=provider]:has([data-variant=inset][data-side=right])]:mr-0 md:in-[[data-sidebar=provider]:has([data-variant=inset])]:rounded-xl md:in-[[data-sidebar=provider]:has([data-variant=inset])]:shadow-sm",
+                "relative flex min-w-0 flex-1 flex-col bg-background md:min-h-0 md:overflow-y-auto [&>[data-sidebar=header]]:sticky [&>[data-sidebar=header]]:top-0 [&>[data-sidebar=header]]:z-20 [&>[data-sidebar=header]]:flex-row [&>[data-sidebar=header]]:items-center [&>[data-sidebar=header]]:justify-start [&>[data-sidebar=header]]:gap-3 [&>[data-sidebar=header]]:bg-background [&>[data-sidebar=header]]:px-4 [&>[data-sidebar=header]>[aria-orientation=vertical]]:h-4 md:in-[[data-sidebar=provider]:has([data-variant=floating])]:my-[calc(--spacing(2)+1px)] md:in-[[data-sidebar=provider]:has([data-variant=inset])]:m-2 md:in-[[data-sidebar=provider]:has([data-variant=inset][data-side=left])]:ml-0 md:in-[[data-sidebar=provider]:has([data-variant=inset][data-side=right])]:mr-0 md:in-[[data-sidebar=provider]:has([data-variant=inset])]:rounded-xl md:in-[[data-sidebar=provider]:has([data-variant=inset])]:shadow-sm md:in-[[data-sidebar=provider]:has([data-variant=inset])]:ring-1 md:in-[[data-sidebar=provider]:has([data-variant=inset])]:ring-sidebar-border",
                 attrs.remove("class"),
             ))
             (attrs)
