@@ -101,7 +101,7 @@ pub async fn sidebar_provider(
         <div
             data-sidebar="provider"
             class=(class!(
-                "flex min-h-svh w-full md:h-svh md:overflow-hidden [--sidebar-width:16rem] [--sidebar-width-mobile:18rem] [--sidebar-width-icon:3rem] md:has-[[data-variant=inset]]:bg-sidebar-accent/50",
+                "flex min-h-svh w-full md:h-svh md:overflow-hidden [--sidebar-width:16rem] [--sidebar-width-mobile:18rem] [--sidebar-width-icon:3rem] md:has-[[data-variant=inset]]:bg-sidebar",
                 attrs.remove("class"),
             ))
             (attrs)
