@@ -165,7 +165,8 @@ pub async fn sidebar(
             :data-state=$(if open { "expanded" } else { "collapsed" })
             :data-collapsible=$(if open { "" } else { collapse })
             class=(class!(
-                "group/sidebar relative w-0 shrink-0 text-sidebar-foreground md:sticky md:top-0 md:h-svh md:w-(--sidebar-width) md:self-start md:transition-[width] md:duration-200 md:data-[collapsible=offcanvas]:w-0 md:data-[collapsible=icon]:w-(--sidebar-width-icon) md:data-[variant=floating]:p-2 motion-reduce:transition-none",
+                "group/sidebar relative w-0 shrink-0 text-sidebar-foreground md:sticky md:top-0 md:h-svh md:w-(--sidebar-width) md:self-start md:transition-[width] md:duration-200 md:data-[collapsible=offcanvas]:w-0 md:data-[collapsible=icon]:w-(--sidebar-width-icon) motion-reduce:transition-none",
+                "md:p-2" if variant == SidebarVariant::Floating,
                 attrs.remove("class"),
             ))
             (attrs)
@@ -185,7 +186,15 @@ pub async fn sidebar(
                     side: side.sheet(),
                     attrs: attributes! {
                         data-sidebar="panel"
-                        class=(class!(PANEL_THEME, "relative [&]:w-(--sidebar-width-mobile) [&]:max-w-[calc(100vw-3rem)] [&]:gap-0 [&]:overflow-hidden [&]:p-0 md:[&]:w-full md:[&]:max-w-none md:[&]:translate-x-0 md:[&]:shadow-none md:[&]:transition-none md:group-data-[variant=floating]/sidebar:rounded-xl md:group-data-[variant=floating]/sidebar:border md:group-data-[variant=floating]/sidebar:shadow-sm md:group-data-[variant=inset]/sidebar:border-0 motion-reduce:transition-none"))
+                        class=(class!(
+                            PANEL_THEME,
+                            "relative [&]:w-(--sidebar-width-mobile) [&]:max-w-[calc(100vw-3rem)] [&]:gap-0 [&]:overflow-hidden [&]:p-0 md:[&]:w-full md:[&]:max-w-none md:[&]:translate-x-0 md:[&]:transition-none motion-reduce:transition-none",
+                            match variant {
+                                SidebarVariant::Sidebar => "md:shadow-none",
+                                SidebarVariant::Floating => "md:rounded-xl md:border md:shadow-sm",
+                                SidebarVariant::Inset => "md:border-0 md:shadow-none",
+                            },
+                        ))
                     },
                     (child)
                 )
@@ -465,12 +474,11 @@ pub async fn sidebar_input(#[default] mut attrs: Attributes) -> Result<impl View
 
 /// A rule between sidebar sections.
 #[component]
-pub async fn sidebar_separator(#[default] mut attrs: Attributes) -> Result<impl View> {
+pub async fn sidebar_separator(#[default] attrs: Attributes) -> Result<impl View> {
     Ok(view! {
         separator(
             attrs: attributes! {
                 data-sidebar="separator"
-                class=(attrs.remove("class"))
                 (attrs)
             }
         )
