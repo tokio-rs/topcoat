@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    runtime::Expr,
     view::{Attributes, Child, View, attributes, component, view},
 };
 
@@ -45,7 +46,8 @@ use super::dialog::dialog;
 #[component]
 pub async fn alert_dialog(
     /// Whether the alert dialog shows.
-    open: bool,
+    #[into]
+    open: Expr<bool>,
     /// Extra attributes for the `<dialog>` element.
     #[default]
     attrs: Attributes,

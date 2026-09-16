@@ -33,7 +33,7 @@ use components::{
     radio_group::{radio_group, radio_group_item},
     select::select,
     separator::{SeparatorOrientation, separator},
-    sheet::{SheetSide, sheet, sheet_content},
+    sheet::{sheet, sheet_content},
     skeleton::skeleton,
     spinner::spinner,
     switch::switch,
@@ -88,11 +88,6 @@ async fn main() {
 struct HomeQuery {
     tab: Option<String>,
     page: Option<usize>,
-    name: Option<String>,
-    env: Option<String>,
-    status: Option<String>,
-    overlay: Option<String>,
-    side: Option<String>,
 }
 
 /// The page's state: its query string read back as the values the page has
@@ -106,16 +101,6 @@ struct State {
     tab: &'static str,
     /// The page of the deployments table.
     page: usize,
-    /// The name the project goes by.
-    name: String,
-    /// The environment the deployments table is filtered to.
-    env: Option<&'static str>,
-    /// The status the deployments table is filtered to.
-    status: Option<&'static str>,
-    /// The overlay covering the page.
-    overlay: Option<&'static str>,
-    /// The edge the sheet comes in from.
-    side: &'static str,
 }
 
 impl State {
@@ -130,12 +115,6 @@ impl State {
         Ok(Self {
             tab: one_of(query.tab.as_deref(), &TABS.map(|(value, _)| value)).unwrap_or(TABS[0].0),
             page: query.page.unwrap_or(1).max(1),
-            name: project_name(query.name.clone()),
-            env: one_of(query.env.as_deref(), &ENVIRONMENTS),
-            status: query.status.as_deref().and_then(status_label),
-            overlay: one_of(query.overlay.as_deref(), &OVERLAYS.map(|(value, _)| value)),
-            side: one_of(query.side.as_deref(), &SIDES.map(|(value, ..)| value))
-                .unwrap_or(SIDES[0].0),
         })
     }
 
@@ -150,21 +129,6 @@ impl State {
         if self.page > 1 {
             params.push(("page", self.page.to_string()));
         }
-        if self.name != NAME {
-            params.push(("name", self.name.clone()));
-        }
-        if let Some(env) = self.env {
-            params.push(("env", env.to_owned()));
-        }
-        if let Some(status) = self.status {
-            params.push(("status", status.to_lowercase()));
-        }
-        if let Some(overlay) = self.overlay {
-            params.push(("overlay", overlay.to_owned()));
-        }
-        if self.side != SIDES[0].0 {
-            params.push(("side", self.side.to_owned()));
-        }
 
         params
     }
@@ -172,9 +136,8 @@ impl State {
     /// The page's URL with `key` set to `value`, or dropped for `None`, and
     /// the rest of the state left as it is.
     ///
-    /// Every link on the page is built this way, which is what keeps opening a
-    /// dialog or turning a page from resetting the parts of the page it has
-    /// nothing to do with.
+    /// Links preserve the other query parameters, so pagination and tabs
+    /// keep their independent state.
     fn href(&self, key: &'static str, value: Option<&str>) -> String {
         let mut params = self.params();
         params.retain(|(name, _)| *name != key);
@@ -199,65 +162,12 @@ impl State {
         }
     }
 
-    /// The URL of the sheet lying against `side`.
-    fn side_href(&self, side: &'static str) -> String {
-        self.href("side", (side != SIDES[0].0).then_some(side))
-    }
-
-    /// The URL of the page with no overlay over it, which is what closes one.
-    fn closed(&self) -> String {
-        self.href("overlay", None)
-    }
-
-    /// Whether a deployment to `env` in `status` passes the table's filters.
-    fn shows(&self, env: &str, status: &str) -> bool {
-        self.env.is_none_or(|filter| filter == env)
-            && self.status.is_none_or(|filter| filter == status)
-    }
-
-    /// What the deployments table is filtered to, in words.
-    fn filtered(&self) -> String {
-        match (self.env, self.status) {
-            (None, None) => String::from("Every environment"),
-            (Some(env), None) => format!("Deployments to {env}"),
-            (None, Some(status)) => format!("{status} deployments"),
-            (Some(env), Some(status)) => format!("{status} deployments to {env}"),
-        }
-    }
-
-    /// The edge the sheet lies against.
-    fn sheet_side(&self) -> SheetSide {
-        SIDES
-            .iter()
-            .find(|(value, ..)| *value == self.side)
-            .map_or(SheetSide::default(), |(.., side)| *side)
-    }
 }
 
 /// The entry of `values` that `value` names, if it names one at all.
 fn one_of(value: Option<&str>, values: &[&'static str]) -> Option<&'static str> {
     let value = value?;
     values.iter().copied().find(|known| *known == value)
-}
-
-/// The name the project goes by until it is renamed.
-const NAME: &str = "topcoat-ui";
-
-/// The name in `value`, if it is one the page's links can carry.
-///
-/// The links here build their query strings by hand, so a name is kept to
-/// what needs no escaping: letters, digits, dashes, and underscores, and no
-/// more than 32 of them. Anything else falls back to the default, the same
-/// way the rest of the state does.
-fn project_name(value: Option<String>) -> String {
-    let name = value.unwrap_or_default();
-    let carried = !name.is_empty()
-        && name.len() <= 32
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
-
-    if carried { name } else { NAME.to_owned() }
 }
 
 /// The panels the project card tabs between: the value each goes by in the
@@ -270,9 +180,6 @@ const TABS: [(&str, &str); 3] = [
 
 /// How many rows one page of the deployments table holds.
 const PER_PAGE: usize = 3;
-
-/// The environments deployments go to.
-const ENVIRONMENTS: [&str; 3] = ["production", "staging", "preview"];
 
 /// The statuses a deployment can be in, and the badge variant each shows in.
 const STATUSES: [(&str, BadgeVariant); 4] = [
@@ -288,32 +195,6 @@ const BRANCHES: [&str; 3] = ["main", "feature/showcase", "feature/dark-mode"];
 
 /// The tags a preview can build from instead of a branch.
 const TAGS: [&str; 3] = ["v1.2.0", "v1.1.0", "v1.0.0"];
-
-/// The overlays that can cover the page, one at a time: the value each goes
-/// by in the URL, and the word for it.
-const OVERLAYS: [(&str, &str); 3] = [
-    ("rename", "Dialog"),
-    ("reset", "Alert dialog"),
-    ("filters", "Sheet"),
-];
-
-/// The edges the sheet can come in from: the value each goes by in the URL,
-/// the word for it, and the side itself. The first is the one it comes from
-/// until another is picked.
-const SIDES: [(&str, &str, SheetSide); 4] = [
-    ("right", "Right", SheetSide::Right),
-    ("left", "Left", SheetSide::Left),
-    ("top", "Top", SheetSide::Top),
-    ("bottom", "Bottom", SheetSide::Bottom),
-];
-
-/// The word for the deployment status `value` names, whatever its case.
-fn status_label(value: &str) -> Option<&'static str> {
-    STATUSES
-        .iter()
-        .find(|(status, _)| status.eq_ignore_ascii_case(value))
-        .map(|(status, _)| *status)
-}
 
 /// The badge variant the deployment status `status` shows in.
 fn status_variant(status: &str) -> BadgeVariant {
@@ -427,24 +308,18 @@ async fn home(cx: &Cx) -> Result<impl View> {
                         demo(form_card())
                         demo(checks_card())
                         demo(radios_card())
-                        demo(overlays_card(state: &state))
                         demo(overview_card(state: &state))
                         demo(faq_card())
                         demo(branches_card())
                         demo(toolbar_card())
                         demo(share_card())
-                        demo(rename_card(state: &state))
+                        demo(dialogs_card())
+                        demo(sheet_card())
                         demo(deployments_card(state: &state))
                         demo(docs_card())
                         demo(pending_card())
                     </div>
                 </main>
-
-                // The overlays cover the page, so they stand outside the
-                // masonry rather than in the cells that open them.
-                rename_dialog(state: &state)
-                reset_dialog(state: &state)
-                filters_sheet(state: &state)
             </body>
         </html>
     })
@@ -454,24 +329,6 @@ async fn home(cx: &Cx) -> Result<impl View> {
 #[component]
 async fn demo(child: Child<'_>) -> Result<impl View> {
     Ok(view! { <div class="mb-4 break-inside-avoid">(child)</div> })
-}
-
-/// The parts of the page's state a form does not set, carried along as hidden
-/// fields.
-///
-/// A form submitted with GET replaces the whole query string with its own
-/// fields, so without these, submitting one would reset the rest of the page.
-/// `sets` names the parameters the form has controls for, separated by spaces;
-/// those are left out, since the form submits its own values for them.
-#[component]
-async fn state_fields(state: &State, sets: &str) -> Result<impl View> {
-    Ok(view! {
-        for (key, value) in state.params() {
-            if !sets.split_whitespace().any(|set| set == key) {
-                <input type="hidden" name=(key) value=(value)>
-            }
-        }
-    })
 }
 
 /// The button family: variants, sizes, and states at a glance.
@@ -908,43 +765,6 @@ async fn radios_card() -> Result<impl View> {
     })
 }
 
-/// The overlays gathered in one place, so each can be opened without hunting
-/// for the card it belongs to.
-///
-/// A trigger is a plain link to this page with the overlay named in its query
-/// string, which is all it takes to open one: the same overlays are opened
-/// from the cards they belong to further down.
-#[component]
-async fn overlays_card(state: &State) -> Result<impl View> {
-    Ok(view! {
-        card(
-            card_header(
-                card_title("Overlays")
-                card_description(
-                    "The URL is what holds one open, so it survives a reload \
-                     and can be linked to."
-                )
-            )
-            card_content(
-                <div class="flex flex-wrap gap-2">
-                    for (overlay, name) in OVERLAYS {
-                        <a
-                            href=(state.href("overlay", Some(overlay)))
-                            class=(button_variants(
-                                ButtonVariant::Outline,
-                                ButtonSize::Sm,
-                            ))
-                        >
-                            "Open "
-                            (name.to_lowercase())
-                        </a>
-                    }
-                </div>
-            )
-        )
-    })
-}
-
 /// A card that tabs between panels.
 ///
 /// Which panel shows is in the URL, so each trigger is a link and only the
@@ -1275,47 +1095,127 @@ async fn share_card() -> Result<impl View> {
     })
 }
 
-/// The name the page carries, and the two overlays that act on it.
-///
-/// Nothing about a trigger is special: opening an overlay is navigating to the
-/// URL the page renders it open for.
+/// A dialog and an alert dialog, each controlled by a local signal.
 #[component]
-async fn rename_card(state: &State) -> Result<impl View> {
+async fn dialogs_card(cx: &Cx) -> Result<impl View> {
+    let open = signal(cx, || false);
+    let confirming = signal(cx, || false);
+
     Ok(view! {
         card(
             card_header(
-                card_title("Project name")
-                card_description(
-                    "The name is part of the URL, and the dialog changes it."
-                )
+                card_title("Dialog")
+                card_description("A content panel or a confirmation prompt.")
             )
             card_content(
-                <div class="flex items-center justify-between gap-4">
-                    <p class="truncate font-mono text-sm">(&state.name)</p>
-                    <a
-                        href=(state.href("overlay", Some("rename")))
-                        class=(button_variants(ButtonVariant::Outline, ButtonSize::Sm))
-                    >
-                        "Rename"
-                    </a>
+                <div class="flex flex-wrap gap-2">
+                    button(
+                        variant: ButtonVariant::Outline,
+                        size: ButtonSize::Sm,
+                        attrs: attributes! { type="button" @click=$(|_e: Event| open.set(true)) },
+                        "Open dialog"
+                    )
+                    button(
+                        variant: ButtonVariant::Outline,
+                        size: ButtonSize::Sm,
+                        attrs: attributes! { type="button" @click=$(|_e: Event| confirming.set(true)) },
+                        "Open alert dialog"
+                    )
                 </div>
-                separator(attrs: attributes! { class="my-4" })
-                <div class="flex items-center justify-between gap-4">
-                    <p class="truncate text-sm text-muted-foreground">
-                        "Put the whole page back"
-                    </p>
-                    // Clearing the page goes through an alert dialog, so it
-                    // takes a deliberate answer rather than one stray click.
-                    <a
-                        href=(state.href("overlay", Some("reset")))
-                        class=(button_variants(
-                            ButtonVariant::Destructive,
-                            ButtonSize::Sm,
-                        ))
-                    >
-                        "Reset"
-                    </a>
-                </div>
+            )
+        )
+        dialog(
+            open: $(open.get()),
+            attrs: attributes! { aria-label="Example dialog" },
+            dialog_content(
+                dialog_header(
+                    dialog_title("Example dialog")
+                    dialog_description(
+                        "A dialog brings content into focus above the page."
+                    )
+                )
+                <p class="text-sm">
+                    "Put your content here, then close the dialog to return to the page."
+                </p>
+                dialog_footer(
+                    button(
+                        attrs: attributes! { type="button" @click=$(|_e: Event| open.set(false)) },
+                        "Close"
+                    )
+                )
+            )
+        )
+        alert_dialog(
+            open: $(confirming.get()),
+            attrs: attributes! { aria-label="Continue?" },
+            dialog_content(
+                dialog_header(
+                    dialog_title("Continue?")
+                    dialog_description(
+                        "An alert dialog asks for an explicit choice before continuing."
+                    )
+                )
+                dialog_footer(
+                    button(
+                        variant: ButtonVariant::Outline,
+                        attrs: attributes! {
+                            type="button"
+                            @click=$(|_e: Event| confirming.set(false))
+                        },
+                        "Cancel"
+                    )
+                    button(
+                        attrs: attributes! {
+                            type="button"
+                            @click=$(|_e: Event| confirming.set(false))
+                        },
+                        "Continue"
+                    )
+                )
+            )
+        )
+    })
+}
+
+/// A sheet controlled by a local signal.
+#[component]
+async fn sheet_card(cx: &Cx) -> Result<impl View> {
+    let open = signal(cx, || false);
+
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Sheet")
+                card_description("A panel that slides in from the edge of the page.")
+            )
+            card_content(
+                button(
+                    variant: ButtonVariant::Outline,
+                    attrs: attributes! { type="button" @click=$(|_e: Event| open.set(true)) },
+                    "Open sheet"
+                )
+            )
+        )
+        sheet(
+            open: $(open.get()),
+            attrs: attributes! { aria-label="Example sheet" },
+            sheet_content(
+                dialog_header(
+                    dialog_title("Example sheet")
+                    dialog_description(
+                        "Use a sheet for content that belongs beside the page."
+                    )
+                )
+                <p class="text-sm">
+                    "The rest of the page stays visible behind this panel."
+                </p>
+                dialog_footer(
+                    attrs: attributes! { class="mt-auto" },
+                    button(
+                        attrs: attributes! { type="button" @click=$(|_e: Event| open.set(false)) },
+                        "Close"
+                    )
+                )
             )
         )
     })
@@ -1338,19 +1238,12 @@ const DEPLOYMENTS: [(&str, &str, &str); 12] = [
     ("d4c3b2a", "staging", "Failed"),
 ];
 
-/// A table of deployments, filtered by the sheet and paginated underneath.
-///
-/// Every one of those comes from the URL, so the links below the table are
-/// what change the rows and which page reads as the current one.
+/// A table of deployments with pagination underneath.
 #[component]
 async fn deployments_card(state: &State) -> Result<impl View> {
-    let rows: Vec<_> = DEPLOYMENTS
-        .into_iter()
-        .filter(|&(_, env, status)| state.shows(env, status))
-        .collect();
+    let rows = &DEPLOYMENTS;
     let pages = rows.len().div_ceil(PER_PAGE).max(1);
-    // A filter can leave fewer pages than the URL asks for, so the page being
-    // read is the last one that still has rows on it.
+    // Clamp the requested page to the available rows.
     let page = state.page.min(pages);
     let previous = state.page_href(page.saturating_sub(1).max(1));
     let next = state.page_href((page + 1).min(pages));
@@ -1361,25 +1254,7 @@ async fn deployments_card(state: &State) -> Result<impl View> {
         card(
             card_header(
                 card_title("Table")
-                card_description(
-                    "Filtered from the sheet and paged by the links below."
-                )
-            )
-            card_content(
-                <div class="flex items-center justify-between gap-4">
-                    <p class="truncate text-sm text-muted-foreground">
-                        (state.filtered())
-                    </p>
-                    // What the sheet holds would not fit a dialog, so it comes
-                    // in from the edge instead.
-                    <a
-                        href=(state.href("overlay", Some("filters")))
-                        class=(button_variants(ButtonVariant::Outline, ButtonSize::Sm))
-                    >
-                        icon(data: iconify_icon!("lucide:filter"))
-                        "Filters"
-                    </a>
-                </div>
+                card_description("Deployment rows with badges and pagination.")
             )
             // The card pads its sections rather than itself, so the table can
             // span its full width; the table's own padding lines the cells up
@@ -1586,215 +1461,6 @@ async fn pending_card(cx: &Cx) -> Result<impl View> {
                         $(if loading.get() { "Finish loading" } else { "Load again" })
                     )
                 </div>
-            )
-        )
-    })
-}
-
-/// The dialog over the page, shown while the URL names it.
-///
-/// Closing it is navigating back to the page that renders it closed, which the
-/// corner button and "Cancel" do as links. "Save" submits the form, which puts
-/// the new name in the URL and leaves the overlay out of it, so the page comes
-/// back renamed with the dialog closed.
-#[component]
-async fn rename_dialog(state: &State) -> Result<impl View> {
-    Ok(view! {
-        dialog(
-            open: state.overlay == Some("rename"),
-            dialog_content(
-                // The panel is positioned, so a close control can sit in one
-                // of its corners.
-                <a
-                    href=(state.closed())
-                    class=(class!(
-                        button_variants(ButtonVariant::Ghost, ButtonSize::Icon),
-                        "absolute top-3 right-3",
-                    ))
-                >
-                    icon(data: iconify_icon!("lucide:x"), label: "Close")
-                </a>
-                <form class="flex flex-col gap-4">
-                    state_fields(state: state, sets: "overlay name")
-                    dialog_header(
-                        dialog_title("Rename project")
-                        dialog_description(
-                            "The name is carried in the query string, so it \
-                             survives a reload and travels with the link."
-                        )
-                    )
-                    <div class="flex flex-col gap-2">
-                        label(attrs: attributes! { for="rename" }, "Name")
-                        // A name the links could not carry as it stands is put
-                        // back to the default, which is what the pattern and
-                        // the length say before the form is even sent.
-                        input(
-                            attrs: attributes! {
-                                id="rename"
-                                name="name"
-                                value=(&state.name)
-                                maxlength="32"
-                                pattern="[A-Za-z0-9_-]+"
-                            }
-                        )
-                    </div>
-                    dialog_footer(
-                        <a
-                            href=(state.closed())
-                            class=(button_variants(ButtonVariant::Ghost, ButtonSize::Md))
-                        >
-                            "Cancel"
-                        </a>
-                        button("Save")
-                    )
-                </form>
-            )
-        )
-    })
-}
-
-/// The alert dialog behind the reset action: it asks the question and offers
-/// nothing but the two answers to it.
-///
-/// Resetting clears the page's choices while keeping its theme.
-#[component]
-async fn reset_dialog(state: &State) -> Result<impl View> {
-    // Bound out here rather than inline: a hyphenated attribute name inside an
-    // `attributes!` nested in a `view!` currently trips `topcoat fmt`.
-    let labels = attributes! {
-        aria-labelledby="reset-title"
-        aria-describedby="reset-description"
-    };
-
-    Ok(view! {
-        alert_dialog(
-            open: state.overlay == Some("reset"),
-            attrs: labels,
-            dialog_content(
-                dialog_header(
-                    dialog_title(
-                        attrs: attributes! { id="reset-title" },
-                        "Reset this page?"
-                    )
-                    dialog_description(
-                        attrs: attributes! { id="reset-description" },
-                        "The panel, the filters, the page of the table, the \
-                         branch, and the name all go back to their defaults."
-                    )
-                )
-                dialog_footer(
-                    <a
-                        href=(state.closed())
-                        class=(button_variants(ButtonVariant::Ghost, ButtonSize::Md))
-                    >
-                        "Leave it as it is"
-                    </a>
-                    <a
-                        href="?"
-                        class=(button_variants(
-                            ButtonVariant::Destructive,
-                            ButtonSize::Md,
-                        ))
-                    >
-                        "Reset the page"
-                    </a>
-                )
-            )
-        )
-    })
-}
-
-/// The sheet behind the deployments table's "Filters" link: a panel along one
-/// edge, holding what a dialog would be too small for.
-///
-/// Applying the filters is submitting the form, which puts them in the URL and
-/// leaves out the overlay, so the sheet closes on the filtered table.
-#[component]
-async fn filters_sheet(state: &State) -> Result<impl View> {
-    Ok(view! {
-        sheet(
-            open: state.overlay == Some("filters"),
-            sheet_content(
-                side: state.sheet_side(),
-                dialog_header(
-                    dialog_title("Filters")
-                    dialog_description("Narrow the deployments in the table.")
-                )
-                // A sheet can lie against any edge. The row picks which,
-                // through links, since a form would take its unsaved values
-                // along.
-                <div class="flex flex-col gap-2">
-                    <p class="text-sm font-medium">"Side"</p>
-                    tabs_list(
-                        for (value, text, _) in SIDES {
-                            tabs_trigger(
-                                active: value == state.side,
-                                attrs: attributes! { href=(state.side_href(value)) },
-                                (text)
-                            )
-                        }
-                    )
-                </div>
-                <form class="flex flex-1 flex-col gap-4">
-                    state_fields(state: state, sets: "env status page overlay side")
-                    <div class="flex flex-col gap-2">
-                        label(attrs: attributes! { for="filter-env" }, "Environment")
-                        select(
-                            attrs: attributes! { id="filter-env" name="env" },
-                            <option value="">"All environments"</option>
-                            for env in ENVIRONMENTS {
-                                <option value=(env) selected=(state.env == Some(env))>
-                                    (env)
-                                </option>
-                            }
-                        )
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        <p class="text-sm font-medium">"Status"</p>
-                        radio_group(
-                            <div class="flex items-center gap-2">
-                                radio_group_item(
-                                    attrs: attributes! {
-                                        id="filter-any"
-                                        name="status"
-                                        value=""
-                                        checked=(state.status.is_none())
-                                    }
-                                )
-                                label(
-                                    attrs: attributes! { for="filter-any" },
-                                    "Any status"
-                                )
-                            </div>
-                            for (status, _) in STATUSES {
-                                let value = status.to_lowercase();
-                                let id = format!("filter-{value}");
-
-                                <div class="flex items-center gap-2">
-                                    radio_group_item(
-                                        attrs: attributes! {
-                                            id=(id.as_str())
-                                            name="status"
-                                            value=(value.as_str())
-                                            checked=(state.status == Some(status))
-                                        }
-                                    )
-                                    label(attrs: attributes! { for=(id.as_str()) }, (status))
-                                </div>
-                            }
-                        )
-                    </div>
-                    dialog_footer(
-                        attrs: attributes! { class="mt-auto" },
-                        <a
-                            href=(state.closed())
-                            class=(button_variants(ButtonVariant::Ghost, ButtonSize::Md))
-                        >
-                            "Cancel"
-                        </a>
-                        button("Apply filters")
-                    )
-                </form>
             )
         )
     })

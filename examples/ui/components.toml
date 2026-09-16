@@ -17,7 +17,7 @@ hash = "sha256:36a91e927a3f4a93c6ab895eaa249c1692bfc8118b1f34823a3f3db3e2b178aa"
 file = "src/components/alert.rs"
 
 [registries.topcoat.components.alert_dialog]
-hash = "sha256:0f111fa5da4ea208cbd4ba3fde25d7d9e02c06b3b3e9d6314d8f420ceec3c4ea"
+hash = "sha256:b8a681fc907446e13f2165f310d7b6bb10cd4d81bcc433b42ffcbcb862e915bc"
 file = "src/components/alert_dialog.rs"
 
 [registries.topcoat.components.avatar]
@@ -45,7 +45,7 @@ hash = "sha256:9dd695f40e391c1b8aaec5e3d439e1f4db9b90f7acbad6c974eeab12d1f0438e"
 file = "src/components/checkbox.rs"
 
 [registries.topcoat.components.dialog]
-hash = "sha256:e0ec972ac908f7cbb700fc8f61108c38723822c9b8ac0f5a9fec7d7a22c5e8fb"
+hash = "sha256:92b8fdd4d938ebd8afe9515ff3a4d6ecca307940f60aad1c3666abcdca2ec80b"
 file = "src/components/dialog.rs"
 
 [registries.topcoat.components.dropdown_menu]
@@ -89,7 +89,7 @@ hash = "sha256:cc8c4299f99e923e3cec90f95616f40db01dce42c22fbf8902e4b0896c2aae1c"
 file = "src/components/separator.rs"
 
 [registries.topcoat.components.sheet]
-hash = "sha256:b13af9a51a8d9e79b9601b55d475682aa09c2ebde50cf1fbbb997775f058fc15"
+hash = "sha256:7286fc577fb10cca6420654f7bea067988e0992137eea5573cabdeb89f0e6f15"
 file = "src/components/sheet.rs"
 
 [registries.topcoat.components.skeleton]

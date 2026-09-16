@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    runtime::Expr,
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
@@ -34,9 +35,8 @@ const FADE: StaticClass = class!(
 /// It is a [`dialog`](super::dialog::dialog) laid against a side rather than
 /// centered, for the things a dialog is too small for: filters, a form, a
 /// detail view of the row being read. Everything else is the dialog's: its
-/// open state is the `open` parameter, so a link or a form that changes the
-/// state behind it is what opens and closes the sheet, and dismissing it in
-/// the browser alone needs scripting.
+/// open state is the `open` parameter, which accepts a boolean for a fixed
+/// state or a runtime expression to open and close it in the browser.
 ///
 /// Child nodes are the sheet's content, normally a single [`sheet_content`]
 /// panel, whose `side` decides which edge it lies against. Build the inside
@@ -62,7 +62,8 @@ const FADE: StaticClass = class!(
 #[component]
 pub async fn sheet(
     /// Whether the sheet shows.
-    open: bool,
+    #[into]
+    open: Expr<bool>,
     /// Extra attributes for the `<dialog>` element.
     #[default]
     mut attrs: Attributes,
@@ -72,7 +73,7 @@ pub async fn sheet(
 ) -> Result<impl View> {
     Ok(view! {
         <dialog
-            open=(open)
+            :open=(open)
             class=(class!(OVERLAY, FADE, attrs.remove("class")))
             (attrs)
         >
