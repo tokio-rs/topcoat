@@ -21,7 +21,7 @@ hash = "sha256:66ca06b47a2b5d663d3ff91cd278af8f48174bd4391694a9f41ece8c021bd88c"
 file = "src/components/card.rs"
 
 [registries.topcoat.components.input]
-hash = "sha256:a2c94942999ae16bba591554f7a242192e43d9ce2648ade3e67f69bfe0f82828"
+hash = "sha256:2d46c835a1761ffd503d08add31a30bc167f028c96b9841eb3febdebf6df316b"
 file = "src/components/input.rs"
 
 [registries.topcoat.components.label]
