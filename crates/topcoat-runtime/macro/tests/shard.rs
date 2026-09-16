@@ -127,6 +127,26 @@ async fn a_signal_argument_is_read_inline_and_rebuilt_from_its_value() {
 }
 
 #[tokio::test]
+async fn a_static_argument_keeps_its_javascript_for_rerenders() {
+    let cx = &Cx::default();
+    let inline = view! { cx => stateful(label: String::from("constant").into()) }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    let (_, identity) = scope_marker(&inline);
+
+    assert!(
+        inline.contains("cx.hydrate(&quot;constant&quot;)"),
+        "{inline}"
+    );
+    assert!(inline.contains("<p>constant "), "{inline}");
+
+    let rerendered = rerender_with(&stateful, identity, r#"["constant"]"#, "{}").await;
+    assert!(rerendered.contains("<p>constant "), "{rerendered}");
+}
+
+#[tokio::test]
 async fn a_signal_argument_without_a_value_is_rejected() {
     let body = Body::from(format!(
         r#"{{"args":[{{"t":"Signal","id":"{}"}}]}}"#,
