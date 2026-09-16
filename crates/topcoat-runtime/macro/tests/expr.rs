@@ -13,6 +13,55 @@ use topcoat::{
     view::{View, ViewExt, attributes, component, view},
 };
 
+#[component]
+async fn nested_expressions(cx: &Cx) -> Result<impl View> {
+    let selected = signal(cx, || true);
+    let active = expr!(selected.get());
+    let label = expr!(if active { "true" } else { "false" });
+    let repeated = expr!(label.to_owned());
+    assert!(!label.is_static());
+    assert!(!repeated.is_static());
+
+    for active in [Expr::from(false), expr!(true)] {
+        let label = expr!(if active { "true" } else { "false" });
+        assert!(label.is_static());
+    }
+
+    Ok(view! {
+        <button :aria-selected=(label) :tabindex=$(if active { 0i32 } else { -1i32 })>
+            (repeated)
+        </button>
+    })
+}
+
+#[tokio::test]
+async fn nested_expressions_preserve_static_and_dynamic_bindings() {
+    let cx = &Cx::default();
+    let html = view! { cx => nested_expressions() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    assert!(html.contains("aria-selected=\"true\""), "{html}");
+    assert!(html.contains("tabindex=\"0\""), "{html}");
+    assert!(html.contains("data-topcoat-bind:aria-selected"), "{html}");
+    assert!(html.contains("data-topcoat-bind:tabindex"), "{html}");
+
+    assert!(!html.contains("::topcoat::dep("), "{html}");
+}
+
+#[test]
+fn capturing_an_expression_reuses_its_server_value() {
+    let evaluations = std::cell::Cell::new(0);
+    let value = expr!(raw!("cx.hydrate(7)", {
+        evaluations.set(evaluations.get() + 1);
+        7.0
+    }));
+    let doubled = expr!(value + value);
+    assert_eq!(doubled.into_evaluated_and_js().0, 14.0);
+    assert_eq!(evaluations.get(), 1);
+}
+
 #[tokio::test]
 async fn trailing_comma_in_an_inline_expression_keeps_both_attributes() {
     let cx = &Cx::default();
@@ -329,10 +378,10 @@ async fn constants_and_captured_values_render_without_bindings() {
         cx =>
         <p :title=$(captured.to_owned())>$(captured.to_owned())</p>
     }
-        .single()
-        .await
-        .unwrap()
-        .render(cx);
+    .single()
+    .await
+    .unwrap()
+    .render(cx);
 
     assert_eq!(html, "<p title=\"<&amp;\">&lt;&amp;</p>");
 }

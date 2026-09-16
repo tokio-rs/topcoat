@@ -1,6 +1,57 @@
 use serde::Serialize;
-use topcoat::runtime::{Expr, Surrogated};
+use topcoat::runtime::{Expr, Js, Surrogated, expr};
 use topcoat_runtime_coherence::{Case, Observe};
+
+#[test]
+fn nested_expressions_inline_values_and_preserve_scope() {
+    let active = expr!(true);
+    let label = expr!(if active { "Selected" } else { "Other" });
+    Case::evaluated("nested label", expr!(label.to_owned()))
+        .check()
+        .unwrap();
+
+    let value = expr!({
+        let number = 3.0;
+        number + 1.0
+    });
+    Case::evaluated(
+        "nested scopes",
+        expr!({
+            let number = 10.0;
+            value + number + value
+        }),
+    )
+    .check()
+    .unwrap();
+
+    let text = Expr::from("\"<>&\n__external0");
+    Case::evaluated("captured source escaping", expr!(text.to_owned()))
+        .check()
+        .unwrap();
+}
+
+#[test]
+fn captured_javascript_runs_at_each_use_inside_a_handler() {
+    let current = expr!(raw!("cx.hydrate(globalThis.current)", false));
+    let handler = expr!(|| if current { "selected" } else { "other" });
+    let (_, js) = handler.into_evaluated_and_js();
+    let source = format!(
+        "(() => {{
+            globalThis.current = false;
+            const handler = {};
+            const first = handler().toString();
+            globalThis.current = true;
+            return cx.hydrate(first + ',' + handler().toString());
+        }})()",
+        js.to_source(),
+    );
+    Case::evaluated(
+        "handler sees current captured value",
+        Expr::evaluate(|| "other,selected", Js::source(source)),
+    )
+    .check()
+    .unwrap();
+}
 
 fn check_conversion<T>(value: T)
 where

@@ -2,6 +2,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::ToTokens;
 use syn::Pat;
 
+use super::js::Js;
 use crate::expr::{Expr, name_resolver::NameResolver};
 
 impl Expr {
@@ -12,7 +13,7 @@ impl Expr {
     pub(super) fn pat(
         pat: &Pat,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<(Ident, String)> {
         let inner = match pat {

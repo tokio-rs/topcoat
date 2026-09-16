@@ -19,16 +19,17 @@ mod expr_path;
 mod expr_return;
 mod expr_unary;
 mod expr_while;
+mod js;
 mod name_resolver;
 mod pat;
 mod stmt;
 
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use topcoat_core_grammar::paths::topcoat_runtime;
 
-use crate::expr::name_resolver::NameResolver;
+use crate::expr::{js::Js, name_resolver::NameResolver};
 
 /// The top-level `expr! { ... }` AST. A thin wrapper around `syn::Expr`; the
 /// whitelist of supported shapes is enforced when lowering to tokens.
@@ -55,7 +56,7 @@ impl Expr {
     /// local binding cannot be resolved.
     pub fn expr_to_tokens(&self) -> syn::Result<TokenStream> {
         let mut rust = TokenStream::new();
-        let mut js = String::new();
+        let mut js = Js::default();
         let mut names = NameResolver::default();
         Self::dispatch(&self.inner, &mut rust, &mut js, &mut names)?;
 
@@ -63,57 +64,27 @@ impl Expr {
             rust = quote! { #topcoat_runtime::Surrogate::into_real(#rust) }
         }
 
-        // Identifiers referenced but not declared by the expression are
-        // captured from the surrounding Rust scope. Their values are encoded
-        // into the JavaScript source at runtime as `const` bindings, declared
-        // ahead of the returned expression.
-        //
-        // A capture is cloned into the expression, so the surrounding scope
-        // keeps its value and any number of expressions can capture the
-        // same one. Owned collections clone their elements, while a signal
-        // shares its value between clones.
+        // Clone each capture once. Its JavaScript is inlined at each use;
+        // its cached server value becomes an ordinary surrogate local.
         let externals = names.externals();
+        let captures = externals.iter().map(|binding| {
+            let ident = &binding.rust_ident;
+            let value = &binding.value;
+            quote! { let #ident = #value; }
+        });
+        let values = externals.iter().map(|binding| {
+            let ident = &binding.rust_ident;
+            quote! { let #ident = #ident.into_captured_value(); }
+        });
 
-        if externals.is_empty() {
-            Ok(quote! {
-                #topcoat_runtime::Expr::evaluate(|| #rust, #topcoat_runtime::Js::source(#js))
-            })
-        } else {
-            let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
-            let rust_external_values = externals.iter().map(|binding| &binding.value);
-
-            let mut js_head = "(() => { const [".to_owned();
-            for (index, binding) in externals.iter().enumerate() {
-                js_head += &binding.js_name;
-                if index < externals.len() - 1 {
-                    js_head += ", ";
-                }
-            }
-            js_head += "] = [";
-
-            let mut js_externals = TokenStream::new();
-            for (index, binding) in externals.iter().enumerate() {
-                let rust_ident = &binding.rust_ident;
-                quote! { .surrogate(&#rust_ident) }.to_tokens(&mut js_externals);
-                if index < externals.len() - 1 {
-                    quote! { .raw(", ") }.to_tokens(&mut js_externals);
-                }
-            }
-
-            let js_tail = "]; return ".to_owned() + &js + "; })()";
-
-            Ok(quote! {{
-                let (#(#rust_external_idents,)*) = (#(#rust_external_values,)*);
-                // The source serializes the surrogates by reference, so it
-                // is built before the Rust expression consumes them.
-                let __js = #topcoat_runtime::Js::builder()
-                    .raw(#js_head)
-                    #js_externals
-                    .source(#js_tail)
-                    .build();
-                #topcoat_runtime::Expr::evaluate(|| #rust, __js)
-            }})
-        }
+        Ok(quote! {{
+            #(#captures)*
+            let __js = #js;
+            #topcoat_runtime::Expr::evaluate(|| {
+                #(#values)*
+                #rust
+            }, __js)
+        }})
     }
 
     /// Lowers a single `syn::Expr` into a Rust value (`rust`) and the
@@ -121,7 +92,7 @@ impl Expr {
     fn dispatch(
         expr: &syn::Expr,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         match expr {

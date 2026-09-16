@@ -2,13 +2,14 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::ExprReturn;
 
+use super::js::Js;
 use crate::expr::{Expr, NameResolver};
 
 impl Expr {
     pub(super) fn expr_return(
         expr: &ExprReturn,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         expr.return_token.to_tokens(rust);

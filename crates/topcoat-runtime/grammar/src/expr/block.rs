@@ -2,6 +2,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::Block;
 
+use super::js::Js;
 use crate::expr::{Expr, name_resolver::NameResolver};
 
 impl Expr {
@@ -10,7 +11,7 @@ impl Expr {
     pub(super) fn block(
         block: &Block,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         js.push_str("{ ");

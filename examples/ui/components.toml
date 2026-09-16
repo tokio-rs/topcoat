@@ -109,7 +109,7 @@ hash = "sha256:9d081f6368b26ab9b244a0cbd5c2a920b749354be77338889f58b0951f269a64"
 file = "src/components/table.rs"
 
 [registries.topcoat.components.tabs]
-hash = "sha256:4ac764d2c426e806afc9acf413a4bbc10c28a65a4234aba8547d764336047dce"
+hash = "sha256:4d2820c5adc9d845349f5ae307979bd4e31f6365dda440d853f4dda774e224f7"
 file = "src/components/tabs.rs"
 
 [registries.topcoat.components.textarea]

@@ -1,13 +1,14 @@
 use proc_macro2::TokenStream;
 use syn::ExprBlock;
 
+use super::js::Js;
 use crate::expr::{Expr, contains_await::ContainsAwait, name_resolver::NameResolver};
 
 impl Expr {
     pub(super) fn expr_block(
         block: &ExprBlock,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         // A Rust block is already an expression; JavaScript has no block

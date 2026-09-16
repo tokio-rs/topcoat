@@ -2,6 +2,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{BinOp, ExprBinary, spanned::Spanned};
 
+use super::js::Js;
 use crate::expr::{Expr, name_resolver::NameResolver};
 
 enum OpKind {
@@ -13,7 +14,7 @@ impl Expr {
     pub(super) fn expr_binary(
         binary: &ExprBinary,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         let (method, kind) = match binary.op {

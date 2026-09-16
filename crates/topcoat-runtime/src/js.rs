@@ -110,6 +110,15 @@ pub struct JsBuilder {
 }
 
 impl JsBuilder {
+    /// Appends an expression in parentheses, preserving its captured values.
+    #[must_use]
+    pub fn expression<T>(mut self, expression: &crate::Expr<T>) -> Self {
+        self.parts.push(JsPart::Raw("("));
+        self.parts.extend(expression.js.parts.iter().cloned());
+        self.parts.push(JsPart::Raw(")"));
+        self
+    }
+
     /// Appends source text.
     #[must_use]
     pub fn source(mut self, js: impl Into<Cow<'static, str>>) -> Self {

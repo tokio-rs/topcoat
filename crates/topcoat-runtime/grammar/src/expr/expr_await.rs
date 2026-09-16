@@ -2,13 +2,14 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::ExprAwait;
 
+use super::js::Js;
 use crate::expr::{Expr, NameResolver};
 
 impl Expr {
     pub(super) fn expr_await(
         expr: &ExprAwait,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         *js += "(await ";

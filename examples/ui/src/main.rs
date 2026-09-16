@@ -52,7 +52,7 @@ use topcoat::{
     context::Cx,
     font::fontsource::fontsource_font,
     icon::{icon, iconify::iconify_icon},
-    router::{Router, RouterBuilderDiscoverExt, page, query_params},
+    router::{Router, RouterBuilderDiscoverExt, page},
     runtime::{Event, RouterBuilderRuntimeExt, expr, shard, signal},
     tailwind,
     view::{Child, View, attributes, class, component, view},
@@ -80,78 +80,7 @@ async fn main() {
     topcoat::start(router).await.unwrap();
 }
 
-/// What the page keeps in its URL.
-///
-/// Every key is optional, so a query string that makes no sense reloads the
-/// page without one rather than failing the request.
-#[query_params(error = redirect("?"))]
-struct HomeQuery {
-    tab: Option<String>,
-}
-
-/// The page's state: its query string read back as the values the page has
-/// markup for.
-///
-/// Everything the page does without scripting goes through here. A link or a
-/// form sets one part of the state, the page comes back rendered for it, and
-/// the state survives a reload and can be shared as it stands.
-struct State {
-    /// The panel the project card shows.
-    tab: &'static str,
-}
-
-impl State {
-    /// Reads the state out of the request's query string.
-    ///
-    /// Every value is looked up among the ones the page has markup for, so a
-    /// query string nobody wrote cannot put the page in a state it has no way
-    /// to render.
-    fn read(cx: &Cx) -> Result<Self> {
-        let query = query_params::<HomeQuery>(cx)?;
-
-        Ok(Self {
-            tab: one_of(query.tab.as_deref(), &TABS.map(|(value, _)| value)).unwrap_or(TABS[0].0),
-        })
-    }
-
-    /// The state as query parameters, leaving out whatever stands at its
-    /// default: a link to the page as it is carries no query string at all.
-    fn params(&self) -> Vec<(&'static str, String)> {
-        let mut params = Vec::new();
-
-        if self.tab != TABS[0].0 {
-            params.push(("tab", self.tab.to_owned()));
-        }
-
-        params
-    }
-
-    /// The page's URL with `key` set to `value`, or dropped for `None`, and
-    /// the rest of the state left as it is.
-    fn href(&self, key: &'static str, value: Option<&str>) -> String {
-        let mut params = self.params();
-        params.retain(|(name, _)| *name != key);
-        if let Some(value) = value {
-            params.push((key, value.to_owned()));
-        }
-
-        let query: Vec<String> = params
-            .iter()
-            .map(|(name, value)| format!("{name}={value}"))
-            .collect();
-
-        format!("?{}", query.join("&"))
-    }
-}
-
-/// The entry of `values` that `value` names, if it names one at all.
-fn one_of(value: Option<&str>, values: &[&'static str]) -> Option<&'static str> {
-    let value = value?;
-    values.iter().copied().find(|known| *known == value)
-}
-
-/// The panels the project card tabs between: the value each goes by in the
-/// URL, and the word on its trigger. The first is the one the page opens on.
+/// The tab values and labels. The first is selected when the page opens.
 const TABS: [(&str, &str); 3] = [
     ("overview", "Overview"),
     ("activity", "Activity"),
@@ -186,7 +115,6 @@ fn status_variant(status: &str) -> BadgeVariant {
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result<impl View> {
-    let state = State::read(cx)?;
     let dark = signal(cx, || false);
 
     Ok(view! {
@@ -288,7 +216,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                         demo(form_card())
                         demo(checks_card())
                         demo(radios_card())
-                        demo(overview_card(state: &state))
+                        demo(overview_card())
                         demo(faq_card())
                         demo(branches_card())
                         demo(toolbar_card())
@@ -745,40 +673,46 @@ async fn radios_card() -> Result<impl View> {
     })
 }
 
-/// A card that tabs between panels.
-///
-/// Which panel shows is in the URL, so each trigger is a link and only the
-/// panel being read is rendered.
+/// A card that switches panels in the browser.
 #[component]
-async fn overview_card(state: &State) -> Result<impl View> {
+async fn overview_card(cx: &Cx) -> Result<impl View> {
+    let selected = signal(cx, || TABS[0].0.to_owned());
+
     Ok(view! {
         card(
             card_header(
                 card_title("Tabs")
-                card_description("The panel being read is the one named in the URL.")
+                card_description("Switch between panels.")
             )
             card_content(
                 tabs(
                     tabs_list(
                         for (value, text) in TABS {
                             tabs_trigger(
-                                active: value == state.tab,
-                                attrs: attributes! { href=(state.href("tab", Some(value))) },
+                                active: $(selected.get() == value),
+                                attrs: attributes! {
+                                    href="#"
+                                    @click=$(|e: Event| {
+                                        e.prevent_default();
+                                        selected.set(value.to_owned());
+                                    })
+                                },
                                 (text)
                             )
                         }
                     )
-                    tabs_content(
-                        <p class="text-sm text-muted-foreground">
-                            (match state.tab {
-                                "activity" => {
-                                    "Reload the page and this same panel comes back."
-                                }
-                                "settings" => "Send the URL on and it opens here too.",
-                                _ => "This panel is in the URL as ?tab=overview.",
-                            })
-                        </p>
-                    )
+                    for (value, _) in TABS {
+                        tabs_content(
+                            attrs: attributes! { :hidden=$(selected.get() != value) },
+                            <p class="text-sm text-muted-foreground">
+                                (match value {
+                                    "activity" => "Recent activity appears here.",
+                                    "settings" => "Adjust your preferences here.",
+                                    _ => "A quick overview of your project.",
+                                })
+                            </p>
+                        )
+                    }
                 )
             )
         )

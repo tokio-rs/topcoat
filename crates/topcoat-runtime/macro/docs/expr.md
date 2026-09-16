@@ -38,6 +38,19 @@ Ok(view! {
 
 The captured value is cloned into the expression, so the surrounding code keeps using it, then serialized into the page during the render and becomes a constant in the generated JavaScript. It is a snapshot: the browser keeps the value from the render, and later changes on the server do not reach it. Captured values must belong to the shared vocabulary described next. Cloning an owned collection clones its elements; capturing a slice borrows the Rust elements but still serializes a snapshot for the browser.
 
+A captured [`Expr<T>`][Expr] behaves as its result type `T` inside the expression. Its JavaScript is inlined at each use, so signal reads stay reactive, including when used inside an event handler. The server reuses its already evaluated value and carries its dynamic status into the enclosing expression. Capturing a static expression keeps the static optimization available.
+
+```rust
+# use topcoat::{Result, context::Cx, runtime::{expr, signal}, view::*};
+# #[component]
+# async fn example(cx: &Cx) -> Result<impl View> {
+let selected = signal(cx, || "overview".to_owned());
+let active = expr!(selected.get() == "overview");
+let label = expr!(if active { "Selected" } else { "Select" });
+# Ok(view! { (label) })
+# }
+```
+
 # The shared vocabulary
 
 Expressions operate on a fixed vocabulary of types that exist on both sides, each exposing a subset of its Rust API. The members you reach for most:

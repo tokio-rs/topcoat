@@ -4,13 +4,14 @@ use syn::{ExprLit, Lit, LitInt};
 use topcoat_core_grammar::paths::topcoat_runtime;
 use topcoat_runtime::Surrogated;
 
+use super::js::Js;
 use crate::expr::{Expr, name_resolver::NameResolver};
 
 impl Expr {
     pub(super) fn expr_lit(
         lit: &ExprLit,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         match &lit.lit {
@@ -39,7 +40,7 @@ impl Expr {
         literal: &LitInt,
         negative: bool,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         let suffix = match literal.suffix() {
@@ -64,9 +65,9 @@ impl Expr {
         // Serialize on the target, not the proc-macro host: pointer widths can
         // differ when cross-compiling. Keep a signed minimum as one literal so
         // its positive magnitude is never evaluated in the signed type.
-        let (ident, name) = names.capture_value(
+        let ident = names.capture_value(
             quote! {
-                #topcoat_runtime::Surrogated::into_surrogate({
+                #topcoat_runtime::Expr::from({
                     let value: #ty = #sign #literal;
                     value
                 })
@@ -74,12 +75,12 @@ impl Expr {
             literal.span(),
         );
         ident.to_tokens(rust);
-        js.push_str(&name);
+        js.expression(&ident);
         Ok(())
     }
 }
 
-fn push_js_surrogate<T>(js: &mut String, value: &T) -> syn::Result<()>
+fn push_js_surrogate<T>(js: &mut Js, value: &T) -> syn::Result<()>
 where
     T: serde::Serialize + ?Sized,
 {

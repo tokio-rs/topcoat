@@ -48,7 +48,10 @@ async fn empty_arguments_and_one_unit_argument_are_distinct() {
             http::StatusCode::BAD_REQUEST,
         );
     }
-    assert_eq!(call(&with_unit, "[]").await.status(), http::StatusCode::BAD_REQUEST);
+    assert_eq!(
+        call(&with_unit, "[]").await.status(),
+        http::StatusCode::BAD_REQUEST
+    );
 }
 
 #[tokio::test]
@@ -59,6 +62,9 @@ async fn multiple_arguments_keep_their_order_and_types() {
     assert_eq!(&bytes[..], br#""hello""#);
 
     for body in [r#"["hello",true]"#, "[true]", r#"[true,"hello",null]"#] {
-        assert_eq!(call(&with_arguments, body).await.status(), http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            call(&with_arguments, body).await.status(),
+            http::StatusCode::BAD_REQUEST
+        );
     }
 }

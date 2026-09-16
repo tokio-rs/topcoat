@@ -2,6 +2,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Expr as SynExpr, ExprClosure};
 
+use super::js::Js;
 use crate::expr::{
     Expr,
     name_resolver::{LocalBindingKind, NameResolver},
@@ -11,7 +12,7 @@ impl Expr {
     pub(super) fn expr_closure(
         closure: &ExprClosure,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         let asyncness = &closure.asyncness;

@@ -6,7 +6,7 @@ use topcoat_core_grammar::paths::topcoat_runtime;
 
 pub(super) enum ResolvedIdent {
     Local { js_name: String, rust_ident: Ident },
-    External { js_name: String, rust_ident: Ident },
+    External { rust_ident: Ident },
 }
 
 struct LocalBinding {
@@ -24,7 +24,6 @@ pub(super) enum LocalBindingKind {
 pub(super) struct ExternalBinding {
     pub(super) value: TokenStream,
     pub(super) rust_ident: Ident,
-    pub(super) js_name: String,
 }
 
 #[derive(Default)]
@@ -84,38 +83,32 @@ impl NameResolver {
         if let Some(index) = self.external_by_name.get(&original) {
             let binding = &self.externals[*index];
             return ResolvedIdent::External {
-                js_name: binding.js_name.clone(),
                 rust_ident: binding.rust_ident.clone(),
             };
         }
 
         let index = self.externals.len();
-        let (rust_ident, js_name) = self.capture_value(
+        let rust_ident = self.capture_value(
             quote! {
-                #topcoat_runtime::Surrogated::into_surrogate(
+                ::core::convert::Into::<#topcoat_runtime::Expr<_>>::into(
                     ::core::clone::Clone::clone(&#ident),
                 )
             },
             ident.span(),
         );
         self.external_by_name.insert(original, index);
-        ResolvedIdent::External {
-            js_name,
-            rust_ident,
-        }
+        ResolvedIdent::External { rust_ident }
     }
 
     /// Binds a value serialized by the Rust target when the expression is built.
-    pub(super) fn capture_value(&mut self, value: TokenStream, span: Span) -> (Ident, String) {
+    pub(super) fn capture_value(&mut self, value: TokenStream, span: Span) -> Ident {
         let index = self.externals.len();
-        let js_name = format!("__external{index}");
         let rust_ident = Ident::new(&format!("__topcoat_external{index}"), span);
         self.externals.push(ExternalBinding {
             value,
-            js_name: js_name.clone(),
             rust_ident: rust_ident.clone(),
         });
-        (rust_ident, js_name)
+        rust_ident
     }
 
     pub(super) fn is_surrogate_local(&self, ident: &Ident) -> bool {

@@ -10,6 +10,7 @@ use syn::{
 };
 use topcoat_core_grammar::paths::topcoat_runtime;
 
+use super::js::Js;
 use crate::expr::{
     Expr,
     name_resolver::{NameResolver, ResolvedIdent},
@@ -19,7 +20,7 @@ impl Expr {
     pub(super) fn expr_macro(
         expr: &ExprMacro,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         BuiltinMacro::parse(&expr.mac)?.lower(rust, js, names)
@@ -28,7 +29,7 @@ impl Expr {
     pub(super) fn stmt_macro(
         stmt_macro: &StmtMacro,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         BuiltinMacro::parse(&stmt_macro.mac)?.lower(rust, js, names)
@@ -57,7 +58,7 @@ impl BuiltinMacro {
     fn lower(
         &self,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         match self {
@@ -100,10 +101,10 @@ impl RawMacro {
     fn lower(
         &self,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
-        js.push_str(&self.interpolate_js(names)?);
+        self.interpolate_js(js, names)?;
 
         match &self.rust {
             Some(rust_expr) => {
@@ -132,13 +133,12 @@ impl RawMacro {
         Ok(())
     }
 
-    fn interpolate_js(&self, names: &mut NameResolver) -> syn::Result<String> {
+    fn interpolate_js(&self, js: &mut Js, names: &mut NameResolver) -> syn::Result<()> {
         let input = self.js.value();
-        let mut output = String::new();
         let mut rest = input.as_str();
 
         while let Some(start) = rest.find("${") {
-            output.push_str(&rest[..start]);
+            js.push_str(&rest[..start]);
 
             let interpolation = &rest[start + 2..];
             let Some(end) = interpolation.find('}') else {
@@ -152,18 +152,16 @@ impl RawMacro {
                 syn::Error::new(self.js.span(), "raw! interpolation must be `${ident}`")
             })?;
 
-            let js_name = match names.resolve(&ident) {
-                ResolvedIdent::Local { js_name, .. } | ResolvedIdent::External { js_name, .. } => {
-                    js_name
-                }
-            };
-            output.push_str(&js_name);
+            match names.resolve(&ident) {
+                ResolvedIdent::Local { js_name, .. } => js.push_str(&js_name),
+                ResolvedIdent::External { rust_ident } => js.expression(&rust_ident),
+            }
 
             rest = &interpolation[end + 1..];
         }
 
-        output.push_str(rest);
-        Ok(output)
+        js.push_str(rest);
+        Ok(())
     }
 }
 

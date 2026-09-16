@@ -2,13 +2,14 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{ExprUnary, UnOp};
 
+use super::js::Js;
 use crate::expr::{Expr, name_resolver::NameResolver};
 
 impl Expr {
     pub(super) fn expr_unary(
         unary: &ExprUnary,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         if matches!(unary.op, UnOp::Neg(_)) {

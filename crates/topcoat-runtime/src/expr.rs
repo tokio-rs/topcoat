@@ -48,6 +48,18 @@ impl<T> Expr<T> {
     pub fn into_evaluated_and_js(self) -> (T, Js) {
         (self.evaluated, self.js)
     }
+
+    /// Returns the captured value, carrying its dependencies into evaluation.
+    #[doc(hidden)]
+    pub fn into_captured_value(self) -> T::Surrogate
+    where
+        T: Surrogated,
+    {
+        if !self.is_static {
+            mark_signal_read();
+        }
+        self.evaluated.into_surrogate()
+    }
 }
 
 impl<T> From<T> for Expr<T>
