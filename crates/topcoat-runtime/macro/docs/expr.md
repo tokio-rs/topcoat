@@ -38,7 +38,7 @@ Ok(view! {
 
 The captured value is cloned into the expression, so the surrounding code keeps using it, then serialized into the page during the render and becomes a constant in the generated JavaScript. It is a snapshot: the browser keeps the value from the render, and later changes on the server do not reach it. Captured values must belong to the shared vocabulary described next. Cloning an owned collection clones its elements; capturing a slice borrows the Rust elements but still serializes a snapshot for the browser.
 
-A captured [`Expr<T>`][Expr] behaves as its result type `T` inside the expression. Its JavaScript is inlined at each use, so signal reads stay reactive, including when used inside an event handler. The server reuses its already evaluated value and carries its dynamic status into the enclosing expression. Capturing a static expression keeps the static optimization available.
+A captured `Expr<T>` behaves as its result type `T` inside the expression. Its JavaScript is inlined at each use, so signal reads stay reactive, including when used inside an event handler. The server reuses its already evaluated value and carries its dynamic status into the enclosing expression. Capturing a static expression keeps the static optimization available.
 
 ```rust
 # use topcoat::{Result, context::Cx, runtime::{expr, signal}, view::*};
