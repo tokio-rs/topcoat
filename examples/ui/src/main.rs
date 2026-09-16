@@ -88,7 +88,6 @@ async fn main() {
 struct HomeQuery {
     tab: Option<String>,
     page: Option<usize>,
-    per_page: Option<usize>,
     name: Option<String>,
     env: Option<String>,
     status: Option<String>,
@@ -107,8 +106,6 @@ struct State {
     tab: &'static str,
     /// The page of the deployments table.
     page: usize,
-    /// How many rows a page of the deployments table holds.
-    per_page: usize,
     /// The name the project goes by.
     name: String,
     /// The environment the deployments table is filtered to.
@@ -133,7 +130,6 @@ impl State {
         Ok(Self {
             tab: one_of(query.tab.as_deref(), &TABS.map(|(value, _)| value)).unwrap_or(TABS[0].0),
             page: query.page.unwrap_or(1).max(1),
-            per_page: one_of_numbers(query.per_page, &PER_PAGE).unwrap_or(PER_PAGE[0]),
             name: project_name(query.name.clone()),
             env: one_of(query.env.as_deref(), &ENVIRONMENTS),
             status: query.status.as_deref().and_then(status_label),
@@ -153,9 +149,6 @@ impl State {
         }
         if self.page > 1 {
             params.push(("page", self.page.to_string()));
-        }
-        if self.per_page != PER_PAGE[0] {
-            params.push(("per_page", self.per_page.to_string()));
         }
         if self.name != NAME {
             params.push(("name", self.name.clone()));
@@ -247,12 +240,6 @@ fn one_of(value: Option<&str>, values: &[&'static str]) -> Option<&'static str> 
     values.iter().copied().find(|known| *known == value)
 }
 
-/// The entry of `values` that `value` names, for the numbers among the state.
-fn one_of_numbers(value: Option<usize>, values: &[usize]) -> Option<usize> {
-    let value = value?;
-    values.iter().copied().find(|known| *known == value)
-}
-
 /// The name the project goes by until it is renamed.
 const NAME: &str = "topcoat-ui";
 
@@ -281,9 +268,8 @@ const TABS: [(&str, &str); 3] = [
     ("settings", "Settings"),
 ];
 
-/// How many rows one page of the deployments table can hold. The first is the
-/// number it holds until another is picked.
-const PER_PAGE: [usize; 3] = [3, 6, 12];
+/// How many rows one page of the deployments table holds.
+const PER_PAGE: usize = 3;
 
 /// The environments deployments go to.
 const ENVIRONMENTS: [&str; 3] = ["production", "staging", "preview"];
@@ -440,7 +426,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                         demo(status_card())
                         demo(form_card())
                         demo(checks_card())
-                        demo(rows_card(state: &state))
+                        demo(radios_card())
                         demo(overlays_card(state: &state))
                         demo(overview_card(state: &state))
                         demo(faq_card())
@@ -636,7 +622,9 @@ async fn team_card() -> Result<impl View> {
 /// Environment statuses told through the badge variants, and a rollout told
 /// through the progress bar.
 #[component]
-async fn status_card() -> Result<impl View> {
+async fn status_card(cx: &Cx) -> Result<impl View> {
+    let completed = signal(cx, || 62usize);
+
     Ok(view! {
         card(
             card_header(
@@ -668,9 +656,34 @@ async fn status_card() -> Result<impl View> {
                         <p class="text-sm text-muted-foreground">
                             "A bar with a value"
                         </p>
-                        <p class="text-sm font-medium">"62%"</p>
+                        <p class="text-sm font-medium">
+                            $(completed.get())
+                            "%"
+                        </p>
                     </div>
-                    progress(value: 62.0)
+                    progress(
+                        attrs: attributes! { aria-label="Rollout progress" :value=$(completed.get()) }
+                    )
+                    <div class="flex justify-end gap-2">
+                        button(
+                            variant: ButtonVariant::Outline,
+                            size: ButtonSize::Sm,
+                            attrs: attributes! { type="button" @click=$(|_e: Event| completed.set(0)) },
+                            "Reset"
+                        )
+                        button(
+                            size: ButtonSize::Sm,
+                            attrs: attributes! {
+                                type="button"
+                                :disabled=$(completed.get() >= 100)
+                                @click=$(|_e: Event| {
+                                    let next = completed.get() + 10;
+                                    completed.set(if next > 100 { 100 } else { next });
+                                })
+                            },
+                            "Advance"
+                        )
+                    </div>
                 </div>
             )
             card_footer(
@@ -855,54 +868,39 @@ async fn checks_card(cx: &Cx) -> Result<impl View> {
     })
 }
 
-/// A radio group that sets how many rows the table further down shows.
-///
-/// The choice reaches the server the way every other one on this page does:
-/// the group sits in a form, and the button submits it into the URL. The page
-/// is left out of the fields carried along, so a table resized by hand comes
-/// back at its first page rather than at one the rows no longer reach.
+/// A standalone radio group whose selection is managed by the browser.
 #[component]
-async fn rows_card(state: &State) -> Result<impl View> {
+async fn radios_card() -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
                 card_title("Radio group")
-                card_description(
-                    "One choice at a time. This one sets how many rows the \
-                     table below shows."
-                )
+                card_description("One choice at a time, with a disabled option.")
             )
             card_content(
-                <form class="flex flex-col gap-4">
-                    state_fields(state: state, sets: "per_page page")
-                    radio_group(
-                        // The name the options share is what has the browser
-                        // let go of one when another is picked.
-                        for rows in PER_PAGE {
-                            let id = format!("rows-{rows}");
+                radio_group(
+                    attrs: attributes! { aria-label="Example options" },
+                    for (value, text, checked, disabled) in [
+                        ("one", "Option one", true, false),
+                        ("two", "Option two", false, false),
+                        ("three", "Option three (disabled)", false, true),
+                    ] {
+                        let id = format!("radio-demo-{value}");
 
-                            <div class="flex items-center gap-2">
-                                radio_group_item(
-                                    attrs: attributes! {
-                                        id=(id.as_str())
-                                        name="per_page"
-                                        value=(rows.to_string())
-                                        checked=(rows == state.per_page)
-                                    }
-                                )
-                                label(
-                                    attrs: attributes! { for=(id.as_str()) },
-                                    (format!("{rows} rows a page"))
-                                )
-                            </div>
-                        }
-                    )
-                    button(
-                        size: ButtonSize::Sm,
-                        attrs: attributes! { class="self-start" },
-                        "Apply"
-                    )
-                </form>
+                        <div class="flex items-center gap-2">
+                            radio_group_item(
+                                attrs: attributes! {
+                                    id=(id.as_str())
+                                    name="radio-demo"
+                                    value=(value)
+                                    checked=(checked)
+                                    disabled=(disabled)
+                                }
+                            )
+                            label(attrs: attributes! { for=(id.as_str()) }, (text))
+                        </div>
+                    }
+                )
             )
         )
     })
@@ -1165,7 +1163,12 @@ async fn toolbar_card(cx: &Cx) -> Result<impl View> {
                         <div class="flex items-center gap-1">
                             for (name, data, text, pressed) in [
                                 ("bold", iconify_icon!("lucide:bold"), "Bold", &bold),
-                                ("italic", iconify_icon!("lucide:italic"), "Italic", &italic),
+                                (
+                                    "italic",
+                                    iconify_icon!("lucide:italic"),
+                                    "Italic",
+                                    &italic,
+                                ),
                                 (
                                     "underline",
                                     iconify_icon!("lucide:underline"),
@@ -1333,8 +1336,7 @@ const DEPLOYMENTS: [(&str, &str, &str); 12] = [
     ("d4c3b2a", "staging", "Failed"),
 ];
 
-/// A table of deployments, filtered by the sheet, sized by the radio group,
-/// and paginated underneath.
+/// A table of deployments, filtered by the sheet and paginated underneath.
 ///
 /// Every one of those comes from the URL, so the links below the table are
 /// what change the rows and which page reads as the current one.
@@ -1344,7 +1346,7 @@ async fn deployments_card(state: &State) -> Result<impl View> {
         .into_iter()
         .filter(|&(_, env, status)| state.shows(env, status))
         .collect();
-    let pages = rows.len().div_ceil(state.per_page).max(1);
+    let pages = rows.len().div_ceil(PER_PAGE).max(1);
     // A filter can leave fewer pages than the URL asks for, so the page being
     // read is the last one that still has rows on it.
     let page = state.page.min(pages);
@@ -1352,14 +1354,13 @@ async fn deployments_card(state: &State) -> Result<impl View> {
     let next = state.page_href((page + 1).min(pages));
 
     Ok(view! {
-        let shown = rows.chunks(state.per_page).nth(page - 1).unwrap_or_default();
+        let shown = rows.chunks(PER_PAGE).nth(page - 1).unwrap_or_default();
 
         card(
             card_header(
                 card_title("Table")
                 card_description(
-                    "Filtered from the sheet, sized by the radio group, and \
-                     paged by the links below."
+                    "Filtered from the sheet and paged by the links below."
                 )
             )
             card_content(
@@ -1516,7 +1517,9 @@ async fn docs_card() -> Result<impl View> {
 /// The shapes a page takes while it waits: the roster before it arrives, and
 /// the two ways of saying that work is under way.
 #[component]
-async fn pending_card() -> Result<impl View> {
+async fn pending_card(cx: &Cx) -> Result<impl View> {
+    let loading = signal(cx, || true);
+
     Ok(view! {
         card(
             card_header(
@@ -1526,7 +1529,7 @@ async fn pending_card() -> Result<impl View> {
             card_content(
                 // The skeletons take the size of what they stand in for, so
                 // the card keeps its height once the roster lands.
-                <div class="flex flex-col gap-4">
+                <div class="flex flex-col gap-4" :hidden=$(!loading.get())>
                     for _ in 0..2 {
                         <div class="flex items-center gap-3">
                             skeleton(attrs: attributes! { class="size-8 rounded-full" })
@@ -1538,15 +1541,48 @@ async fn pending_card() -> Result<impl View> {
                         </div>
                     }
                 </div>
+                <div class="flex flex-col gap-4" :hidden=$(loading.get())>
+                    for (name, email, initials, role) in MEMBERS.into_iter().take(2) {
+                        <div class="flex items-center gap-3">
+                            avatar(size: AvatarSize::Sm, avatar_fallback((initials)))
+                            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                                <p class="truncate text-sm font-medium">(name)</p>
+                                <p class="truncate text-xs text-muted-foreground">
+                                    (email)
+                                </p>
+                            </div>
+                            badge(variant: BadgeVariant::Outline, (role))
+                        </div>
+                    }
+                </div>
                 separator(attrs: attributes! { class="my-4" })
                 <div class="flex flex-col gap-2">
                     <p class="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        spinner()
-                        "Work whose end is not in sight"
+                        <span class="contents" :hidden=$(!loading.get())>
+                            spinner()
+                        </span>
+                        $(if loading.get() {
+                            "Loading the roster"
+                        } else {
+                            "Roster loaded"
+                        })
                     </p>
                     // Without a value the bar reads as work whose extent is
                     // not known yet.
-                    progress()
+                    progress(
+                        attrs: attributes! { aria-label="Loading roster" :hidden=$(!loading.get()) }
+                    )
+                    <br>
+                    button(
+                        variant: ButtonVariant::Outline,
+                        size: ButtonSize::Sm,
+                        attrs: attributes! {
+                            type="button"
+                            class="self-end"
+                            @click=$(|_e: Event| loading.toggle())
+                        },
+                        $(if loading.get() { "Finish loading" } else { "Load again" })
+                    )
                 </div>
             )
         )

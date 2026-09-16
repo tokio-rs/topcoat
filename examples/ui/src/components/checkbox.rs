@@ -43,7 +43,7 @@ pub async fn checkbox(#[default] mut attrs: Attributes) -> Result<impl View> {
     Ok(view! {
         <span
             class=(class!(
-                "relative inline-flex shrink-0 has-[:disabled]:opacity-50",
+                "peer relative inline-flex shrink-0 has-[:disabled]:opacity-50",
                 attrs.remove("class"),
             ))
         >

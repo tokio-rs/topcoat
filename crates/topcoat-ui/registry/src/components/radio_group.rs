@@ -76,7 +76,7 @@ pub async fn radio_group_item(#[default] mut attrs: Attributes) -> Result<impl V
     Ok(view! {
         <span
             class=(class!(
-                "relative inline-flex shrink-0 has-[:disabled]:opacity-50",
+                "peer relative inline-flex shrink-0 has-[:disabled]:opacity-50",
                 attrs.remove("class"),
             ))
         >
