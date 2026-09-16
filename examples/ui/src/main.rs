@@ -744,10 +744,12 @@ async fn form_card(cx: &Cx) -> Result<impl View> {
                                 @change=$(|e: Event| region.set(e.target.value))
                             },
                             <optgroup label="Europe">
+                                <legend>"Europe"</legend>
                                 <option>"eu-central-1"</option>
                                 <option>"eu-west-2"</option>
                             </optgroup>
                             <optgroup label="Americas">
+                                <legend>"Americas"</legend>
                                 <option>"us-east-1"</option>
                                 <option>"sa-east-1"</option>
                             </optgroup>

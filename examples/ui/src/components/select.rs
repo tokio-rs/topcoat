@@ -36,6 +36,10 @@ const PICKER: StaticClass = class!(
      [&::picker(select)]:bg-popover [&::picker(select)]:p-1 \
      [&::picker(select)]:text-popover-foreground [&::picker(select)]:shadow-sm \
      [&::picker-icon]:hidden \
+     [&_optgroup>legend]:px-2 [&_optgroup>legend]:py-1.5 \
+     [&_optgroup>legend]:text-xs [&_optgroup>legend]:font-medium \
+     [&_optgroup>legend]:text-muted-foreground [&_optgroup>legend]:cursor-default \
+     [&_optgroup>legend]:select-none \
      [&_option]:flex [&_option]:items-center [&_option]:gap-2 [&_option]:rounded-md \
      [&_option]:px-2 [&_option]:py-1.5 [&_option]:text-sm [&_option]:outline-none \
      [&_option:hover]:bg-foreground/5 [&_option:focus]:bg-foreground/5 \
@@ -83,6 +87,8 @@ fn checkmark_style(cx: &Cx) -> String {
 /// handlers) are forwarded to the `<select>`; a `class` among them is appended
 /// to the wrapping element's classes, so width utilities size the whole
 /// control. Like the input, it fills its container by default.
+/// For a styled group heading, add a `<legend>` as the first child of the
+/// `<optgroup>`. Keep its `label` attribute for native picker fallbacks.
 ///
 /// On browsers with customizable select support the drop-down picker is
 /// restyled to match the dropdown menu component, and the chevron flips while
