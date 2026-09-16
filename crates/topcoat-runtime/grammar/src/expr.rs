@@ -76,7 +76,7 @@ impl Expr {
 
         if externals.is_empty() {
             Ok(quote! {
-                #topcoat_runtime::Expr::new(#rust, #topcoat_runtime::Js::source(#js))
+                #topcoat_runtime::Expr::evaluate(|| #rust, #topcoat_runtime::Js::source(#js))
             })
         } else {
             let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
@@ -111,7 +111,7 @@ impl Expr {
                     #js_externals
                     .source(#js_tail)
                     .build();
-                #topcoat_runtime::Expr::new(#rust, __js)
+                #topcoat_runtime::Expr::evaluate(|| #rust, __js)
             }})
         }
     }

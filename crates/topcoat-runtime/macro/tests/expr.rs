@@ -9,22 +9,18 @@
 use topcoat::{
     Result,
     context::Cx,
-    runtime::{Expr, expr, procedure, signal},
+    runtime::{Event, Expr, expr, procedure, signal},
     view::{View, ViewExt, attributes, component, view},
 };
 
 #[tokio::test]
-async fn trailing_comma_in_an_inline_expression_keeps_both_bindings() {
+async fn trailing_comma_in_an_inline_expression_keeps_both_attributes() {
     let cx = &Cx::default();
     let dark = false;
     let html = view! {
         cx =>
         let label = expr!(
-            if dark {
-                "Switch to light theme"
-            } else {
-                "Switch to dark theme"
-            },
+            if dark { "Switch to light theme" } else { "Switch to dark theme" },
         );
 
         <button :title=(label.clone()) :aria-label=(label)>"Theme"</button>
@@ -35,8 +31,11 @@ async fn trailing_comma_in_an_inline_expression_keeps_both_bindings() {
     .render(cx);
 
     assert!(html.contains("title=\"Switch to dark theme\""), "{html}");
-    assert!(html.contains("aria-label=\"Switch to dark theme\""), "{html}");
-    assert_eq!(html.matches("data-topcoat-bind:").count(), 2, "{html}");
+    assert!(
+        html.contains("aria-label=\"Switch to dark theme\""),
+        "{html}"
+    );
+    assert!(!html.contains("data-topcoat-bind:"), "{html}");
 }
 
 #[component]
@@ -57,17 +56,12 @@ async fn toggle_reaches_the_generated_javascript() {
     assert!(html.contains(".toggle()"), "{html}");
 }
 
-#[tokio::test]
-async fn bool_then_avoids_javascript_thenable_assimilation() {
-    let cx = &Cx::default();
-    let html = view! { cx => $(true.then(|| "yes").unwrap()) }
-        .single()
-        .await
-        .unwrap()
-        .render(cx);
-
-    assert!(html.contains(".then_("), "{html}");
-    assert!(!html.contains(".then("), "{html}");
+#[test]
+fn bool_then_avoids_javascript_thenable_assimilation() {
+    let (_, js) = expr!(true.then(|| "yes").unwrap()).into_evaluated_and_js();
+    let source = js.to_source();
+    assert!(source.contains(".then_("), "{source}");
+    assert!(!source.contains(".then("), "{source}");
 }
 
 #[component]
@@ -228,7 +222,7 @@ async fn push_str_accepts_the_owned_string_from_an_event() {
 async fn a_captured_value_cannot_break_out_of_its_marker_comment() {
     let cx = &Cx::default();
     let spicy = String::from(r#"-->"<&"#);
-    let html = view! { cx => <p>$(spicy.to_owned())</p> }
+    let html = view! { cx => captured_text(text: spicy) }
         .single()
         .await
         .unwrap()
@@ -251,6 +245,12 @@ async fn a_captured_value_cannot_break_out_of_its_marker_comment() {
 async fn quoted_push_str_button(cx: &Cx) -> Result<impl View> {
     let name = signal(cx, String::new);
     Ok(view! { <button @click=$(|_e| name.push_str("say \"hi\""))>"x"</button> })
+}
+
+#[component]
+async fn captured_text(cx: &Cx, text: String) -> Result<impl View> {
+    let shown = signal(cx, || true);
+    Ok(view! { <p>$(if shown.get() { text.to_owned() } else { "".to_owned() })</p> })
 }
 
 #[tokio::test]
@@ -279,10 +279,10 @@ async fn value_conversion_renders_props_as_ordinary_attributes() {
         panel(open: true)
         panel(open: false)
     }
-        .single()
-        .await
-        .unwrap()
-        .render(cx);
+    .single()
+    .await
+    .unwrap()
+    .render(cx);
 
     assert_eq!(html, "<dialog open=\"\"></dialog><dialog></dialog>");
 }
@@ -320,31 +320,27 @@ async fn value_conversion_renders_nodes_without_markers_and_escapes_html() {
 }
 
 #[tokio::test]
-async fn explicit_runtime_constants_are_not_value_conversions() {
+async fn constants_and_captured_values_render_without_bindings() {
     let cx = &Cx::default();
-    assert!(!expr!(true).is_static());
-    let html = view! { cx => <p>$("constant")</p> }
+    assert!(expr!(true).is_static());
+    let captured = String::from("<&");
+    assert!(expr!(captured.to_owned()).is_static());
+    let html = view! {
+        cx =>
+        <p :title=$(captured.to_owned())>$(captured.to_owned())</p>
+    }
         .single()
         .await
         .unwrap()
         .render(cx);
 
-    assert!(html.contains("::topcoat::expr::start("), "{html}");
-    assert!(html.contains("::topcoat::expr::end"), "{html}");
+    assert_eq!(html, "<p title=\"<&amp;\">&lt;&amp;</p>");
 }
 
 #[tokio::test]
 async fn forwarded_value_conversions_replace_dynamic_bindings() {
     let cx = &Cx::default();
-    let previous = attributes! { cx => :value=$("old") :disabled=$(true) };
-    let attrs = attributes! {
-        cx =>
-        (previous)
-        :value=(Expr::from("\"<&"))
-        :disabled=(Expr::from(false))
-        :required=(Expr::from(true))
-    };
-    let html = view! { cx => <input (attrs)> }
+    let html = view! { cx => replaced_dynamic_bindings() }
         .single()
         .await
         .unwrap()
@@ -356,12 +352,24 @@ async fn forwarded_value_conversions_replace_dynamic_bindings() {
     assert!(!html.contains("data-topcoat-bind:"), "{html}");
 }
 
+#[component]
+async fn replaced_dynamic_bindings(cx: &Cx) -> Result<impl View> {
+    let value = signal(cx, || String::from("old"));
+    let disabled = signal(cx, || true);
+    let previous = attributes! { :value=$(value.get()) :disabled=$(disabled.get()) };
+    let attrs = attributes! {
+        (previous)
+        :value=(Expr::from("\"<&"))
+        :disabled=(Expr::from(false))
+        :required=(Expr::from(true))
+    };
+    Ok(view! { <input (attrs)> })
+}
+
 #[tokio::test]
 async fn forwarded_dynamic_bindings_replace_value_conversions() {
     let cx = &Cx::default();
-    let previous = attributes! { cx => :value=(Expr::from("old")) };
-    let attrs = attributes! { cx => (previous) :value=$("new") };
-    let html = view! { cx => <input (attrs)> }
+    let html = view! { cx => replaced_static_binding() }
         .single()
         .await
         .unwrap()
@@ -369,4 +377,64 @@ async fn forwarded_dynamic_bindings_replace_value_conversions() {
 
     assert!(html.contains("value=\"new\""), "{html}");
     assert!(html.contains("data-topcoat-bind:value="), "{html}");
+}
+
+#[component]
+async fn replaced_static_binding(cx: &Cx) -> Result<impl View> {
+    let value = signal(cx, || String::from("new"));
+    let previous = attributes! { :value=(Expr::from("old")) };
+    let attrs = attributes! { (previous) :value=$(value.get()) };
+    Ok(view! { <input (attrs)> })
+}
+
+#[component]
+async fn observed_expressions(cx: &Cx) -> Result<impl View> {
+    let count = signal(cx, || 1usize);
+    let text = signal(cx, || String::from("hello"));
+    assert!(!expr!(count.get()).is_static());
+    assert!(!expr!(text.read().len()).is_static());
+    assert!(expr!(count).is_static());
+    assert!(expr!(if false { count.get() } else { 0 }).is_static());
+    assert!(!expr!(if count.get() > 0 { "yes" } else { "no" }).is_static());
+
+    let fallback = expr!({
+        let current = count;
+        raw!("${current}.get()", current.get())
+    });
+    assert!(!fallback.is_static());
+    let borrowed_fallback = expr!({
+        let current = text;
+        raw!("${current}.get().len()", current.read().len())
+    });
+    assert!(!borrowed_fallback.is_static());
+    assert!(expr!(raw!("cx.hydrate(true)", true)).is_static());
+
+    let handler = expr!(|_e: Event| count.increment());
+    assert!(handler.is_static());
+    let async_handler = expr!(async |_e: Event| {
+        test_procedure("hello".to_owned()).await;
+    });
+    assert!(async_handler.is_static());
+
+    Ok(view! {
+        <button @click=(handler) @input=(async_handler)>"Run"</button>
+        <p>(fallback)</p>
+        <input :value=(borrowed_fallback)>
+    })
+}
+
+#[tokio::test]
+async fn signal_reads_and_raw_fallbacks_keep_bindings_but_not_server_dependencies() {
+    let cx = &Cx::default();
+    let html = view! { cx => observed_expressions() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+    assert!(html.contains("::topcoat::expr::start("), "{html}");
+    assert!(html.contains("data-topcoat-bind:value="), "{html}");
+    assert!(html.contains("data-topcoat-on:click="), "{html}");
+    assert!(html.contains("data-topcoat-on:input="), "{html}");
+    assert!(!html.contains("::topcoat::dep("), "{html}");
 }

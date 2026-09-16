@@ -27,7 +27,7 @@ where
     ///
     /// Reads inside a runtime expression are the client-reactive path and
     /// do not register a dependency on the server; the server-side
-    /// evaluation that produces the initial render reads untracked.
+    /// evaluation only records whether the expression needs a browser binding.
     #[must_use]
     pub fn read(&self) -> <&T as Surrogated>::Surrogate {
         self.0.read_untracked().into_surrogate()

@@ -280,8 +280,8 @@ mod tests {
 
     #[test]
     fn a_stalled_rust_future_is_an_execution_failure() {
-        let compiled = Expr::new(
-            async || std::future::pending::<<f64 as Surrogated>::Surrogate>().await,
+        let compiled = Expr::evaluate(
+            || async || std::future::pending::<<f64 as Surrogated>::Surrogate>().await,
             Js::source("async () => new Promise(() => {})"),
         );
         let result =

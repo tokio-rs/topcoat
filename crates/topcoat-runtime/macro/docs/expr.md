@@ -18,6 +18,8 @@ The server evaluates the expression once to produce the initial HTML. In the bro
 
 An invocation expands to an [`Expr`] value bundling the server-evaluated result with the JavaScript source.
 
+The server evaluates expressions synchronously and observes their signal reads. If an expression reads no signals, it renders without reactive bindings or marker comments. This includes literals and captured ordinary values. Constructing an event-handler closure does not run its body, but its JavaScript is still emitted so the handler can run in the browser.
+
 # Captured variables
 
 An identifier that is not defined inside the expression is captured from the surrounding Rust scope:
@@ -86,6 +88,8 @@ Ok(view! {
 ```
 
 `${ident}` inside the JavaScript string interpolates a binding from the expression's scope. Without the Rust argument the expression can no longer be evaluated on the server, so that form is only usable where the expression runs purely in the browser. In either form, keeping the two sides equivalent is up to you.
+
+Signal reads in the Rust fallback determine whether the expression needs a browser binding. The fallback must therefore read the signals its JavaScript depends on, even if their initial values happen to produce a constant result.
 
 [`Expr`]: struct.Expr.html
 [`Signal`]: struct.Signal.html

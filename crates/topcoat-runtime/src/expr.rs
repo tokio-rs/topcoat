@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use serde::Serialize;
 use topcoat_core::context::Cx;
 use topcoat_view::{NodeViewParts, PartsWriter};
@@ -6,8 +8,9 @@ use crate::{Js, Surrogate, Surrogated};
 
 /// A value with a JavaScript expression that can produce it in the browser.
 ///
-/// Converting an ordinary value with [`From`] creates a static expression.
-/// Static expressions render without browser bindings or marker comments.
+/// Expressions whose evaluation reads no signals can render without browser
+/// bindings or marker comments. Their JavaScript is still available for
+/// event handlers and shard arguments.
 #[derive(Debug, Clone)]
 pub struct Expr<T> {
     pub(crate) evaluated: T,
@@ -16,19 +19,24 @@ pub struct Expr<T> {
 }
 
 impl<T> Expr<T> {
+    /// Evaluates an expression while observing signal reads.
+    ///
+    /// The evaluation is synchronous. Its signal reads must represent the
+    /// dependencies of the JavaScript expression as well.
     #[inline]
-    pub fn new(evaluated: T, js: Js) -> Self {
+    pub fn evaluate(evaluate: impl FnOnce() -> T, js: Js) -> Self {
+        let _scope = ReadScope::enter();
+        let evaluated = evaluate();
         Self {
             evaluated,
             js,
-            is_static: false,
+            is_static: SIGNAL_READ.get() == Some(false),
         }
     }
 
-    /// Whether this expression was converted from an ordinary value.
+    /// Whether this expression is known not to require reactive evaluation.
     ///
-    /// Expressions created with [`new`](Self::new) are dynamic, even when
-    /// their JavaScript evaluates to a constant.
+    /// Signal reads during [`evaluate`](Self::evaluate) make it dynamic.
     #[inline]
     #[must_use]
     pub fn is_static(&self) -> bool {
@@ -55,11 +63,7 @@ where
     fn from(value: T) -> Self {
         let surrogate = value.into_surrogate();
         let js = Js::builder().surrogate(&surrogate).build();
-        Self {
-            evaluated: surrogate.into_real(),
-            js,
-            is_static: true,
-        }
+        Self::evaluate(|| surrogate.into_real(), js)
     }
 }
 
@@ -86,6 +90,111 @@ where
         self.evaluated.into_view_parts(cx, parts);
         parts.push_comment(|comment| {
             comment.push_promoted_str_unescaped(&"::topcoat::expr::end");
+        });
+    }
+}
+
+thread_local! {
+    static SIGNAL_READ: Cell<Option<bool>> = const { Cell::new(None) };
+}
+
+/// Records a read and returns whether an expression is being evaluated.
+pub(crate) fn mark_signal_read() -> bool {
+    if SIGNAL_READ.get().is_some() {
+        SIGNAL_READ.set(Some(true));
+        true
+    } else {
+        false
+    }
+}
+
+/// Restores the enclosing synchronous evaluation, including during unwinding.
+struct ReadScope {
+    previous: Option<bool>,
+}
+
+impl ReadScope {
+    fn enter() -> Self {
+        Self {
+            previous: SIGNAL_READ.replace(Some(false)),
+        }
+    }
+}
+
+impl Drop for ReadScope {
+    fn drop(&mut self) {
+        let read = SIGNAL_READ.replace(self.previous) == Some(true);
+        if read {
+            mark_signal_read();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{panic::catch_unwind, sync::Barrier};
+
+    use super::*;
+
+    #[test]
+    fn nested_evaluations_propagate_reads_without_contaminating_siblings() {
+        let outer = Expr::evaluate(
+            || {
+                let inner = Expr::evaluate(mark_signal_read, Js::source(""));
+                assert!(!inner.is_static());
+                let sibling = Expr::evaluate(|| 1, Js::source(""));
+                assert!(sibling.is_static());
+            },
+            Js::source(""),
+        );
+        assert!(!outer.is_static());
+        assert!(Expr::evaluate(|| 1, Js::source("")).is_static());
+    }
+
+    #[test]
+    fn panic_restores_the_parent_scope_and_preserves_its_reads() {
+        let outer = Expr::evaluate(
+            || {
+                let panic = catch_unwind(|| {
+                    Expr::evaluate(
+                        || {
+                            mark_signal_read();
+                            panic!("evaluation failed");
+                        },
+                        Js::source(""),
+                    )
+                });
+                assert!(panic.is_err());
+            },
+            Js::source(""),
+        );
+        assert!(!outer.is_static());
+        assert!(Expr::evaluate(|| 1, Js::source("")).is_static());
+    }
+
+    #[test]
+    fn concurrent_evaluations_do_not_share_reads() {
+        let barrier = Barrier::new(2);
+        std::thread::scope(|scope| {
+            let dynamic = scope.spawn(|| {
+                Expr::evaluate(
+                    || {
+                        mark_signal_read();
+                        barrier.wait();
+                        barrier.wait();
+                    },
+                    Js::source(""),
+                )
+            });
+            let constant = Expr::evaluate(
+                || {
+                    barrier.wait();
+                    barrier.wait();
+                },
+                Js::source(""),
+            );
+            assert!(constant.is_static());
+            assert!(!dynamic.join().unwrap().is_static());
         });
     }
 }

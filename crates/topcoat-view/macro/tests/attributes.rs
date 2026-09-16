@@ -43,7 +43,7 @@ async fn attributes_macro_builds_runtime_attributes() {
     assert!(attrs.contains_key("data-state"));
     assert!(attrs.contains_key("type"));
     assert!(attrs.contains_key("data-bound"));
-    assert!(attrs.contains_key("data-topcoat-bind:data-bound"));
+    assert!(!attrs.contains_key("data-topcoat-bind:data-bound"));
     assert!(attrs.contains_key("data-topcoat-on:input"));
     assert!(!attrs.contains_key("data-skip"));
     assert!(!attrs.contains_key("data-stop"));

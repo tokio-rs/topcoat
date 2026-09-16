@@ -139,6 +139,7 @@ impl<T> Signal<T> {
     /// way. It can be called anywhere, not just inside a body.
     #[must_use]
     pub fn read_untracked(&self) -> &T {
+        crate::expr::mark_signal_read();
         &self.value
     }
 
@@ -146,6 +147,10 @@ impl<T> Signal<T> {
     /// this signal.
     #[track_caller]
     fn track(&self) {
+        // Rust fallbacks inside expr! follow the client-reactive path too.
+        if crate::expr::mark_signal_read() {
+            return;
+        }
         let id = self.id;
         hoist_once(
             HoistKey::new((TypeId::of::<SignalId>(), id)),
@@ -213,7 +218,7 @@ where
     /// body wants to own.
     #[must_use]
     pub fn get_untracked(&self) -> T {
-        T::clone(&self.value)
+        T::clone(self.read_untracked())
     }
 }
 
