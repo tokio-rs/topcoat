@@ -5,7 +5,7 @@ components_dir = "src/components"
 [theme]
 name = "neutral"
 registry = "topcoat"
-hash = "sha256:b6e17c687faab82b2b316ee055d20c3282c8712393dea30432b62f84f3b6bad6"
+hash = "sha256:6e451a2d3470b0ee544ccf4240da8631bad4c807a06ae0d3a1fc77154b86c3b9"
 file = "styles.css"
 
 [registries.topcoat.components.accordion]
@@ -93,7 +93,7 @@ hash = "sha256:7286fc577fb10cca6420654f7bea067988e0992137eea5573cabdeb89f0e6f15"
 file = "src/components/sheet.rs"
 
 [registries.topcoat.components.sidebar]
-hash = "sha256:c2f4dec9573901fdaff63c7d7d8f00932e602934a64d99ba08a5f879fc19825c"
+hash = "sha256:ee693ecb20bfb8786b21d8f25db8285d495b0ca77e16ba4daddf2cb237941a7e"
 file = "src/components/sidebar.rs"
 
 [registries.topcoat.components.skeleton]

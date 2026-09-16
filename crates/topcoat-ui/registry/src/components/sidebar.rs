@@ -99,7 +99,7 @@ pub async fn sidebar_provider(
         <div
             data-sidebar="provider"
             class=(class!(
-                "flex min-h-svh w-full [--sidebar-width:16rem] [--sidebar-width-mobile:18rem] [--sidebar-width-icon:3rem] has-[[data-variant=inset]]:bg-card",
+                "flex min-h-svh w-full [--sidebar-width:16rem] [--sidebar-width-mobile:18rem] [--sidebar-width-icon:3rem] has-[[data-variant=inset]]:bg-sidebar",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -109,7 +109,21 @@ pub async fn sidebar_provider(
     })
 }
 
+// Ordinary components nested in the panel inherit its palette too. The
+// scoped aliases keep buttons, inputs and captions independent of the page.
+const PANEL_THEME: StaticClass = class!(
+    "[--background:var(--sidebar)] [--foreground:var(--sidebar-foreground)] \
+     [--card:var(--sidebar)] [--card-foreground:var(--sidebar-foreground)] \
+     [--primary:var(--sidebar-primary)] \
+     [--primary-foreground:var(--sidebar-primary-foreground)] \
+     [--border:var(--sidebar-border)] [--ring:var(--sidebar-ring)] \
+     [--muted-foreground:color-mix(in_oklab,var(--sidebar-foreground)_70%,transparent)]",
+);
+
 /// A desktop panel that becomes a sheet over the page below `md` (48rem).
+///
+/// The `--sidebar-*` theme tokens control its colors independently of cards,
+/// sheets and page content. Nested controls inherit the sidebar palette.
 ///
 /// `open` controls desktop expansion. `mobile_open` independently controls
 /// the mobile sheet, so it can start closed while desktop starts expanded.
@@ -151,7 +165,7 @@ pub async fn sidebar(
             :data-state=$(if open { "expanded" } else { "collapsed" })
             :data-collapsible=$(if open { "" } else { collapse })
             class=(class!(
-                "group/sidebar relative w-0 shrink-0 text-card-foreground md:sticky md:top-0 md:h-svh md:w-(--sidebar-width) md:self-start md:transition-[width] md:duration-200 md:data-[collapsible=offcanvas]:w-0 md:data-[collapsible=icon]:w-(--sidebar-width-icon) md:data-[variant=floating]:p-2 motion-reduce:transition-none",
+                "group/sidebar relative w-0 shrink-0 text-sidebar-foreground md:sticky md:top-0 md:h-svh md:w-(--sidebar-width) md:self-start md:transition-[width] md:duration-200 md:data-[collapsible=offcanvas]:w-0 md:data-[collapsible=icon]:w-(--sidebar-width-icon) md:data-[variant=floating]:p-2 motion-reduce:transition-none",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -171,7 +185,7 @@ pub async fn sidebar(
                     side: side.sheet(),
                     attrs: attributes! {
                         data-sidebar="panel"
-                        class="relative [&]:w-(--sidebar-width-mobile) [&]:max-w-[calc(100vw-3rem)] [&]:gap-0 [&]:overflow-hidden [&]:p-0 md:[&]:w-full md:[&]:max-w-none md:[&]:translate-x-0 md:[&]:shadow-none md:[&]:transition-none md:group-data-[variant=floating]/sidebar:rounded-xl md:group-data-[variant=floating]/sidebar:border md:group-data-[variant=floating]/sidebar:shadow-sm md:group-data-[variant=inset]/sidebar:border-0 motion-reduce:transition-none"
+                        class=(class!(PANEL_THEME, "relative [&]:w-(--sidebar-width-mobile) [&]:max-w-[calc(100vw-3rem)] [&]:gap-0 [&]:overflow-hidden [&]:p-0 md:[&]:w-full md:[&]:max-w-none md:[&]:translate-x-0 md:[&]:shadow-none md:[&]:transition-none md:group-data-[variant=floating]/sidebar:rounded-xl md:group-data-[variant=floating]/sidebar:border md:group-data-[variant=floating]/sidebar:shadow-sm md:group-data-[variant=inset]/sidebar:border-0 motion-reduce:transition-none"))
                     },
                     (child)
                 )
@@ -226,7 +240,7 @@ pub async fn sidebar_rail(
             title="Toggle sidebar"
             :aria-expanded=$(if open { "true" } else { "false" })
             class=(class!(
-                "absolute inset-y-0 z-10 hidden w-2 cursor-pointer outline-none after:absolute after:inset-y-0 after:w-px hover:after:bg-border focus-visible:after:bg-ring md:block group-data-[side=left]/sidebar:right-0 group-data-[side=left]/sidebar:after:right-0 group-data-[side=right]/sidebar:left-0 group-data-[side=right]/sidebar:after:left-0",
+                "absolute inset-y-0 z-10 hidden w-2 cursor-pointer outline-none after:absolute after:inset-y-0 after:w-px hover:after:bg-sidebar-border focus-visible:after:bg-sidebar-ring md:block group-data-[side=left]/sidebar:right-0 group-data-[side=left]/sidebar:after:right-0 group-data-[side=right]/sidebar:left-0 group-data-[side=right]/sidebar:after:left-0",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -344,7 +358,7 @@ pub async fn sidebar_group_label(
         <div
             data-sidebar="group-label"
             class=(class!(
-                "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-muted-foreground md:group-data-[collapsible=icon]/sidebar:hidden",
+                "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 md:group-data-[collapsible=icon]/sidebar:hidden",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -365,7 +379,7 @@ pub async fn sidebar_group_action(
             type="button"
             data-sidebar="group-action"
             class=(class!(
-                "absolute top-3 right-3 flex size-6 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 md:group-data-[collapsible=icon]/sidebar:hidden [&_svg]:size-4",
+                "absolute top-3 right-3 flex size-6 items-center justify-center rounded-md text-sidebar-foreground/70 outline-none hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50 md:group-data-[collapsible=icon]/sidebar:hidden [&_svg]:size-4",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -470,7 +484,7 @@ impl SidebarMenuButtonVariant {
     fn classes(self) -> StaticClass {
         match self {
             Self::Default => class!("border-transparent"),
-            Self::Outline => class!("border-border bg-background shadow-xs"),
+            Self::Outline => class!("border-sidebar-border bg-sidebar shadow-xs"),
         }
     }
 }
@@ -496,7 +510,7 @@ impl SidebarMenuButtonSize {
 }
 
 const MENU_BUTTON: StaticClass = class!(
-    "peer/menu-button flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-md border px-2 text-left outline-none transition-colors hover:bg-foreground/5 active:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-foreground/10 data-[active=true]:font-medium has-[+[data-sidebar=menu-action]]:pr-8 has-[+[data-sidebar=menu-badge]]:pr-8 [&>svg]:size-4 [&>svg]:shrink-0 [&>span:last-child]:truncate md:group-data-[collapsible=icon]/sidebar:size-8 md:group-data-[collapsible=icon]/sidebar:justify-center md:group-data-[collapsible=icon]/sidebar:p-0 md:group-data-[collapsible=icon]/sidebar:[&>span:last-child]:sr-only",
+    "peer/menu-button flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-md border px-2 text-left outline-none transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:font-medium has-[+[data-sidebar=menu-action]]:pr-8 has-[+[data-sidebar=menu-badge]]:pr-8 [&>svg]:size-4 [&>svg]:shrink-0 [&>span:last-child]:truncate md:group-data-[collapsible=icon]/sidebar:size-8 md:group-data-[collapsible=icon]/sidebar:justify-center md:group-data-[collapsible=icon]/sidebar:p-0 md:group-data-[collapsible=icon]/sidebar:[&>span:last-child]:sr-only",
 );
 
 /// Classes for styling another element as a sidebar menu button.
@@ -561,7 +575,7 @@ pub async fn sidebar_menu_action(
             type="button"
             data-sidebar="menu-action"
             class=(class!(
-                "absolute top-1 right-1 flex size-6 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 md:group-data-[collapsible=icon]/sidebar:hidden [&_svg]:size-4",
+                "absolute top-1 right-1 flex size-6 items-center justify-center rounded-md text-sidebar-foreground/70 outline-none hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50 md:group-data-[collapsible=icon]/sidebar:hidden [&_svg]:size-4",
                 if show_on_hover {
                     "md:opacity-0 md:group-hover/menu-item:opacity-100 md:group-focus-within/menu-item:opacity-100"
                 } else {
@@ -586,7 +600,7 @@ pub async fn sidebar_menu_badge(
         <span
             data-sidebar="menu-badge"
             class=(class!(
-                "pointer-events-none absolute top-1 right-1 flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs tabular-nums text-muted-foreground md:group-data-[collapsible=icon]/sidebar:hidden",
+                "pointer-events-none absolute top-1 right-1 flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs tabular-nums text-sidebar-foreground/70 md:group-data-[collapsible=icon]/sidebar:hidden",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -634,7 +648,7 @@ pub async fn sidebar_menu_sub(
         <ul
             data-sidebar="menu-sub"
             class=(class!(
-                "mx-3.5 flex min-w-0 flex-col gap-1 border-l border-border px-2.5 py-1 md:group-data-[collapsible=icon]/sidebar:hidden",
+                "mx-3.5 flex min-w-0 flex-col gap-1 border-l border-sidebar-border px-2.5 py-1 md:group-data-[collapsible=icon]/sidebar:hidden",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -676,7 +690,7 @@ pub async fn sidebar_menu_sub_button(
             data-sidebar="menu-sub-button"
             :aria-current=$(active.then_some("page"))
             class=(class!(
-                "flex min-w-0 items-center gap-2 rounded-md px-2 text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-foreground/10 aria-[current=page]:text-foreground aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0 [&>span:last-child]:truncate",
+                "flex min-w-0 items-center gap-2 rounded-md px-2 text-sidebar-foreground/70 outline-none hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-accent-foreground aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0 [&>span:last-child]:truncate",
                 size.classes(),
                 attrs.remove("class"),
             ))
