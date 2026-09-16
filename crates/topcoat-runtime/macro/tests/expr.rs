@@ -13,6 +13,32 @@ use topcoat::{
     view::{View, ViewExt, attributes, component, view},
 };
 
+#[tokio::test]
+async fn trailing_comma_in_an_inline_expression_keeps_both_bindings() {
+    let cx = &Cx::default();
+    let dark = false;
+    let html = view! {
+        cx =>
+        let label = expr!(
+            if dark {
+                "Switch to light theme"
+            } else {
+                "Switch to dark theme"
+            },
+        );
+
+        <button :title=(label.clone()) :aria-label=(label)>"Theme"</button>
+    }
+    .single()
+    .await
+    .unwrap()
+    .render(cx);
+
+    assert!(html.contains("title=\"Switch to dark theme\""), "{html}");
+    assert!(html.contains("aria-label=\"Switch to dark theme\""), "{html}");
+    assert_eq!(html.matches("data-topcoat-bind:").count(), 2, "{html}");
+}
+
 #[component]
 async fn toggle_button(cx: &Cx) -> Result<impl View> {
     let open = signal(cx, || false);

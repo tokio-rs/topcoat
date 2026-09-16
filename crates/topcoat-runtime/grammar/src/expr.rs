@@ -33,13 +33,15 @@ use crate::expr::name_resolver::NameResolver;
 /// The top-level `expr! { ... }` AST. A thin wrapper around `syn::Expr`; the
 /// whitelist of supported shapes is enforced when lowering to tokens.
 pub struct Expr {
-    inner: syn::Expr,
+    pub inner: syn::Expr,
+    pub comma_token: Option<syn::Token![,]>,
 }
 
 impl Parse for Expr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             inner: input.parse()?,
+            comma_token: input.parse()?,
         })
     }
 }
@@ -145,5 +147,37 @@ impl Expr {
             other => return Err(syn::Error::new_spanned(other, "unsupported expression")),
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn optional_trailing_comma_preserves_the_expression() {
+        for source in [
+            "true",
+            "if dark.get() { \"Light\" } else { \"Dark\" }",
+            "|_e| open.toggle()",
+            "async |_e| submit().await",
+        ] {
+            let plain: Expr = syn::parse_str(source).unwrap();
+            let trailing: Expr = syn::parse_str(&format!("{source},")).unwrap();
+
+            assert!(plain.comma_token.is_none());
+            assert!(trailing.comma_token.is_some());
+            assert_eq!(
+                plain.expr_to_tokens().unwrap().to_string(),
+                trailing.expr_to_tokens().unwrap().to_string(),
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_missing_or_multiple_expressions() {
+        for source in ["", ",", "true, false", "true,,", "true;"] {
+            assert!(syn::parse_str::<Expr>(source).is_err(), "{source}");
+        }
     }
 }

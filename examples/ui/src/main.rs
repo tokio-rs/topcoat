@@ -53,6 +53,7 @@ use topcoat::{
     font::fontsource::fontsource_font,
     icon::{icon, iconify::iconify_icon},
     router::{Router, RouterBuilderDiscoverExt, page, query_params},
+    runtime::{Event, RouterBuilderRuntimeExt, expr, signal},
     tailwind,
     view::{Child, View, attributes, class, component, view},
 };
@@ -71,6 +72,7 @@ const REGISTRY: &str = "https://github.com/tokio-rs/topcoat/tree/main/crates/top
 #[tokio::main]
 async fn main() {
     let router = Router::builder()
+        .runtime()
         .assets(AssetBundle::load().unwrap())
         .discover()
         .build();
@@ -84,7 +86,6 @@ async fn main() {
 /// page without one rather than failing the request.
 #[query_params(error = redirect("?"))]
 struct HomeQuery {
-    theme: Option<String>,
     tab: Option<String>,
     page: Option<usize>,
     per_page: Option<usize>,
@@ -103,8 +104,6 @@ struct HomeQuery {
 /// form sets one part of the state, the page comes back rendered for it, and
 /// the state survives a reload and can be shared as it stands.
 struct State {
-    /// Whether the page uses the dark theme.
-    dark: bool,
     /// The panel the project card shows.
     tab: &'static str,
     /// The page of the deployments table.
@@ -136,7 +135,6 @@ impl State {
         let branch = query.branch.as_deref();
 
         Ok(Self {
-            dark: query.theme.as_deref() == Some("dark"),
             tab: one_of(query.tab.as_deref(), &TABS.map(|(value, _)| value)).unwrap_or(TABS[0].0),
             page: query.page.unwrap_or(1).max(1),
             per_page: one_of_numbers(query.per_page, &PER_PAGE).unwrap_or(PER_PAGE[0]),
@@ -157,9 +155,6 @@ impl State {
     fn params(&self) -> Vec<(&'static str, String)> {
         let mut params = Vec::new();
 
-        if self.dark {
-            params.push(("theme", String::from("dark")));
-        }
         if self.tab != TABS[0].0 {
             params.push(("tab", self.tab.to_owned()));
         }
@@ -355,16 +350,22 @@ fn status_variant(status: &str) -> BadgeVariant {
 #[page("/")]
 async fn home(cx: &Cx) -> Result<impl View> {
     let state = State::read(cx)?;
+    let dark = signal(cx, || false);
 
     Ok(view! {
         <!DOCTYPE html>
         <html
-            class=(class!("dark" if state.dark))
-            style=(if state.dark { "color-scheme: dark" } else { "color-scheme: light" })
+            :class=$(if dark.get() { "dark" } else { "" })
+            :style=$(if dark.get() {
+                "color-scheme: dark"
+            } else {
+                "color-scheme: light"
+            })
         >
             <head>
                 <title>"Topcoat UI"</title>
                 topcoat::dev::script()
+                topcoat::runtime::script()
                 topcoat::font::link(font: fontsource_font!(GEIST, host: Asset))
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
             </head>
@@ -410,31 +411,33 @@ async fn home(cx: &Cx) -> Result<impl View> {
                                 </a>
                             </div>
                         </header>
-                        <a
-                            href=(state.href("theme", (!state.dark).then_some("dark")))
-                            class=(class!(
-                                button_variants(ButtonVariant::Primary, ButtonSize::Lg),
-                                "self-end sm:self-start",
-                            ))
-                            aria-label=(if state.dark {
+
+                        let theme_label = expr!(
+                            if dark.get() {
                                 "Switch to light theme"
                             } else {
                                 "Switch to dark theme"
-                            })
-                            title=(if state.dark {
-                                "Switch to light theme"
-                            } else {
-                                "Switch to dark theme"
-                            })
-                        >
-                            if state.dark {
+                            },
+                        );
+
+                        button(
+                            size: ButtonSize::Lg,
+                            attrs: attributes! {
+                                type="button"
+                                class="self-end sm:self-start"
+                                @click=$(|_e: Event| dark.toggle())
+                                :aria-label=(theme_label.clone())
+                                :title=(theme_label)
+                            },
+                            <span class="contents" :hidden=$(!dark.get())>
                                 "Light theme"
                                 icon(data: iconify_icon!("lucide:sun"))
-                            } else {
+                            </span>
+                            <span class="contents" :hidden=$(dark.get())>
                                 "Dark theme"
                                 icon(data: iconify_icon!("lucide:moon"))
-                            }
-                        </a>
+                            </span>
+                        )
                     </div>
 
                     // A masonry of small, self-contained demos, each built
@@ -1569,7 +1572,7 @@ async fn reset_dialog(state: &State) -> Result<impl View> {
                         "Leave it as it is"
                     </a>
                     <a
-                        href=(if state.dark { "?theme=dark" } else { "?" })
+                        href="?"
                         class=(button_variants(
                             ButtonVariant::Destructive,
                             ButtonSize::Md,
