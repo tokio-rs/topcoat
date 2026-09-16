@@ -162,9 +162,10 @@ function morphChildren(
 		if (parent instanceof Element && newNode instanceof Element) {
 			const select = parent.closest("select");
 			if (select && ctx.preservedSelects.has(select)) {
-				const options = newNode instanceof HTMLOptionElement
-					? [newNode]
-					: Array.from(newNode.querySelectorAll("option"));
+				const options =
+					newNode instanceof HTMLOptionElement
+						? [newNode]
+						: Array.from(newNode.querySelectorAll("option"));
 				for (const option of options) {
 					option.removeAttribute("selected");
 					option.selected = false;
@@ -304,7 +305,12 @@ function morphNode(ctx: Ctx, oldNode: ChildNode, newNode: Node): ChildNode {
 			syncAttributes(oldNode, newNode, preserve);
 			// A textarea's children are its default value. Leave them alone
 			// when preserving its value, including its caret and selection.
-			if (!(ctx.options.preserveFormState && oldNode instanceof HTMLTextAreaElement)) {
+			if (
+				!(
+					ctx.options.preserveFormState &&
+					oldNode instanceof HTMLTextAreaElement
+				)
+			) {
 				morphChildren(
 					ctx,
 					oldNode,
@@ -437,22 +443,27 @@ function syncProperties(
 	preserve: Set<string>,
 ): void {
 	if (oldEl instanceof HTMLInputElement && newEl instanceof HTMLInputElement) {
-		if (!preserve.has("checked") && oldEl.checked !== newEl.checked) oldEl.checked = newEl.checked;
-		if (!preserve.has("value") && oldEl.value !== newEl.value) oldEl.value = newEl.value;
+		if (!preserve.has("checked") && oldEl.checked !== newEl.checked)
+			oldEl.checked = newEl.checked;
+		if (!preserve.has("value") && oldEl.value !== newEl.value)
+			oldEl.value = newEl.value;
 	} else if (
 		oldEl instanceof HTMLTextAreaElement &&
 		newEl instanceof HTMLTextAreaElement
 	) {
-		if (!preserve.has("value") && oldEl.value !== newEl.value) oldEl.value = newEl.value;
+		if (!preserve.has("value") && oldEl.value !== newEl.value)
+			oldEl.value = newEl.value;
 	} else if (
 		oldEl instanceof HTMLOptionElement &&
 		newEl instanceof HTMLOptionElement
 	) {
-		if (!preserve.has("selected") && oldEl.selected !== newEl.selected) oldEl.selected = newEl.selected;
+		if (!preserve.has("selected") && oldEl.selected !== newEl.selected)
+			oldEl.selected = newEl.selected;
 	} else if (
 		oldEl instanceof HTMLSelectElement &&
 		newEl instanceof HTMLSelectElement
 	) {
-		if (!preserve.has("value") && oldEl.value !== newEl.value) oldEl.value = newEl.value;
+		if (!preserve.has("value") && oldEl.value !== newEl.value)
+			oldEl.value = newEl.value;
 	}
 }

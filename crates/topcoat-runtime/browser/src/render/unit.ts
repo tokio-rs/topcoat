@@ -117,7 +117,9 @@ export abstract class RenderUnit {
 	}
 
 	/** Rebuilds the content's resources around a DOM update. */
-	protected replace(insert: (scope: Scope, orphans: Set<SignalId>) => void): void {
+	protected replace(
+		insert: (scope: Scope, orphans: Set<SignalId>) => void,
+	): void {
 		if (this.isDisposed) return;
 		this.requestController.cancel();
 

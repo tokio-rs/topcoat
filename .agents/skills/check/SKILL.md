@@ -27,16 +27,18 @@ cargo hack clippy --workspace --each-feature --exclude-features stage-icons --no
 cargo +nightly udeps --workspace --all-targets --all-features --locked
 ```
 
-## Runtime browser bundle
+## Browser projects
 
-Only when you touched `crates/topcoat-runtime/browser`. The runtime serves a prebuilt `dist/index.js` via `asset!`, and the coherence crate embeds `dist/coherence.js`. CI rejects drift in either bundle (`git diff --exit-code -- dist/index.js dist/coherence.js`). Rebuild them and stage any regenerated bundles alongside your source change:
+For changes in `crates/topcoat-runtime/browser` or `crates/topcoat-cli/browser`, run these commands from the affected project's directory. For shared code in `crates/topcoat-core/browser`, run them in both projects. `yarn lint` checks formatting, imports, and lint rules, including the shared code.
 
 ```
-cd crates/topcoat-runtime/browser
 yarn install --frozen-lockfile
+yarn lint
 yarn build
 yarn test
 ```
+
+The runtime and CLI embed their prebuilt `dist/index.js`; the runtime's coherence crate also embeds `dist/coherence.js`. CI rebuilds these files and rejects drift. Include regenerated bundles alongside source changes.
 
 ## New crates
 

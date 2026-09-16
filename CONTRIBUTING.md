@@ -68,14 +68,16 @@ cargo hack clippy --workspace --each-feature --exclude-features stage-icons --no
 cargo +nightly udeps --workspace --all-targets --all-features --locked
 ```
 
-If you touched `crates/topcoat-runtime/browser`, the prebuilt browser bundle has to be rebuilt and committed alongside your source change. CI fails if it drifts:
+For browser changes, run the following commands from `crates/topcoat-runtime/browser` or `crates/topcoat-cli/browser`, depending on the project you changed. Changes to the shared code in `crates/topcoat-core/browser` need both projects checked and rebuilt. CI checks formatting, linting, tests, and that the committed bundles match their source:
 
 ```sh
-cd crates/topcoat-runtime/browser
 yarn install --frozen-lockfile
+yarn lint
 yarn build
 yarn test
 ```
+
+Commit the regenerated `dist/index.js` with the source changes. The runtime also builds `dist/coherence.js`, which must be committed when it changes.
 
 The full check list, including when each command is needed, is in the [`check`](.agents/skills/check/SKILL.md) skill.
 

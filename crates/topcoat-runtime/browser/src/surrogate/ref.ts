@@ -3,6 +3,7 @@ export class Ref<T> {
 		private readonly read: () => T,
 		private readonly write?: (v: T) => void,
 	) {
+		// biome-ignore lint/correctness/noConstructorReturn: References forward the pointee's methods through this proxy.
 		return new Proxy(this, {
 			get(reference, property, receiver) {
 				if (

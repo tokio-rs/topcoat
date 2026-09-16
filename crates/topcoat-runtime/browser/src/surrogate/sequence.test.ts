@@ -6,7 +6,7 @@ import { Integer, integerType } from "./integer";
 import { Option } from "./option";
 import { Panic } from "./panic";
 import { Ref } from "./ref";
-import { FixedArray, Slice, Vec } from "./sequence";
+import { type FixedArray, Slice, Vec } from "./sequence";
 import { String as RuntimeString } from "./string";
 
 for (const bits of [16, 32, 64]) {

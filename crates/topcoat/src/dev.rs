@@ -52,10 +52,16 @@ fn http_to_ws(url: &str) -> String {
 
 /// Inject the `topcoat dev` client script.
 ///
-/// The script reloads the page once a new build is serving, and shows a
-/// small floating status indicator while the dev server is rebuilding or
-/// after a build failure. Pass `status_indicator: false` to disable the
-/// indicator while keeping live reload.
+/// The script morphs fresh HTML into the page once a new build is serving,
+/// keeping matching elements and their form state. When the runtime is
+/// loaded, signals whose identities still match keep their values too.
+/// Moving signal calls or component invocations can change their identities.
+///
+/// Changes to scripts, the base URL, or the doctype trigger a full reload.
+/// Reload manually to reset form state and signal values to their defaults.
+///
+/// A small floating status indicator shows rebuilds and failures. Pass
+/// `status_indicator: false` to hide it while keeping live updates.
 ///
 /// Renders nothing when the app is not running under `topcoat dev`.
 #[component]

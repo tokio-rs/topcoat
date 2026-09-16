@@ -1,7 +1,10 @@
 // @vitest-environment happy-dom
 import { beforeEach, expect, it } from "vitest";
 
-import { morph, type MorphOptions } from "../../../../topcoat-core/browser/morph";
+import {
+	type MorphOptions,
+	morph,
+} from "../../../../topcoat-core/browser/morph";
 
 beforeEach(() => {
 	document.body.innerHTML = "";
@@ -27,7 +30,10 @@ it("preserves edited controls without focus while still updating their attribute
 	area.value = "written";
 	box.checked = false;
 
-	morphBody(`<input value="new" class="changed"><textarea disabled>new</textarea><input type="checkbox" checked><p>added</p>`, { preserveFormState: true });
+	morphBody(
+		`<input value="new" class="changed"><textarea disabled>new</textarea><input type="checkbox" checked><p>added</p>`,
+		{ preserveFormState: true },
+	);
 
 	expect(document.querySelector("input")).toBe(input);
 	expect(input.value).toBe("typed");
@@ -43,13 +49,20 @@ it("keeps untouched controls too and applies defaults to newly inserted controls
 	const range = document.querySelector('[type="range"]') as HTMLInputElement;
 	const value = range.value;
 
-	morphBody(`<input value="new"><textarea>new</textarea><input type="checkbox" checked><input type="range" value="75"><input id="added" value="fresh">`, { preserveFormState: true });
+	morphBody(
+		`<input value="new"><textarea>new</textarea><input type="checkbox" checked><input type="range" value="75"><input id="added" value="fresh">`,
+		{ preserveFormState: true },
+	);
 
 	expect(document.querySelector("input")?.value).toBe("old");
 	expect(document.querySelector("textarea")?.value).toBe("old");
-	expect((document.querySelector('[type="checkbox"]') as HTMLInputElement).checked).toBe(false);
+	expect(
+		(document.querySelector('[type="checkbox"]') as HTMLInputElement).checked,
+	).toBe(false);
 	expect(range.value).toBe(value);
-	expect((document.getElementById("added") as HTMLInputElement).value).toBe("fresh");
+	expect((document.getElementById("added") as HTMLInputElement).value).toBe(
+		"fresh",
+	);
 });
 
 it("keeps a focused control's selection without writing its value", () => {
@@ -59,11 +72,17 @@ it("keeps a focused control's selection without writing its value", () => {
 	area.focus();
 	area.setSelectionRange(2, 6, "backward");
 
-	morphBody(`<textarea class="new">server</textarea>`, { preserveFormState: true });
+	morphBody(`<textarea class="new">server</textarea>`, {
+		preserveFormState: true,
+	});
 
 	expect(document.activeElement).toBe(area);
 	expect(area.value).toBe("some typed text");
-	expect([area.selectionStart, area.selectionEnd, area.selectionDirection]).toEqual([2, 6, "backward"]);
+	expect([
+		area.selectionStart,
+		area.selectionEnd,
+		area.selectionDirection,
+	]).toEqual([2, 6, "backward"]);
 });
 
 it("preserves edited selections when defaults change and selected options are added", () => {
@@ -72,7 +91,10 @@ it("preserves edited selections when defaults change and selected options are ad
 	select.value = "b";
 	const option = document.getElementById("b");
 
-	morphBody(`<select class="new"><option id="a" value="a" selected>A!</option><optgroup label="group"><option id="b" value="b">B!</option><option value="c" selected>C</option></optgroup></select>`, { preserveFormState: true });
+	morphBody(
+		`<select class="new"><option id="a" value="a" selected>A!</option><optgroup label="group"><option id="b" value="b">B!</option><option value="c" selected>C</option></optgroup></select>`,
+		{ preserveFormState: true },
+	);
 
 	expect(document.querySelector("select")).toBe(select);
 	expect(document.getElementById("b")).toBe(option);
@@ -84,13 +106,22 @@ it("preserves edited selections when defaults change and selected options are ad
 
 it("preserves both untouched and multiple selections", () => {
 	document.body.innerHTML = `<select><option value="a">A</option><option value="b">B</option></select><select multiple><option value="a" selected>A</option><option value="b">B</option></select>`;
-	const [single, multiple] = Array.from(document.querySelectorAll("select")) as [HTMLSelectElement, HTMLSelectElement];
-	multiple.options[1]!.selected = true;
+	const [single, multiple] = Array.from(
+		document.querySelectorAll("select"),
+	) as [HTMLSelectElement, HTMLSelectElement];
+	const option = multiple.options[1];
+	if (!option) throw new Error("Missing option");
+	option.selected = true;
 
-	morphBody(`<select><option value="a">A</option><option value="b" selected>B</option></select><select multiple><option value="a">A</option><option value="b">B</option></select>`, { preserveFormState: true });
+	morphBody(
+		`<select><option value="a">A</option><option value="b" selected>B</option></select><select multiple><option value="a">A</option><option value="b">B</option></select>`,
+		{ preserveFormState: true },
+	);
 
 	expect(single.value).toBe("a");
-	expect(Array.from(multiple.selectedOptions, (option) => option.value)).toEqual(["a", "b"]);
+	expect(
+		Array.from(multiple.selectedOptions, (option) => option.value),
+	).toEqual(["a", "b"]);
 });
 
 it("updates text and attributes in place, keeping the element", () => {

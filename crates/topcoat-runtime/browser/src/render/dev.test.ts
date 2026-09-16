@@ -1,7 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from "vitest";
 import { PageRefresh } from "../../../../topcoat-cli/browser/src/refresh";
-import { DEV_RUNTIME_EVENT, type DevRuntimeDetail } from "../../../../topcoat-core/browser/dev";
+import {
+	DEV_RUNTIME_EVENT,
+	type DevRuntimeDetail,
+} from "../../../../topcoat-core/browser/dev";
 import { flushEffects } from "../reactivity";
 import { Runtime } from "../runtime";
 import { F64 } from "../surrogate";
@@ -19,7 +22,12 @@ const declaration = (id: string, value: number) =>
 it("a dev refresh keeps page and shard signals while replacing bindings and head content", async () => {
 	vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
 	vi.spyOn(window, "scrollTo").mockImplementation(() => {});
-	vi.stubGlobal("location", { href: "http://localhost/search?q=x", pathname: "/search", search: "?q=x", reload: vi.fn() });
+	vi.stubGlobal("location", {
+		href: "http://localhost/search?q=x",
+		pathname: "/search",
+		search: "?q=x",
+		reload: vi.fn(),
+	});
 	document.head.innerHTML = `<title>Old</title>${declaration("a", 1)}`;
 	const shard = `<!--::topcoat::shard::start("1", "0", [])-->${declaration("b", 2)}<p>shard</p><!--::topcoat::shard::end("0")-->`;
 	document.body.innerHTML = `${declaration("removed", 1)}<button data-topcoat-on:click="() => cx.signal('a').increment()">add</button><input data-topcoat-bind:value="cx.signal('a').get()">${shard}`;
@@ -32,19 +40,28 @@ it("a dev refresh keeps page and shard signals while replacing bindings and head
 		runtime.context.signal("b").set(new F64(3));
 		flushEffects();
 		const input = document.querySelector("input");
-		const button = document.querySelector("button")!;
+		const button = document.querySelector("button");
+		if (!button) throw new Error("Missing button");
 		const doctype = document.doctype ? "<!doctype html>" : "";
 		const html = `${doctype}<html><head><title>New</title>${declaration("a", 0)}</head><body>${declaration("added", 4)}<button data-topcoat-on:click="() => { cx.signal('a').increment(); cx.signal('a').increment(); }">add two</button><input data-topcoat-bind:value="cx.signal('a').get()">${shard}</body></html>`;
 		let resolve!: (value: Response) => void;
-		const pending = new Promise<Response>((done) => { resolve = done; });
+		const pending = new Promise<Response>((done) => {
+			resolve = done;
+		});
 		const fetch = vi.fn().mockReturnValue(pending);
 		vi.stubGlobal("fetch", fetch);
 		const reportError = vi.fn();
-		const refresh = new PageRefresh(() => false, () => {}, reportError);
+		const refresh = new PageRefresh(
+			() => false,
+			() => {},
+			reportError,
+		);
 		const task = refresh.refresh();
 		await Promise.resolve();
 		expect(fetch.mock.calls[0]?.[0]).toBe("/_topcoat/runtime/pages/search?q=x");
-		expect(JSON.parse(fetch.mock.calls[0]?.[1].body)).toEqual({ signals: { a: 5, b: 3, removed: 1 } });
+		expect(JSON.parse(fetch.mock.calls[0]?.[1].body)).toEqual({
+			signals: { a: 5, b: 3, removed: 1 },
+		});
 		// A change made while the server is rendering must survive too.
 		count.set(new F64(7));
 		resolve(new Response(html, { headers: { "Content-Type": "text/html" } }));

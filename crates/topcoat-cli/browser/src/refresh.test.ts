@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// @vitest-environment-options {"happyDOM":{"settings":{"disableCSSFileLoading":true,"handleDisabledFileLoadingAsSuccess":true}}}
+// @vitest-environment-options {"settings":{"disableCSSFileLoading":true,"handleDisabledFileLoadingAsSuccess":true}}
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PageRefresh } from "./refresh";
 

@@ -2,6 +2,8 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StatusIndicator } from "./status";
 
+const fontsDescriptor = Object.getOwnPropertyDescriptor(document, "fonts");
+
 beforeEach(() => {
 	document.body.innerHTML = "";
 	vi.stubGlobal(
@@ -12,10 +14,16 @@ beforeEach(() => {
 			}
 		},
 	);
-	vi.spyOn(document.fonts, "add").mockReturnValue(document.fonts);
+	// Happy DOM does not implement the document's font set.
+	Object.defineProperty(document, "fonts", {
+		configurable: true,
+		value: { add: vi.fn() },
+	});
 });
 
 afterEach(() => {
+	if (fontsDescriptor) Object.defineProperty(document, "fonts", fontsDescriptor);
+	else Reflect.deleteProperty(document, "fonts");
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
@@ -23,15 +31,18 @@ afterEach(() => {
 it("updates the pill, allows dismissal and shows the next build event", () => {
 	const status = new StatusIndicator(true);
 	status.show("rebuilding");
-	const host = document.querySelector("topcoat-dev-status")!;
-	const shadow = host.shadowRoot!;
+	const host = document.querySelector("topcoat-dev-status");
+	const shadow = host?.shadowRoot;
+	if (!host || !shadow) throw new Error("Missing status indicator");
 	expect(shadow.querySelector("b")?.textContent).toBe("rebuilding");
 	status.show("build failed", true);
 	expect(shadow.querySelector("b")?.className).toBe("error");
 	expect((shadow.querySelector(".spinner") as HTMLElement).style.display).toBe(
 		"none",
 	);
-	shadow.querySelector("button")!.click();
+	const dismiss = shadow.querySelector("button");
+	if (!dismiss) throw new Error("Missing dismiss button");
+	dismiss.click();
 	expect(host.isConnected).toBe(false);
 	status.show("rebuilding");
 	expect(document.querySelector("topcoat-dev-status")).toBe(host);

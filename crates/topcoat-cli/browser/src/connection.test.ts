@@ -4,6 +4,11 @@ import { DevConnection } from "./connection";
 
 class Socket {
 	static all: Socket[] = [];
+	static at(index: number): Socket {
+		const socket = Socket.all[index];
+		if (!socket) throw new Error(`Missing socket ${index}`);
+		return socket;
+	}
 	onopen: (() => void) | null = null;
 	onclose: (() => void) | null = null;
 	onmessage: ((event: { data: unknown }) => void) | null = null;
@@ -45,7 +50,7 @@ function start() {
 
 it("uses the script's origin and only delivers known build events", () => {
 	const handlers = start();
-	const socket = Socket.all[0]!;
+	const socket = Socket.at(0);
 	expect(socket.url).toBe("wss://localhost:59039/ws");
 	socket.onopen?.();
 	socket.onmessage?.({ data: "rebuilding" });
@@ -57,9 +62,9 @@ it("uses the script's origin and only delivers known build events", () => {
 
 it("keeps the reconnected socket for subsequent builds", () => {
 	const handlers = start();
-	Socket.all[0]!.close();
+	Socket.at(0).close();
 	vi.advanceTimersByTime(500);
-	const socket = Socket.all[1]!;
+	const socket = Socket.at(1);
 	socket.onopen?.();
 	socket.onmessage?.({ data: "reload" });
 	vi.advanceTimersByTime(5000);
@@ -71,20 +76,20 @@ it("keeps the reconnected socket for subsequent builds", () => {
 it("defers reconnecting during navigation and resumes after a page is restored", () => {
 	const handlers = start();
 	window.dispatchEvent(new Event("pagehide"));
-	Socket.all[0]!.close();
+	Socket.at(0).close();
 	vi.advanceTimersByTime(1000);
 	expect(Socket.all).toHaveLength(1);
 	expect(connection.isNavigating).toBe(true);
 	expect(handlers.navigating).toHaveBeenCalledOnce();
 	window.dispatchEvent(new Event("pageshow"));
 	vi.advanceTimersByTime(500);
-	Socket.all[1]!.onopen?.();
+	Socket.at(1).onopen?.();
 	expect(handlers.reconnected).toHaveBeenCalledOnce();
 });
 
 it("cancels a pending reconnect when stopped", () => {
 	start();
-	Socket.all[0]!.close();
+	Socket.at(0).close();
 	connection.stop();
 	vi.advanceTimersByTime(1000);
 	expect(Socket.all).toHaveLength(1);
