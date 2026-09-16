@@ -1,4 +1,4 @@
-A shard is a special type of component that can re-run whenever its inputs change in the browser. Arguments are runtime [expressions](macro.expr.html): the browser tracks the signals they read, and when one changes it requests a fresh render from the server and swaps the result into the DOM. A signal the shard body reads on the server counts as an input too. Shards are exposed as API endpoints from your server; arguments **must not be trusted**.
+A shard is a special type of component that can re-run whenever its inputs change in the browser. Arguments accept fixed values or runtime [expressions](macro.expr.html): the browser tracks the signals expressions read, and when one changes it requests a fresh render from the server and swaps the result into the DOM. A signal the shard body reads on the server counts as an input too. Shards are exposed as API endpoints from your server; arguments **must not be trusted**.
 
 ```rust
 use topcoat::{Result, context::Cx, runtime::shard, view::{View, view}};
@@ -17,7 +17,7 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
 
 # Calling Shards
 
-Inside a [`view!`] body, call a shard like a component, passing a runtime expression for each parameter:
+Inside a [`view!`] body, call a shard like a component. Each parameter accepts its declared type `T` or an `Expr<T>`, with conversion handled automatically:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Event}};
@@ -31,6 +31,7 @@ Ok(view! {
     <input :value=$(query.get()) @input=$(|e: Event| query.set(e.target.value))>
 
     search_results(query: $(query.get()))
+    search_results(query: "shoes".to_owned())
 })
 # }
 ```
@@ -124,7 +125,7 @@ async fn search_results(cx: &Cx, query: String, limit: Signal<usize>) -> Result<
 # let query = signal(cx, String::new);
 # let limit = signal(cx, || 10usize);
 # Ok(view! {
-search_results(query: $(query.get()), limit: $(limit))
+search_results(query: $(query.get()), limit: limit)
 # })
 # }
 ```
