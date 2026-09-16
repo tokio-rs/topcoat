@@ -14,6 +14,7 @@ const TEXTAREA: StaticClass = class!(
      bg-transparent px-3 py-2 text-sm transition-colors outline-none \
      placeholder:text-muted-foreground \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
+     aria-invalid:border-destructive aria-invalid:focus-visible:ring-destructive \
      focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
 );
 
@@ -25,6 +26,7 @@ const TEXTAREA: StaticClass = class!(
 /// initial value. The textarea fills its container, so size it through the
 /// container or with a width class; it grows with its content from a
 /// two-line minimum.
+/// Set `aria-invalid="true"` to use the error border and focus ring.
 ///
 /// ```ignore
 /// view! {

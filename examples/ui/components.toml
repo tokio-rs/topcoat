@@ -61,7 +61,7 @@ hash = "sha256:a4cfcb51a2b5f8d887e5a03bef008c42518ef5cc90d562418c0ec0cf8d73855d"
 file = "src/components/hover_card.rs"
 
 [registries.topcoat.components.input]
-hash = "sha256:a2c94942999ae16bba591554f7a242192e43d9ce2648ade3e67f69bfe0f82828"
+hash = "sha256:2d46c835a1761ffd503d08add31a30bc167f028c96b9841eb3febdebf6df316b"
 file = "src/components/input.rs"
 
 [registries.topcoat.components.kbd]
@@ -85,7 +85,7 @@ hash = "sha256:e39c3ac299eb6b26ff9c6a710a654c3ff6f02bca10abd89ac4b925e6d7ea895a"
 file = "src/components/radio_group.rs"
 
 [registries.topcoat.components.select]
-hash = "sha256:f10ee1476854c574abc8e735f82eb9bfa2bb1237024bada6b753745bacdd075d"
+hash = "sha256:3a1ff362c7daa536d04c41a567aadcf07cba7e5738d9f0fcebd4e5df5762917a"
 file = "src/components/select.rs"
 
 [registries.topcoat.components.separator]
@@ -121,7 +121,7 @@ hash = "sha256:4d2820c5adc9d845349f5ae307979bd4e31f6365dda440d853f4dda774e224f7"
 file = "src/components/tabs.rs"
 
 [registries.topcoat.components.textarea]
-hash = "sha256:d25bbbcf3a575930cbfacbfa62bb4816944c19bfd3b462721347aab34f4f0c05"
+hash = "sha256:058b7cf87e15056c6e8a351ac51bf561d3304c80051be1378c4f03b439abd55c"
 file = "src/components/textarea.rs"
 
 [registries.topcoat.components.toggle]

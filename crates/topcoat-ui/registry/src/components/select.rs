@@ -15,6 +15,7 @@ const SELECT: StaticClass = class!(
     "h-9 w-full appearance-none items-center rounded-lg border border-border \
      bg-transparent pr-8 pl-3 text-left text-sm transition-colors outline-none \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
+     aria-invalid:border-destructive aria-invalid:focus-visible:ring-destructive \
      focus-visible:ring-offset-background disabled:pointer-events-none",
 );
 
@@ -87,6 +88,7 @@ fn checkmark_style(cx: &Cx) -> String {
 /// handlers) are forwarded to the `<select>`; a `class` among them is appended
 /// to the wrapping element's classes, so width utilities size the whole
 /// control. Like the input, it fills its container by default.
+/// Set `aria-invalid="true"` to use the error border and focus ring.
 /// For a styled group heading, add a `<legend>` as the first child of the
 /// `<optgroup>`. Keep its `label` attribute for native picker fallbacks.
 ///
