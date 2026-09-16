@@ -10,7 +10,7 @@ where
     let expression = Expr::from(value);
     assert!(expression.is_static());
     Case::evaluated("converted value", expression)
-        .check_conversion()
+        .check()
         .unwrap();
 }
 
