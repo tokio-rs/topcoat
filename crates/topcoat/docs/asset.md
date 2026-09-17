@@ -108,6 +108,12 @@ topcoat asset bundle --bin my-app
 topcoat asset bundle --package my-package
 ```
 
+To bundle a binary built with custom compiler flags or another build tool, pass its path. This scans that exact artifact without rebuilding it:
+
+```sh
+topcoat asset bundle --executable target/custom/debug/my-app
+```
+
 The subcommands build the application to scan it, and they accept the same profile flags as `cargo build`. Bundle with the profile you are going to run, since each profile keeps its own bundle:
 
 ```sh

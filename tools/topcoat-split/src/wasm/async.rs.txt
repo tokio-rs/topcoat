@@ -1,0 +1,75 @@
+mod asynchronous {
+    use alloc::boxed::Box;
+    use core::{
+        future::{Future, poll_fn},
+        pin::Pin,
+        task::{Context, Poll, Waker},
+    };
+
+    use wasm_bindgen::prelude::*;
+
+    use super::ClientValue;
+
+    #[wasm_bindgen(module = "/host.js")]
+    extern "C" {
+        fn procedure_start(index: u32, args: &JsValue);
+        fn arguments_new() -> JsValue;
+        fn arguments_push(args: &JsValue, value: &JsValue);
+        fn procedure_ready() -> bool;
+        fn procedure_result() -> JsValue;
+    }
+
+    pub struct Arguments(JsValue);
+
+    impl Arguments {
+        pub fn new() -> Self {
+            Self(arguments_new())
+        }
+
+        pub fn push(&self, value: &JsValue) {
+            arguments_push(&self.0, value);
+        }
+    }
+
+    // JavaScript owns this handle until the handler completes or rejects.
+    // This avoids a global task table and permits non-Send Rust futures.
+    #[wasm_bindgen]
+    pub struct Task {
+        future: Pin<Box<dyn Future<Output = JsValue>>>,
+    }
+
+    pub fn run<F: Future<Output = JsValue> + 'static>(future: F) -> JsValue {
+        Task {
+            future: Box::pin(future),
+        }
+        .into()
+    }
+
+    #[wasm_bindgen]
+    pub fn resume(task: &mut Task) -> bool {
+        // The binding holds an exclusive borrow of this task. Signal writes
+        // may still enter other handlers, which own independent tasks.
+        // Retain the future until JS releases the task, including when ready.
+        // Only Topcoat procedure completion supplies wakeups.
+        task.future
+            .as_mut()
+            .poll(&mut Context::from_waker(Waker::noop()))
+            .is_ready()
+    }
+
+    pub fn procedure<T: ClientValue>(index: u32, args: Arguments) -> impl Future<Output = T> {
+        let mut started = false;
+        poll_fn(move |_| {
+            if !started {
+                started = true;
+                procedure_start(index, &args.0);
+                Poll::Pending
+            } else if procedure_ready() {
+                Poll::Ready(T::from_js(procedure_result()))
+            } else {
+                Poll::Pending
+            }
+        })
+    }
+}
+pub use asynchronous::*;

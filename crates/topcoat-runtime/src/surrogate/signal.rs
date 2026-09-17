@@ -58,7 +58,7 @@ where
     ///
     /// Always panics; signal writes can only occur in client-side expressions.
     #[track_caller]
-    pub fn set(&self, _v: T::Surrogate) {
+    pub fn set(&self, _v: impl Into<T::Surrogate>) {
         write_in_browser_only();
     }
 }

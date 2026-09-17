@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use topcoat::{
     Result,
+    client::Text,
     context::Cx,
     router::{href, page},
     runtime::{Event, shard, signal},
@@ -25,7 +26,8 @@ use crate::{
 #[page]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     // The signal lives in the browser; typing filters without a reload.
-    let query = signal(cx, String::new);
+    let query = signal(cx, Text::new);
+    let empty = Text::new();
 
     Ok(view! {
         <h1 class="text-3xl font-bold tracking-tight">"The menu"</h1>
@@ -44,7 +46,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                 attrs: attributes! {
                     type="button"
                     :disabled=$(query.get().is_empty())
-                    @click=$(|_e: Event| query.set("".to_owned()))
+                    @click=$(|_e: Event| query.set(empty.clone()))
                 },
                 "Clear"
             )
@@ -76,13 +78,13 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
 
 /// The drinks matching the search, rendered on the server.
 #[shard]
-async fn drink_grid(cx: &Cx, query: String) -> Result<impl View> {
+async fn drink_grid(cx: &Cx, query: Text) -> Result<impl View> {
     // Stands in for a slower lookup, so the skeleton is visible before the
     // grid streams in.
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // The query comes from the client, so treat it as untrusted input.
-    let needle = query.trim().to_lowercase();
+    let needle = query.as_str().trim().to_lowercase();
 
     let matches: Vec<&Drink> = drinks(cx)
         .await?

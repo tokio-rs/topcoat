@@ -5,7 +5,14 @@
 
 use std::marker::PhantomData;
 
+#[cfg(topcoat_wasm)]
+use crate::client::Text as StringSurrogate;
+#[cfg(not(topcoat_wasm))]
 use crate::{BoolSurrogate, F64Surrogate, StringSurrogate};
+#[cfg(topcoat_wasm)]
+type BoolSurrogate = bool;
+#[cfg(topcoat_wasm)]
+type F64Surrogate = f64;
 
 pub struct Event {
     pub alt_key: BoolSurrogate,

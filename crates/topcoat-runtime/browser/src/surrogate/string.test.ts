@@ -91,3 +91,11 @@ it("trims only the requested end", () => {
 	);
 	expect(new Str("x\u{FEFF}").trim_end().toNodeText()).toBe("x\u{FEFF}");
 });
+
+it("Text concatenation preserves Unicode and the inputs", () => {
+	const left = new RuntimeString("\u2615\u{1f680}");
+	const right = new RuntimeString("e\u0301\0");
+	expect(left.concat(right).dehydrate()).toBe("\u2615\u{1f680}e\u0301\0");
+	expect(left.dehydrate()).toBe("\u2615\u{1f680}");
+	expect(right.dehydrate()).toBe("e\u0301\0");
+});

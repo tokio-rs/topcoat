@@ -37,23 +37,34 @@ const imports = [];
 const initializers = [];
 const nodeInitializers = [];
 const sizes = [];
+const allocatorModules = new Map();
 for (const [index, bundle] of manifest.bundles.entries()) {
   const directory = join(output, "crates", bundle.name);
   const pkg = join(output, "pkg", bundle.name);
-  const { wasm, glue } = buildClient({ directory, targetDir: join(buildCache, "client"), pkg,
+  const { wasm, glue, allocator } = buildClient({ directory, targetDir: join(buildCache, "client"), pkg,
     name: `topcoat_client_${bundle.name.replaceAll("-", "_")}`, profile, client, wasmOpt });
   if (release) {
     assert.doesNotMatch(glue, /TextEncoder|TextDecoder|JSON\.(parse|stringify)/, "typed Wasm glue must not encode text or JSON");
   }
   const generatedCargo = readFileSync(join(directory, "Cargo.toml"), "utf8");
   assert.doesNotMatch(generatedCargo, /serde/, "client crates must not depend on serde");
+  if (allocator && !allocatorModules.has(allocator.filename)) {
+    const name = `allocator${allocatorModules.size}`;
+    allocatorModules.set(allocator.filename, name);
+    nodeInitializers.push(`const ${name} = new WebAssembly.Module(readFileSync(${JSON.stringify(allocator.file)}));`);
+  }
   const host = glue.match(/from ['"]([^'"]+\/host\.js)['"]/);
   if (!host) throw new Error("missing Wasm host imports");
-  imports.push(`import init${index}, {dispatch as dispatch${index}} from ${JSON.stringify(join(pkg, "kernel.js"))};\nimport {frames as frames${index}} from ${JSON.stringify(join(pkg, host[1]))};`);
+  imports.push(`import init${index}, {dispatch as dispatch${index}${bundle.entries.some(entry => entry.async) ? `, resume as resume${index}, cancel as cancel${index}` : ""}} from ${JSON.stringify(join(pkg, "kernel.js"))};\nimport {frames as frames${index}} from ${JSON.stringify(join(pkg, host[1]))};`);
   initializers.push(`await init${index}({module_or_path: new URL(${JSON.stringify(`./${bundle.name}.wasm`)}, import.meta.url)});`);
-  nodeInitializers.push(`await init${index}({module_or_path: readFileSync(${JSON.stringify(wasm)})});`);
+  nodeInitializers.push(`await init${index}({module_or_path: readFileSync(${JSON.stringify(wasm)})${allocator ? `, allocator_module: ${allocatorModules.get(allocator.filename)}` : ""}});`);
   const publicDir = join(output, "public");
   mkdirSync(publicDir, { recursive: true });
+  if (allocator && !sizes.some(item => item.bundle === allocator.filename)) {
+    const bytes = readFileSync(allocator.file);
+    writeFileSync(join(output, "public", allocator.filename), bytes);
+    sizes.push({ bundle: allocator.filename, shared: true, profile, raw: bytes.length, gzip: gzipSync(bytes).length, brotli: brotliCompressSync(bytes).length });
+  }
   const bytes = readFileSync(wasm);
   writeFileSync(join(publicDir, `${bundle.name}.wasm`), bytes);
   sizes.push({ bundle: bundle.name, profile, raw: bytes.length, gzip: gzipSync(bytes).length, brotli: brotliCompressSync(bytes).length });
@@ -63,7 +74,7 @@ run("cargo", [`+${client}`, "rustc", "-p", "runtime", "--bin", "wasm-native", "-
 });
 const html = run(join(buildCache, "server/debug/wasm-native"), [], { stdio: ["ignore", "pipe", "inherit"], encoding: "utf8" });
 writeFileSync(join(output, "public/index.html"), html);
-const bridge = `import {install} from ${JSON.stringify(join(tool, "src/wasm/bridge.js"))};\ninstall([${manifest.bundles.map((bundle, index) => `{entries:${JSON.stringify(bundle.entries)},dispatch:dispatch${index},frames:frames${index}}`).join(",")}]);`;
+const bridge = `import {install} from ${JSON.stringify(join(tool, "src/wasm/bridge.js"))};\ninstall([${manifest.bundles.map((bundle, index) => `{entries:${JSON.stringify(bundle.entries)},procedures:${JSON.stringify(bundle.procedures)},dispatch:dispatch${index},frames:frames${index}${bundle.entries.some(entry => entry.async) ? `,resume:resume${index},cancel:cancel${index}` : ""}}`).join(",")}]);`;
 const runtime = join(root, "crates/topcoat-runtime/browser/src");
 const app = `${imports.join("\n")}\n${initializers.join("\n")}\n${bridge}\nimport {Runtime} from ${JSON.stringify(join(runtime, "runtime.ts"))};\nnew Runtime().start(document);`;
 writeFileSync(join(output, "app.ts"), app);

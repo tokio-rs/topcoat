@@ -125,12 +125,11 @@ impl<'tcx> Roots<'tcx> {
 impl<'tcx> Visitor<'tcx> for Roots<'tcx> {
     fn visit_expr(&mut self, expr: &'tcx hir::Expr<'tcx>) {
         let typeck = self.tcx.typeck(expr.hir_id.owner.def_id);
+        let Some(expr_ty) = typeck.expr_ty_opt(expr) else {
+            return;
+        };
         let references = self.references.entry(expr.hir_id.owner.def_id).or_default();
-        for arg in typeck
-            .expr_ty(expr)
-            .walk()
-            .chain(typeck.node_args(expr.hir_id).iter())
-        {
+        for arg in expr_ty.walk().chain(typeck.node_args(expr.hir_id).iter()) {
             if let Some(ty) = arg.as_type()
                 && let ty::Adt(def, _) = ty.kind()
             {
@@ -216,6 +215,8 @@ struct Bundle<'tcx> {
     entries: Vec<serde_json::Value>,
     error: Option<String>,
     native: bool,
+    event_mask: u64,
+    procedures: BTreeMap<String, serde_json::Value>,
 }
 
 impl<'tcx> Bundle<'tcx> {
@@ -223,6 +224,8 @@ impl<'tcx> Bundle<'tcx> {
         Self {
             tcx,
             native,
+            event_mask: 0,
+            procedures: BTreeMap::new(),
             selected: HashSet::new(),
             pending: Vec::new(),
             edits: BTreeMap::new(),
@@ -247,6 +250,43 @@ impl<'tcx> Bundle<'tcx> {
     }
 
     fn require(&mut self, mut id: DefId) {
+        if self.native
+            && let Some(procedure) = crate::wasm::procedure(self.tcx, id)
+        {
+            let local = id.expect_local();
+            if self.procedures.contains_key(&self.tcx.def_path_str(id)) {
+                return;
+            }
+            let result = (|| -> Result<(), String> {
+                let index = self.procedures.len();
+                let mut params = Vec::new();
+                let mut bridges = Vec::new();
+                let mut arguments = Vec::new();
+                for (index, ty) in procedure.args.iter().enumerate() {
+                    bridges.push(crate::wasm::bridge_type(self.tcx, *ty)?);
+                    params.push(format!("arg{index}: {}", self.type_source(*ty)?));
+                    arguments.push(format!(
+                        "args.push(&crate::__topcoat::ClientValue::into_js(arg{index}));"
+                    ));
+                }
+                let bridge = crate::wasm::bridge_type(self.tcx, procedure.output)?;
+                let output = self.type_source(procedure.output)?;
+                let name = self.tcx.item_name(id);
+                self.modules.entry(self.module(local)).or_default().push(format!(
+                    "pub fn {name}({}) -> impl core::future::Future<Output = {output}> {{ let args = crate::__topcoat::Arguments::new(); {} crate::__topcoat::procedure({index}, args) }}",
+                    params.join(", "), arguments.join("\n")));
+                self.procedures.insert(
+                    self.tcx.def_path_str(id),
+                    json!({"index": index, "id": procedure.id, "args": bridges, "result": bridge}),
+                );
+                Ok(())
+            })();
+            if let Err(error) = result {
+                self.error = Some(error);
+            }
+            return;
+        }
+
         if self.native && crate::wasm::mapped_path(self.tcx, id).is_some() {
             return;
         }
@@ -396,19 +436,13 @@ impl<'tcx> Bundle<'tcx> {
 
     fn add_root(&mut self, root: &Root<'tcx>) -> Result<(), String> {
         let body = self.tcx.hir_body(root.closure.body);
+        let asynchronous = root.metadata.as_ref().is_some_and(|m| m["async"] == true);
         let handler = root
             .metadata
             .as_ref()
             .is_some_and(|metadata| metadata["handler"] == true);
         if !body.params.is_empty() && !handler {
             return Err("split root closures must have zero arguments; handler adapters are not implemented yet".into());
-        }
-        if handler {
-            for parameter in body.params {
-                if crate::wasm::uses_parameter(body.value, parameter.pat.hir_id) {
-                    return Err("Wasm event fields are not supported yet".into());
-                }
-            }
         }
         let captures = self.tcx.closure_captures(root.closure.def_id);
         let mut params = Vec::new();
@@ -439,7 +473,23 @@ impl<'tcx> Bundle<'tcx> {
             let signal = matches!(capture.place.base_ty.peel_refs().kind(), ty::Adt(def, _) if crate::wasm::is_signal(self.tcx, def.did()));
             metadata.push(json!({"name": name, "type": ty, "value_type": value_type, "signal": signal, "bridge": bridge, "capture": format!("{:?}", capture.info.capture_kind)}));
         }
-        let result = self.tcx.typeck(root.closure.def_id).expr_ty(body.value);
+        let event = handler && crate::wasm::uses_event(self.tcx, body);
+        if event {
+            let parameter = &body.params[0];
+            let hir::PatKind::Binding(_, _, name, _) = parameter.pat.kind else {
+                return Err("event handlers require a named argument".into());
+            };
+            params.push(format!("{name}: crate::__topcoat::Event"));
+        }
+        let result = if asynchronous {
+            let hir::ExprKind::Closure(coroutine) = body.value.kind else {
+                return Err("unsupported async handler lowering".into());
+            };
+            let inner = self.tcx.hir_body(coroutine.body);
+            self.tcx.typeck(coroutine.def_id).expr_ty(inner.value)
+        } else {
+            self.tcx.typeck(root.closure.def_id).expr_ty(body.value)
+        };
         if self.native {
             crate::wasm::bridge_type(self.tcx, result)?;
         }
@@ -453,7 +503,13 @@ impl<'tcx> Bundle<'tcx> {
             .entry(module.clone())
             .or_default()
             .push(format!(
-                "pub fn {name}({}) -> {result} {{ {source} }}",
+                "{}pub {}fn {name}({}) -> {result} {{ {source} }}",
+                if self.native && !asynchronous && event {
+                    "#[cfg_attr(not(debug_assertions), inline(always))]\n"
+                } else {
+                    ""
+                },
+                if asynchronous { "async " } else { "" },
                 params.join(", ")
             ));
         let path = module
@@ -462,7 +518,7 @@ impl<'tcx> Bundle<'tcx> {
             .cloned()
             .collect::<Vec<_>>()
             .join("::");
-        self.entries.push(json!({"index": index, "function": path, "captures": metadata, "result": result, "source": source, "id": root.metadata.as_ref().map(|m| &m["id"]), "handler": handler}));
+        self.entries.push(json!({"index": index, "function": path, "captures": metadata, "result": result, "source": source, "id": root.metadata.as_ref().map(|m| &m["id"]), "handler": handler, "event": event, "event_mask": 0, "async": asynchronous}));
         Ok(())
     }
 
@@ -639,6 +695,19 @@ impl<'tcx> Visitor<'tcx> for Bundle<'tcx> {
 
     fn visit_expr(&mut self, expr: &'tcx hir::Expr<'tcx>) {
         let typeck = self.tcx.typeck(expr.hir_id.owner.def_id);
+        if self.native
+            && let hir::ExprKind::Field(base, field) = expr.kind
+            && let ty::Adt(def, _) = typeck.expr_ty(base).peel_refs().kind()
+            && crate::wasm::is_event(self.tcx, def.did())
+        {
+            let fields: Vec<String> =
+                serde_json::from_str(include_str!("wasm/event-fields.json")).unwrap();
+            for (index, name) in fields.iter().enumerate() {
+                if name.split('.').next_back() == Some(field.as_str()) {
+                    self.event_mask |= 1 << index;
+                }
+            }
+        }
         self.require_type(typeck.expr_ty(expr));
         if let Some(id) = typeck.type_dependent_def_id(expr.hir_id) {
             if self.tcx.trait_of_assoc(id).is_some() {
@@ -727,15 +796,19 @@ pub fn extract(tcx: TyCtxt<'_>, output: &Path) -> Result<(), String> {
         let mut source = bundle
             .finish()
             .map_err(|error| format!("bundle `{name}`: {error}"))?;
+        for entry in &mut bundle.entries {
+            entry["event_mask"] = json!(bundle.event_mask);
+        }
         let mut items = bundle
             .selected
             .iter()
             .map(|id| tcx.def_path_str(*id))
             .collect::<Vec<_>>();
         items.sort();
-        let manifest =
-            json!({"version": 1, "bundle": name, "entries": bundle.entries, "items": items});
+        let manifest = json!({"version": 1, "bundle": name, "entries": bundle.entries, "items": items, "procedures": bundle.procedures.values().collect::<Vec<_>>()});
         if native {
+            source.insert_str(0, "#![no_std]\n");
+            source.push_str(include_str!("wasm/allocator.rs.txt"));
             source.push_str(&crate::wasm::runtime(&manifest)?);
         }
         artifacts.push((name, source, manifest));
@@ -766,7 +839,7 @@ pub fn extract(tcx: TyCtxt<'_>, output: &Path) -> Result<(), String> {
         index["bundles"]
             .as_array_mut()
             .unwrap()
-            .push(json!({"name": name, "entries": manifest["entries"]}));
+            .push(json!({"name": name, "entries": manifest["entries"], "procedures": manifest["procedures"]}));
         for entry in manifest["entries"].as_array().unwrap() {
             if let Some(id) = entry["id"].as_str() {
                 index["expressions"][id] = entry.clone();

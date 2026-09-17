@@ -17,7 +17,10 @@ pub(super) fn expand(source: &syn::Expr) -> syn::Result<TokenStream> {
         location.column
     );
     let handler = matches!(source, syn::Expr::Closure(_));
-    let metadata = serde_json::json!({"id": id, "handler": handler, "source": text}).to_string();
+    let asynchronous = matches!(source, syn::Expr::Closure(closure) if closure.asyncness.is_some());
+    let metadata =
+        serde_json::json!({"id": id, "handler": handler, "async": asynchronous, "source": text})
+            .to_string();
     let mut js = quote!(#topcoat_runtime::Js::source("undefined"));
     if let Ok(path) = std::env::var("TOPCOAT_WASM_MANIFEST") {
         let manifest: serde_json::Value =
@@ -65,13 +68,19 @@ pub(super) fn expand(source: &syn::Expr) -> syn::Result<TokenStream> {
         ));
     }
     if let syn::Expr::Closure(closure) = source {
-        if closure.asyncness.is_some() || closure.inputs.len() != 1 {
+        if closure.inputs.len() != 1 {
             return Err(syn::Error::new(
                 span,
-                "Wasm event handlers currently require one synchronous event argument",
+                "Wasm event handlers currently require one event argument",
             ));
         }
         let mut closure = closure.clone();
+        // The marker is never invoked on the server. Borrow while analyzing so
+        // a move handler does not consume values needed by later view bindings.
+        // The client dispatcher owns the captured values for the whole future.
+        if asynchronous {
+            closure.capture = None;
+        }
         let parameter = closure.inputs.first().unwrap();
         if !matches!(parameter, syn::Pat::Type(_)) {
             closure.inputs[0] = syn::Pat::Type(syn::PatType {

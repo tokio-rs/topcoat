@@ -1,0 +1,12 @@
+#[global_allocator]
+static ALLOCATOR: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+#[panic_handler]
+fn panic_abort(_: &core::panic::PanicInfo<'_>) -> ! {
+    core::arch::wasm32::unreachable()
+}
+
+#[inline]
+fn __topcoat_abort() -> ! {
+    core::arch::wasm32::unreachable()
+}

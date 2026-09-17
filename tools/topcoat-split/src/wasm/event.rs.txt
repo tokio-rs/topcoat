@@ -1,0 +1,285 @@
+mod event {
+    use super::Text;
+    use wasm_bindgen::prelude::*;
+    #[wasm_bindgen(module = "/host.js")]
+    extern "C" {
+        fn event_text(field: u32) -> JsValue;
+        fn event_number(field: u32) -> f64;
+        fn event_bool(field: u32) -> bool;
+        fn event_action(action: u32);
+    }
+    pub struct Event {
+        pub alt_key: bool,
+        pub bubbles: bool,
+        pub button: f64,
+        pub buttons: f64,
+        pub cancelable: bool,
+        pub client_x: f64,
+        pub client_y: f64,
+        pub code: Text,
+        pub ctrl_key: bool,
+        pub data: Text,
+        pub default_prevented: bool,
+        pub delta_x: f64,
+        pub delta_y: f64,
+        pub delta_z: f64,
+        pub event_type: Text,
+        pub input_type: Text,
+        pub is_composing: bool,
+        pub key: Text,
+        pub meta_key: bool,
+        pub movement_x: f64,
+        pub movement_y: f64,
+        pub offset_x: f64,
+        pub offset_y: f64,
+        pub page_x: f64,
+        pub page_y: f64,
+        pub pointer_id: f64,
+        pub pointer_type: Text,
+        pub repeat: bool,
+        pub screen_x: f64,
+        pub screen_y: f64,
+        pub shift_key: bool,
+        pub time_stamp: f64,
+        pub target: EventTarget,
+        pub current_target: EventTarget,
+    }
+    pub struct EventTarget {
+        pub checked: bool,
+        pub id: Text,
+        pub name: Text,
+        pub text_content: Text,
+        pub value: Text,
+    }
+    impl Event {
+        #[inline(always)]
+        pub fn new(mask: u64) -> Self {
+            Self {
+                alt_key: if mask & (1 << 0) != 0 {
+                    event_bool(0)
+                } else {
+                    false
+                },
+                bubbles: if mask & (1 << 1) != 0 {
+                    event_bool(1)
+                } else {
+                    false
+                },
+                button: if mask & (1 << 2) != 0 {
+                    event_number(2)
+                } else {
+                    0.0
+                },
+                buttons: if mask & (1 << 3) != 0 {
+                    event_number(3)
+                } else {
+                    0.0
+                },
+                cancelable: if mask & (1 << 4) != 0 {
+                    event_bool(4)
+                } else {
+                    false
+                },
+                client_x: if mask & (1 << 5) != 0 {
+                    event_number(5)
+                } else {
+                    0.0
+                },
+                client_y: if mask & (1 << 6) != 0 {
+                    event_number(6)
+                } else {
+                    0.0
+                },
+                code: if mask & (1 << 7) != 0 {
+                    Text(event_text(7))
+                } else {
+                    Text(JsValue::NULL)
+                },
+                ctrl_key: if mask & (1 << 8) != 0 {
+                    event_bool(8)
+                } else {
+                    false
+                },
+                data: if mask & (1 << 9) != 0 {
+                    Text(event_text(9))
+                } else {
+                    Text(JsValue::NULL)
+                },
+                default_prevented: if mask & (1 << 10) != 0 {
+                    event_bool(10)
+                } else {
+                    false
+                },
+                delta_x: if mask & (1 << 11) != 0 {
+                    event_number(11)
+                } else {
+                    0.0
+                },
+                delta_y: if mask & (1 << 12) != 0 {
+                    event_number(12)
+                } else {
+                    0.0
+                },
+                delta_z: if mask & (1 << 13) != 0 {
+                    event_number(13)
+                } else {
+                    0.0
+                },
+                event_type: if mask & (1 << 14) != 0 {
+                    Text(event_text(14))
+                } else {
+                    Text(JsValue::NULL)
+                },
+                input_type: if mask & (1 << 15) != 0 {
+                    Text(event_text(15))
+                } else {
+                    Text(JsValue::NULL)
+                },
+                is_composing: if mask & (1 << 16) != 0 {
+                    event_bool(16)
+                } else {
+                    false
+                },
+                key: if mask & (1 << 17) != 0 {
+                    Text(event_text(17))
+                } else {
+                    Text(JsValue::NULL)
+                },
+                meta_key: if mask & (1 << 18) != 0 {
+                    event_bool(18)
+                } else {
+                    false
+                },
+                movement_x: if mask & (1 << 19) != 0 {
+                    event_number(19)
+                } else {
+                    0.0
+                },
+                movement_y: if mask & (1 << 20) != 0 {
+                    event_number(20)
+                } else {
+                    0.0
+                },
+                offset_x: if mask & (1 << 21) != 0 {
+                    event_number(21)
+                } else {
+                    0.0
+                },
+                offset_y: if mask & (1 << 22) != 0 {
+                    event_number(22)
+                } else {
+                    0.0
+                },
+                page_x: if mask & (1 << 23) != 0 {
+                    event_number(23)
+                } else {
+                    0.0
+                },
+                page_y: if mask & (1 << 24) != 0 {
+                    event_number(24)
+                } else {
+                    0.0
+                },
+                pointer_id: if mask & (1 << 25) != 0 {
+                    event_number(25)
+                } else {
+                    0.0
+                },
+                pointer_type: if mask & (1 << 26) != 0 {
+                    Text(event_text(26))
+                } else {
+                    Text(JsValue::NULL)
+                },
+                repeat: if mask & (1 << 27) != 0 {
+                    event_bool(27)
+                } else {
+                    false
+                },
+                screen_x: if mask & (1 << 28) != 0 {
+                    event_number(28)
+                } else {
+                    0.0
+                },
+                screen_y: if mask & (1 << 29) != 0 {
+                    event_number(29)
+                } else {
+                    0.0
+                },
+                shift_key: if mask & (1 << 30) != 0 {
+                    event_bool(30)
+                } else {
+                    false
+                },
+                time_stamp: if mask & (1 << 31) != 0 {
+                    event_number(31)
+                } else {
+                    0.0
+                },
+                target: EventTarget {
+                    checked: if mask & (1 << 32) != 0 {
+                        event_bool(32)
+                    } else {
+                        false
+                    },
+                    id: if mask & (1 << 33) != 0 {
+                        Text(event_text(33))
+                    } else {
+                        Text(JsValue::NULL)
+                    },
+                    name: if mask & (1 << 34) != 0 {
+                        Text(event_text(34))
+                    } else {
+                        Text(JsValue::NULL)
+                    },
+                    text_content: if mask & (1 << 35) != 0 {
+                        Text(event_text(35))
+                    } else {
+                        Text(JsValue::NULL)
+                    },
+                    value: if mask & (1 << 36) != 0 {
+                        Text(event_text(36))
+                    } else {
+                        Text(JsValue::NULL)
+                    },
+                },
+                current_target: EventTarget {
+                    checked: if mask & (1 << 37) != 0 {
+                        event_bool(37)
+                    } else {
+                        false
+                    },
+                    id: if mask & (1 << 38) != 0 {
+                        Text(event_text(38))
+                    } else {
+                        Text(JsValue::NULL)
+                    },
+                    name: if mask & (1 << 39) != 0 {
+                        Text(event_text(39))
+                    } else {
+                        Text(JsValue::NULL)
+                    },
+                    text_content: if mask & (1 << 40) != 0 {
+                        Text(event_text(40))
+                    } else {
+                        Text(JsValue::NULL)
+                    },
+                    value: if mask & (1 << 41) != 0 {
+                        Text(event_text(41))
+                    } else {
+                        Text(JsValue::NULL)
+                    },
+                },
+            }
+        }
+        pub fn prevent_default(&self) {
+            event_action(0);
+        }
+        pub fn stop_propagation(&self) {
+            event_action(1);
+        }
+        pub fn stop_immediate_propagation(&self) {
+            event_action(2);
+        }
+    }
+}
+pub use event::*;

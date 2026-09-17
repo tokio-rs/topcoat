@@ -1,0 +1,8 @@
+{
+  "name": "topcoat-split-tools",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "binaryen": "132.0.0"
+  }
+}

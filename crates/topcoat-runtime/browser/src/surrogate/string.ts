@@ -127,6 +127,10 @@ export class String extends Str {
 		return new Str(this.v);
 	}
 
+	concat(other: String): String {
+		return new String(this.v + other.v);
+	}
+
 	clone(): String {
 		return new String(this.v);
 	}

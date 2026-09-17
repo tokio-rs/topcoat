@@ -1,4 +1,7 @@
+#[allow(dead_code, unused_imports)]
 mod __topcoat {
+    // EVENT_RUNTIME
+    // ASYNC_RUNTIME
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen(module = "/host.js")]
@@ -36,13 +39,25 @@ mod __topcoat {
         fn read(slot: u32) -> Self;
         fn write(slot: u32, value: Self);
         fn into_js(self) -> JsValue;
+        fn from_js(value: JsValue) -> Self;
     }
 
     impl ClientValue for Text {
-        fn capture(slot: u32) -> Self { Self(capture(slot)) }
-        fn read(slot: u32) -> Self { Self(read(slot)) }
-        fn write(slot: u32, value: Self) { write(slot, &value.0); }
-        fn into_js(self) -> JsValue { self.0 }
+        fn capture(slot: u32) -> Self {
+            Self(capture(slot))
+        }
+        fn read(slot: u32) -> Self {
+            Self(read(slot))
+        }
+        fn write(slot: u32, value: Self) {
+            write(slot, &value.0);
+        }
+        fn into_js(self) -> JsValue {
+            self.0
+        }
+        fn from_js(value: JsValue) -> Self {
+            Self(value)
+        }
     }
 
     macro_rules! numbers {
@@ -52,42 +67,99 @@ mod __topcoat {
                 fn read(slot: u32) -> Self { read_number(slot) as Self }
                 fn write(slot: u32, value: Self) { write_number(slot, value as f64); }
                 fn into_js(self) -> JsValue { JsValue::from_f64(self as f64) }
+                fn from_js(value: JsValue) -> Self { value.as_f64().unwrap_or_else(|| crate::__topcoat_abort()) as Self }
             }
         )* };
     }
     numbers!(f64, i8, i16, i32, u8, u16, u32);
 
     impl ClientValue for bool {
-        fn capture(slot: u32) -> Self { capture_bool(slot) }
-        fn read(slot: u32) -> Self { read_bool(slot) }
-        fn write(slot: u32, value: Self) { write_bool(slot, value); }
-        fn into_js(self) -> JsValue { JsValue::from_bool(self) }
+        fn capture(slot: u32) -> Self {
+            capture_bool(slot)
+        }
+        fn read(slot: u32) -> Self {
+            read_bool(slot)
+        }
+        fn write(slot: u32, value: Self) {
+            write_bool(slot, value);
+        }
+        fn into_js(self) -> JsValue {
+            JsValue::from_bool(self)
+        }
+        fn from_js(value: JsValue) -> Self {
+            value.as_bool().unwrap_or_else(|| crate::__topcoat_abort())
+        }
     }
 
     impl ClientValue for () {
-        fn capture(slot: u32) -> Self { capture(slot); }
-        fn read(slot: u32) -> Self { read(slot); }
-        fn write(slot: u32, _: Self) { write(slot, &JsValue::NULL); }
-        fn into_js(self) -> JsValue { JsValue::NULL }
+        fn capture(slot: u32) -> Self {
+            capture(slot);
+        }
+        fn read(slot: u32) -> Self {
+            read(slot);
+        }
+        fn write(slot: u32, _: Self) {
+            write(slot, &JsValue::NULL);
+        }
+        fn into_js(self) -> JsValue {
+            JsValue::NULL
+        }
+        fn from_js(_: JsValue) -> Self {}
     }
 
     pub struct Signal<T> {
         slot: u32,
-        marker: std::marker::PhantomData<T>,
+        marker: core::marker::PhantomData<T>,
     }
 
     impl<T> Signal<T> {
         pub fn new(slot: u32) -> Self {
-            Self { slot, marker: std::marker::PhantomData }
+            Self {
+                slot,
+                marker: core::marker::PhantomData,
+            }
+        }
+    }
+
+    macro_rules! numeric_signals {
+        ($($ty:ty),*) => { $(impl Signal<$ty> {
+            pub fn increment(&self) { let value = self.get();
+                #[cfg(debug_assertions)]
+                let next = value.checked_add(1).unwrap_or_else(|| crate::__topcoat_abort());
+                #[cfg(not(debug_assertions))]
+                let next = value.wrapping_add(1);
+                self.set(next); }
+            pub fn decrement(&self) { let value = self.get();
+                #[cfg(debug_assertions)]
+                let next = value.checked_sub(1).unwrap_or_else(|| crate::__topcoat_abort());
+                #[cfg(not(debug_assertions))]
+                let next = value.wrapping_sub(1);
+                self.set(next); }
+        })* };
+    }
+    numeric_signals!(i8, i16, i32, u8, u16, u32);
+
+    impl Signal<f64> {
+        pub fn increment(&self) {
+            self.set(self.get() + 1.0);
+        }
+        pub fn decrement(&self) {
+            self.set(self.get() - 1.0);
         }
     }
 
     impl<T> Clone for Signal<T> {
-        fn clone(&self) -> Self { Self::new(self.slot) }
+        fn clone(&self) -> Self {
+            Self::new(self.slot)
+        }
     }
 
     impl<T: ClientValue> Signal<T> {
-        pub fn get(&self) -> T { T::read(self.slot) }
-        pub fn set(&self, value: T) { T::write(self.slot, value); }
+        pub fn get(&self) -> T {
+            T::read(self.slot)
+        }
+        pub fn set(&self, value: T) {
+            T::write(self.slot, value);
+        }
     }
 }

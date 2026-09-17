@@ -76,7 +76,13 @@ impl ToTokens for Procedure {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let item = &self.1.item;
         let vis = &item.vis;
-        let ident = &item.sig.ident;
+        let original_ident = &item.sig.ident;
+        let native_ident = format_ident!("__TopcoatProcedure_{}", original_ident);
+        let ident = if cfg!(topcoat_wasm) {
+            &native_ident
+        } else {
+            original_ident
+        };
         let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
 
         // Marker: the value users register and reference. A unit struct, so
@@ -146,14 +152,26 @@ impl ToTokens for Procedure {
                     let #topcoat_router::content::Json(#topcoat_runtime::Arguments(args)) =
                         <#topcoat_router::content::Json<#topcoat_runtime::Arguments<Surrogate>> as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
                     let (#(#args,)*) = #topcoat_runtime::Surrogate::into_real(args);
-                    let response = #topcoat_runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
+                    let response = #topcoat_runtime::Surrogated::into_surrogate(#original_ident(#(#args_with_cx),*).await?);
                     #topcoat_router::response::IntoResponse::into_response(#topcoat_router::content::Json(response), cx)
                 }
             }
         };
 
         // The trait implementation dispatching calls to the bridge.
-        let id = uuid::Uuid::new_v4().to_string();
+        let location = original_ident.span().start();
+        let id = if cfg!(topcoat_wasm) {
+            let key = format!(
+                "{}:{}:{}:{}",
+                original_ident.span().file(),
+                location.line,
+                location.column,
+                original_ident
+            );
+            native_id(&key)
+        } else {
+            uuid::Uuid::new_v4().to_string()
+        };
         let procedure = quote! {
             impl #topcoat_runtime::Procedure for #ident {
                 fn id(&self) -> #topcoat_runtime::ProcedureId {
@@ -199,7 +217,13 @@ impl ToTokens for Procedure {
             quote! { #topcoat_inventory::submit! { &#ident as &'static dyn #topcoat_runtime::Procedure } }
         });
 
+        let native = cfg!(topcoat_wasm).then(|| quote! {
+            #vis fn #original_ident(#(#args: #arg_tys),*) -> impl ::core::future::Future<Output = #return_ty> {
+                #topcoat_runtime::__topcoat_wasm_procedure::<_, #return_ty>(#id, (#(#args,)*))
+            }
+        });
         quote! {
+            #native
             #marker
 
             const _: () = {
@@ -216,9 +240,28 @@ impl ToTokens for Procedure {
     }
 }
 
+fn native_id(key: &str) -> String {
+    let hash = key.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    });
+    format!("wasm-{hash:016x}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_ids_are_stable_route_segments() {
+        let key = "src/app/menu/drink.rs:109:9:place_order";
+        let id = native_id(key);
+        assert_eq!(id, native_id(key));
+        assert_ne!(id, native_id("src/app/menu/drink.rs:110:9:place_order"));
+        assert!(
+            id.bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        );
+    }
 
     fn parse_err(source: &str) -> String {
         match syn::parse_str::<ProcedureItem>(source) {

@@ -27,11 +27,16 @@ const arms = kinds.map((kind, index) => {
       0 => <${type} as ClientValue>::capture(0).into_js(),
       1 => signal.get().into_js(),
       2 => { signal.set(<${type} as ClientValue>::capture(1)); signal.get().into_js() },
+      ${index >= 3 ? "4 => { signal.increment(); signal.get().into_js() }, 5 => { signal.decrement(); signal.get().into_js() }," : ""}
       _ => core::arch::wasm32::unreachable(),
     }
   }`;
 }).join(",\n");
-writeFileSync(join(output, "src/lib.rs"), `#![forbid(unsafe_code)]\n#![allow(dead_code)]\n${readFileSync(join(tool, "src/wasm/runtime.rs.txt"), "utf8")}
+writeFileSync(join(output, "src/lib.rs"), `#![no_std]
+#![forbid(unsafe_code)]
+#![allow(dead_code)]
+extern crate alloc;
+${readFileSync(join(tool, "src/wasm/allocator.rs.txt"), "utf8")}\n${readFileSync(join(tool, "src/wasm/runtime.rs.txt"), "utf8")}
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn dispatch(kind: u32, operation: u32) -> wasm_bindgen::JsValue {
   use __topcoat::ClientValue;
@@ -44,7 +49,7 @@ pub fn dispatch(kind: u32, operation: u32) -> wasm_bindgen::JsValue {
 `);
 for (const profile of ["debug", "release"]) {
   const pkg = join(output, profile);
-  const { wasm, glue } = buildClient({ directory: output, targetDir: join(output, "target"), pkg,
+  const { wasm, glue, allocator } = buildClient({ directory: output, targetDir: join(output, "target"), pkg,
     name: "typed_bridge_checks", profile, client, wasmOpt });
   assert.doesNotMatch(glue, /__wbindgen_number_get|__wbindgen_boolean_get/, "primitive inputs must use typed imports");
   const module = new WebAssembly.Module(readFileSync(wasm));
@@ -62,7 +67,7 @@ for (const profile of ["debug", "release"]) {
 import {readFileSync} from "node:fs";
 import init, {dispatch} from ${JSON.stringify(join(pkg, "kernel.js"))};
 import {frames} from ${JSON.stringify(join(pkg, host))};
-await init({module_or_path:readFileSync(${JSON.stringify(wasm)})});
+await init({module_or_path:readFileSync(${JSON.stringify(wasm)})${allocator ? `,allocator_module:readFileSync(${JSON.stringify(allocator.file)})` : ""}});
 const kinds = ${JSON.stringify(kinds)};
 // These values cannot be JSON encoded without losing NaN, infinity, and -0.
 const samples = ${sampleSource};
@@ -85,6 +90,19 @@ for (const [kind, bridge] of kinds.entries()) {
       assert.equal(value, samples[kind][0], "invalid writes leave the signal unchanged");
     }
     assert.equal(dispatch(kind, 1), value, "valid calls work after failed validation");
+    if (kind >= 3) {
+      value = 2;
+      assert.equal(dispatch(kind, 4), 3, "increment uses the signal value");
+      assert.equal(dispatch(kind, 5), 2, "decrement uses the signal value");
+    }
+    if (kind >= 4) {
+      value = samples[kind][1];
+      if (${JSON.stringify(profile)} === "release") assert.equal(dispatch(kind, 4), samples[kind][0], "release overflow wraps");
+      else {
+        assert.throws(() => dispatch(kind, 4), WebAssembly.RuntimeError, "debug overflow traps");
+        assert.equal(value, samples[kind][1], "overflow does not write the signal");
+      }
+    }
   } finally { frames.pop(); }
 }
 console.log(${JSON.stringify(`${profile}: typed captures, reads, writes, bounds, and invalid input checks passed.`)});

@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    client::Text,
     context::Cx,
     router::{error::RouterErrorExt, href, page, path_param},
     runtime::{Event, procedure, signal},
@@ -28,11 +29,11 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
         .ok_or_not_found()?;
 
     // Snapshots captured by the runtime expressions below.
-    let name = drink.name.clone();
+    let name = Text::from(drink.name.clone());
     let price = drink.price;
 
     let quantity = signal(cx, || 1.0);
-    let confirmation = signal(cx, String::new);
+    let confirmation = signal(cx, Text::new);
 
     Ok(view! {
         <a
@@ -88,7 +89,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
             button(
                 attrs: attributes! {
                     @click=$(async move |_e: Event| {
-                        let message = place_order(name.to_owned(), quantity.get()).await;
+                        let message = place_order(name.clone(), quantity.get()).await;
                         confirmation.set(message);
                     })
                 },
@@ -105,11 +106,11 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
 // The arguments come from the client, so a real application would validate
 // them before ringing anything up.
 #[procedure]
-async fn place_order(cx: &Cx, drink: String, quantity: f64) -> Result<String> {
+async fn place_order(cx: &Cx, drink: Text, quantity: f64) -> Result<Text> {
     let greeting = match current_customer(cx) {
         Some(name) => format!("Coming right up, {name}"),
         None => "Coming right up".to_owned(),
     };
 
-    Ok(format!("{greeting}: {quantity} x {drink}."))
+    Ok(Text::from(format!("{greeting}: {quantity} x {drink}.")))
 }

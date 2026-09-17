@@ -56,7 +56,11 @@ async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
                 topcoat::dev::script()
 
                 // Signals, shards, and procedures need the browser runtime.
-                topcoat::runtime::script()
+                if cfg!(topcoat_wasm) {
+                    <script type="module" src="/_topcoat/wasm/app.js"></script>
+                } else {
+                    topcoat::runtime::script()
+                }
 
                 topcoat::font::link(font: GEIST)
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
@@ -202,4 +206,30 @@ async fn sign_in(cx: &Cx, Form(form): Form<SignIn>) -> Result<SeeOther> {
 
     // Post/Redirect/Get, so a reload does not submit the form again.
     Ok(see_other(href!(page).resolve(cx)))
+}
+
+/// Serves the generated client bundles when running the Wasm exploration build.
+#[cfg(topcoat_wasm)]
+#[route(GET "/_topcoat/wasm/{file}")]
+async fn wasm_asset(cx: &Cx) -> Result<topcoat::router::response::Response> {
+    use topcoat::router::{Body, error::not_found, request::uri, response::Response};
+    let name = uri(cx).path().rsplit('/').next().unwrap_or_default();
+    if name.is_empty()
+        || !name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+    {
+        return Err(not_found().into());
+    }
+    let directory = std::env::var("TOPCOAT_WASM_PUBLIC")?;
+    let body =
+        std::fs::read(std::path::Path::new(&directory).join(name)).map_err(|_| not_found())?;
+    let content_type = if name.ends_with(".wasm") {
+        "application/wasm"
+    } else {
+        "text/javascript"
+    };
+    Ok(Response::builder()
+        .header("Content-Type", content_type)
+        .body(Body::from(body))?)
 }

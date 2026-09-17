@@ -29,3 +29,12 @@ pub struct WasmValue<T> {
 pub fn __wasm_value<T>(v: T) -> WasmValue<T> {
     WasmValue { t: "Wasm", v }
 }
+
+/// Type-checks a procedure's client signature without running its server body.
+#[doc(hidden)]
+pub fn __topcoat_wasm_procedure<A, T: crate::client::ClientValue>(
+    _: &str,
+    _: A,
+) -> impl Future<Output = T> {
+    std::future::pending()
+}

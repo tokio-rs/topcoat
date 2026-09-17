@@ -15,7 +15,7 @@ assert_eq!(name, Text::from("Coffee"));
 assert!(!label.is_empty());
 ```
 
-Construct Text on the server, then capture it in an expression or store it in a signal. Constructing Text from a string literal inside a Wasm expression is not supported yet. Text does not expose `&str`, byte indexing, or implicit conversion to a native String. Both backends use Unicode scalar values; malformed JavaScript strings are rejected at the bridge.
+Construct Text on the server, then capture it in an expression or store it in a signal. Constructing Text from a string literal inside a Wasm expression is not supported yet. Client expressions do not expose `&str`, byte indexing, or implicit conversion to a native String. Server code can use `Text::new()`, `as_str()`, and `Display` for initialization, database queries, and formatting. Both backends use Unicode scalar values; malformed JavaScript strings are rejected at the bridge.
 
 ## Signal values
 
@@ -24,3 +24,7 @@ Construct Text on the server, then capture it in an expression or store it in a 
 Signals keep their identity in JavaScript. Reading a signal tracks a reactive dependency and returns a primitive or Text snapshot. A Text snapshot is immutable, so concatenating it does not change the signal; assigning the result with `set` performs the update. Integer bounds and value types are checked before a write changes the signal. Floating-point signal state must be finite.
 
 Server-to-browser state transfer still uses serialization. Only the browser-to-Wasm execution path avoids it. The generated client crates do not depend on serde.
+
+Text can also cross shard and procedure boundaries. Those server requests use the existing string serialization format; the HTTP and JSON work remains in JavaScript. Numeric signals support `increment()` and `decrement()`. Integer overflow follows the client build profile.
+
+Event fields such as `event.target.value` provide Text snapshots. Async event handlers compile to Rust futures, with captured signals retained across `await`. Each poll restores the handler's capture environment. Procedures use typed client stubs, keeping their server implementations out of Wasm. A failed procedure rejects the handler promise. JavaScript schedules procedure responses and resumes the matching Rust future. Sequential procedure awaits and concurrent handlers are supported, with one outstanding procedure per handler. Arbitrary futures requiring other wakeups are unsupported. JavaScript owns each task handle and releases its pinned Rust future on completion or rejection. Generated client crates use `no_std` and `wee_alloc`. Allocating bundles import a shared allocator Wasm file, compiled once in the browser and instantiated separately for each bundle with its own memory. Page sizes exclude that shared download. Bridge precondition failures and Rust panic conditions abort with a Wasm trap, without unwinding or formatting a panic message. Release builds also trap on invalid task handles or overlapping polls of the same task; debug builds retain binding error messages. An abort does not roll back signal writes or run destructors; the bridge disables that Wasm module until it is reloaded. Server code still uses std.

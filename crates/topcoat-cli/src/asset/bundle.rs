@@ -13,6 +13,9 @@ use crate::common::cargo::{BuildFlags, BuildOpts, Metadata};
 pub(super) struct BundleArgs {
     #[command(flatten)]
     build: BuildFlags,
+    /// Bundle an already-built executable without rebuilding it
+    #[arg(long, conflicts_with_all = ["bin", "package", "release", "profile"])]
+    executable: Option<PathBuf>,
     /// Output directory for the bundle (defaults to an `assets` directory
     /// next to the built executable)
     #[arg(short, long)]
@@ -20,10 +23,18 @@ pub(super) struct BundleArgs {
 }
 
 pub(super) async fn run(args: BundleArgs) {
-    let (exe, bytes) = BuildOpts::from(args.build)
-        .build_and_read(|_, _| {})
-        .await
-        .unwrap_or_else(|e| e.print_and_exit());
+    let (exe, bytes) = if let Some(exe) = args.executable {
+        let bytes = std::fs::read(&exe).unwrap_or_else(|error| {
+            eprintln!("failed to read {}: {error}", exe.display());
+            std::process::exit(1);
+        });
+        (exe, bytes)
+    } else {
+        BuildOpts::from(args.build)
+            .build_and_read(|_, _| {})
+            .await
+            .unwrap_or_else(|e| e.print_and_exit())
+    };
 
     let out_dir = match run_bundle(&exe, &bytes, args.out).await {
         Ok(path) => path,

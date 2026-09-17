@@ -650,3 +650,17 @@ mod tests {
         assert_eq!(signal.read_untracked(), "x");
     }
 }
+
+#[cfg(topcoat_wasm)]
+macro_rules! numeric_signal {
+    ($($ty:ty),*) => { $(
+        impl Signal<$ty> {
+            /// Adds one to the current value in a client expression.
+            pub fn increment(&self) { self.set(self.get() + 1 as $ty); }
+            /// Subtracts one from the current value in a client expression.
+            pub fn decrement(&self) { self.set(self.get() - 1 as $ty); }
+        }
+    )* };
+}
+#[cfg(topcoat_wasm)]
+numeric_signal!(f64, i8, i16, i32, u8, u16, u32);
