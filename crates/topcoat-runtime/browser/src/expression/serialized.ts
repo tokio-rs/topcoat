@@ -27,6 +27,7 @@ export interface SerializedSequence {
 }
 
 export type DehydratedSurrogate =
+	| { t: "Wasm"; v: unknown }
 	| SerializedInteger
 	| SerializedSequence
 	| null

@@ -53,6 +53,9 @@ pub use serve::{serve, serve_until, start};
 #[cfg(feature = "runtime")]
 pub mod runtime;
 
+#[cfg(feature = "runtime")]
+pub mod client;
+
 #[cfg(feature = "session")]
 pub mod session;
 

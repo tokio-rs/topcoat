@@ -3,6 +3,7 @@ name = "runtime"
 version.workspace = true
 edition.workspace = true
 publish = false
+default-run = "runtime"
 
 [dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

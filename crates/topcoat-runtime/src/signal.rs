@@ -1,12 +1,15 @@
 use std::{any::TypeId, collections::HashMap, panic::Location, sync::Arc};
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
+#[cfg(not(topcoat_wasm))]
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use topcoat_core::{
     context::{Cx, identity, try_request_context},
     identity::{Identity, SiteKey},
 };
 use topcoat_view::{HoistKey, hoist, hoist_once};
 
+#[cfg(not(topcoat_wasm))]
 use crate::{Surrogate, Surrogated};
 
 /// The identity of a signal, shared by the server and the browser runtime.
@@ -251,6 +254,7 @@ pub trait SignalValue: Sized {
     fn from_value(value: &serde_json::Value) -> Option<Self>;
 }
 
+#[cfg(not(topcoat_wasm))]
 impl<T> SignalValue for T
 where
     T: Surrogated,
@@ -271,6 +275,35 @@ where
         T::Surrogate::deserialize(value)
             .ok()
             .map(Surrogate::into_real)
+    }
+}
+
+#[cfg(topcoat_wasm)]
+impl<T: crate::ClientValue> SignalValue for T {
+    type Surrogate<'a>
+        = crate::WasmValue<&'a T>
+    where
+        Self: 'a;
+
+    fn surrogate(&self) -> Self::Surrogate<'_> {
+        crate::__wasm_value(self)
+    }
+
+    fn from_value(value: &serde_json::Value) -> Option<Self> {
+        (value.get("t")?.as_str()? == "Wasm")
+            .then(|| serde_json::from_value(value.get("v")?.clone()).ok())?
+    }
+}
+
+#[cfg(topcoat_wasm)]
+impl<T> Signal<T> {
+    /// Writes the signal in a client expression.
+    ///
+    /// # Panics
+    ///
+    /// Panics when executed on the server.
+    pub fn set(&self, _value: T) {
+        panic!("signal writes can only execute in the browser");
     }
 }
 

@@ -7,6 +7,7 @@ import { Ref } from "../surrogate/ref";
 import { Result } from "../surrogate/result";
 import { FixedArray, Slice, Vec } from "../surrogate/sequence";
 import { String as RuntimeString, Str } from "../surrogate/string";
+import { WasmValue } from "../surrogate/wasm";
 import type { Context } from "./context";
 import type { DehydratedSurrogate } from "./serialized";
 
@@ -27,6 +28,8 @@ export function hydrate(value: DehydratedSurrogate, cx: Context): unknown {
 			throw new Error(`Unknown surrogate type: ${typeof value}`);
 		case "object":
 			switch (value.t) {
+				case "Wasm":
+					return new WasmValue(value.v);
 				case "u8":
 				case "u16":
 				case "u32":

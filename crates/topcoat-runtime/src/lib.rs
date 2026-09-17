@@ -2,6 +2,7 @@
 
 mod arguments;
 mod bind_attribute;
+mod client;
 mod event_handler;
 mod expr;
 mod js;
@@ -16,9 +17,11 @@ mod shard;
 mod shard_scope;
 mod signal;
 mod surrogate;
+mod wasm;
 
 pub use arguments::*;
 pub use bind_attribute::*;
+pub use client::*;
 pub use event_handler::*;
 pub use expr::*;
 pub use js::*;
@@ -34,5 +37,6 @@ pub use shard_scope::*;
 pub use signal::*;
 pub use surrogate::*;
 use topcoat_asset::{Asset, asset};
+pub use wasm::*;
 
 pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");

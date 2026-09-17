@@ -32,3 +32,6 @@ pub trait Component {
         Self: 'cx,
         Self::Props<'a>: 'cx;
 }
+/// Records a render owner for the experimental compiler analyzer.
+#[doc(hidden)]
+pub fn __topcoat_wasm_owner<T>(_: &str, _: &str) {}

@@ -44,6 +44,7 @@ impl ToTokens for Shard {
         let inputs = &item.sig.inputs;
         let output = &item.sig.output;
         let block = &item.block;
+        let owner = topcoat_core_grammar::wasm::owner("shard", ident, &item.sig.generics);
 
         // Split the inputs into the optional `cx` parameter and the value
         // parameters that become shard arguments.
@@ -150,7 +151,7 @@ impl ToTokens for Shard {
                 async fn handler(
                     __cx: &#topcoat_context::Cx,
                     #inputs
-                ) #output #block
+                ) #output { #owner #block }
             }
         };
 

@@ -6,6 +6,7 @@ pub mod paths;
 #[cfg(feature = "pretty")]
 pub mod pretty;
 pub mod quote_option;
+pub mod wasm;
 
 pub use parse_option::*;
 pub use quote_option::*;

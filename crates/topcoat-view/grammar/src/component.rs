@@ -56,6 +56,10 @@ impl ToTokens for Component {
         let mut generics = item.sig.generics.clone();
         let vis = &item.vis;
         let ident = &item.sig.ident;
+        let owner = topcoat_core_grammar::wasm::owner("component", ident, &item.sig.generics);
+        if !owner.is_empty() {
+            item.block.stmts.insert(0, parse_quote!(#owner));
+        }
         let props_ident = format_ident!(
             "{}Props",
             ident.unraw().to_string().to_pascal_case(),

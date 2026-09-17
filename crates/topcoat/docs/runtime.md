@@ -2,6 +2,8 @@ Topcoat's runtime makes server-rendered pages interactive without a wasm bundle,
 
 The runtime is **highly experimental** and fairly limited today: expressions support only a small vocabulary of types and methods, and many patterns have no ergonomic answer yet. It will improve in future releases; expect both additions and breaking changes.
 
+An opt-in Wasm backend is being explored separately. Its [client value types](crate::client) use a typed browser bridge without JSON or UTF-8 conversion during expression execution. The examples in this guide describe the default JavaScript backend.
+
 # Setup
 
 Interactive pages need the runtime's browser script. `script()` renders the script tag; include it in your document head:

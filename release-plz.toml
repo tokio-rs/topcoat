@@ -1,4 +1,5 @@
 [workspace]
+# tools/topcoat-split is an excluded, non-publishable workspace with a pinned compiler.
 # The release job in ci.yml only runs for release PR merges and manual
 # dispatches, so release-plz itself does not need to check the commit.
 git_release_draft = true

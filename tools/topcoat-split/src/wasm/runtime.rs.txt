@@ -1,0 +1,93 @@
+mod __topcoat {
+    use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen(module = "/host.js")]
+    extern "C" {
+        fn capture(slot: u32) -> JsValue;
+        fn read(slot: u32) -> JsValue;
+        fn write(slot: u32, value: &JsValue);
+        fn capture_number(slot: u32) -> f64;
+        fn read_number(slot: u32) -> f64;
+        fn write_number(slot: u32, value: f64);
+        fn capture_bool(slot: u32) -> bool;
+        fn read_bool(slot: u32) -> bool;
+        fn write_bool(slot: u32, value: bool);
+        fn text_concat(left: &JsValue, right: &JsValue) -> JsValue;
+        fn text_empty(value: &JsValue) -> bool;
+    }
+
+    #[derive(Clone, PartialEq)]
+    pub struct Text(JsValue);
+
+    impl Text {
+        pub fn concat(&self, other: &Self) -> Self {
+            Self(text_concat(&self.0, &other.0))
+        }
+
+        pub fn is_empty(&self) -> bool {
+            text_empty(&self.0)
+        }
+    }
+
+    impl Eq for Text {}
+
+    pub trait ClientValue: Sized {
+        fn capture(slot: u32) -> Self;
+        fn read(slot: u32) -> Self;
+        fn write(slot: u32, value: Self);
+        fn into_js(self) -> JsValue;
+    }
+
+    impl ClientValue for Text {
+        fn capture(slot: u32) -> Self { Self(capture(slot)) }
+        fn read(slot: u32) -> Self { Self(read(slot)) }
+        fn write(slot: u32, value: Self) { write(slot, &value.0); }
+        fn into_js(self) -> JsValue { self.0 }
+    }
+
+    macro_rules! numbers {
+        ($($ty:ty),*) => { $(
+            impl ClientValue for $ty {
+                fn capture(slot: u32) -> Self { capture_number(slot) as Self }
+                fn read(slot: u32) -> Self { read_number(slot) as Self }
+                fn write(slot: u32, value: Self) { write_number(slot, value as f64); }
+                fn into_js(self) -> JsValue { JsValue::from_f64(self as f64) }
+            }
+        )* };
+    }
+    numbers!(f64, i8, i16, i32, u8, u16, u32);
+
+    impl ClientValue for bool {
+        fn capture(slot: u32) -> Self { capture_bool(slot) }
+        fn read(slot: u32) -> Self { read_bool(slot) }
+        fn write(slot: u32, value: Self) { write_bool(slot, value); }
+        fn into_js(self) -> JsValue { JsValue::from_bool(self) }
+    }
+
+    impl ClientValue for () {
+        fn capture(slot: u32) -> Self { capture(slot); }
+        fn read(slot: u32) -> Self { read(slot); }
+        fn write(slot: u32, _: Self) { write(slot, &JsValue::NULL); }
+        fn into_js(self) -> JsValue { JsValue::NULL }
+    }
+
+    pub struct Signal<T> {
+        slot: u32,
+        marker: std::marker::PhantomData<T>,
+    }
+
+    impl<T> Signal<T> {
+        pub fn new(slot: u32) -> Self {
+            Self { slot, marker: std::marker::PhantomData }
+        }
+    }
+
+    impl<T> Clone for Signal<T> {
+        fn clone(&self) -> Self { Self::new(self.slot) }
+    }
+
+    impl<T: ClientValue> Signal<T> {
+        pub fn get(&self) -> T { T::read(self.slot) }
+        pub fn set(&self, value: T) { T::write(self.slot, value); }
+    }
+}

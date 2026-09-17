@@ -102,6 +102,10 @@ impl ToTokens for Page {
         // The component takes the request body as its `body` prop, so a body
         // parameter bound to another pattern is rebound from `body` inside.
         let mut face = item.clone();
+        let owner = topcoat_core_grammar::wasm::owner("page", ident, &item.sig.generics);
+        if !owner.is_empty() {
+            face.block.stmts.insert(0, parse_quote!(#owner));
+        }
         for (arg, input) in args.iter().zip(&mut face.sig.inputs) {
             if let (HandlerArg::Request(_), FnArg::Typed(pat_type)) = (arg, input)
                 && !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "body")

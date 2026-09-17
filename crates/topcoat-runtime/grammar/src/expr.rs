@@ -21,6 +21,7 @@ mod expr_unary;
 mod expr_while;
 mod js;
 mod name_resolver;
+mod native;
 mod pat;
 mod stmt;
 
@@ -55,6 +56,9 @@ impl Expr {
     /// Returns an error if any sub-expression is not a supported shape, or if a
     /// local binding cannot be resolved.
     pub fn expr_to_tokens(&self) -> syn::Result<TokenStream> {
+        if cfg!(topcoat_wasm) {
+            return native::expand(&self.inner);
+        }
         let mut rust = TokenStream::new();
         let mut js = Js::default();
         let mut names = NameResolver::default();
