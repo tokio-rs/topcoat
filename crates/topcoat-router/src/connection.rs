@@ -1,8 +1,7 @@
 use std::net::SocketAddr;
 
-use topcoat_core::context::Cx;
-
-use crate::request::extensions;
+use http::request::Parts;
+use topcoat_core::context::{Cx, try_request_context};
 
 /// The IP address and port of the direct connection, stored in the request
 /// [`extensions`].
@@ -23,7 +22,8 @@ pub struct RemoteAddr(pub SocketAddr);
 /// Behind a reverse proxy, this returns the proxy's address. Use
 /// [`client_ip`](crate::client_ip) to read the client's IP address instead.
 /// Returns `None` if the request has no [`RemoteAddr`] in its extensions,
-/// as is normally the case for Unix socket connections.
+/// as is normally the case for Unix socket connections, or if the context
+/// was not created by a router.
 ///
 /// # Examples
 ///
@@ -36,9 +36,9 @@ pub struct RemoteAddr(pub SocketAddr);
 /// ```
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn remote_addr(cx: &Cx) -> Option<SocketAddr> {
-    extensions(cx).get::<RemoteAddr>().map(|remote| remote.0)
+    let parts = try_request_context::<Parts>(cx)?;
+    parts.extensions.get::<RemoteAddr>().map(|remote| remote.0)
 }
 
 #[cfg(test)]
@@ -67,5 +67,10 @@ mod tests {
     #[test]
     fn a_request_without_a_peer_address_has_none() {
         assert_eq!(remote_addr(&cx_with(None)), None);
+    }
+
+    #[test]
+    fn a_context_without_a_request_has_none() {
+        assert_eq!(remote_addr(&CxTestBuilder::new().build()), None);
     }
 }

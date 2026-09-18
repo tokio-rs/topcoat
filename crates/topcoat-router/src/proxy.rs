@@ -237,32 +237,29 @@ impl TrustedProxies {
                 parse_node(value.to_str().ok()?.trim())
             }
             ForwardedHeader::Forwarded => {
+                // A quote left open would swallow whatever a proxy appends
+                // after it, so a field with one is malformed as a whole.
+                let fields: Vec<&[u8]> = values
+                    .map(|value| {
+                        let field = value.as_bytes();
+                        is_well_quoted(field).then_some(field)
+                    })
+                    .collect::<Option<_>>()?;
                 // An element's quoted strings may contain the list and
                 // parameter delimiters, so the split reads front to back with
-                // the quoting in mind, and the walk goes over the elements
-                // from the back. A quote left open would swallow whatever a
-                // proxy appends within the same field, so such a field is one
-                // unreadable element; a field the proxy adds on its own line
-                // stays readable.
-                let mut elements: Vec<Option<&[u8]>> = Vec::new();
-                for value in values {
-                    let field = value.as_bytes();
-                    if is_well_quoted(field) {
-                        elements.extend(
-                            split_quoted(field, b',')
-                                .filter(|element| !element.trim_ascii().is_empty())
-                                .map(Some),
-                        );
-                    } else {
-                        elements.push(None);
-                    }
-                }
-                self.walk(
-                    remote,
-                    elements.into_iter().rev().map(|element| {
-                        forwarded_for(element?).and_then(|node| parse_node(&node))
-                    }),
-                )
+                // the quoting in mind, and the walk goes over the addresses
+                // from the back.
+                let addresses: Vec<Option<IpAddr>> = fields
+                    .into_iter()
+                    .flat_map(|field| {
+                        split_quoted(field, b',')
+                            .filter(|element| !element.trim_ascii().is_empty())
+                            .map(|element| {
+                                forwarded_for(element).and_then(|node| parse_node(&node))
+                            })
+                    })
+                    .collect();
+                self.walk(remote, addresses.into_iter().rev())
             }
             ForwardedHeader::XForwardedFor => {
                 // The entries from the one nearest to the application (the
@@ -836,6 +833,26 @@ mod tests {
                 "1.1.1.1, 198.51.100.1, 192.0.2.7"
             ),
             Some(ip("198.51.100.1"))
+        );
+    }
+
+    #[test]
+    fn a_hop_trusted_by_position_needs_no_readable_address() {
+        // The load balancer names itself in a form the header cannot carry
+        // as an address, as RFC 7239 allows for intermediate hops.
+        let proxies = TrustedProxies::new().nearest(2);
+        for value in ["198.51.100.1, unknown", "198.51.100.1, _lb1"] {
+            assert_eq!(
+                resolve(&proxies, Some("203.0.113.9"), value),
+                Some(ip("198.51.100.1")),
+                "{value}"
+            );
+        }
+        // The client itself must still be readable.
+        assert_eq!(resolve(&proxies, Some("203.0.113.9"), "unknown"), None);
+        assert_eq!(
+            resolve(&proxies, Some("203.0.113.9"), "unknown, 10.0.0.3"),
+            None
         );
     }
 

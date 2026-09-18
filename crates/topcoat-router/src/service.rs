@@ -32,7 +32,8 @@ use crate::{Body, Listener, RemoteAddr, Router, request::Request, response::Resp
 /// ```
 ///
 /// The wrapped [`Router`] is shared behind an [`Arc`], so the service is cheap
-/// to clone. One clone is handed to each accepted connection.
+/// to clone. The serve functions derive a clone for each accepted connection
+/// that stamps the connection's [`RemoteAddr`] on every request it serves.
 #[derive(Clone)]
 pub struct RouterService {
     router: Arc<Router>,
@@ -59,9 +60,8 @@ impl RouterService {
     /// The clone serving one connection, accepted from `remote_addr`.
     fn for_connection(&self, remote_addr: Option<SocketAddr>) -> Self {
         Self {
-            router: Arc::clone(&self.router),
-            shutdown_timeout: self.shutdown_timeout,
             remote_addr,
+            ..self.clone()
         }
     }
 

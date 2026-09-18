@@ -32,6 +32,11 @@ The ones you reach for most, all listed in [`topcoat::router::request`](crate::r
 - [`content_type(cx)`](crate::router::request::content_type) returns the request `Content-Type`.
 - [`extensions(cx)`](crate::router::request::extensions) returns request extensions.
 
+Two more, in [`topcoat::router`](crate::router) itself, describe where the request came from:
+
+- [`remote_addr(cx)`](crate::router::remote_addr) returns the address of the direct connection, if it has one.
+- [`client_ip(cx)`](crate::router::client_ip) returns the client's IP address, read through any trusted reverse proxies.
+
 Use [`parts(cx)`](crate::router::request::parts) when you need several fields at once:
 
 ```rust
