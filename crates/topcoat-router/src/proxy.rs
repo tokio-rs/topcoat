@@ -706,7 +706,7 @@ mod tests {
     fn networks_accept_references() {
         // A list read from configuration, passed without moving it.
         let strings = vec![String::from("10.0.0.0/8")];
-        let addresses = vec![ip("192.0.2.7")];
+        let addresses = [ip("192.0.2.7")];
         let proxies = TrustedProxies::new()
             .networks(&strings)
             .networks(addresses.iter());
