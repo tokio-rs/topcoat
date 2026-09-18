@@ -37,6 +37,11 @@ const HTTP_DATE_END_SECS: u64 = 253_402_300_800;
 
 /// A [`Route`] that serves files from a directory on disk.
 ///
+/// For simpler registration, use
+/// [`serve_dir`](RouterBuilderDirectoryExt::serve_dir) on the router builder,
+/// or [`public_dir`](RouterBuilderDirectoryExt::public_dir) to serve files
+/// at the site root.
+///
 /// The path must end in a catch-all parameter. Its value is the file path
 /// relative to the directory. For example, `/public/{*file}` with directory
 /// `public` serves `/public/css/site.css` from `public/css/site.css`.
@@ -199,18 +204,24 @@ impl Route for DirectoryRoute {
     }
 }
 
-/// Registers directories to serve files from on a [`RouterBuilder`].
+/// Adds directory-serving methods to [`RouterBuilder`].
 ///
-/// Implemented for [`RouterBuilder`] so it is in scope wherever a router is
-/// being built. Each method registers a [`DirectoryRoute`].
+/// Import this trait to use [`serve_dir`](Self::serve_dir) and
+/// [`public_dir`](Self::public_dir). Both methods register a [`DirectoryRoute`],
+/// so all behavior and restrictions documented there apply here as well.
 pub trait RouterBuilderDirectoryExt {
-    /// Serves the files of `dir` at `path`, whose catch-all captures the file
-    /// to serve.
+    /// Serves files from `dir` at `path`.
+    ///
+    /// The final catch-all parameter selects the file within `dir`. For
+    /// example, the route below serves `/downloads/report.pdf` from
+    /// `var/downloads/report.pdf`.
+    ///
+    /// Registers `DirectoryRoute::new(path, dir)` with the builder. See
+    /// [`DirectoryRoute`] for file-serving behavior and restrictions.
     ///
     /// # Panics
     ///
-    /// Panics if `path` is a string that is not a well-formed route path, or
-    /// if it does not end in a catch-all.
+    /// Panics if `path` is invalid or does not end in a catch-all parameter.
     ///
     /// # Examples
     ///
@@ -224,11 +235,14 @@ pub trait RouterBuilderDirectoryExt {
     #[must_use]
     fn serve_dir(self, path: impl IntoPath, dir: impl Into<FsPathBuf>) -> Self;
 
-    /// Serves the files of `dir` at the site root, so `public/logo.svg` is
-    /// served at `/logo.svg`.
+    /// Serves files from `dir` at the site root.
     ///
-    /// A file is only served where no other route claims the URL, and the
-    /// root `/` itself is left to a page registered there.
+    /// For example, `public_dir("./public")` serves `./public/logo.svg` at
+    /// `/logo.svg`. This is shorthand for `serve_dir("/{*file}", dir)`.
+    /// The catch-all does not match `/`, so a home page can be registered
+    /// separately.
+    ///
+    /// Registers a [`DirectoryRoute`] with the same behavior and restrictions.
     ///
     /// # Examples
     ///
@@ -279,7 +293,7 @@ fn http_date(modified: SystemTime) -> Option<HttpDate> {
 /// Checks whether to return `304 Not Modified` for an existing file.
 ///
 /// `If-None-Match` takes precedence. Only `*` matches because this route does
-/// not generate ETags. When that header is absent, checks whether the file was
+/// not generate `ETags`. When that header is absent, checks whether the file was
 /// last modified at or before the date in `If-Modified-Since`. Missing or
 /// invalid dates return `false`.
 fn is_not_modified(cx: &Cx, last_modified: Option<HttpDate>) -> bool {
