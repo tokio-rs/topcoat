@@ -4,7 +4,7 @@ use http::request::Parts;
 use topcoat_core::context::{Cx, try_request_context};
 
 /// The IP address and port of the direct connection, stored in the request
-/// [`extensions`].
+/// [`extensions`](crate::request::extensions).
 ///
 /// Topcoat adds this to every request received over TCP. Read it with
 /// [`remote_addr`]. Behind a reverse proxy, this is the proxy's address.
