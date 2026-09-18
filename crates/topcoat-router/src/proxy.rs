@@ -370,13 +370,9 @@ pub trait IntoIpNet {
 impl IntoIpNet for &str {
     #[track_caller]
     fn into_ip_net(self) -> IpNet {
-        match self.parse::<IpNet>() {
-            Ok(network) => network,
-            Err(_) => match self.parse::<IpAddr>() {
-                Ok(addr) => IpNet::from(addr),
-                Err(_) => panic!("invalid trusted proxy network `{self}`"),
-            },
-        }
+        self.parse::<IpNet>()
+            .or_else(|_| self.parse::<IpAddr>().map(IpNet::from))
+            .unwrap_or_else(|_| panic!("invalid trusted proxy network `{self}`"))
     }
 }
 
