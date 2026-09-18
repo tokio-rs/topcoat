@@ -9,6 +9,57 @@ use topcoat_core::context::{Cx, try_request_context};
 
 use crate::{remote_addr, request::headers};
 
+/// The client's address as resolved when the request arrived, stored on the
+/// request context of every dispatch.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
+
+/// Returns the client's IP address for this request, or `None`
+/// when it cannot be determined.
+///
+/// By default, this returns the IP address from [`remote_addr`]. Behind a
+/// reverse proxy, that is the proxy's address. Configure [`TrustedProxies`]
+/// on the router to read the client's address from the proxy's header.
+///
+/// For a header that lists multiple addresses, Topcoat starts with the direct
+/// connection and reads the list from right to left. It skips trusted proxies
+/// and returns the first address it does not trust. If every address is
+/// trusted, it returns the leftmost address. If the list is empty or missing,
+/// it uses the direct connection's address.
+///
+/// Returns `None` if the direct connection's address is unknown and it is not
+/// trusted through [`TrustedProxies::nearest`], or if an address needed from
+/// the header cannot be parsed. Headers containing a single address follow
+/// the rules in [`ForwardedHeader::Single`]. IPv4-mapped IPv6 addresses are
+/// returned as IPv4.
+///
+/// The router determines the address before running any layers. Later changes
+/// to request headers do not change this result. Returns `None` if the context
+/// was not created by a router.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{client_ip, error::forbidden},
+/// };
+///
+/// # fn is_banned(_ip: std::net::IpAddr) -> bool { false }
+/// fn reject_banned(cx: &Cx) -> Result<()> {
+///     match client_ip(cx) {
+///         Some(ip) if is_banned(ip) => Err(forbidden().into()),
+///         _ => Ok(()),
+///     }
+/// }
+/// ```
+#[must_use]
+#[track_caller]
+pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
+    try_request_context::<ClientIp>(cx)?.0
+}
+
 /// Configures which reverse proxies can report the client's IP address.
 ///
 /// When your application is behind a reverse proxy, incoming connections
@@ -257,57 +308,6 @@ impl Default for TrustedProxies {
     }
 }
 
-/// The client's address as resolved when the request arrived, stored on the
-/// request context of every dispatch.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
-
-/// Returns the client's IP address for this request, or `None`
-/// when it cannot be determined.
-///
-/// By default, this returns the IP address from [`remote_addr`]. Behind a
-/// reverse proxy, that is the proxy's address. Configure [`TrustedProxies`]
-/// on the router to read the client's address from the proxy's header.
-///
-/// For a header that lists multiple addresses, Topcoat starts with the direct
-/// connection and reads the list from right to left. It skips trusted proxies
-/// and returns the first address it does not trust. If every address is
-/// trusted, it returns the leftmost address. If the list is empty or missing,
-/// it uses the direct connection's address.
-///
-/// Returns `None` if the direct connection's address is unknown and it is not
-/// trusted through [`TrustedProxies::nearest`], or if an address needed from
-/// the header cannot be parsed. Headers containing a single address follow
-/// the rules in [`ForwardedHeader::Single`]. IPv4-mapped IPv6 addresses are
-/// returned as IPv4.
-///
-/// The router determines the address before running any layers. Later changes
-/// to request headers do not change this result. Returns `None` if the context
-/// was not created by a router.
-///
-/// # Examples
-///
-/// ```rust
-/// use topcoat::{
-///     Result,
-///     context::Cx,
-///     router::{client_ip, error::forbidden},
-/// };
-///
-/// # fn is_banned(_ip: std::net::IpAddr) -> bool { false }
-/// fn reject_banned(cx: &Cx) -> Result<()> {
-///     match client_ip(cx) {
-///         Some(ip) if is_banned(ip) => Err(forbidden().into()),
-///         _ => Ok(()),
-///     }
-/// }
-/// ```
-#[must_use]
-#[track_caller]
-pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
-    try_request_context::<ClientIp>(cx)?.0
-}
-
 /// The HTTP header used to read the client's IP address from a trusted proxy.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ForwardedHeader {
@@ -411,10 +411,10 @@ impl IntoIpNet for IpAddr {
     }
 }
 
-/// Parses a node identifier as forwarding headers spell one: an address, or
-/// an address with a port, where an IPv6 address with a port is in brackets.
-/// A value like `unknown` or an obfuscated identifier carries no address,
-/// and neither does any other form.
+/// Reads an IP address from a forwarding header value, ignoring any port.
+/// IPv6 addresses with a port must be enclosed in brackets.
+/// Returns `None` for `unknown`, hidden addresses such as `_client`, or
+/// invalid values.
 fn parse_node(value: &str) -> Option<IpAddr> {
     if let Ok(ip) = value.parse::<IpAddr>() {
         return Some(ip.to_canonical());
@@ -433,8 +433,10 @@ fn parse_node(value: &str) -> Option<IpAddr> {
     is_node_port(port).then(|| ip.to_canonical())
 }
 
-/// Whether `value` is a port as a node identifier carries one: up to five
-/// digits, or an obfuscated port starting with `_`.
+/// Checks whether a forwarding header's port is one to five digits or a
+/// hidden value starting with `_`. Hidden values must contain at least one
+/// ASCII letter, digit, `.`, `_`, or `-` after the leading `_`, and no other
+/// characters.
 fn is_node_port(value: &str) -> bool {
     match value.strip_prefix('_') {
         Some(obfuscated) => {
@@ -447,8 +449,10 @@ fn is_node_port(value: &str) -> bool {
     }
 }
 
-/// Reads the `for` parameter out of one element of a `Forwarded` header,
-/// unquoted, or `None` when the element has none or quotes it malformed.
+/// Reads the `for` value from one entry in a `Forwarded` header and removes
+/// its surrounding quotes and backslash escapes.
+/// Returns `None` if `for` is missing or repeated, a parameter has no `=`,
+/// or the value has an unclosed quote or an incomplete escape.
 fn forwarded_for(element: &str) -> Option<Cow<'_, str>> {
     let mut found = None;
     for pair in split_quoted(element, ';') {
@@ -457,8 +461,8 @@ fn forwarded_for(element: &str) -> Option<Cow<'_, str>> {
         }
         let (name, value) = pair.split_once('=')?;
         if name.trim().eq_ignore_ascii_case("for") {
-            // A parameter may appear once per element; a second one is
-            // ambiguous.
+            // Reject duplicate `for` parameters because we cannot tell
+            // which address to use.
             if found.is_some() {
                 return None;
             }
@@ -468,8 +472,8 @@ fn forwarded_for(element: &str) -> Option<Cow<'_, str>> {
     found
 }
 
-/// Whether every quoted string in `value` is closed, with no escape left
-/// dangling at its end.
+/// Checks that every opening quote has a closing quote and every backslash
+/// inside a quoted string has a character after it.
 fn is_well_quoted(value: &str) -> bool {
     let mut quoted = false;
     let mut escaped = false;
@@ -489,9 +493,10 @@ fn is_well_quoted(value: &str) -> bool {
     !quoted && !escaped
 }
 
-/// Splits `value` at each `delimiter` outside of a quoted string, since a
-/// quoted string may contain the delimiter (escaped quotes included). The
-/// value's quoting must be well formed (see [`is_well_quoted`]).
+/// Splits `value` at each `delimiter`, keeping quoted strings together.
+/// A backslash inside a quoted string escapes the next character, so an
+/// escaped quote does not end the string.
+/// Check the quotes with [`is_well_quoted`] before calling this function.
 fn split_quoted(value: &str, delimiter: char) -> impl Iterator<Item = &str> {
     let mut quoted = false;
     let mut escaped = false;
@@ -513,8 +518,10 @@ fn split_quoted(value: &str, delimiter: char) -> impl Iterator<Item = &str> {
     })
 }
 
-/// Strips the quotes and escapes off a quoted string, or returns a token as
-/// it is. A value with an opening quote but no closing one is malformed.
+/// Removes surrounding quotes and replaces each backslash escape with the
+/// character after it. Returns unquoted values unchanged.
+/// Returns `None` if a quoted value has no closing quote or ends with an
+/// incomplete escape.
 fn unquote(value: &str) -> Option<Cow<'_, str>> {
     let Some(rest) = value.strip_prefix('"') else {
         return Some(Cow::Borrowed(value));
