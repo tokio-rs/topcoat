@@ -1,13 +1,11 @@
 use std::net::SocketAddr;
 
-use http::request::Parts;
-use topcoat_core::context::{Cx, try_request_context};
-
 /// The IP address and port of the direct connection, stored in the request
 /// [`extensions`](crate::request::extensions).
 ///
 /// Topcoat adds this to every request received over TCP. Read it with
-/// [`remote_addr`]. Behind a reverse proxy, this is the proxy's address.
+/// [`remote_addr`](crate::request::remote_addr). Behind a reverse proxy,
+/// this is the proxy's address.
 ///
 /// Unix socket connections have no IP address, so Topcoat does not add this
 /// value for them. If you serve the router through a tower service or pass
@@ -16,37 +14,13 @@ use topcoat_core::context::{Cx, try_request_context};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RemoteAddr(pub SocketAddr);
 
-/// Returns the IP address and port of the direct connection for this request,
-/// or `None` when they are unknown.
-///
-/// Behind a reverse proxy, this returns the proxy's address. Use
-/// [`client_ip`](crate::client_ip) to read the client's IP address instead.
-/// Returns `None` if the request has no [`RemoteAddr`] in its extensions,
-/// as is normally the case for Unix socket connections, or if the context
-/// was not created by a router.
-///
-/// # Examples
-///
-/// ```rust
-/// use topcoat::{context::Cx, router::remote_addr};
-///
-/// fn peer_port(cx: &Cx) -> Option<u16> {
-///     remote_addr(cx).map(|addr| addr.port())
-/// }
-/// ```
-#[inline]
-#[must_use]
-pub fn remote_addr(cx: &Cx) -> Option<SocketAddr> {
-    let parts = try_request_context::<Parts>(cx)?;
-    parts.extensions.get::<RemoteAddr>().map(|remote| remote.0)
-}
-
 #[cfg(test)]
 mod tests {
     use http::Request;
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::{Cx, CxTestBuilder};
 
     use super::*;
+    use crate::request::remote_addr;
 
     /// Builds a `Cx` for a request carrying `remote`, if any.
     fn cx_with(remote: Option<SocketAddr>) -> Cx {

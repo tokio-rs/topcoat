@@ -76,7 +76,7 @@ let app = app.layer(axum::middleware::map_request(|mut request: Request| async {
 
 Serve the axum application with `app.into_make_service_with_connect_info::<SocketAddr>()` to populate that extension. See axum's [`ConnectInfo` documentation](https://docs.rs/axum/latest/axum/extract/struct.ConnectInfo.html) for the server setup.
 
-Topcoat's [`remote_addr`](crate::remote_addr) then returns the connection address, and [`client_ip`](crate::client_ip) uses its IP by default. If the server receives requests through a reverse proxy, configure [`TrustedProxies`](crate::TrustedProxies) on the Topcoat router to read the client's IP from the proxy's header.
+Topcoat's [`remote_addr`](crate::request::remote_addr) then returns the connection address, and [`client_ip`](crate::request::client_ip) uses its IP by default. If the server receives requests through a reverse proxy, configure [`TrustedProxies`](crate::TrustedProxies) on the Topcoat router to read the client's IP from the proxy's header.
 
 Without `RemoteAddr`, `remote_addr(cx)` returns `None`. The connection can still be trusted by position with [`TrustedProxies::nearest`](crate::TrustedProxies::nearest), as with a proxy connected over a Unix socket. The direct connection counts as the first hop even when its address is unknown. Only use this when every request must pass through the configured number of proxies. Running Topcoat inside another tower application does not itself add a proxy hop.
 

@@ -5,60 +5,14 @@ use std::{
 
 use http::{HeaderMap, HeaderName, header};
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
-use topcoat_core::context::{Cx, try_request_context};
+use topcoat_core::context::Cx;
 
-use crate::{remote_addr, request::headers};
+use crate::request::{headers, remote_addr};
 
 /// The client's address as resolved when the request arrived, stored on the
 /// request context of every dispatch.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
-
-/// Returns the client's IP address for this request, or `None`
-/// when it cannot be determined.
-///
-/// By default, this returns the IP address from [`remote_addr`]. Behind a
-/// reverse proxy, that is the proxy's address. Configure [`TrustedProxies`]
-/// on the router to read the client's address from the proxy's header.
-///
-/// For a header that lists multiple addresses, Topcoat starts with the direct
-/// connection and reads the list from right to left. It skips trusted proxies
-/// and returns the first address it does not trust. If every address is
-/// trusted, it returns the leftmost address. If the list is empty or missing,
-/// it uses the direct connection's address.
-///
-/// Returns `None` if the direct connection's address is unknown and it is not
-/// trusted through [`TrustedProxies::nearest`], or if an address needed from
-/// the header cannot be parsed. Headers containing a single address follow
-/// the rules in [`ForwardedHeader::Single`]. IPv4-mapped IPv6 addresses are
-/// returned as IPv4.
-///
-/// The router determines the address before running any layers. Later changes
-/// to request headers do not change this result. Returns `None` if the context
-/// was not created by a router.
-///
-/// # Examples
-///
-/// ```rust
-/// use topcoat::{
-///     Result,
-///     context::Cx,
-///     router::{client_ip, error::forbidden},
-/// };
-///
-/// # fn is_banned(_ip: std::net::IpAddr) -> bool { false }
-/// fn reject_banned(cx: &Cx) -> Result<()> {
-///     match client_ip(cx) {
-///         Some(ip) if is_banned(ip) => Err(forbidden().into()),
-///         _ => Ok(()),
-///     }
-/// }
-/// ```
-#[must_use]
-#[track_caller]
-pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
-    try_request_context::<ClientIp>(cx)?.0
-}
 
 /// Configures which reverse proxies can report the client's IP address.
 ///
@@ -75,8 +29,9 @@ pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
 ///
 /// Register this configuration with
 /// [`RouterBuilder::trusted_proxies`](crate::RouterBuilder::trusted_proxies),
-/// then call [`client_ip`] to read the client's address. By default, Topcoat
-/// trusts no proxies and uses the address of the direct connection.
+/// then call [`client_ip`](crate::request::client_ip) to read the client's
+/// address. By default, Topcoat trusts no proxies and uses the address of
+/// the direct connection.
 ///
 /// Each trusted proxy must update the configured [header](Self::header)
 /// with the address it received the request from. If it passes along a
@@ -115,8 +70,8 @@ impl TrustedProxies {
     /// Creates a configuration that trusts no proxies.
     ///
     /// Until you add trusted proxies with [`networks`](Self::networks) or
-    /// [`nearest`](Self::nearest), [`client_ip`] uses the IP address of the
-    /// direct connection.
+    /// [`nearest`](Self::nearest), [`client_ip`](crate::request::client_ip)
+    /// uses the IP address of the direct connection.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -339,7 +294,8 @@ pub enum ForwardedHeader {
     ///
     /// If the direct connection is trusted, Topcoat uses this header's value
     /// as the client's address. The header must appear exactly once and
-    /// contain exactly one address. Otherwise, [`client_ip`] returns `None`.
+    /// contain exactly one address. Otherwise,
+    /// [`client_ip`](crate::request::client_ip) returns `None`.
     ///
     /// The proxy connecting to the application must set this header itself
     /// or verify that it came from another trusted proxy. If a load balancer

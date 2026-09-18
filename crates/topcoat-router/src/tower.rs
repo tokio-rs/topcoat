@@ -528,7 +528,8 @@ fn recover(error: BoxError) -> Error {
 ///
 /// The surrounding server owns the connections, so the router does not know
 /// the peer address of a request it receives this way. To make
-/// [`remote_addr`](crate::remote_addr) and [`client_ip`](crate::client_ip)
+/// [`remote_addr`](crate::request::remote_addr) and
+/// [`client_ip`](crate::request::client_ip)
 /// work, insert a [`RemoteAddr`](crate::RemoteAddr) into the request's
 /// extensions before it reaches the service.
 #[derive(Clone)]

@@ -395,10 +395,10 @@ mod tests {
     use super::*;
     use crate::{
         Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn,
-        Path, RemoteAddr, Route, RouteFn, RouteFuture, Slot, TrailingSlash, client_ip,
+        Path, RemoteAddr, Route, RouteFn, RouteFuture, Slot, TrailingSlash,
         error::rewrite,
         raw_path_params,
-        request::{Bytes, method, original_method, original_uri, uri},
+        request::{Bytes, client_ip, method, original_method, original_uri, uri},
         response::IntoResponse,
         to_bytes,
     };

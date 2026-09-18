@@ -222,8 +222,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, Method, Path, RouteFn, RouteFuture, RouteHandlerFn, Router, remote_addr,
-        request::Bytes,
+        Body, Method, Path, RouteFn, RouteFuture, RouteHandlerFn, Router,
+        request::{Bytes, remote_addr},
         response::{IntoResponse, Response},
     };
 

@@ -31,11 +31,8 @@ The ones you reach for most, all listed in [`topcoat::router::request`](crate::r
 - [`headers(cx)`](crate::router::request::headers) returns the request headers.
 - [`content_type(cx)`](crate::router::request::content_type) returns the request `Content-Type`.
 - [`extensions(cx)`](crate::router::request::extensions) returns request extensions.
-
-Two more, in [`topcoat::router`](crate::router) itself, describe where the request came from:
-
-- [`remote_addr(cx)`](crate::router::remote_addr) returns the address of the direct connection, if it has one.
-- [`client_ip(cx)`](crate::router::client_ip) returns the client's IP address, read through any trusted reverse proxies.
+- [`remote_addr(cx)`](crate::router::request::remote_addr) returns the address of the direct connection, if it has one.
+- [`client_ip(cx)`](crate::router::request::client_ip) returns the client's IP address, read through any trusted reverse proxies.
 
 Use [`parts(cx)`](crate::router::request::parts) when you need several fields at once:
 
@@ -60,7 +57,7 @@ fn request_id(cx: &Cx) -> Option<&str> {
 }
 ```
 
-A handler reached through a [rewrite](crate::router::error#rewrites) sees the rewritten request in all of the above. Each helper has an `original_` counterpart returning the request as the client sent it, from [`original_parts(cx)`](crate::router::request::original_parts) down to [`original_uri(cx)`](crate::router::request::original_uri); for a request that was never rewritten they agree with the plain helpers.
+A handler reached through a [rewrite](crate::router::error#rewrites) sees the rewritten request in the HTTP field helpers. Those helpers have `original_` counterparts returning the request as the client sent it, from [`original_parts(cx)`](crate::router::request::original_parts) down to [`original_uri(cx)`](crate::router::request::original_uri); for a request that was never rewritten they agree with the plain helpers. The client's IP address is resolved when the request arrives and stays the same across rewrites.
 
 # Path and query helpers
 

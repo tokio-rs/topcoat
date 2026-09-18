@@ -1,3 +1,5 @@
+use std::net::{IpAddr, SocketAddr};
+
 /// Byte-buffer types re-exported for use as request body extractors and as
 /// response bodies.
 pub use bytes::{Bytes, BytesMut};
@@ -8,7 +10,7 @@ use topcoat_core::{
     identity::Identity,
 };
 
-use crate::{Body, body_limit, error::bad_request, to_bytes};
+use crate::{Body, RemoteAddr, body_limit, error::bad_request, proxy::ClientIp, to_bytes};
 
 /// An incoming HTTP request, carrying a [`Body`] by default.
 pub type Request<T = Body> = http::Request<T>;
@@ -294,6 +296,79 @@ pub fn content_type(cx: &Cx) -> Option<&str> {
 #[track_caller]
 pub fn extensions(cx: &Cx) -> &http::Extensions {
     &parts(cx).extensions
+}
+
+/// Returns the IP address and port of the direct connection for this request,
+/// or `None` when they are unknown.
+///
+/// Behind a reverse proxy, this returns the proxy's address. Use
+/// [`client_ip`] to read the client's IP address instead.
+/// Returns `None` if the request has no [`RemoteAddr`] in its extensions,
+/// as is normally the case for Unix socket connections, or if the context
+/// was not created by a router.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::remote_addr};
+///
+/// fn peer_port(cx: &Cx) -> Option<u16> {
+///     remote_addr(cx).map(|addr| addr.port())
+/// }
+/// ```
+#[inline]
+#[must_use]
+pub fn remote_addr(cx: &Cx) -> Option<SocketAddr> {
+    let parts = try_request_context::<Parts>(cx)?;
+    parts.extensions.get::<RemoteAddr>().map(|remote| remote.0)
+}
+
+/// Returns the client's IP address for this request, or `None`
+/// when it cannot be determined.
+///
+/// By default, this returns the IP address from [`remote_addr`]. Behind a
+/// reverse proxy, that is the proxy's address. Configure
+/// [`TrustedProxies`](crate::TrustedProxies) on the router to read the
+/// client's address from the proxy's header.
+///
+/// For a header that lists multiple addresses, Topcoat starts with the direct
+/// connection and reads the list from right to left. It skips trusted proxies
+/// and returns the first address it does not trust. If every address is
+/// trusted, it returns the leftmost address. If the list is empty or missing,
+/// it uses the direct connection's address.
+///
+/// Returns `None` if the direct connection's address is unknown and it is not
+/// trusted through [`TrustedProxies::nearest`](crate::TrustedProxies::nearest),
+/// or if an address needed from the header cannot be parsed. Headers
+/// containing a single address follow the rules in
+/// [`ForwardedHeader::Single`](crate::ForwardedHeader::Single). IPv4-mapped
+/// IPv6 addresses are returned as IPv4.
+///
+/// The router determines the address before running any layers. Later changes
+/// to request headers do not change this result. Returns `None` if the context
+/// was not created by a router.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{error::forbidden, request::client_ip},
+/// };
+///
+/// # fn is_banned(_ip: std::net::IpAddr) -> bool { false }
+/// fn reject_banned(cx: &Cx) -> Result<()> {
+///     match client_ip(cx) {
+///         Some(ip) if is_banned(ip) => Err(forbidden().into()),
+///         _ => Ok(()),
+///     }
+/// }
+/// ```
+#[must_use]
+#[track_caller]
+pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
+    try_request_context::<ClientIp>(cx)?.0
 }
 
 /// The parts a rewritten request originally arrived with, stored on the
