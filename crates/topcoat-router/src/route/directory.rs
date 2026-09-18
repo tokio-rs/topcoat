@@ -29,31 +29,27 @@ use crate::{
     response::Response,
 };
 
-/// The size of the chunks a file is streamed in.
+/// The maximum initial buffer size for file streaming.
 const CHUNK_SIZE: usize = 64 * 1024;
 
-/// The first second past the year 9999, the last year an HTTP date can name.
+/// Unix timestamp for the start of year 10000, beyond the HTTP date range.
 const HTTP_DATE_END_SECS: u64 = 253_402_300_800;
 
-/// A [`Route`] that serves the files of a directory on disk.
+/// A [`Route`] that serves files from a directory on disk.
 ///
-/// The route's path ends in a catch-all, and what the catch-all captures is
-/// the file's path inside the directory: a route at `/public/{*file}` serves
-/// `/public/css/site.css` from `public/css/site.css`. A request that resolves
-/// to nothing readable inside the directory, including one that tries to
-/// escape it with `..`, responds with `404 Not Found`. Symbolic links are
-/// followed.
+/// The path must end in a catch-all parameter. Its value is the file path
+/// relative to the directory. For example, `/public/{*file}` with directory
+/// `public` serves `/public/css/site.css` from `public/css/site.css`.
 ///
-/// Every file is sent with the `Content-Type` its extension suggests, its
-/// `Content-Length`, and a `Last-Modified` header. A request carrying an
-/// `If-Modified-Since` header for a file that has not changed since gets a
-/// `304 Not Modified` response without a body. Files are not cached beyond
-/// that, so a changed file is picked up on the next request.
+/// Supports `GET` and `HEAD`. Responses include `Content-Length`, a
+/// `Content-Type` based on the file extension, and `Last-Modified` when the
+/// modification time is available and can be represented as an HTTP date.
+/// Conditional requests can return `304 Not Modified` without a body.
+/// Files are streamed from disk and are not cached in memory.
 ///
-/// Everything inside the directory is public, so point the route at a
-/// directory that holds nothing else. Files that never change are better
-/// declared with `asset!`, which hashes them into their URL so browsers can
-/// cache them forever.
+/// Missing files, unreadable files, directories, and paths containing `..`
+/// return `404 Not Found`. Dotfiles are served. Symbolic links are followed,
+/// including links to files outside the directory.
 ///
 /// # Examples
 ///
@@ -65,7 +61,8 @@ const HTTP_DATE_END_SECS: u64 = 253_402_300_800;
 ///     .build();
 /// ```
 ///
-/// Registered at the root, the route serves any URL that no other route claims.
+/// Use `/{*file}` to serve files directly under the site root, such as
+/// `/logo.svg`. The catch-all does not match `/` itself.
 ///
 /// ```rust
 /// use topcoat::router::{DirectoryRoute, Router};
@@ -76,27 +73,26 @@ const HTTP_DATE_END_SECS: u64 = 253_402_300_800;
 /// ```
 #[derive(Debug, Clone)]
 pub struct DirectoryRoute {
-    /// The identity of this route's handler.
+    /// The route's unique id.
     id: RouteId,
-    /// The URL path this route handles, ending in a catch-all.
+    /// The route pattern, ending in a catch-all.
     path: Cow<'static, Path>,
-    /// The name of the path's catch-all parameter.
+    /// The catch-all parameter's name.
     param: Box<str>,
-    /// The directory the files are served from.
+    /// The directory containing the files.
     dir: FsPathBuf,
 }
 
 impl DirectoryRoute {
-    /// Creates a route serving the files of `dir` at `path`, whose catch-all
-    /// captures the file to serve.
+    /// Serves files from `dir` at `path`.
     ///
-    /// A relative `dir` is resolved against the working directory of the
-    /// process at request time.
+    /// The final catch-all parameter selects the file within `dir`. Relative
+    /// directories are resolved against the process's current working
+    /// directory on each request.
     ///
     /// # Panics
     ///
-    /// Panics if `path` is a string that is not a well-formed route path, or
-    /// if it does not end in a catch-all.
+    /// Panics if `path` is invalid or does not end in a catch-all parameter.
     #[track_caller]
     pub fn new(path: impl IntoPath, dir: impl Into<FsPathBuf>) -> Self {
         let path = path.into_path();
@@ -115,18 +111,17 @@ impl DirectoryRoute {
         }
     }
 
-    /// The directory the files are served from.
+    /// Returns the directory this route serves files from.
     #[must_use]
     pub fn dir(&self) -> &FsPath {
         &self.dir
     }
 
-    /// Maps the requested URL onto a path inside the directory.
+    /// Builds a filesystem path from the catch-all's decoded segments.
     ///
-    /// Returns `None` when a segment is not a plain file name: an empty
-    /// segment, `.` or `..`, or one holding a separator that was encoded in
-    /// the URL. Refusing those means a request cannot name anything outside
-    /// the directory, though a symbolic link inside it may still point out.
+    /// Each segment must be a single filename. Rejects empty segments, `.`
+    /// and `..`, and encoded path separators. Symbolic links can still lead
+    /// outside the directory.
     fn resolve(&self, cx: &Cx) -> Option<FsPathBuf> {
         let mut file = self.dir.clone();
         for segment in path_param_segments(cx, &self.param) {
@@ -139,14 +134,13 @@ impl DirectoryRoute {
         Some(file)
     }
 
-    /// Builds the response for the file the request resolves to.
+    /// Serves the requested file.
     async fn serve(&self, cx: &Cx) -> Result<Response> {
         let Some(path) = self.resolve(cx) else {
             return Err(not_found().into());
         };
-        // The file type is checked before the file is opened: a directory has
-        // nothing to send, and opening a special file like a named pipe can
-        // block until a peer shows up.
+        // Check the file type before opening. Opening a named pipe can block
+        // indefinitely while waiting for a writer.
         if !tokio::fs::metadata(&path)
             .await
             .map_err(io_error)?
@@ -154,9 +148,8 @@ impl DirectoryRoute {
         {
             return Err(not_found().into());
         }
-        // The headers describe the file that was opened rather than whatever
-        // the path named a moment earlier, so a file replaced in between is
-        // still sent whole.
+        // Read metadata from the open handle. The file may have been replaced
+        // since the check above.
         let file = File::open(&path).await.map_err(io_error)?;
         let metadata = file.metadata().await?;
         if !metadata.is_file() {
@@ -206,12 +199,10 @@ impl Route for DirectoryRoute {
     }
 }
 
-/// Converts a failure to reach a file into the error to respond with.
+/// Maps file access errors to router errors.
 ///
-/// A failure meaning there is no file to serve at the path becomes
-/// `404 Not Found`: besides a missing file that covers a path running through
-/// a regular file, one the process may not read, and one the platform rejects
-/// outright. Any other failure is reported as is.
+/// Missing files, invalid paths, and permission errors become `404 Not Found`.
+/// Other I/O errors are propagated.
 fn io_error(error: io::Error) -> Error {
     match error.kind() {
         io::ErrorKind::NotFound
@@ -222,27 +213,22 @@ fn io_error(error: io::Error) -> Error {
     }
 }
 
-/// Converts a file's modification time into a `Last-Modified` value.
+/// Converts a modification time to an HTTP date.
 ///
-/// A time in the future is clamped to now, as a `Last-Modified` must not be
-/// later than the response it is sent with. A time before 1970 cannot be
-/// expressed as an HTTP date and yields `None`, so the header is left out.
-/// Neither can one past the year 9999, which after the clamping only a system
-/// clock that far off produces.
+/// Clamps future timestamps to now. Returns `None` if the resulting date is
+/// outside the range supported by `HttpDate`.
 fn http_date(modified: SystemTime) -> Option<HttpDate> {
     let modified = modified.min(SystemTime::now());
     let secs = modified.duration_since(UNIX_EPOCH).ok()?.as_secs();
     (secs < HTTP_DATE_END_SECS).then(|| HttpDate::from(modified))
 }
 
-/// Returns whether the request's conditions say the client's copy of the file
-/// is current, so `304 Not Modified` answers it.
+/// Checks whether to return `304 Not Modified` for an existing file.
 ///
-/// `If-None-Match` takes precedence over `If-Modified-Since`. Files carry no
-/// `ETag`, so only its `*` form, which matches any existing file, is met; a
-/// list of tags never is. Without it, `If-Modified-Since` is met by a time no
-/// earlier than the file's `last_modified`. A missing or malformed header is
-/// never met, so the file is sent.
+/// `If-None-Match` takes precedence. Only `*` matches because this route does
+/// not generate ETags. When that header is absent, checks whether the file was
+/// last modified at or before the date in `If-Modified-Since`. Missing or
+/// invalid dates return `false`.
 fn is_not_modified(cx: &Cx, last_modified: Option<HttpDate>) -> bool {
     let headers = headers(cx);
     match (headers.get(IF_NONE_MATCH), last_modified) {
@@ -256,10 +242,9 @@ fn is_not_modified(cx: &Cx, last_modified: Option<HttpDate>) -> bool {
     }
 }
 
-/// Guesses a file's `Content-Type` from its extension, falling back to
-/// `application/octet-stream`.
+/// Returns the content type for the file extension, or `application/octet-stream`.
 fn content_type(path: &FsPath) -> HeaderValue {
-    // A guessed type is drawn from a fixed table of header-safe strings.
+    // The MIME table contains static strings that are valid header values.
     HeaderValue::from_static(
         mime_guess::from_path(path)
             .first_raw()
@@ -267,13 +252,10 @@ fn content_type(path: &FsPath) -> HeaderValue {
     )
 }
 
-/// Streams the first `len` bytes of `file` as a response body, one chunk at a
-/// time.
+/// Streams up to `len` bytes from `file`.
 ///
-/// The body is cut at `len`, the length the response advertises, so a file
-/// that grows while it is sent does not overrun its `Content-Length`. A file
-/// smaller than a chunk gets a buffer of its own size, so serving many small
-/// files at once does not hold a full chunk for each.
+/// Limits reads to the advertised `Content-Length` if the file grows during
+/// the response. Small files use a smaller initial buffer.
 fn stream(file: File, len: u64) -> Body {
     let capacity = usize::try_from(len).map_or(CHUNK_SIZE, |len| len.min(CHUNK_SIZE));
     let chunks = ReaderStream::with_capacity(file.take(len), capacity).map_ok(Frame::<Bytes>::data);
@@ -293,8 +275,7 @@ mod tests {
     use super::*;
     use crate::Router;
 
-    /// Creates an empty directory for a test, wiping whatever an earlier run
-    /// left behind.
+    /// Creates an empty test directory, removing any files from a previous run.
     fn temp_dir(name: &str) -> FsPathBuf {
         let dir = env::temp_dir().join(format!("topcoat-router-directory-{name}"));
         let _ = fs::remove_dir_all(&dir);
@@ -302,7 +283,7 @@ mod tests {
         dir
     }
 
-    /// Fills `dir` with a fixed set of files and a nested directory.
+    /// Creates sample files in `dir`, including a nested stylesheet.
     fn populate(dir: &FsPath) {
         fs::write(dir.join("index.html"), "<h1>Hello</h1>").unwrap();
         fs::write(dir.join("logo.svg"), "<svg/>").unwrap();
@@ -325,7 +306,7 @@ mod tests {
             .block_on(future)
     }
 
-    /// Dispatches a request through the router and reads the full response.
+    /// Sends a request through the router and collects the response body.
     fn send(
         router: &Router,
         method: Method,
@@ -735,18 +716,16 @@ mod tests {
             .unwrap();
         assert!(status.success());
         let router = router("/public/{*file}", &dir);
-        // Opening the pipe would block until a writer connects, so the route
-        // has to reject it without opening it. The blocked open would also
-        // keep the runtime from shutting down, so it is not waited for.
+        // A blocked open would also prevent runtime shutdown. Use a timeout
+        // and shut down without waiting so a regression fails instead of hanging.
         let request = Request::get("/public/pipe").body(Body::empty()).unwrap();
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
-        let response = runtime.block_on(tokio::time::timeout(
-            Duration::from_secs(5),
-            router.handle(request),
-        ));
+        let response = runtime.block_on(async {
+            tokio::time::timeout(Duration::from_secs(5), router.handle(request)).await
+        });
         runtime.shutdown_background();
         let response = response.expect("the request blocked on opening the pipe");
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
