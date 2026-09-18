@@ -10,7 +10,7 @@ use topcoat_core::context::{AppContext, Cx, try_request_context, with_identity};
 
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
-    RouteIndex, RouterBuilder, Routes, Terminal,
+    RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
     error::{REWRITE_LIMIT, RewriteError, RewriteLoopError, internal_server_response, respond},
     request::{OriginalParts, Request},
     response::{Response, ResponseHeaders, response_headers},
@@ -233,6 +233,8 @@ pub(crate) struct RouterInner {
     pub(crate) app_context: Arc<AppContext>,
     /// The origin policy wrapping every request as the outermost layer.
     pub(crate) origin: OriginLayer,
+    /// The proxies trusted to report the client's address.
+    pub(crate) trusted_proxies: TrustedProxies,
     /// The compression applied to responses on their way out.
     #[cfg(feature = "compression")]
     pub(crate) compression: crate::Compression,
@@ -354,6 +356,7 @@ pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
         always_layers: Box::new([]),
         app_context: Arc::new(AppContext::new()),
         origin: OriginLayer::new(OriginPolicy::new()),
+        trusted_proxies: TrustedProxies::new(),
         #[cfg(feature = "compression")]
         compression: crate::Compression::new(),
     };
@@ -385,7 +388,7 @@ mod tests {
     use super::*;
     use crate::{
         Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn,
-        Path, Route, RouteFn, RouteFuture, Slot, TrailingSlash,
+        Path, RemoteAddr, Route, RouteFn, RouteFuture, Slot, TrailingSlash, client_ip,
         error::rewrite,
         raw_path_params,
         request::{Bytes, method, original_method, original_uri, uri},
@@ -1149,6 +1152,58 @@ mod tests {
             .unwrap();
         let response = block_on(router.handle(request));
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    // -- Router::handle: client address --
+
+    /// Echoes the client address, or `none`.
+    fn echo_client_ip(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            client_ip(cx)
+                .map_or_else(|| "none".to_owned(), |ip| ip.to_string())
+                .into_response(cx)
+        })
+    }
+
+    /// Dispatches a request that arrived from `remote` with an
+    /// `X-Forwarded-For` header, reading the body.
+    fn send_forwarded(router: &Router, remote: &str, forwarded_for: &str) -> Bytes {
+        let request = http::Request::builder()
+            .method(Method::GET)
+            .uri("/ip")
+            .header("x-forwarded-for", forwarded_for)
+            .extension(RemoteAddr(remote.parse().unwrap()))
+            .body(Body::empty())
+            .unwrap();
+        let response = block_on(router.handle(request));
+        block_on(to_bytes(response.into_body(), usize::MAX)).unwrap()
+    }
+
+    #[test]
+    fn the_client_ip_is_the_peer_without_trusted_proxies() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/ip"), echo_client_ip))
+            .build();
+        let body = send_forwarded(&router, "10.0.0.1:4242", "198.51.100.1");
+        assert_eq!(&body[..], b"10.0.0.1");
+
+        // A request without a peer address has no client address either.
+        let (_, _, body) = send(&router, Method::GET, "/ip");
+        assert_eq!(&body[..], b"none");
+    }
+
+    #[test]
+    fn the_client_ip_resolves_through_trusted_proxies() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/ip"), echo_client_ip))
+            .trusted_proxies(TrustedProxies::new().networks(["10.0.0.0/8"]))
+            .build();
+        let body = send_forwarded(&router, "10.0.0.1:4242", "198.51.100.1");
+        assert_eq!(&body[..], b"198.51.100.1");
+
+        // The header of a request from an untrusted peer is not read.
+        let body = send_forwarded(&router, "203.0.113.9:4242", "198.51.100.1");
+        assert_eq!(&body[..], b"203.0.113.9");
     }
 
     // -- Router::handle: method sets --

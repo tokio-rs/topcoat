@@ -10,7 +10,8 @@ use topcoat_core::{base_url::BaseUrl, context::AppContext};
 
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Layout, Methods, OriginLayer, OriginPolicy, Page,
-    PageWithLayouts, Path, Route, Router, RouterInner, Routes, TrailingSlash, layers_for_path,
+    PageWithLayouts, Path, Route, Router, RouterInner, Routes, TrailingSlash, TrustedProxies,
+    layers_for_path,
 };
 
 /// Builds a [`Router`] for a Topcoat application.
@@ -51,6 +52,7 @@ pub struct RouterBuilder {
     layers: Vec<Arc<dyn Layer>>,
     context: AppContext,
     origin_policy: OriginPolicy,
+    trusted_proxies: TrustedProxies,
     trailing_slash: TrailingSlash,
     #[cfg(feature = "compression")]
     compression: crate::Compression,
@@ -70,6 +72,7 @@ impl RouterBuilder {
             layers: Vec::new(),
             context,
             origin_policy: OriginPolicy::new(),
+            trusted_proxies: TrustedProxies::new(),
             trailing_slash: TrailingSlash::default(),
             #[cfg(feature = "compression")]
             compression: crate::Compression::new(),
@@ -219,6 +222,30 @@ impl RouterBuilder {
     #[must_use]
     pub fn origin_policy(mut self, origin_policy: OriginPolicy) -> Self {
         self.origin_policy = origin_policy;
+        self
+    }
+
+    /// Registers the reverse proxies trusted to report the client's address.
+    ///
+    /// By default no proxy is trusted, so [`client_ip`](crate::client_ip) is
+    /// the address of the connection's peer. Behind a reverse proxy that peer
+    /// is the proxy; register the proxies a request can arrive through, and
+    /// the client's address is read from the forwarding header instead. See
+    /// [`TrustedProxies`] for how proxies are identified and which header is
+    /// read.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use topcoat::router::{Router, TrustedProxies};
+    ///
+    /// let router = Router::builder()
+    ///     .trusted_proxies(TrustedProxies::new().networks(["10.0.0.0/8"]))
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn trusted_proxies(mut self, trusted_proxies: TrustedProxies) -> Self {
+        self.trusted_proxies = trusted_proxies;
         self
     }
 
@@ -504,6 +531,7 @@ impl RouterBuilder {
             always_layers,
             app_context: Arc::new(self.context),
             origin: OriginLayer::new(self.origin_policy),
+            trusted_proxies: self.trusted_proxies,
             #[cfg(feature = "compression")]
             compression: self.compression,
         })
