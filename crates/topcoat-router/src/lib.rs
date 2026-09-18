@@ -41,6 +41,7 @@ pub use connection::*;
 pub use endpoint::*;
 pub use href::*;
 pub use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};
+pub use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 pub use layer::*;
 #[cfg(feature = "serve")]
 pub use listener::*;

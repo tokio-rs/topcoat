@@ -4,6 +4,7 @@ use std::{
 };
 
 use http::{HeaderMap, HeaderName, header};
+use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use topcoat_core::context::{Cx, try_request_context};
 
 use crate::{remote_addr, request::headers};
@@ -16,8 +17,7 @@ use crate::{remote_addr, request::headers};
 /// send that header too, so the router only reads it on a connection it knows
 /// comes from a proxy. This value names those proxies. Register it with
 /// [`RouterBuilder::trusted_proxies`](crate::RouterBuilder::trusted_proxies),
-/// and [`client_ip`] resolves the client's address
-/// through them.
+/// and [`client_ip`] resolves the client's address through them.
 ///
 /// A proxy is trusted by the [network](Self::networks) it connects from, or,
 /// when its address is not fixed, by its position: the
@@ -55,7 +55,7 @@ use crate::{remote_addr, request::headers};
 /// ```
 #[derive(Debug, Clone)]
 pub struct TrustedProxies {
-    networks: Vec<Network>,
+    networks: Vec<IpNet>,
     nearest: usize,
     header: ForwardedHeader,
 }
@@ -77,29 +77,41 @@ impl TrustedProxies {
 
     /// Trusts every proxy connecting from one of `networks`.
     ///
-    /// Each value is an address with a prefix length in CIDR notation, like
-    /// `"10.0.0.0/8"` or `"fd00::/8"`, or a single address like
-    /// `"127.0.0.1"`. IPv4 and IPv6 networks are separate: an IPv6 network
-    /// never contains an IPv4 address. The IPv4-mapped IPv6 form
-    /// (`::ffff:10.0.0.1`), which a dual-stack socket reports IPv4 peers in,
-    /// counts as IPv4 both here and in the addresses compared against it.
+    /// Each value is a string in CIDR notation like `"10.0.0.0/8"` or
+    /// `"fd00::/8"`, a single address like `"127.0.0.1"`, or an [`IpNet`]
+    /// or [`IpAddr`] value; see [`IntoIpNet`]. IPv4 and IPv6 networks are
+    /// separate: an IPv6 network never contains an IPv4 address. The
+    /// IPv4-mapped IPv6 form (`::ffff:10.0.0.1`), which a dual-stack socket
+    /// reports IPv4 peers in, counts as IPv4 both here and in the addresses
+    /// compared against it.
     ///
     /// # Panics
     ///
-    /// Panics if a value is not an address or a network in CIDR notation.
+    /// Panics if a string is not an address or a network in CIDR notation.
     #[must_use]
     #[track_caller]
     pub fn networks<I>(mut self, networks: I) -> Self
     where
         I: IntoIterator,
-        I::Item: AsRef<str>,
+        I::Item: IntoIpNet,
     {
+        /// The prefix length of the `::ffff:0:0/96` block holding the mapped
+        /// addresses; a longer prefix denotes a network within it.
+        const MAPPED_PREFIX: u8 = 96;
+
         for network in networks {
-            let network = network.as_ref();
-            match Network::parse(network) {
-                Some(network) => self.networks.push(network),
-                None => panic!("invalid trusted proxy network `{network}`"),
-            }
+            let network = match network.into_ip_net() {
+                // A network of mapped addresses is the IPv4 network it maps
+                // to, the form addresses are compared in.
+                IpNet::V6(v6) if v6.prefix_len() >= MAPPED_PREFIX => match v6.addr().to_canonical()
+                {
+                    IpAddr::V4(addr) => Ipv4Net::new(addr, v6.prefix_len() - MAPPED_PREFIX)
+                        .map_or(IpNet::V6(v6), IpNet::V4),
+                    IpAddr::V6(_) => IpNet::V6(v6),
+                },
+                network => network,
+            };
+            self.networks.push(network);
         }
         self
     }
@@ -235,7 +247,7 @@ impl TrustedProxies {
     /// application, is trusted.
     fn is_trusted(&self, addr: Option<IpAddr>, hop: usize) -> bool {
         hop < self.nearest
-            || addr.is_some_and(|ip| self.networks.iter().any(|network| network.contains(ip)))
+            || addr.is_some_and(|ip| self.networks.iter().any(|network| network.contains(&ip)))
     }
 }
 
@@ -330,67 +342,63 @@ impl ForwardedHeader {
     }
 }
 
-/// A network in CIDR notation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Network {
-    addr: IpAddr,
-    prefix: u8,
+/// Conversion into a network, accepted by [`TrustedProxies::networks`].
+///
+/// A string is parsed as a network in CIDR notation (`"10.0.0.0/8"`) or as a
+/// single address (`"10.0.0.1"`), and panics otherwise; an address converts
+/// to the network holding it alone, and a network converts as it is.
+pub trait IntoIpNet {
+    /// Converts the value into a network.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is a string that is neither an address nor a
+    /// network in CIDR notation.
+    #[track_caller]
+    fn into_ip_net(self) -> IpNet;
 }
 
-impl Network {
-    /// Parses `"addr/prefix"`, or a bare address as a network of one.
-    ///
-    /// A network of IPv4-mapped IPv6 addresses (`::ffff:10.0.0.0/104`) is
-    /// read as the IPv4 network it maps to, the form addresses are compared
-    /// in.
-    fn parse(value: &str) -> Option<Self> {
-        /// The prefix length of the `::ffff:0:0/96` block holding the mapped
-        /// addresses; a longer prefix denotes a network within it.
-        const MAPPED_PREFIX: u8 = 96;
-
-        let (addr, prefix) = if let Some((addr, prefix)) = value.split_once('/') {
-            (addr.parse::<IpAddr>().ok()?, prefix.parse::<u8>().ok()?)
-        } else {
-            let addr = value.parse::<IpAddr>().ok()?;
-            (addr, Self::bits(addr))
-        };
-        if prefix > Self::bits(addr) {
-            return None;
-        }
-        match (addr, addr.to_canonical()) {
-            (IpAddr::V6(_), canonical @ IpAddr::V4(_)) if prefix >= MAPPED_PREFIX => Some(Self {
-                addr: canonical,
-                prefix: prefix - MAPPED_PREFIX,
-            }),
-            _ => Some(Self { addr, prefix }),
+impl IntoIpNet for &str {
+    #[track_caller]
+    fn into_ip_net(self) -> IpNet {
+        match self.parse::<IpNet>() {
+            Ok(network) => network,
+            Err(_) => match self.parse::<IpAddr>() {
+                Ok(addr) => IpNet::from(addr),
+                Err(_) => panic!("invalid trusted proxy network `{self}`"),
+            },
         }
     }
+}
 
-    /// Whether `ip`, in its canonical form, lies within the network.
-    fn contains(self, ip: IpAddr) -> bool {
-        match (self.addr, ip) {
-            (IpAddr::V4(network), IpAddr::V4(ip)) => {
-                let mask = u32::MAX
-                    .checked_shl(32 - u32::from(self.prefix))
-                    .unwrap_or(0);
-                u32::from(network) & mask == u32::from(ip) & mask
-            }
-            (IpAddr::V6(network), IpAddr::V6(ip)) => {
-                let mask = u128::MAX
-                    .checked_shl(128 - u32::from(self.prefix))
-                    .unwrap_or(0);
-                u128::from(network) & mask == u128::from(ip) & mask
-            }
-            _ => false,
-        }
+impl IntoIpNet for String {
+    #[track_caller]
+    fn into_ip_net(self) -> IpNet {
+        self.as_str().into_ip_net()
     }
+}
 
-    /// The address length of `addr`'s family, the largest prefix it allows.
-    fn bits(addr: IpAddr) -> u8 {
-        match addr {
-            IpAddr::V4(_) => 32,
-            IpAddr::V6(_) => 128,
-        }
+impl IntoIpNet for IpNet {
+    fn into_ip_net(self) -> IpNet {
+        self
+    }
+}
+
+impl IntoIpNet for Ipv4Net {
+    fn into_ip_net(self) -> IpNet {
+        IpNet::V4(self)
+    }
+}
+
+impl IntoIpNet for Ipv6Net {
+    fn into_ip_net(self) -> IpNet {
+        IpNet::V6(self)
+    }
+}
+
+impl IntoIpNet for IpAddr {
+    fn into_ip_net(self) -> IpNet {
+        IpNet::from(self)
     }
 }
 
@@ -627,6 +635,24 @@ mod tests {
         assert_eq!(
             resolve(&proxies, Some("10.0.0.2"), "198.51.100.1"),
             Some(ip("10.0.0.2"))
+        );
+    }
+
+    #[test]
+    fn networks_accept_parsed_values() {
+        let network: IpNet = "10.0.0.0/8".parse().unwrap();
+        let proxies = TrustedProxies::new()
+            .networks([network])
+            .networks([ip("192.0.2.7")]);
+        for peer in ["10.1.2.3", "192.0.2.7"] {
+            assert_eq!(
+                resolve(&proxies, Some(peer), "198.51.100.1"),
+                Some(ip("198.51.100.1"))
+            );
+        }
+        assert_eq!(
+            resolve(&proxies, Some("192.0.2.8"), "198.51.100.1"),
+            Some(ip("192.0.2.8"))
         );
     }
 

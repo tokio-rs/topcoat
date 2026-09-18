@@ -78,6 +78,7 @@ matchit.workspace = true
 mime_guess = { workspace = true, optional = true }
 percent-encoding.workspace = true
 inventory = { workspace = true, optional = true }
+ipnet.workspace = true
 multer = { workspace = true, optional = true }
 pin-project-lite.workspace = true
 ref-cast.workspace = true
