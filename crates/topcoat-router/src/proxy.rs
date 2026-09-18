@@ -212,7 +212,8 @@ impl TrustedProxies {
     /// header lists, skipping every trusted proxy; the first untrusted
     /// address is the client's. When every address is trusted, the farthest
     /// one is returned. An entry that carries no readable address ends the
-    /// walk with no client address at all.
+    /// walk with no client address at all, unless its hop is trusted by
+    /// position and the walk goes on past it.
     pub(crate) fn client_ip(&self, remote: Option<IpAddr>, headers: &HeaderMap) -> Option<IpAddr> {
         let remote = remote.map(|ip| ip.to_canonical());
         if !self.is_trusted(remote, 0) {
@@ -236,29 +237,32 @@ impl TrustedProxies {
                 parse_node(value.to_str().ok()?.trim())
             }
             ForwardedHeader::Forwarded => {
-                // A quote left open would swallow whatever a proxy appends
-                // after it, so a field with one is malformed as a whole.
-                let fields: Vec<&[u8]> = values
-                    .map(|value| {
-                        let field = value.as_bytes();
-                        is_well_quoted(field).then_some(field)
-                    })
-                    .collect::<Option<_>>()?;
                 // An element's quoted strings may contain the list and
                 // parameter delimiters, so the split reads front to back with
-                // the quoting in mind, and the walk goes over the addresses
-                // from the back.
-                let addresses: Vec<Option<IpAddr>> = fields
-                    .into_iter()
-                    .flat_map(|field| {
-                        split_quoted(field, b',')
-                            .filter(|element| !element.trim_ascii().is_empty())
-                            .map(|element| {
-                                forwarded_for(element).and_then(|node| parse_node(&node))
-                            })
-                    })
-                    .collect();
-                self.walk(remote, addresses.into_iter().rev())
+                // the quoting in mind, and the walk goes over the elements
+                // from the back. A quote left open would swallow whatever a
+                // proxy appends within the same field, so such a field is one
+                // unreadable element; a field the proxy adds on its own line
+                // stays readable.
+                let mut elements: Vec<Option<&[u8]>> = Vec::new();
+                for value in values {
+                    let field = value.as_bytes();
+                    if is_well_quoted(field) {
+                        elements.extend(
+                            split_quoted(field, b',')
+                                .filter(|element| !element.trim_ascii().is_empty())
+                                .map(Some),
+                        );
+                    } else {
+                        elements.push(None);
+                    }
+                }
+                self.walk(
+                    remote,
+                    elements.into_iter().rev().map(|element| {
+                        forwarded_for(element?).and_then(|node| parse_node(&node))
+                    }),
+                )
             }
             ForwardedHeader::XForwardedFor => {
                 // The entries from the one nearest to the application (the
@@ -289,11 +293,16 @@ impl TrustedProxies {
     ) -> Option<IpAddr> {
         let mut farthest = remote;
         for (hop, address) in addresses.enumerate() {
-            let ip = address?;
-            if !self.is_trusted(Some(ip), hop + 1) {
-                return Some(ip);
+            let hop = hop + 1;
+            // A hop trusted by position needs no readable address; any other
+            // hop must name one to be checked against the networks.
+            if hop >= self.nearest {
+                let ip = address?;
+                if !self.is_trusted(Some(ip), hop) {
+                    return Some(ip);
+                }
             }
-            farthest = Some(ip);
+            farthest = address;
         }
         farthest
     }
@@ -412,6 +421,18 @@ impl IntoIpNet for IpAddr {
     }
 }
 
+/// A reference to any accepted value, so a stored list can be passed by
+/// reference.
+impl<T> IntoIpNet for &T
+where
+    T: IntoIpNet + Clone,
+{
+    #[track_caller]
+    fn into_ip_net(self) -> IpNet {
+        self.clone().into_ip_net()
+    }
+}
+
 /// Reads an IP address from a forwarding header value, ignoring any port.
 /// IPv6 addresses with a port must be enclosed in brackets.
 /// Returns `None` for `unknown`, hidden addresses such as `_client`, or
@@ -475,50 +496,59 @@ fn forwarded_for(element: &[u8]) -> Option<Cow<'_, str>> {
     found
 }
 
+/// Tracks quoted strings while scanning a header value byte by byte.
+///
+/// A backslash inside a quoted string escapes the next byte, so an escaped
+/// quote does not end the string.
+#[derive(Default)]
+struct QuoteState {
+    /// Whether the scan is inside a quoted string.
+    quoted: bool,
+    /// Whether the previous byte was a backslash inside a quoted string.
+    escaped: bool,
+}
+
+impl QuoteState {
+    /// Advances past `byte`, returning whether it is plain text outside any
+    /// quoted string, so delimiters found there count.
+    fn feed(&mut self, byte: u8) -> bool {
+        if self.escaped {
+            self.escaped = false;
+        } else if self.quoted {
+            match byte {
+                b'\\' => self.escaped = true,
+                b'"' => self.quoted = false,
+                _ => {}
+            }
+        } else if byte == b'"' {
+            self.quoted = true;
+        } else {
+            return true;
+        }
+        false
+    }
+
+    /// Whether every quoted string has been closed and no escape is pending.
+    fn is_closed(&self) -> bool {
+        !self.quoted && !self.escaped
+    }
+}
+
 /// Checks that every opening quote has a closing quote and every backslash
 /// inside a quoted string has a character after it.
 fn is_well_quoted(value: &[u8]) -> bool {
-    let mut quoted = false;
-    let mut escaped = false;
+    let mut state = QuoteState::default();
     for &byte in value {
-        if escaped {
-            escaped = false;
-        } else if quoted {
-            match byte {
-                b'\\' => escaped = true,
-                b'"' => quoted = false,
-                _ => {}
-            }
-        } else if byte == b'"' {
-            quoted = true;
-        }
+        state.feed(byte);
     }
-    !quoted && !escaped
+    state.is_closed()
 }
 
 /// Splits `value` at each `delimiter`, keeping quoted strings together.
-/// A backslash inside a quoted string escapes the next byte, so an escaped
-/// quote does not end the string.
 /// Check the quotes with [`is_well_quoted`] before calling this function.
 fn split_quoted(value: &[u8], delimiter: u8) -> impl Iterator<Item = &[u8]> {
-    let mut quoted = false;
-    let mut escaped = false;
-    value.split(move |&byte| {
-        if escaped {
-            escaped = false;
-        } else if quoted {
-            match byte {
-                b'\\' => escaped = true,
-                b'"' => quoted = false,
-                _ => {}
-            }
-        } else if byte == b'"' {
-            quoted = true;
-        } else {
-            return byte == delimiter;
-        }
-        false
-    })
+    let mut state = QuoteState::default();
+    value.split(move |&byte| state.feed(byte) && byte == delimiter)
 }
 
 /// Removes surrounding quotes and replaces each backslash escape with the
@@ -663,6 +693,26 @@ mod tests {
         let proxies = TrustedProxies::new()
             .networks([network])
             .networks([ip("192.0.2.7")]);
+        for peer in ["10.1.2.3", "192.0.2.7"] {
+            assert_eq!(
+                resolve(&proxies, Some(peer), "198.51.100.1"),
+                Some(ip("198.51.100.1"))
+            );
+        }
+        assert_eq!(
+            resolve(&proxies, Some("192.0.2.8"), "198.51.100.1"),
+            Some(ip("192.0.2.8"))
+        );
+    }
+
+    #[test]
+    fn networks_accept_references() {
+        // A list read from configuration, passed without moving it.
+        let strings = vec![String::from("10.0.0.0/8")];
+        let addresses = vec![ip("192.0.2.7")];
+        let proxies = TrustedProxies::new()
+            .networks(&strings)
+            .networks(addresses.iter());
         for peer in ["10.1.2.3", "192.0.2.7"] {
             assert_eq!(
                 resolve(&proxies, Some(peer), "198.51.100.1"),
