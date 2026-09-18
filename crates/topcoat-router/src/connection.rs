@@ -4,24 +4,26 @@ use topcoat_core::context::Cx;
 
 use crate::request::extensions;
 
-/// The socket address of the peer a request's connection was accepted from,
-/// carried in the request [`extensions`].
+/// The IP address and port of the direct connection, stored in the request
+/// [`extensions`].
 ///
-/// The server inserts it on every request of a connection accepted over TCP.
-/// A request that arrives another way carries none unless whoever hands it to
-/// the router inserts one: a connection over a Unix socket has no socket
-/// address, and a tower service embedding the router passes the request
-/// through as it is. Read it with [`remote_addr`].
+/// Topcoat adds this to every request received over TCP. Read it with
+/// [`remote_addr`]. Behind a reverse proxy, this is the proxy's address.
+///
+/// Unix socket connections have no IP address, so Topcoat does not add this
+/// value for them. If you serve the router through a tower service or pass
+/// requests to it yourself, insert this value into each request's extensions
+/// to make the connection's address available.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RemoteAddr(pub SocketAddr);
 
-/// Returns the socket address of the peer the current request's connection
-/// was accepted from, or `None` when it is unknown.
+/// Returns the IP address and port of the direct connection for this request,
+/// or `None` when they are unknown.
 ///
-/// Behind a reverse proxy this is the proxy's address, not the client's; use
-/// [`client_ip`](crate::client_ip) for the client's. The address is unknown
-/// for a connection over a Unix socket, or a request that reached the router
-/// without a [`RemoteAddr`] in its extensions.
+/// Behind a reverse proxy, this returns the proxy's address. Use
+/// [`client_ip`](crate::client_ip) to read the client's IP address instead.
+/// Returns `None` if the request has no [`RemoteAddr`] in its extensions,
+/// as is normally the case for Unix socket connections.
 ///
 /// # Examples
 ///

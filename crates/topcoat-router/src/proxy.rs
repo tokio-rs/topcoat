@@ -9,31 +9,31 @@ use topcoat_core::context::{Cx, try_request_context};
 
 use crate::{remote_addr, request::headers};
 
-/// The reverse proxies the router trusts to report the client's address.
+/// Configures which reverse proxies can report the client's IP address.
 ///
-/// A request that arrives through a reverse proxy (a load balancer, a CDN,
-/// nginx in front of the application) connects from the proxy's address, and
-/// the proxy passes the client's address along in a header. Any client can
-/// send that header too, so the router only reads it on a connection it knows
-/// comes from a proxy. This value names those proxies. Register it with
+/// When your application is behind a reverse proxy, incoming connections
+/// come from the proxy's IP address. The proxy sends the client's IP address
+/// in an HTTP header. Clients can send these headers too, so Topcoat ignores
+/// them unless you configure it to trust the proxy.
+///
+/// Use [`networks`](Self::networks) to identify proxies by their IP addresses
+/// or networks. If their addresses are not known, use [`nearest`](Self::nearest)
+/// to trust a fixed number of proxies in front of your application. Prefer
+/// networks when possible. Trusting a fixed number is only safe if clients
+/// cannot bypass any of those proxies.
+///
+/// Register this configuration with
 /// [`RouterBuilder::trusted_proxies`](crate::RouterBuilder::trusted_proxies),
-/// and [`client_ip`] resolves the client's address through them.
+/// then call [`client_ip`] to read the client's address. By default, Topcoat
+/// trusts no proxies and uses the address of the direct connection.
 ///
-/// A proxy is trusted by the [network](Self::networks) it connects from, or,
-/// when its address is not fixed, by its position: the
-/// [nearest](Self::nearest) proxies to the application, counted from the
-/// connection's peer outward. Prefer networks, since positional trust also
-/// covers a client that manages to take a proxy's position. The default
-/// trusts no proxy, so the client address is the connection's peer.
-///
-/// Trusting a proxy means trusting it to append the address it sees to the
-/// forwarding [header](Self::header) on every request it passes on. A proxy
-/// that forwards the header a client sent, unchanged, lets that client choose
-/// its own address.
+/// Each trusted proxy must update the configured [header](Self::header)
+/// with the address it received the request from. If it passes along a
+/// client's header unchanged, the client can fake its IP address.
 ///
 /// # Examples
 ///
-/// nginx on a private network in front of the application:
+/// Trust proxies on a private network:
 ///
 /// ```rust
 /// use topcoat::router::{Router, TrustedProxies};
@@ -43,8 +43,8 @@ use crate::{remote_addr, request::headers};
 ///     .build();
 /// ```
 ///
-/// A managed load balancer whose addresses are not known ahead of time, as
-/// the only proxy between the client and the application:
+/// Trust one load balancer whose IP address may change. Use this only when
+/// every request must pass through that load balancer:
 ///
 /// ```rust
 /// use topcoat::router::{Router, TrustedProxies};
@@ -61,11 +61,11 @@ pub struct TrustedProxies {
 }
 
 impl TrustedProxies {
-    /// Creates the default policy: no proxy is trusted, and the client
-    /// address is the connection's peer.
+    /// Creates a configuration that trusts no proxies.
     ///
-    /// Add proxies with [`networks`](Self::networks) and
-    /// [`nearest`](Self::nearest).
+    /// Until you add trusted proxies with [`networks`](Self::networks) or
+    /// [`nearest`](Self::nearest), [`client_ip`] uses the IP address of the
+    /// direct connection.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -75,15 +75,15 @@ impl TrustedProxies {
         }
     }
 
-    /// Trusts every proxy connecting from one of `networks`.
+    /// Adds IP addresses or networks to the list of trusted proxies.
     ///
-    /// Each value is a string in CIDR notation like `"10.0.0.0/8"` or
-    /// `"fd00::/8"`, a single address like `"127.0.0.1"`, or an [`IpNet`]
-    /// or [`IpAddr`] value; see [`IntoIpNet`]. IPv4 and IPv6 networks are
-    /// separate: an IPv6 network never contains an IPv4 address. The
-    /// IPv4-mapped IPv6 form (`::ffff:10.0.0.1`), which a dual-stack socket
-    /// reports IPv4 peers in, counts as IPv4 both here and in the addresses
-    /// compared against it.
+    /// Pass addresses such as `"127.0.0.1"` or networks in CIDR notation such
+    /// as `"10.0.0.0/8"` and `"fd00::/8"`. You can also pass [`IpNet`] or
+    /// [`IpAddr`] values. See [`IntoIpNet`] for the accepted types.
+    ///
+    /// IPv4 and IPv6 networks are matched separately. IPv4-mapped IPv6
+    /// addresses, such as `::ffff:10.0.0.1`, are treated as IPv4 addresses.
+    /// Networks within the mapped IPv6 range are also converted to IPv4.
     ///
     /// # Panics
     ///
@@ -116,33 +116,32 @@ impl TrustedProxies {
         self
     }
 
-    /// Trusts the `count` proxies nearest to the application, whatever
-    /// their addresses.
+    /// Trusts the `count` proxies closest to the application, regardless of
+    /// their IP addresses.
     ///
-    /// The connection's peer is the first; each address the forwarding header
-    /// lists, read from its end, is the next one out. Use this for a proxy
-    /// whose address is not fixed, like a managed load balancer, or one that
-    /// connects over a Unix socket and so has no address at all.
+    /// The proxy that connects directly to the application counts as the
+    /// first. Further proxies are counted from right to left in the
+    /// forwarding header. Use this when a proxy's IP address may change, or
+    /// when it connects over a Unix socket and has no IP address.
     ///
-    /// Trust by position is only safe when every request passes through
-    /// exactly `count` proxies, since whatever sits at those positions is
-    /// trusted, the client included. With a CDN in front of a load balancer,
-    /// `count` is two; if a client can also reach the load balancer directly,
-    /// bypassing the CDN, it takes the CDN's position and the address it
-    /// sends in the header is believed. Prefer [`networks`](Self::networks)
-    /// wherever the proxies' addresses are known, and reserve this for a
-    /// fixed topology the application cannot be reached around.
+    /// Only use this when every request must pass through those `count`
+    /// proxies. For example, a CDN followed by a load balancer needs a count
+    /// of two. If a client can bypass the CDN and connect to the load balancer
+    /// directly, Topcoat will trust the client as the second proxy. The client
+    /// can then fake its address by sending a forwarding header.
+    ///
+    /// Prefer [`networks`](Self::networks) when the proxies' addresses are known.
     #[must_use]
     pub fn nearest(mut self, count: usize) -> Self {
         self.nearest = count;
         self
     }
 
-    /// Sets the header the client address is read from.
+    /// Selects the header used to read the client's IP address.
     ///
-    /// The default is [`ForwardedHeader::XForwardedFor`]. Only this header is
-    /// read: a proxy manages one of them, and reading another would trust a
-    /// value the client may have sent.
+    /// Defaults to [`ForwardedHeader::XForwardedFor`]. Choose the header your
+    /// proxy updates. Topcoat ignores the other headers because they may
+    /// contain values supplied by the client.
     #[must_use]
     pub fn header(mut self, header: ForwardedHeader) -> Self {
         self.header = header;
@@ -263,24 +262,28 @@ impl Default for TrustedProxies {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
 
-/// Returns the IP address of the client behind the current request, or `None`
+/// Returns the client's IP address for this request, or `None`
 /// when it cannot be determined.
 ///
-/// Without trusted proxies this is the address of the connection's peer, as
-/// [`remote_addr`] returns it. With [`TrustedProxies`] registered on the
-/// router, a request arriving from a trusted proxy resolves to the address
-/// the proxy reports in the forwarding header, walking past every trusted
-/// proxy in the chain to the first address that is not one.
+/// By default, this returns the IP address from [`remote_addr`]. Behind a
+/// reverse proxy, that is the proxy's address. Configure [`TrustedProxies`]
+/// on the router to read the client's address from the proxy's header.
 ///
-/// The router resolves the address once, as the request arrives and before
-/// any layer runs, so every reader over the life of the request sees the same
-/// client, whatever a layer does to the headers later. A context no router
-/// dispatched has no client.
+/// For a header that lists multiple addresses, Topcoat starts with the direct
+/// connection and reads the list from right to left. It skips trusted proxies
+/// and returns the first address it does not trust. If every address is
+/// trusted, it returns the leftmost address. If the list is empty or missing,
+/// it uses the direct connection's address.
 ///
-/// The address is unknown when the peer is unknown and not trusted by
-/// position, or when a trusted proxy reported an entry that carries no
-/// readable address. An IPv4 address a dual-stack listener reports in its
-/// IPv6-mapped form is returned as IPv4.
+/// Returns `None` if the direct connection's address is unknown and it is not
+/// trusted through [`TrustedProxies::nearest`], or if an address needed from
+/// the header cannot be parsed. Headers containing a single address follow
+/// the rules in [`ForwardedHeader::Single`]. IPv4-mapped IPv6 addresses are
+/// returned as IPv4.
+///
+/// The router determines the address before running any layers. Later changes
+/// to request headers do not change this result. Returns `None` if the context
+/// was not created by a router.
 ///
 /// # Examples
 ///
@@ -305,27 +308,32 @@ pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
     try_request_context::<ClientIp>(cx)?.0
 }
 
-/// The header a trusted proxy reports the client address in.
+/// The HTTP header used to read the client's IP address from a trusted proxy.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ForwardedHeader {
-    /// `X-Forwarded-For`, listing the client's address followed by the
-    /// address of each proxy the request passed through after it, comma
-    /// separated. Set by most proxies and load balancers; the default.
+    /// A comma-separated list of IP addresses in `X-Forwarded-For`.
+    ///
+    /// Each proxy appends the address it received the request from, so the
+    /// client's address comes first, followed by the proxies' addresses.
+    /// This is the default header.
     XForwardedFor,
-    /// `Forwarded` (RFC 7239), listing the same chain as `for=` parameters,
-    /// one element per proxy.
+    /// The `Forwarded` header (RFC 7239).
+    ///
+    /// Each proxy adds an entry with a `for=` parameter containing the address
+    /// it received the request from. Topcoat reads these parameters in the
+    /// same order as the addresses in `X-Forwarded-For`.
     Forwarded,
-    /// A header carrying the client's address alone, like `CF-Connecting-IP`
+    /// A header containing only the client's IP address, such as `CF-Connecting-IP`
     /// or `True-Client-IP`.
     ///
-    /// Once the connection's peer is trusted, the header's value is the
-    /// client's address; there is no chain to walk. The header must appear
-    /// exactly once, holding exactly one address, or it names none.
+    /// If the direct connection is trusted, Topcoat uses this header's value
+    /// as the client's address. The header must appear exactly once and
+    /// contain exactly one address. Otherwise, [`client_ip`] returns `None`.
     ///
-    /// The peer must set or overwrite the header itself, or verify that the
-    /// proxy before it did. Trusting an internal load balancer that passes
-    /// the header through unchanged vouches for nothing about a value that
-    /// was supposedly set further out, since the client may have sent it.
+    /// The proxy connecting to the application must set this header itself
+    /// or verify that it came from another trusted proxy. If a load balancer
+    /// simply passes the header through, a client may be able to supply a
+    /// fake address.
     Single(HeaderName),
 }
 
@@ -342,11 +350,12 @@ impl ForwardedHeader {
     }
 }
 
-/// Conversion into a network, accepted by [`TrustedProxies::networks`].
+/// A value that can be passed to [`TrustedProxies::networks`].
 ///
-/// A string is parsed as a network in CIDR notation (`"10.0.0.0/8"`) or as a
-/// single address (`"10.0.0.1"`), and panics otherwise; an address converts
-/// to the network holding it alone, and a network converts as it is.
+/// Strings can contain a network in CIDR notation (`"10.0.0.0/8"`) or a
+/// single IP address (`"10.0.0.1"`). Invalid strings cause a panic. An IP
+/// address becomes a network containing only that address. Network values
+/// are used as they are.
 pub trait IntoIpNet {
     /// Converts the value into a network.
     ///

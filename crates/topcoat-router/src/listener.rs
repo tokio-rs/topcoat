@@ -16,12 +16,12 @@ pub trait Listener: Send + 'static {
     /// The I/O stream of an accepted connection.
     type Io: AsyncRead + AsyncWrite + Unpin + Send + 'static;
 
-    /// Accepts the next inbound connection, yielding its I/O stream and the
-    /// peer's socket address, when the transport has one.
+    /// Accepts the next connection and returns its I/O stream and the remote
+    /// IP address and port, if available.
     ///
-    /// The address is stamped on every request of the connection as its
-    /// [`RemoteAddr`](crate::RemoteAddr). A transport without socket
-    /// addresses, like a Unix domain socket, yields `None`.
+    /// Topcoat stores the address as [`RemoteAddr`](crate::RemoteAddr) in
+    /// every request received over the connection. Return `None` for
+    /// connections without an IP address, such as Unix sockets.
     ///
     /// # Errors
     ///
@@ -55,10 +55,10 @@ impl Listener for TcpListener {
 /// Serves over a Unix domain socket, typically behind a reverse proxy that
 /// forwards HTTP to the socket path.
 ///
-/// A Unix socket peer has no socket address, so requests carry no
-/// [`RemoteAddr`](crate::RemoteAddr). To resolve the client
-/// address through the proxy on the other end, trust it by position with
-/// [`TrustedProxies::nearest`](crate::TrustedProxies::nearest).
+/// Unix socket connections have no IP address, so requests have no
+/// [`RemoteAddr`](crate::RemoteAddr). If a reverse proxy connects through
+/// this socket, use [`TrustedProxies::nearest`](crate::TrustedProxies::nearest)
+/// to trust it and read the client's IP address from its headers.
 ///
 /// Binding fails with `AddrInUse` if the socket file already exists, and
 /// dropping the listener does not remove it, so remove any stale file from a

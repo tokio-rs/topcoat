@@ -20,7 +20,18 @@ mod lint_regressions {
         seventh: u8,
         eighth: u8,
     ) -> Result<impl View> {
-        Ok(view! { <span>(first)(second)(third)(fourth)(fifth)(sixth)(seventh)(eighth)</span> })
+        Ok(view! {
+            <span>
+                (first)
+                (second)
+                (third)
+                (fourth)
+                (fifth)
+                (sixth)
+                (seventh)
+                (eighth)
+            </span>
+        })
     }
 }
 

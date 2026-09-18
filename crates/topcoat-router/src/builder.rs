@@ -225,14 +225,13 @@ impl RouterBuilder {
         self
     }
 
-    /// Registers the reverse proxies trusted to report the client's address.
+    /// Configures which reverse proxies can report the client's IP address.
     ///
-    /// By default no proxy is trusted, so [`client_ip`](crate::client_ip) is
-    /// the address of the connection's peer. Behind a reverse proxy that peer
-    /// is the proxy; register the proxies a request can arrive through, and
-    /// the client's address is read from the forwarding header instead. See
-    /// [`TrustedProxies`] for how proxies are identified and which header is
-    /// read.
+    /// By default, [`client_ip`](crate::client_ip) returns the IP address of
+    /// the direct connection. Behind a reverse proxy, that is the proxy's
+    /// address. Use this method to trust your proxies so Topcoat can read the
+    /// client's address from their HTTP headers. See [`TrustedProxies`] for
+    /// how to choose the proxies and header to use.
     ///
     /// # Examples
     ///
