@@ -1,3 +1,6 @@
+#[cfg(feature = "fs")]
+mod directory;
+
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -10,6 +13,8 @@ use std::{
     },
 };
 
+#[cfg(feature = "fs")]
+pub use directory::*;
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{

@@ -35,6 +35,7 @@ full = [
 	"discover",
 	"font",
 	"font-fontsource",
+	"fs",
 	"htmx",
 	"icon",
 	"icon-iconify",
@@ -93,6 +94,10 @@ font-fontsource = [
 	"font",
 	"topcoat-font/fontsource",
 	"topcoat-font-macro/fontsource",
+]
+fs = [
+	"router",
+	"topcoat-router/fs",
 ]
 htmx = [
 	"dep:topcoat-htmx",
