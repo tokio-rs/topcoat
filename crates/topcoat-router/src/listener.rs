@@ -26,7 +26,8 @@ pub trait Listener: Send + 'static {
     /// # Errors
     ///
     /// Returns an I/O error if accepting the connection fails.
-    fn accept(&mut self) -> impl Future<Output = io::Result<(Self::Io, Option<SocketAddr>)>> + Send;
+    fn accept(&mut self)
+    -> impl Future<Output = io::Result<(Self::Io, Option<SocketAddr>)>> + Send;
 
     /// The local TCP address the listener is bound to, when it has one.
     ///

@@ -12,6 +12,7 @@ use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
     RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
     error::{REWRITE_LIMIT, RewriteError, RewriteLoopError, internal_server_response, respond},
+    proxy::ClientIp,
     request::{OriginalParts, Request},
     response::{Response, ResponseHeaders, response_headers},
 };
@@ -95,6 +96,9 @@ impl Router {
         // The context a rewrite handed over for the dispatches after it, if
         // any; a dispatch otherwise starts from an empty request context.
         let mut base: Option<Cx> = None;
+        // The client's address, resolved once as the request arrives and
+        // carried onto every dispatch after a rewrite.
+        let mut client_ip: Option<ClientIp> = None;
 
         let (cx, result) = loop {
             // The chain's terminal and the layer stack wrapping it: a matched
@@ -138,6 +142,9 @@ impl Router {
                 }
                 None => (Terminal::NotFound, &*inner.always_layers, cx.with(parts)),
             };
+            let client_ip =
+                *client_ip.get_or_insert_with(|| ClientIp(inner.trusted_proxies.resolve(&cx)));
+            let cx = cx.with(client_ip);
 
             let cx = if base.is_none() {
                 match crate::request::initial_identity(&cx) {
@@ -1190,6 +1197,27 @@ mod tests {
         // A request without a peer address has no client address either.
         let (_, _, body) = send(&router, Method::GET, "/ip");
         assert_eq!(&body[..], b"none");
+    }
+
+    /// A pathless layer that hands the chain the request without its
+    /// forwarding header, as middleware rewriting headers would.
+    fn strip_forwarded<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        let mut parts = request_context::<http::request::Parts>(cx).clone();
+        parts.headers.remove("x-forwarded-for");
+        let cx = cx.with(parts);
+        Box::pin(async move { next.run(&cx, body).await })
+    }
+
+    #[test]
+    fn the_client_ip_is_resolved_as_the_request_arrives() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/ip"), echo_client_ip))
+            .layer(LayerFn::new(None::<&Path>, strip_forwarded))
+            .trusted_proxies(TrustedProxies::new().networks(["10.0.0.0/8"]))
+            .build();
+        // The layer's edit to the headers changes nothing about the client.
+        let body = send_forwarded(&router, "10.0.0.1:4242", "198.51.100.1");
+        assert_eq!(&body[..], b"198.51.100.1");
     }
 
     #[test]

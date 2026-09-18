@@ -1,12 +1,12 @@
 use std::{
+    borrow::Cow,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    sync::Arc,
 };
 
 use http::{HeaderMap, HeaderName, header};
 use topcoat_core::context::{Cx, try_request_context};
 
-use crate::{RouterInner, remote_addr, request::headers};
+use crate::{remote_addr, request::headers};
 
 /// The reverse proxies the router trusts to report the client's address.
 ///
@@ -19,11 +19,12 @@ use crate::{RouterInner, remote_addr, request::headers};
 /// and [`client_ip`](crate::request::client_ip) resolves the client's address
 /// through them.
 ///
-/// A proxy is trusted by the [network](Self::networks) it connects from, or
-/// by its position when its address is not fixed: the
+/// A proxy is trusted by the [network](Self::networks) it connects from, or,
+/// when its address is not fixed, by its position: the
 /// [nearest](Self::nearest) proxies to the application, counted from the
-/// connection's peer outward. The default trusts no proxy, so the client
-/// address is the connection's peer.
+/// connection's peer outward. Prefer networks, since positional trust also
+/// covers a client that manages to take a proxy's position. The default
+/// trusts no proxy, so the client address is the connection's peer.
 ///
 /// Trusting a proxy means trusting it to append the address it sees to the
 /// forwarding [header](Self::header) on every request it passes on. A proxy
@@ -78,8 +79,10 @@ impl TrustedProxies {
     ///
     /// Each value is an address with a prefix length in CIDR notation, like
     /// `"10.0.0.0/8"` or `"fd00::/8"`, or a single address like
-    /// `"127.0.0.1"`. An IPv4 address arriving over an IPv6 socket in its
-    /// mapped form (`::ffff:10.0.0.1`) matches an IPv4 network.
+    /// `"127.0.0.1"`. IPv4 and IPv6 networks are separate: an IPv6 network
+    /// never contains an IPv4 address. The IPv4-mapped IPv6 form
+    /// (`::ffff:10.0.0.1`), which a dual-stack socket reports IPv4 peers in,
+    /// counts as IPv4 both here and in the addresses compared against it.
     ///
     /// # Panics
     ///
@@ -107,9 +110,16 @@ impl TrustedProxies {
     /// The connection's peer is the first; each address the forwarding header
     /// lists, read from its end, is the next one out. Use this for a proxy
     /// whose address is not fixed, like a managed load balancer, or one that
-    /// connects over a Unix socket and so has no address at all. Count every
-    /// proxy between the client and the application: with a CDN in front of
-    /// a load balancer, that is two.
+    /// connects over a Unix socket and so has no address at all.
+    ///
+    /// Trust by position is only safe when every request passes through
+    /// exactly `count` proxies, since whatever sits at those positions is
+    /// trusted, the client included. With a CDN in front of a load balancer,
+    /// `count` is two; if a client can also reach the load balancer directly,
+    /// bypassing the CDN, it takes the CDN's position and the address it
+    /// sends in the header is believed. Prefer [`networks`](Self::networks)
+    /// wherever the proxies' addresses are known, and reserve this for a
+    /// fixed topology the application cannot be reached around.
     #[must_use]
     pub fn nearest(mut self, count: usize) -> Self {
         self.nearest = count;
@@ -127,6 +137,12 @@ impl TrustedProxies {
         self
     }
 
+    /// Resolves the client address of the request on `cx`.
+    pub(crate) fn resolve(&self, cx: &Cx) -> Option<IpAddr> {
+        let remote = remote_addr(cx).map(|addr| addr.ip());
+        self.client_ip(remote, headers(cx))
+    }
+
     /// Resolves the client address of a request that arrived from `remote`
     /// with `headers`.
     ///
@@ -141,31 +157,66 @@ impl TrustedProxies {
             return remote;
         }
 
-        // The header's entries from the one nearest to the application (the
-        // end of the last value) outward.
-        let mut entries = headers.get_all(self.header.name()).iter().rev().flat_map(|value| {
-            // A value that is not visible ASCII carries no address, so it is
-            // read as one unparsable entry.
-            value
-                .to_str()
-                .unwrap_or("?")
-                .split(',')
-                .map(str::trim)
-                .filter(|entry| !entry.is_empty())
-                .rev()
-        });
+        // A value that is not visible ASCII carries no address, so it is read
+        // as one unparsable entry.
+        let values = headers
+            .get_all(self.header.name())
+            .iter()
+            .map(|value| value.to_str().unwrap_or("?"));
 
-        if let ForwardedHeader::Single(_) = self.header {
-            return entries.next().and_then(parse_node);
+        match self.header {
+            ForwardedHeader::Single(_) => {
+                // Exactly one field holding exactly one address; any other
+                // shape is ambiguous, so it names none.
+                let mut values = values;
+                let value = values.next()?;
+                if values.next().is_some() {
+                    return None;
+                }
+                parse_node(value.trim())
+            }
+            ForwardedHeader::Forwarded => {
+                // An element's quoted strings may contain the list and
+                // parameter delimiters, so the split reads front to back with
+                // the quoting in mind, and the walk goes over the addresses
+                // from the back.
+                let addresses: Vec<Option<IpAddr>> = values
+                    .flat_map(|value| {
+                        split_quoted(value, ',')
+                            .filter(|element| !element.trim().is_empty())
+                            .map(|element| {
+                                forwarded_for(element).and_then(|node| parse_node(&node))
+                            })
+                    })
+                    .collect();
+                self.walk(remote, addresses.into_iter().rev())
+            }
+            ForwardedHeader::XForwardedFor => {
+                // The entries from the one nearest to the application (the
+                // end of the last value) outward.
+                let entries = values.rev().flat_map(|value| {
+                    value
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|entry| !entry.is_empty())
+                        .rev()
+                });
+                self.walk(remote, entries.map(parse_node))
+            }
         }
+    }
 
+    /// Walks outward from the peer at `remote` over `addresses`, the
+    /// forwarding header's entries from the one nearest to the application,
+    /// to the first untrusted address.
+    fn walk(
+        &self,
+        remote: Option<IpAddr>,
+        addresses: impl Iterator<Item = Option<IpAddr>>,
+    ) -> Option<IpAddr> {
         let mut farthest = remote;
-        for (hop, entry) in entries.enumerate() {
-            let entry = match self.header {
-                ForwardedHeader::Forwarded => forwarded_for(entry)?,
-                ForwardedHeader::XForwardedFor | ForwardedHeader::Single(_) => entry,
-            };
-            let ip = parse_node(entry)?;
+        for (hop, address) in addresses.enumerate() {
+            let ip = address?;
             if !self.is_trusted(Some(ip), hop + 1) {
                 return Some(ip);
             }
@@ -189,6 +240,11 @@ impl Default for TrustedProxies {
     }
 }
 
+/// The client's address as resolved when the request arrived, stored on the
+/// request context of every dispatch.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
+
 /// Returns the IP address of the client behind the current request, or `None`
 /// when it cannot be determined.
 ///
@@ -197,6 +253,11 @@ impl Default for TrustedProxies {
 /// router, a request arriving from a trusted proxy resolves to the address
 /// the proxy reports in the forwarding header, walking past every trusted
 /// proxy in the chain to the first address that is not one.
+///
+/// The router resolves the address once, as the request arrives and before
+/// any layer runs, so every reader over the life of the request sees the same
+/// client, whatever a layer does to the headers later. A context no router
+/// dispatched has no client.
 ///
 /// The address is unknown when the peer is unknown and not trusted by
 /// position, or when a trusted proxy reported an entry that carries no
@@ -223,11 +284,7 @@ impl Default for TrustedProxies {
 #[must_use]
 #[track_caller]
 pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
-    let remote = remote_addr(cx).map(|addr| addr.ip());
-    match try_request_context::<Arc<RouterInner>>(cx) {
-        Some(router) => router.trusted_proxies.client_ip(remote, headers(cx)),
-        None => remote.map(|ip| ip.to_canonical()),
-    }
+    try_request_context::<ClientIp>(cx)?.0
 }
 
 /// The header a trusted proxy reports the client address in.
@@ -240,11 +297,17 @@ pub enum ForwardedHeader {
     /// `Forwarded` (RFC 7239), listing the same chain as `for=` parameters,
     /// one element per proxy.
     Forwarded,
-    /// A header carrying the client's address alone, set by the outermost
-    /// proxy, like `CF-Connecting-IP` or `True-Client-IP`.
+    /// A header carrying the client's address alone, like `CF-Connecting-IP`
+    /// or `True-Client-IP`.
     ///
-    /// The header's last value is taken as the client's address as soon as
-    /// the connection's peer is trusted; there is no chain to walk.
+    /// Once the connection's peer is trusted, the header's value is the
+    /// client's address; there is no chain to walk. The header must appear
+    /// exactly once, holding exactly one address, or it names none.
+    ///
+    /// The peer must set or overwrite the header itself, or verify that the
+    /// proxy before it did. Trusting an internal load balancer that passes
+    /// the header through unchanged vouches for nothing about a value that
+    /// was supposedly set further out, since the client may have sent it.
     Single(HeaderName),
 }
 
@@ -270,6 +333,10 @@ struct Network {
 
 impl Network {
     /// Parses `"addr/prefix"`, or a bare address as a network of one.
+    ///
+    /// A network of IPv4-mapped IPv6 addresses (`::ffff:10.0.0.0/104`) is
+    /// read as the IPv4 network it maps to, the form addresses are compared
+    /// in.
     fn parse(value: &str) -> Option<Self> {
         let (addr, prefix) = match value.split_once('/') {
             Some((addr, prefix)) => (addr.parse::<IpAddr>().ok()?, prefix.parse::<u8>().ok()?),
@@ -278,24 +345,34 @@ impl Network {
                 (addr, Self::bits(addr))
             }
         };
-        (prefix <= Self::bits(addr)).then_some(Self { addr, prefix })
+        if prefix > Self::bits(addr) {
+            return None;
+        }
+        /// The prefix length of the `::ffff:0:0/96` block holding the mapped
+        /// addresses; a longer prefix denotes a network within it.
+        const MAPPED_PREFIX: u8 = 96;
+        match (addr, addr.to_canonical()) {
+            (IpAddr::V6(_), canonical @ IpAddr::V4(_)) if prefix >= MAPPED_PREFIX => Some(Self {
+                addr: canonical,
+                prefix: prefix - MAPPED_PREFIX,
+            }),
+            _ => Some(Self { addr, prefix }),
+        }
     }
 
-    /// Whether `ip` lies within the network.
+    /// Whether `ip`, in its canonical form, lies within the network.
     fn contains(self, ip: IpAddr) -> bool {
-        // An IPv4 address mapped into IPv6 lies in the IPv4 network it maps
-        // to, and in an IPv6 network covering its mapped form.
-        self.matches(ip) || self.matches(ip.to_canonical())
-    }
-
-    fn matches(self, ip: IpAddr) -> bool {
         match (self.addr, ip) {
             (IpAddr::V4(network), IpAddr::V4(ip)) => {
-                let mask = u32::MAX.checked_shl(32 - u32::from(self.prefix)).unwrap_or(0);
+                let mask = u32::MAX
+                    .checked_shl(32 - u32::from(self.prefix))
+                    .unwrap_or(0);
                 u32::from(network) & mask == u32::from(ip) & mask
             }
             (IpAddr::V6(network), IpAddr::V6(ip)) => {
-                let mask = u128::MAX.checked_shl(128 - u32::from(self.prefix)).unwrap_or(0);
+                let mask = u128::MAX
+                    .checked_shl(128 - u32::from(self.prefix))
+                    .unwrap_or(0);
                 u128::from(network) & mask == u128::from(ip) & mask
             }
             _ => false,
@@ -311,31 +388,98 @@ impl Network {
     }
 }
 
-/// Parses a node identifier as forwarding headers spell one: an address, an
-/// address with a port, an IPv6 address in brackets, or a quoted form of
-/// those. A value like `unknown` or an obfuscated identifier carries no
-/// address.
+/// Parses a node identifier as forwarding headers spell one: an address, or
+/// an address with a port, where an IPv6 address with a port is in brackets.
+/// A value like `unknown` or an obfuscated identifier carries no address,
+/// and neither does any other form.
 fn parse_node(value: &str) -> Option<IpAddr> {
-    let value = value.trim_matches('"');
     if let Ok(ip) = value.parse::<IpAddr>() {
         return Some(ip.to_canonical());
     }
-    if let Some(rest) = value.strip_prefix('[') {
-        let (ip, _port) = rest.split_once(']')?;
-        let ip = ip.parse::<Ipv6Addr>().ok()?;
-        return Some(IpAddr::V6(ip).to_canonical());
-    }
-    let (ip, _port) = value.rsplit_once(':')?;
-    let ip = ip.parse::<Ipv4Addr>().ok()?;
-    Some(IpAddr::V4(ip))
+    let (ip, port) = match value.strip_prefix('[') {
+        Some(rest) => {
+            let (ip, rest) = rest.split_once(']')?;
+            let ip = IpAddr::V6(ip.parse::<Ipv6Addr>().ok()?);
+            if rest.is_empty() {
+                return Some(ip.to_canonical());
+            }
+            (ip, rest.strip_prefix(':')?)
+        }
+        None => {
+            let (ip, port) = value.rsplit_once(':')?;
+            (IpAddr::V4(ip.parse::<Ipv4Addr>().ok()?), port)
+        }
+    };
+    is_node_port(port).then(|| ip.to_canonical())
 }
 
-/// Reads the `for` parameter out of one element of a `Forwarded` header.
-fn forwarded_for(element: &str) -> Option<&str> {
-    element.split(';').find_map(|pair| {
+/// Whether `value` is a port as a node identifier carries one: up to five
+/// digits, or an obfuscated port starting with `_`.
+fn is_node_port(value: &str) -> bool {
+    match value.strip_prefix('_') {
+        Some(obfuscated) => {
+            !obfuscated.is_empty()
+                && obfuscated
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+        }
+        None => (1..=5).contains(&value.len()) && value.bytes().all(|b| b.is_ascii_digit()),
+    }
+}
+
+/// Reads the `for` parameter out of one element of a `Forwarded` header,
+/// unquoted, or `None` when the element has none or quotes it malformed.
+fn forwarded_for(element: &str) -> Option<Cow<'_, str>> {
+    split_quoted(element, ';').find_map(|pair| {
         let (name, value) = pair.split_once('=')?;
-        name.trim().eq_ignore_ascii_case("for").then(|| value.trim())
+        name.trim()
+            .eq_ignore_ascii_case("for")
+            .then(|| unquote(value.trim()))?
     })
+}
+
+/// Splits `value` at each `delimiter` outside of a quoted string, since a
+/// quoted string may contain the delimiter (escaped quotes included).
+fn split_quoted(value: &str, delimiter: char) -> impl Iterator<Item = &str> {
+    let mut quoted = false;
+    let mut escaped = false;
+    value.split(move |c: char| {
+        if escaped {
+            escaped = false;
+        } else if quoted {
+            match c {
+                '\\' => escaped = true,
+                '"' => quoted = false,
+                _ => {}
+            }
+        } else if c == '"' {
+            quoted = true;
+        } else {
+            return c == delimiter;
+        }
+        false
+    })
+}
+
+/// Strips the quotes and escapes off a quoted string, or returns a token as
+/// it is. A value with an opening quote but no closing one is malformed.
+fn unquote(value: &str) -> Option<Cow<'_, str>> {
+    let Some(rest) = value.strip_prefix('"') else {
+        return Some(Cow::Borrowed(value));
+    };
+    let inner = rest.strip_suffix('"')?;
+    if !inner.contains('\\') {
+        return Some(Cow::Borrowed(inner));
+    }
+    let mut unescaped = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => unescaped.push(chars.next()?),
+            c => unescaped.push(c),
+        }
+    }
+    Some(Cow::Owned(unescaped))
 }
 
 #[cfg(test)]
@@ -475,6 +619,38 @@ mod tests {
     }
 
     #[test]
+    fn a_mapped_ipv4_network_is_read_as_ipv4() {
+        for network in ["::ffff:10.0.0.0/104", "::ffff:10.0.0.1"] {
+            let proxies = TrustedProxies::new().networks([network]);
+            for peer in ["10.0.0.1", "::ffff:10.0.0.1"] {
+                assert_eq!(
+                    resolve(&proxies, Some(peer), "198.51.100.1"),
+                    Some(ip("198.51.100.1")),
+                    "{network} should contain {peer}"
+                );
+            }
+            assert_eq!(
+                resolve(&proxies, Some("192.0.2.1"), "198.51.100.1"),
+                Some(ip("192.0.2.1")),
+                "{network} should not contain 192.0.2.1"
+            );
+        }
+    }
+
+    #[test]
+    fn an_ipv6_network_never_contains_an_ipv4_address() {
+        // The whole of IPv6 covers the mapped block, but the families stay
+        // apart.
+        let proxies = TrustedProxies::new().networks(["::/0"]);
+        for peer in ["10.0.0.1", "::ffff:10.0.0.1"] {
+            assert_eq!(
+                resolve(&proxies, Some(peer), "198.51.100.1"),
+                Some(ip("10.0.0.1"))
+            );
+        }
+    }
+
+    #[test]
     fn a_zero_prefix_matches_everything() {
         let proxies = TrustedProxies::new().networks(["0.0.0.0/0", "::/0"]);
         assert_eq!(
@@ -524,7 +700,11 @@ mod tests {
     fn nearest_counts_hops_out_from_the_peer() {
         let proxies = TrustedProxies::new().nearest(2);
         assert_eq!(
-            resolve(&proxies, Some("203.0.113.9"), "1.1.1.1, 198.51.100.1, 192.0.2.7"),
+            resolve(
+                &proxies,
+                Some("203.0.113.9"),
+                "1.1.1.1, 198.51.100.1, 192.0.2.7"
+            ),
             Some(ip("198.51.100.1"))
         );
     }
@@ -566,9 +746,32 @@ mod tests {
             Some(ip("2001:db8::1"))
         );
         assert_eq!(
-            resolve(&proxies, Some("10.0.0.1"), "\"[2001:db8::1]\""),
+            resolve(&proxies, Some("10.0.0.1"), "[2001:db8::1]"),
             Some(ip("2001:db8::1"))
         );
+        // An obfuscated port still names the address.
+        assert_eq!(
+            resolve(&proxies, Some("10.0.0.1"), "[2001:db8::1]:_port1"),
+            Some(ip("2001:db8::1"))
+        );
+    }
+
+    #[test]
+    fn a_malformed_node_leaves_the_client_unknown() {
+        let proxies = TrustedProxies::new().nearest(1);
+        for value in [
+            "\"198.51.100.1\"",
+            "198.51.100.1:",
+            "198.51.100.1:123456",
+            "198.51.100.1:http",
+            "[2001:db8::1",
+            "[2001:db8::1]:",
+            "[2001:db8::1]:4242x",
+            "[2001:db8::1]garbage",
+            "[198.51.100.1]",
+        ] {
+            assert_eq!(resolve(&proxies, Some("10.0.0.1"), value), None, "{value}");
+        }
     }
 
     #[test]
@@ -623,6 +826,46 @@ mod tests {
     }
 
     #[test]
+    fn forwarded_quoted_strings_may_contain_the_delimiters() {
+        let proxies = TrustedProxies::new()
+            .nearest(1)
+            .header(ForwardedHeader::Forwarded);
+        let resolve = |value: &str| {
+            let map = headers(&[("forwarded", value)]);
+            proxies.client_ip(Some(ip("10.0.0.1")), &map)
+        };
+
+        // A comma inside a quoted extension does not start a new element.
+        assert_eq!(
+            resolve("for=198.51.100.1;ext=\",for=203.0.113.9\""),
+            Some(ip("198.51.100.1"))
+        );
+        // Nor does a semicolon start a new parameter.
+        assert_eq!(
+            resolve("for=\"[2001:db8::1]\";ext=\"a;for=203.0.113.9\""),
+            Some(ip("2001:db8::1"))
+        );
+        // An escaped quote does not end the quoted string.
+        assert_eq!(
+            resolve("for=\"[2001:db8::1]:80\";ext=\"x\\\"y,for=203.0.113.9\""),
+            Some(ip("2001:db8::1"))
+        );
+        // Escapes inside the address are unescaped.
+        assert_eq!(resolve("for=\"198.51.\\100.1\""), Some(ip("198.51.100.1")));
+    }
+
+    #[test]
+    fn a_forwarded_value_with_an_unclosed_quote_leaves_the_client_unknown() {
+        let proxies = TrustedProxies::new()
+            .nearest(1)
+            .header(ForwardedHeader::Forwarded);
+        for value in ["for=\"198.51.100.1", "for=\"198.51.100.1\\\""] {
+            let map = headers(&[("forwarded", value)]);
+            assert_eq!(proxies.client_ip(Some(ip("10.0.0.1")), &map), None);
+        }
+    }
+
+    #[test]
     fn a_forwarded_element_without_an_address_leaves_the_client_unknown() {
         let proxies = TrustedProxies::new()
             .nearest(1)
@@ -648,11 +891,12 @@ mod tests {
 
     #[test]
     fn a_single_header_is_the_client_behind_a_trusted_peer() {
-        let proxies = TrustedProxies::new()
-            .networks(["10.0.0.0/8"])
-            .header(ForwardedHeader::Single(HeaderName::from_static(
-                "cf-connecting-ip",
-            )));
+        let proxies =
+            TrustedProxies::new()
+                .networks(["10.0.0.0/8"])
+                .header(ForwardedHeader::Single(HeaderName::from_static(
+                    "cf-connecting-ip",
+                )));
         let headers = headers(&[
             ("cf-connecting-ip", "198.51.100.1"),
             ("x-forwarded-for", "1.1.1.1, 198.51.100.1, 192.0.2.7"),
@@ -668,18 +912,23 @@ mod tests {
         );
         // A trusted peer that did not set the header leaves the client
         // unknown.
-        assert_eq!(proxies.client_ip(Some(ip("10.0.0.1")), &HeaderMap::new()), None);
+        assert_eq!(
+            proxies.client_ip(Some(ip("10.0.0.1")), &HeaderMap::new()),
+            None
+        );
     }
 
     #[test]
-    fn a_single_header_takes_its_last_value() {
+    fn a_single_header_with_more_than_one_address_is_ambiguous() {
         let proxies = TrustedProxies::new()
             .nearest(1)
-            .header(ForwardedHeader::Single(HeaderName::from_static("x-real-ip")));
-        let headers = headers(&[("x-real-ip", "1.1.1.1"), ("x-real-ip", "198.51.100.1")]);
-        assert_eq!(
-            proxies.client_ip(Some(ip("10.0.0.1")), &headers),
-            Some(ip("198.51.100.1"))
-        );
+            .header(ForwardedHeader::Single(HeaderName::from_static(
+                "x-real-ip",
+            )));
+        // Two fields, or one field listing two addresses.
+        let map = headers(&[("x-real-ip", "1.1.1.1"), ("x-real-ip", "198.51.100.1")]);
+        assert_eq!(proxies.client_ip(Some(ip("10.0.0.1")), &map), None);
+        let map = headers(&[("x-real-ip", "1.1.1.1, 198.51.100.1")]);
+        assert_eq!(proxies.client_ip(Some(ip("10.0.0.1")), &map), None);
     }
 }
