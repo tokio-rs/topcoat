@@ -22,7 +22,7 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, IntoPath, Methods, Path, Route, RouteFuture, RouteId,
+    Body, IntoPath, Methods, Path, Route, RouteFuture, RouteId, RouterBuilder,
     error::not_found,
     path_param_segments,
     request::{headers, method},
@@ -196,6 +196,59 @@ impl Route for DirectoryRoute {
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
         Box::pin(self.serve(cx))
+    }
+}
+
+/// Registers directories to serve files from on a [`RouterBuilder`].
+///
+/// Implemented for [`RouterBuilder`] so it is in scope wherever a router is
+/// being built. Each method registers a [`DirectoryRoute`].
+pub trait RouterBuilderDirectoryExt {
+    /// Serves the files of `dir` at `path`, whose catch-all captures the file
+    /// to serve.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `path` is a string that is not a well-formed route path, or
+    /// if it does not end in a catch-all.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use topcoat::router::{Router, RouterBuilderDirectoryExt};
+    ///
+    /// let router = Router::builder()
+    ///     .serve_dir("/downloads/{*file}", "var/downloads")
+    ///     .build();
+    /// ```
+    #[must_use]
+    fn serve_dir(self, path: impl IntoPath, dir: impl Into<FsPathBuf>) -> Self;
+
+    /// Serves the files of `dir` at the site root, so `public/logo.svg` is
+    /// served at `/logo.svg`.
+    ///
+    /// A file is only served where no other route claims the URL, and the
+    /// root `/` itself is left to a page registered there.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use topcoat::router::{Router, RouterBuilderDirectoryExt};
+    ///
+    /// let router = Router::builder().public_dir("./public").build();
+    /// ```
+    #[must_use]
+    fn public_dir(self, dir: impl Into<FsPathBuf>) -> Self;
+}
+
+impl RouterBuilderDirectoryExt for RouterBuilder {
+    #[track_caller]
+    fn serve_dir(self, path: impl IntoPath, dir: impl Into<FsPathBuf>) -> Self {
+        self.route(DirectoryRoute::new(path, dir))
+    }
+
+    fn public_dir(self, dir: impl Into<FsPathBuf>) -> Self {
+        self.serve_dir("/{*file}", dir)
     }
 }
 
