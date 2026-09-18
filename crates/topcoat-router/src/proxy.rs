@@ -891,10 +891,7 @@ mod tests {
 
         // The client sent an entry the header cannot decode, and the proxy
         // appended the real address after it.
-        assert_eq!(
-            resolve(b"\xff\xfe, 198.51.100.1"),
-            Some(ip("198.51.100.1"))
-        );
+        assert_eq!(resolve(b"\xff\xfe, 198.51.100.1"), Some(ip("198.51.100.1")));
         // The same byte within the entry the walk reaches leaves the client
         // unknown.
         assert_eq!(resolve(b"198.51.100.1\xff"), None);
