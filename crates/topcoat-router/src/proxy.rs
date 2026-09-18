@@ -219,12 +219,10 @@ impl TrustedProxies {
             return remote;
         }
 
-        // A value that is not visible ASCII carries no address, so it is read
-        // as one unparsable entry.
-        let values = headers
-            .get_all(self.header.name())
-            .iter()
-            .map(|value| value.to_str().unwrap_or("?"));
+        // The lists are split as bytes and each entry is decoded on its own,
+        // so a byte outside ASCII that a client put in its entry spoils that
+        // entry alone, not the address a proxy appended after it.
+        let values = headers.get_all(self.header.name()).iter();
 
         match self.header {
             ForwardedHeader::Single(_) => {
@@ -235,13 +233,16 @@ impl TrustedProxies {
                 if values.next().is_some() {
                     return None;
                 }
-                parse_node(value.trim())
+                parse_node(value.to_str().ok()?.trim())
             }
             ForwardedHeader::Forwarded => {
                 // A quote left open would swallow whatever a proxy appends
                 // after it, so a field with one is malformed as a whole.
-                let fields: Vec<&str> = values
-                    .map(|value| is_well_quoted(value).then_some(value))
+                let fields: Vec<&[u8]> = values
+                    .map(|value| {
+                        let field = value.as_bytes();
+                        is_well_quoted(field).then_some(field)
+                    })
                     .collect::<Option<_>>()?;
                 // An element's quoted strings may contain the list and
                 // parameter delimiters, so the split reads front to back with
@@ -250,8 +251,8 @@ impl TrustedProxies {
                 let addresses: Vec<Option<IpAddr>> = fields
                     .into_iter()
                     .flat_map(|field| {
-                        split_quoted(field, ',')
-                            .filter(|element| !element.trim().is_empty())
+                        split_quoted(field, b',')
+                            .filter(|element| !element.trim_ascii().is_empty())
                             .map(|element| {
                                 forwarded_for(element).and_then(|node| parse_node(&node))
                             })
@@ -264,12 +265,16 @@ impl TrustedProxies {
                 // end of the last value) outward.
                 let entries = values.rev().flat_map(|value| {
                     value
-                        .split(',')
-                        .map(str::trim)
+                        .as_bytes()
+                        .split(|&byte| byte == b',')
+                        .map(<[u8]>::trim_ascii)
                         .filter(|entry| !entry.is_empty())
                         .rev()
                 });
-                self.walk(remote, entries.map(parse_node))
+                self.walk(
+                    remote,
+                    entries.map(|entry| str::from_utf8(entry).ok().and_then(parse_node)),
+                )
             }
         }
     }
@@ -447,11 +452,13 @@ fn is_node_port(value: &str) -> bool {
 
 /// Reads the `for` value from one entry in a `Forwarded` header and removes
 /// its surrounding quotes and backslash escapes.
-/// Returns `None` if `for` is missing or repeated, a parameter has no `=`,
-/// or the value has an unclosed quote or an incomplete escape.
-fn forwarded_for(element: &str) -> Option<Cow<'_, str>> {
+/// Returns `None` if `for` is missing or repeated, a parameter has no `=` or
+/// a byte outside ASCII, or the value has an unclosed quote or an incomplete
+/// escape.
+fn forwarded_for(element: &[u8]) -> Option<Cow<'_, str>> {
     let mut found = None;
-    for pair in split_quoted(element, ';') {
+    for pair in split_quoted(element, b';') {
+        let pair = str::from_utf8(pair).ok()?;
         if pair.trim().is_empty() {
             continue;
         }
@@ -470,19 +477,19 @@ fn forwarded_for(element: &str) -> Option<Cow<'_, str>> {
 
 /// Checks that every opening quote has a closing quote and every backslash
 /// inside a quoted string has a character after it.
-fn is_well_quoted(value: &str) -> bool {
+fn is_well_quoted(value: &[u8]) -> bool {
     let mut quoted = false;
     let mut escaped = false;
-    for c in value.chars() {
+    for &byte in value {
         if escaped {
             escaped = false;
         } else if quoted {
-            match c {
-                '\\' => escaped = true,
-                '"' => quoted = false,
+            match byte {
+                b'\\' => escaped = true,
+                b'"' => quoted = false,
                 _ => {}
             }
-        } else if c == '"' {
+        } else if byte == b'"' {
             quoted = true;
         }
     }
@@ -490,25 +497,25 @@ fn is_well_quoted(value: &str) -> bool {
 }
 
 /// Splits `value` at each `delimiter`, keeping quoted strings together.
-/// A backslash inside a quoted string escapes the next character, so an
-/// escaped quote does not end the string.
+/// A backslash inside a quoted string escapes the next byte, so an escaped
+/// quote does not end the string.
 /// Check the quotes with [`is_well_quoted`] before calling this function.
-fn split_quoted(value: &str, delimiter: char) -> impl Iterator<Item = &str> {
+fn split_quoted(value: &[u8], delimiter: u8) -> impl Iterator<Item = &[u8]> {
     let mut quoted = false;
     let mut escaped = false;
-    value.split(move |c: char| {
+    value.split(move |&byte| {
         if escaped {
             escaped = false;
         } else if quoted {
-            match c {
-                '\\' => escaped = true,
-                '"' => quoted = false,
+            match byte {
+                b'\\' => escaped = true,
+                b'"' => quoted = false,
                 _ => {}
             }
-        } else if c == '"' {
+        } else if byte == b'"' {
             quoted = true;
         } else {
-            return c == delimiter;
+            return byte == delimiter;
         }
         false
     })
@@ -873,6 +880,27 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_byte_outside_ascii_spoils_its_entry_only() {
+        let proxies = TrustedProxies::new().nearest(1);
+        let resolve = |value: &[u8]| {
+            let mut map = HeaderMap::new();
+            map.append("x-forwarded-for", HeaderValue::from_bytes(value).unwrap());
+            proxies.client_ip(Some(ip("10.0.0.1")), &map)
+        };
+
+        // The client sent an entry the header cannot decode, and the proxy
+        // appended the real address after it.
+        assert_eq!(
+            resolve(b"\xff\xfe, 198.51.100.1"),
+            Some(ip("198.51.100.1"))
+        );
+        // The same byte within the entry the walk reaches leaves the client
+        // unknown.
+        assert_eq!(resolve(b"198.51.100.1\xff"), None);
+        assert_eq!(resolve(b"\xff"), None);
+    }
+
     // -- the Forwarded header --
 
     #[test]
@@ -957,6 +985,31 @@ mod tests {
     }
 
     #[test]
+    fn a_forwarded_byte_outside_ascii_spoils_its_element_only() {
+        let proxies = TrustedProxies::new()
+            .nearest(1)
+            .header(ForwardedHeader::Forwarded);
+        let resolve = |value: &[u8]| {
+            let mut map = HeaderMap::new();
+            map.append("forwarded", HeaderValue::from_bytes(value).unwrap());
+            proxies.client_ip(Some(ip("10.0.0.1")), &map)
+        };
+
+        // The proxy appended its element after one the client sent.
+        assert_eq!(
+            resolve(b"for=\xff\xfe, for=198.51.100.1"),
+            Some(ip("198.51.100.1"))
+        );
+        // A quoted string may hold such a byte without ending early.
+        assert_eq!(
+            resolve(b"for=203.0.113.9;ext=\"\xff,for=1.1.1.1\", for=198.51.100.1"),
+            Some(ip("198.51.100.1"))
+        );
+        // The element the walk reaches carries no address.
+        assert_eq!(resolve(b"for=198.51.100.1;ext=\xff"), None);
+    }
+
+    #[test]
     fn a_forwarded_element_with_two_for_parameters_is_ambiguous() {
         let proxies = TrustedProxies::new()
             .nearest(1)
@@ -1029,6 +1082,21 @@ mod tests {
         let map = headers(&[("x-real-ip", "1.1.1.1"), ("x-real-ip", "198.51.100.1")]);
         assert_eq!(proxies.client_ip(Some(ip("10.0.0.1")), &map), None);
         let map = headers(&[("x-real-ip", "1.1.1.1, 198.51.100.1")]);
+        assert_eq!(proxies.client_ip(Some(ip("10.0.0.1")), &map), None);
+    }
+
+    #[test]
+    fn a_single_header_with_a_byte_outside_ascii_is_unreadable() {
+        let proxies = TrustedProxies::new()
+            .nearest(1)
+            .header(ForwardedHeader::Single(HeaderName::from_static(
+                "x-real-ip",
+            )));
+        let mut map = HeaderMap::new();
+        map.append(
+            "x-real-ip",
+            HeaderValue::from_bytes(b"198.51.100.1\xff").unwrap(),
+        );
         assert_eq!(proxies.client_ip(Some(ip("10.0.0.1")), &map), None);
     }
 }
