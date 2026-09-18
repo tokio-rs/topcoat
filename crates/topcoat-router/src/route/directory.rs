@@ -37,6 +37,10 @@ const HTTP_DATE_END_SECS: u64 = 253_402_300_800;
 
 /// A [`Route`] that serves files from a directory on disk.
 ///
+/// For application assets such as images and stylesheets, prefer Topcoat's
+/// `asset!` system. It generates content-hashed URLs for long-lived caching,
+/// and Rust asset handles help avoid typos in URL strings.
+///
 /// For simpler registration, use
 /// [`serve_dir`](RouterBuilderDirectoryExt::serve_dir) on the router builder,
 /// or [`public_dir`](RouterBuilderDirectoryExt::public_dir) to serve files
@@ -205,6 +209,10 @@ impl Route for DirectoryRoute {
 }
 
 /// Adds directory-serving methods to [`RouterBuilder`].
+///
+/// For application assets, prefer Topcoat's `asset!` system for content-hashed
+/// URLs and Rust asset handles. These methods are useful for files that need
+/// fixed URLs or are created at runtime.
 ///
 /// Import this trait to use [`serve_dir`](Self::serve_dir) and
 /// [`public_dir`](Self::public_dir). Both methods register a [`DirectoryRoute`],
@@ -496,6 +504,36 @@ mod tests {
         let (status, _, body) = get(&router, "/css/site.css");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body, "body{}");
+    }
+
+    // -- RouterBuilderDirectoryExt --
+
+    #[test]
+    fn serve_dir_registers_the_route() {
+        let dir = temp_dir("serve-dir");
+        populate(&dir);
+        let router = Router::builder().serve_dir("/public/{*file}", &dir).build();
+        let (status, _, body) = get(&router, "/public/logo.svg");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, "<svg/>");
+    }
+
+    #[test]
+    fn public_dir_serves_at_the_root() {
+        let dir = temp_dir("public-dir");
+        populate(&dir);
+        let router = Router::builder().public_dir(&dir).build();
+        let (status, _, body) = get(&router, "/logo.svg");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, "<svg/>");
+        let (status, _, _) = get(&router, "/");
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    #[should_panic(expected = "must end in a catch-all")]
+    fn serve_dir_without_a_catch_all_panics() {
+        let _ = Router::builder().serve_dir("/public", "public");
     }
 
     #[test]

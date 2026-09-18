@@ -315,6 +315,38 @@ Other features collect their own annotated items at link time, so `discover()` r
 
 [`module_router!`] registers module-derived handlers only. It returns a `RouterBuilder`, so call `discover()` on it, or register the remaining items by hand, exactly as above.
 
+# Static files
+
+For application assets such as images and stylesheets, we recommend the [asset system](../asset/index.html). It generates content-hashed URLs for long-lived caching, and Rust asset handles help avoid typos in URL strings. Serving a directory is useful when files need fixed URLs or are created at runtime.
+
+Enable the `fs` feature to serve files from a directory. Import [`RouterBuilderDirectoryExt`] and call [`public_dir`](RouterBuilderDirectoryExt::public_dir) to serve them at the site root:
+
+```rust
+# #[cfg(feature = "fs")]
+# {
+use topcoat::router::{Router, RouterBuilderDirectoryExt};
+
+let router = Router::builder().public_dir("./public").build();
+# }
+```
+
+This serves `./public/logo.svg` at `/logo.svg` and `./public/css/site.css` at `/css/site.css`. The directory is relative to the process's current working directory. The root URL `/` is left available for a home page.
+
+Use [`serve_dir`](RouterBuilderDirectoryExt::serve_dir) to choose a different route path. Its final catch-all parameter selects the file within the directory:
+
+```rust
+# #[cfg(feature = "fs")]
+# {
+use topcoat::router::{Router, RouterBuilderDirectoryExt};
+
+let router = Router::builder()
+    .serve_dir("/downloads/{*file}", "./files")
+    .build();
+# }
+```
+
+This serves `./files/report.pdf` at `/downloads/report.pdf`. The catch-all does not match `/downloads` or `/downloads/` itself.
+
 # Serving
 
 Use [`start`](crate::start) to run a finalized router:
@@ -345,7 +377,7 @@ topcoat::serve(listener, router).await
 
 The socket file of a previous run is not removed automatically, so remove any stale file before binding, as above.
 
-Serving is the only part of the framework that depends on tokio and hyper, and it sits behind the `serve` cargo feature, enabled by default. The rest (routing, views, and request handling) works without it: [`Router::handle`] turns a [`Request`](request::Request) into a [`Response`](response::Response) directly, with no listener involved. On a platform that receives HTTP requests for you, such as a serverless or WebAssembly runtime, build `topcoat` without default features, leave `serve` off, and call [`Router::handle`] from the platform's request handler.
+The HTTP server uses Tokio and Hyper and sits behind the `serve` Cargo feature, enabled by default. Routing, views, and request handling work without it: [`Router::handle`] turns a [`Request`](request::Request) into a [`Response`](response::Response) directly, with no listener involved. On a platform that receives HTTP requests for you, such as a serverless or WebAssembly runtime, build `topcoat` without default features, leave `serve` off, and call [`Router::handle`] from the platform's request handler.
 
 # Tower services
 
