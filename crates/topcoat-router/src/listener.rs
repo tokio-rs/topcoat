@@ -20,7 +20,7 @@ pub trait Listener: Send + 'static {
     /// peer's socket address, when the transport has one.
     ///
     /// The address is stamped on every request of the connection as its
-    /// [`RemoteAddr`](crate::request::RemoteAddr). A transport without socket
+    /// [`RemoteAddr`](crate::RemoteAddr). A transport without socket
     /// addresses, like a Unix domain socket, yields `None`.
     ///
     /// # Errors
@@ -56,7 +56,7 @@ impl Listener for TcpListener {
 /// forwards HTTP to the socket path.
 ///
 /// A Unix socket peer has no socket address, so requests carry no
-/// [`RemoteAddr`](crate::request::RemoteAddr). To resolve the client
+/// [`RemoteAddr`](crate::RemoteAddr). To resolve the client
 /// address through the proxy on the other end, trust it by position with
 /// [`TrustedProxies::nearest`](crate::TrustedProxies::nearest).
 ///

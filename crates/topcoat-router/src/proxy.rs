@@ -16,7 +16,7 @@ use crate::{remote_addr, request::headers};
 /// send that header too, so the router only reads it on a connection it knows
 /// comes from a proxy. This value names those proxies. Register it with
 /// [`RouterBuilder::trusted_proxies`](crate::RouterBuilder::trusted_proxies),
-/// and [`client_ip`](crate::request::client_ip) resolves the client's address
+/// and [`client_ip`] resolves the client's address
 /// through them.
 ///
 /// A proxy is trusted by the [network](Self::networks) it connects from, or,
@@ -176,13 +176,19 @@ impl TrustedProxies {
                 parse_node(value.trim())
             }
             ForwardedHeader::Forwarded => {
+                // A quote left open would swallow whatever a proxy appends
+                // after it, so a field with one is malformed as a whole.
+                let fields: Vec<&str> = values
+                    .map(|value| is_well_quoted(value).then_some(value))
+                    .collect::<Option<_>>()?;
                 // An element's quoted strings may contain the list and
                 // parameter delimiters, so the split reads front to back with
                 // the quoting in mind, and the walk goes over the addresses
                 // from the back.
-                let addresses: Vec<Option<IpAddr>> = values
-                    .flat_map(|value| {
-                        split_quoted(value, ',')
+                let addresses: Vec<Option<IpAddr>> = fields
+                    .into_iter()
+                    .flat_map(|field| {
+                        split_quoted(field, ',')
                             .filter(|element| !element.trim().is_empty())
                             .map(|element| {
                                 forwarded_for(element).and_then(|node| parse_node(&node))
@@ -338,19 +344,19 @@ impl Network {
     /// read as the IPv4 network it maps to, the form addresses are compared
     /// in.
     fn parse(value: &str) -> Option<Self> {
-        let (addr, prefix) = match value.split_once('/') {
-            Some((addr, prefix)) => (addr.parse::<IpAddr>().ok()?, prefix.parse::<u8>().ok()?),
-            None => {
-                let addr = value.parse::<IpAddr>().ok()?;
-                (addr, Self::bits(addr))
-            }
+        /// The prefix length of the `::ffff:0:0/96` block holding the mapped
+        /// addresses; a longer prefix denotes a network within it.
+        const MAPPED_PREFIX: u8 = 96;
+
+        let (addr, prefix) = if let Some((addr, prefix)) = value.split_once('/') {
+            (addr.parse::<IpAddr>().ok()?, prefix.parse::<u8>().ok()?)
+        } else {
+            let addr = value.parse::<IpAddr>().ok()?;
+            (addr, Self::bits(addr))
         };
         if prefix > Self::bits(addr) {
             return None;
         }
-        /// The prefix length of the `::ffff:0:0/96` block holding the mapped
-        /// addresses; a longer prefix denotes a network within it.
-        const MAPPED_PREFIX: u8 = 96;
         match (addr, addr.to_canonical()) {
             (IpAddr::V6(_), canonical @ IpAddr::V4(_)) if prefix >= MAPPED_PREFIX => Some(Self {
                 addr: canonical,
@@ -396,19 +402,16 @@ fn parse_node(value: &str) -> Option<IpAddr> {
     if let Ok(ip) = value.parse::<IpAddr>() {
         return Some(ip.to_canonical());
     }
-    let (ip, port) = match value.strip_prefix('[') {
-        Some(rest) => {
-            let (ip, rest) = rest.split_once(']')?;
-            let ip = IpAddr::V6(ip.parse::<Ipv6Addr>().ok()?);
-            if rest.is_empty() {
-                return Some(ip.to_canonical());
-            }
-            (ip, rest.strip_prefix(':')?)
+    let (ip, port) = if let Some(rest) = value.strip_prefix('[') {
+        let (ip, rest) = rest.split_once(']')?;
+        let ip = IpAddr::V6(ip.parse::<Ipv6Addr>().ok()?);
+        if rest.is_empty() {
+            return Some(ip.to_canonical());
         }
-        None => {
-            let (ip, port) = value.rsplit_once(':')?;
-            (IpAddr::V4(ip.parse::<Ipv4Addr>().ok()?), port)
-        }
+        (ip, rest.strip_prefix(':')?)
+    } else {
+        let (ip, port) = value.rsplit_once(':')?;
+        (IpAddr::V4(ip.parse::<Ipv4Addr>().ok()?), port)
     };
     is_node_port(port).then(|| ip.to_canonical())
 }
@@ -430,16 +433,48 @@ fn is_node_port(value: &str) -> bool {
 /// Reads the `for` parameter out of one element of a `Forwarded` header,
 /// unquoted, or `None` when the element has none or quotes it malformed.
 fn forwarded_for(element: &str) -> Option<Cow<'_, str>> {
-    split_quoted(element, ';').find_map(|pair| {
+    let mut found = None;
+    for pair in split_quoted(element, ';') {
+        if pair.trim().is_empty() {
+            continue;
+        }
         let (name, value) = pair.split_once('=')?;
-        name.trim()
-            .eq_ignore_ascii_case("for")
-            .then(|| unquote(value.trim()))?
-    })
+        if name.trim().eq_ignore_ascii_case("for") {
+            // A parameter may appear once per element; a second one is
+            // ambiguous.
+            if found.is_some() {
+                return None;
+            }
+            found = Some(unquote(value.trim())?);
+        }
+    }
+    found
+}
+
+/// Whether every quoted string in `value` is closed, with no escape left
+/// dangling at its end.
+fn is_well_quoted(value: &str) -> bool {
+    let mut quoted = false;
+    let mut escaped = false;
+    for c in value.chars() {
+        if escaped {
+            escaped = false;
+        } else if quoted {
+            match c {
+                '\\' => escaped = true,
+                '"' => quoted = false,
+                _ => {}
+            }
+        } else if c == '"' {
+            quoted = true;
+        }
+    }
+    !quoted && !escaped
 }
 
 /// Splits `value` at each `delimiter` outside of a quoted string, since a
-/// quoted string may contain the delimiter (escaped quotes included).
+/// quoted string may contain the delimiter (escaped quotes included). The
+/// value's quoting must be well formed (see [`is_well_quoted`]).
 fn split_quoted(value: &str, delimiter: char) -> impl Iterator<Item = &str> {
     let mut quoted = false;
     let mut escaped = false;
@@ -859,10 +894,37 @@ mod tests {
         let proxies = TrustedProxies::new()
             .nearest(1)
             .header(ForwardedHeader::Forwarded);
-        for value in ["for=\"198.51.100.1", "for=\"198.51.100.1\\\""] {
+        for value in [
+            "for=\"198.51.100.1",
+            "for=\"198.51.100.1\\\"",
+            // The client left a quote open and the proxy appended the real
+            // address after it; the client's address must not win.
+            "for=203.0.113.9;ext=\", for=198.51.100.1",
+        ] {
             let map = headers(&[("forwarded", value)]);
-            assert_eq!(proxies.client_ip(Some(ip("10.0.0.1")), &map), None);
+            assert_eq!(
+                proxies.client_ip(Some(ip("10.0.0.1")), &map),
+                None,
+                "{value}"
+            );
         }
+
+        // The same with the proxy adding a field of its own: a malformed
+        // field spoils the whole header.
+        let map = headers(&[
+            ("forwarded", "for=203.0.113.9;ext=\""),
+            ("forwarded", "for=198.51.100.1"),
+        ]);
+        assert_eq!(proxies.client_ip(Some(ip("10.0.0.1")), &map), None);
+    }
+
+    #[test]
+    fn a_forwarded_element_with_two_for_parameters_is_ambiguous() {
+        let proxies = TrustedProxies::new()
+            .nearest(1)
+            .header(ForwardedHeader::Forwarded);
+        let map = headers(&[("forwarded", "for=203.0.113.9;for=198.51.100.1")]);
+        assert_eq!(proxies.client_ip(Some(ip("10.0.0.1")), &map), None);
     }
 
     #[test]
