@@ -153,23 +153,28 @@ impl DirectoryRoute {
         }
 
         let last_modified = metadata.modified().ok().and_then(http_date);
-        let mut response = Response::new(Body::empty());
+        let mut response = Response::new(());
         let headers = response.headers_mut();
         if let Some(last_modified) = last_modified {
-            headers.insert(LAST_MODIFIED, last_modified.to_string().parse()?);
+            headers.insert(
+                LAST_MODIFIED,
+                HeaderValue::try_from(last_modified.to_string())?,
+            );
             if is_unchanged_since(cx, last_modified) {
                 *response.status_mut() = StatusCode::NOT_MODIFIED;
-                return Ok(response);
+                return Ok(response.map(|()| Body::empty()));
             }
         }
         let len = metadata.len();
         headers.insert(CONTENT_TYPE, content_type(&path));
         headers.insert(CONTENT_LENGTH, HeaderValue::from(len));
-        if method(cx) != Method::HEAD {
+        let body = if method(cx) == Method::HEAD || len == 0 {
+            Body::empty()
+        } else {
             let file = File::open(&path).await.map_err(io_error)?;
-            *response.body_mut() = stream(file, len);
-        }
-        Ok(response)
+            stream(file, len)
+        };
+        Ok(response.map(|()| body))
     }
 }
 
@@ -238,19 +243,24 @@ fn is_unchanged_since(cx: &Cx, last_modified: HttpDate) -> bool {
 /// Guesses a file's `Content-Type` from its extension, falling back to
 /// `application/octet-stream`.
 fn content_type(path: &FsPath) -> HeaderValue {
-    let mime = mime_guess::from_path(path).first_or_octet_stream();
     // A guessed type is drawn from a fixed table of header-safe strings.
-    HeaderValue::from_str(mime.as_ref()).expect("a guessed content type is a valid header value")
+    HeaderValue::from_static(
+        mime_guess::from_path(path)
+            .first_raw()
+            .unwrap_or("application/octet-stream"),
+    )
 }
 
 /// Streams the first `len` bytes of `file` as a response body, one chunk at a
 /// time.
 ///
 /// The body is cut at `len`, the length the response advertises, so a file
-/// that grows while it is sent does not overrun its `Content-Length`.
+/// that grows while it is sent does not overrun its `Content-Length`. A file
+/// smaller than a chunk gets a buffer of its own size, so serving many small
+/// files at once does not hold a full chunk for each.
 fn stream(file: File, len: u64) -> Body {
-    let chunks =
-        ReaderStream::with_capacity(file.take(len), CHUNK_SIZE).map_ok(Frame::<Bytes>::data);
+    let capacity = usize::try_from(len).map_or(CHUNK_SIZE, |len| len.min(CHUNK_SIZE));
+    let chunks = ReaderStream::with_capacity(file.take(len), capacity).map_ok(Frame::<Bytes>::data);
     Body::new(StreamBody::new(chunks))
 }
 
@@ -400,6 +410,18 @@ mod tests {
         let (status, headers, _) = get(&router, "/public/notes");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(headers[CONTENT_TYPE], "application/octet-stream");
+    }
+
+    #[test]
+    fn serves_an_empty_file() {
+        let dir = temp_dir("empty-file");
+        populate(&dir);
+        fs::write(dir.join("empty.txt"), "").unwrap();
+        let router = router("/public/{*file}", &dir);
+        let (status, headers, body) = get(&router, "/public/empty.txt");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers[CONTENT_LENGTH], "0");
+        assert!(body.is_empty());
     }
 
     #[test]
