@@ -65,7 +65,7 @@ const HTTP_DATE_END_SECS: u64 = 253_402_300_800;
 ///     .build();
 /// ```
 ///
-/// Registered at the root, the route serves any URL no other route claims:
+/// Registered at the root, the route serves any URL that no other route claims.
 ///
 /// ```rust
 /// use topcoat::router::{DirectoryRoute, Router};
@@ -147,23 +147,34 @@ impl DirectoryRoute {
         // The file type is checked before the file is opened: a directory has
         // nothing to send, and opening a special file like a named pipe can
         // block until a peer shows up.
-        let metadata = tokio::fs::metadata(&path).await.map_err(io_error)?;
+        if !tokio::fs::metadata(&path)
+            .await
+            .map_err(io_error)?
+            .is_file()
+        {
+            return Err(not_found().into());
+        }
+        // The headers describe the file that was opened rather than whatever
+        // the path named a moment earlier, so a file replaced in between is
+        // still sent whole.
+        let file = File::open(&path).await.map_err(io_error)?;
+        let metadata = file.metadata().await?;
         if !metadata.is_file() {
             return Err(not_found().into());
         }
 
-        let last_modified = metadata.modified().ok().and_then(http_date);
         let mut response = Response::new(());
         let headers = response.headers_mut();
+        let last_modified = metadata.modified().ok().and_then(http_date);
         if let Some(last_modified) = last_modified {
             headers.insert(
                 LAST_MODIFIED,
                 HeaderValue::try_from(last_modified.to_string())?,
             );
-            if is_unchanged_since(cx, last_modified) {
-                *response.status_mut() = StatusCode::NOT_MODIFIED;
-                return Ok(response.map(|()| Body::empty()));
-            }
+        }
+        if is_not_modified(cx, last_modified) {
+            *response.status_mut() = StatusCode::NOT_MODIFIED;
+            return Ok(response.map(|()| Body::empty()));
         }
         let len = metadata.len();
         headers.insert(CONTENT_TYPE, content_type(&path));
@@ -171,7 +182,6 @@ impl DirectoryRoute {
         let body = if method(cx) == Method::HEAD || len == 0 {
             Body::empty()
         } else {
-            let file = File::open(&path).await.map_err(io_error)?;
             stream(file, len)
         };
         Ok(response.map(|()| body))
@@ -215,29 +225,35 @@ fn io_error(error: io::Error) -> Error {
 /// Converts a file's modification time into a `Last-Modified` value.
 ///
 /// A time in the future is clamped to now, as a `Last-Modified` must not be
-/// later than the response it is sent with. A time an HTTP date cannot
-/// express, before 1970 or past the year 9999, yields `None` so the header is
-/// left out.
+/// later than the response it is sent with. A time before 1970 cannot be
+/// expressed as an HTTP date and yields `None`, so the header is left out.
+/// Neither can one past the year 9999, which after the clamping only a system
+/// clock that far off produces.
 fn http_date(modified: SystemTime) -> Option<HttpDate> {
     let modified = modified.min(SystemTime::now());
     let secs = modified.duration_since(UNIX_EPOCH).ok()?.as_secs();
     (secs < HTTP_DATE_END_SECS).then(|| HttpDate::from(modified))
 }
 
-/// Returns whether the request's `If-Modified-Since` header names a time no
-/// earlier than the file's `last_modified`.
+/// Returns whether the request's conditions say the client's copy of the file
+/// is current, so `304 Not Modified` answers it.
 ///
-/// A missing or malformed header never matches, so the file is sent. Neither
-/// does one accompanied by `If-None-Match`, which takes precedence and, as
-/// files carry no `ETag`, can never match either.
-fn is_unchanged_since(cx: &Cx, last_modified: HttpDate) -> bool {
+/// `If-None-Match` takes precedence over `If-Modified-Since`. Files carry no
+/// `ETag`, so only its `*` form, which matches any existing file, is met; a
+/// list of tags never is. Without it, `If-Modified-Since` is met by a time no
+/// earlier than the file's `last_modified`. A missing or malformed header is
+/// never met, so the file is sent.
+fn is_not_modified(cx: &Cx, last_modified: Option<HttpDate>) -> bool {
     let headers = headers(cx);
-    !headers.contains_key(IF_NONE_MATCH)
-        && headers
+    match (headers.get(IF_NONE_MATCH), last_modified) {
+        (Some(value), _) => value.as_bytes() == b"*",
+        (None, Some(last_modified)) => headers
             .get(IF_MODIFIED_SINCE)
             .and_then(|value| value.to_str().ok())
             .and_then(|value| value.parse::<HttpDate>().ok())
-            .is_some_and(|since| last_modified <= since)
+            .is_some_and(|since| last_modified <= since),
+        (None, None) => false,
+    }
 }
 
 /// Guesses a file's `Content-Type` from its extension, falling back to
@@ -585,6 +601,51 @@ mod tests {
     }
 
     #[test]
+    fn if_none_match_star_is_not_modified() {
+        let dir = temp_dir("if-none-match-star");
+        populate(&dir);
+        let router = router("/public/{*file}", &dir);
+        for method in [Method::GET, Method::HEAD] {
+            let (status, headers, body) = send(
+                &router,
+                method,
+                "/public/index.html",
+                &[(IF_NONE_MATCH, "*")],
+            );
+            assert_eq!(status, StatusCode::NOT_MODIFIED);
+            assert!(headers.contains_key(LAST_MODIFIED));
+            assert!(!headers.contains_key(CONTENT_TYPE));
+            assert!(body.is_empty());
+        }
+        let (status, _, _) = send(
+            &router,
+            Method::GET,
+            "/public/missing.html",
+            &[(IF_NONE_MATCH, "*")],
+        );
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn if_none_match_star_needs_no_last_modified() {
+        let dir = temp_dir("if-none-match-star-ancient");
+        populate(&dir);
+        set_modified(
+            &dir.join("index.html"),
+            UNIX_EPOCH - Duration::from_hours(24),
+        );
+        let router = router("/public/{*file}", &dir);
+        let (status, headers, _) = send(
+            &router,
+            Method::GET,
+            "/public/index.html",
+            &[(IF_NONE_MATCH, "*")],
+        );
+        assert_eq!(status, StatusCode::NOT_MODIFIED);
+        assert!(!headers.contains_key(LAST_MODIFIED));
+    }
+
+    #[test]
     fn if_none_match_takes_precedence_over_if_modified_since() {
         let dir = temp_dir("if-none-match");
         populate(&dir);
@@ -674,10 +735,21 @@ mod tests {
             .unwrap();
         assert!(status.success());
         let router = router("/public/{*file}", &dir);
-        // Opening the pipe would block until a writer connects, so this only
-        // completes if the route rejects it without opening it.
-        let (status, _, _) = get(&router, "/public/pipe");
-        assert_eq!(status, StatusCode::NOT_FOUND);
+        // Opening the pipe would block until a writer connects, so the route
+        // has to reject it without opening it. The blocked open would also
+        // keep the runtime from shutting down, so it is not waited for.
+        let request = Request::get("/public/pipe").body(Body::empty()).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let response = runtime.block_on(tokio::time::timeout(
+            Duration::from_secs(5),
+            router.handle(request),
+        ));
+        runtime.shutdown_background();
+        let response = response.expect("the request blocked on opening the pipe");
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 
     #[test]
