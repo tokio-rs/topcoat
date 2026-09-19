@@ -109,18 +109,18 @@ async fn dashboard(cx: &Cx) -> Result<impl View> {
 
 The rewritten dispatch keeps the request's method and headers and reads `body` as its request body; the path may carry a query string. Everything else starts over: the response built so far is discarded along with the request context, so per-request state like memoized values or response cookies staged by the abandoned dispatch does not leak into the new one. Layers run again too, including pathless ones.
 
-The returned [`RewriteError`] has more configuration options. [`method`](RewriteError::method) dispatches the rewritten request with a different HTTP method than the one it arrived with. [`cx`](RewriteError::cx) sets the request context the rewritten dispatch starts from, and every later dispatch in the same chain; a handler uses it to hand values on to the target, since a dispatch otherwise starts from an empty context. A form handler can combine both to re-run the page it was posted from as a `GET` with a value telling the page what happened:
+The returned [`RewriteError`] has more configuration options. [`method`](RewriteError::method) dispatches the rewritten request with a different HTTP method than the one it arrived with. [`with`](RewriteError::with) carries a value into the next dispatch and every later dispatch in the same chain, where it is available through [`request_context`](topcoat_core::context::request_context). Each dispatch still gets a fresh context and memoization cache. Calling `with` again, or on a later rewrite, replaces a carried value of the same type while keeping the other carried values. A form handler can combine both options to render its page as a `GET` with a value telling the page what happened:
 
 ```rust
 use topcoat::{Result, context::{Cx, try_request_context}, router::{Body, Method, error::rewrite, page, route}, view::{View, view}};
 
 struct Saved;
 
-#[route(POST "/settings")]
-async fn save_settings(cx: &Cx) -> Result<()> {
+#[route(POST "/settings/save")]
+async fn save_settings() -> Result<()> {
     Err(rewrite("/settings", Body::empty())
         .method(Method::GET)
-        .cx(cx.with(Saved))
+        .with(Saved)
         .into())
 }
 
@@ -131,7 +131,7 @@ async fn settings(cx: &Cx) -> Result<impl View> {
         if saved {
             <p>"Settings saved."</p>
         }
-        <form method="post"></form>
+        <form method="post" action="/settings/save"></form>
     })
 }
 ```

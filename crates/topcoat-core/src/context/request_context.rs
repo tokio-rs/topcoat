@@ -156,8 +156,8 @@ impl RequestContext {
 /// Values that [`Cx::with_many`](crate::context::Cx::with_many) registers on a
 /// request context in one step.
 ///
-/// Implemented for tuples of context values, so several types can be
-/// registered without deriving a scope per value.
+/// Implemented for tuples of context values and [`RequestContext`], so
+/// several types can be registered without deriving a scope per value.
 pub trait ContextValues {
     /// Registers every value on `context`.
     fn install(self, context: &mut RequestContext);
