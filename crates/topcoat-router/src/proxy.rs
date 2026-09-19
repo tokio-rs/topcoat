@@ -5,6 +5,7 @@ use std::{
 
 use http::{HeaderMap, HeaderName, header};
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
+
 use crate::{RemoteAddr, request::Request};
 
 /// The client's address as resolved when the request arrived, stored on the

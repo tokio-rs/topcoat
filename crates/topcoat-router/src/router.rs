@@ -13,8 +13,8 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
-    RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
+    Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route,
+    RouteId, RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
     error::{REWRITE_LIMIT, RewriteError, RewriteLoopError, internal_server_response, respond},
     proxy::ClientIp,
     request::{OriginalParts, Request},
