@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-v0.8.1...topcoat-view-v0.9.0) - 2026-09-19
+
+### Added
+
+- *(router)* `client_ip(cx)` accessor and trusted proxies ([#425](https://github.com/tokio-rs/topcoat/pull/425))
+- *(ui)* sidebar component ([#419](https://github.com/tokio-rs/topcoat/pull/419))
+- *(runtime)* better reactivity support for (Topcoat-) UI components ([#418](https://github.com/tokio-rs/topcoat/pull/418))
+- *(view)* [**breaking**] new way to specify identities (`#[key(...)]` and `cx.keyed(...)`) ([#410](https://github.com/tokio-rs/topcoat/pull/410))
+
 ## [0.8.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-v0.7.0...topcoat-view-v0.8.0) - 2026-09-09
 
 ### Added
