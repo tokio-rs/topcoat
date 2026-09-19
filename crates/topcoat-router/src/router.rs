@@ -6,12 +6,14 @@ use std::{
     task::Poll,
 };
 
-use topcoat_core::context::{
-    AppContext, ContextValues, Cx, RequestContext, try_request_context, with_identity,
+use http::request::Parts;
+use topcoat_core::{
+    context::{AppContext, ContextValues, Cx, RequestContext, try_request_context, with_identity},
+    error::Result,
 };
 
 use crate::{
-    Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
+    Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
     RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
     error::{REWRITE_LIMIT, RewriteError, RewriteLoopError, internal_server_response, respond},
     proxy::ClientIp,
@@ -85,74 +87,34 @@ impl Router {
     /// Handles one request inside the panic isolation boundary.
     async fn handle_inner(&self, request: Request) -> Response {
         let inner = &*self.inner;
+        // The client's address comes from the headers the request arrived
+        // with, which no rewrite changes, so it is resolved once.
+        let client_ip = ClientIp(inner.trusted_proxies.resolve(&request));
         let (mut parts, mut body) = request.into_parts();
-
-        // The paths this request has already been dispatched under, filled in
-        // only once a rewrite happens; a request served in one dispatch never
-        // touches it.
-        let mut visited: Vec<String> = Vec::new();
-        // The parts of the first dispatch, carried on every rewritten
-        // dispatch's context so its handler can read the request as the
-        // client sent it.
-        let mut original: Option<http::request::Parts> = None;
-        // Only values explicitly attached to a rewrite survive into later
-        // dispatches. Each dispatch gets fresh shared request state.
-        let mut carried = RequestContext::new();
-        // The client's address, resolved once as the request arrives and
-        // carried onto every dispatch after a rewrite.
-        let mut client_ip: Option<ClientIp> = None;
+        let original = OriginalParts(parts.clone());
+        let mut chain = RewriteChain::default();
 
         let (cx, result) = loop {
-            let cx = Cx::new(Arc::clone(&inner.app_context)).with_many(carried.clone());
-            // Every dispatch gets its own slot for deferred response headers,
-            // so a rewrite drops whatever the discarded dispatch queued.
-            let cx = cx.with_many((
-                Arc::clone(&self.inner),
-                ResponseHeaders::new(),
-                RawPathParams::default(),
-            ));
-            let cx = match &original {
-                Some(parts) => cx.with(OriginalParts(parts.clone())),
-                None => cx,
-            };
-            // Matched routes run their own layers. Unmatched requests resolve
-            // to a 404 or 405 through only the layers without a path.
-            let (next, cx) = match inner.endpoints.at(parts.uri.path()) {
-                Some((endpoint_index, endpoint, params)) => {
-                    let path_params = RawPathParams::from_match(
-                        endpoint.path(),
-                        params.iter().map(|(_, value)| value),
-                    );
-                    let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
-                    let next = match route_index {
-                        Some(index) => Next::new(&[], Terminal::Route(&inner.routes[index])),
-                        None => {
-                            Next::new(&inner.always_layers, Terminal::MethodNotAllowed(endpoint))
-                        }
-                    };
-                    let matched = Matched {
-                        endpoint: endpoint_index,
-                        route: route_index,
-                    };
-                    (next, cx.with_many((matched, path_params, parts)))
-                }
-                None => (
-                    Next::new(&inner.always_layers, Terminal::NotFound),
-                    cx.with(parts),
-                ),
-            };
-            let client_ip =
-                *client_ip.get_or_insert_with(|| ClientIp(inner.trusted_proxies.resolve(&cx)));
-            let cx = cx.with(client_ip);
-
+            // Every dispatch starts from a fresh context, so a rewrite drops
+            // whatever the discarded dispatch registered or queued. Only the
+            // values carried by rewrites come along, and the router's own
+            // values are installed after them so they take precedence.
+            let cx = Cx::new(Arc::clone(&inner.app_context))
+                .with_many(chain.context.clone())
+                .with_many((
+                    Arc::clone(&self.inner),
+                    ResponseHeaders::new(),
+                    RawPathParams::default(),
+                    original.clone(),
+                    client_ip,
+                    parts,
+                ));
             let cx = match crate::request::initial_identity(&cx) {
                 Ok(identity) => with_identity(cx, identity),
                 Err(error) => break (cx, Err(error)),
             };
 
-            // The origin layer wraps the whole chain, denying untrusted
-            // cross-origin requests before anything else runs.
-            let result = inner.origin.handle(&cx, body, next).await;
+            let (cx, result) = self.dispatch(cx, body).await;
 
             // A rewrite bubbling out of the chain discards this dispatch,
             // response and request context both, and goes around again with
@@ -164,37 +126,10 @@ impl Router {
                     Err(failed) => break (cx, Err(failed.into_error())),
                 },
             };
-            let rewrite = rewrite.into_parts();
-            let target = rewrite.path_and_query;
-
-            let previous = try_request_context::<http::request::Parts>(&cx)
-                .expect("a dispatched request carries its parts");
-            visited.push(dispatched_path(&previous.uri));
-            if visited.iter().any(|path| path == target.as_str()) {
-                let error = RewriteLoopError::cycle(&visited, target.as_str());
-                break (cx, Err(error.into()));
-            }
-            if visited.len() > REWRITE_LIMIT {
-                let error = RewriteLoopError::limit(&visited, target.as_str());
-                break (cx, Err(error.into()));
-            }
-
-            // The next dispatch keeps the headers, and the method unless the
-            // rewrite changes it, swapping the path and query into the URI.
-            let mut next_parts = previous.clone();
-            if original.is_none() {
-                original = Some(previous.clone());
-            }
-            let mut uri_parts = std::mem::take(&mut next_parts.uri).into_parts();
-            uri_parts.path_and_query = Some(target);
-            next_parts.uri = http::Uri::from_parts(uri_parts)
-                .expect("replacing the path of a valid request uri keeps it valid");
-            if let Some(method) = rewrite.method {
-                next_parts.method = method;
-            }
-            rewrite.context.install(&mut carried);
-            parts = next_parts;
-            body = rewrite.body;
+            (parts, body) = match chain.follow(crate::request::parts(&cx), rewrite) {
+                Ok(request) => request.into_parts(),
+                Err(error) => break (cx, Err(error)),
+            };
         };
         let mut response = respond(&cx, result);
         response_headers(&cx).apply(response.headers_mut());
@@ -203,12 +138,41 @@ impl Router {
         // bodies. The negotiation reads the request headers as the layers
         // left them.
         #[cfg(feature = "compression")]
-        let response = match try_request_context::<http::request::Parts>(&cx) {
-            Some(parts) => inner.compression.compress(&parts.headers, response).await,
-            None => response,
-        };
+        let response = inner
+            .compression
+            .compress(crate::request::headers(&cx), response)
+            .await;
 
         response
+    }
+
+    /// Matches and runs one dispatch, retaining its context for the response.
+    async fn dispatch(&self, cx: Cx, body: Body) -> (Cx, Result<Response>) {
+        let inner = &*self.inner;
+        let parts = crate::request::parts(&cx);
+        let (cx, next) = match inner.endpoints.at(parts.uri.path()) {
+            Some((endpoint_index, endpoint, params)) => {
+                let path_params = RawPathParams::from_match(
+                    endpoint.path(),
+                    params.iter().map(|(_, value)| value),
+                );
+                let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
+                let next = match route_index {
+                    Some(index) => Next::new(&[], Terminal::Route(&inner.routes[index])),
+                    None => Next::new(&inner.always_layers, Terminal::MethodNotAllowed(endpoint)),
+                };
+                let matched = Matched {
+                    endpoint: endpoint_index,
+                    route: route_index,
+                };
+                (cx.with_many((matched, path_params)), next)
+            }
+            None => (cx, Next::new(&inner.always_layers, Terminal::NotFound)),
+        };
+
+        // The origin check precedes all route and pathless layers.
+        let result = inner.origin.handle(&cx, body, next).await;
+        (cx, result)
     }
 }
 
@@ -239,12 +203,53 @@ pub(crate) struct RouterInner {
     pub(crate) compression: crate::Compression,
 }
 
-/// The path and query a request was dispatched under, as recorded in a
-/// rewrite chain.
-fn dispatched_path(uri: &http::Uri) -> String {
-    uri.path_and_query()
-        .map_or(uri.path(), http::uri::PathAndQuery::as_str)
-        .to_owned()
+/// What a request remembers across the dispatches of a rewrite chain.
+///
+/// A request served in one dispatch leaves it empty. Each rewrite extends
+/// it, and every dispatch after a rewrite starts its context from the
+/// carried values.
+#[derive(Default)]
+struct RewriteChain {
+    /// The paths the request was dispatched under so far, in order.
+    visited: Vec<String>,
+    /// The values rewrites carried into the later dispatches.
+    context: RequestContext,
+}
+
+impl RewriteChain {
+    /// Records the dispatch with `previous` as the one `rewrite` came out of
+    /// and builds the request for the next dispatch, which keeps the headers,
+    /// and the method unless the rewrite changes it, under the rewritten path
+    /// and query.
+    ///
+    /// Fails when the request was already dispatched under the rewritten
+    /// path or the chain grew past the rewrite limit.
+    fn follow(&mut self, previous: &Parts, rewrite: RewriteError) -> Result<Request> {
+        let rewrite = rewrite.into_parts();
+        let target = rewrite.path_and_query;
+        let uri = &previous.uri;
+        let path = uri
+            .path_and_query()
+            .map_or(uri.path(), http::uri::PathAndQuery::as_str);
+        self.visited.push(path.to_owned());
+        if self.visited.iter().any(|path| path == target.as_str()) {
+            return Err(RewriteLoopError::cycle(&self.visited, target.as_str()).into());
+        }
+        if self.visited.len() > REWRITE_LIMIT {
+            return Err(RewriteLoopError::limit(&self.visited, target.as_str()).into());
+        }
+
+        let mut parts = previous.clone();
+        let mut uri = std::mem::take(&mut parts.uri).into_parts();
+        uri.path_and_query = Some(target);
+        parts.uri = http::Uri::from_parts(uri)
+            .expect("replacing the path of a valid request uri keeps it valid");
+        if let Some(method) = rewrite.method {
+            parts.method = method;
+        }
+        rewrite.context.install(&mut self.context);
+        Ok(Request::from_parts(parts, rewrite.body))
+    }
 }
 
 /// What a request was dispatched to, stored on its context.

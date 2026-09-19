@@ -5,9 +5,7 @@ use std::{
 
 use http::{HeaderMap, HeaderName, header};
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
-use topcoat_core::context::Cx;
-
-use crate::request::{headers, remote_addr};
+use crate::{RemoteAddr, request::Request};
 
 /// The client's address as resolved when the request arrived, stored on the
 /// request context of every dispatch.
@@ -154,10 +152,14 @@ impl TrustedProxies {
         self
     }
 
-    /// Resolves the client address of the request on `cx`.
-    pub(crate) fn resolve(&self, cx: &Cx) -> Option<IpAddr> {
-        let remote = remote_addr(cx).map(|addr| addr.ip());
-        self.client_ip(remote, headers(cx))
+    /// Resolves the client address of `request` from the connection it
+    /// arrived on and the forwarding headers it carries.
+    pub(crate) fn resolve(&self, request: &Request) -> Option<IpAddr> {
+        let remote = request
+            .extensions()
+            .get::<RemoteAddr>()
+            .map(|remote| remote.0.ip());
+        self.client_ip(remote, request.headers())
     }
 
     /// Resolves the client address of a request that arrived from `remote`
