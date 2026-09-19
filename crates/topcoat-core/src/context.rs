@@ -132,7 +132,7 @@ impl Cx {
     }
 
     /// Returns a child handle whose request context also holds every value in
-    /// `values`, a tuple of context values.
+    /// `values`, a tuple of context values or a [`RequestContext`].
     ///
     /// Behaves like chained [`with`](Self::with) calls, but builds the child's
     /// request context in one step.

@@ -163,6 +163,12 @@ pub trait ContextValues {
     fn install(self, context: &mut RequestContext);
 }
 
+impl ContextValues for RequestContext {
+    fn install(self, context: &mut RequestContext) {
+        context.entries.extend(self.entries);
+    }
+}
+
 macro_rules! impl_context_values {
     ($($value:ident: $type:ident),+) => {
         impl<$($type),+> ContextValues for ($($type,)+)

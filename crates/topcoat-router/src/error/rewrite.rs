@@ -1,7 +1,7 @@
-use std::sync::Mutex;
+use std::{any::Any, sync::Mutex};
 
 use http::{Method, uri::PathAndQuery};
-use topcoat_core::context::Cx;
+use topcoat_core::context::RequestContext;
 
 use crate::Body;
 
@@ -25,7 +25,7 @@ pub(crate) const REWRITE_LIMIT: usize = 8;
 /// The returned [`RewriteError`] has options for the rare cases where the
 /// rewritten dispatch should differ from the request in more than its path
 /// and body: another [`method`](RewriteError::method), or values carried on
-/// its [request context](RewriteError::cx).
+/// its [request context](RewriteError::with).
 ///
 /// # Panics
 ///
@@ -58,7 +58,7 @@ pub fn rewrite(path: impl AsRef<str>, body: impl Into<Body>) -> RewriteError {
             .expect("rewrite path is not a valid uri path and query"),
         body: Mutex::new(body.into()),
         method: None,
-        cx: None,
+        context: RequestContext::new(),
     }
 }
 
@@ -74,7 +74,7 @@ pub struct RewriteError {
     /// an [`Error`](topcoat_core::error::Error).
     body: Mutex<Body>,
     method: Option<Method>,
-    cx: Option<Cx>,
+    context: RequestContext,
 }
 
 impl RewriteError {
@@ -86,18 +86,21 @@ impl RewriteError {
         self
     }
 
-    /// Carries the request context values of `cx` into the rewritten
-    /// dispatch, and every dispatch after it in the same chain.
+    /// Carries `value` into the rewritten dispatch and every dispatch after
+    /// it in the same chain, available through
+    /// [`request_context`](topcoat_core::context::request_context).
     ///
-    /// A dispatch normally starts from an empty request context. With this
-    /// option it starts from the values on `cx`, so a handler can hand
-    /// values it computed to the handler at the target, typically through
-    /// [`Cx::with`]. The values the router installs for a dispatch, such as
-    /// the request parts and the path parameters, shadow any of the same
-    /// type carried over.
+    /// Each dispatch starts with a fresh context and memoization cache.
+    /// Only explicitly carried values survive a rewrite. Calling this
+    /// again, or on a later rewrite, replaces a carried value of the same
+    /// type. Values installed by the router, such as the request parts and
+    /// path parameters, take precedence over carried values.
     #[must_use]
-    pub fn cx(mut self, cx: Cx) -> Self {
-        self.cx = Some(cx);
+    pub fn with<T>(mut self, value: T) -> Self
+    where
+        T: Any + Send + Sync,
+    {
+        self.context.insert(value);
         self
     }
 
@@ -111,7 +114,7 @@ impl RewriteError {
             path_and_query: self.path_and_query,
             body,
             method: self.method,
-            cx: self.cx,
+            context: self.context,
         }
     }
 }
@@ -122,7 +125,7 @@ pub(crate) struct RewriteParts {
     pub(crate) path_and_query: PathAndQuery,
     pub(crate) body: Body,
     pub(crate) method: Option<Method>,
-    pub(crate) cx: Option<Cx>,
+    pub(crate) context: RequestContext,
 }
 
 impl std::fmt::Display for RewriteError {

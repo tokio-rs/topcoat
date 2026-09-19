@@ -88,7 +88,7 @@ impl Route for PageRerunRoute {
 
             Err(rewrite(target, Body::empty())
                 .method(Method::GET)
-                .cx(cx.with(request.signals))
+                .with(request.signals)
                 .into())
         })
     }

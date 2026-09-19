@@ -6,7 +6,9 @@ use std::{
     task::Poll,
 };
 
-use topcoat_core::context::{AppContext, Cx, try_request_context, with_identity};
+use topcoat_core::context::{
+    AppContext, ContextValues, Cx, RequestContext, try_request_context, with_identity,
+};
 
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
@@ -93,21 +95,22 @@ impl Router {
         // dispatch's context so its handler can read the request as the
         // client sent it.
         let mut original: Option<http::request::Parts> = None;
-        // The context a rewrite handed over for the dispatches after it, if
-        // any; a dispatch otherwise starts from an empty request context.
-        let mut base: Option<Cx> = None;
+        // Only values explicitly attached to a rewrite survive into later
+        // dispatches. Each dispatch gets fresh shared request state.
+        let mut carried = RequestContext::new();
         // The client's address, resolved once as the request arrives and
         // carried onto every dispatch after a rewrite.
         let mut client_ip: Option<ClientIp> = None;
 
         let (cx, result) = loop {
-            let cx = match &base {
-                Some(base) => base.clone(),
-                None => Cx::new(Arc::clone(&inner.app_context)),
-            };
+            let cx = Cx::new(Arc::clone(&inner.app_context)).with_many(carried.clone());
             // Every dispatch gets its own slot for deferred response headers,
             // so a rewrite drops whatever the discarded dispatch queued.
-            let cx = cx.with_many((Arc::clone(&self.inner), ResponseHeaders::new()));
+            let cx = cx.with_many((
+                Arc::clone(&self.inner),
+                ResponseHeaders::new(),
+                RawPathParams::default(),
+            ));
             let cx = match &original {
                 Some(parts) => cx.with(OriginalParts(parts.clone())),
                 None => cx,
@@ -142,13 +145,9 @@ impl Router {
                 *client_ip.get_or_insert_with(|| ClientIp(inner.trusted_proxies.resolve(&cx)));
             let cx = cx.with(client_ip);
 
-            let cx = if base.is_none() {
-                match crate::request::initial_identity(&cx) {
-                    Ok(identity) => with_identity(cx, identity),
-                    Err(error) => break (cx, Err(error)),
-                }
-            } else {
-                cx
+            let cx = match crate::request::initial_identity(&cx) {
+                Ok(identity) => with_identity(cx, identity),
+                Err(error) => break (cx, Err(error)),
             };
 
             // The origin layer wraps the whole chain, denying untrusted
@@ -193,9 +192,7 @@ impl Router {
             if let Some(method) = rewrite.method {
                 next_parts.method = method;
             }
-            if let Some(cx) = rewrite.cx {
-                base = Some(cx);
-            }
+            rewrite.context.install(&mut carried);
             parts = next_parts;
             body = rewrite.body;
         };
@@ -802,16 +799,16 @@ mod tests {
     /// A value a rewrite hands to the handler at its target.
     struct Carried(&'static str);
 
-    /// Rewrites to `/carried`, handing over a context carrying a value.
-    fn rewrite_with_cx(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+    /// Rewrites to `/carried`, handing over a value.
+    fn rewrite_with_value(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
             Err(rewrite("/carried", Body::empty())
-                .cx(cx.with(Carried("handed over")))
+                .with(Carried("handed over"))
                 .into())
         })
     }
 
-    /// Rewrites on to `/carried-again` without a context of its own.
+    /// Rewrites on to `/carried-again` without carrying another value.
     fn rewrite_onward(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { Err(rewrite("/carried-again", Body::empty()).into()) })
     }
@@ -912,9 +909,9 @@ mod tests {
     }
 
     #[test]
-    fn a_rewrite_carries_its_context_through_the_rest_of_the_chain() {
+    fn a_rewrite_carries_its_values_through_the_rest_of_the_chain() {
         let router = RouterBuilder::new()
-            .route(RouteFn::new(Method::GET, path("/old"), rewrite_with_cx))
+            .route(RouteFn::new(Method::GET, path("/old"), rewrite_with_value))
             .route(RouteFn::new(Method::GET, path("/carried"), rewrite_onward))
             .route(RouteFn::new(
                 Method::GET,
@@ -932,6 +929,87 @@ mod tests {
         // starts from an empty context.
         let (_, _, body) = send(&router, Method::GET, "/carried-again");
         assert_eq!(&body[..], b"none");
+    }
+
+    #[test]
+    fn later_rewrites_replace_values_of_the_same_type_and_keep_other_values() {
+        fn start(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async {
+                Err(rewrite("/replace", Body::empty())
+                    .with(Carried("superseded"))
+                    .with(Carried("first"))
+                    .with(42u32)
+                    .into())
+            })
+        }
+
+        fn replace(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async move {
+                assert_eq!(request_context::<Carried>(cx).0, "first");
+                Err(rewrite("/inspect", Body::empty())
+                    .with(Carried("second"))
+                    .into())
+            })
+        }
+
+        fn inspect(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async move {
+                assert_eq!(*request_context::<u32>(cx), 42);
+                request_context::<Carried>(cx).0.into_response(cx)
+            })
+        }
+
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/start"), start))
+            .route(RouteFn::new(Method::GET, path("/replace"), replace))
+            .route(RouteFn::new(Method::GET, path("/inspect"), inspect))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/start");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"second");
+    }
+
+    #[test]
+    fn carrying_values_does_not_carry_dispatch_state() {
+        use topcoat_core::context::{CxId, identity, memoize_cache};
+
+        fn cached_id(cx: &Cx) -> CxId {
+            *memoize_cache(cx).memoize(cx, (), (), |cx, ()| cx.id())
+        }
+
+        fn start(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async move {
+                let cx = cx.with(Carried("local")).keyed("local");
+                response_headers(&cx).append(
+                    http::HeaderName::from_static("x-abandoned"),
+                    http::HeaderValue::from_static("yes"),
+                );
+                Err(rewrite("/inspect", Body::empty())
+                    .with(cached_id(&cx))
+                    .into())
+            })
+        }
+
+        fn inspect(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async move {
+                assert_ne!(*request_context::<CxId>(cx), cx.id());
+                assert_eq!(cached_id(cx), cx.id());
+                assert!(try_request_context::<Carried>(cx).is_none());
+                assert_eq!(identity(cx), crate::request::initial_identity(cx)?);
+                "fresh".into_response(cx)
+            })
+        }
+
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/start"), start))
+            .route(RouteFn::new(Method::GET, path("/inspect"), inspect))
+            .build();
+
+        let (status, headers, body) = send(&router, Method::GET, "/start");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"fresh");
+        assert!(!headers.contains_key("x-abandoned"));
     }
 
     #[test]
