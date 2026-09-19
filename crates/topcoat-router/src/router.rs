@@ -101,10 +101,6 @@ impl Router {
         let mut client_ip: Option<ClientIp> = None;
 
         let (cx, result) = loop {
-            // The chain's terminal and the layer stack wrapping it: a matched
-            // route carries its own precomputed stack, while a request that
-            // matched no route resolves to a 404 or 405 through the layers
-            // without a path, which wrap every request.
             let cx = match &base {
                 Some(base) => base.clone(),
                 None => Cx::new(Arc::clone(&inner.app_context)),
@@ -116,31 +112,31 @@ impl Router {
                 Some(parts) => cx.with(OriginalParts(parts.clone())),
                 None => cx,
             };
-            let (terminal, layer_stack, cx) = match inner.endpoints.at(parts.uri.path()) {
+            // Matched routes run their own layers. Unmatched requests resolve
+            // to a 404 or 405 through only the layers without a path.
+            let (next, cx) = match inner.endpoints.at(parts.uri.path()) {
                 Some((endpoint_index, endpoint, params)) => {
                     let path_params = RawPathParams::from_match(
                         endpoint.path(),
                         params.iter().map(|(_, value)| value),
                     );
                     let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
-                    let (terminal, layer_stack) = match route_index {
-                        Some(index) => {
-                            let registered = &inner.routes[index];
-                            (Terminal::Route(&*registered.route), &*registered.layers)
+                    let next = match route_index {
+                        Some(index) => Next::new(&[], Terminal::Route(&inner.routes[index])),
+                        None => {
+                            Next::new(&inner.always_layers, Terminal::MethodNotAllowed(endpoint))
                         }
-                        None => (Terminal::MethodNotAllowed(endpoint), &*inner.always_layers),
                     };
                     let matched = Matched {
                         endpoint: endpoint_index,
                         route: route_index,
                     };
-                    (
-                        terminal,
-                        layer_stack,
-                        cx.with_many((matched, path_params, parts)),
-                    )
+                    (next, cx.with_many((matched, path_params, parts)))
                 }
-                None => (Terminal::NotFound, &*inner.always_layers, cx.with(parts)),
+                None => (
+                    Next::new(&inner.always_layers, Terminal::NotFound),
+                    cx.with(parts),
+                ),
             };
             let client_ip =
                 *client_ip.get_or_insert_with(|| ClientIp(inner.trusted_proxies.resolve(&cx)));
@@ -157,7 +153,6 @@ impl Router {
 
             // The origin layer wraps the whole chain, denying untrusted
             // cross-origin requests before anything else runs.
-            let next = Next::new(layer_stack, terminal);
             let result = inner.origin.handle(&cx, body, next).await;
 
             // A rewrite bubbling out of the chain discards this dispatch,
@@ -333,7 +328,7 @@ pub fn route(cx: &Cx) -> &dyn Route {
 #[must_use]
 pub fn try_route(cx: &Cx) -> Option<&dyn Route> {
     let (router, matched) = try_matched(cx)?;
-    Some(&*router.routes[matched.route?].route)
+    Some(&router.routes[matched.route?])
 }
 
 /// Returns the endpoint serving the route registered under `id` on the router
@@ -343,8 +338,8 @@ pub fn try_route(cx: &Cx) -> Option<&dyn Route> {
 #[must_use]
 pub fn route_endpoint(cx: &Cx, id: RouteId) -> Option<&Endpoint> {
     let router = try_request_context::<Arc<RouterInner>>(cx)?;
-    let index = router.routes.index_of(id)?;
-    Some(&router.endpoints[router.routes[index].endpoint])
+    let index = router.routes.endpoint(id)?;
+    Some(&router.endpoints[index])
 }
 
 /// Builds the request context of a request matched to an endpoint at `path`,

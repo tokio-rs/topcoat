@@ -461,7 +461,7 @@ impl RouterBuilder {
                 });
 
             let route_index = routes.push(route, endpoint_index, layer_stack);
-            let route = &routes[route_index].route;
+            let route = &routes[route_index];
             let endpoint = &mut endpoints[endpoint_index];
 
             // An any-method route shares its path with specific-method routes
