@@ -91,7 +91,7 @@ impl Router {
         // with, which no rewrite changes, so it is resolved once.
         let client_ip = ClientIp(inner.trusted_proxies.resolve(&request));
         let (mut parts, mut body) = request.into_parts();
-        let original = OriginalParts(parts.clone());
+        let original = OriginalParts(Arc::new(parts.clone()));
         let mut chain = RewriteChain::default();
 
         let (cx, result) = loop {
@@ -1052,6 +1052,18 @@ mod tests {
 
         let (_, _, body) = send(&router, Method::GET, "/new?q=2");
         assert_eq!(&body[..], b"/new?q=2 /new?q=2");
+    }
+
+    #[test]
+    fn stripping_a_prefix_keeps_the_original_uri_without_a_rewrite() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/res/{*file}"), echo_uris))
+            .layer(crate::StripPrefixLayer::new("/res"))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/res/logo.svg?v=2");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"/logo.svg?v=2 /res/logo.svg?v=2");
     }
 
     #[test]

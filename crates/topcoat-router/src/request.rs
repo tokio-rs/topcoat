@@ -1,4 +1,7 @@
-use std::net::{IpAddr, SocketAddr};
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 
 /// Byte-buffer types re-exported for use as request body extractors and as
 /// response bodies.
@@ -371,18 +374,19 @@ pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
     try_request_context::<ClientIp>(cx)?.0
 }
 
-/// The parts a rewritten request originally arrived with, stored on the
-/// request context of every dispatch reached through a rewrite.
+/// The parts the request arrived with, shared by every dispatch.
 #[derive(Debug, Clone)]
-pub(crate) struct OriginalParts(pub(crate) Parts);
+pub(crate) struct OriginalParts(pub(crate) Arc<Parts>);
 
 /// Returns the [`Parts`] of the request as the client sent it, before any
-/// rewrite.
+/// rewrite or changes made by layers.
 ///
 /// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
 /// rewritten request in [`parts`], which may differ in its URI and method;
-/// this accessor returns the parts the request arrived with. For a request
-/// that was never rewritten the two are the same.
+/// this accessor returns the parts the request arrived with. Layers can
+/// also change the current parts without a rewrite. For example,
+/// [`StripPrefixLayer`](crate::StripPrefixLayer) changes the current URI
+/// while leaving the original URI intact.
 ///
 /// # Examples
 ///
@@ -433,7 +437,8 @@ pub fn original_method(cx: &Cx) -> &http::Method {
 /// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
 /// rewritten URI in [`uri`]; this accessor returns the URI the request
 /// arrived with, for example to render a form that posts back to the visible
-/// URL. For a request that was never rewritten the two are the same.
+/// URL. Layers such as [`StripPrefixLayer`](crate::StripPrefixLayer) can
+/// also change the current URI without changing this original URI.
 ///
 /// [`Uri`]: http::Uri
 ///
