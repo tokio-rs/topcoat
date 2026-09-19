@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-v0.8.1...topcoat-core-v0.9.0) - 2026-09-19
+
+### Added
+
+- *(cli)* stateful hot reload ([#421](https://github.com/tokio-rs/topcoat/pull/421))
+- *(view)* [**breaking**] new way to specify identities (`#[key(...)]` and `cx.keyed(...)`) ([#410](https://github.com/tokio-rs/topcoat/pull/410))
+- *(core)* [**breaking**] make Error cheap to clone ([#396](https://github.com/tokio-rs/topcoat/pull/396))
+
+### Other
+
+- *(router)* `RouteWithLayers`, `handle_inner` ([#426](https://github.com/tokio-rs/topcoat/pull/426))
+
 ## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-v0.6.2...topcoat-core-v0.7.0) - 2026-09-04
 
 ### Added
